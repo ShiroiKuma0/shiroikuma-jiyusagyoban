@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.15 — 2026-05-04
+
+External automation target baseline.
+
+- Added a permission-scoped exported receiver for documented external automation intents.
+- Added external actions to run tasks, enable/disable profiles, query automation status, and pass task variables.
+- Persisted external task runs to the Room run log with action trace summaries.
+- Added manifest permission strings and security documentation for external callers.
+- Added unit coverage for external variable-name validation and documented variable extra names.
+
 ## v0.2.14 — 2026-05-04
 
 Locale plugin host baseline.
