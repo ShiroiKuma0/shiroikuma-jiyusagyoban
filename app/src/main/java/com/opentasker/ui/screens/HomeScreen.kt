@@ -8,9 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.opentasker.ui.theme.ComponentSize
-import com.opentasker.ui.theme.Radii
-import com.opentasker.ui.theme.Spacing
+import com.opentasker.ui.theme.DesignSystem
 
 /**
  * Home screen providing navigation to main app sections.
