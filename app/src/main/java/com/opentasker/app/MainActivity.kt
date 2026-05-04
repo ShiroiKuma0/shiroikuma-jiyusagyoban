@@ -46,6 +46,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             onViewRunLog = { currentScreen = Screen.RunLog },
+                            onBatchOperations = { currentScreen = Screen.BatchOperations },
                         )
                     }
                     is Screen.ProfileEditor -> {
@@ -136,6 +137,12 @@ class MainActivity : ComponentActivity() {
                             onBack = { currentScreen = Screen.ProfileList },
                         )
                     }
+                    is Screen.BatchOperations -> {
+                        BatchOperationsScreen(
+                            db = db,
+                            onBack = { currentScreen = Screen.ProfileList },
+                        )
+                    }
                 }
             }
         }
@@ -144,6 +151,7 @@ class MainActivity : ComponentActivity() {
 
 sealed class Screen {
     data object ProfileList : Screen()
+    data object BatchOperations : Screen()
     data class ProfileEditor(val profile: Profile?) : Screen()
     data class TaskEditor(val task: Task?) : Screen()
     data object ActionPicker : Screen()
