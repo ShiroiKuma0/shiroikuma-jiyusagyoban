@@ -1,10 +1,12 @@
 package com.opentasker.app
 
 import android.app.Application
+import android.content.Intent
 import androidx.room.Room
 import com.opentasker.core.actions.*
 import com.opentasker.core.contexts.*
 import com.opentasker.core.engine.ActionRegistry
+import com.opentasker.core.engine.AutomationService
 import com.opentasker.core.storage.AppDatabase
 
 class OpenTaskerApp : Application() {
@@ -25,6 +27,9 @@ class OpenTaskerApp : Application() {
         
         // Register all context sources
         registerContextSources()
+        
+        // Start the automation engine service
+        startService(Intent(this, AutomationService::class.java))
     }
 
     private fun registerActions() {

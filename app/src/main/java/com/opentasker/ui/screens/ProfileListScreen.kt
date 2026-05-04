@@ -70,6 +70,7 @@ fun ProfileListScreen(
     onCreateProfile: () -> Unit,
     onEditProfile: (Profile) -> Unit,
     onDeleteProfile: (Profile) -> Unit,
+    onViewRunLog: () -> Unit,
 ) {
     val viewModel: ProfileListViewModel = viewModel(
         factory = ProfileListViewModelFactory(db)
@@ -81,6 +82,11 @@ fun ProfileListScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Profiles") },
+                actions = {
+                    Button(onClick = onViewRunLog) {
+                        Text("Run Log")
+                    }
+                }
             )
         },
         floatingActionButton = {

@@ -17,6 +17,7 @@ import com.opentasker.ui.screens.ActionPickerScreen
 import com.opentasker.ui.screens.ContextPickerScreen
 import com.opentasker.ui.screens.ProfileEditorScreen
 import com.opentasker.ui.screens.ProfileListScreen
+import com.opentasker.ui.screens.RunLogScreen
 import com.opentasker.ui.screens.TaskEditorScreen
 import com.opentasker.ui.theme.OpenTaskerTheme
 import kotlinx.coroutines.launch
@@ -44,6 +45,7 @@ class MainActivity : ComponentActivity() {
                                     db.profileDao().delete(profile.toEntity())
                                 }
                             },
+                            onViewRunLog = { currentScreen = Screen.RunLog },
                         )
                     }
                     is Screen.ProfileEditor -> {
@@ -128,6 +130,12 @@ class MainActivity : ComponentActivity() {
                             onCancel = { currentScreen = Screen.ProfileEditor(currentEditingProfile) },
                         )
                     }
+                    is Screen.RunLog -> {
+                        RunLogScreen(
+                            db = db,
+                            onBack = { currentScreen = Screen.ProfileList },
+                        )
+                    }
                 }
             }
         }
@@ -141,4 +149,5 @@ sealed class Screen {
     data object ActionPicker : Screen()
     data class ActionEditor(val actionSpec: com.opentasker.core.model.ActionSpec) : Screen()
     data object ContextPicker : Screen()
+    data object RunLog : Screen()
 }
