@@ -2,9 +2,9 @@ package com.opentasker.automation.core
 
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionRegistry
-import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.automation.model.ActionConfig
+import com.opentasker.automation.model.ActionResult
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -31,7 +31,7 @@ class ActionExecutorImpl @Inject constructor() {
         actions: List<ActionConfig>,
         registry: ActionRegistry,
         parallel: Boolean = false
-    ): List<ActionExecutionResult> {
+    ): List<ActionResult> {
         return try {
             if (parallel) {
                 executeParallel(actions, registry)
@@ -41,10 +41,10 @@ class ActionExecutorImpl @Inject constructor() {
         } catch (e: Exception) {
             AppLogger.error(tag, "Error during action execution", e)
             listOf(
-                ActionExecutionResult(
+                ActionResult(
                     success = false,
-                    actionId = "",
-                    error = "Execution error: ${e.message}"
+                    message = "Execution error: ${e.message}",
+                    executionTimeMs = 0L
                 )
             )
         }
@@ -53,16 +53,17 @@ class ActionExecutorImpl @Inject constructor() {
     private suspend fun executeSequential(
         actions: List<ActionConfig>,
         registry: ActionRegistry
-    ): List<ActionExecutionResult> {
-        val results = mutableListOf<ActionExecutionResult>()
+    ): List<ActionResult> {
+        val results = mutableListOf<ActionResult>()
         for (action in actions) {
+            val startTime = System.currentTimeMillis()
             val result = executeOne(action, registry)
-            results.add(result)
+            results.add(result.copy(executionTimeMs = System.currentTimeMillis() - startTime))
             // Log each result
             if (result.success) {
                 AppLogger.debug(tag, "Action ${action.id} succeeded")
             } else {
-                AppLogger.warn(tag, "Action ${action.id} failed: ${result.error}")
+                AppLogger.warn(tag, "Action ${action.id} failed: ${result.message}")
             }
         }
         return results
@@ -71,7 +72,7 @@ class ActionExecutorImpl @Inject constructor() {
     private suspend fun executeParallel(
         actions: List<ActionConfig>,
         registry: ActionRegistry
-    ): List<ActionExecutionResult> {
+    ): List<ActionResult> {
         return coroutineScope {
             val jobs = actions.map { action ->
                 async { executeOne(action, registry) }
@@ -80,9 +81,9 @@ class ActionExecutorImpl @Inject constructor() {
             // Log results
             results.forEach { result ->
                 if (result.success) {
-                    AppLogger.debug(tag, "Action ${result.actionId} succeeded")
+                    AppLogger.debug(tag, "Action succeeded")
                 } else {
-                    AppLogger.warn(tag, "Action ${result.actionId} failed: ${result.error}")
+                    AppLogger.warn(tag, "Action failed: ${result.message}")
                 }
             }
             results
@@ -92,7 +93,8 @@ class ActionExecutorImpl @Inject constructor() {
     private suspend fun executeOne(
         actionConfig: ActionConfig,
         registry: ActionRegistry
-    ): ActionExecutionResult {
+    ): ActionResult {
+        val startTime = System.currentTimeMillis()
         return try {
             // Get the action from registry
             val action = registry.get(actionConfig.type)
@@ -101,10 +103,10 @@ class ActionExecutorImpl @Inject constructor() {
                     tag,
                     "Action type '${actionConfig.type}' not found in registry, skipping"
                 )
-                return ActionExecutionResult(
+                return ActionResult(
                     success = false,
-                    actionId = actionConfig.id,
-                    error = "Action type not found: ${actionConfig.type}"
+                    message = "Action type not found: ${actionConfig.type}",
+                    executionTimeMs = System.currentTimeMillis() - startTime
                 )
             }
             
@@ -115,27 +117,19 @@ class ActionExecutorImpl @Inject constructor() {
             
             // For now, log and return success
             AppLogger.debug(tag, "Executing action ${actionConfig.id} of type ${actionConfig.type}")
-            ActionExecutionResult(
+            ActionResult(
                 success = true,
-                actionId = actionConfig.id,
-                error = null
+                message = "Action executed successfully",
+                executionTimeMs = System.currentTimeMillis() - startTime
             )
         } catch (e: Exception) {
             AppLogger.error(tag, "Error executing action ${actionConfig.id}", e)
-            ActionExecutionResult(
+            ActionResult(
                 success = false,
-                actionId = actionConfig.id,
-                error = e.message ?: "Unknown error"
+                message = e.message ?: "Unknown error",
+                executionTimeMs = System.currentTimeMillis() - startTime,
+                stackTrace = e.stackTraceToString()
             )
         }
     }
 }
-
-/**
- * Result of executing a single action.
- */
-data class ActionExecutionResult(
-    val success: Boolean,
-    val actionId: String = "",
-    val error: String? = null
-)
