@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.opentasker.automation.model.TriggerConfig
+import com.opentasker.ui.theme.DesignSystem
 
 /**
  * Screen to pick and configure a trigger type.
@@ -35,12 +36,21 @@ fun TriggerPickerScreen(
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Select Trigger Type") },
+                    title = { 
+                        Text(
+                            "Select Trigger Type",
+                            style = MaterialTheme.typography.headlineMedium
+                        ) 
+                    },
                     navigationIcon = {
                         IconButton(onClick = onCancel) {
                             Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                         }
-                    }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
+                    )
                 )
             }
         ) { paddingValues ->
@@ -48,8 +58,8 @@ fun TriggerPickerScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(DesignSystem.Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)
             ) {
                 items(TRIGGER_TYPES) { trigger ->
                     TriggerTypeCard(
@@ -68,19 +78,18 @@ fun TriggerTypeCard(
     onClick: () -> Unit
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         ),
+        elevation = CardDefaults.cardElevation(defaultElevation = DesignSystem.Elevation.sm),
         onClick = onClick
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(DesignSystem.Spacing.lg),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -90,7 +99,7 @@ fun TriggerTypeCard(
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(DesignSystem.Spacing.sm))
                 Text(
                     text = trigger.description,
                     style = MaterialTheme.typography.bodySmall,
@@ -102,12 +111,13 @@ fun TriggerTypeCard(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = "Select ${trigger.name}",
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(DesignSystem.ComponentSize.iconMedium)
             )
         }
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun TriggerConfigurationScreen(
     triggerType: String,
@@ -117,16 +127,26 @@ fun TriggerConfigurationScreen(
     val triggerDef = TRIGGER_TYPES.find { it.id == triggerType }
     
     val config = remember { mutableStateMapOf<String, String>() }
+    var isSaving by remember { mutableStateOf(false) }
     
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Configure ${triggerDef?.name ?: "Trigger"}") },
+                title = { 
+                    Text(
+                        "Configure ${triggerDef?.name ?: "Trigger"}",
+                        style = MaterialTheme.typography.headlineMedium
+                    ) 
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                )
             )
         }
     ) { paddingValues ->
@@ -134,23 +154,24 @@ fun TriggerConfigurationScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(DesignSystem.Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)
         ) {
             if (triggerDef != null) {
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(DesignSystem.Radii.md),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                        )
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = DesignSystem.Elevation.sm)
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                .padding(DesignSystem.Spacing.lg),
+                            verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)
                         ) {
                             Text(
                                 text = triggerDef.name,
@@ -177,40 +198,45 @@ fun TriggerConfigurationScreen(
             }
             
             item {
+                Spacer(modifier = Modifier.height(DesignSystem.Spacing.xl))
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)
                 ) {
                     OutlinedButton(
                         onClick = onBack,
                         modifier = Modifier
                             .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(8.dp)
+                            .height(DesignSystem.ComponentSize.buttonLarge),
+                        shape = RoundedCornerShape(DesignSystem.Radii.md)
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(DesignSystem.ComponentSize.iconSmall))
+                        Spacer(modifier = Modifier.width(DesignSystem.Spacing.sm))
                         Text("Cancel")
                     }
                     
                     Button(
                         onClick = {
-                            onSave(
-                                TriggerConfig(
-                                    id = triggerType,
-                                    config = config.toMap()
+                            isSaving = true
+                            try {
+                                onSave(
+                                    TriggerConfig(
+                                        id = triggerType,
+                                        config = config.toMap()
+                                    )
                                 )
-                            )
+                            } finally {
+                                isSaving = false
+                            }
                         },
                         modifier = Modifier
                             .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(8.dp)
+                            .height(DesignSystem.ComponentSize.buttonLarge),
+                        shape = RoundedCornerShape(DesignSystem.Radii.md),
+                        enabled = !isSaving
                     ) {
-                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(DesignSystem.ComponentSize.iconSmall))
+                        Spacer(modifier = Modifier.width(DesignSystem.Spacing.sm))
                         Text("Add Trigger")
                     }
                 }
@@ -225,7 +251,7 @@ fun TriggerConfigField(
     value: String,
     onValueChange: (String) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
         Text(
             text = field.label,
             style = MaterialTheme.typography.labelMedium
@@ -233,28 +259,30 @@ fun TriggerConfigField(
         
         when (field.type) {
             "text" -> {
-                TextField(
+                OutlinedTextField(
                     value = value,
                     onValueChange = onValueChange,
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text(field.placeholder) }
+                    placeholder = { Text(field.placeholder) },
+                    singleLine = true
                 )
             }
             "number" -> {
-                TextField(
+                OutlinedTextField(
                     value = value,
                     onValueChange = onValueChange,
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text(field.placeholder) }
+                    placeholder = { Text(field.placeholder) },
+                    singleLine = true
                 )
             }
             "dropdown" -> {
-                // Simplified dropdown - would need full implementation
-                TextField(
+                OutlinedTextField(
                     value = value,
                     onValueChange = onValueChange,
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text(field.placeholder) }
+                    placeholder = { Text(field.placeholder) },
+                    singleLine = true
                 )
             }
             else -> {}
