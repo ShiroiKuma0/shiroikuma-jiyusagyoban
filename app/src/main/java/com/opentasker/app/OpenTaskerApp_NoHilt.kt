@@ -23,6 +23,7 @@ import com.opentasker.automation.trigger.impl.BatteryTrigger
 import com.opentasker.automation.trigger.impl.GeofenceTrigger
 import com.opentasker.automation.trigger.impl.TimeTrigger
 import com.opentasker.automation.trigger.impl.WiFiTrigger
+import com.opentasker.core.registerCoreRuntime
 import com.opentasker.core.actions.registerActionMetadata
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseMigrations
@@ -54,6 +55,7 @@ class OpenTaskerApp_NoHilt : Application() {
     override fun onCreate() {
         super.onCreate()
         registerActionMetadata()
+        registerCoreRuntime()
          
         if (_db == null) {
             _db = Room.databaseBuilder(

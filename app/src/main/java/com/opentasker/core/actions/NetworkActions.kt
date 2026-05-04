@@ -4,6 +4,7 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -62,9 +63,33 @@ class HttpPostAction : Action {
         val url = args["url"] ?: return ActionResult.Failure("missing url")
         val data = args["data"] ?: ""
         val varName = args["var"] ?: "result"
-        ctx.logger("HTTP POST $url")
-        // TODO: Implement with URLConnection or OkHttp
-        return ActionResult.Success
+        val timeout = (args["timeout_sec"]?.toIntOrNull() ?: 10).coerceIn(1, 60) * 1000
+        return try {
+            val parsedUrl = URL(url)
+            if (parsedUrl.protocol != "https") return ActionResult.Failure("only https URLs are allowed")
+            val connection = parsedUrl.openConnection() as HttpURLConnection
+            try {
+                val response = connection.apply {
+                    connectTimeout = timeout
+                    readTimeout = timeout
+                    requestMethod = "POST"
+                    instanceFollowRedirects = false
+                    doOutput = true
+                    setRequestProperty("Content-Type", args["content_type"] ?: "text/plain; charset=utf-8")
+                }.run {
+                    outputStream.use { it.write(data.toByteArray(Charsets.UTF_8)) }
+                    val stream = if (responseCode in 200..299) inputStream else errorStream
+                    stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                }
+                ctx.variables.set(varName, response)
+                ctx.logger("HTTP POST ${parsedUrl.host} to \$$varName")
+                ActionResult.Success
+            } finally {
+                connection.disconnect()
+            }
+        } catch (e: Exception) {
+            ActionResult.Failure("request failed: ${e.message}")
+        }
     }
 }
 
@@ -77,7 +102,7 @@ class HttpPostAction : Action {
  *   - "var": variable to store result (true/false)
  */
 class PingAction : Action {
-    override val id = "net.ping"
+    override val id = "ping"
     override val category = ActionCategory.NET
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
@@ -109,15 +134,43 @@ private val HOST_PATTERN = Regex("^[A-Za-z0-9.-]{1,253}$")
  *   - "timeout_sec": optional timeout (default: 30)
  */
 class DownloadAction : Action {
-    override val id = "net.download"
+    override val id = "download"
     override val category = ActionCategory.NET
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val url = args["url"] ?: return ActionResult.Failure("missing url")
         val path = args["path"] ?: return ActionResult.Failure("missing path")
-        val timeout = (args["timeout_sec"]?.toIntOrNull() ?: 30) * 1000
-        ctx.logger("Download $url → $path (timeout: ${timeout}ms)")
-        // TODO: Implement with URLConnection, configurable timeout, and progress callback
-        return ActionResult.Success
+        val timeout = (args["timeout_sec"]?.toIntOrNull() ?: 30).coerceIn(1, 300) * 1000
+        return try {
+            val parsedUrl = URL(url)
+            if (parsedUrl.protocol != "https") return ActionResult.Failure("only https URLs are allowed")
+            val destination = safeDownloadFile(ctx, path)
+                ?: return ActionResult.Failure("path is outside OpenTasker downloads")
+            destination.parentFile?.mkdirs()
+
+            val connection = parsedUrl.openConnection() as HttpURLConnection
+            try {
+                connection.connectTimeout = timeout
+                connection.readTimeout = timeout
+                connection.instanceFollowRedirects = false
+                connection.inputStream.use { input ->
+                    destination.outputStream().use { output -> input.copyTo(output) }
+                }
+                ctx.logger("Downloaded ${parsedUrl.host} to ${destination.name}")
+                ActionResult.Success
+            } finally {
+                connection.disconnect()
+            }
+        } catch (e: Exception) {
+            ActionResult.Failure("download failed: ${e.message}")
+        }
     }
+}
+
+private fun safeDownloadFile(ctx: ActionContext, path: String): File? {
+    if (path.isBlank() || path.contains('\u0000')) return null
+    val baseDir = File(ctx.app.filesDir, "downloads").canonicalFile
+    val requested = File(baseDir, path.trimStart('/', '\\')).canonicalFile
+    if (!requested.path.startsWith(baseDir.path + File.separator) && requested != baseDir) return null
+    return requested
 }
