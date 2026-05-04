@@ -1,0 +1,119 @@
+package com.opentasker.di
+
+import android.content.Context
+import com.opentasker.automation.core.DefaultActionExecutor
+import com.opentasker.automation.core.DefaultActionRegistry
+import com.opentasker.automation.core.DefaultConstraintEvaluator
+import com.opentasker.automation.core.DefaultConstraintRegistry
+import com.opentasker.automation.core.DefaultTriggerMatcher
+import com.opentasker.automation.core.DefaultTriggerRegistry
+import com.opentasker.automation.action.impl.IntentAction
+import com.opentasker.automation.action.impl.NotificationAction
+import com.opentasker.automation.action.impl.ShellAction
+import com.opentasker.automation.core.ActionExecutor
+import com.opentasker.automation.core.ActionRegistry
+import com.opentasker.automation.core.ConstraintEvaluator
+import com.opentasker.automation.core.ConstraintRegistry
+import com.opentasker.automation.core.TriggerMatcher
+import com.opentasker.automation.core.TriggerRegistry
+import com.opentasker.automation.trigger.impl.AppOpenTrigger
+import com.opentasker.automation.trigger.impl.BatteryTrigger
+import com.opentasker.automation.trigger.impl.GeofenceTrigger
+import com.opentasker.automation.trigger.impl.TimeTrigger
+import com.opentasker.automation.trigger.impl.WiFiTrigger
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
+import javax.inject.Singleton
+
+/**
+ * Hilt DI module for automation engine.
+ * Registers all triggers, constraints, actions, and core components.
+ */
+@Module
+@InstallIn(SingletonComponent::class)
+object AutomationModule {
+
+    // ========== REGISTRIES ==========
+
+    @Singleton
+    @Provides
+    fun provideTriggerRegistry(): TriggerRegistry {
+        return DefaultTriggerRegistry().apply {
+            register(TimeTrigger())
+            register(WiFiTrigger())
+            register(BatteryTrigger())
+            register(GeofenceTrigger())
+            register(AppOpenTrigger())
+        }
+    }
+
+    @Singleton
+    @Provides
+    fun provideConstraintRegistry(): ConstraintRegistry {
+        return DefaultConstraintRegistry()
+        // TODO: Register constraint implementations as they're added
+    }
+
+    @Singleton
+    @Provides
+    fun provideActionRegistry(@ApplicationContext context: Context): ActionRegistry {
+        return DefaultActionRegistry().apply {
+            register(NotificationAction(context))
+            register(IntentAction(context))
+            register(ShellAction())
+        }
+    }
+
+    // ========== CORE ENGINE COMPONENTS ==========
+
+    @Singleton
+    @Provides
+    fun provideTriggerMatcher(): TriggerMatcher {
+        return DefaultTriggerMatcher()
+    }
+
+    @Singleton
+    @Provides
+    fun provideConstraintEvaluator(): ConstraintEvaluator {
+        return DefaultConstraintEvaluator()
+    }
+
+    @Singleton
+    @Provides
+    fun provideActionExecutor(): ActionExecutor {
+        return DefaultActionExecutor()
+    }
+
+    // ========== INDIVIDUAL TRIGGERS ==========
+
+    @Provides
+    fun provideTimeTrigger(): TimeTrigger = TimeTrigger()
+
+    @Provides
+    fun provideWiFiTrigger(): WiFiTrigger = WiFiTrigger()
+
+    @Provides
+    fun provideBatteryTrigger(): BatteryTrigger = BatteryTrigger()
+
+    @Provides
+    fun provideGeofenceTrigger(): GeofenceTrigger = GeofenceTrigger()
+
+    @Provides
+    fun provideAppOpenTrigger(): AppOpenTrigger = AppOpenTrigger()
+
+    // ========== INDIVIDUAL ACTIONS ==========
+
+    @Provides
+    fun provideNotificationAction(@ApplicationContext context: Context): NotificationAction =
+        NotificationAction(context)
+
+    @Provides
+    fun provideIntentAction(@ApplicationContext context: Context): IntentAction =
+        IntentAction(context)
+
+    @Provides
+    fun provideShellAction(): ShellAction = ShellAction()
+}

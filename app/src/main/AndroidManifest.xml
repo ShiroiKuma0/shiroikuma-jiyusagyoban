@@ -15,6 +15,9 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.BATTERY_STATS" />
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions"
         xmlns:tools="http://schemas.android.com/tools" />
@@ -47,11 +50,47 @@
                 android:value="OpenTasker automation engine — runs user-defined profiles when their contexts match" />
         </service>
 
+        <service
+            android:name="com.opentasker.automation.service.AppOpenService"
+            android:exported="false" />
+
         <receiver
             android:name="com.opentasker.core.engine.BootReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.opentasker.automation.receiver.TimeEventReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.TIME_TICK" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.opentasker.automation.receiver.WiFiEventReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.opentasker.automation.receiver.BatteryEventReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BATTERY_CHANGED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.opentasker.automation.receiver.GeofenceEventReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.opentasker.automation.GEOFENCE_EVENT" />
             </intent-filter>
         </receiver>
     </application>
