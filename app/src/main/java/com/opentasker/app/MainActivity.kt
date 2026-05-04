@@ -1,6 +1,7 @@
 package com.opentasker.app
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -13,6 +14,7 @@ import com.opentasker.automation.model.AutomationRule
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.toEntity
+import com.opentasker.core.validation.InputValidation
 import com.opentasker.ui.screens.ActionEditorScreen
 import com.opentasker.ui.screens.ActionPickerScreen
 import com.opentasker.ui.screens.AutomationExecutionLogScreen
@@ -93,14 +95,25 @@ class MainActivity : ComponentActivity() {
                         ProfileEditorScreen(
                             profile = currentEditingProfile,
                             onSave = { profile ->
+                                val validationErrors = InputValidation.validateProfile(profile)
+                                if (validationErrors.isNotEmpty()) {
+                                    val errorMessage = validationErrors.joinToString("\n") { "${it.field}: ${it.message}" }
+                                    Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_LONG).show()
+                                    return@ProfileEditorScreen
+                                }
                                 scope.launch {
-                                    if (profile.id == 0L) {
-                                        db.profileDao().insert(profile.toEntity())
-                                    } else {
-                                        db.profileDao().update(profile.toEntity())
+                                    try {
+                                        if (profile.id == 0L) {
+                                            db.profileDao().insert(profile.toEntity())
+                                        } else {
+                                            db.profileDao().update(profile.toEntity())
+                                        }
+                                        currentEditingProfile = null
+                                        currentScreen = Screen.ProfileList
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("MainActivity", "Failed to save profile: ${e.message}", e)
+                                        Toast.makeText(this@MainActivity, "Failed to save profile: ${e.message}", Toast.LENGTH_LONG).show()
                                     }
-                                    currentEditingProfile = null
-                                    currentScreen = Screen.ProfileList
                                 }
                             },
                             onBack = {
@@ -116,14 +129,25 @@ class MainActivity : ComponentActivity() {
                         TaskEditorScreen(
                             task = currentEditingTask,
                             onSave = { task ->
+                                val validationErrors = InputValidation.validateTask(task)
+                                if (validationErrors.isNotEmpty()) {
+                                    val errorMessage = validationErrors.joinToString("\n") { "${it.field}: ${it.message}" }
+                                    Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_LONG).show()
+                                    return@TaskEditorScreen
+                                }
                                 scope.launch {
-                                    if (task.id == 0L) {
-                                        db.taskDao().insert(task.toEntity())
-                                    } else {
-                                        db.taskDao().update(task.toEntity())
+                                    try {
+                                        if (task.id == 0L) {
+                                            db.taskDao().insert(task.toEntity())
+                                        } else {
+                                            db.taskDao().update(task.toEntity())
+                                        }
+                                        currentEditingTask = null
+                                        currentScreen = taskEditorReturnTarget
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("MainActivity", "Failed to save task: ${e.message}", e)
+                                        Toast.makeText(this@MainActivity, "Failed to save task: ${e.message}", Toast.LENGTH_LONG).show()
                                     }
-                                    currentEditingTask = null
-                                    currentScreen = taskEditorReturnTarget
                                 }
                             },
                             onBack = {
