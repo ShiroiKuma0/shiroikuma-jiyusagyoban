@@ -20,6 +20,7 @@ import com.opentasker.ui.screens.ProfileEditorScreen
 import com.opentasker.ui.screens.ProfileListScreen
 import com.opentasker.ui.screens.RunLogScreen
 import com.opentasker.ui.screens.TaskEditorScreen
+import com.opentasker.ui.screens.TaskListScreen
 import com.opentasker.ui.theme.OpenTaskerTheme
 import kotlinx.coroutines.launch
 
@@ -48,6 +49,20 @@ class MainActivity : ComponentActivity() {
                             },
                             onViewRunLog = { currentScreen = Screen.RunLog },
                             onBatchOperations = { currentScreen = Screen.BatchOperations },
+                            onManageTasks = { currentScreen = Screen.TaskList },
+                        )
+                    }
+                    is Screen.TaskList -> {
+                        TaskListScreen(
+                            db = db,
+                            onCreateTask = { currentScreen = Screen.TaskEditor(null) },
+                            onEditTask = { currentScreen = Screen.TaskEditor(it) },
+                            onDeleteTask = { task ->
+                                scope.launch {
+                                    db.taskDao().delete(task.toEntity())
+                                }
+                            },
+                            onBack = { currentScreen = Screen.ProfileList },
                         )
                     }
                     is Screen.ProfileEditor -> {
@@ -153,6 +168,7 @@ class MainActivity : ComponentActivity() {
 
 sealed class Screen {
     data object ProfileList : Screen()
+    data object TaskList : Screen()
     data object BatchOperations : Screen()
     data class ProfileEditor(val profile: Profile?) : Screen()
     data class TaskEditor(val task: Task?) : Screen()

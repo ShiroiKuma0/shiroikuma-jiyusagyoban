@@ -1,12 +1,15 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
@@ -19,11 +22,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -37,10 +42,12 @@ import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.toEntity
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.launch
 
 class TaskListViewModel(private val db: AppDatabase) : ViewModel() {
     val tasks: StateFlow<List<Task>> = db.taskDao()
@@ -384,6 +391,108 @@ fun TaskEditorScreen(
                     .padding(top = 16.dp)
             ) {
                 Text("Save")
+            }
+        }
+    }
+}
+
+class TaskListViewModelForList(private val db: AppDatabase) : ViewModel() {
+    val tasks: StateFlow<List<Task>> = db.taskDao()
+        .getAllAsFlow()
+        .map { entities -> entities.map { it.toDomain() } }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Lazily,
+            initialValue = emptyList()
+        )
+}
+
+class TaskListViewModelForListFactory(private val db: AppDatabase) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(TaskListViewModelForList::class.java)) {
+            return TaskListViewModelForList(db) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+fun TaskListScreen(
+    db: AppDatabase,
+    onCreateTask: () -> Unit,
+    onEditTask: (Task) -> Unit,
+    onDeleteTask: (Task) -> Unit,
+    onBack: () -> Unit,
+) {
+    val viewModel: TaskListViewModelForList = viewModel(
+        factory = TaskListViewModelForListFactory(db)
+    )
+    val tasks by viewModel.tasks.collectAsState()
+    val scope = rememberCoroutineScope()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Tasks") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        },
+        floatingActionButton = {
+            Button(onClick = onCreateTask) {
+                Icon(Icons.Filled.Add, contentDescription = "Add")
+                Text("New Task")
+            }
+        }
+    ) { inner ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(inner)
+                .padding(16.dp)
+        ) {
+            if (tasks.isEmpty()) {
+                Text(
+                    "No tasks yet. Create one to get started!",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+            } else {
+                LazyColumn {
+                    items(tasks, key = { it.id }) { task ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(task.name, style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        "${task.actions.size} actions",
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
+                                Button(onClick = { onEditTask(task) }) {
+                                    Text("Edit")
+                                }
+                                IconButton(onClick = { onDeleteTask(task) }) {
+                                    Icon(Icons.Filled.Delete, contentDescription = "Delete")
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
