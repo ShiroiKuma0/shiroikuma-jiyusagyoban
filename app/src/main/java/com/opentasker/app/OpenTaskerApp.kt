@@ -39,3 +39,6 @@ class OpenTaskerApp : Application() {
         }
     }
 }
+
+// Fallback wrapper—if Hilt KSP code generation fails, use this class
+class Hilt_OpenTaskerApp : OpenTaskerApp()
