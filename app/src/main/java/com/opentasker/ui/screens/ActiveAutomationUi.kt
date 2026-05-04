@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -49,6 +50,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -85,6 +87,7 @@ import java.util.Locale
 private enum class OpenTaskerScreen(val label: String) {
     Profiles("Profiles"),
     Tasks("Tasks"),
+    Setup("Setup"),
     RunLog("Run Log"),
 }
 
@@ -196,6 +199,7 @@ fun ActiveAutomationUi(
     val tasks by viewModel.tasks.collectAsState()
     val runLogs by viewModel.runLogs.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     var screen by remember { mutableStateOf(OpenTaskerScreen.Profiles) }
     var taskDialog by remember { mutableStateOf<Task?>(null) }
     var showCreateTaskDialog by remember { mutableStateOf(false) }
@@ -248,6 +252,7 @@ fun ActiveAutomationUi(
                     Icon(Icons.Filled.Add, contentDescription = "Create task")
                 }
 
+                OpenTaskerScreen.Setup,
                 OpenTaskerScreen.RunLog -> Unit
             }
         },
@@ -261,6 +266,7 @@ fun ActiveAutomationUi(
                             val icon = when (destination) {
                                 OpenTaskerScreen.Profiles -> Icons.Filled.CheckCircle
                                 OpenTaskerScreen.Tasks -> Icons.Filled.Edit
+                                OpenTaskerScreen.Setup -> Icons.Filled.Settings
                                 OpenTaskerScreen.RunLog -> Icons.Filled.Info
                             }
                             Icon(icon, contentDescription = null)
@@ -316,6 +322,11 @@ fun ActiveAutomationUi(
                     )
                 },
                 contentPadding = innerPadding,
+            )
+
+            OpenTaskerScreen.Setup -> PermissionOnboardingScreen(
+                contentPadding = innerPadding,
+                onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
             )
 
             OpenTaskerScreen.RunLog -> RunLogScreenContent(runLogs, innerPadding)

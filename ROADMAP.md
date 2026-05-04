@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.2. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.3. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-04  
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.2  
+**Current app version:** 0.2.3  
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -13,19 +13,19 @@ Source-backed product roadmap for OpenTasker v0.2.2. This file reconciles the cu
 
 OpenTasker is an Android/Kotlin automation app targeting API 35 with Jetpack Compose, Material 3, Room, Coroutines, WorkManager, DataStore, Gson, and Hilt dependencies. The project goal is a privacy-first, fully on-device, open-source Tasker/MacroDroid/Automate alternative.
 
-The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, and run logs. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating/onboarding remains required before public beta claims.
+The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, run logs, and setup/onboarding status. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
 
 Key local constraints:
 
 | Area | Current truth | Roadmap implication |
 |---|---|---|
-| UI | Active profile/task/action/context/run-log management UI is restored; advanced stale snapshots remain unused | Continue hardening UI with capability gating and platform onboarding |
+| UI | Active profile/task/action/context/run-log/setup management UI is restored; advanced stale snapshots remain unused | Continue hardening UI with capability gating |
 | Engine | Foreground automation service and registries are wired through `OpenTaskerApp_NoHilt` | Keep non-Hilt runtime stable until Hilt migration is deliberate |
 | Actions | Several actions are implemented and hardened, but several classes still contain success-shaped stubs | Stub replacement must precede "action library" marketing |
 | Contexts | Some context sources rely on restricted Android APIs or incomplete implementations | Permission/onboarding and platform-safe replacements are P0/P1 |
 | Persistence | Room schema export now exists; backup/restore hardened | Migration tests and upgrade strategy can be built on this |
 | Release | Debug/release builds pass locally; release signing is env-var driven | F-Droid/Play readiness still needs policy and reproducibility work |
-| Docs | README was corrected to v0.2.2; old roadmap/notes overclaimed v0.3/v0.4 completion | Roadmap tiers below supersede old milestone claims |
+| Docs | README was corrected to v0.2.3; old roadmap/notes overclaimed v0.3/v0.4 completion | Roadmap tiers below supersede old milestone claims |
 
 ---
 
@@ -69,6 +69,7 @@ Key local constraints:
 
 ### N2 - Add first-run permission and reliability onboarding
 
+**Status:** Baseline completed in v0.2.3. The active Setup tab shows status and routes users to runtime permission requests or Android special-access settings.  
 **Description:** Add an in-app setup checklist for notification permission, exact alarm access, battery optimization exemption, usage access, notification listener, overlay access, location/background location, Bluetooth/WiFi permissions, SMS, DND access, and package visibility explanations. Each item must show why it is needed, current status, and the exact settings action when Android requires special access.  
 **Sources:** Android notification permission [S26], exact alarm behavior [S25], Play permission declarations [S29][S30][S33], Doze/OEM killing [S22][S28], MacroDroid helper pain [S17].  
 **Category:** UX, reliability, security, platform/OS, distribution.  
