@@ -15,10 +15,7 @@ class TimeEventReceiver : AutomationBroadcastReceiver() {
         if (intent.action == Intent.ACTION_TIME_TICK) {
             try {
                 log("Time tick event")
-
-                // TODO: Post event to automation engine
-                // val engine = AutomationEngine.getInstance(context)
-                // engine.onEvent(AutomationEvent.TimeEvent(System.currentTimeMillis()))
+                automationEngine.onEvent(AutomationEvent.TimeEvent(System.currentTimeMillis()))
             } catch (e: Exception) {
                 log("Error processing time event", e)
             }

@@ -20,10 +20,7 @@ class WiFiEventReceiver : AutomationBroadcastReceiver() {
                 val ssid = getCurrentSSID(context) ?: "Unknown"
 
                 log("WiFi event: connected=$connected, ssid=$ssid")
-
-                // TODO: Post event to automation engine
-                // val engine = AutomationEngine.getInstance(context)
-                // engine.onEvent(AutomationEvent.WiFiEvent(ssid, connected))
+                automationEngine.onEvent(AutomationEvent.WiFiEvent(ssid, connected))
             } catch (e: Exception) {
                 log("Error processing WiFi event", e)
             }
