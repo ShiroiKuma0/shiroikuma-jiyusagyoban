@@ -1,7 +1,6 @@
 package com.opentasker.app
 
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -16,17 +15,20 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.opentasker.ui.theme.OpenTaskerTheme
 
-class MainActivity : ComponentActivity() {
+/**
+ * Minimal MainActivity that displays the OpenTasker logo for testing
+ */
+class MainActivityMinimal : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        Log.d("MainActivity", "Initializing OpenTasker")
         
         setContent {
             OpenTaskerTheme {
