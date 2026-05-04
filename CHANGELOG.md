@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.12 — 2026-05-04
+
+Profile template baseline.
+
+- Added an on-device profile template catalog with eight roadmap-backed starter patterns.
+- Added slot substitution for template names, context configs, and action arguments.
+- Added a Compose template picker and slot form that installs templates as disabled profiles with starter tasks.
+- Gated planned calendar, NFC, and external-intent templates so they are visible but cannot create broken profiles yet.
+- Added unit coverage for catalog completeness, unsupported-action gating, slot expansion, and planned-template blocking.
+
 ## v0.2.11 — 2026-05-04
 
 Public documentation truthfulness pass.
