@@ -1,13 +1,13 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.4-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.5-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.4** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scenes, and variables — without the proprietary lock-in.
+**OpenTasker v0.2.5** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scenes, and variables — without the proprietary lock-in.
 
-> **Status:** v0.2.4 restores active profile/task/action/context/run-log management, adds setup checks, and hardens scheduled time ticks with exact-alarm fallback behavior.
+> **Status:** v0.2.5 restores active profile/task/action/context/run-log management, adds setup checks, and uses platform-safe callbacks for time and WiFi trigger events.
 
 ---
 
@@ -20,6 +20,7 @@
 ✅ **Compose UI reintegration started** — active navigation now manages profiles, tasks, actions, contexts, and run logs from Room  
 ✅ **Setup checklist** — notifications, exact alarms, battery optimization, usage access, notification access, overlays, location, Bluetooth, SMS, and DND access  
 ✅ **Scheduled time ticks** — AlarmManager exact scheduling when allowed, inexact fallback when Android denies exact alarms  
+✅ **WiFi trigger monitor** — dynamic NetworkCallback path instead of restricted manifest connectivity broadcasts  
 ✅ **Database persistence** — Room DAOs with StateFlow live updates  
 ✅ **Action metadata system** — dynamic form generation for all 43 actions  
 ✅ **Context configuration** — UI for all 6 context families (app, time, day, location, state, event)  
@@ -89,7 +90,7 @@ Release APKs are unsigned unless `OPEN_TASKER_RELEASE_KEYSTORE`, `OPEN_TASKER_RE
 ## Next Phase (v0.3)
 
 1. **Capability gating** — hide or explain unsupported platform actions before execution
-2. **WiFi trigger hardening** — replace static connectivity broadcasts with NetworkCallback
+2. **App-open trigger hardening** — replace plain background polling with platform-safe usage stats monitoring
 3. **Variable inspector** — display task runtime variables during execution
 4. **Tasker import** — `.prj.xml` parser for profile migration
 5. **Plugin SDK** — stable AIDL interface for custom actions
