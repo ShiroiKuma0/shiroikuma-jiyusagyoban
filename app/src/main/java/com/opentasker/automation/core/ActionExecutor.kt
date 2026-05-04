@@ -14,7 +14,7 @@ import javax.inject.Singleton
  * Handles missing actions gracefully with skip-and-log behavior.
  */
 @Singleton
-class ActionExecutorImpl @Inject constructor() {
+class ActionExecutorImpl @Inject constructor() : ActionExecutor {
     private val tag = "ActionExecutor"
     
     /**
