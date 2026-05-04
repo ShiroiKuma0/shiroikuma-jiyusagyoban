@@ -8,12 +8,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -90,31 +93,33 @@ fun RunLogScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(32.dp),
+                        .padding(40.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
                     Icon(
                         Icons.Filled.Info,
                         contentDescription = null,
-                        modifier = Modifier.height(48.dp),
+                        modifier = Modifier.size(72.dp),
                         tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
                     Text(
-                        "No executions yet",
+                        "No execution history yet",
                         style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "Run tasks to see execution history and logs here",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.Center
                     )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "Execution history appears here when profiles and tasks run. Enable a profile and execute its tasks to see logs.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.2
+                    )
                 }
-            } else {
+            }else {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -141,31 +146,43 @@ fun RunLogEntryItem(entry: RunLogEntry) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(96.dp),
-        shape = RoundedCornerShape(10.dp)
+            .padding(horizontal = 4.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(10.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(
+            containerColor = if (entry.success)
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            else
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
+        )
     ) {
         Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp),
+                .fillMaxWidth()
+                .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    entry.taskName,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    timeStr,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = if (entry.success) Icons.Filled.CheckCircle else Icons.Filled.Error,
+                        contentDescription = null,
+                        tint = statusColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        entry.taskName,
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
                 if (entry.message.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         entry.message,
                         style = MaterialTheme.typography.bodySmall,
@@ -173,18 +190,20 @@ fun RunLogEntryItem(entry: RunLogEntry) {
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    Spacer(modifier = Modifier.height(6.dp))
                 }
+                Text(
+                    timeStr,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
-            Column(
-                horizontalAlignment = Alignment.End,
+            Surface(
+                color = statusColor.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(6.dp),
                 modifier = Modifier.padding(start = 12.dp)
             ) {
-                Surface(
-                    color = statusColor.copy(alpha = 0.12f),
-                    shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier.padding(bottom = 4.dp)
-                ) {
-                    Text(
+                Text(
                         statusText,
                         style = MaterialTheme.typography.labelSmall,
                         color = statusColor,
