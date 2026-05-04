@@ -54,8 +54,13 @@ class AutomationEngine @Inject constructor(
                 log("Event received: $event")
 
                 // Load all enabled rules that belong to active profiles
-                val allRules = ruleRepository.getAllEnabled()
-                val rules: List<AutomationRule> = allRules.filter { activeProfiles.getOrDefault(it.profileId, false) }
+                val allRules: List<AutomationRule> = ruleRepository.getAllEnabled()
+                val rules = mutableListOf<AutomationRule>()
+                for (rule in allRules) {
+                    if (activeProfiles.getOrDefault(rule.profileId, false)) {
+                        rules.add(rule)
+                    }
+                }
 
                 if (rules.isEmpty()) {
                     log("No active profiles or rules found")
