@@ -13,18 +13,25 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.ToggleOn
+import androidx.compose.material.icons.filled.ToggleOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -126,37 +133,45 @@ fun ProfileListScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(32.dp),
+                        .padding(40.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
                     Icon(
                         Icons.Filled.Info,
                         contentDescription = null,
-                        modifier = Modifier.height(48.dp),
+                        modifier = Modifier.size(72.dp),
                         tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
                     Text(
                         "No profiles yet",
                         style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "Create your first automation profile to get started",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    ElevatedButton(onClick = onCreateProfile) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "Profiles let you group automation tasks together and enable/disable them as a unit. Create your first profile to start automating.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.2
+                    )
+                    Spacer(modifier = Modifier.height(28.dp))
+                    Button(
+                        onClick = onCreateProfile,
+                        modifier = Modifier
+                            .fillMaxWidth(0.7f)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
                         Icon(Icons.Filled.Add, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("New Profile")
+                        Text("Create First Profile")
                     }
                 }
-            } else {
+            }else {
                 LazyColumn(
                     modifier = Modifier
                         .weight(1f)
@@ -242,44 +257,114 @@ fun ProfileCardItem(
     onDelete: (Profile) -> Unit,
     onToggle: (Profile, Boolean) -> Unit,
 ) {
+    var showDeleteConfirm by androidx.compose.runtime.remember { mutableStateOf(false) }
+    
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete \"${profile.name}\"?") },
+            text = { Text("All tasks in this profile will be lost. This action cannot be undone.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteConfirm = false
+                        onDelete(profile)
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(72.dp),
+            .padding(horizontal = 4.dp, vertical = 6.dp),
         shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (profile.enabled)
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+            else
+                MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+        ),
         onClick = { onEdit(profile) }
     ) {
         Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp),
+                .fillMaxWidth()
+                .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    profile.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        profile.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (profile.enabled) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                "Active",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     "${profile.contexts.size} context${if (profile.contexts.size == 1) "" else "s"}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Spacer(modifier = Modifier.width(8.dp))
-            Switch(
-                checked = profile.enabled,
-                onCheckedChange = { onToggle(profile, it) }
-            )
-            IconButton(
-                onClick = { onDelete(profile) },
-                modifier = Modifier.height(24.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.padding(start = 8.dp)
             ) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                IconButton(
+                    onClick = { onToggle(profile, !profile.enabled) },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = if (profile.enabled) Icons.Default.ToggleOn else Icons.Default.ToggleOff,
+                        contentDescription = if (profile.enabled) "Disable" else "Enable",
+                        modifier = Modifier.size(20.dp),
+                        tint = if (profile.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(
+                    onClick = { showDeleteConfirm = true },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.Delete,
+                        contentDescription = "Delete",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
     }

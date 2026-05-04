@@ -14,6 +14,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -106,37 +108,45 @@ fun TaskListScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(32.dp),
+                        .padding(40.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
                     Icon(
                         Icons.Filled.Info,
                         contentDescription = null,
-                        modifier = Modifier.height(48.dp),
+                        modifier = Modifier.size(72.dp),
                         tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
                     Text(
                         "No tasks yet",
                         style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "Create your first task to define automation actions",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurface,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    ElevatedButton(onClick = onCreateTask) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "Tasks define the actions OpenTasker will perform when rules are triggered. Create your first task to start automating.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.2
+                    )
+                    Spacer(modifier = Modifier.height(28.dp))
+                    Button(
+                        onClick = onCreateTask,
+                        modifier = Modifier
+                            .fillMaxWidth(0.7f)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
                         Icon(Icons.Filled.Add, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("New Task")
+                        Text("Create First Task")
                     }
                 }
-            } else {
+            }else {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -163,17 +173,48 @@ fun TaskCardItem(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    var showDeleteConfirm by androidx.compose.runtime.remember { mutableStateOf(false) }
+    
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete \"${task.name}\"?") },
+            text = { Text("This action cannot be undone.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteConfirm = false
+                        onDelete()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(80.dp),
+            .padding(horizontal = 4.dp, vertical = 6.dp),
         shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        ),
         onClick = onEdit
     ) {
         Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp),
+                .fillMaxWidth()
+                .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -184,16 +225,22 @@ fun TaskCardItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        "${task.actions.size} action${if (task.actions.size == 1) "" else "s"}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            "${task.actions.size} action${if (task.actions.size == 1) "" else "s"}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                        )
+                    }
                     Text(
                         "Priority: ${task.priority}",
                         style = MaterialTheme.typography.labelSmall,
@@ -201,19 +248,32 @@ fun TaskCardItem(
                     )
                 }
             }
-            Spacer(modifier = Modifier.width(8.dp))
-            Row {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.padding(start = 8.dp)
+            ) {
                 IconButton(
                     onClick = onEdit,
-                    modifier = Modifier.height(32.dp)
+                    modifier = Modifier.size(36.dp)
                 ) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
+                    Icon(
+                        Icons.Filled.Edit,
+                        contentDescription = "Edit",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
                 }
                 IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.height(32.dp)
+                    onClick = { showDeleteConfirm = true },
+                    modifier = Modifier.size(36.dp)
                 ) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                    Icon(
+                        Icons.Filled.Delete,
+                        contentDescription = "Delete",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
                 }
             }
         }

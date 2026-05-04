@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.opentasker.automation.model.ExecutionLog
 import java.text.SimpleDateFormat
@@ -48,41 +49,56 @@ fun AutomationExecutionLogScreen(
                 .padding(paddingValues)
         ) {
             // Filter bar
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Row(
+            if (logs.isNotEmpty()) {
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    )
                 ) {
-                    FilterChip(
-                        selected = filterBySuccess == true,
-                        onClick = { 
-                            filterBySuccess = if (filterBySuccess == true) null else true
-                        },
-                        label = { Text("✓ Success") }
-                    )
-                    FilterChip(
-                        selected = filterBySuccess == false,
-                        onClick = { 
-                            filterBySuccess = if (filterBySuccess == false) null else false
-                        },
-                        label = { Text("✗ Failed") }
-                    )
-                    if (filterByRule != null) {
-                        AssistChip(
-                            onClick = { filterByRule = null },
-                            label = { Text("Clear") },
-                            leadingIcon = {
-                                Icon(Icons.Default.Close, contentDescription = null)
-                            }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        FilterChip(
+                            selected = filterBySuccess == true,
+                            onClick = { 
+                                filterBySuccess = if (filterBySuccess == true) null else true
+                            },
+                            label = { Text("Successful") },
+                            leadingIcon = if (filterBySuccess == true) {
+                                { Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else null
                         )
+                        FilterChip(
+                            selected = filterBySuccess == false,
+                            onClick = { 
+                                filterBySuccess = if (filterBySuccess == false) null else false
+                            },
+                            label = { Text("Failed") },
+                            leadingIcon = if (filterBySuccess == false) {
+                                { Icon(Icons.Default.Error, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else null
+                        )
+                        if (filterByRule != null || filterBySuccess != null) {
+                            Spacer(modifier = Modifier.weight(1f))
+                            AssistChip(
+                                onClick = { 
+                                    filterByRule = null
+                                    filterBySuccess = null
+                                },
+                                label = { Text("Clear filters") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -111,27 +127,30 @@ fun EmptyLogState() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(32.dp),
+            .padding(40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
-            imageVector = Icons.Default.History,
+            imageVector = Icons.Default.HistoryToggleOff,
             contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.surfaceVariant
+            modifier = Modifier.size(72.dp),
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(20.dp))
         Text(
-            "No execution logs",
+            "No execution history yet",
             style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         Text(
-            "Logs will appear here when rules are triggered",
+            "Execution logs will appear here once your automation rules begin running. Create a rule and enable it to see logs.",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.2
         )
     }
 }
@@ -141,65 +160,96 @@ fun ExecutionLogCard(log: ExecutionLog) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(4.dp),
-        shape = RoundedCornerShape(8.dp),
+            .padding(horizontal = 4.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (log.success) 
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
             else 
-                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
         )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = log.eventType ?: "Unknown Event",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = log.message ?: "No message",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (log.success) Icons.Default.CheckCircle else Icons.Default.Error,
+                            contentDescription = null,
+                            tint = if (log.success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Column {
+                            Text(
+                                text = log.eventType ?: "Unknown Event",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            if ((log.message ?: "").isNotEmpty()) {
+                                Text(
+                                    text = log.message ?: "",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
                 }
-                Icon(
-                    imageVector = if (log.success) Icons.Default.CheckCircle else Icons.Default.Error,
-                    contentDescription = null,
-                    tint = if (log.success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(24.dp)
-                )
             }
             
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = formatTimestamp(log.timestamp),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Text(
-                    text = "${log.executionTimeMs}ms",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "${log.successCount}/${log.actionCount} actions",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(
+                        text = "${log.executionTimeMs}ms",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                    )
+                }
+                
+                Surface(
+                    color = if (log.successCount == log.actionCount)
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                    else
+                        MaterialTheme.colorScheme.error.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(
+                        text = "${log.successCount}/${log.actionCount} actions",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (log.successCount == log.actionCount)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                    )
+                }
             }
             
             if (log.details.isNotEmpty()) {
