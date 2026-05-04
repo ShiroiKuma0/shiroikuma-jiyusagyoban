@@ -1,0 +1,95 @@
+# OpenTasker Architecture
+
+## Research summary — how Tasker works
+
+Tasker (closed source, package `net.dinglisch.android.taskerm`) is a Java/Kotlin Android app that began life around 2007 in the Android Developer Challenge 2. Its mental model — confirmed by the official user guide at <https://tasker.joaoapps.com/userguide/en/index.html> — is:
+
+```
+Profile  := { Context+ } -> { Task+ }
+Context  := Application | Time | Day | Location | State | Event
+Task     := Action[]   (with flow control: If/For/Goto/Wait/Stop)
+Action   := one of ~350 built-in primitives, or a plugin-supplied action
+Scene    := UI overlay built from Elements (Button, Slider, Web, Map, ...)
+Variable := named slot, %global or %local, expanded at action runtime
+```
+
+Profiles are *active* whenever **all** their contexts match. Activation runs the entry task; deactivation runs the (optional) exit task. Tasks are ordered Action lists with imperative flow control. Persistence is XML (`*.prj.xml`, `*.tsk.xml`, `*.prf.xml`, `*.scn.xml`). Plugins expose actions/conditions/events via the Locale-compatible AIDL contract (`com.twofortyfouram.locale.intent.action.EDIT_SETTING` etc.), which is also the de-facto Android automation plugin standard.
+
+Tasker's source is **not public**. This architecture is reconstructed from the user guide, public plugin SDK, intent surface, and observable behavior — not decompilation.
+
+## OpenTasker layered architecture
+
+```
+┌───────────────────────────────────────────────────────┐
+│  UI (Jetpack Compose, Material 3, AMOLED default)     │
+│  - Profiles / Tasks / Scenes / Variables / Run Log    │
+├───────────────────────────────────────────────────────┤
+│  Engine                                               │
+│  - ProfileMatcher  (evaluates active set)             │
+│  - TaskRunner      (executes actions, flow control)   │
+│  - VariableStore   (global + per-task locals)         │
+│  - ContextSources  (Flow<ContextEvent> per type)      │
+├───────────────────────────────────────────────────────┤
+│  Action Library                                       │
+│  - Action interface + registry                        │
+│  - Built-ins grouped by category                      │
+│  - Plugin loader (AIDL)                               │
+├───────────────────────────────────────────────────────┤
+│  Storage (Room + DataStore)                           │
+│  - Profiles, Tasks, Actions, Scenes, Variables        │
+│  - Run log                                            │
+├───────────────────────────────────────────────────────┤
+│  Platform                                             │
+│  - AutomationService (foreground)                     │
+│  - WorkManager for scheduled/deferred                 │
+│  - BroadcastReceivers / Notification Listener /       │
+│    AccessibilityService / UsageStats / Location       │
+└───────────────────────────────────────────────────────┘
+```
+
+### Engine flow
+
+1. `AutomationService` starts on boot, loads all enabled `Profile`s.
+2. Each `Profile` subscribes to its `Context` sources (cold `Flow`s exposed by `ContextSources`).
+3. `ProfileMatcher` keeps a per-profile boolean state. When all contexts in a profile transition `false → true`, it submits the entry task; on `true → false`, the exit task.
+4. `TaskRunner` walks the action list, expanding `%vars` against `VariableStore`, honoring flow-control instructions, and writing to the run log.
+5. Actions return a `Result` (Success / Failure / Skip) — `TaskRunner` decides whether to halt based on the action's "Continue Task After Error" flag.
+
+### Persistence schema (Room)
+
+| Table | Key fields |
+|---|---|
+| `profiles` | id, name, enabled, exitTaskId |
+| `profile_contexts` | profileId, type, configJson |
+| `tasks` | id, name, collisionMode, priority |
+| `actions` | id, taskId, ordinal, type, configJson, continueOnError, label |
+| `scenes` | id, name, width, height, configJson |
+| `scene_elements` | id, sceneId, type, x, y, w, h, configJson |
+| `variables` | name (PK), value, isGlobal |
+| `run_log` | id, taskId, startedAt, durationMs, result, message |
+
+Action and context configurations are stored as JSON blobs (kotlinx.serialization) so adding new types doesn't require a Room migration.
+
+### Action interface
+
+```kotlin
+interface Action {
+    val id: String                   // stable identifier, e.g. "wifi.toggle"
+    val category: ActionCategory
+    suspend fun run(ctx: ActionContext, args: ActionArgs): ActionResult
+}
+```
+
+`ActionContext` exposes the application context, variable store, current task scope, and a logger. Plugins implement the same interface via an AIDL bridge.
+
+### Plugin SDK
+
+OpenTasker's plugin contract is binary-compatible with the **Locale plugin API** (`com.twofortyfouram.locale.intent.action.EDIT_SETTING` / `FIRE_SETTING`, plus the condition variants). This means existing Tasker/Locale plugins work unchanged where their actions don't depend on Tasker-private intents. A native richer AIDL surface (`IOpenTaskerPlugin`) is also exposed for plugins that want variable access and live progress reporting.
+
+## Why these choices
+
+- **Kotlin + Compose + Material 3** — modern, smaller, type-safe, and matches your stack rules.
+- **Room over raw XML** — XML import/export is supported for Tasker compat, but the live store is queryable.
+- **JSON in blobs for action/context config** — additive schema, no migration churn per new action.
+- **Locale-compat plugin API** — instant ecosystem of existing plugins.
+- **Foreground `AutomationService`** — required for reliable trigger eval on modern Android (Doze, App Standby).

@@ -1,0 +1,31 @@
+# Android / Gradle
+*.iml
+.gradle/
+local.properties
+.idea/
+.DS_Store
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+release/
+
+# Keystores (NEVER commit)
+*.jks
+*.keystore
+keystore.properties
+
+# Kotlin
+.kotlin/
+
+# Local agent working notes (never commit)
+CLAUDE.md
+CODEX_CHANGELOG.md
+.claude/
+*.bak

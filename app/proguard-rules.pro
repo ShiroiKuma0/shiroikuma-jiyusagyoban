@@ -1,0 +1,3 @@
+-keep class com.opentasker.core.model.** { *; }
+-keepclassmembers class **$$serializer { *; }
+-keepclasseswithmembers class * { @kotlinx.serialization.Serializable <fields>; }
