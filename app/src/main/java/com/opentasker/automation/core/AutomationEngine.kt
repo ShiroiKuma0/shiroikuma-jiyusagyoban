@@ -36,9 +36,9 @@ class AutomationEngine @Inject constructor(
     private val constraintRegistry: ConstraintRegistry,
     private val actionRegistry: ActionRegistry,
     private val triggerMatcher: TriggerMatcher,
-    private val constraintEvaluator: ConstraintEvaluator,
-    private val actionExecutor: ActionExecutorImpl
+    private val constraintEvaluator: ConstraintEvaluator
 ) {
+    private val actionExecutor by lazy { ActionExecutorImpl() }
     private val scope = CoroutineScope(Dispatchers.Default)
     
     // Cache for active profiles (in-memory, not persisted)

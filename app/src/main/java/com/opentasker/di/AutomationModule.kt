@@ -108,8 +108,7 @@ object AutomationModule {
         constraintRegistry: ConstraintRegistry,
         actionRegistry: ActionRegistry,
         triggerMatcher: TriggerMatcher,
-        constraintEvaluator: ConstraintEvaluator,
-        actionExecutor: ActionExecutorImpl
+        constraintEvaluator: ConstraintEvaluator
     ): AutomationEngine {
         return AutomationEngine(
             context,
@@ -119,8 +118,7 @@ object AutomationModule {
             constraintRegistry,
             actionRegistry,
             triggerMatcher,
-            constraintEvaluator,
-            actionExecutor
+            constraintEvaluator
         )
     }
 
