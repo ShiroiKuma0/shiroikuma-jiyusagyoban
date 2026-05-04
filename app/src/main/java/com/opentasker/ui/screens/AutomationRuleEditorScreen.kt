@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.opentasker.automation.model.AutomationRule
 import com.opentasker.automation.model.TriggerConfig
@@ -163,42 +164,59 @@ fun RuleEditorMainScreen(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    )
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         Text(
                             text = "Rule Details",
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         
-                        TextField(
+                        OutlinedTextField(
                             value = name,
                             onValueChange = onNameChange,
                             label = { Text("Rule Name") },
+                            placeholder = { Text("e.g. Morning Notification") },
                             modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
+                            singleLine = true,
+                            shape = RoundedCornerShape(8.dp)
                         )
                         
-                        TextField(
+                        OutlinedTextField(
                             value = description,
                             onValueChange = onDescriptionChange,
                             label = { Text("Description") },
+                            placeholder = { Text("What does this rule do?") },
                             modifier = Modifier.fillMaxWidth(),
                             minLines = 2,
-                            maxLines = 3
+                            maxLines = 3,
+                            shape = RoundedCornerShape(8.dp)
                         )
+                        
+                        Divider(modifier = Modifier.padding(vertical = 4.dp))
                         
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Enabled")
+                            Column {
+                                Text("Status", style = MaterialTheme.typography.labelMedium)
+                                Text(
+                                    if (enabled) "Active" else "Inactive",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                             Switch(checked = enabled, onCheckedChange = onEnabledChange)
                         }
                         
@@ -207,8 +225,17 @@ fun RuleEditorMainScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Execution Mode")
-                            Text(executionMode.replaceFirstChar { it.uppercase() })
+                            Column {
+                                Text("Execution Mode", style = MaterialTheme.typography.labelMedium)
+                                Text(
+                                    executionMode.replaceFirstChar { it.uppercase() },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            ElevatedButton(onClick = {}) {
+                                Text("Change")
+                            }
                         }
                     }
                 }
@@ -218,7 +245,10 @@ fun RuleEditorMainScreen(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    )
                 ) {
                     Column(
                         modifier = Modifier
@@ -231,22 +261,35 @@ fun RuleEditorMainScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Triggers (${triggers.size})",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            IconButton(onClick = onAddTrigger) {
-                                Icon(Icons.Default.Add, contentDescription = "Add trigger")
+                            Column {
+                                Text(
+                                    text = "Triggers",
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Text(
+                                    text = "${triggers.size} trigger${if (triggers.size != 1) "s" else ""} configured",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Button(
+                                onClick = onAddTrigger,
+                                modifier = Modifier.height(36.dp),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Add", style = MaterialTheme.typography.labelSmall)
                             }
                         }
                         
                         if (triggers.isEmpty()) {
                             Text(
-                                text = "Add a trigger to define when this rule activates",
+                                text = "Add a trigger to define when this rule activates. Triggers can be events (WiFi connect, app open) or conditions (time, location).",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                        } else {
+                        }else {
                             triggers.forEachIndexed { index, trigger ->
                                 TriggerConfigCard(
                                     trigger = trigger,
@@ -262,7 +305,10 @@ fun RuleEditorMainScreen(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    )
                 ) {
                     Column(
                         modifier = Modifier
@@ -275,18 +321,31 @@ fun RuleEditorMainScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Constraints (${constraintGroups.size})",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            IconButton(onClick = onAddConstraint) {
-                                Icon(Icons.Default.Add, contentDescription = "Add constraint")
+                            Column {
+                                Text(
+                                    text = "Constraints",
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Text(
+                                    text = "${constraintGroups.size} group${if (constraintGroups.size != 1) "s" else ""} (optional)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Button(
+                                onClick = onAddConstraint,
+                                modifier = Modifier.height(36.dp),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Add", style = MaterialTheme.typography.labelSmall)
                             }
                         }
                         
                         if (constraintGroups.isEmpty()) {
                             Text(
-                                text = "Add constraints to refine when this rule executes (optional)",
+                                text = "Constraints refine when this rule executes. Combine multiple conditions with AND/OR logic for precise control.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -306,7 +365,10 @@ fun RuleEditorMainScreen(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    )
                 ) {
                     Column(
                         modifier = Modifier
@@ -319,22 +381,35 @@ fun RuleEditorMainScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Actions (${actions.size})",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            IconButton(onClick = onAddAction) {
-                                Icon(Icons.Default.Add, contentDescription = "Add action")
+                            Column {
+                                Text(
+                                    text = "Actions",
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Text(
+                                    text = "${actions.size} action${if (actions.size != 1) "s" else ""} configured",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Button(
+                                onClick = onAddAction,
+                                modifier = Modifier.height(36.dp),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Add", style = MaterialTheme.typography.labelSmall)
                             }
                         }
                         
                         if (actions.isEmpty()) {
                             Text(
-                                text = "Add actions to define what happens when this rule triggers",
+                                text = "Actions define what happens when this rule triggers. Execute notifications, send intents, run shell commands, and more.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                        } else {
+                        }else {
                             actions.forEachIndexed { index, action ->
                                 ActionConfigCard(
                                     action = action,
@@ -346,18 +421,56 @@ fun RuleEditorMainScreen(
                 }
             }
             
-            // Save button
+            // Save/Cancel buttons
             item {
-                Button(
-                    onClick = onSave,
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 16.dp),
-                    enabled = name.isNotBlank() && triggers.isNotEmpty() && actions.isNotEmpty()
+                        .padding(vertical = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(Icons.Default.Save, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Save Rule")
+                    OutlinedButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Cancel")
+                    }
+                    
+                    Button(
+                        onClick = onSave,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        enabled = name.isNotBlank() && triggers.isNotEmpty() && actions.isNotEmpty()
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Save Rule")
+                    }
+                }
+                if (name.isBlank() || triggers.isEmpty() || actions.isEmpty()) {
+                    Text(
+                        text = buildString {
+                            val issues = mutableListOf<String>()
+                            if (name.isBlank()) issues.add("name")
+                            if (triggers.isEmpty()) issues.add("at least one trigger")
+                            if (actions.isEmpty()) issues.add("at least one action")
+                            append("Required: ")
+                            append(issues.joinToString(", "))
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                    )
                 }
             }
         }

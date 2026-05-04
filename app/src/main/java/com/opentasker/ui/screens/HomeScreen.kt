@@ -21,9 +21,18 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("OpenTasker") },
+                title = { 
+                    Column {
+                        Text("OpenTasker", style = MaterialTheme.typography.headlineSmall)
+                        Text(
+                            "Automation Platform",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         }
@@ -32,39 +41,43 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.Top)
         ) {
             Text(
-                text = "Choose what to do",
+                text = "What would you like to do?",
                 style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.padding(bottom = 24.dp)
+                color = MaterialTheme.colorScheme.onSurface
             )
             
-            // Profiles card
-            NavigationCard(
-                icon = Icons.Default.Settings,
-                title = "Profiles",
-                description = "Manage automation profiles and tasks (legacy system)",
-                onClick = onProfilesClick
-            )
-            
-            // Automation Rules card
-            NavigationCard(
-                icon = Icons.Default.AutoAwesome,
-                title = "Automation Rules",
-                description = "Create event-driven automation rules (new system)",
-                onClick = onAutomationRulesClick
-            )
-            
-            // Execution Log card
-            NavigationCard(
-                icon = Icons.Default.History,
-                title = "Execution Log",
-                description = "View automation execution history",
-                onClick = onRunLogClick
-            )
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Profiles card
+                NavigationCard(
+                    icon = Icons.Default.Settings,
+                    title = "Profiles",
+                    description = "Manage automation profiles and tasks (legacy system)",
+                    onClick = onProfilesClick
+                )
+                
+                // Automation Rules card
+                NavigationCard(
+                    icon = Icons.Default.AutoAwesome,
+                    title = "Automation Rules",
+                    description = "Create event-driven automation rules (new system)",
+                    onClick = onAutomationRulesClick
+                )
+                
+                // Execution Log card
+                NavigationCard(
+                    icon = Icons.Default.History,
+                    title = "Execution Log",
+                    description = "View automation execution history and performance",
+                    onClick = onRunLogClick
+                )
+            }
         }
     }
 }
@@ -82,46 +95,53 @@ fun NavigationCard(
             .height(120.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+        ),
+        onClick = onClick
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            
-            Column(
-                modifier = Modifier
-                    .weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(44.dp),
+                    tint = MaterialTheme.colorScheme.primary
                 )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2
+                    )
+                }
             }
             
-            IconButton(onClick = onClick) {
-                Icon(
-                    imageVector = Icons.Default.ArrowForward,
-                    contentDescription = "Go to $title"
-                )
-            }
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+            )
         }
     }
 }

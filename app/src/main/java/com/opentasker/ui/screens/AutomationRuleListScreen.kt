@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.opentasker.automation.model.AutomationRule
 import com.opentasker.automation.model.TriggerConfig
@@ -79,33 +80,42 @@ fun EmptyRulesState(onCreateRule: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(32.dp),
+            .padding(40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
-            imageVector = Icons.Default.Info,
+            imageVector = Icons.Default.AutoAwesome,
             contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.surfaceVariant
+            modifier = Modifier.size(72.dp),
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(20.dp))
         Text(
             "No automation rules yet",
             style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         Text(
-            "Create a rule to automate actions based on triggers and conditions",
+            "Create your first rule to automate tasks based on triggers and conditions. Rules execute automatically when their conditions are met.",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.2
         )
-        Spacer(modifier = Modifier.height(24.dp))
-        Button(onClick = onCreateRule) {
+        Spacer(modifier = Modifier.height(28.dp))
+        Button(
+            onClick = onCreateRule,
+            modifier = Modifier
+                .fillMaxWidth(0.7f)
+                .height(48.dp),
+            shape = RoundedCornerShape(8.dp)
+        ) {
             Icon(Icons.Default.Add, contentDescription = null)
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Create Rule")
+            Text("Create First Rule")
         }
     }
 }
@@ -117,83 +127,123 @@ fun RuleCard(
     onDelete: () -> Unit,
     onToggle: () -> Unit
 ) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete \"${rule.name}\"?") },
+            text = { Text("This action cannot be undone. All rule history will be permanently deleted.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteConfirm = false
+                        onDelete()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(4.dp),
-        shape = RoundedCornerShape(8.dp),
+            .padding(horizontal = 4.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (rule.enabled) 
-                MaterialTheme.colorScheme.surface 
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             else 
-                MaterialTheme.colorScheme.surfaceVariant
-        )
+                MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+        ),
+        onClick = onEdit
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
+                .padding(16.dp)
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(end = 8.dp)
+                        .padding(end = 12.dp)
                 ) {
-                    Text(
-                        text = rule.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = if (rule.enabled) 
-                            MaterialTheme.colorScheme.onSurface 
-                        else 
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = rule.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                        StatusBadge(enabled = rule.enabled)
+                    }
+                    
                     if (rule.description.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = rule.description,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
                         )
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Spacer(modifier = Modifier.height(10.dp))
                     RuleSummary(rule = rule)
                 }
                 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.padding(start = 8.dp)
                 ) {
                     IconButton(
                         onClick = onToggle,
-                        modifier = Modifier.size(40.dp)
+                        modifier = Modifier.size(36.dp)
                     ) {
                         Icon(
-                            imageVector = if (rule.enabled) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                            contentDescription = if (rule.enabled) "Disable" else "Enable"
+                            imageVector = if (rule.enabled) Icons.Default.ToggleOn else Icons.Default.ToggleOff,
+                            contentDescription = if (rule.enabled) "Disable rule" else "Enable rule",
+                            modifier = Modifier.size(20.dp),
+                            tint = if (rule.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(
                         onClick = onEdit,
-                        modifier = Modifier.size(40.dp)
+                        modifier = Modifier.size(36.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
-                            contentDescription = "Edit"
+                            contentDescription = "Edit rule",
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                     IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.size(40.dp)
+                        onClick = { showDeleteConfirm = true },
+                        modifier = Modifier.size(36.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete",
+                            contentDescription = "Delete rule",
+                            modifier = Modifier.size(20.dp),
                             tint = MaterialTheme.colorScheme.error
                         )
                     }
@@ -204,32 +254,58 @@ fun RuleCard(
 }
 
 @Composable
-fun RuleSummary(rule: AutomationRule) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+fun StatusBadge(enabled: Boolean) {
+    Surface(
+        color = if (enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.error.copy(alpha = 0.2f),
+        shape = RoundedCornerShape(4.dp)
     ) {
-        // Triggers
         Text(
-            text = "Triggers: ${rule.triggers.size} • ${rule.triggers.mapNotNull { it.id }.joinToString(", ")}",
+            text = if (enabled) "Active" else "Inactive",
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary
+            color = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
         )
+    }
+}
+
+@Composable
+fun RuleSummary(rule: AutomationRule) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SummaryBadge("${rule.triggers.size}", "Trigger${if (rule.triggers.size != 1) "s" else ""}")
         
-        // Constraints
         if (rule.constraintGroups.isNotEmpty()) {
-            Text(
-                text = "Constraints: ${rule.constraintGroups.size} group(s)",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.secondary
-            )
+            SummaryBadge("${rule.constraintGroups.size}", "Constraint${if (rule.constraintGroups.size != 1) "s" else ""}")
         }
         
-        // Actions
-        Text(
-            text = "Actions: ${rule.actions.size} (${rule.executionMode.lowercase()})",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.tertiary
-        )
+        SummaryBadge("${rule.actions.size}", "Action${if (rule.actions.size != 1) "s" else ""}")
+    }
+}
+
+@Composable
+fun SummaryBadge(count: String, label: String) {
+    Surface(
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+        shape = RoundedCornerShape(4.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = count,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
