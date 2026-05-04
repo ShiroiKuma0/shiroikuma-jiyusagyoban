@@ -32,7 +32,9 @@ jobs:
           accept-android-sdk-licenses: true
       
       - name: Make gradlew executable
-        run: chmod +x ./gradlew
+        run: |
+          dos2unix ./gradlew || sed -i 's/\r$//' ./gradlew
+          chmod +x ./gradlew
       
       - name: Build release APK
         run: ./gradlew assembleRelease
