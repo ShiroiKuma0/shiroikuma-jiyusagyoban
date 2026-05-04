@@ -25,6 +25,12 @@
         xmlns:tools="http://schemas.android.com/tools" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
+    <permission
+        android:name="com.opentasker.permission.AUTOMATION"
+        android:description="@string/permission_automation_description"
+        android:label="@string/permission_automation_label"
+        android:protectionLevel="normal" />
+
     <queries>
         <intent>
             <action android:name="com.twofortyfouram.locale.intent.action.EDIT_SETTING" />
@@ -91,6 +97,17 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.opentasker.automation.GEOFENCE_EVENT" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.opentasker.core.external.AutomationTargetReceiver"
+            android:exported="true"
+            android:permission="com.opentasker.permission.AUTOMATION">
+            <intent-filter>
+                <action android:name="com.opentasker.action.RUN_TASK" />
+                <action android:name="com.opentasker.action.SET_PROFILE_ENABLED" />
+                <action android:name="com.opentasker.action.QUERY_STATUS" />
             </intent-filter>
         </receiver>
     </application>

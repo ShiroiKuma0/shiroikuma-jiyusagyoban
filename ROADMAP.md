@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.14. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.15. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-04  
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.14  
+**Current app version:** 0.2.15  
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -229,6 +229,7 @@ Key local constraints:
 
 ### X4 - OpenTasker as automation target
 
+**Status:** Baseline completed in v0.2.15. Added a custom-permission receiver for task execution, profile enable/disable, status queries, variable extras, run-log persistence, docs, and contract tests.  
 **Description:** Expose documented, permission-scoped intents so other apps can trigger profiles/tasks, query profile status, or pass variables into a task. Include examples and security controls for exported receivers/services.  
 **Sources:** openHAB Android Tasker plugin [S5], NetGuard intent API lesson [S6], Locale SDK [S7].  
 **Category:** integrations, security, dev-experience.  
