@@ -94,7 +94,9 @@ data class TriggerConfig(
     val id: String = UUID.randomUUID().toString(),
     val type: String, // "time", "geofence", "wifi", "battery", etc.
     val displayName: String = "", // User-friendly name
-    val enabled: Boolean = true
+    val enabled: Boolean = true,
+    @Transient
+    val config: Map<String, Any> = emptyMap() // Runtime configuration map (not serialized)
 ) : Parcelable
 
 @Parcelize
@@ -102,7 +104,9 @@ data class ConstraintConfig(
     val id: String = UUID.randomUUID().toString(),
     val type: String, // "battery", "time_range", "location", "wifi", etc.
     val displayName: String = "",
-    val enabled: Boolean = true
+    val enabled: Boolean = true,
+    @Transient
+    val config: Map<String, Any> = emptyMap()
 ) : Parcelable
 
 @Parcelize
@@ -110,7 +114,9 @@ data class ActionConfig(
     val id: String = UUID.randomUUID().toString(),
     val type: String, // "notification", "intent", "toggle_wifi", etc.
     val displayName: String = "",
-    val enabled: Boolean = true
+    val enabled: Boolean = true,
+    @Transient
+    val config: Map<String, Any> = emptyMap()
 ) : Parcelable
 
 // ============================================================================
