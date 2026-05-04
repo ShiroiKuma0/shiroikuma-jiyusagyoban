@@ -15,13 +15,19 @@ import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.automation.app.AppUsageMonitor
 import com.opentasker.automation.network.WiFiNetworkMonitor
 import com.opentasker.automation.scheduler.TimeEventScheduler
+import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.RunLogEntry
+import com.opentasker.core.model.Task
 import com.opentasker.core.storage.toEntity
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.util.ArrayDeque
 import java.util.Collections
 
 /**
@@ -42,6 +48,8 @@ class AutomationService : Service() {
     private val matchers = Collections.synchronizedMap(mutableMapOf<Long, ProfileMatcher>())
     private val profileCooldowns = Collections.synchronizedMap(mutableMapOf<Long, Long>()) // profileId -> cooldownUntilMs
     private val matcherJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>()) // Track jobs for cleanup
+    private val profileTaskJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>())
+    private val queuedProfileTasks = Collections.synchronizedMap(mutableMapOf<Long, ArrayDeque<Task>>())
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -66,6 +74,9 @@ class AutomationService : Service() {
         matcherJobs.clear()
         matchers.clear()
         profileCooldowns.clear()
+        profileTaskJobs.values.forEach { it.cancel() }
+        profileTaskJobs.clear()
+        queuedProfileTasks.clear()
         timeEventScheduler.cancel()
         wifiNetworkMonitor.stop()
         appUsageMonitor.stop()
@@ -113,15 +124,13 @@ class AutomationService : Service() {
     private suspend fun onProfileActivated(profile: com.opentasker.core.model.Profile) {
         if (profile.enterTaskId <= 0) return
         
-        if (!tryReserveCooldown(profile.id, profile.cooldownSec)) return
-        
         val task = db.taskDao().getById(profile.enterTaskId)
         if (task == null) {
             android.util.Log.w("OpenTasker", "Enter task ${profile.enterTaskId} not found for profile ${profile.name}")
             return
         }
         val domain = task.toDomain()
-        runTask(domain, profile.id, profile.cooldownSec)
+        dispatchTask(profile, domain)
     }
 
     private suspend fun onProfileDeactivated(profile: com.opentasker.core.model.Profile) {
@@ -132,13 +141,87 @@ class AutomationService : Service() {
             return
         }
         val domain = task.toDomain()
-        runTask(domain, profile.id, profile.cooldownSec)
+        dispatchTask(profile, domain)
     }
 
+    private fun dispatchTask(
+        profile: com.opentasker.core.model.Profile,
+        task: Task,
+    ) {
+        if (!tryReserveCooldown(profile.id, profile.cooldownSec)) return
+
+        when (profile.automationMode) {
+            AutomationMode.SINGLE -> {
+                if (profileTaskJobs[profile.id]?.isActive == true) {
+                    android.util.Log.i("OpenTasker", "Profile ${profile.id} already running; SINGLE mode skipped retrigger")
+                    return
+                }
+                profileTaskJobs[profile.id] = launchTrackedTask(profile.id, task)
+            }
+
+            AutomationMode.RESTART -> {
+                profileTaskJobs[profile.id]?.cancel()
+                profileTaskJobs[profile.id] = launchTrackedTask(profile.id, task)
+            }
+
+            AutomationMode.QUEUED -> {
+                if (profileTaskJobs[profile.id]?.isActive == true) {
+                    synchronized(queuedProfileTasks) {
+                        queuedProfileTasks.getOrPut(profile.id) { ArrayDeque() }.add(task)
+                    }
+                    android.util.Log.i("OpenTasker", "Profile ${profile.id} queued retrigger")
+                    return
+                }
+                profileTaskJobs[profile.id] = launchQueuedTasks(profile.id, task)
+            }
+
+            AutomationMode.PARALLEL -> {
+                scope.launch { runTask(task, profile.id) }
+            }
+        }
+    }
+
+    private fun launchTrackedTask(profileId: Long, task: Task): Job =
+        scope.launch(start = CoroutineStart.DEFAULT) {
+            val thisJob = currentCoroutineContext()[Job]
+            try {
+                runTask(task, profileId)
+            } finally {
+                synchronized(profileTaskJobs) {
+                    if (profileTaskJobs[profileId] == thisJob) {
+                        profileTaskJobs.remove(profileId)
+                    }
+                }
+            }
+        }
+
+    private fun launchQueuedTasks(profileId: Long, firstTask: Task): Job =
+        scope.launch(start = CoroutineStart.DEFAULT) {
+            val thisJob = currentCoroutineContext()[Job]
+            var nextTask: Task? = firstTask
+            try {
+                while (isActive && nextTask != null) {
+                    runTask(requireNotNull(nextTask), profileId)
+                    nextTask = synchronized(queuedProfileTasks) {
+                        queuedProfileTasks[profileId]?.poll()?.also {
+                            if (queuedProfileTasks[profileId]?.isEmpty() == true) {
+                                queuedProfileTasks.remove(profileId)
+                            }
+                        }
+                    }
+                }
+            } finally {
+                synchronized(profileTaskJobs) {
+                    if (profileTaskJobs[profileId] == thisJob) {
+                        profileTaskJobs.remove(profileId)
+                    }
+                }
+            }
+        }
+
     private suspend fun runTask(
-        task: com.opentasker.core.model.Task,
-        profileId: Long,
-        cooldownSec: Int
+        task: Task,
+        profileId: Long
     ) {
         val variables = VariableStore()
         val ctx = ActionContext(this, variables) { msg ->

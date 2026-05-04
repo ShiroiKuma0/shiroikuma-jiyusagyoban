@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.16 — 2026-05-04
+
+Automation mode baseline.
+
+- Added per-profile automation modes: single, restart, queued, and parallel.
+- Added a Room v1-to-v2 migration that persists `automationMode` on profiles.
+- Added profile editor mode selection and profile cards showing the current mode.
+- Updated `AutomationService` dispatch so re-triggers can be skipped, restarted, queued, or run in parallel.
+- Added unit coverage for profile entity automation-mode round trips and legacy fallback.
+
 ## v0.2.15 — 2026-05-04
 
 External automation target baseline.
