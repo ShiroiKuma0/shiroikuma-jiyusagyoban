@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.13 — 2026-05-04
+
+Open JSON bundle baseline.
+
+- Added schema-versioned OpenTasker JSON bundle models for profiles, tasks, actions, contexts, variables, scenes, and metadata.
+- Added deterministic export ordering and capability requirement metadata for setup-required or unsupported actions.
+- Added import planning/reporting with warnings for unsupported actions and lossy missing-reference handling.
+- Added Room-backed export/import repository logic with task ID remapping, variable upsert, profile remapping, and scene element link remapping.
+- Documented the v1 JSON bundle format and added unit coverage for sorting, capability metadata, validation, and JSON round trips.
+
 ## v0.2.12 — 2026-05-04
 
 Profile template baseline.
