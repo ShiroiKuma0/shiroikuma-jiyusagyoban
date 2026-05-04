@@ -38,7 +38,7 @@ class AutomationEngine @Inject constructor(
     private val triggerMatcher: TriggerMatcher,
     private val constraintEvaluator: ConstraintEvaluator
 ) {
-    private val actionExecutor by lazy { ActionExecutorImpl() }
+    private val actionExecutor: ActionExecutor by lazy { ActionExecutorImpl() }
     private val scope = CoroutineScope(Dispatchers.Default)
     
     // Cache for active profiles (in-memory, not persisted)
@@ -128,13 +128,13 @@ class AutomationEngine @Inject constructor(
             // Log the failure
             val executionLog = ExecutionLog(
                 ruleId = rule.id,
-                profileId = rule.profileId,
-                eventType = event::class.simpleName ?: "Unknown",
-                triggered = false,
-                executionTimeMs = 0,
-                actionCount = 0,
-                successCount = 0,
-                details = "Error: ${e.message}"
+                ruleName = rule.name,
+                triggerId = null,
+                triggerType = event::class.simpleName,
+                timestamp = System.currentTimeMillis(),
+                status = ExecutionStatus.FAILURE,
+                message = "Error: ${e.message}",
+                executionTimeMs = 0
             )
             logRepository.insert(executionLog)
         }
