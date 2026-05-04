@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.3 — 2026-05-04
+
+Permission onboarding pass.
+
+- Added a Setup tab with live status for Android runtime permissions and special access gates.
+- Added direct request/open-settings actions for notifications, exact alarms, battery optimization, usage access, notification access, overlay access, foreground/background location, Bluetooth, SMS, and DND access.
+- Added Bluetooth scan permission metadata for Android 12+ Bluetooth setup.
+- Updated README/version metadata for the setup checklist.
+
 ## v0.2.2 — 2026-05-04
 
 Active UI reintegration pass.

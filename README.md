@@ -1,13 +1,13 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.2-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.3-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.2** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scenes, and variables — without the proprietary lock-in.
+**OpenTasker v0.2.3** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scenes, and variables — without the proprietary lock-in.
 
-> **Status:** v0.2.2 restores an active Compose management UI for profiles, tasks, actions, contexts, and run logs. Some advanced editor surfaces still need deeper capability gating and platform onboarding before a public beta claim.
+> **Status:** v0.2.3 restores active profile/task/action/context/run-log management and adds an in-app setup checklist for Android runtime permissions and special access.
 
 ---
 
@@ -18,6 +18,7 @@
 ✅ **Reactive contexts** — battery, headphones, screen, WiFi, app foreground, time, SMS/events  
 ✅ **AMOLED-first** — Catppuccin Mocha palette, light theme toggle  
 ✅ **Compose UI reintegration started** — active navigation now manages profiles, tasks, actions, contexts, and run logs from Room  
+✅ **Setup checklist** — notifications, exact alarms, battery optimization, usage access, notification access, overlays, location, Bluetooth, SMS, and DND access  
 ✅ **Database persistence** — Room DAOs with StateFlow live updates  
 ✅ **Action metadata system** — dynamic form generation for all 43 actions  
 ✅ **Context configuration** — UI for all 6 context families (app, time, day, location, state, event)  
@@ -86,8 +87,8 @@ Release APKs are unsigned unless `OPEN_TASKER_RELEASE_KEYSTORE`, `OPEN_TASKER_RE
 
 ## Next Phase (v0.3)
 
-1. **Permission onboarding** — explain and request Usage Stats, notifications, location, overlay, and settings-write access from the app
-2. **Capability gating** — hide or explain unsupported platform actions before execution
+1. **Capability gating** — hide or explain unsupported platform actions before execution
+2. **Exact alarm hardening** — remove alarm-clock-only permissions and add graceful fallback behavior
 3. **Variable inspector** — display task runtime variables during execution
 4. **Tasker import** — `.prj.xml` parser for profile migration
 5. **Plugin SDK** — stable AIDL interface for custom actions
