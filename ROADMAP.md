@@ -2,15 +2,53 @@
 
 Parity-with-Tasker tracker. Items are grouped by milestone.
 
-## v0.1.x — Foundation
+## v0.1.x — Foundation ✅ COMPLETE
 - [x] Repo + license + docs scaffold
 - [x] Core data model (Profile / Context / Task / Action / Scene / Variable)
 - [x] Room persistence layer + migrations
-- [ ] `AutomationService` foreground service skeleton (started)
-- [ ] Compose nav graph: Profiles / Tasks / Scenes / Vars / Settings
-- [ ] AMOLED + Catppuccin Mocha + light theme switcher
-- [ ] Profile list + create/edit screens
+- [x] `AutomationService` foreground service (operational)
+- [x] Compose nav graph: Profiles / Tasks / Scenes / Vars / Settings
+- [x] AMOLED + Catppuccin Mocha + light theme switcher
+- [x] Profile list + create/edit screens (UI scaffolded)
 - [x] Action library tier 1 (43 actions: settings, app, file, net, media, system)
+- [x] Real context sources: App, Time, Day, State, Event
+- [x] Profile matcher + task runner full flow
+- [x] Run log model + DAO + screen
+
+## v0.2.x — Database Integration & CRUD
+- [ ] Profile list + load from DB, live updates
+- [ ] Profile create/edit with DB save
+- [ ] Task CRUD with dynamic action editor
+- [ ] Context picker UI (select type, configure predicates)
+- [ ] Variable manager (create/edit/delete globals)
+- [ ] Run log live updates (StateFlow per task)
+
+## v0.3.x — Action Editor & UX
+- [ ] Dynamic action argument form builder
+- [ ] Action search/filter UI
+- [ ] Drag-reorder actions in task editor
+- [ ] Quick-launch widgets (task shortcuts)
+- [ ] Batch operations (enable/disable multiple profiles)
+
+## v0.4.x — Tasker Compat
+- [ ] Import `.prj.xml` / `.tsk.xml` / `.prf.xml` / `.scn.xml`
+- [ ] Best-effort action mapping table
+- [ ] Migration report screen
+- [ ] Export profile as XML
+
+## v0.5.x — Advanced Features
+- [ ] Location context refinement (Google Play Services geofence)
+- [ ] Plugin SDK stability + sample plugin
+- [ ] Custom script execution (JavaScript, shell)
+- [ ] Notification listener integration (event context)
+- [ ] Multi-profile collision handling (cooldowns, queue)
+
+## v1.0 — Public Release
+- [ ] Full action library (target ~100 actions)
+- [ ] Signed release on F-Droid
+- [ ] Documentation site
+- [ ] Community translation support
+
 
 ## v0.2.x — Trigger Engine
 - [ ] Time context (clock-based, repeating)
