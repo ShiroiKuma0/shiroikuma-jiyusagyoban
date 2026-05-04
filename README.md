@@ -1,13 +1,13 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.1.0** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scenes, and variables — without the proprietary lock-in.
+**OpenTasker v0.2.0** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scenes, and variables — without the proprietary lock-in.
 
-> **Status:** v0.1.0 complete with engine + 43 actions + UI scaffolding. Context sources fully implemented. Ready for database integration and action editor.
+> **Status:** v0.2.0 complete with full UI layer: profile/task CRUD, action editor (43 types), context picker, database persistence via Room. Engine fully operational with context sources. Ready for automation execution and run log visualization.
 
 ---
 
@@ -17,10 +17,14 @@
 ✅ **43 built-in actions** — settings, apps, files, network, media, system  
 ✅ **Reactive contexts** — battery, headphones, screen, WiFi, app foreground, time, SMS/events  
 ✅ **AMOLED-first** — Catppuccin Mocha palette, light theme toggle  
-✅ **Compose UI** — profile/task/variables/settings/run-log screens  
+✅ **Compose UI** — full CRUD for profiles/tasks/contexts/actions with dynamic forms  
+✅ **Database persistence** — Room DAOs with StateFlow live updates  
+✅ **Action metadata system** — dynamic form generation for all 43 actions  
+✅ **Context configuration** — UI for all 6 context families (app, time, day, location, state, event)  
 ✅ **100% Kotlin** — modern, type-safe, coroutine-friendly  
-⏳ **DB integration** — Room DAOs ready, awaiting CRUD screens  
-⏳ **Tasker compat** — architecture matches for future `.prj.xml` import  
+⏳ **Profile execution** — AutomationService wired to TaskRunner for context triggers  
+⏳ **Run log viewer** — real-time StateFlow-based execution history  
+⏳ **Tasker compat** — architecture matches for future `.prj.xml` import
 
 ---
 
@@ -80,14 +84,14 @@ Signed release APK attached to each [GitHub Release](https://github.com/SysAdmin
 
 ---
 
-## Next Phase (v0.2)
+## Next Phase (v0.3)
 
-1. **Database CRUD** — profile/task persistence, load/save UI integration
-2. **Action editor** — dynamic form builder for action args
-3. **Context picker** — UI to select contexts and configure predicates
-4. **Run log live updates** — StateFlow-based real-time log viewer
-5. **Tasker import** — `.prj.xml` parser for profile migration
-6. **Plugin SDK** — stable AIDL interface for custom actions
+1. **Profile execution** — wire AutomationService to ProfileMatcher and TaskRunner
+2. **Run log viewer** — StateFlow-based real-time task execution display
+3. **Variable inspector** — display task runtime variables during execution
+4. **Tasker import** — `.prj.xml` parser for profile migration
+5. **Plugin SDK** — stable AIDL interface for custom actions
+6. **Scheduled tasks** — AlarmManager-based background task execution
 
 ---
 
