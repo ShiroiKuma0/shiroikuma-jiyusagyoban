@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -22,6 +23,7 @@ import kotlinx.coroutines.launch
  * Screen for batch operations on profiles: multi-select, enable/disable/delete all.
  * Supports search/filter by profile name or context type.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun BatchOperationsScreen(
     db: AppDatabase,
@@ -90,7 +92,7 @@ fun BatchOperationsScreen(
                         scope.launch {
                             selectedIds.forEach { id ->
                                 val profile = allProfiles.find { it.id == id } ?: return@forEach
-                                db.profileDao().insertOrUpdate(profile.copy(enabled = true).toEntity())
+                                db.profileDao().update(profile.copy(enabled = true).toEntity())
                             }
                             selectedIds = emptySet()
                         }
@@ -107,7 +109,7 @@ fun BatchOperationsScreen(
                         scope.launch {
                             selectedIds.forEach { id ->
                                 val profile = allProfiles.find { it.id == id } ?: return@forEach
-                                db.profileDao().insertOrUpdate(profile.copy(enabled = false).toEntity())
+                                db.profileDao().update(profile.copy(enabled = false).toEntity())
                             }
                             selectedIds = emptySet()
                         }
