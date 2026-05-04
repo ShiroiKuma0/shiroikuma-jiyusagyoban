@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.15. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.16. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-04  
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.15  
+**Current app version:** 0.2.16  
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -242,6 +242,7 @@ Key local constraints:
 
 ### X5 - Automation modes: single, restart, queued, parallel
 
+**Status:** Baseline completed in v0.2.16. Added persisted per-profile automation modes, migration support, UI selection, single/restart/queued/parallel dispatch logic, and profile entity tests.  
 **Description:** Add per-profile re-trigger behavior modeled after Home Assistant automation modes. Current cooldown behavior becomes one policy instead of the whole concurrency model.  
 **Sources:** Home Assistant automation modes [S12], current cooldown logic [L1].  
 **Category:** correctness, reliability, UX.  
