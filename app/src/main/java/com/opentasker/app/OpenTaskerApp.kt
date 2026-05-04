@@ -87,6 +87,5 @@ class OpenTaskerApp : Application() {
         ContextSourceRegistry.register(LocationContextSource())
         ContextSourceRegistry.register(StateContextSourceImpl())
         ContextSourceRegistry.register(EventContextSourceImpl())
-        ContextSourceRegistry.register(ScheduleContextSource())
     }
 }
