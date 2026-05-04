@@ -803,7 +803,7 @@ private fun RunLogCard(entry: RunLogEntry) {
                 Text(entry.taskName, style = MaterialTheme.typography.titleMedium)
                 Text(time, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (entry.message.isNotBlank()) {
-                    Text(entry.message, style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                    Text(entry.message, style = MaterialTheme.typography.bodyMedium, maxLines = 8, overflow = TextOverflow.Ellipsis)
                 }
             }
             Text("${entry.durationMs} ms", style = MaterialTheme.typography.labelMedium)
