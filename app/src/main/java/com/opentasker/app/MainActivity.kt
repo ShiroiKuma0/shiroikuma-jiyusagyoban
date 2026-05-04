@@ -14,6 +14,7 @@ import com.opentasker.core.model.Task
 import com.opentasker.core.storage.toEntity
 import com.opentasker.ui.screens.ActionEditorScreen
 import com.opentasker.ui.screens.ActionPickerScreen
+import com.opentasker.ui.screens.ContextPickerScreen
 import com.opentasker.ui.screens.ProfileEditorScreen
 import com.opentasker.ui.screens.ProfileListScreen
 import com.opentasker.ui.screens.TaskEditorScreen
@@ -29,6 +30,7 @@ class MainActivity : ComponentActivity() {
             OpenTaskerTheme {
                 var currentScreen by remember { mutableStateOf<Screen>(Screen.ProfileList) }
                 var currentEditingTask by remember { mutableStateOf<Task?>(null) }
+                var currentEditingProfile by remember { mutableStateOf<Profile?>(null) }
                 val scope = rememberCoroutineScope()
 
                 when (val screen = currentScreen) {
@@ -45,8 +47,9 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     is Screen.ProfileEditor -> {
+                        if (currentEditingProfile == null) currentEditingProfile = screen.profile
                         ProfileEditorScreen(
-                            profile = screen.profile,
+                            profile = currentEditingProfile,
                             onSave = { profile ->
                                 scope.launch {
                                     if (profile.id == 0L) {
@@ -54,10 +57,15 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         db.profileDao().update(profile.toEntity())
                                     }
+                                    currentEditingProfile = null
                                     currentScreen = Screen.ProfileList
                                 }
                             },
-                            onBack = { currentScreen = Screen.ProfileList },
+                            onBack = {
+                                currentEditingProfile = null
+                                currentScreen = Screen.ProfileList
+                            },
+                            onAddContext = { currentScreen = Screen.ContextPicker },
                         )
                     }
                     is Screen.TaskEditor -> {
@@ -107,6 +115,19 @@ class MainActivity : ComponentActivity() {
                             onCancel = { currentScreen = Screen.ActionPicker },
                         )
                     }
+                    is Screen.ContextPicker -> {
+                        ContextPickerScreen(
+                            onContextSelected = { context ->
+                                if (currentEditingProfile != null) {
+                                    currentEditingProfile = currentEditingProfile!!.copy(
+                                        contexts = currentEditingProfile!!.contexts + context
+                                    )
+                                }
+                                currentScreen = Screen.ProfileEditor(currentEditingProfile)
+                            },
+                            onCancel = { currentScreen = Screen.ProfileEditor(currentEditingProfile) },
+                        )
+                    }
                 }
             }
         }
@@ -119,4 +140,5 @@ sealed class Screen {
     data class TaskEditor(val task: Task?) : Screen()
     data object ActionPicker : Screen()
     data class ActionEditor(val actionSpec: com.opentasker.core.model.ActionSpec) : Screen()
+    data object ContextPicker : Screen()
 }

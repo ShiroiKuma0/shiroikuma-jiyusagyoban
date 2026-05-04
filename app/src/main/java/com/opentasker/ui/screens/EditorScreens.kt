@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
@@ -31,6 +32,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.CollisionMode
+import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.AppDatabase
@@ -65,8 +67,10 @@ fun ProfileEditorScreen(
     profile: Profile?,
     onSave: (Profile) -> Unit,
     onBack: () -> Unit,
+    onAddContext: () -> Unit = {},
 ) {
     var name by remember { mutableStateOf(profile?.name ?: "") }
+    var contexts by remember { mutableStateOf(profile?.contexts ?: emptyList()) }
     var enterTaskId by remember { mutableStateOf(profile?.enterTaskId ?: 0L) }
     var exitTaskId by remember { mutableStateOf(profile?.exitTaskId) }
     var cooldownSec by remember { mutableStateOf(profile?.cooldownSec?.toString() ?: "0") }
@@ -97,10 +101,34 @@ fun ProfileEditorScreen(
             )
 
             Text(
-                "Contexts (not yet implemented in UI)",
+                "Contexts (${contexts.size})",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(top = 16.dp)
             )
+
+            if (contexts.isEmpty()) {
+                Text("No contexts configured", style = MaterialTheme.typography.bodySmall)
+            } else {
+                LazyColumn {
+                    items(contexts.size) { i ->
+                        ContextListItem(
+                            context = contexts[i],
+                            onDelete = {
+                                contexts = contexts.filterIndexed { idx, _ -> idx != i }
+                            }
+                        )
+                    }
+                }
+            }
+
+            Button(
+                onClick = onAddContext,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+            ) {
+                Text("Add Context")
+            }
 
             Text(
                 "Enter task (click to select)",
@@ -125,7 +153,7 @@ fun ProfileEditorScreen(
                             id = profile?.id ?: 0,
                             name = name,
                             enabled = profile?.enabled ?: true,
-                            contexts = profile?.contexts ?: emptyList(),
+                            contexts = contexts,
                             enterTaskId = enterTaskId,
                             exitTaskId = exitTaskId,
                             cooldownSec = cooldownSec.toIntOrNull() ?: 0
