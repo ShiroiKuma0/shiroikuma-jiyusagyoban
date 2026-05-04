@@ -47,10 +47,7 @@ class TimeTrigger : TriggerDefinition {
                 matches(parts[4], dayOfWeek)
     }
 
-    /**
-     * Check if value matches cron field.
-     * Supports: exact numbers, wildcards (*), ranges (1-5), lists (1,3,5), steps (*/15)
-     */
+    // Check if value matches cron field (exact numbers, wildcards, ranges, lists, steps)
     private fun matches(field: String, value: Int): Boolean {
         return when {
             field == "*" -> true
