@@ -333,10 +333,9 @@ fun ProfileEditorScreen(
                     }
                 },
                 isLoading = isSaving,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Save Profile")
-            }
+                modifier = Modifier.fillMaxWidth(),
+                text = "Save Profile"
+            )
         }
     }
 }
@@ -548,10 +547,9 @@ fun TaskEditorScreen(
                     }
                 },
                 isLoading = isSaving,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Save Task")
-            }
+                modifier = Modifier.fillMaxWidth(),
+                text = "Save Task"
+            )
         }
     }
 }
