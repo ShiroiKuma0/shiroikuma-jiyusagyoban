@@ -3,6 +3,7 @@ package com.opentasker.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -11,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.opentasker.automation.model.ActionConfig
+import com.opentasker.ui.theme.DesignSystem
 
 /**
  * Screen to pick and configure an action type.
@@ -34,12 +36,21 @@ fun ActionPickerScreen(
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Select Action Type") },
+                    title = { 
+                        Text(
+                            "Select Action Type",
+                            style = MaterialTheme.typography.headlineMedium
+                        ) 
+                    },
                     navigationIcon = {
                         IconButton(onClick = onCancel) {
                             Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                         }
-                    }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
+                    )
                 )
             }
         ) { paddingValues ->
@@ -47,8 +58,8 @@ fun ActionPickerScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(DesignSystem.Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)
             ) {
                 items(ACTION_TYPES) { action ->
                     ActionTypeCard(
@@ -68,18 +79,18 @@ fun ActionTypeCard(
 ) {
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(10.dp),
+            .fillMaxWidth(),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         ),
+        elevation = CardDefaults.cardElevation(defaultElevation = DesignSystem.Elevation.sm),
         onClick = onClick
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(DesignSystem.Spacing.lg),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -89,7 +100,7 @@ fun ActionTypeCard(
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(DesignSystem.Spacing.sm))
                 Text(
                     text = action.description,
                     style = MaterialTheme.typography.bodySmall,
@@ -101,12 +112,13 @@ fun ActionTypeCard(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = "Select ${action.name}",
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(DesignSystem.ComponentSize.iconMedium)
             )
         }
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ActionConfigurationScreen(
     actionType: String,
@@ -116,16 +128,26 @@ fun ActionConfigurationScreen(
     val actionDef = ACTION_TYPES.find { it.id == actionType }
     
     val config = remember { mutableStateMapOf<String, String>() }
+    var isSaving by remember { mutableStateOf(false) }
     
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Configure ${actionDef?.name ?: "Action"}") },
+                title = { 
+                    Text(
+                        "Configure ${actionDef?.name ?: "Action"}",
+                        style = MaterialTheme.typography.headlineMedium
+                    ) 
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                )
             )
         }
     ) { paddingValues ->
@@ -133,8 +155,8 @@ fun ActionConfigurationScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(DesignSystem.Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)
         ) {
             if (actionDef != null) {
                 item {
@@ -156,21 +178,26 @@ fun ActionConfigurationScreen(
             }
             
             item {
+                Spacer(modifier = Modifier.height(DesignSystem.Spacing.xl))
                 Button(
                     onClick = {
-                        onSave(
-                            ActionConfig(
-                                id = actionType,
-                                config = config.toMap()
+                        isSaving = true
+                        try {
+                            onSave(
+                                ActionConfig(
+                                    id = actionType,
+                                    config = config.toMap()
+                                )
                             )
-                        )
+                        } finally {
+                            isSaving = false
+                        }
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isSaving
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(DesignSystem.Spacing.sm))
                     Text("Add Action")
                 }
             }
@@ -321,3 +348,65 @@ val ACTION_TYPES = listOf(
         )
     )
 )
+
+data class ConfigField(
+    val key: String,
+    val label: String,
+    val type: String, // "text", "number", "dropdown"
+    val placeholder: String,
+    val helpText: String = "",
+    val options: List<String> = emptyList()
+)
+
+@Composable
+fun TriggerConfigField(
+    field: ConfigField,
+    value: String,
+    onValueChange: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
+        Text(
+            text = field.label,
+            style = MaterialTheme.typography.labelMedium
+        )
+        
+        when (field.type) {
+            "text" -> {
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text(field.placeholder) },
+                    singleLine = true
+                )
+            }
+            "number" -> {
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text(field.placeholder) },
+                    singleLine = true
+                )
+            }
+            "dropdown" -> {
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text(field.placeholder) },
+                    singleLine = true
+                )
+            }
+            else -> {}
+        }
+        
+        if (field.helpText.isNotEmpty()) {
+            Text(
+                text = field.helpText,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
