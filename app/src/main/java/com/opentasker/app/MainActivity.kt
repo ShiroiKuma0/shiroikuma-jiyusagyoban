@@ -7,9 +7,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.opentasker.core.model.Profile
+import com.opentasker.ui.screens.ProfileEditorScreen
+import com.opentasker.ui.screens.ProfileListScreen
 import com.opentasker.ui.theme.OpenTaskerTheme
 
 class MainActivity : ComponentActivity() {
@@ -18,18 +23,31 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             OpenTaskerTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { inner ->
-                    Home(modifier = Modifier.padding(inner))
+                var currentScreen by remember { mutableStateOf<Screen>(Screen.ProfileList) }
+
+                when (val screen = currentScreen) {
+                    is Screen.ProfileList -> {
+                        ProfileListScreen(
+                            onCreateProfile = { currentScreen = Screen.ProfileEditor(null) },
+                            onEditProfile = { currentScreen = Screen.ProfileEditor(it) },
+                            onDeleteProfile = { /* TODO */ },
+                        )
+                    }
+                    is Screen.ProfileEditor -> {
+                        ProfileEditorScreen(
+                            profile = screen.profile,
+                            onSave = { /* TODO: save to DB */ currentScreen = Screen.ProfileList },
+                            onBack = { currentScreen = Screen.ProfileList },
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-@Composable
-private fun Home(modifier: Modifier = Modifier) {
-    Text(
-        text = "OpenTasker v0.1.0\n\nProfiles, Tasks, Scenes, Variables — coming online.",
-        modifier = modifier
-    )
+sealed class Screen {
+    data object ProfileList : Screen()
+    data class ProfileEditor(val profile: Profile?) : Screen()
 }
+
