@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.8 — 2026-05-04
+
+Capability gating baseline.
+
+- Added a central action capability registry for supported, setup-required, and unsupported actions.
+- Annotated task action rows and action picker cards with setup/unsupported status.
+- Disabled unsupported privileged or unimplemented actions in the add-action flow.
+- Added warning copy in action configuration dialogs for actions that require setup.
+- Added unit coverage for capability gating defaults.
+
 ## v0.2.7 — 2026-05-04
 
 Runtime registry and stub-failure hardening pass.
