@@ -8,6 +8,7 @@ import com.opentasker.automation.model.AutomationEvent
 import com.opentasker.automation.model.AutomationRule
 import com.opentasker.automation.model.ExecutionLog
 import com.opentasker.automation.model.ExecutionStatus
+import com.opentasker.automation.model.ActionResult
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,7 +37,7 @@ class AutomationEngine @Inject constructor(
     private val actionRegistry: ActionRegistry,
     private val triggerMatcher: TriggerMatcher,
     private val constraintEvaluator: ConstraintEvaluator,
-    private val actionExecutor: ActionExecutor
+    private val actionExecutor: ActionExecutorImpl
 ) {
     private val scope = CoroutineScope(Dispatchers.Default)
     

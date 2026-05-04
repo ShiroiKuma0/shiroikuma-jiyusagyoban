@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.opentasker.automation.model.ExecutionLog
+import com.opentasker.automation.model.ExecutionStatus
 import com.opentasker.ui.theme.DesignSystem
 import java.text.SimpleDateFormat
 import java.util.*
@@ -31,7 +32,7 @@ fun AutomationExecutionLogScreen(
     
     val filteredLogs = logs.filter { log ->
         (filterByRule == null || log.ruleId == filterByRule) &&
-        (filterBySuccess == null || (log.success == (filterBySuccess == true)))
+        (filterBySuccess == null || ((log.status == ExecutionStatus.SUCCESS) == (filterBySuccess == true)))
     }.sortedByDescending { it.timestamp }
 
     Scaffold(
@@ -160,11 +161,15 @@ fun EmptyLogState() {
 
 @Composable
 fun ExecutionLogCard(log: ExecutionLog) {
+    val isSuccess = log.status == ExecutionStatus.SUCCESS
+    val successCount = log.actionResults.count { it.second.success }
+    val actionCount = log.actionResults.size
+    
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(DesignSystem.Radii.md),
         colors = CardDefaults.cardColors(
-            containerColor = if (log.success) 
+            containerColor = if (isSuccess) 
                 MaterialTheme.colorScheme.surfaceVariant
             else 
                 MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
@@ -188,14 +193,14 @@ fun ExecutionLogCard(log: ExecutionLog) {
                         horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)
                     ) {
                         Icon(
-                            imageVector = if (log.success) Icons.Default.CheckCircle else Icons.Default.Error,
+                            imageVector = if (isSuccess) Icons.Default.CheckCircle else Icons.Default.Error,
                             contentDescription = null,
-                            tint = if (log.success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                            tint = if (isSuccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(DesignSystem.ComponentSize.iconMedium)
                         )
                         Column {
                             Text(
-                                text = log.eventType ?: "Unknown Event",
+                                text = log.triggerType ?: "Unknown Event",
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -236,16 +241,16 @@ fun ExecutionLogCard(log: ExecutionLog) {
                 }
                 
                 Surface(
-                    color = if (log.successCount == log.actionCount)
+                    color = if (successCount == actionCount)
                         MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                     else
                         MaterialTheme.colorScheme.error.copy(alpha = 0.2f),
                     shape = RoundedCornerShape(4.dp)
                 ) {
                     Text(
-                        text = "${log.successCount}/${log.actionCount} actions",
+                        text = "$successCount/$actionCount actions",
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (log.successCount == log.actionCount)
+                        color = if (successCount == actionCount)
                             MaterialTheme.colorScheme.primary
                         else
                             MaterialTheme.colorScheme.error,
