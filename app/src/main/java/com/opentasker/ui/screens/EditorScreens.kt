@@ -555,23 +555,3 @@ fun TaskEditorScreen(
         }
     }
 }
-                                id = task?.id ?: 0,
-                                name = name,
-                                priority = priority.toIntOrNull() ?: 0,
-                                collisionMode = CollisionMode.valueOf(collisionMode.uppercase()),
-                                actions = actions,
-                            )
-                        )
-                    } catch (e: Exception) {
-                        // TODO: show error toast
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp)
-            ) {
-                Text("Save")
-            }
-        }
-    }
-}

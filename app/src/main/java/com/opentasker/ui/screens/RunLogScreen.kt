@@ -206,18 +206,18 @@ fun RunLogEntryItem(entry: RunLogEntry) {
                 modifier = Modifier.padding(start = DesignSystem.Spacing.md)
             ) {
                 Text(
-                        statusText,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = statusColor,
-                        modifier = Modifier.padding(horizontal = DesignSystem.Spacing.sm, vertical = DesignSystem.Spacing.xs)
-                    )
-                }
-                Text(
-                    "${entry.durationMs}ms",
+                    statusText,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = statusColor,
+                    modifier = Modifier.padding(horizontal = DesignSystem.Spacing.sm, vertical = DesignSystem.Spacing.xs)
                 )
             }
+            Text(
+                "${entry.durationMs}ms",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = DesignSystem.Spacing.sm)
+            )
         }
     }
 }
