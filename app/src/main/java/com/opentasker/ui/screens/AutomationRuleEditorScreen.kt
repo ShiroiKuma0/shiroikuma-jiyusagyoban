@@ -8,7 +8,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.opentasker.automation.model.AutomationRule
 import com.opentasker.automation.model.TriggerConfig
@@ -18,7 +17,7 @@ import com.opentasker.automation.model.ConstraintGroup
 import com.opentasker.automation.model.LogicalOperator
 
 /**
- * Screen for editing an automation rule.
+ * Screen for editing an automation rule with integrated picker screens.
  */
 @Composable
 fun AutomationRuleEditorScreen(
@@ -35,14 +34,116 @@ fun AutomationRuleEditorScreen(
     var constraintGroups by remember { mutableStateOf(rule?.constraintGroups ?: emptyList()) }
     var actions by remember { mutableStateOf(rule?.actions ?: emptyList()) }
     
-    var showTriggerPicker by remember { mutableStateOf(false) }
-    var showConstraintPicker by remember { mutableStateOf(false) }
-    var showActionPicker by remember { mutableStateOf(false) }
+    var currentScreen by remember { mutableStateOf<RuleEditorScreen>(RuleEditorScreen.Main) }
+    
+    when (currentScreen) {
+        is RuleEditorScreen.Main -> {
+            RuleEditorMainScreen(
+                name = name,
+                onNameChange = { name = it },
+                description = description,
+                onDescriptionChange = { description = it },
+                enabled = enabled,
+                onEnabledChange = { enabled = it },
+                executionMode = executionMode,
+                onExecutionModeChange = { executionMode = it },
+                triggers = triggers,
+                constraintGroups = constraintGroups,
+                actions = actions,
+                onAddTrigger = { currentScreen = RuleEditorScreen.TriggerPicker },
+                onRemoveTrigger = { index ->
+                    triggers = triggers.filterIndexed { i, _ -> i != index }
+                },
+                onAddConstraint = { currentScreen = RuleEditorScreen.ConstraintPicker },
+                onRemoveConstraint = { index ->
+                    constraintGroups = constraintGroups.filterIndexed { i, _ -> i != index }
+                },
+                onAddAction = { currentScreen = RuleEditorScreen.ActionPicker },
+                onRemoveAction = { index ->
+                    actions = actions.filterIndexed { i, _ -> i != index }
+                },
+                onSave = {
+                    if (name.isNotBlank() && triggers.isNotEmpty() && actions.isNotEmpty()) {
+                        val newRule = AutomationRule(
+                            id = rule?.id ?: System.nanoTime().toString(),
+                            name = name,
+                            description = description,
+                            enabled = enabled,
+                            profileId = rule?.profileId ?: "default",
+                            triggers = triggers,
+                            constraintGroups = constraintGroups,
+                            actions = actions,
+                            executionMode = executionMode
+                        )
+                        onSave(newRule)
+                    }
+                },
+                onBack = onBack
+            )
+        }
+        is RuleEditorScreen.TriggerPicker -> {
+            TriggerPickerScreen(
+                onTriggerSelected = { trigger ->
+                    triggers = triggers + trigger
+                    currentScreen = RuleEditorScreen.Main
+                },
+                onCancel = { currentScreen = RuleEditorScreen.Main }
+            )
+        }
+        is RuleEditorScreen.ConstraintPicker -> {
+            ConstraintPickerScreen(
+                onConstraintGroupSelected = { group ->
+                    constraintGroups = constraintGroups + group
+                    currentScreen = RuleEditorScreen.Main
+                },
+                onCancel = { currentScreen = RuleEditorScreen.Main }
+            )
+        }
+        is RuleEditorScreen.ActionPicker -> {
+            ActionPickerScreen(
+                onActionSelected = { action ->
+                    actions = actions + action
+                    currentScreen = RuleEditorScreen.Main
+                },
+                onCancel = { currentScreen = RuleEditorScreen.Main }
+            )
+        }
+    }
+}
 
+sealed class RuleEditorScreen {
+    data object Main : RuleEditorScreen()
+    data object TriggerPicker : RuleEditorScreen()
+    data object ConstraintPicker : RuleEditorScreen()
+    data object ActionPicker : RuleEditorScreen()
+}
+
+@Composable
+fun RuleEditorMainScreen(
+    name: String,
+    onNameChange: (String) -> Unit,
+    description: String,
+    onDescriptionChange: (String) -> Unit,
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    executionMode: String,
+    onExecutionModeChange: (String) -> Unit,
+    triggers: List<TriggerConfig>,
+    constraintGroups: List<ConstraintGroup>,
+    actions: List<ActionConfig>,
+    onAddTrigger: () -> Unit,
+    onRemoveTrigger: (Int) -> Unit,
+    onAddConstraint: () -> Unit,
+    onRemoveConstraint: (Int) -> Unit,
+    onAddAction: () -> Unit,
+    onRemoveAction: (Int) -> Unit,
+    onSave: () -> Unit,
+    onBack: () -> Unit
+) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (rule == null) "Create Rule" else "Edit Rule") },
+                title = { Text("Create Rule") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -77,7 +178,7 @@ fun AutomationRuleEditorScreen(
                         
                         TextField(
                             value = name,
-                            onValueChange = { name = it },
+                            onValueChange = onNameChange,
                             label = { Text("Rule Name") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
@@ -85,7 +186,7 @@ fun AutomationRuleEditorScreen(
                         
                         TextField(
                             value = description,
-                            onValueChange = { description = it },
+                            onValueChange = onDescriptionChange,
                             label = { Text("Description") },
                             modifier = Modifier.fillMaxWidth(),
                             minLines = 2,
@@ -98,7 +199,7 @@ fun AutomationRuleEditorScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text("Enabled")
-                            Switch(checked = enabled, onCheckedChange = { enabled = it })
+                            Switch(checked = enabled, onCheckedChange = onEnabledChange)
                         }
                         
                         Row(
@@ -107,21 +208,7 @@ fun AutomationRuleEditorScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text("Execution Mode")
-                            DropdownMenu(
-                                expanded = false,
-                                onDismissRequest = {},
-                                modifier = Modifier.align(Alignment.CenterVertically)
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Parallel") },
-                                    onClick = { executionMode = "parallel" }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Sequential") },
-                                    onClick = { executionMode = "sequential" }
-                                )
-                            }
-                            Text(executionMode.capitalize())
+                            Text(executionMode.replaceFirstChar { it.uppercase() })
                         }
                     }
                 }
@@ -148,7 +235,7 @@ fun AutomationRuleEditorScreen(
                                 text = "Triggers (${triggers.size})",
                                 style = MaterialTheme.typography.titleMedium
                             )
-                            IconButton(onClick = { showTriggerPicker = true }) {
+                            IconButton(onClick = onAddTrigger) {
                                 Icon(Icons.Default.Add, contentDescription = "Add trigger")
                             }
                         }
@@ -163,7 +250,7 @@ fun AutomationRuleEditorScreen(
                             triggers.forEachIndexed { index, trigger ->
                                 TriggerConfigCard(
                                     trigger = trigger,
-                                    onRemove = { triggers = triggers.filterIndexed { i, _ -> i != index } }
+                                    onRemove = { onRemoveTrigger(index) }
                                 )
                             }
                         }
@@ -192,7 +279,7 @@ fun AutomationRuleEditorScreen(
                                 text = "Constraints (${constraintGroups.size})",
                                 style = MaterialTheme.typography.titleMedium
                             )
-                            IconButton(onClick = { showConstraintPicker = true }) {
+                            IconButton(onClick = onAddConstraint) {
                                 Icon(Icons.Default.Add, contentDescription = "Add constraint")
                             }
                         }
@@ -207,7 +294,7 @@ fun AutomationRuleEditorScreen(
                             constraintGroups.forEachIndexed { index, group ->
                                 ConstraintGroupCard(
                                     group = group,
-                                    onRemove = { constraintGroups = constraintGroups.filterIndexed { i, _ -> i != index } }
+                                    onRemove = { onRemoveConstraint(index) }
                                 )
                             }
                         }
@@ -236,7 +323,7 @@ fun AutomationRuleEditorScreen(
                                 text = "Actions (${actions.size})",
                                 style = MaterialTheme.typography.titleMedium
                             )
-                            IconButton(onClick = { showActionPicker = true }) {
+                            IconButton(onClick = onAddAction) {
                                 Icon(Icons.Default.Add, contentDescription = "Add action")
                             }
                         }
@@ -251,7 +338,7 @@ fun AutomationRuleEditorScreen(
                             actions.forEachIndexed { index, action ->
                                 ActionConfigCard(
                                     action = action,
-                                    onRemove = { actions = actions.filterIndexed { i, _ -> i != index } }
+                                    onRemove = { onRemoveAction(index) }
                                 )
                             }
                         }
@@ -262,22 +349,7 @@ fun AutomationRuleEditorScreen(
             // Save button
             item {
                 Button(
-                    onClick = {
-                        if (name.isNotBlank() && triggers.isNotEmpty() && actions.isNotEmpty()) {
-                            val newRule = AutomationRule(
-                                id = rule?.id ?: System.nanoTime().toString(),
-                                name = name,
-                                description = description,
-                                enabled = enabled,
-                                profileId = rule?.profileId ?: "default",
-                                triggers = triggers,
-                                constraintGroups = constraintGroups,
-                                actions = actions,
-                                executionMode = executionMode
-                            )
-                            onSave(newRule)
-                        }
-                    },
+                    onClick = onSave,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 16.dp),
@@ -319,7 +391,7 @@ fun TriggerConfigCard(
                 )
                 if (trigger.config.isNotEmpty()) {
                     Text(
-                        text = trigger.config.entries.joinToString(", ") { "${it.key}=${it.value}" },
+                        text = trigger.config.entries.take(1).joinToString(", ") { "${it.key}=${it.value}" },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
@@ -392,7 +464,7 @@ fun ActionConfigCard(
                 )
                 if (action.config.isNotEmpty()) {
                     Text(
-                        text = action.config.entries.take(2).joinToString(", ") { "${it.key}=${it.value}" },
+                        text = action.config.entries.take(1).joinToString(", ") { "${it.key}=${it.value}" },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onTertiaryContainer
                     )
