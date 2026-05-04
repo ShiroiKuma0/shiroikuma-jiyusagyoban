@@ -2,7 +2,6 @@ package com.opentasker.automation.receiver
 
 import android.content.Context
 import android.content.Intent
-import android.intent.action.Intent
 import android.os.BatteryManager
 import com.opentasker.automation.model.AutomationEvent
 
@@ -28,10 +27,7 @@ class BatteryEventReceiver : AutomationBroadcastReceiver() {
                 }
 
                 log("Battery event: level=$level%, status=$statusString")
-
-                // TODO: Post event to automation engine
-                // val engine = AutomationEngine.getInstance(context)
-                // engine.onEvent(AutomationEvent.BatteryEvent(level, statusString))
+                automationEngine.onEvent(AutomationEvent.BatteryEvent(level, statusString))
             } catch (e: Exception) {
                 log("Error processing battery event", e)
             }

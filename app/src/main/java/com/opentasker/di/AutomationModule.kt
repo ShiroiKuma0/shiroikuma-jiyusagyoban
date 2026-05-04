@@ -1,6 +1,7 @@
 package com.opentasker.di
 
 import android.content.Context
+import com.opentasker.automation.core.AutomationEngine
 import com.opentasker.automation.core.DefaultActionExecutor
 import com.opentasker.automation.core.DefaultActionRegistry
 import com.opentasker.automation.core.DefaultConstraintEvaluator
@@ -20,6 +21,8 @@ import com.opentasker.automation.core.ConstraintEvaluator
 import com.opentasker.automation.core.ConstraintRegistry
 import com.opentasker.automation.core.TriggerMatcher
 import com.opentasker.automation.core.TriggerRegistry
+import com.opentasker.automation.data.repository.AutomationRuleRepository
+import com.opentasker.automation.data.repository.ExecutionLogRepository
 import com.opentasker.automation.trigger.impl.AppOpenTrigger
 import com.opentasker.automation.trigger.impl.BatteryTrigger
 import com.opentasker.automation.trigger.impl.GeofenceTrigger
@@ -93,6 +96,32 @@ object AutomationModule {
     @Provides
     fun provideActionExecutor(): ActionExecutor {
         return DefaultActionExecutor()
+    }
+
+    @Singleton
+    @Provides
+    fun provideAutomationEngine(
+        @ApplicationContext context: Context,
+        ruleRepository: AutomationRuleRepository,
+        logRepository: ExecutionLogRepository,
+        triggerRegistry: TriggerRegistry,
+        constraintRegistry: ConstraintRegistry,
+        actionRegistry: ActionRegistry,
+        triggerMatcher: TriggerMatcher,
+        constraintEvaluator: ConstraintEvaluator,
+        actionExecutor: ActionExecutor
+    ): AutomationEngine {
+        return AutomationEngine(
+            context,
+            ruleRepository,
+            logRepository,
+            triggerRegistry,
+            constraintRegistry,
+            actionRegistry,
+            triggerMatcher,
+            constraintEvaluator,
+            actionExecutor
+        )
     }
 
     // ========== INDIVIDUAL TRIGGERS ==========
