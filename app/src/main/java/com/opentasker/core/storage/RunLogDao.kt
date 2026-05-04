@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import com.opentasker.core.model.RunLogEntry
+import kotlinx.coroutines.flow.Flow
 
 @Entity("run_logs")
 data class RunLogEntity(
@@ -27,6 +28,8 @@ interface RunLogDao {
     @Insert suspend fun insert(e: RunLogEntity)
     @Query("SELECT * FROM run_logs ORDER BY timestamp DESC LIMIT 100")
     suspend fun getRecent(): List<RunLogEntity>
+    @Query("SELECT * FROM run_logs ORDER BY timestamp DESC LIMIT 100")
+    fun getRecentFlow(): Flow<List<RunLogEntity>>
     @Query("SELECT * FROM run_logs WHERE taskId = :taskId ORDER BY timestamp DESC LIMIT 50")
     suspend fun getByTask(taskId: Long): List<RunLogEntity>
     @Query("DELETE FROM run_logs WHERE timestamp < :before")

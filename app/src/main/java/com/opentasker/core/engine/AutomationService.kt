@@ -10,6 +10,8 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.opentasker.app.OpenTaskerApp
+import com.opentasker.core.model.RunLogEntry
+import com.opentasker.core.storage.toEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -28,6 +30,7 @@ class AutomationService : Service() {
     private val db by lazy { OpenTaskerApp.db }
     
     private val matchers = mutableMapOf<Long, ProfileMatcher>()
+    private val profileCooldowns = mutableMapOf<Long, Long>() // profileId -> cooldownUntilMs
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -70,29 +73,57 @@ class AutomationService : Service() {
 
     private suspend fun onProfileActivated(profile: com.opentasker.core.model.Profile) {
         if (profile.enterTaskId <= 0) return
+        
+        // Respect cooldown
+        val cooldownUntil = profileCooldowns[profile.id] ?: 0
+        if (System.currentTimeMillis() < cooldownUntil) {
+            android.util.Log.i("OpenTasker", "Profile ${profile.name} on cooldown, skipping")
+            return
+        }
+        
         val task = db.taskDao().getById(profile.enterTaskId) ?: return
         val domain = task.toDomain()
-        runTask(domain)
+        runTask(domain, profile.id, profile.cooldownMinutes)
     }
 
     private suspend fun onProfileDeactivated(profile: com.opentasker.core.model.Profile) {
         if (profile.exitTaskId == null || profile.exitTaskId <= 0) return
         val task = db.taskDao().getById(profile.exitTaskId) ?: return
         val domain = task.toDomain()
-        runTask(domain)
+        runTask(domain, profile.id, profile.cooldownMinutes)
     }
 
-    private suspend fun runTask(task: com.opentasker.core.model.Task) {
+    private suspend fun runTask(
+        task: com.opentasker.core.model.Task,
+        profileId: Long,
+        cooldownMinutes: Int
+    ) {
         val variables = VariableStore()
         val ctx = ActionContext(this, variables) { msg ->
             android.util.Log.i("OpenTasker", msg)
         }
         val runner = TaskRunner(ctx)
         val report = runner.run(task)
+        
+        // Write to run log
+        val logEntry = RunLogEntry(
+            taskId = task.id,
+            taskName = task.name,
+            durationMs = report.durationMs,
+            success = report.success,
+            message = report.message ?: ""
+        )
+        db.runLogDao().insert(logEntry.toEntity())
+        
         android.util.Log.i(
             "OpenTasker",
             "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)"
         )
+        
+        // Apply cooldown
+        if (cooldownMinutes > 0) {
+            profileCooldowns[profileId] = System.currentTimeMillis() + (cooldownMinutes * 60 * 1000)
+        }
     }
 
     private fun startForegroundCompat() {

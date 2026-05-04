@@ -22,27 +22,31 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.storage.AppDatabase
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 class RunLogViewModel(private val db: AppDatabase) : ViewModel() {
-    fun logs(): Flow<List<RunLogEntry>> = flowOf(emptyList())
-    // TODO: load logs from DB, expose as StateFlow for live updates
+    val logs: StateFlow<List<RunLogEntry>> = db.runLogDao().getRecentFlow()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 }
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun RunLogScreen(
+    db: AppDatabase,
     onBack: () -> Unit,
-    viewModel: RunLogViewModel = viewModel(),
+    viewModel: RunLogViewModel = viewModel { RunLogViewModel(db) },
 ) {
-    val logs by viewModel.logs().collectAsState(emptyList())
+    val logs by viewModel.logs.collectAsState()
 
     Scaffold(
         topBar = {
