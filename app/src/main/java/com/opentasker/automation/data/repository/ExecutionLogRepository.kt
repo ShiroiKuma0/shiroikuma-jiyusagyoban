@@ -7,6 +7,7 @@ import com.opentasker.automation.model.ExecutionLog
 import com.opentasker.automation.model.ExecutionStatus
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.opentasker.core.logging.AppLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -102,9 +103,20 @@ class ExecutionLogRepository(private val dao: ExecutionLogDao) {
     private fun fromEntity(entity: ExecutionLogEntity): ExecutionLog {
         val actionResults: List<Pair<String, ActionResult>> = if (entity.actionResultsJson != null) {
             val type = object : TypeToken<List<Pair<String, ActionResult>>>() {}.type
-            gson.fromJson(entity.actionResultsJson, type)
+            try {
+                gson.fromJson(entity.actionResultsJson, type) ?: emptyList()
+            } catch (e: Exception) {
+                AppLogger.error(TAG, "Failed to deserialize action results for log ${entity.id}", e)
+                emptyList()
+            }
         } else {
             emptyList()
+        }
+        val status = try {
+            ExecutionStatus.valueOf(entity.status)
+        } catch (e: Exception) {
+            AppLogger.warn(TAG, "Unknown status '${entity.status}', defaulting to FAILURE")
+            ExecutionStatus.FAILURE
         }
 
         return ExecutionLog(
@@ -114,10 +126,14 @@ class ExecutionLogRepository(private val dao: ExecutionLogDao) {
             triggerId = entity.triggerId,
             triggerType = entity.triggerType,
             timestamp = entity.timestamp,
-            status = ExecutionStatus.valueOf(entity.status),
+            status = status,
             message = entity.message,
             executionTimeMs = entity.executionTimeMs,
             actionResults = actionResults
         )
+    }
+
+    companion object {
+        private const val TAG = "ExecutionLogRepository"
     }
 }

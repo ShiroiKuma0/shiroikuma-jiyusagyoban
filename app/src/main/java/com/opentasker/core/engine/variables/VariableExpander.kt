@@ -1,7 +1,7 @@
 package com.opentasker.core.engine.variables
 
 import com.opentasker.core.engine.VariableStore
-import java.util.regex.Pattern
+import org.json.JSONObject
 import kotlin.math.floor
 
 /**
@@ -127,10 +127,10 @@ class VariableExpander {
                 val parts = op.substring(6).split(":")
                 val pattern = parts.getOrNull(0) ?: ""
                 val groupIdx = parts.getOrNull(1)?.toIntOrNull() ?: 0
+                if (pattern.length > MAX_REGEX_LENGTH || baseValue.length > MAX_REGEX_INPUT_LENGTH) return ""
                 try {
-                    val regex = Pattern.compile(pattern)
-                    val matcher = regex.matcher(baseValue)
-                    if (matcher.find()) matcher.group(groupIdx) else ""
+                    val match = Regex(pattern).find(baseValue)
+                    match?.groups?.get(groupIdx)?.value ?: ""
                 } catch (e: Exception) {
                     ""
                 }
@@ -139,6 +139,7 @@ class VariableExpander {
                 val parts = op.substring(8).split(":", limit = 2)
                 val pattern = parts.getOrNull(0) ?: ""
                 val replacement = parts.getOrNull(1) ?: ""
+                if (pattern.length > MAX_REGEX_LENGTH || baseValue.length > MAX_REGEX_INPUT_LENGTH) return baseValue
                 try {
                     baseValue.replace(Regex(pattern), replacement)
                 } catch (e: Exception) {
@@ -189,21 +190,17 @@ class VariableExpander {
     }
 
     private fun evaluateJsonPath(json: String, path: String): String {
-        // Simplified JSON path evaluation: json.field.subfield
-        // For now, just handle top-level keys
         try {
+            var current: Any? = JSONObject(json)
             val keys = path.split(".")
-            var current = json
             for (key in keys) {
-                val pattern = "\"$key\"\\s*:\\s*\"([^\"]*)\""
-                val match = Regex(pattern).find(current)
-                if (match != null) {
-                    current = match.groupValues[1]
+                current = if (current is JSONObject) {
+                    current.opt(key)
                 } else {
                     return ""
                 }
             }
-            return current
+            return current?.toString() ?: ""
         } catch (e: Exception) {
             return ""
         }
@@ -212,6 +209,8 @@ class VariableExpander {
     companion object {
         private val TERNARY_PATTERN = Regex("""^\(([^)]+)\)\s*\?\s*([^:]+)\s*:\s*(.+)$""")
         private val VAR_WITH_OP_PATTERN = Regex("""^%(\w+)\(([^)]*)\)$""")
+        private const val MAX_REGEX_LENGTH = 256
+        private const val MAX_REGEX_INPUT_LENGTH = 10_000
     }
 }
 

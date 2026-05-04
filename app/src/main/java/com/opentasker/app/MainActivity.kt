@@ -19,7 +19,6 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.opentasker.ui.theme.OpenTaskerTheme
 
 class MainActivity : ComponentActivity() {
@@ -49,26 +48,32 @@ class MainActivity : ComponentActivity() {
                             tint = MaterialTheme.colorScheme.primary
                         )
                         
-                        Text(
-                            text = "OpenTasker",
-                            style = MaterialTheme.typography.displaySmall,
-                            fontSize = 36.sp,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.padding(top = 32.dp)
-                        )
-                        
-                        Text(
-                            text = "Automation for Everyone",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-                        
-                        Text(
-                            text = "v0.1.0",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 16.dp)
+                         Text(
+                             text = "OpenTasker",
+                             style = MaterialTheme.typography.displaySmall,
+                             color = MaterialTheme.colorScheme.onBackground,
+                             modifier = Modifier.padding(top = 32.dp)
+                         )
+                         
+                         Text(
+                             text = getString(com.opentasker.app.R.string.automation_status_title),
+                             style = MaterialTheme.typography.bodyLarge,
+                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                             modifier = Modifier.padding(top = 8.dp)
+                         )
+
+                         Text(
+                             text = getString(com.opentasker.app.R.string.automation_status_body),
+                             style = MaterialTheme.typography.bodyMedium,
+                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                             modifier = Modifier.padding(top = 8.dp)
+                         )
+                         
+                         Text(
+                             text = "v${BuildConfig.VERSION_NAME}",
+                             style = MaterialTheme.typography.labelSmall,
+                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                             modifier = Modifier.padding(top = 16.dp)
                         )
                     }
                 }

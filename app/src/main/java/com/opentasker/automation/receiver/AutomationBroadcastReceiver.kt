@@ -1,20 +1,16 @@
 package com.opentasker.automation.receiver
 
 import android.content.BroadcastReceiver
-import android.content.Context
 import android.util.Log
-import com.opentasker.automation.core.AutomationEngine
-import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
+import com.opentasker.app.OpenTaskerApp_NoHilt
 
 /**
  * Base class for automation broadcast receivers.
  * Provides common logging and engine access.
  */
-@AndroidEntryPoint
 abstract class AutomationBroadcastReceiver : BroadcastReceiver() {
-    @Inject
-    lateinit var automationEngine: AutomationEngine
+    protected val automationEngine
+        get() = OpenTaskerApp_NoHilt.automationEngine
 
     protected fun log(message: String, throwable: Throwable? = null) {
         Log.d(TAG, message, throwable)

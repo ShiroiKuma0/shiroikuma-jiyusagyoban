@@ -54,11 +54,22 @@ private val Amoled = darkColorScheme(
 
 private val Light = lightColorScheme(
     primary = Color(0xFF8839EF),
+    onPrimary = Color.White,
     secondary = Color(0xFF209FB5),
+    onSecondary = Color.White,
     tertiary = Color(0xFF40A02B),
+    onTertiary = Color.White,
+    error = Color(0xFFB00020),
+    onError = Color.White,
+    errorContainer = Color(0xFFF9DEDC),
+    onErrorContainer = Color(0xFF410E0B),
     background = Color(0xFFFAFAFA),
+    onBackground = Color(0xFF1E1E2E),
     surface = Color(0xFFFFFFFF),
     onSurface = Color(0xFF1E1E2E),
+    surfaceVariant = Color(0xFFE7E0EC),
+    onSurfaceVariant = Color(0xFF49454F),
+    outline = Color(0xFF79747E),
 )
 
 @Composable
