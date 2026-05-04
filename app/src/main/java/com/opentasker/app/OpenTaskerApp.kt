@@ -1,0 +1,66 @@
+package com.opentasker.app
+
+import android.app.Application
+import androidx.room.Room
+import com.opentasker.core.actions.*
+import com.opentasker.core.contexts.*
+import com.opentasker.core.engine.ActionRegistry
+import com.opentasker.core.storage.AppDatabase
+
+class OpenTaskerApp : Application() {
+    companion object {
+        lateinit var db: AppDatabase
+            private set
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        
+        // Initialize Room database
+        db = Room.databaseBuilder(this, AppDatabase::class.java, "opentasker.db").build()
+        
+        // Register all built-in actions
+        registerActions()
+        
+        // Register all context sources
+        registerContextSources()
+    }
+
+    private fun registerActions() {
+        ActionRegistry.register(NotifyAction())
+        ActionRegistry.register(SetVariableAction())
+        ActionRegistry.register(SayAction())
+        ActionRegistry.register(WaitAction())
+        ActionRegistry.register(LaunchIntentAction())
+        
+        ActionRegistry.register(WiFiToggleAction())
+        ActionRegistry.register(BluetoothToggleAction())
+        ActionRegistry.register(BrightnessAction())
+        ActionRegistry.register(VolumeAction())
+        ActionRegistry.register(AirplaneModeAction())
+        ActionRegistry.register(MobileDataAction())
+        ActionRegistry.register(ScreenTimeoutAction())
+        
+        ActionRegistry.register(LaunchAppAction())
+        ActionRegistry.register(KillAppAction())
+        ActionRegistry.register(GoHomeAction())
+        ActionRegistry.register(OpenUrlAction())
+        ActionRegistry.register(SendSmsAction())
+        ActionRegistry.register(ScreenshotAction())
+        
+        ActionRegistry.register(ReadFileAction())
+        ActionRegistry.register(WriteFileAction())
+        ActionRegistry.register(AppendFileAction())
+        ActionRegistry.register(DeleteFileAction())
+        ActionRegistry.register(ListFilesAction())
+    }
+
+    private fun registerContextSources() {
+        ContextSourceRegistry.register(ApplicationContextSource())
+        ContextSourceRegistry.register(TimeContextSource())
+        ContextSourceRegistry.register(DayContextSource())
+        ContextSourceRegistry.register(LocationContextSource())
+        ContextSourceRegistry.register(StateContextSource())
+        ContextSourceRegistry.register(EventContextSource())
+    }
+}
