@@ -16,4 +16,13 @@ data class Profile(
     val enterTaskId: Long,
     val exitTaskId: Long? = null,
     val cooldownSec: Int = 0,
+    val automationMode: AutomationMode = AutomationMode.SINGLE,
 )
+
+@Serializable
+enum class AutomationMode {
+    SINGLE,
+    RESTART,
+    QUEUED,
+    PARALLEL,
+}

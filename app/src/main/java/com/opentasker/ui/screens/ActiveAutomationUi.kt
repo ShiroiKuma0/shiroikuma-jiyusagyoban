@@ -69,6 +69,7 @@ import com.opentasker.core.actions.FieldType
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.model.ActionSpec
+import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
@@ -154,7 +155,7 @@ class ActiveAutomationViewModel(private val db: AppDatabase) : ViewModel() {
         }
     }
 
-    fun createProfile(name: String, enabled: Boolean, enterTaskId: Long, cooldownSec: Int) =
+    fun createProfile(name: String, enabled: Boolean, enterTaskId: Long, cooldownSec: Int, automationMode: AutomationMode) =
         launchWithMessage("Profile created") {
             db.profileDao().insert(
                 Profile(
@@ -162,6 +163,7 @@ class ActiveAutomationViewModel(private val db: AppDatabase) : ViewModel() {
                     enabled = enabled,
                     enterTaskId = enterTaskId,
                     cooldownSec = cooldownSec.coerceAtLeast(0),
+                    automationMode = automationMode,
                 ).toEntity()
             )
         }
@@ -378,8 +380,8 @@ fun ActiveAutomationUi(
             profile = null,
             tasks = tasks,
             onDismiss = { showCreateProfileDialog = false },
-            onSave = { name, enabled, enterTaskId, cooldown ->
-                viewModel.createProfile(name, enabled, enterTaskId, cooldown)
+            onSave = { name, enabled, enterTaskId, cooldown, automationMode ->
+                viewModel.createProfile(name, enabled, enterTaskId, cooldown, automationMode)
                 showCreateProfileDialog = false
             },
         )
@@ -412,13 +414,14 @@ fun ActiveAutomationUi(
             profile = profile,
             tasks = tasks,
             onDismiss = { profileDialog = null },
-            onSave = { name, enabled, enterTaskId, cooldown ->
+            onSave = { name, enabled, enterTaskId, cooldown, automationMode ->
                 viewModel.updateProfile(
                     profile.copy(
                         name = name.trim(),
                         enabled = enabled,
                         enterTaskId = enterTaskId,
                         cooldownSec = cooldown.coerceAtLeast(0),
+                        automationMode = automationMode,
                     )
                 )
                 profileDialog = null
@@ -598,6 +601,7 @@ private fun ProfileCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AssistChip(onClick = {}, label = { Text("${profile.contexts.size} context${plural(profile.contexts.size)}") })
                 AssistChip(onClick = {}, label = { Text("${profile.cooldownSec}s cooldown") })
+                AssistChip(onClick = {}, label = { Text(profile.automationMode.name.lowercase()) })
             }
             if (profile.contexts.isEmpty()) {
                 Text(
@@ -1064,13 +1068,14 @@ private fun ProfileEditorDialog(
     profile: Profile?,
     tasks: List<Task>,
     onDismiss: () -> Unit,
-    onSave: (String, Boolean, Long, Int) -> Unit,
+    onSave: (String, Boolean, Long, Int, AutomationMode) -> Unit,
 ) {
     val initialTaskId = profile?.enterTaskId ?: tasks.firstOrNull()?.id ?: 0L
     var name by remember(profile?.id) { mutableStateOf(profile?.name.orEmpty()) }
     var enabled by remember(profile?.id) { mutableStateOf(profile?.enabled ?: true) }
     var enterTaskId by remember(profile?.id, tasks) { mutableStateOf(initialTaskId) }
     var cooldown by remember(profile?.id) { mutableStateOf((profile?.cooldownSec ?: 0).toString()) }
+    var automationMode by remember(profile?.id) { mutableStateOf(profile?.automationMode ?: AutomationMode.SINGLE) }
     val canSave = name.isNotBlank() && enterTaskId > 0
 
     AlertDialog(
@@ -1098,10 +1103,20 @@ private fun ProfileEditorDialog(
                     label = { Text("Cooldown seconds") },
                     singleLine = true,
                 )
+                Text("Re-trigger behavior", style = MaterialTheme.typography.labelLarge)
+                AutomationMode.entries.forEach { mode ->
+                    OutlinedButton(
+                        onClick = { automationMode = mode },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        val label = mode.name.lowercase().replaceFirstChar { it.uppercase() }
+                        Text(if (mode == automationMode) "$label selected" else "$label - ${automationModeDescription(mode)}")
+                    }
+                }
             }
         },
         confirmButton = {
-            Button(enabled = canSave, onClick = { onSave(name, enabled, enterTaskId, cooldown.toIntOrNull() ?: 0) }) {
+            Button(enabled = canSave, onClick = { onSave(name, enabled, enterTaskId, cooldown.toIntOrNull() ?: 0, automationMode) }) {
                 Text("Save")
             }
         },
@@ -1376,6 +1391,13 @@ private fun defaultContextConfig(type: ContextType): Map<String, String> = when 
     ContextType.DAY -> mapOf("days" to "MON,TUE,WED,THU,FRI")
     ContextType.LOCATION -> mapOf("radiusMeters" to "100")
     else -> emptyMap()
+}
+
+private fun automationModeDescription(mode: AutomationMode): String = when (mode) {
+    AutomationMode.SINGLE -> "ignore while running"
+    AutomationMode.RESTART -> "cancel and restart"
+    AutomationMode.QUEUED -> "run again in order"
+    AutomationMode.PARALLEL -> "allow overlap"
 }
 
 private fun contextDescription(type: ContextType): String = when (type) {

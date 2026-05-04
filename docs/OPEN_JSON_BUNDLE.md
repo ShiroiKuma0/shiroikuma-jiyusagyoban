@@ -21,6 +21,7 @@ Top-level fields:
 
 - Tasks import first and receive new local Room IDs.
 - Profiles import after tasks; missing enter-task references skip that profile with a lossy warning.
+- Profile automation modes are preserved as `SINGLE`, `RESTART`, `QUEUED`, or `PARALLEL`.
 - Missing exit-task references are dropped with a lossy warning.
 - Variables insert or update by variable name.
 - Scenes import after tasks; missing element task links are dropped with a lossy warning.
