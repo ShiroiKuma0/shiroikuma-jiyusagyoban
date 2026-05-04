@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
                 var currentEditingTask by remember { mutableStateOf<Task?>(null) }
                 var currentEditingProfile by remember { mutableStateOf<Profile?>(null) }
                 var currentEditingRule by remember { mutableStateOf<AutomationRule?>(null) }
+                var taskEditorReturnTarget by remember { mutableStateOf<Screen>(Screen.TaskList) }
                 val scope = rememberCoroutineScope()
 
                 when (val screen = currentScreen) {
@@ -47,7 +48,8 @@ class MainActivity : ComponentActivity() {
                         HomeScreen(
                             onProfilesClick = { currentScreen = Screen.ProfileList },
                             onAutomationRulesClick = { currentScreen = Screen.AutomationRuleList },
-                            onRunLogClick = { currentScreen = Screen.RunLog }
+                            onRunLogClick = { currentScreen = Screen.RunLog },
+                            onTasksClick = { currentScreen = Screen.TaskList }
                         )
                     }
                     is Screen.ProfileList -> {
@@ -68,14 +70,20 @@ class MainActivity : ComponentActivity() {
                     is Screen.TaskList -> {
                         TaskListScreen(
                             db = db,
-                            onCreateTask = { currentScreen = Screen.TaskEditor(null) },
-                            onEditTask = { task: Task -> currentScreen = Screen.TaskEditor(task) },
+                            onCreateTask = { 
+                                taskEditorReturnTarget = Screen.TaskList
+                                currentScreen = Screen.TaskEditor(null) 
+                            },
+                            onEditTask = { task: Task -> 
+                                taskEditorReturnTarget = Screen.TaskList
+                                currentScreen = Screen.TaskEditor(task) 
+                            },
                             onDeleteTask = { task: Task ->
                                 scope.launch {
                                     db.taskDao().delete(task.toEntity())
                                 }
                             },
-                            onBack = { currentScreen = Screen.ProfileList },
+                            onBack = { currentScreen = Screen.Home },
                         )
                     }
                     is Screen.ProfileEditor -> {
@@ -113,12 +121,12 @@ class MainActivity : ComponentActivity() {
                                         db.taskDao().update(task.toEntity())
                                     }
                                     currentEditingTask = null
-                                    currentScreen = Screen.ProfileList
+                                    currentScreen = taskEditorReturnTarget
                                 }
                             },
                             onBack = {
                                 currentEditingTask = null
-                                currentScreen = Screen.ProfileList
+                                currentScreen = taskEditorReturnTarget
                             },
                             onTaskUpdated = { updatedTask ->
                                 currentEditingTask = updatedTask
