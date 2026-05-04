@@ -7,6 +7,7 @@ import com.opentasker.automation.data.repository.ExecutionLogRepository
 import com.opentasker.automation.model.AutomationEvent
 import com.opentasker.automation.model.AutomationRule
 import com.opentasker.automation.model.ExecutionLog
+import com.opentasker.automation.model.ExecutionStatus
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -51,9 +52,9 @@ class AutomationEngine @Inject constructor(
             try {
                 log("Event received: $event")
 
-                // Load all enabled rules for this profile
-                val rules = ruleRepository.getAllRules()
-                    .filter { it.enabled && activeProfiles.getOrDefault(it.profileId, false) }
+                // Load all enabled rules that belong to active profiles
+                val rules = ruleRepository.getAllEnabled()
+                    .filter { activeProfiles.getOrDefault(it.profileId, false) }
 
                 if (rules.isEmpty()) {
                     log("No active profiles or rules found")
@@ -97,20 +98,25 @@ class AutomationEngine @Inject constructor(
             val actionResults = actionExecutor.execute(
                 rule.actions,
                 actionRegistry,
-                parallel = rule.executionMode == "parallel"
+                parallel = rule.executionMode.name.lowercase() == "parallel"
             )
             val executionTimeMs = System.currentTimeMillis() - startTime
 
             // Step 4: Log execution
+            val status = if (actionResults.all { it.success }) ExecutionStatus.SUCCESS else ExecutionStatus.FAILURE
+            val successCount = actionResults.count { it.success }
             val executionLog = ExecutionLog(
                 ruleId = rule.id,
-                profileId = rule.profileId,
-                eventType = event::class.simpleName ?: "Unknown",
-                triggered = true,
+                ruleName = rule.name,
+                triggerId = null,
+                triggerType = event::class.simpleName,
+                timestamp = System.currentTimeMillis(),
+                status = status,
+                message = "Executed $successCount/${rule.actions.size} actions",
                 executionTimeMs = executionTimeMs,
-                actionCount = rule.actions.size,
-                successCount = actionResults.count { it.success },
-                details = "Executed ${actionResults.count { it.success }}/${rule.actions.size} actions"
+                actionResults = actionResults.mapIndexed { idx, result ->
+                    rule.actions.getOrNull(idx)?.id ?: "unknown-$idx" to result
+                }
             )
             logRepository.insert(executionLog)
 
