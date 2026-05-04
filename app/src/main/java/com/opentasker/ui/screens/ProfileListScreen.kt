@@ -36,7 +36,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -127,7 +126,7 @@ fun ProfileListScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(32.dp),
-                    horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
                     Icon(
@@ -254,7 +253,7 @@ fun ProfileCardItem(
                 .fillMaxSize()
                 .padding(12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
