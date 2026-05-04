@@ -1,6 +1,7 @@
 package com.opentasker.core.engine
 
 import android.content.Context
+import java.util.Collections
 
 /**
  * Runtime context handed to every Action.run() invocation.
@@ -35,9 +36,9 @@ enum class ActionCategory {
 
 /** Registry of all known Action implementations, keyed by [Action.id]. */
 object ActionRegistry {
-    private val byId = mutableMapOf<String, Action>()
+    private val byId = Collections.synchronizedMap(mutableMapOf<String, Action>())
 
     fun register(action: Action) { byId[action.id] = action }
     fun get(id: String): Action? = byId[id]
-    fun all(): Collection<Action> = byId.values
+    fun all(): Collection<Action> = byId.values.toList() // Return a copy to prevent external modification
 }

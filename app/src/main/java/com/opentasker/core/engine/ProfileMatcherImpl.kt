@@ -18,11 +18,9 @@ class ProfileMatcher(
     private val app: Context,
     private val profile: Profile,
 ) {
-    private var lastMatched = false
-
-    fun stateChanges(): Flow<ProfileStateChange?> {
+    fun stateChanges(): Flow<ProfileStateChange> {
         if (profile.contexts.isEmpty()) {
-            return kotlinx.coroutines.flow.flowOf(null)
+            return kotlinx.coroutines.flow.emptyFlow()
         }
 
         val flows = profile.contexts.mapNotNull { spec ->
@@ -38,22 +36,20 @@ class ProfileMatcher(
         }
 
         return if (flows.isEmpty()) {
-            kotlinx.coroutines.flow.flowOf(null)
+            kotlinx.coroutines.flow.emptyFlow()
         } else {
             combine(flows) { allMatches ->
                 allMatches.all { it }
             }
                 .distinctUntilChanged()
-                .map { nowMatched ->
-                    val prev = lastMatched
-                    lastMatched = nowMatched
-                    if (prev == nowMatched) {
-                        null
-                    } else {
-                        if (nowMatched) ProfileStateChange.Activated else ProfileStateChange.Deactivated
+                .scan(Pair(false, false)) { (_, prev), now -> Pair(prev, now) }
+                .mapNotNull { (prev, now) ->
+                    when {
+                        !prev && now -> ProfileStateChange.Activated
+                        prev && !now -> ProfileStateChange.Deactivated
+                        else -> null
                     }
                 }
-                .filterNotNull()
         }
     }
 }
