@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.4 — 2026-05-04
+
+Exact alarm hardening pass.
+
+- Removed `USE_EXACT_ALARM` so OpenTasker no longer declares the alarm-clock/calendar-only permission.
+- Added an app-owned time tick scheduler that uses exact `AlarmManager` delivery when allowed and inexact `setWindow()` fallback when exact alarms are denied.
+- Replaced the manifest `TIME_TICK` dependency with an internal scheduled receiver and exact-alarm permission-change rescheduling.
+- Added focused unit coverage for minute-boundary scheduling.
+- Updated setup text and README/roadmap metadata for exact-alarm fallback behavior.
+
 ## v0.2.3 — 2026-05-04
 
 Permission onboarding pass.

@@ -12,6 +12,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.opentasker.app.MainActivity
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.automation.scheduler.TimeEventScheduler
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.storage.toEntity
 import kotlinx.coroutines.CoroutineScope
@@ -32,6 +33,7 @@ class AutomationService : Service() {
     private val job = Job()
     private val scope = CoroutineScope(Dispatchers.Main + job)
     private val db by lazy { OpenTaskerApp_NoHilt.db }
+    private val timeEventScheduler by lazy { TimeEventScheduler(this) }
     
     private val matchers = Collections.synchronizedMap(mutableMapOf<Long, ProfileMatcher>())
     private val profileCooldowns = Collections.synchronizedMap(mutableMapOf<Long, Long>()) // profileId -> cooldownUntilMs
@@ -42,6 +44,7 @@ class AutomationService : Service() {
     override fun onCreate() {
         super.onCreate()
         startForegroundCompat()
+        timeEventScheduler.scheduleNextMinute()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -57,6 +60,7 @@ class AutomationService : Service() {
         matcherJobs.clear()
         matchers.clear()
         profileCooldowns.clear()
+        timeEventScheduler.cancel()
         job.cancel()
         super.onDestroy()
     }
