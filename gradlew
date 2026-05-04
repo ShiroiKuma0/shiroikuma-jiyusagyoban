@@ -137,3 +137,4 @@ fi
 
 BASE_DIR=`basename "$APP_HOME"`
 exec "$JAVACMD" "${JVM_OPTS[@]}" -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
+
