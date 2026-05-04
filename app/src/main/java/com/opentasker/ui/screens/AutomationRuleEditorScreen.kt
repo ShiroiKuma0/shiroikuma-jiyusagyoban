@@ -2,6 +2,7 @@ package com.opentasker.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -16,10 +17,12 @@ import com.opentasker.automation.model.ConstraintConfig
 import com.opentasker.automation.model.ActionConfig
 import com.opentasker.automation.model.ConstraintGroup
 import com.opentasker.automation.model.LogicalOperator
+import com.opentasker.ui.theme.DesignSystem
 
 /**
  * Screen for editing an automation rule with integrated picker screens.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun AutomationRuleEditorScreen(
     rule: AutomationRule?,
@@ -157,23 +160,23 @@ fun RuleEditorMainScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(DesignSystem.Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.lg)
         ) {
             // Rule name and description
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(DesignSystem.Radii.lg),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                            .padding(DesignSystem.Spacing.lg),
+                        verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)
                     ) {
                         Text(
                             text = "Rule Details",
@@ -188,7 +191,7 @@ fun RuleEditorMainScreen(
                             placeholder = { Text("e.g. Morning Notification") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(DesignSystem.Radii.md)
                         )
                         
                         OutlinedTextField(
