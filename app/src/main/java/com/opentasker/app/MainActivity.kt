@@ -40,14 +40,18 @@ class MainActivity : ComponentActivity() {
             setContent {
                 val db = OpenTaskerApp.db
                 OpenTaskerTheme {
-                    var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
-                    var currentEditingTask by remember { mutableStateOf<Task?>(null) }
-                    var currentEditingProfile by remember { mutableStateOf<Profile?>(null) }
-                    var currentEditingRule by remember { mutableStateOf<AutomationRule?>(null) }
-                    var taskEditorReturnTarget by remember { mutableStateOf<Screen>(Screen.TaskList) }
-                    val scope = rememberCoroutineScope()
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
+                        var currentEditingTask by remember { mutableStateOf<Task?>(null) }
+                        var currentEditingProfile by remember { mutableStateOf<Profile?>(null) }
+                        var currentEditingRule by remember { mutableStateOf<AutomationRule?>(null) }
+                        var taskEditorReturnTarget by remember { mutableStateOf<Screen>(Screen.TaskList) }
+                        val scope = rememberCoroutineScope()
 
-                    when (val screen = currentScreen) {
+                        when (val screen = currentScreen) {
                     is Screen.Home -> {
                         HomeScreen(
                             onProfilesClick = { currentScreen = Screen.ProfileList },
@@ -247,6 +251,7 @@ class MainActivity : ComponentActivity() {
                             logs = emptyList(), // TODO: Load from repository
                             onBack = { currentScreen = Screen.AutomationRuleList }
                         )
+                    }
                     }
                 }
             }
