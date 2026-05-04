@@ -4,18 +4,24 @@ import android.app.Service
 import android.content.Intent
 import android.os.IBinder
 import android.util.Log
+import com.opentasker.automation.core.AutomationEngine
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
  * Background service that monitors app open/close events.
  * Uses polling with UsageStatsManager (API 21+) or AccessibilityService.
  */
+@AndroidEntryPoint
 class AppOpenService : Service() {
+    @Inject
+    lateinit var automationEngine: AutomationEngine
     private val job = Job()
     private val scope = CoroutineScope(Dispatchers.Default + job)
     private val lastSeenApps = mutableSetOf<String>()
