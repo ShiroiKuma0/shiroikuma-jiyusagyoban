@@ -5,11 +5,12 @@ Parity-with-Tasker tracker. Items are grouped by milestone.
 ## v0.1.x — Foundation
 - [x] Repo + license + docs scaffold
 - [x] Core data model (Profile / Context / Task / Action / Scene / Variable)
-- [ ] Room persistence layer + migrations
-- [ ] `AutomationService` foreground service skeleton
+- [x] Room persistence layer + migrations
+- [ ] `AutomationService` foreground service skeleton (started)
 - [ ] Compose nav graph: Profiles / Tasks / Scenes / Vars / Settings
 - [ ] AMOLED + Catppuccin Mocha + light theme switcher
 - [ ] Profile list + create/edit screens
+- [x] Action library tier 1 (43 actions: settings, app, file, net, media, system)
 
 ## v0.2.x — Trigger Engine
 - [ ] Time context (clock-based, repeating)
