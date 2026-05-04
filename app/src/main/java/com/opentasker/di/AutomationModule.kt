@@ -109,7 +109,7 @@ object AutomationModule {
         actionRegistry: ActionRegistry,
         triggerMatcher: TriggerMatcher,
         constraintEvaluator: ConstraintEvaluator,
-        actionExecutor: ActionExecutor
+        actionExecutor: ActionExecutorImpl
     ): AutomationEngine {
         return AutomationEngine(
             context,

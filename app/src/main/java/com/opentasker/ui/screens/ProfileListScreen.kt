@@ -53,9 +53,7 @@ import androidx.lifecycle.viewModelScope
 import com.opentasker.core.model.Profile
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.toEntity
-import com.opentasker.ui.theme.ComponentSize
-import com.opentasker.ui.theme.Radii
-import com.opentasker.ui.theme.Spacing
+import com.opentasker.ui.theme.DesignSystem
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
