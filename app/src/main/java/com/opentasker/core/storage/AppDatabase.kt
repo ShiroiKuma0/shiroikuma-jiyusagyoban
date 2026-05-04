@@ -4,7 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class],
+    entities = [ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class],
     version = 1,
     exportSchema = true,
 )
@@ -13,4 +13,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
     abstract fun sceneDao(): SceneDao
     abstract fun variableDao(): VariableDao
+    abstract fun runLogDao(): RunLogDao
 }
