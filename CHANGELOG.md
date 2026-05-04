@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.11 — 2026-05-04
+
+Public documentation truthfulness pass.
+
+- Corrected README action counts and active runtime-context claims to match the compiled APK.
+- Clarified that plugin hosting, Tasker XML import/export, day schedules, and location/geofence runtime support are planned or still being hardened rather than shipped.
+- Updated architecture docs to describe the current foreground-service trigger monitors and action capability gates.
+- Removed stale audit/checkpoint documents that overclaimed completion against older source snapshots.
+
 ## v0.2.10 — 2026-05-04
 
 Regression-test hardening pass.
@@ -111,7 +120,7 @@ Full UI layer with database integration and action editor.
 - **Database integration:** Room DAOs with StateFlow live updates for profiles and tasks
 - **Profile CRUD:** Create, edit, delete profiles with persistence
 - **Task CRUD:** Create, edit, delete tasks with action lists
-- **Action editor:** Dynamic form generation for all 43 actions based on metadata registry
+- **Action editor:** Dynamic form generation for registered action definitions based on metadata registry
 - **Context picker:** Multi-select context families with predicate configuration (app, time, day, location, state, event)
 - **Action metadata system:** Comprehensive metadata for all built-in actions with field types and validation
 - **Task list screen:** Dedicated view to browse and manage all tasks

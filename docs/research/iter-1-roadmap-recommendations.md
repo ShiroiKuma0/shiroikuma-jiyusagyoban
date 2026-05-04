@@ -1,6 +1,7 @@
-# OpenTasker Research — ROADMAP Reconciliation & Recommendations
+# OpenTasker Research — Historical ROADMAP Reconciliation & Recommendations
 
-**Iteration 1 — L1 Research Phase Complete**
+**Iteration 1 — L1 Research Phase Complete**  
+**Status:** Historical research snapshot. The root `ROADMAP.md` is the active source of truth for current version status and shipped/planned feature boundaries.
 Generated from: 30+ sources across 9 categories (OSS competitors, commercial refs, adjacent domains, awesome-lists, community signal, standards/specs, academic blogs, dependency changelogs, security advisories)
 
 ---
@@ -21,7 +22,7 @@ Research identifies **high-priority v0.3 items** and **strategic v0.4+ additions
 ## Phase 2 Key Findings — Harvest (80-200 raw items)
 
 ### Action Library Expansion (30+ gaps identified)
-**Current:** 43 built-in actions  
+**Current at v0.2.11:** 39 registered action definitions with capability gating; some restricted Android operations are intentionally blocked or setup-required.
 **Market research findings:**
 - **Tasker reference:** ~350 built-in actions (broad but niche)
 - **Macrodroid:** ~200 actions (similar breadth)

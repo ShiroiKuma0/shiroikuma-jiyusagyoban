@@ -1,21 +1,21 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.10-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.11-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.10** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scenes, and variables — without the proprietary lock-in.
+**OpenTasker v0.2.11** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, and actions are active now; scenes, variable tooling, imports, and plugins are planned.
 
-> **Status:** v0.2.10 restores active profile/task/action/context/run-log management, adds setup checks, uses platform-safe trigger monitors, gates unsupported actions, records action-level run log traces, and expands regression coverage around parser/runtime seams.
+> **Status:** v0.2.11 restores active profile/task/action/context/run-log management, adds setup checks, uses platform-safe trigger monitors, gates unsupported actions, records action-level run log traces, and keeps public docs aligned with the compiled APK.
 
 ---
 
 ## Highlights
 
 ✅ **Core engine operational** — profiles → contexts → tasks → actions pipeline  
-✅ **43 built-in actions** — settings, apps, files, network, media, system  
-✅ **Reactive contexts** — battery, headphones, screen, WiFi, app foreground, time, SMS/events  
+✅ **39 registered action definitions** — supported actions run, restricted actions are gated or fail explicitly  
+✅ **Reactive context sources** — app foreground, time, state, event, WiFi, and app-open monitoring are wired; day/location are planned runtime work  
 ✅ **AMOLED-first** — Catppuccin Mocha palette, light theme toggle  
 ✅ **Compose UI reintegration started** — active navigation now manages profiles, tasks, actions, contexts, and run logs from Room  
 ✅ **Setup checklist** — notifications, exact alarms, battery optimization, usage access, notification access, overlays, location, Bluetooth, SMS, and DND access  
@@ -27,8 +27,8 @@
 ✅ **Run log traces** — task history includes action-level status, duration, and failure reasons  
 ✅ **Regression coverage** — cron parsing and variable scoping edge cases are test-covered  
 ✅ **Database persistence** — Room DAOs with StateFlow live updates  
-✅ **Action metadata system** — dynamic form generation for all 43 actions  
-✅ **Context configuration** — UI for all 6 context families (app, time, day, location, state, event)  
+✅ **Action metadata system** — dynamic form generation for all 39 registered action definitions  
+✅ **Context configuration UI** — editor supports all 6 context families while runtime support continues to harden by family  
 ✅ **100% Kotlin** — modern, type-safe, coroutine-friendly  
 ✅ **Profile execution** — AutomationService wired to TaskRunner for context triggers  
 ✅ **Run log persistence** — task execution history is written to Room  
@@ -47,29 +47,29 @@ ContextSources (app, time, state, event)
   ↓
 TaskRunner (executes action list)
   ↓
-ActionRegistry (43 built-ins + plugin SDK)
+ActionRegistry (built-ins + capability gates; plugin SDK planned)
   ↓
 Room DB (persistent storage)
 ```
 
-### Contexts (6 families)
-- **Application** — foreground app detection (UsageStatsManager)
-- **Time** — clock windows (09:00–17:00)
-- **Day** — weekly schedule (SMTWTFS)
-- **Location** — geofence (skeleton)
-- **State** — device state (battery ≥80%, headphones, screen on/off, WiFi)
-- **Event** — one-shots (SMS, boot, intents)
+### Contexts
+- **Runtime-wired now:** Application foreground detection, time ticks, device state broadcasts, event broadcasts, WiFi network changes, and app-open monitoring.
+- **Configured in UI but still being hardened:** Day schedules and location/geofence contexts.
 
-### Actions (43 built-in)
+### Actions (39 registered definitions)
 | Category | Count | Examples |
 |----------|-------|----------|
 | Settings | 7 | WiFi, Bluetooth, brightness, volume, airplane, mobile data, screen timeout |
-| App | 6 | launch, kill, go home, open URL, SMS, screenshot |
+| App | 7 | launch intent, launch app, kill, go home, open URL, SMS, screenshot |
 | File | 5 | read, write, append, delete, list |
 | Network | 4 | HTTP GET/POST, ping, download |
 | Media | 6 | play, stop, pause, next, previous, mute |
 | System | 6 | vibrate, reboot, lock, screen off/wake, log |
-| Flow | 3 | wait, set variable, TTS speak |
+| Notification | 2 | notification/toast, TTS speak |
+| Variable | 1 | set variable |
+| Flow | 1 | wait |
+
+Some actions are intentionally disabled or marked setup-required because Android restricts normal apps from changing airplane mode, mobile data, screenshots, reboot, screen-off, and similar privileged operations.
 
 ---
 

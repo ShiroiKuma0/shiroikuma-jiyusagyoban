@@ -22,7 +22,7 @@ Tasker's source is **not public**. This architecture is reconstructed from the u
 ```
 ┌───────────────────────────────────────────────────────┐
 │  UI (Jetpack Compose, Material 3, AMOLED default)     │
-│  - Profiles / Tasks / Scenes / Variables / Run Log    │
+│  - Profiles / Tasks / Setup / Run Log                 │
 ├───────────────────────────────────────────────────────┤
 │  Engine                                               │
 │  - ProfileMatcher  (evaluates active set)             │
@@ -33,7 +33,7 @@ Tasker's source is **not public**. This architecture is reconstructed from the u
 │  Action Library                                       │
 │  - Action interface + registry                        │
 │  - Built-ins grouped by category                      │
-│  - Plugin loader (AIDL)                               │
+│  - Capability gating for restricted actions           │
 ├───────────────────────────────────────────────────────┤
 │  Storage (Room + DataStore)                           │
 │  - Profiles, Tasks, Actions, Scenes, Variables        │
@@ -41,9 +41,8 @@ Tasker's source is **not public**. This architecture is reconstructed from the u
 ├───────────────────────────────────────────────────────┤
 │  Platform                                             │
 │  - AutomationService (foreground)                     │
-│  - WorkManager for scheduled/deferred                 │
-│  - BroadcastReceivers / Notification Listener /       │
-│    AccessibilityService / UsageStats / Location       │
+│  - AlarmManager exact/inexact time ticks              │
+│  - NetworkCallback / BroadcastReceivers / UsageStats  │
 └───────────────────────────────────────────────────────┘
 ```
 
@@ -52,7 +51,7 @@ Tasker's source is **not public**. This architecture is reconstructed from the u
 1. `AutomationService` starts on boot, loads all enabled `Profile`s.
 2. Each `Profile` subscribes to its `Context` sources (cold `Flow`s exposed by `ContextSources`).
 3. `ProfileMatcher` keeps a per-profile boolean state. When all contexts in a profile transition `false → true`, it submits the entry task; on `true → false`, the exit task.
-4. `TaskRunner` walks the action list, expanding `%vars` against `VariableStore`, honoring flow-control instructions, and writing to the run log.
+4. `TaskRunner` walks the action list, expanding `%vars` against `VariableStore`, executing actions sequentially, and writing action-level trace summaries to the run log.
 5. Actions return a `Result` (Success / Failure / Skip) — `TaskRunner` decides whether to halt based on the action's "Continue Task After Error" flag.
 
 ### Persistence schema (Room)
@@ -79,16 +78,16 @@ interface Action {
 }
 ```
 
-`ActionContext` exposes the application context, variable store, current task scope, and a logger. Plugins implement the same interface via an AIDL bridge.
+`ActionContext` exposes the application context, variable store, current task scope, and a logger. Plugin support is planned; the current runtime is the built-in action registry plus capability metadata for unsupported or setup-required Android operations.
 
 ### Plugin SDK
 
-OpenTasker's plugin contract is binary-compatible with the **Locale plugin API** (`com.twofortyfouram.locale.intent.action.EDIT_SETTING` / `FIRE_SETTING`, plus the condition variants). This means existing Tasker/Locale plugins work unchanged where their actions don't depend on Tasker-private intents. A native richer AIDL surface (`IOpenTaskerPlugin`) is also exposed for plugins that want variable access and live progress reporting.
+Locale-compatible plugin hosting is a roadmap item, not an active compiled feature. The architecture reserves a plugin boundary through stable action IDs, capability checks, and the `Action` interface, but no public AIDL/plugin host should be documented as shipped until the roadmap plugin item lands.
 
 ## Why these choices
 
 - **Kotlin + Compose + Material 3** — modern, smaller, type-safe, and matches your stack rules.
-- **Room over raw XML** — XML import/export is supported for Tasker compat, but the live store is queryable.
+- **Room over raw XML** — the live store is queryable; Tasker/XML import-export is planned, not shipped.
 - **JSON in blobs for action/context config** — additive schema, no migration churn per new action.
-- **Locale-compat plugin API** — instant ecosystem of existing plugins.
+- **Locale-compat plugin API** — planned to unlock the existing plugin ecosystem after the local execution/runtime model is stable.
 - **Foreground `AutomationService`** — required for reliable trigger eval on modern Android (Doze, App Standby).
