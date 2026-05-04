@@ -9,13 +9,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import com.opentasker.automation.model.AutomationRule
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.toEntity
 import com.opentasker.ui.screens.ActionEditorScreen
 import com.opentasker.ui.screens.ActionPickerScreen
+import com.opentasker.ui.screens.AutomationExecutionLogScreen
+import com.opentasker.ui.screens.AutomationRuleEditorScreen
+import com.opentasker.ui.screens.AutomationRuleListScreen
 import com.opentasker.ui.screens.BatchOperationsScreen
 import com.opentasker.ui.screens.ContextPickerScreen
+import com.opentasker.ui.screens.HomeScreen
 import com.opentasker.ui.screens.ProfileEditorScreen
 import com.opentasker.ui.screens.ProfileListScreen
 import com.opentasker.ui.screens.RunLogScreen
@@ -31,12 +36,20 @@ class MainActivity : ComponentActivity() {
         setContent {
             val db = OpenTaskerApp.db
             OpenTaskerTheme {
-                var currentScreen by remember { mutableStateOf<Screen>(Screen.ProfileList) }
+                var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
                 var currentEditingTask by remember { mutableStateOf<Task?>(null) }
                 var currentEditingProfile by remember { mutableStateOf<Profile?>(null) }
+                var currentEditingRule by remember { mutableStateOf<AutomationRule?>(null) }
                 val scope = rememberCoroutineScope()
 
                 when (val screen = currentScreen) {
+                    is Screen.Home -> {
+                        HomeScreen(
+                            onProfilesClick = { currentScreen = Screen.ProfileList },
+                            onAutomationRulesClick = { currentScreen = Screen.AutomationRuleList },
+                            onRunLogClick = { currentScreen = Screen.RunLog }
+                        )
+                    }
                     is Screen.ProfileList -> {
                         ProfileListScreen(
                             db = db,
@@ -160,6 +173,47 @@ class MainActivity : ComponentActivity() {
                             onBack = { currentScreen = Screen.ProfileList },
                         )
                     }
+                    is Screen.AutomationRuleList -> {
+                        AutomationRuleListScreen(
+                            rules = emptyList(), // TODO: Load from repository
+                            onCreateRule = { currentScreen = Screen.AutomationRuleEditor(null) },
+                            onEditRule = { currentScreen = Screen.AutomationRuleEditor(it) },
+                            onDeleteRule = { rule ->
+                                scope.launch {
+                                    // TODO: Delete from repository
+                                }
+                            },
+                            onToggleRule = { rule ->
+                                scope.launch {
+                                    // TODO: Toggle in repository
+                                }
+                            },
+                            onBack = { currentScreen = Screen.ProfileList }
+                        )
+                    }
+                    is Screen.AutomationRuleEditor -> {
+                        if (currentEditingRule == null) currentEditingRule = screen.rule
+                        AutomationRuleEditorScreen(
+                            rule = currentEditingRule,
+                            onSave = { rule ->
+                                scope.launch {
+                                    // TODO: Save to repository
+                                    currentEditingRule = null
+                                    currentScreen = Screen.AutomationRuleList
+                                }
+                            },
+                            onBack = {
+                                currentEditingRule = null
+                                currentScreen = Screen.AutomationRuleList
+                            }
+                        )
+                    }
+                    is Screen.AutomationExecutionLog -> {
+                        AutomationExecutionLogScreen(
+                            logs = emptyList(), // TODO: Load from repository
+                            onBack = { currentScreen = Screen.AutomationRuleList }
+                        )
+                    }
                 }
             }
         }
@@ -167,13 +221,17 @@ class MainActivity : ComponentActivity() {
 }
 
 sealed class Screen {
+    data object Home : Screen()
     data object ProfileList : Screen()
     data object TaskList : Screen()
     data object BatchOperations : Screen()
+    data object AutomationRuleList : Screen()
     data class ProfileEditor(val profile: Profile?) : Screen()
     data class TaskEditor(val task: Task?) : Screen()
+    data class AutomationRuleEditor(val rule: AutomationRule?) : Screen()
     data object ActionPicker : Screen()
     data class ActionEditor(val actionSpec: com.opentasker.core.model.ActionSpec) : Screen()
     data object ContextPicker : Screen()
     data object RunLog : Screen()
+    data object AutomationExecutionLog : Screen()
 }
