@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.8. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.9. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-04  
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.8  
+**Current app version:** 0.2.9  
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -25,7 +25,7 @@ Key local constraints:
 | Contexts | Time ticks use app-owned AlarmManager scheduling, WiFi events use dynamic NetworkCallback, and app-open events use foreground-service-owned UsageStats polling; other context sources still rely on restricted Android APIs or incomplete implementations | Permission/onboarding and platform-safe replacements remain P0/P1 |
 | Persistence | Room schema export now exists; backup/restore hardened | Migration tests and upgrade strategy can be built on this |
 | Release | Debug/release builds pass locally; release signing is env-var driven | F-Droid/Play readiness still needs policy and reproducibility work |
-| Docs | README was corrected to v0.2.8; old roadmap/notes overclaimed v0.3/v0.4 completion | Roadmap tiers below supersede old milestone claims |
+| Docs | README was corrected to v0.2.9; old roadmap/notes overclaimed v0.3/v0.4 completion | Roadmap tiers below supersede old milestone claims |
 
 ---
 
@@ -147,6 +147,7 @@ Key local constraints:
 
 ### N8 - Make run logs execution-grade
 
+**Status:** Baseline completed in v0.2.9. Task execution now records action-level trace summaries with status, action type, label, duration, and failure message in run-log entries.  
 **Description:** Expand run logs from task-level completion into step-level traces with action input summary, expanded variables, permission/capability failure reason, duration, retry/cooldown decision, and source trigger. Add filtering by profile/task/error.  
 **Sources:** Node-RED debug sidebar [S9], Huginn agent health/events [S11], Home Assistant state inspector [S12], n8n executions/error handling [S10].  
 **Category:** observability, UX, debugging, testing.  

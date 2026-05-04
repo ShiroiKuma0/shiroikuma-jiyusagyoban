@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.9 — 2026-05-04
+
+Run log tracing baseline.
+
+- Added action execution traces with index, label, action type, duration, status, and message.
+- Persisted summarized action traces in task run-log messages.
+- Expanded run-log cards to show multi-line action trace summaries.
+- Added unit coverage for trace summary formatting.
+
 ## v0.2.8 — 2026-05-04
 
 Capability gating baseline.
