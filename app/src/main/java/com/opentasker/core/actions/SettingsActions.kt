@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioManager
 import android.net.wifi.WifiManager
 import android.bluetooth.BluetoothAdapter
 import android.os.Build
@@ -21,9 +22,10 @@ import com.opentasker.core.engine.ActionResult
  *   - "state": "on", "off", or "toggle"
  */
 class WiFiToggleAction : Action {
-    override val id = "wifi.set"
+    override val id = "wifi.toggle"
     override val category = ActionCategory.SETTINGS
 
+    @Suppress("DEPRECATION")
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val state = args["state"] ?: "toggle"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -50,9 +52,10 @@ class WiFiToggleAction : Action {
  *   - "state": "on", "off", or "toggle"
  */
 class BluetoothToggleAction : Action {
-    override val id = "bt.set"
+    override val id = "bluetooth.toggle"
     override val category = ActionCategory.SETTINGS
 
+    @Suppress("DEPRECATION")
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val state = args["state"] ?: "toggle"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
@@ -81,7 +84,7 @@ class BluetoothToggleAction : Action {
  *   - "brightness": 0-255 (or auto)
  */
 class BrightnessAction : Action {
-    override val id = "display.brightness"
+    override val id = "brightness.set"
     override val category = ActionCategory.SETTINGS
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
@@ -111,13 +114,31 @@ class BrightnessAction : Action {
  *   - "level": 0-15 (or "mute", "unmute")
  */
 class VolumeAction : Action {
-    override val id = "audio.volume"
+    override val id = "volume.set"
     override val category = ActionCategory.SETTINGS
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        ctx.logger("Volume: set to ${args["level"]}")
-        // TODO: Implement AudioManager.setStreamVolume
-        return ActionResult.Success
+        val levelArg = args["level"] ?: return ActionResult.Failure("missing level")
+        val audioManager = ctx.app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            ?: return ActionResult.Failure("audio service not available")
+        val streamType = streamType(args["stream"] ?: "music") ?: return ActionResult.Failure("invalid stream")
+
+        return try {
+            when (levelArg.lowercase()) {
+                "mute" -> audioManager.adjustStreamVolume(streamType, AudioManager.ADJUST_MUTE, 0)
+                "unmute" -> audioManager.adjustStreamVolume(streamType, AudioManager.ADJUST_UNMUTE, 0)
+                else -> {
+                    val max = audioManager.getStreamMaxVolume(streamType)
+                    val level = levelArg.toIntOrNull()?.coerceIn(0, max)
+                        ?: return ActionResult.Failure("invalid level: $levelArg")
+                    audioManager.setStreamVolume(streamType, level, 0)
+                }
+            }
+            ctx.logger("Volume ${args["stream"] ?: "music"}: $levelArg")
+            ActionResult.Success
+        } catch (ex: SecurityException) {
+            ActionResult.Failure("volume change blocked by DND policy: ${ex.message}", ex)
+        }
     }
 }
 
@@ -128,14 +149,13 @@ class VolumeAction : Action {
  *   - "state": "on", "off", or "toggle"
  */
 class AirplaneModeAction : Action {
-    override val id = "airplane.set"
+    override val id = "airplane.toggle"
     override val category = ActionCategory.SETTINGS
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val state = args["state"] ?: "toggle"
         ctx.logger("Airplane mode: $state")
-        // TODO: Implement via Settings.Global.putInt(AIRPLANE_MODE_ON) + broadcast
-        return ActionResult.Success
+        return ActionResult.Failure("Airplane mode changes are restricted to system or device-owner apps")
     }
 }
 
@@ -146,15 +166,24 @@ class AirplaneModeAction : Action {
  *   - "state": "on", "off", or "toggle"
  */
 class MobileDataAction : Action {
-    override val id = "mobile.data"
+    override val id = "mobile.toggle"
     override val category = ActionCategory.SETTINGS
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val state = args["state"] ?: "toggle"
         ctx.logger("Mobile data: $state")
-        // TODO: Implement via TelephonyManager reflection
-        return ActionResult.Success
+        return ActionResult.Failure("Mobile data changes are restricted to carrier, system, or device-owner apps")
     }
+}
+
+private fun streamType(name: String): Int? = when (name.lowercase()) {
+    "music", "media" -> AudioManager.STREAM_MUSIC
+    "alarm" -> AudioManager.STREAM_ALARM
+    "ring", "ringer" -> AudioManager.STREAM_RING
+    "notification" -> AudioManager.STREAM_NOTIFICATION
+    "system" -> AudioManager.STREAM_SYSTEM
+    "voice", "call" -> AudioManager.STREAM_VOICE_CALL
+    else -> null
 }
 
 /**
@@ -164,7 +193,7 @@ class MobileDataAction : Action {
  *   - "millis": milliseconds until screen times out (0 = never)
  */
 class ScreenTimeoutAction : Action {
-    override val id = "display.timeout"
+    override val id = "screen.timeout"
     override val category = ActionCategory.SETTINGS
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {

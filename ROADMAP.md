@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.6. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.7. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-04  
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.6  
+**Current app version:** 0.2.7  
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -21,11 +21,11 @@ Key local constraints:
 |---|---|---|
 | UI | Active profile/task/action/context/run-log/setup management UI is restored; advanced stale snapshots remain unused | Continue hardening UI with capability gating |
 | Engine | Foreground automation service and registries are wired through `OpenTaskerApp_NoHilt` | Keep non-Hilt runtime stable until Hilt migration is deliberate |
-| Actions | Several actions are implemented and hardened, but several classes still contain success-shaped stubs | Stub replacement must precede "action library" marketing |
+| Actions | Built-in action IDs now align with UI metadata and success-shaped stubs were replaced with real behavior or explicit unsupported failures | Capability gating should build on these honest runtime results |
 | Contexts | Time ticks use app-owned AlarmManager scheduling, WiFi events use dynamic NetworkCallback, and app-open events use foreground-service-owned UsageStats polling; other context sources still rely on restricted Android APIs or incomplete implementations | Permission/onboarding and platform-safe replacements remain P0/P1 |
 | Persistence | Room schema export now exists; backup/restore hardened | Migration tests and upgrade strategy can be built on this |
 | Release | Debug/release builds pass locally; release signing is env-var driven | F-Droid/Play readiness still needs policy and reproducibility work |
-| Docs | README was corrected to v0.2.6; old roadmap/notes overclaimed v0.3/v0.4 completion | Roadmap tiers below supersede old milestone claims |
+| Docs | README was corrected to v0.2.7; old roadmap/notes overclaimed v0.3/v0.4 completion | Roadmap tiers below supersede old milestone claims |
 
 ---
 
@@ -121,6 +121,7 @@ Key local constraints:
 
 ### N6 - Replace success-shaped stubs with real implementations or explicit unsupported failures
 
+**Status:** Baseline completed in v0.2.7. Built-in actions and context sources are registered at startup, UI metadata IDs match runtime IDs, several action paths now execute real behavior, and privileged/unimplemented actions fail explicitly instead of reporting success.  
 **Description:** Audit all action/context classes for TODO, placeholder, `return success`, and unimplemented behavior. Each must either perform the action, report a specific permission/platform limitation, or be hidden behind capability checks until implemented.  
 **Sources:** Local source scan [L2], Tasker/MacroDroid action-count expectations [S16][S17], Automate block breadth [S18].  
 **Category:** correctness, UX, observability, testing.  

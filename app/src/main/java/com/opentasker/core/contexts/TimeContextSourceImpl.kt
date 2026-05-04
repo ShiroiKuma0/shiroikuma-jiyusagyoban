@@ -2,12 +2,12 @@ package com.opentasker.core.contexts
 
 import android.content.Context
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 /**
  * Real TimeContextSource with minute-by-minute clock updates.
@@ -23,23 +23,25 @@ class TimeContextSourceImpl : ContextSource {
     override fun events(app: Context): Flow<ContextEvent> = callbackFlow {
         var lastMinute = -1
 
-        while (!isClosedForSend) {
-            val cal = Calendar.getInstance()
-            val now = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
-            if (now != lastMinute) {
-                lastMinute = now
-                trySend(
-                    ContextEvent(
-                        type,
-                        true,
-                        mapOf("time" to "%02d:%02d".format(cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE)))
+        val tickJob = launch {
+            while (isActive) {
+                val cal = Calendar.getInstance()
+                val now = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
+                if (now != lastMinute) {
+                    lastMinute = now
+                    trySend(
+                        ContextEvent(
+                            type,
+                            true,
+                            mapOf("time" to "%02d:%02d".format(cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE)))
+                        )
                     )
-                )
+                }
+                delay(1000)
             }
-            delay(1000)
         }
 
-        awaitClose()
+        awaitClose { tickJob.cancel() }
     }
 }
 

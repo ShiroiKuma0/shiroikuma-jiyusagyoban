@@ -1,5 +1,14 @@
 package com.opentasker.core.actions
 
+import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
@@ -20,9 +29,36 @@ class NotifyAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val title = args["title"] ?: "Notification"
         val text = args["text"] ?: ""
-        ctx.logger("Notify: $title | $text")
-        // TODO: Implement Toast/NotificationCompat
-        return ActionResult.Success
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(ctx.app, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return ActionResult.Failure("Notification permission is not granted")
+        }
+
+        val notificationManager = ctx.app.getSystemService(NotificationManager::class.java)
+        notificationManager.createNotificationChannel(
+            NotificationChannel(CHANNEL_ID, "OpenTasker actions", NotificationManager.IMPORTANCE_DEFAULT),
+        )
+
+        val notification = NotificationCompat.Builder(ctx.app, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .build()
+
+        return try {
+            NotificationManagerCompat.from(ctx.app).notify(System.currentTimeMillis().toInt(), notification)
+            ctx.logger("Notify: $title | $text")
+            ActionResult.Success
+        } catch (ex: SecurityException) {
+            ActionResult.Failure("notification failed: ${ex.message}", ex)
+        }
+    }
+
+    companion object {
+        private const val CHANNEL_ID = "opentasker.actions"
     }
 }
 
@@ -59,8 +95,7 @@ class SayAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val text = args["text"] ?: ""
         ctx.logger("TTS: $text")
-        // TODO: Use TextToSpeech engine
-        return ActionResult.Success
+        return ActionResult.Failure("Text-to-speech action is not implemented yet")
     }
 }
 
@@ -98,8 +133,23 @@ class LaunchIntentAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val pkg = args["package"] ?: return ActionResult.Failure("missing package")
-        ctx.logger("Intent: $pkg")
-        // TODO: Resolve and launch intent
-        return ActionResult.Success
+        val action = args["action"]?.ifBlank { null }
+        val category = args["category"]?.ifBlank { null }
+        return try {
+            val intent = if (action == null) {
+                ctx.app.packageManager.getLaunchIntentForPackage(pkg)
+                    ?: return ActionResult.Failure("app not found: $pkg")
+            } else {
+                Intent(action).setPackage(pkg)
+            }.apply {
+                category?.let(::addCategory)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            ctx.app.startActivity(intent)
+            ctx.logger("Intent launch: $pkg")
+            ActionResult.Success
+        } catch (ex: Exception) {
+            ActionResult.Failure("intent launch failed: ${ex.message}", ex)
+        }
     }
 }

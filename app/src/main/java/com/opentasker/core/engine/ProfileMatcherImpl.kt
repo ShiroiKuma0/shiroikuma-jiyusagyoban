@@ -9,8 +9,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.scan
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.mapNotNull
 
 /**
@@ -31,7 +31,7 @@ class ProfileMatcher(
             return kotlinx.coroutines.flow.emptyFlow()
         }
 
-        val flows = profile.contexts.mapNotNull { spec ->
+        val flows = profile.contexts.map { spec ->
             val source = ContextSourceRegistry.get(spec.type.name.lowercase())
             if (source != null) {
                 source.events(app).map { event ->
@@ -39,7 +39,8 @@ class ProfileMatcher(
                     if (spec.invert) !matched else matched
                 }
             } else {
-                null
+                AppLogger.warn(tag, "No context source registered for ${spec.type}; treating as non-matching")
+                flowOf(false)
             }
         }
 

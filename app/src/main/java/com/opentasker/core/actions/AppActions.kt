@@ -1,7 +1,11 @@
 package com.opentasker.core.actions
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.telephony.SmsManager
+import androidx.core.content.ContextCompat
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
@@ -22,6 +26,7 @@ class LaunchAppAction : Action {
         return try {
             val intent = ctx.app.packageManager.getLaunchIntentForPackage(pkg)
                 ?: return ActionResult.Failure("app not found: $pkg")
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             ctx.app.startActivity(intent)
             ctx.logger("Launch: $pkg")
             ActionResult.Success
@@ -44,8 +49,7 @@ class KillAppAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val pkg = args["package"] ?: return ActionResult.Failure("missing package")
         ctx.logger("Kill: $pkg")
-        // TODO: Implement via ActivityManager.killBackgroundProcesses
-        return ActionResult.Success
+        return ActionResult.Failure("Killing apps is not supported without privileged app-management access")
     }
 }
 
@@ -74,13 +78,13 @@ class GoHomeAction : Action {
  *   - "url": URL to open
  */
 class OpenUrlAction : Action {
-    override val id = "browser.open"
+    override val id = "url.open"
     override val category = ActionCategory.APP
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val url = args["url"] ?: return ActionResult.Failure("missing url")
         return try {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             ctx.app.startActivity(intent)
             ctx.logger("Open URL: $url")
             ActionResult.Success
@@ -104,9 +108,18 @@ class SendSmsAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val number = args["number"] ?: return ActionResult.Failure("missing number")
         val message = args["message"] ?: ""
-        ctx.logger("SMS to $number: $message")
-        // TODO: Implement via SmsManager.sendTextMessage
-        return ActionResult.Success
+        if (ContextCompat.checkSelfPermission(ctx.app, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+            return ActionResult.Failure("SMS permission is not granted")
+        }
+        if (message.isBlank()) return ActionResult.Failure("missing message")
+        return try {
+            @Suppress("DEPRECATION")
+            SmsManager.getDefault().sendTextMessage(number, null, message, null, null)
+            ctx.logger("SMS sent to $number")
+            ActionResult.Success
+        } catch (ex: Exception) {
+            ActionResult.Failure("SMS send failed: ${ex.message}", ex)
+        }
     }
 }
 
@@ -123,7 +136,6 @@ class ScreenshotAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: "/sdcard/screenshot.png"
         ctx.logger("Screenshot: $path")
-        // TODO: Implement via shell screencap command or MediaProjection
-        return ActionResult.Success
+        return ActionResult.Failure("Screenshot capture requires MediaProjection consent or privileged shell access")
     }
 }
