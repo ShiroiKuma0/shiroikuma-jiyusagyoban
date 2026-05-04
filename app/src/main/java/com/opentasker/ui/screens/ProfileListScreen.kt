@@ -72,6 +72,7 @@ fun ProfileListScreen(
     onDeleteProfile: (Profile) -> Unit,
     onViewRunLog: () -> Unit,
     onBatchOperations: () -> Unit = {},
+    onManageTasks: () -> Unit = {},
 ) {
     val viewModel: ProfileListViewModel = viewModel(
         factory = ProfileListViewModelFactory(db)
@@ -84,6 +85,9 @@ fun ProfileListScreen(
             TopAppBar(
                 title = { Text("Profiles") },
                 actions = {
+                    Button(onClick = onManageTasks) {
+                        Text("Tasks")
+                    }
                     Button(onClick = onBatchOperations) {
                         Text("Batch Ops")
                     }
