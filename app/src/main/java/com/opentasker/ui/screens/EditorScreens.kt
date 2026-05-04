@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -50,6 +52,10 @@ import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.toEntity
+import com.opentasker.core.validation.InputValidation
+import com.opentasker.ui.components.LoadingButton
+import com.opentasker.ui.components.TextFieldWithError
+import com.opentasker.ui.theme.DesignSystem
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -90,6 +96,9 @@ fun ProfileEditorScreen(
     var enterTaskId by remember { mutableStateOf(profile?.enterTaskId ?: 0L) }
     var exitTaskId by remember { mutableStateOf(profile?.exitTaskId) }
     var cooldownSec by remember { mutableStateOf(profile?.cooldownSec?.toString() ?: "0") }
+    var isSaving by remember { mutableStateOf(false) }
+    var nameError by remember { mutableStateOf<String?>(null) }
+    var cooldownError by remember { mutableStateOf<String?>(null) }
     
     // Load available tasks
     val availableTasks = remember { mutableStateOf(emptyList<Task>()) }
@@ -127,40 +136,45 @@ fun ProfileEditorScreen(
                 .fillMaxSize()
                 .padding(inner)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+                .padding(DesignSystem.Spacing.lg)
         ) {
-            OutlinedTextField(
+            TextFieldWithError(
                 value = name,
-                onValueChange = { name = it },
-                label = { Text("Profile name") },
+                onValueChange = { 
+                    name = it
+                    nameError = null
+                },
+                label = "Profile name",
+                error = nameError,
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(DesignSystem.Spacing.xl))
             Text(
                 "Contexts (${contexts.size})",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(DesignSystem.Spacing.md))
 
             if (contexts.isEmpty()) {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    shape = RoundedCornerShape(8.dp)
+                        .padding(vertical = DesignSystem.Spacing.md),
+                    shape = RoundedCornerShape(DesignSystem.Radii.md),
+                    elevation = CardDefaults.cardElevation(defaultElevation = DesignSystem.Elevation.sm)
                 ) {
                     Text(
                         "No contexts yet. Add one to define triggers.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(12.dp)
+                        modifier = Modifier.padding(DesignSystem.Spacing.lg)
                     )
                 }
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
                     items(contexts.size) { i ->
                         ContextListItem(
                             context = contexts[i],
@@ -172,20 +186,20 @@ fun ProfileEditorScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(DesignSystem.Spacing.md))
             ElevatedButton(
                 onClick = onAddContext,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Filled.Add, contentDescription = null)
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.width(DesignSystem.Spacing.sm))
                 Text("Add Context")
             }
 
             Text(
-                "Enter task (click to select)",
+                "Enter task (required)",
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 16.dp)
+                modifier = Modifier.padding(top = DesignSystem.Spacing.xl)
             )
             
             // Task picker dropdown
@@ -201,9 +215,12 @@ fun ProfileEditorScreen(
                 }
                 
                 if (expandedEnter) {
-                    Card(modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp)) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = DesignSystem.Spacing.md),
+                        shape = RoundedCornerShape(DesignSystem.Radii.md)
+                    ) {
                         LazyColumn {
                             items(availableTasks.value.size) { idx ->
                                 val task = availableTasks.value[idx]
@@ -228,7 +245,7 @@ fun ProfileEditorScreen(
             Text(
                 "Exit task (optional)",
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 16.dp)
+                modifier = Modifier.padding(top = DesignSystem.Spacing.xl)
             )
             
             if (availableTasks.value.isNotEmpty()) {
@@ -243,9 +260,12 @@ fun ProfileEditorScreen(
                 }
                 
                 if (expandedExit) {
-                    Card(modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp)) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = DesignSystem.Spacing.md),
+                        shape = RoundedCornerShape(DesignSystem.Radii.md)
+                    ) {
                         LazyColumn {
                             item {
                                 Button(
@@ -276,34 +296,46 @@ fun ProfileEditorScreen(
                 }
             }
 
-            OutlinedTextField(
+            TextFieldWithError(
                 value = cooldownSec,
-                onValueChange = { cooldownSec = it },
-                label = { Text("Cooldown (seconds)") },
+                onValueChange = { 
+                    cooldownSec = it
+                    cooldownError = null
+                },
+                label = "Cooldown (seconds)",
+                error = cooldownError,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp)
+                    .padding(top = DesignSystem.Spacing.md)
             )
 
-            Button(
+            Spacer(modifier = Modifier.height(DesignSystem.Spacing.xl))
+            LoadingButton(
                 onClick = {
-                    onSave(
-                        Profile(
-                            id = profile?.id ?: 0,
-                            name = name,
-                            enabled = profile?.enabled ?: true,
-                            contexts = contexts,
-                            enterTaskId = enterTaskId,
-                            exitTaskId = exitTaskId,
-                            cooldownSec = cooldownSec.toIntOrNull() ?: 0
+                    // Validate input
+                    nameError = if (name.trim().isEmpty()) "Profile name cannot be empty" else null
+                    cooldownError = if (cooldownSec.toIntOrNull() == null) "Cooldown must be a valid number" else null
+                    
+                    if (nameError == null && cooldownError == null) {
+                        isSaving = true
+                        onSave(
+                            Profile(
+                                id = profile?.id ?: 0,
+                                name = name.trim(),
+                                enabled = profile?.enabled ?: true,
+                                contexts = contexts,
+                                enterTaskId = enterTaskId,
+                                exitTaskId = exitTaskId,
+                                cooldownSec = cooldownSec.toIntOrNull() ?: 0
+                            )
                         )
-                    )
+                        isSaving = false
+                    }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp)
+                isLoading = isSaving,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Save")
+                Text("Save Profile")
             }
         }
     }
@@ -322,16 +354,28 @@ fun TaskEditorScreen(
     var actions by remember { mutableStateOf(task?.actions ?: emptyList()) }
     var priority by remember { mutableStateOf(task?.priority?.toString() ?: "0") }
     var collisionMode by remember { mutableStateOf(task?.collisionMode?.name ?: "QUEUE") }
+    var isSaving by remember { mutableStateOf(false) }
+    var nameError by remember { mutableStateOf<String?>(null) }
+    var priorityError by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (task == null) "New Task" else "Edit ${task.name}") },
+                title = { 
+                    Text(
+                        if (task == null) "New Task" else "Edit ${task.name}",
+                        style = MaterialTheme.typography.headlineMedium
+                    ) 
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                )
             )
         }
     ) { inner ->
@@ -339,75 +383,178 @@ fun TaskEditorScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(inner)
-                .padding(16.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(DesignSystem.Spacing.lg)
         ) {
-            OutlinedTextField(
+            TextFieldWithError(
                 value = name,
-                onValueChange = { name = it },
-                label = { Text("Task name") },
-                modifier = Modifier.fillMaxWidth()
+                onValueChange = { 
+                    name = it
+                    nameError = null
+                },
+                label = "Task name",
+                error = nameError,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
             )
 
-            OutlinedTextField(
+            TextFieldWithError(
                 value = priority,
-                onValueChange = { priority = it },
-                label = { Text("Priority (0-100)") },
+                onValueChange = { 
+                    priority = it
+                    priorityError = null
+                },
+                label = "Priority (0-100)",
+                error = priorityError,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp)
+                    .padding(top = DesignSystem.Spacing.md)
             )
-
-            OutlinedTextField(
-                value = collisionMode,
-                onValueChange = { collisionMode = it },
-                label = { Text("Collision mode (QUEUE/INTERRUPT)") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp)
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(top = 16.dp))
 
             Text(
-                "Actions (${actions.size})",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 16.dp)
+                "Collision mode",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = DesignSystem.Spacing.md)
             )
-
-            LazyColumn {
-                items(actions.size) { i ->
-                    val action = actions[i]
-                    Card(modifier = Modifier
+            
+            var collisionModeExpanded by remember { mutableStateOf(false) }
+            Button(
+                onClick = { collisionModeExpanded = !collisionModeExpanded },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(collisionMode)
+            }
+            
+            if (collisionModeExpanded) {
+                Card(
+                    modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(action.type, style = MaterialTheme.typography.labelMedium)
-                            action.label?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                        }
-                        IconButton(onClick = {
-                            actions = actions.filterIndexed { idx, _ -> idx != i }
-                        }) {
-                            Icon(Icons.Filled.Delete, contentDescription = "Delete")
+                        .padding(top = DesignSystem.Spacing.sm),
+                    shape = RoundedCornerShape(DesignSystem.Radii.md)
+                ) {
+                    Column {
+                        listOf("QUEUE", "INTERRUPT").forEach { mode ->
+                            Button(
+                                onClick = {
+                                    collisionMode = mode
+                                    collisionModeExpanded = false
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(mode)
+                            }
+                            if (mode != "INTERRUPT") HorizontalDivider()
                         }
                     }
                 }
             }
 
-            Button(
+            HorizontalDivider(modifier = Modifier.padding(top = DesignSystem.Spacing.xl))
+
+            Text(
+                "Actions (${actions.size})",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = DesignSystem.Spacing.lg)
+            )
+
+            if (actions.isNotEmpty()) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+                    items(actions.size) { i ->
+                        val action = actions[i]
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(DesignSystem.Radii.md),
+                            elevation = CardDefaults.cardElevation(defaultElevation = DesignSystem.Elevation.sm)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(DesignSystem.Spacing.lg),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(action.type, style = MaterialTheme.typography.labelMedium)
+                                    action.label?.let { 
+                                        Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1) 
+                                    }
+                                }
+                                IconButton(
+                                    onClick = {
+                                        actions = actions.filterIndexed { idx, _ -> idx != i }
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Delete, 
+                                        contentDescription = "Delete action",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = DesignSystem.Spacing.md),
+                    shape = RoundedCornerShape(DesignSystem.Radii.md),
+                    elevation = CardDefaults.cardElevation(defaultElevation = DesignSystem.Elevation.sm)
+                ) {
+                    Text(
+                        "No actions yet. Add one to define what happens.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(DesignSystem.Spacing.lg)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(DesignSystem.Spacing.md))
+            ElevatedButton(
                 onClick = onAddAction,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp)
+                modifier = Modifier.fillMaxWidth()
             ) {
+                Icon(Icons.Filled.Add, contentDescription = null)
+                Spacer(modifier = Modifier.width(DesignSystem.Spacing.sm))
                 Text("Add Action")
             }
 
-            Button(
+            Spacer(modifier = Modifier.height(DesignSystem.Spacing.xl))
+            LoadingButton(
                 onClick = {
-                    try {
-                        onSave(
-                            Task(
+                    // Validate input
+                    nameError = if (name.trim().isEmpty()) "Task name cannot be empty" else null
+                    priorityError = if (priority.toIntOrNull() == null) "Priority must be a valid number" else null
+                    
+                    if (nameError == null && priorityError == null) {
+                        isSaving = true
+                        try {
+                            onSave(
+                                Task(
+                                    id = task?.id ?: 0,
+                                    name = name.trim(),
+                                    actions = actions,
+                                    priority = priority.toIntOrNull() ?: 0,
+                                    collisionMode = CollisionMode.valueOf(collisionMode)
+                                )
+                            )
+                        } catch (e: Exception) {
+                            nameError = "Failed to save task: ${e.message}"
+                        } finally {
+                            isSaving = false
+                        }
+                    }
+                },
+                isLoading = isSaving,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Save Task")
+            }
+        }
+    }
+}
                                 id = task?.id ?: 0,
                                 name = name,
                                 priority = priority.toIntOrNull() ?: 0,
