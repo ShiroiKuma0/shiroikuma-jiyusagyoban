@@ -3,6 +3,7 @@ package com.opentasker.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -17,10 +18,12 @@ import com.opentasker.automation.model.ConstraintConfig
 import com.opentasker.automation.model.ActionConfig
 import com.opentasker.automation.model.ConstraintGroup
 import com.opentasker.automation.model.LogicalOperator
+import com.opentasker.ui.theme.DesignSystem
 
 /**
  * Screen for viewing and managing all automation rules.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun AutomationRuleListScreen(
     rules: List<AutomationRule> = emptyList(),
@@ -33,7 +36,12 @@ fun AutomationRuleListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Automation Rules") },
+                title = { 
+                    Text(
+                        "Automation Rules",
+                        style = MaterialTheme.typography.headlineMedium
+                    ) 
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -43,7 +51,11 @@ fun AutomationRuleListScreen(
                     IconButton(onClick = onCreateRule) {
                         Icon(Icons.Default.Add, contentDescription = "Create rule")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                )
             )
         }
     ) { paddingValues ->
@@ -58,8 +70,8 @@ fun AutomationRuleListScreen(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(DesignSystem.Spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)
                 ) {
                     items(rules) { rule ->
                         RuleCard(
@@ -80,24 +92,24 @@ fun EmptyRulesState(onCreateRule: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(40.dp),
+            .padding(DesignSystem.Spacing.xxl),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
             imageVector = Icons.Default.AutoAwesome,
             contentDescription = null,
-            modifier = Modifier.size(72.dp),
+            modifier = Modifier.size(DesignSystem.ComponentSize.iconXLarge),
             tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
         )
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(DesignSystem.Spacing.xl))
         Text(
             "No automation rules yet",
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(DesignSystem.Spacing.md))
         Text(
             "Create your first rule to automate tasks based on triggers and conditions. Rules execute automatically when their conditions are met.",
             style = MaterialTheme.typography.bodyMedium,
@@ -105,16 +117,16 @@ fun EmptyRulesState(onCreateRule: () -> Unit) {
             textAlign = TextAlign.Center,
             lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.2
         )
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(DesignSystem.Spacing.xl))
         Button(
             onClick = onCreateRule,
             modifier = Modifier
                 .fillMaxWidth(0.7f)
-                .height(48.dp),
-            shape = RoundedCornerShape(8.dp)
+                .height(DesignSystem.ComponentSize.buttonLarge),
+            shape = RoundedCornerShape(DesignSystem.Radii.md)
         ) {
             Icon(Icons.Default.Add, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(DesignSystem.Spacing.sm))
             Text("Create First Rule")
         }
     }
@@ -156,22 +168,21 @@ fun RuleCard(
     }
     
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
         colors = CardDefaults.cardColors(
             containerColor = if (rule.enabled) 
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                MaterialTheme.colorScheme.surfaceVariant
             else 
-                MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                MaterialTheme.colorScheme.surface
         ),
+        elevation = CardDefaults.cardElevation(defaultElevation = DesignSystem.Elevation.sm),
         onClick = onEdit
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(DesignSystem.Spacing.lg)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -181,11 +192,11 @@ fun RuleCard(
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(end = 12.dp)
+                        .padding(end = DesignSystem.Spacing.md)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)
                     ) {
                         Text(
                             text = rule.name,
@@ -197,7 +208,7 @@ fun RuleCard(
                     }
                     
                     if (rule.description.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(DesignSystem.Spacing.sm))
                         Text(
                             text = rule.description,
                             style = MaterialTheme.typography.bodySmall,
@@ -205,45 +216,44 @@ fun RuleCard(
                             maxLines = 1
                         )
                     }
-                    
                     Spacer(modifier = Modifier.height(10.dp))
                     RuleSummary(rule = rule)
                 }
                 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    modifier = Modifier.padding(start = 8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs),
+                    modifier = Modifier.padding(start = DesignSystem.Spacing.md)
                 ) {
                     IconButton(
                         onClick = onToggle,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(DesignSystem.ComponentSize.buttonMedium)
                     ) {
                         Icon(
                             imageVector = if (rule.enabled) Icons.Default.ToggleOn else Icons.Default.ToggleOff,
                             contentDescription = if (rule.enabled) "Disable rule" else "Enable rule",
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(DesignSystem.ComponentSize.iconSmall),
                             tint = if (rule.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(
                         onClick = onEdit,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(DesignSystem.ComponentSize.buttonMedium)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
                             contentDescription = "Edit rule",
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(DesignSystem.ComponentSize.iconSmall)
                         )
                     }
                     IconButton(
                         onClick = { showDeleteConfirm = true },
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(DesignSystem.ComponentSize.buttonMedium)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Delete rule",
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(DesignSystem.ComponentSize.iconSmall),
                             tint = MaterialTheme.colorScheme.error
                         )
                     }
@@ -257,13 +267,13 @@ fun RuleCard(
 fun StatusBadge(enabled: Boolean) {
     Surface(
         color = if (enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.error.copy(alpha = 0.2f),
-        shape = RoundedCornerShape(4.dp)
+        shape = RoundedCornerShape(DesignSystem.Radii.xs)
     ) {
         Text(
             text = if (enabled) "Active" else "Inactive",
             style = MaterialTheme.typography.labelSmall,
             color = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            modifier = Modifier.padding(horizontal = DesignSystem.Spacing.sm, vertical = DesignSystem.Spacing.xs)
         )
     }
 }
