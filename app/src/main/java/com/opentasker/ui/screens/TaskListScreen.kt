@@ -26,6 +26,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.ui.theme.DesignSystem
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -108,24 +109,24 @@ fun TaskListScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(40.dp),
+                        .padding(DesignSystem.Spacing.xxl),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
                     Icon(
                         Icons.Filled.Info,
                         contentDescription = null,
-                        modifier = Modifier.size(72.dp),
+                        modifier = Modifier.size(DesignSystem.ComponentSize.iconXLarge),
                         tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                     )
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(DesignSystem.Spacing.xl))
                     Text(
                         "No tasks yet",
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onSurface,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(DesignSystem.Spacing.md))
                     Text(
                         "Tasks define the actions OpenTasker will perform when rules are triggered. Create your first task to start automating.",
                         style = MaterialTheme.typography.bodyMedium,
@@ -133,26 +134,26 @@ fun TaskListScreen(
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.2
                     )
-                    Spacer(modifier = Modifier.height(28.dp))
+                    Spacer(modifier = Modifier.height(DesignSystem.Spacing.xl))
                     Button(
                         onClick = onCreateTask,
                         modifier = Modifier
                             .fillMaxWidth(0.7f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(8.dp)
+                            .height(DesignSystem.ComponentSize.buttonLarge),
+                        shape = RoundedCornerShape(DesignSystem.Radii.md)
                     ) {
                         Icon(Icons.Filled.Add, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(DesignSystem.Spacing.sm))
                         Text("Create First Task")
                     }
                 }
-            }else {
+            } else {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp)
-                        .padding(top = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(horizontal = DesignSystem.Spacing.lg)
+                        .padding(top = DesignSystem.Spacing.md),
+                    verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)
                 ) {
                     items(tasks, key = { it.id }) { task ->
                         TaskCardItem(
@@ -202,19 +203,18 @@ fun TaskCardItem(
     }
     
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         ),
+        elevation = CardDefaults.cardElevation(defaultElevation = DesignSystem.Elevation.sm),
         onClick = onEdit
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(DesignSystem.Spacing.lg),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -225,20 +225,20 @@ fun TaskCardItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(DesignSystem.Spacing.sm))
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Surface(
                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                        shape = RoundedCornerShape(4.dp)
+                        shape = RoundedCornerShape(DesignSystem.Radii.xs)
                     ) {
                         Text(
                             "${task.actions.size} action${if (task.actions.size == 1) "" else "s"}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                            modifier = Modifier.padding(horizontal = DesignSystem.Spacing.sm, vertical = DesignSystem.Spacing.xs)
                         )
                     }
                     Text(
@@ -250,28 +250,28 @@ fun TaskCardItem(
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                modifier = Modifier.padding(start = 8.dp)
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs),
+                modifier = Modifier.padding(start = DesignSystem.Spacing.md)
             ) {
                 IconButton(
                     onClick = onEdit,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(DesignSystem.ComponentSize.buttonMedium)
                 ) {
                     Icon(
                         Icons.Filled.Edit,
                         contentDescription = "Edit",
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(DesignSystem.ComponentSize.iconSmall),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
                 IconButton(
                     onClick = { showDeleteConfirm = true },
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(DesignSystem.ComponentSize.buttonMedium)
                 ) {
                     Icon(
                         Icons.Filled.Delete,
                         contentDescription = "Delete",
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(DesignSystem.ComponentSize.iconSmall),
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
