@@ -1,13 +1,13 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.9-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.10-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.9** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scenes, and variables — without the proprietary lock-in.
+**OpenTasker v0.2.10** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scenes, and variables — without the proprietary lock-in.
 
-> **Status:** v0.2.9 restores active profile/task/action/context/run-log management, adds setup checks, uses platform-safe trigger monitors, gates unsupported actions, and records action-level run log traces.
+> **Status:** v0.2.10 restores active profile/task/action/context/run-log management, adds setup checks, uses platform-safe trigger monitors, gates unsupported actions, records action-level run log traces, and expands regression coverage around parser/runtime seams.
 
 ---
 
@@ -25,6 +25,7 @@
 ✅ **Runtime action registry** — UI action IDs map to real implementations or explicit unsupported failures  
 ✅ **Capability gating** — action picker marks setup requirements and blocks unsupported privileged actions  
 ✅ **Run log traces** — task history includes action-level status, duration, and failure reasons  
+✅ **Regression coverage** — cron parsing and variable scoping edge cases are test-covered  
 ✅ **Database persistence** — Room DAOs with StateFlow live updates  
 ✅ **Action metadata system** — dynamic form generation for all 43 actions  
 ✅ **Context configuration** — UI for all 6 context families (app, time, day, location, state, event)  
