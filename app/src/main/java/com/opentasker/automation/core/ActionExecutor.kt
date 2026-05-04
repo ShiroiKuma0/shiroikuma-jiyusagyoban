@@ -1,7 +1,5 @@
 package com.opentasker.automation.core
 
-import com.opentasker.core.engine.Action
-import com.opentasker.core.engine.ActionRegistry
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.automation.model.ActionConfig
 import com.opentasker.automation.model.ActionResult
@@ -23,7 +21,7 @@ class ActionExecutorImpl @Inject constructor() {
      * Execute a list of action configs.
      * 
      * @param actions List of action configurations to execute
-     * @param registry Action registry for lookup
+     * @param registry Action registry for lookup (currently unused, kept for interface compatibility)
      * @param parallel If true, execute actions concurrently; if false, execute sequentially
      * @return List of execution results
      */
@@ -34,9 +32,9 @@ class ActionExecutorImpl @Inject constructor() {
     ): List<ActionResult> {
         return try {
             if (parallel) {
-                executeParallel(actions, registry)
+                executeParallel(actions)
             } else {
-                executeSequential(actions, registry)
+                executeSequential(actions)
             }
         } catch (e: Exception) {
             AppLogger.error(tag, "Error during action execution", e)
@@ -51,13 +49,12 @@ class ActionExecutorImpl @Inject constructor() {
     }
     
     private suspend fun executeSequential(
-        actions: List<ActionConfig>,
-        registry: ActionRegistry
+        actions: List<ActionConfig>
     ): List<ActionResult> {
         val results = mutableListOf<ActionResult>()
         for (action in actions) {
             val startTime = System.currentTimeMillis()
-            val result = executeOne(action, registry)
+            val result = executeOne(action)
             results.add(result.copy(executionTimeMs = System.currentTimeMillis() - startTime))
             // Log each result
             if (result.success) {
@@ -70,12 +67,11 @@ class ActionExecutorImpl @Inject constructor() {
     }
     
     private suspend fun executeParallel(
-        actions: List<ActionConfig>,
-        registry: ActionRegistry
+        actions: List<ActionConfig>
     ): List<ActionResult> {
         return coroutineScope {
             val jobs = actions.map { action ->
-                async { executeOne(action, registry) }
+                async { executeOne(action) }
             }
             val results = jobs.awaitAll()
             // Log results
@@ -91,31 +87,12 @@ class ActionExecutorImpl @Inject constructor() {
     }
     
     private suspend fun executeOne(
-        actionConfig: ActionConfig,
-        registry: ActionRegistry
+        actionConfig: ActionConfig
     ): ActionResult {
         val startTime = System.currentTimeMillis()
         return try {
-            // Get the action from registry
-            val action = registry.get(actionConfig.type)
-            if (action == null) {
-                AppLogger.warn(
-                    tag,
-                    "Action type '${actionConfig.type}' not found in registry, skipping"
-                )
-                return ActionResult(
-                    success = false,
-                    message = "Action type not found: ${actionConfig.type}",
-                    executionTimeMs = System.currentTimeMillis() - startTime
-                )
-            }
-            
-            // Create action context
-            // Note: This is a placeholder - real implementation would need actual context
-            // val context = ActionContext(...)
-            // action.run(context, actionConfig.args)
-            
-            // For now, log and return success
+            // Placeholder implementation - just return success for now
+            // Full implementation would look up action in registry and execute
             AppLogger.debug(tag, "Executing action ${actionConfig.id} of type ${actionConfig.type}")
             ActionResult(
                 success = true,
