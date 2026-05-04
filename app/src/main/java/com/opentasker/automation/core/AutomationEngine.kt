@@ -42,7 +42,7 @@ class AutomationEngine @Inject constructor(
     private val scope = CoroutineScope(Dispatchers.Default)
     
     // Cache for active profiles (in-memory, not persisted)
-    private val activeProfiles = ConcurrentHashMap<Long, Boolean>()
+    private val activeProfiles = ConcurrentHashMap<String, Boolean>()
 
     /**
      * Process an incoming automation event.
@@ -109,11 +109,8 @@ class AutomationEngine @Inject constructor(
             val executionTimeMs = System.currentTimeMillis() - startTime
 
             // Step 4: Log execution
-            val status = if (actionResults.all { it.success }) ExecutionStatus.SUCCESS else ExecutionStatus.FAILURE
-            val successCount = actionResults.count { it.success }
-            val pairedResults = actionResults.mapIndexed { idx, result ->
-                (rule.actions.getOrNull(idx)?.id ?: "unknown-$idx") to result
-            }.toList()
+            val status = if (actionResults.all { it.second.success }) ExecutionStatus.SUCCESS else ExecutionStatus.FAILURE
+            val successCount = actionResults.count { it.second.success }
             val executionLog = ExecutionLog(
                 ruleId = rule.id,
                 ruleName = rule.name,
@@ -123,7 +120,7 @@ class AutomationEngine @Inject constructor(
                 status = status,
                 message = "Executed $successCount/${rule.actions.size} actions",
                 executionTimeMs = executionTimeMs,
-                actionResults = pairedResults
+                actionResults = actionResults
             )
             logRepository.insert(executionLog)
 
