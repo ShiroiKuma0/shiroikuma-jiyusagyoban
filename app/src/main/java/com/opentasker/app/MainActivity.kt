@@ -14,6 +14,7 @@ import com.opentasker.core.model.Task
 import com.opentasker.core.storage.toEntity
 import com.opentasker.ui.screens.ActionEditorScreen
 import com.opentasker.ui.screens.ActionPickerScreen
+import com.opentasker.ui.screens.BatchOperationsScreen
 import com.opentasker.ui.screens.ContextPickerScreen
 import com.opentasker.ui.screens.ProfileEditorScreen
 import com.opentasker.ui.screens.ProfileListScreen
