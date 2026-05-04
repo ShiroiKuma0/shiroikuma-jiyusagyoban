@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
                                 currentScreen = Screen.ProfileList
                             },
                             onAddContext = { currentScreen = Screen.ContextPicker },
+                            db = db,
                         )
                     }
                     is Screen.TaskEditor -> {

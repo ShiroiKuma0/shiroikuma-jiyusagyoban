@@ -20,6 +20,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,12 +69,23 @@ fun ProfileEditorScreen(
     onSave: (Profile) -> Unit,
     onBack: () -> Unit,
     onAddContext: () -> Unit = {},
+    db: AppDatabase? = null,
 ) {
     var name by remember { mutableStateOf(profile?.name ?: "") }
     var contexts by remember { mutableStateOf(profile?.contexts ?: emptyList()) }
     var enterTaskId by remember { mutableStateOf(profile?.enterTaskId ?: 0L) }
     var exitTaskId by remember { mutableStateOf(profile?.exitTaskId) }
     var cooldownSec by remember { mutableStateOf(profile?.cooldownSec?.toString() ?: "0") }
+    
+    // Load available tasks
+    val availableTasks = remember { mutableStateOf(emptyList<Task>()) }
+    if (db != null) {
+        val taskListVM: TaskListViewModel = viewModel(
+            factory = TaskListViewModelFactory(db)
+        )
+        val tasks by taskListVM.tasks.collectAsState()
+        availableTasks.value = tasks
+    }
 
     Scaffold(
         topBar = {
@@ -135,7 +147,94 @@ fun ProfileEditorScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(top = 16.dp)
             )
-            // TODO: Task picker
+            
+            // Task picker dropdown
+            if (availableTasks.value.isNotEmpty()) {
+                var expandedEnter by remember { mutableStateOf(false) }
+                val selectedEnterTask = availableTasks.value.find { it.id == enterTaskId }
+                
+                Button(
+                    onClick = { expandedEnter = !expandedEnter },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(selectedEnterTask?.name ?: "Select enter task")
+                }
+                
+                if (expandedEnter) {
+                    Card(modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)) {
+                        LazyColumn {
+                            items(availableTasks.value.size) { idx ->
+                                val task = availableTasks.value[idx]
+                                Button(
+                                    onClick = {
+                                        enterTaskId = task.id
+                                        expandedEnter = false
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(task.name)
+                                }
+                                HorizontalDivider()
+                            }
+                        }
+                    }
+                }
+            } else {
+                Text("No tasks yet. Create one first.", style = MaterialTheme.typography.bodySmall)
+            }
+            
+            Text(
+                "Exit task (optional)",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 16.dp)
+            )
+            
+            if (availableTasks.value.isNotEmpty()) {
+                var expandedExit by remember { mutableStateOf(false) }
+                val selectedExitTask = availableTasks.value.find { it.id == exitTaskId }
+                
+                Button(
+                    onClick = { expandedExit = !expandedExit },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(selectedExitTask?.name ?: "Select exit task (or none)")
+                }
+                
+                if (expandedExit) {
+                    Card(modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)) {
+                        LazyColumn {
+                            item {
+                                Button(
+                                    onClick = {
+                                        exitTaskId = null
+                                        expandedExit = false
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("(None)")
+                                }
+                            }
+                            items(availableTasks.value.size) { idx ->
+                                val task = availableTasks.value[idx]
+                                Button(
+                                    onClick = {
+                                        exitTaskId = task.id
+                                        expandedExit = false
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(task.name)
+                                }
+                                HorizontalDivider()
+                            }
+                        }
+                    }
+                }
+            }
 
             OutlinedTextField(
                 value = cooldownSec,
