@@ -82,14 +82,14 @@ fun TextFieldWithError(
                         Icons.Default.Error,
                         contentDescription = "Error",
                         tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(ComponentSize.iconMedium)
+                        modifier = Modifier.size(DesignSystem.ComponentSize.iconMedium)
                     )
                 }
             } else null,
             modifier = Modifier
                 .fillMaxWidth()
                 .defaultMinSize(minHeight = DesignSystem.ComponentSize.buttonMedium),
-            shape = RoundedCornerShape(Radii.sm),
+            shape = RoundedCornerShape(DesignSystem.Radii.sm),
             singleLine = singleLine,
             maxLines = maxLines,
             enabled = enabled,
@@ -106,7 +106,7 @@ fun TextFieldWithError(
         )
         
         if (error != null) {
-            Spacer(modifier = Modifier.height(Spacing.xs))
+            Spacer(modifier = Modifier.height(DesignSystem.Spacing.xs))
             Text(
                 text = error,
                 color = MaterialTheme.colorScheme.error,
@@ -114,7 +114,7 @@ fun TextFieldWithError(
                 modifier = Modifier.padding(start = DesignSystem.Spacing.md)
             )
         } else if (helperText != null) {
-            Spacer(modifier = Modifier.height(Spacing.xs))
+            Spacer(modifier = Modifier.height(DesignSystem.Spacing.xs))
             Text(
                 text = helperText,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -153,7 +153,7 @@ fun LoadingButton(
         modifier = modifier.defaultMinSize(minHeight = DesignSystem.ComponentSize.buttonMedium),
         enabled = enabled && !isLoading,
         colors = buttonColors,
-        shape = RoundedCornerShape(Radii.md),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
         contentPadding = PaddingValues(
             horizontal = DesignSystem.Spacing.md,
             vertical = DesignSystem.Spacing.sm
@@ -161,20 +161,20 @@ fun LoadingButton(
     ) {
         if (isLoading) {
             CircularProgressIndicator(
-                modifier = Modifier.size(ComponentSize.iconSmall),
+                modifier = Modifier.size(DesignSystem.ComponentSize.iconSmall),
                 color = MaterialTheme.colorScheme.onPrimary,
                 strokeWidth = 2.dp
             )
-            Spacer(modifier = Modifier.width(Spacing.sm))
+            Spacer(modifier = Modifier.width(DesignSystem.Spacing.sm))
         }
         
         if (icon != null && !isLoading) {
             Icon(
                 icon,
                 contentDescription = null,
-                modifier = Modifier.size(ComponentSize.iconMedium)
+                modifier = Modifier.size(DesignSystem.ComponentSize.iconMedium)
             )
-            Spacer(modifier = Modifier.width(Spacing.sm))
+            Spacer(modifier = Modifier.width(DesignSystem.Spacing.sm))
         }
         
         Text(
@@ -206,7 +206,7 @@ fun LoadingSkeleton(
                     .height(lineHeight.fontSize.value.dp * 1.2f)
                     .padding(vertical = DesignSystem.Spacing.xs),
                 color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(Radii.sm)
+                shape = RoundedCornerShape(DesignSystem.Radii.sm)
             ) {}
         }
     }
@@ -225,7 +225,7 @@ fun StateBadge(
     Surface(
         modifier = modifier,
         color = color.copy(alpha = 0.15f),
-        shape = RoundedCornerShape(Radii.xs),
+        shape = RoundedCornerShape(DesignSystem.Radii.xs),
     ) {
         Text(
             text = text,
@@ -254,12 +254,12 @@ fun LoadingIndicator(
         verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
     ) {
         CircularProgressIndicator(
-            modifier = Modifier.size(ComponentSize.iconLarge),
+            modifier = Modifier.size(DesignSystem.ComponentSize.iconLarge),
             color = MaterialTheme.colorScheme.primary,
             strokeWidth = 4.dp
         )
         if (message != null) {
-            Spacer(modifier = Modifier.height(Spacing.md))
+            Spacer(modifier = Modifier.height(DesignSystem.Spacing.md))
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyMedium,
@@ -282,17 +282,17 @@ fun ErrorState(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(Spacing.lg),
+            .padding(DesignSystem.Spacing.lg),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
     ) {
         Icon(
             Icons.Default.Error,
             contentDescription = "Error",
-            modifier = Modifier.size(ComponentSize.iconLarge),
+            modifier = Modifier.size(DesignSystem.ComponentSize.iconLarge),
             tint = MaterialTheme.colorScheme.error
         )
-        Spacer(modifier = Modifier.height(Spacing.md))
+        Spacer(modifier = Modifier.height(DesignSystem.Spacing.md))
         Text(
             text = message,
             style = MaterialTheme.typography.bodyMedium,
@@ -300,7 +300,7 @@ fun ErrorState(
             modifier = Modifier.fillMaxWidth()
         )
         if (onRetry != null) {
-            Spacer(modifier = Modifier.height(Spacing.md))
+            Spacer(modifier = Modifier.height(DesignSystem.Spacing.md))
             TextButton(onClick = onRetry) {
                 Text("Retry")
             }
@@ -314,4 +314,5 @@ fun ErrorState(
  */
 fun Modifier.disabledAlpha(disabled: Boolean): Modifier =
     if (disabled) this.then(Modifier.background(Color.Black.copy(alpha = 0.2f))) else this
+
 
