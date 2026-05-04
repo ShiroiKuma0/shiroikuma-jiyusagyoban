@@ -255,6 +255,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+            }
         } catch (e: Exception) {
             android.util.Log.e("MainActivity", "Failed to initialize UI: ${e.message}", e)
             // Show error screen if database fails
