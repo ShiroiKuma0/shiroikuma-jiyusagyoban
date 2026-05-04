@@ -146,7 +146,7 @@ class AutomationEngine @Inject constructor(
     /**
      * Enable/disable a profile.
      */
-    fun setProfileActive(profileId: Long, active: Boolean) {
+    fun setProfileActive(profileId: String, active: Boolean) {
         activeProfiles[profileId] = active
         log("Profile $profileId: ${if (active) "enabled" else "disabled"}")
     }
@@ -154,7 +154,7 @@ class AutomationEngine @Inject constructor(
     /**
      * Check if a profile is active.
      */
-    fun isProfileActive(profileId: Long): Boolean {
+    fun isProfileActive(profileId: String): Boolean {
         return activeProfiles.getOrDefault(profileId, false)
     }
 
