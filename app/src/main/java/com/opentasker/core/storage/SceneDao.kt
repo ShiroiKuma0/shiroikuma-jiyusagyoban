@@ -20,7 +20,13 @@ data class SceneEntity(
     val heightDp: Int,
     val elementsJson: String,
 ) {
-    fun toDomain() = Scene(id, name, widthDp, heightDp, Json.decodeFromString(elementsJson))
+    fun toDomain() = try {
+        Scene(id, name, widthDp, heightDp, Json.decodeFromString(elementsJson))
+    } catch (e: Exception) {
+        android.util.Log.e("SceneDao", "Failed to deserialize scene $id: ${e.message}", e)
+        // Return scene with empty elements as fallback
+        Scene(id, name, widthDp, heightDp, emptyList())
+    }
 }
 
 fun Scene.toEntity() = SceneEntity(id, name, widthDp, heightDp, Json.encodeToString(elements))

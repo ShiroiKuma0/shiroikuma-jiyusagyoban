@@ -22,9 +22,15 @@ data class ProfileEntity(
     val cooldownSec: Int,
     val contextsJson: String,
 ) {
-    fun toDomain() = Profile(
-        id, name, enabled, Json.decodeFromString(contextsJson), enterTaskId, exitTaskId, cooldownSec
-    )
+    fun toDomain() = try {
+        Profile(
+            id, name, enabled, Json.decodeFromString(contextsJson), enterTaskId, exitTaskId, cooldownSec
+        )
+    } catch (e: Exception) {
+        android.util.Log.e("ProfileDao", "Failed to deserialize profile $id: ${e.message}", e)
+        // Return profile with empty contexts as fallback
+        Profile(id, name, enabled, emptyList(), enterTaskId, exitTaskId, cooldownSec)
+    }
 }
 
 fun Profile.toEntity() = ProfileEntity(
