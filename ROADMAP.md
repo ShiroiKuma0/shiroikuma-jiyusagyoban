@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.10. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.11. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-04  
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.10  
+**Current app version:** 0.2.11  
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -25,7 +25,7 @@ Key local constraints:
 | Contexts | Time ticks use app-owned AlarmManager scheduling, WiFi events use dynamic NetworkCallback, and app-open events use foreground-service-owned UsageStats polling; other context sources still rely on restricted Android APIs or incomplete implementations | Permission/onboarding and platform-safe replacements remain P0/P1 |
 | Persistence | Room schema export now exists; backup/restore hardened | Migration tests and upgrade strategy can be built on this |
 | Release | Debug/release builds pass locally; release signing is env-var driven | F-Droid/Play readiness still needs policy and reproducibility work |
-| Docs | README was corrected to v0.2.10; old roadmap/notes overclaimed v0.3/v0.4 completion | Roadmap tiers below supersede old milestone claims |
+| Docs | README and architecture docs were corrected to v0.2.11; stale checkpoint/audit files that overclaimed old snapshots were removed | Roadmap tiers below supersede old milestone claims |
 
 ---
 
@@ -173,6 +173,7 @@ Key local constraints:
 
 ### N10 - Correct public docs to distinguish active product, source snapshots, and planned features
 
+**Status:** Completed in v0.2.11. README and architecture docs now separate compiled features from planned plugin/import/geofence/day-schedule work, and stale historical checkpoint/audit files were removed.  
 **Description:** Keep README, architecture docs, changelog, and roadmap aligned with the active APK. Avoid claiming full CRUD UI, design-system coverage, action counts, scheduling, or plugin support until compiled and verified.  
 **Sources:** Local docs/source mismatch [L1][L5].  
 **Category:** docs, dev-experience, release.  
