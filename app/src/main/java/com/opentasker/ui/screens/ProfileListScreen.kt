@@ -3,22 +3,29 @@ package com.opentasker.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.TaskAlt
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -83,18 +90,7 @@ fun ProfileListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Profiles") },
-                actions = {
-                    Button(onClick = onManageTasks) {
-                        Text("Tasks")
-                    }
-                    Button(onClick = onBatchOperations) {
-                        Text("Batch Ops")
-                    }
-                    Button(onClick = onViewRunLog) {
-                        Text("Run Log")
-                    }
-                }
+                title = { Text("Profiles") }
             )
         },
         floatingActionButton = {
@@ -133,8 +129,21 @@ fun ProfileListScreen(
                     }
                 }
             }
+            
+            // Navigation buttons
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = onManageTasks, modifier = Modifier.fillMaxWidth()) {
+                Text("Manage Tasks")
+            }
+            Button(onClick = onBatchOperations, modifier = Modifier.fillMaxWidth()) {
+                Text("Batch Operations")
+            }
+            Button(onClick = onViewRunLog, modifier = Modifier.fillMaxWidth()) {
+                Text("View Run Log")
+            }
         }
     }
+}
 }
 
 @Composable
