@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.5. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.6. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-04  
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.5  
+**Current app version:** 0.2.6  
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -22,10 +22,10 @@ Key local constraints:
 | UI | Active profile/task/action/context/run-log/setup management UI is restored; advanced stale snapshots remain unused | Continue hardening UI with capability gating |
 | Engine | Foreground automation service and registries are wired through `OpenTaskerApp_NoHilt` | Keep non-Hilt runtime stable until Hilt migration is deliberate |
 | Actions | Several actions are implemented and hardened, but several classes still contain success-shaped stubs | Stub replacement must precede "action library" marketing |
-| Contexts | Time ticks use app-owned AlarmManager scheduling and WiFi events use dynamic NetworkCallback; other context sources still rely on restricted Android APIs or incomplete implementations | Permission/onboarding and platform-safe replacements remain P0/P1 |
+| Contexts | Time ticks use app-owned AlarmManager scheduling, WiFi events use dynamic NetworkCallback, and app-open events use foreground-service-owned UsageStats polling; other context sources still rely on restricted Android APIs or incomplete implementations | Permission/onboarding and platform-safe replacements remain P0/P1 |
 | Persistence | Room schema export now exists; backup/restore hardened | Migration tests and upgrade strategy can be built on this |
 | Release | Debug/release builds pass locally; release signing is env-var driven | F-Droid/Play readiness still needs policy and reproducibility work |
-| Docs | README was corrected to v0.2.5; old roadmap/notes overclaimed v0.3/v0.4 completion | Roadmap tiers below supersede old milestone claims |
+| Docs | README was corrected to v0.2.6; old roadmap/notes overclaimed v0.3/v0.4 completion | Roadmap tiers below supersede old milestone claims |
 
 ---
 
@@ -108,6 +108,7 @@ Key local constraints:
 
 ### N5 - Replace or foreground AppOpenService polling
 
+**Status:** Baseline completed in v0.2.6. The separate background `AppOpenService` is removed; AutomationService now owns `UsageStatsManager` polling, pauses explicitly when usage access is denied, and emits app opened/closed events on foreground package changes.  
 **Description:** Replace the plain background `AppOpenService` polling loop with a platform-safe usage-stats context source, WorkManager-backed periodic sampling, or a properly declared foreground path where user-visible monitoring is required. Add usage-access onboarding via `ACTION_USAGE_ACCESS_SETTINGS`.  
 **Sources:** UsageStatsManager docs [S34], Android background service limits [S23], platform audit [L3].  
 **Category:** correctness, reliability, performance, platform/OS.  
