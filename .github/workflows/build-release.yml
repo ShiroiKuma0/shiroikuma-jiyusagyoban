@@ -36,8 +36,6 @@ jobs:
       
       - name: Build release APK
         run: ./gradlew assembleRelease
-        env:
-          ANDROID_HOME: ${{ android.sdk_root }}
       
       - name: Rename APK
         run: |
