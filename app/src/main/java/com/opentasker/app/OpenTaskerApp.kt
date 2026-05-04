@@ -19,8 +19,9 @@ class OpenTaskerApp : Application() {
         // Initialize Room database
         db = Room.databaseBuilder(this, AppDatabase::class.java, "opentasker.db").build()
         
-        // Register all built-in actions
+        // Register all built-in actions and their metadata
         registerActions()
+        registerActionMetadata()
         
         // Register all context sources
         registerContextSources()

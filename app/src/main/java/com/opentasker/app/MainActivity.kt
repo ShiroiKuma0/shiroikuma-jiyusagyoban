@@ -12,6 +12,8 @@ import androidx.compose.runtime.setValue
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.toEntity
+import com.opentasker.ui.screens.ActionEditorScreen
+import com.opentasker.ui.screens.ActionPickerScreen
 import com.opentasker.ui.screens.ProfileEditorScreen
 import com.opentasker.ui.screens.ProfileListScreen
 import com.opentasker.ui.screens.TaskEditorScreen
@@ -71,6 +73,26 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             onBack = { currentScreen = Screen.ProfileList },
+                            onAddAction = { currentScreen = Screen.ActionPicker },
+                        )
+                    }
+                    is Screen.ActionPicker -> {
+                        ActionPickerScreen(
+                            onActionSelected = { action ->
+                                currentScreen = Screen.ActionEditor(action)
+                            },
+                            onCancel = { currentScreen = Screen.TaskEditor(null) },
+                        )
+                    }
+                    is Screen.ActionEditor -> {
+                        ActionEditorScreen(
+                            actionSpec = screen.actionSpec,
+                            onSave = { action ->
+                                // For now, just go back to task editor
+                                // In a real implementation, we'd pass the action back to TaskEditor
+                                currentScreen = Screen.TaskEditor(null)
+                            },
+                            onCancel = { currentScreen = Screen.ActionPicker },
                         )
                     }
                 }
@@ -83,4 +105,6 @@ sealed class Screen {
     data object ProfileList : Screen()
     data class ProfileEditor(val profile: Profile?) : Screen()
     data class TaskEditor(val task: Task?) : Screen()
+    data object ActionPicker : Screen()
+    data class ActionEditor(val actionSpec: com.opentasker.core.model.ActionSpec) : Screen()
 }

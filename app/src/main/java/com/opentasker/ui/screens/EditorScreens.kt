@@ -148,6 +148,7 @@ fun TaskEditorScreen(
     task: Task?,
     onSave: (Task) -> Unit,
     onBack: () -> Unit,
+    onAddAction: () -> Unit = {},
 ) {
     var name by remember { mutableStateOf(task?.name ?: "") }
     var actions by remember { mutableStateOf(task?.actions ?: emptyList()) }
@@ -223,6 +224,15 @@ fun TaskEditorScreen(
                         }
                     }
                 }
+            }
+
+            Button(
+                onClick = onAddAction,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+            ) {
+                Text("Add Action")
             }
 
             Button(
