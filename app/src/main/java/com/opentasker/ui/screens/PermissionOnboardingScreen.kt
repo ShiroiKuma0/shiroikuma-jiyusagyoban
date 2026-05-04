@@ -1,7 +1,6 @@
 package com.opentasker.ui.screens
 
 import android.Manifest
-import android.app.AlarmManager
 import android.app.AppOpsManager
 import android.app.NotificationManager
 import android.content.ActivityNotFoundException
@@ -53,6 +52,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.opentasker.core.scheduling.ExactAlarmSupport
 
 private data class PermissionSetupItem(
     val title: String,
@@ -198,10 +198,10 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
         PermissionSetupItem(
             title = "Exact alarms",
-            body = "Allows precise scheduled automations. If denied, scheduled work must fall back to less exact windows.",
-            granted = canScheduleExactAlarms(context),
+            body = "Allows precise scheduled automations. If denied, OpenTasker falls back to inexact delivery windows.",
+            granted = ExactAlarmSupport.canScheduleExactAlarms(context),
             actionLabel = "Open settings",
-            action = PermissionAction.SettingsIntent(exactAlarmIntent(context)),
+            action = PermissionAction.SettingsIntent(ExactAlarmSupport.settingsIntent(context)),
             requiredFor = "Time triggers, schedules",
         ),
         PermissionSetupItem(
@@ -296,12 +296,6 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
 private fun hasPermission(context: Context, permission: String): Boolean =
     ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
 
-private fun canScheduleExactAlarms(context: Context): Boolean {
-    if (Build.VERSION.SDK_INT < 31) return true
-    val alarmManager = context.getSystemService(AlarmManager::class.java)
-    return alarmManager.canScheduleExactAlarms()
-}
-
 private fun ignoresBatteryOptimizations(context: Context): Boolean {
     val powerManager = context.getSystemService(PowerManager::class.java)
     return powerManager.isIgnoringBatteryOptimizations(context.packageName)
@@ -326,14 +320,6 @@ private fun hasNotificationListenerAccess(context: Context): Boolean {
 private fun hasNotificationPolicyAccess(context: Context): Boolean {
     val notificationManager = context.getSystemService(NotificationManager::class.java)
     return notificationManager.isNotificationPolicyAccessGranted
-}
-
-private fun exactAlarmIntent(context: Context): Intent {
-    return if (Build.VERSION.SDK_INT >= 31) {
-        Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}"))
-    } else {
-        appDetailsIntent(context)
-    }
 }
 
 private fun appDetailsIntent(context: Context): Intent =
