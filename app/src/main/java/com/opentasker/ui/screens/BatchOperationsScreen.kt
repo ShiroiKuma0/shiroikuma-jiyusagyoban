@@ -227,7 +227,7 @@ private fun BatchOperationProfileCard(
                     .size(12.dp)
                     .background(
                         color = if (profile.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                        shape = RoundedCornerShape(50%)
+                        shape = RoundedCornerShape(6.dp)
                     )
             )
         }
