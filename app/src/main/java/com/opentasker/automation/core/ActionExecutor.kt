@@ -4,7 +4,7 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionRegistry
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.logging.AppLogger
-import com.opentasker.core.model.ActionConfig
+import com.opentasker.automation.model.ActionConfig
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
