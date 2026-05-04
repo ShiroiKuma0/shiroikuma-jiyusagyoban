@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.3. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.4. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-04  
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.3  
+**Current app version:** 0.2.4  
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -22,10 +22,10 @@ Key local constraints:
 | UI | Active profile/task/action/context/run-log/setup management UI is restored; advanced stale snapshots remain unused | Continue hardening UI with capability gating |
 | Engine | Foreground automation service and registries are wired through `OpenTaskerApp_NoHilt` | Keep non-Hilt runtime stable until Hilt migration is deliberate |
 | Actions | Several actions are implemented and hardened, but several classes still contain success-shaped stubs | Stub replacement must precede "action library" marketing |
-| Contexts | Some context sources rely on restricted Android APIs or incomplete implementations | Permission/onboarding and platform-safe replacements are P0/P1 |
+| Contexts | Time ticks now use app-owned AlarmManager scheduling with exact/inexact fallback; other context sources still rely on restricted Android APIs or incomplete implementations | Permission/onboarding and platform-safe replacements remain P0/P1 |
 | Persistence | Room schema export now exists; backup/restore hardened | Migration tests and upgrade strategy can be built on this |
 | Release | Debug/release builds pass locally; release signing is env-var driven | F-Droid/Play readiness still needs policy and reproducibility work |
-| Docs | README was corrected to v0.2.3; old roadmap/notes overclaimed v0.3/v0.4 completion | Roadmap tiers below supersede old milestone claims |
+| Docs | README was corrected to v0.2.4; old roadmap/notes overclaimed v0.3/v0.4 completion | Roadmap tiers below supersede old milestone claims |
 
 ---
 
@@ -82,6 +82,7 @@ Key local constraints:
 
 ### N3 - Remove `USE_EXACT_ALARM` and harden exact scheduling
 
+**Status:** Baseline completed in v0.2.4. `USE_EXACT_ALARM` is removed, app-owned time ticks reschedule through `AlarmManager`, and exact-alarm denial falls back to inexact `setWindow()` delivery.  
 **Description:** Keep `SCHEDULE_EXACT_ALARM`, remove `USE_EXACT_ALARM`, add `AlarmManager.canScheduleExactAlarms()` guards, register for permission-state changes, and gracefully degrade to inexact `setWindow()`/WorkManager with clear status text.  
 **Sources:** Android 14 exact alarm docs [S25], platform audit [L3].  
 **Category:** reliability, security, platform/OS, distribution.  
