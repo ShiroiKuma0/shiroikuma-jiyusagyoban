@@ -56,8 +56,8 @@ class MainActivity : ComponentActivity() {
                         TaskListScreen(
                             db = db,
                             onCreateTask = { currentScreen = Screen.TaskEditor(null) },
-                            onEditTask = { task -> currentScreen = Screen.TaskEditor(task) },
-                            onDeleteTask = { task ->
+                            onEditTask = { task: Task -> currentScreen = Screen.TaskEditor(task) },
+                            onDeleteTask = { task: Task ->
                                 scope.launch {
                                     db.taskDao().delete(task.toEntity())
                                 }
