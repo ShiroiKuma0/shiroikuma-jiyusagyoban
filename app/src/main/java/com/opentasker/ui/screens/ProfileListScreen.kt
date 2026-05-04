@@ -53,6 +53,9 @@ import androidx.lifecycle.viewModelScope
 import com.opentasker.core.model.Profile
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.toEntity
+import com.opentasker.ui.theme.ComponentSize
+import com.opentasker.ui.theme.Radii
+import com.opentasker.ui.theme.Spacing
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -133,24 +136,24 @@ fun ProfileListScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(40.dp),
+                        .padding(Spacing.xl),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
                     Icon(
                         Icons.Filled.Info,
                         contentDescription = null,
-                        modifier = Modifier.size(72.dp),
+                        modifier = Modifier.size(ComponentSize.iconLarge * 2),
                         tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                     )
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(Spacing.lg))
                     Text(
                         "No profiles yet",
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(Spacing.md))
                     Text(
                         "Profiles let you group automation tasks together and enable/disable them as a unit. Create your first profile to start automating.",
                         style = MaterialTheme.typography.bodyMedium,
@@ -158,16 +161,16 @@ fun ProfileListScreen(
                         textAlign = TextAlign.Center,
                         lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.2
                     )
-                    Spacer(modifier = Modifier.height(28.dp))
+                    Spacer(modifier = Modifier.height(Spacing.xl))
                     Button(
                         onClick = onCreateProfile,
                         modifier = Modifier
                             .fillMaxWidth(0.7f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(8.dp)
+                            .height(ComponentSize.buttonLarge),
+                        shape = RoundedCornerShape(Radii.md)
                     ) {
                         Icon(Icons.Filled.Add, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(Spacing.sm))
                         Text("Create First Profile")
                     }
                 }
@@ -176,9 +179,9 @@ fun ProfileListScreen(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp)
-                        .padding(top = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(horizontal = Spacing.md)
+                        .padding(top = Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md)
                 ) {
                     items(profiles, key = { it.id }) { profile ->
                         ProfileCardItem(
@@ -239,8 +242,12 @@ private fun PremiumNavButton(
 ) {
     Button(
         onClick = onClick,
-        modifier = modifier.height(40.dp),
-        shape = RoundedCornerShape(6.dp)
+        modifier = modifier.height(ComponentSize.buttonMedium),
+        shape = RoundedCornerShape(Radii.sm),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            horizontal = Spacing.md,
+            vertical = Spacing.sm
+        )
     ) {
         Text(
             label,
@@ -288,20 +295,21 @@ fun ProfileCardItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(10.dp),
+            .padding(horizontal = Spacing.xs, vertical = Spacing.sm),
+        shape = RoundedCornerShape(Radii.md),
         colors = CardDefaults.cardColors(
             containerColor = if (profile.enabled)
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
             else
                 MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
         ),
-        onClick = { onEdit(profile) }
+        onClick = { onEdit(profile) },
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(Spacing.lg),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
