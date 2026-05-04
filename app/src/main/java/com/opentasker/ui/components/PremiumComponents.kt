@@ -40,10 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
-import com.opentasker.ui.theme.ComponentSize
-import com.opentasker.ui.theme.Opacity
-import com.opentasker.ui.theme.Radii
-import com.opentasker.ui.theme.Spacing
+import com.opentasker.ui.theme.DesignSystem
 
 /**
  * Premium UI components for OpenTasker with consistent design system.
@@ -91,7 +88,7 @@ fun TextFieldWithError(
             } else null,
             modifier = Modifier
                 .fillMaxWidth()
-                .defaultMinSize(minHeight = ComponentSize.buttonMedium),
+                .defaultMinSize(minHeight = DesignSystem.ComponentSize.buttonMedium),
             shape = RoundedCornerShape(Radii.sm),
             singleLine = singleLine,
             maxLines = maxLines,
@@ -102,8 +99,8 @@ fun TextFieldWithError(
                 unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
                 errorBorderColor = MaterialTheme.colorScheme.error,
-                disabledBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = Opacity.disabled),
-                disabledTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = Opacity.disabled),
+                disabledBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = DesignSystem.Opacity.disabled),
+                disabledTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = DesignSystem.Opacity.disabled),
             ),
             textStyle = MaterialTheme.typography.bodyMedium,
         )
@@ -114,7 +111,7 @@ fun TextFieldWithError(
                 text = error,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(start = Spacing.md)
+                modifier = Modifier.padding(start = DesignSystem.Spacing.md)
             )
         } else if (helperText != null) {
             Spacer(modifier = Modifier.height(Spacing.xs))
@@ -122,7 +119,7 @@ fun TextFieldWithError(
                 text = helperText,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(start = Spacing.md)
+                modifier = Modifier.padding(start = DesignSystem.Spacing.md)
             )
         }
     }
@@ -153,13 +150,13 @@ fun LoadingButton(
     
     Button(
         onClick = onClick,
-        modifier = modifier.defaultMinSize(minHeight = ComponentSize.buttonMedium),
+        modifier = modifier.defaultMinSize(minHeight = DesignSystem.ComponentSize.buttonMedium),
         enabled = enabled && !isLoading,
         colors = buttonColors,
         shape = RoundedCornerShape(Radii.md),
         contentPadding = PaddingValues(
-            horizontal = Spacing.md,
-            vertical = Spacing.sm
+            horizontal = DesignSystem.Spacing.md,
+            vertical = DesignSystem.Spacing.sm
         )
     ) {
         if (isLoading) {
@@ -207,7 +204,7 @@ fun LoadingSkeleton(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(lineHeight.fontSize.value.dp * 1.2f)
-                    .padding(vertical = Spacing.xs),
+                    .padding(vertical = DesignSystem.Spacing.xs),
                 color = MaterialTheme.colorScheme.surface,
                 shape = RoundedCornerShape(Radii.sm)
             ) {}
@@ -235,8 +232,8 @@ fun StateBadge(
             style = MaterialTheme.typography.labelSmall,
             color = color,
             modifier = Modifier.padding(
-                horizontal = Spacing.sm,
-                vertical = Spacing.xs
+                horizontal = DesignSystem.Spacing.sm,
+                vertical = DesignSystem.Spacing.xs
             )
         )
     }
@@ -317,3 +314,4 @@ fun ErrorState(
  */
 fun Modifier.disabledAlpha(disabled: Boolean): Modifier =
     if (disabled) this.then(Modifier.background(Color.Black.copy(alpha = 0.2f))) else this
+
