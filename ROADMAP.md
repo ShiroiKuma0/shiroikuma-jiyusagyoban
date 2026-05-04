@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.7. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.8. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-04  
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.7  
+**Current app version:** 0.2.8  
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -21,11 +21,11 @@ Key local constraints:
 |---|---|---|
 | UI | Active profile/task/action/context/run-log/setup management UI is restored; advanced stale snapshots remain unused | Continue hardening UI with capability gating |
 | Engine | Foreground automation service and registries are wired through `OpenTaskerApp_NoHilt` | Keep non-Hilt runtime stable until Hilt migration is deliberate |
-| Actions | Built-in action IDs now align with UI metadata and success-shaped stubs were replaced with real behavior or explicit unsupported failures | Capability gating should build on these honest runtime results |
+| Actions | Built-in action IDs align with UI metadata, success-shaped stubs fail honestly, and the UI now blocks unsupported privileged actions | Capability registry can expand into context and permission-aware execution gates |
 | Contexts | Time ticks use app-owned AlarmManager scheduling, WiFi events use dynamic NetworkCallback, and app-open events use foreground-service-owned UsageStats polling; other context sources still rely on restricted Android APIs or incomplete implementations | Permission/onboarding and platform-safe replacements remain P0/P1 |
 | Persistence | Room schema export now exists; backup/restore hardened | Migration tests and upgrade strategy can be built on this |
 | Release | Debug/release builds pass locally; release signing is env-var driven | F-Droid/Play readiness still needs policy and reproducibility work |
-| Docs | README was corrected to v0.2.7; old roadmap/notes overclaimed v0.3/v0.4 completion | Roadmap tiers below supersede old milestone claims |
+| Docs | README was corrected to v0.2.8; old roadmap/notes overclaimed v0.3/v0.4 completion | Roadmap tiers below supersede old milestone claims |
 
 ---
 
@@ -134,6 +134,7 @@ Key local constraints:
 
 ### N7 - Add capability registry and action/context gating
 
+**Status:** Baseline completed in v0.2.8. A central action capability registry now marks supported/setup-required/unsupported actions, annotates picker/editor rows, and blocks unsupported privileged actions before they are added.  
 **Description:** Centralize platform, permission, API-level, distribution-flavor, and feature-implementation capability checks. Use it to enable/disable UI rows, annotate unsupported actions, explain missing setup, and block execution with actionable errors.  
 **Sources:** Android policy/API constraints [S25][S26][S27][S29][S30][S33], competitors' permission complexity [S16][S17][S18].  
 **Category:** architecture, UX, reliability, security.  

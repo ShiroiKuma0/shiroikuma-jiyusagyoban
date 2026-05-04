@@ -65,6 +65,8 @@ import com.opentasker.core.actions.ActionField
 import com.opentasker.core.actions.ActionMetadata
 import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.actions.FieldType
+import com.opentasker.core.capabilities.ActionCapabilityRegistry
+import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
@@ -671,6 +673,7 @@ private fun ActionRow(
     onDelete: () -> Unit,
 ) {
     val metadata = ActionMetadataRegistry.get(action.type)
+    val capability = ActionCapabilityRegistry.get(action.type)
     Surface(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
         shape = RoundedCornerShape(12.dp),
@@ -690,6 +693,12 @@ private fun ActionRow(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (capability.level != CapabilityLevel.Supported) {
+                    AssistChip(
+                        onClick = {},
+                        label = { Text(if (capability.level == CapabilityLevel.Unsupported) "Unsupported" else "Needs setup") },
+                    )
+                }
             }
             IconButton(onClick = onEdit) {
                 Icon(Icons.Filled.Edit, contentDescription = "Edit action")
@@ -934,11 +943,31 @@ private fun ActionPickerDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(actions, key = { it.id }) { metadata ->
-                    Card(onClick = { onSelect(metadata) }, modifier = Modifier.fillMaxWidth()) {
+                    val capability = ActionCapabilityRegistry.get(metadata.id)
+                    Card(
+                        onClick = { onSelect(metadata) },
+                        enabled = capability.canAdd,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
                         Column(Modifier.padding(12.dp)) {
-                            Text(metadata.name, style = MaterialTheme.typography.titleSmall)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(metadata.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                                if (capability.level != CapabilityLevel.Supported) {
+                                    AssistChip(
+                                        onClick = {},
+                                        label = { Text(if (capability.level == CapabilityLevel.Unsupported) "Unsupported" else "Setup") },
+                                    )
+                                }
+                            }
                             Text(metadata.category, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                             Text(metadata.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (capability.level != CapabilityLevel.Supported) {
+                                Text(capability.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                            }
                         }
                     }
                 }
@@ -961,6 +990,7 @@ private fun ActionConfigDialog(
     var values by remember(state.existing?.id, state.metadata.id) {
         mutableStateOf(state.metadata.fields.associate { field -> field.key to state.existing?.args?.get(field.key).orEmpty() })
     }
+    val capability = remember(state.metadata.id) { ActionCapabilityRegistry.get(state.metadata.id) }
     val missingRequired = state.metadata.fields.any { it.required && values[it.key].isNullOrBlank() }
 
     AlertDialog(
@@ -973,6 +1003,24 @@ private fun ActionConfigDialog(
             ) {
                 item {
                     Text(state.metadata.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (capability.level != CapabilityLevel.Supported) {
+                        Spacer(Modifier.height(8.dp))
+                        Surface(
+                            color = if (capability.level == CapabilityLevel.Unsupported) {
+                                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
+                            } else {
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                        ) {
+                            Text(
+                                capability.reason,
+                                modifier = Modifier.padding(12.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(value = label, onValueChange = { label = it }, label = { Text("Label") }, singleLine = true)
                 }
@@ -987,7 +1035,7 @@ private fun ActionConfigDialog(
         },
         confirmButton = {
             Button(
-                enabled = !missingRequired,
+                enabled = !missingRequired && capability.canAdd,
                 onClick = {
                     onSave(
                         ActionSpec(
