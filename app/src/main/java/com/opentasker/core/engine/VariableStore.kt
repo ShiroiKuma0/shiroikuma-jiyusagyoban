@@ -6,6 +6,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * In-memory variable store with a global scope and stack of local scopes.
+ * Thread-safe for concurrent read/write access.
  *
  * Naming convention (matches Tasker):
  *   - %UPPERCASE   → global, persistent
@@ -20,21 +21,31 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class VariableStore {
     private val globals = ConcurrentHashMap<String, String>()
-    private val localStack = ArrayDeque<MutableMap<String, String>>()
+    private val localStack = java.util.Collections.synchronizedList(mutableListOf<MutableMap<String, String>>())
     private val expander = VariableExpander()
     private val arrayStore = ArrayStore()
 
-    fun pushScope() { localStack.addLast(mutableMapOf()) }
-    fun popScope() { if (localStack.isNotEmpty()) localStack.removeLast() }
+    fun pushScope() { localStack.add(mutableMapOf()) }
+    fun popScope() { 
+        synchronized(localStack) {
+            if (localStack.isNotEmpty()) localStack.removeAt(localStack.size - 1)
+        }
+    }
 
     fun set(name: String, value: String) {
         if (isGlobalName(name)) globals[name] = value
-        else (localStack.lastOrNull() ?: globals)[name] = value
+        else {
+            synchronized(localStack) {
+                (localStack.lastOrNull() ?: globals)[name] = value
+            }
+        }
     }
 
     fun get(name: String): String? {
-        for (i in localStack.indices.reversed()) {
-            localStack[i][name]?.let { return it }
+        synchronized(localStack) {
+            for (i in localStack.indices.reversed()) {
+                localStack[i][name]?.let { return it }
+            }
         }
         return globals[name]
     }

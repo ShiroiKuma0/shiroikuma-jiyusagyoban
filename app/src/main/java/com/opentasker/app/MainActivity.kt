@@ -33,17 +33,19 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent {
-            val db = OpenTaskerApp.db
-            OpenTaskerTheme {
-                var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
-                var currentEditingTask by remember { mutableStateOf<Task?>(null) }
-                var currentEditingProfile by remember { mutableStateOf<Profile?>(null) }
-                var currentEditingRule by remember { mutableStateOf<AutomationRule?>(null) }
-                var taskEditorReturnTarget by remember { mutableStateOf<Screen>(Screen.TaskList) }
-                val scope = rememberCoroutineScope()
+        
+        try {
+            setContent {
+                val db = OpenTaskerApp.db
+                OpenTaskerTheme {
+                    var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
+                    var currentEditingTask by remember { mutableStateOf<Task?>(null) }
+                    var currentEditingProfile by remember { mutableStateOf<Profile?>(null) }
+                    var currentEditingRule by remember { mutableStateOf<AutomationRule?>(null) }
+                    var taskEditorReturnTarget by remember { mutableStateOf<Screen>(Screen.TaskList) }
+                    val scope = rememberCoroutineScope()
 
-                when (val screen = currentScreen) {
+                    when (val screen = currentScreen) {
                     is Screen.Home -> {
                         HomeScreen(
                             onProfilesClick = { currentScreen = Screen.ProfileList },
@@ -221,6 +223,26 @@ class MainActivity : ComponentActivity() {
                             logs = emptyList(), // TODO: Load from repository
                             onBack = { currentScreen = Screen.AutomationRuleList }
                         )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Failed to initialize UI: ${e.message}", e)
+            // Show error screen if database fails
+            setContent {
+                OpenTaskerTheme {
+                    Surface(
+                        modifier = androidx.compose.foundation.layout.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        Column(
+                            modifier = androidx.compose.foundation.layout.padding(16.dp),
+                            verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+                            horizontalAlignment = androidx.compose.foundation.layout.Alignment.CenterHorizontally
+                        ) {
+                            Text("Failed to initialize OpenTasker", style = MaterialTheme.typography.headlineSmall)
+                            Text(e.message ?: "Unknown error", style = MaterialTheme.typography.bodyMedium)
+                        }
                     }
                 }
             }
