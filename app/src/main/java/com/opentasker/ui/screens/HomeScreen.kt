@@ -16,8 +16,9 @@ import androidx.compose.ui.unit.dp
 fun HomeScreen(
     onProfilesClick: () -> Unit,
     onAutomationRulesClick: () -> Unit,
-    onRunLogClick: () -> Unit
-) {
+    onRunLogClick: () -> Unit,
+    onTasksClick: () -> Unit
+){
     Scaffold(
         topBar = {
             TopAppBar(
@@ -54,20 +55,28 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Profiles card
-                NavigationCard(
-                    icon = Icons.Default.Settings,
-                    title = "Profiles",
-                    description = "Manage automation profiles and tasks (legacy system)",
-                    onClick = onProfilesClick
-                )
-                
                 // Automation Rules card
                 NavigationCard(
                     icon = Icons.Default.AutoAwesome,
                     title = "Automation Rules",
                     description = "Create event-driven automation rules (new system)",
                     onClick = onAutomationRulesClick
+                )
+                
+                // Tasks card
+                NavigationCard(
+                    icon = Icons.Default.CheckCircle,
+                    title = "Tasks",
+                    description = "Manage reusable actions and task templates",
+                    onClick = onTasksClick
+                )
+                
+                // Profiles card
+                NavigationCard(
+                    icon = Icons.Default.Settings,
+                    title = "Profiles",
+                    description = "Manage automation profiles (legacy system)",
+                    onClick = onProfilesClick
                 )
                 
                 // Execution Log card
