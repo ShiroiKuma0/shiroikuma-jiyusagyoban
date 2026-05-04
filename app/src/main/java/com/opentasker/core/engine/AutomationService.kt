@@ -16,6 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.util.Collections
 
 /**
  * Foreground service that hosts the trigger engine.
@@ -29,8 +30,9 @@ class AutomationService : Service() {
     private val scope = CoroutineScope(Dispatchers.Main + job)
     private val db by lazy { OpenTaskerApp.db }
     
-    private val matchers = mutableMapOf<Long, ProfileMatcher>()
-    private val profileCooldowns = mutableMapOf<Long, Long>() // profileId -> cooldownUntilMs
+    private val matchers = Collections.synchronizedMap(mutableMapOf<Long, ProfileMatcher>())
+    private val profileCooldowns = Collections.synchronizedMap(mutableMapOf<Long, Long>()) // profileId -> cooldownUntilMs
+    private val matcherJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>()) // Track jobs for cleanup
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -47,26 +49,36 @@ class AutomationService : Service() {
     }
 
     override fun onDestroy() {
+        // Cancel all matcher collection jobs first
+        matcherJobs.values.forEach { it.cancel() }
+        matcherJobs.clear()
+        matchers.clear()
+        profileCooldowns.clear()
         job.cancel()
         super.onDestroy()
     }
 
     private suspend fun reloadProfiles() {
+        // Cancel previous matcher jobs
+        matcherJobs.values.forEach { it.cancel() }
+        matcherJobs.clear()
+        matchers.clear()
+        
         val profiles = db.profileDao().getAllEnabled()
         for (profile in profiles) {
             val domain = profile.toDomain()
             val matcher = ProfileMatcher(this, domain)
 
-            scope.launch {
+            val matcherJob = scope.launch {
                 matcher.stateChanges().collect { change ->
                     when (change) {
                         is ProfileStateChange.Activated -> onProfileActivated(domain)
                         is ProfileStateChange.Deactivated -> onProfileDeactivated(domain)
-                        else -> {} // no-op for other states
                     }
                 }
             }
-
+            
+            matcherJobs[domain.id] = matcherJob
             matchers[domain.id] = matcher
         }
     }
@@ -81,14 +93,22 @@ class AutomationService : Service() {
             return
         }
         
-        val task = db.taskDao().getById(profile.enterTaskId) ?: return
+        val task = db.taskDao().getById(profile.enterTaskId)
+        if (task == null) {
+            android.util.Log.w("OpenTasker", "Enter task ${profile.enterTaskId} not found for profile ${profile.name}")
+            return
+        }
         val domain = task.toDomain()
         runTask(domain, profile.id, profile.cooldownSec)
     }
 
     private suspend fun onProfileDeactivated(profile: com.opentasker.core.model.Profile) {
         if (profile.exitTaskId == null || profile.exitTaskId <= 0) return
-        val task = db.taskDao().getById(profile.exitTaskId) ?: return
+        val task = db.taskDao().getById(profile.exitTaskId)
+        if (task == null) {
+            android.util.Log.w("OpenTasker", "Exit task ${profile.exitTaskId} not found for profile ${profile.name}")
+            return
+        }
         val domain = task.toDomain()
         runTask(domain, profile.id, profile.cooldownSec)
     }
