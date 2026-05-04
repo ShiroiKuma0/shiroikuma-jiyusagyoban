@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.2.6 — 2026-05-04
+
+App-open trigger hardening pass.
+
+- Removed the unused plain background `AppOpenService` and its manifest entry.
+- Added a foreground-service-owned `AppUsageMonitor` that polls `UsageStatsManager` only when usage access is granted.
+- Added opened/closed `AppEvent` dispatch when the foreground package changes.
+- Shared usage-access detection between setup UI and the app-open monitor.
+- Added focused unit coverage for foreground package selection.
+- Updated README/roadmap metadata for app-open monitoring.
+
 ## v0.2.5 — 2026-05-04
 
 WiFi trigger hardening pass.

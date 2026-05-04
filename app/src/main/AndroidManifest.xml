@@ -52,10 +52,6 @@
                 android:value="OpenTasker automation engine — runs user-defined profiles when their contexts match" />
         </service>
 
-        <service
-            android:name="com.opentasker.automation.service.AppOpenService"
-            android:exported="false" />
-
         <receiver
             android:name="com.opentasker.core.engine.BootReceiver"
             android:exported="false">
