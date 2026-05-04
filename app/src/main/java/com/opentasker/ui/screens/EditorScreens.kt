@@ -25,9 +25,39 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewModelScope
 import com.opentasker.core.model.ActionSpec
+import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
+import com.opentasker.core.storage.AppDatabase
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
+
+class TaskListViewModel(private val db: AppDatabase) : ViewModel() {
+    val tasks: StateFlow<List<Task>> = db.taskDao()
+        .getAllAsFlow()
+        .map { entities -> entities.map { it.toDomain() } }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Lazily,
+            initialValue = emptyList()
+        )
+}
+
+class TaskListViewModelFactory(private val db: AppDatabase) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(TaskListViewModel::class.java)) {
+            return TaskListViewModel(db) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -121,6 +151,8 @@ fun TaskEditorScreen(
 ) {
     var name by remember { mutableStateOf(task?.name ?: "") }
     var actions by remember { mutableStateOf(task?.actions ?: emptyList()) }
+    var priority by remember { mutableStateOf(task?.priority?.toString() ?: "0") }
+    var collisionMode by remember { mutableStateOf(task?.collisionMode?.name ?: "QUEUE") }
 
     Scaffold(
         topBar = {
@@ -145,6 +177,24 @@ fun TaskEditorScreen(
                 onValueChange = { name = it },
                 label = { Text("Task name") },
                 modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = priority,
+                onValueChange = { priority = it },
+                label = { Text("Priority (0-100)") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+            )
+
+            OutlinedTextField(
+                value = collisionMode,
+                onValueChange = { collisionMode = it },
+                label = { Text("Collision mode (QUEUE/INTERRUPT)") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
             )
 
             HorizontalDivider(modifier = Modifier.padding(top = 16.dp))
@@ -177,13 +227,19 @@ fun TaskEditorScreen(
 
             Button(
                 onClick = {
-                    onSave(
-                        Task(
-                            id = task?.id ?: 0,
-                            name = name,
-                            actions = actions,
+                    try {
+                        onSave(
+                            Task(
+                                id = task?.id ?: 0,
+                                name = name,
+                                priority = priority.toIntOrNull() ?: 0,
+                                collisionMode = CollisionMode.valueOf(collisionMode.uppercase()),
+                                actions = actions,
+                            )
                         )
-                    )
+                    } catch (e: Exception) {
+                        // TODO: show error toast
+                    }
                 },
                 modifier = Modifier
                     .fillMaxWidth()

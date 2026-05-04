@@ -10,9 +10,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.Task
 import com.opentasker.core.storage.toEntity
 import com.opentasker.ui.screens.ProfileEditorScreen
 import com.opentasker.ui.screens.ProfileListScreen
+import com.opentasker.ui.screens.TaskEditorScreen
 import com.opentasker.ui.theme.OpenTaskerTheme
 import kotlinx.coroutines.launch
 
@@ -55,6 +57,22 @@ class MainActivity : ComponentActivity() {
                             onBack = { currentScreen = Screen.ProfileList },
                         )
                     }
+                    is Screen.TaskEditor -> {
+                        TaskEditorScreen(
+                            task = screen.task,
+                            onSave = { task ->
+                                scope.launch {
+                                    if (task.id == 0L) {
+                                        db.taskDao().insert(task.toEntity())
+                                    } else {
+                                        db.taskDao().update(task.toEntity())
+                                    }
+                                    currentScreen = Screen.ProfileList
+                                }
+                            },
+                            onBack = { currentScreen = Screen.ProfileList },
+                        )
+                    }
                 }
             }
         }
@@ -64,4 +82,5 @@ class MainActivity : ComponentActivity() {
 sealed class Screen {
     data object ProfileList : Screen()
     data class ProfileEditor(val profile: Profile?) : Screen()
+    data class TaskEditor(val task: Task?) : Screen()
 }

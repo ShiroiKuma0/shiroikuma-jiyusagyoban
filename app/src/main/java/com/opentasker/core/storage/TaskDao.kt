@@ -37,4 +37,5 @@ interface TaskDao {
     @Delete suspend fun delete(t: TaskEntity)
     @Query("SELECT * FROM tasks WHERE id = :id") suspend fun getById(id: Long): TaskEntity?
     @Query("SELECT * FROM tasks") suspend fun getAll(): List<TaskEntity>
+    @Query("SELECT * FROM tasks") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<TaskEntity>>
 }
