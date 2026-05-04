@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.scan
+import kotlinx.coroutines.flow.mapNotNull
 
 /**
  * Watches a Profile's contexts and emits state transitions.
