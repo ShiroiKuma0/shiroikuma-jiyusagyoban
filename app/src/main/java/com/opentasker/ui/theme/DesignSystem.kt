@@ -156,6 +156,15 @@ object ComponentSize {
     
     // Touch target minimum (accessibility)
     val touchTargetMin = 48.dp
+    
+    // List item height
+    val listItemHeight = 64.dp
+    
+    // Checkbox size
+    val checkboxSize = 24.dp
+    
+    // Status indicator size
+    val statusIndicator = 12.dp
 }
 
 // ========== Opacity Scale ==========

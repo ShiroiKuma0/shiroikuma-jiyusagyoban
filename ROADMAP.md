@@ -23,7 +23,7 @@ Parity-with-Tasker tracker + FOSS-first feature roadmap. Items grouped by milest
 
 ---
 
-## v0.4.0 — Variable System & Scheduled Execution ⏳ QUEUED (HIGH PRIORITY)
+## v0.4.0 — Variable System & Scheduled Execution ⏳ IN PROGRESS
 
 Research-backed high-impact items blocking advanced automation use cases.
 
@@ -32,12 +32,12 @@ Research-backed high-impact items blocking advanced automation use cases.
 Current state: Basic `%expansion` string substitution only  
 Target: Full expression evaluator with arrays, math, regex, JSON parsing
 
-- [ ] **Arrays:** `%list(#)` count, `%list(1)` indexed access, `%list()` join
-- [ ] **Math operators:** `%var(+5)`, `%var(*2)`, `%var(//)` floor, `%var(/round)`
-- [ ] **String manipulation:** Case conversion (upper/lower), substring, trim, split/join
-- [ ] **Regex support:** `%text(regex:pattern:group)` extract, `regex-replace:pattern:replacement`
-- [ ] **JSON parsing:** Parse HTTP response JSON → extract nested fields via `%json.path.to.field`
-- [ ] **Conditional assignment:** `%var = (expr) ? true_val : false_val`
+- [x] **Arrays:** `%list(#)` count, `%list(1)` indexed access, `%list()` join
+- [x] **Math operators:** `%var(+5)`, `%var(*2)`, `%var(//)` floor, `%var(/round)`
+- [x] **String manipulation:** Case conversion (upper/lower), substring, trim, split/join
+- [x] **Regex support:** `%text(regex:pattern:group)` extract, `regex-replace:pattern:replacement`
+- [x] **JSON parsing:** Parse HTTP response JSON → extract nested fields via `%json.path.to.field`
+- [x] **Conditional assignment:** `%var = (expr) ? true_val : false_val`
 - [ ] **Local variable scope:** Task-scoped vs global (prevent side effects across tasks)
 - [ ] **Variable persistence:** Save/restore across profile cycles if needed
 - [ ] **Expression parser integration:** MVEL, SpEL, or custom lightweight evaluator
@@ -49,9 +49,9 @@ Target: Full expression evaluator with arrays, math, regex, JSON parsing
 Current state: Only event-driven execution (context match)  
 Target: Trigger profiles on schedule (daily, weekly, at specific time)
 
-- [ ] **AlarmManager vs WorkManager trade-off:** Study battery impact, persistence, API 31+ constraints
-- [ ] **Schedule context type:** Add to context family (periodic trigger like cron)
-- [ ] **Time window refinement:** Extend beyond simple "from/to" to recurring (every Mon 09:00)
+- [x] **AlarmManager vs WorkManager trade-off:** Study battery impact, persistence, API 31+ constraints
+- [x] **Schedule context type:** Add to context family (periodic trigger like cron)
+- [x] **Time window refinement:** Extend beyond simple "from/to" to recurring (every Mon 09:00)
 - [ ] **Persistent wake lock:** Ensure scheduled tasks run even if device asleep (with battery warnings)
 - [ ] **Cancellation:** Stop scheduled task if profile disabled or task list cleared
 
@@ -62,20 +62,22 @@ Target: Trigger profiles on schedule (daily, weekly, at specific time)
 Current: 43 built-in actions  
 Target: +5-10 high-demand actions
 
-- [ ] **Calendar:** Read events by date range, create event, send invites
-- [ ] **Contacts:** Query by name/number, read email/phone, manage groups
+- [x] **Calendar:** Read events by date range, create event, send invites
+- [x] **Contacts:** Query by name/number, read email/phone, manage groups
 - [ ] **Notification listener:** Listen for app notifications → trigger on text match
-- [ ] **Bluetooth discovery:** Scan for BT devices, connect/disconnect (complement toggle)
+- [x] **Bluetooth discovery:** Scan for BT devices, connect/disconnect (complement toggle)
 - [ ] **Call operations:** Answer/hang up call, speaker on/off (system permissions required)
-- [ ] **Clipboard:** Read/write system clipboard, listen for changes
+- [x] **Clipboard:** Read/write system clipboard, listen for changes
 - [ ] **SMS/MMS:** Read SMS threads, send MMS (complement existing SMS send)
 - [ ] **Email:** Send via Gmail provider intent if installed
 
 **Research:** Tasker has ~350 actions (broad), Macrodroid ~200 (focused). OpenTasker targeting ~70 high-value actions by v0.5.0.
 
-### UI Polish: Batch Ops & Search (TIER 2 P1)
+### UI Polish: Design System & Component Refinement (TIER 2 P1)
 **Effort:** 4 pts | **Impact:** 7/10  
-- [ ] **Batch operations:** Select multiple profiles → enable/disable/delete at once
+- [ ] **Design system foundation:** Unified spacing, radius, typography, elevation scales ✅ (DesignSystem.kt)
+- [ ] **Screen refactoring:** Apply design system to all 11 major screens (6 done, 5 in progress)
+- [ ] **Batch operations:** Select multiple profiles → enable/disable/delete at once ✅ (BatchOperationsScreen)
 - [ ] **Search/filter:** Find profiles by name, context type, action type
 - [ ] **Pinned profiles:** Mark favorite profiles, show at top of list
 - [ ] **Drag-reorder:** Reorder actions/contexts in editor without delete/re-add

@@ -3,6 +3,7 @@ package com.opentasker.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -13,10 +14,12 @@ import androidx.compose.ui.unit.dp
 import com.opentasker.automation.model.ConstraintConfig
 import com.opentasker.automation.model.ConstraintGroup
 import com.opentasker.automation.model.LogicalOperator
+import com.opentasker.ui.theme.DesignSystem
 
 /**
  * Screen to pick and configure constraint groups.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ConstraintPickerScreen(
     onConstraintGroupSelected: (ConstraintGroup) -> Unit,
@@ -61,14 +64,14 @@ fun ConstraintPickerScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(8.dp),
-                    shape = RoundedCornerShape(8.dp)
+                        .padding(DesignSystem.Spacing.md),
+                    shape = RoundedCornerShape(DesignSystem.Radii.md)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            .padding(DesignSystem.Spacing.lg),
+                        horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.lg)
                     ) {
                         Text("Logic:", style = MaterialTheme.typography.labelMedium)
                         repeat(2) { index ->
@@ -87,8 +90,8 @@ fun ConstraintPickerScreen(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(DesignSystem.Spacing.md),
+                    verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)
                 ) {
                     items(CONSTRAINT_TYPES) { constraint ->
                         ConstraintTypeCard(
@@ -108,19 +111,18 @@ fun ConstraintTypeCard(
     onClick: () -> Unit
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
         ),
+        elevation = CardDefaults.cardElevation(defaultElevation = DesignSystem.Elevation.sm),
         onClick = onClick
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(DesignSystem.Spacing.lg),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -130,7 +132,7 @@ fun ConstraintTypeCard(
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(DesignSystem.Spacing.sm))
                 Text(
                     text = constraint.description,
                     style = MaterialTheme.typography.bodySmall,
@@ -142,7 +144,7 @@ fun ConstraintTypeCard(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = "Select ${constraint.name}",
                 tint = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(DesignSystem.ComponentSize.iconMedium)
             )
         }
     }
