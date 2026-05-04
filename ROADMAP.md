@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.4. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.5. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-04  
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.4  
+**Current app version:** 0.2.5  
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -22,10 +22,10 @@ Key local constraints:
 | UI | Active profile/task/action/context/run-log/setup management UI is restored; advanced stale snapshots remain unused | Continue hardening UI with capability gating |
 | Engine | Foreground automation service and registries are wired through `OpenTaskerApp_NoHilt` | Keep non-Hilt runtime stable until Hilt migration is deliberate |
 | Actions | Several actions are implemented and hardened, but several classes still contain success-shaped stubs | Stub replacement must precede "action library" marketing |
-| Contexts | Time ticks now use app-owned AlarmManager scheduling with exact/inexact fallback; other context sources still rely on restricted Android APIs or incomplete implementations | Permission/onboarding and platform-safe replacements remain P0/P1 |
+| Contexts | Time ticks use app-owned AlarmManager scheduling and WiFi events use dynamic NetworkCallback; other context sources still rely on restricted Android APIs or incomplete implementations | Permission/onboarding and platform-safe replacements remain P0/P1 |
 | Persistence | Room schema export now exists; backup/restore hardened | Migration tests and upgrade strategy can be built on this |
 | Release | Debug/release builds pass locally; release signing is env-var driven | F-Droid/Play readiness still needs policy and reproducibility work |
-| Docs | README was corrected to v0.2.4; old roadmap/notes overclaimed v0.3/v0.4 completion | Roadmap tiers below supersede old milestone claims |
+| Docs | README was corrected to v0.2.5; old roadmap/notes overclaimed v0.3/v0.4 completion | Roadmap tiers below supersede old milestone claims |
 
 ---
 
@@ -95,6 +95,7 @@ Key local constraints:
 
 ### N4 - Replace static WiFi connectivity receiver with NetworkCallback
 
+**Status:** Baseline completed in v0.2.5. The manifest `CONNECTIVITY_CHANGE` receiver is gone; AutomationService owns a `ConnectivityManager.NetworkCallback` and emits WiFi trigger events with permission-aware SSID fallback.  
 **Description:** Remove reliance on manifest-declared `CONNECTIVITY_CHANGE`, use dynamic `ConnectivityManager.registerNetworkCallback()`, use `NetworkCapabilities.transportInfo as? WifiInfo` on API 31+, and handle `NEARBY_WIFI_DEVICES`/location permission requirements.  
 **Sources:** Android 7 broadcast restrictions [S24], Android WiFi permission changes [S27], platform audit [L3].  
 **Category:** correctness, reliability, platform/OS.  
