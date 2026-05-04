@@ -39,10 +39,19 @@ jobs:
       - name: Build release APK
         run: gradle assembleRelease
       
-      - name: Rename APK
+      - name: Find and rename APK
         run: |
-          cp app/build/outputs/apk/release/app-release.apk \
-             app/build/outputs/apk/release/OpenTasker-v${{ inputs.version }}-release.apk
+          # Find the built APK
+          APK_PATH=$(find app/build/outputs/apk -name "*.apk" -type f | head -1)
+          if [ -z "$APK_PATH" ]; then
+            echo "ERROR: No APK found in app/build/outputs/apk"
+            exit 1
+          fi
+          echo "Found APK at: $APK_PATH"
+          
+          # Rename and move to release directory
+          mkdir -p app/build/outputs/apk/release
+          cp "$APK_PATH" app/build/outputs/apk/release/OpenTasker-v${{ inputs.version }}-release.apk
       
       - name: Create Release
         uses: softprops/action-gh-release@v1
