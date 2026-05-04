@@ -5,6 +5,7 @@ import com.opentasker.automation.data.entity.AutomationRuleEntity
 import com.opentasker.automation.model.AutomationRule
 import com.opentasker.automation.model.ExecutionMode
 import com.google.gson.Gson
+import com.opentasker.core.logging.AppLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -87,6 +88,28 @@ class AutomationRuleRepository(private val dao: AutomationRuleDao) {
     }
 
     private fun fromEntity(entity: AutomationRuleEntity): AutomationRule {
-        return gson.fromJson(entity.ruleJson, AutomationRule::class.java)
+        return try {
+            gson.fromJson(entity.ruleJson, AutomationRule::class.java) ?: corruptedRule(entity, "Null JSON")
+        } catch (e: Exception) {
+            AppLogger.error(TAG, "Failed to deserialize rule ${entity.id}", e)
+            corruptedRule(entity, e.message ?: "Malformed JSON")
+        }
+    }
+
+    private fun corruptedRule(entity: AutomationRuleEntity, reason: String) = AutomationRule(
+        id = entity.id,
+        name = "${entity.name} [Corrupted]",
+        description = reason,
+        enabled = false,
+        profileId = entity.profileId,
+        triggers = emptyList(),
+        actions = emptyList(),
+        executionMode = runCatching { ExecutionMode.valueOf(entity.executionMode) }.getOrDefault(ExecutionMode.SEQUENTIAL),
+        createdAt = entity.createdAt,
+        updatedAt = entity.updatedAt
+    )
+
+    companion object {
+        private const val TAG = "AutomationRuleRepository"
     }
 }

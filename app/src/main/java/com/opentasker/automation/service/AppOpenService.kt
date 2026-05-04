@@ -4,24 +4,22 @@ import android.app.Service
 import android.content.Intent
 import android.os.IBinder
 import android.util.Log
-import com.opentasker.automation.core.AutomationEngine
-import dagger.hilt.android.AndroidEntryPoint
+import com.opentasker.app.OpenTaskerApp_NoHilt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 /**
  * Background service that monitors app open/close events.
  * Uses polling with UsageStatsManager (API 21+) or AccessibilityService.
  */
-@AndroidEntryPoint
 class AppOpenService : Service() {
-    @Inject
-    lateinit var automationEngine: AutomationEngine
+    private val automationEngine by lazy { OpenTaskerApp_NoHilt.automationEngine }
     private val job = Job()
     private val scope = CoroutineScope(Dispatchers.Default + job)
     private val lastSeenApps = mutableSetOf<String>()
@@ -30,11 +28,13 @@ class AppOpenService : Service() {
         log("AppOpenService started")
 
         scope.launch {
-            while (true) {
+            while (isActive) {
                 try {
                     // Poll for app changes every 2 seconds
                     delay(2000)
                     checkAppChanges()
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     log("Error checking app changes", e)
                 }

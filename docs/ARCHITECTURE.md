@@ -59,14 +59,13 @@ Tasker's source is **not public**. This architecture is reconstructed from the u
 
 | Table | Key fields |
 |---|---|
-| `profiles` | id, name, enabled, exitTaskId |
-| `profile_contexts` | profileId, type, configJson |
-| `tasks` | id, name, collisionMode, priority |
-| `actions` | id, taskId, ordinal, type, configJson, continueOnError, label |
-| `scenes` | id, name, width, height, configJson |
-| `scene_elements` | id, sceneId, type, x, y, w, h, configJson |
+| `profiles` | id, name, enabled, enterTaskId, exitTaskId, cooldownSec, contextsJson |
+| `tasks` | id, name, collisionMode, priority, actionsJson |
+| `scenes` | id, name, widthDp, heightDp, elementsJson |
 | `variables` | name (PK), value, isGlobal |
-| `run_log` | id, taskId, startedAt, durationMs, result, message |
+| `run_logs` | id, taskId, taskName, timestamp, durationMs, success, message |
+| `automation_rules` | id, name, enabled, profileId, ruleJson, executionMode, createdAt, updatedAt |
+| `execution_logs` | id, ruleId, ruleName, triggerId, triggerType, timestamp, status, message, executionTimeMs, actionResultsJson |
 
 Action and context configurations are stored as JSON blobs (kotlinx.serialization) so adding new types doesn't require a Room migration.
 

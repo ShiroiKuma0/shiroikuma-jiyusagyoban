@@ -2,6 +2,7 @@ package com.opentasker.automation.model
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
+import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.RawValue
 import java.util.UUID
 
@@ -96,6 +97,7 @@ data class TriggerConfig(
     val displayName: String = "", // User-friendly name
     val enabled: Boolean = true
 ) : Parcelable {
+    @IgnoredOnParcel
     @Transient
     var config: Map<String, Any> = emptyMap() // Runtime-only config, not serialized
 }
@@ -107,6 +109,7 @@ data class ConstraintConfig(
     val displayName: String = "",
     val enabled: Boolean = true
 ) : Parcelable {
+    @IgnoredOnParcel
     @Transient
     var config: Map<String, Any> = emptyMap()
 }
@@ -118,6 +121,7 @@ data class ActionConfig(
     val displayName: String = "",
     val enabled: Boolean = true
 ) : Parcelable {
+    @IgnoredOnParcel
     @Transient
     var config: Map<String, Any> = emptyMap()
 }

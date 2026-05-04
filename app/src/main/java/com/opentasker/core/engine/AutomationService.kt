@@ -3,18 +3,21 @@ package com.opentasker.core.engine
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import com.opentasker.app.MainActivity
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.storage.toEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.util.Collections
 
@@ -70,11 +73,23 @@ class AutomationService : Service() {
             val matcher = ProfileMatcher(this, domain)
 
             val matcherJob = scope.launch {
-                matcher.stateChanges().collect { change ->
-                    when (change) {
-                        is ProfileStateChange.Activated -> onProfileActivated(domain)
-                        is ProfileStateChange.Deactivated -> onProfileDeactivated(domain)
+                try {
+                    matcher.stateChanges().collect { change ->
+                        try {
+                            when (change) {
+                                is ProfileStateChange.Activated -> onProfileActivated(domain)
+                                is ProfileStateChange.Deactivated -> onProfileDeactivated(domain)
+                            }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            android.util.Log.e("OpenTasker", "Failed handling state change for ${domain.name}", e)
+                        }
                     }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    android.util.Log.e("OpenTasker", "Profile matcher stopped for ${domain.name}", e)
                 }
             }
             
@@ -86,12 +101,7 @@ class AutomationService : Service() {
     private suspend fun onProfileActivated(profile: com.opentasker.core.model.Profile) {
         if (profile.enterTaskId <= 0) return
         
-        // Respect cooldown
-        val cooldownUntil = profileCooldowns[profile.id] ?: 0
-        if (System.currentTimeMillis() < cooldownUntil) {
-            android.util.Log.i("OpenTasker", "Profile ${profile.name} on cooldown, skipping")
-            return
-        }
+        if (!tryReserveCooldown(profile.id, profile.cooldownSec)) return
         
         val task = db.taskDao().getById(profile.enterTaskId)
         if (task == null) {
@@ -140,9 +150,20 @@ class AutomationService : Service() {
             "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)"
         )
         
-        // Apply cooldown
-        if (cooldownSec > 0) {
-            profileCooldowns[profileId] = System.currentTimeMillis() + (cooldownSec * 1000)
+    }
+
+    private fun tryReserveCooldown(profileId: Long, cooldownSec: Int): Boolean {
+        val now = System.currentTimeMillis()
+        synchronized(profileCooldowns) {
+            val cooldownUntil = profileCooldowns[profileId] ?: 0
+            if (now < cooldownUntil) {
+                android.util.Log.i("OpenTasker", "Profile $profileId on cooldown, skipping")
+                return false
+            }
+            if (cooldownSec > 0) {
+                profileCooldowns[profileId] = now + (cooldownSec * 1000L)
+            }
+            return true
         }
     }
 
@@ -150,10 +171,17 @@ class AutomationService : Service() {
         val nm = getSystemService(NotificationManager::class.java)
         val channel = NotificationChannel(CHANNEL, "OpenTasker engine", NotificationManager.IMPORTANCE_MIN)
         nm.createNotificationChannel(channel)
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         val n: Notification = NotificationCompat.Builder(this, CHANNEL)
             .setContentTitle("OpenTasker is running")
-            .setContentText("Watching profile triggers")
+            .setContentText("Tap to open automation status")
             .setSmallIcon(android.R.drawable.ic_menu_compass)
+            .setContentIntent(pendingIntent)
             .setOngoing(true)
             .build()
         if (Build.VERSION.SDK_INT >= 34) {

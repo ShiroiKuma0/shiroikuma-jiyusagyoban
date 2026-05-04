@@ -4,8 +4,8 @@ import android.content.Context
 import com.opentasker.core.logging.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -31,10 +31,11 @@ class DatabaseBackupManager @Inject constructor(
      */
     suspend fun backup(): Result<File> = withContext(Dispatchers.IO) {
         return@withContext try {
-            // Close the database first
-            db.close()
-            
             val sourceFile = context.getDatabasePath("opentasker.db")
+            if (!sourceFile.exists()) {
+                return@withContext Result.failure(IOException("Database file does not exist"))
+            }
+            db.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)").use { }
             val timestamp = dateFormat.format(Date())
             val backupFile = File(backupDir, "opentasker_backup_$timestamp.db")
             
@@ -57,23 +58,24 @@ class DatabaseBackupManager @Inject constructor(
      */
     suspend fun restore(backupFile: File): Result<Unit> = withContext(Dispatchers.IO) {
         return@withContext try {
-            if (!backupFile.exists()) {
+            val canonicalBackupDir = backupDir.canonicalFile
+            val canonicalBackup = backupFile.canonicalFile
+            if (!canonicalBackup.path.startsWith(canonicalBackupDir.path + File.separator)) {
+                return@withContext Result.failure(SecurityException("Backup file is outside the OpenTasker backup directory"))
+            }
+            if (!canonicalBackup.exists()) {
                 return@withContext Result.failure(Exception("Backup file not found: ${backupFile.absolutePath}"))
             }
-            
-            // Close the database first
-            db.close()
-            
-            val targetFile = context.getDatabasePath("opentasker.db")
-            
-            backupFile.inputStream().use { input ->
-                FileOutputStream(targetFile).use { output ->
+
+            val pendingRestore = File(backupDir, "opentasker_restore_pending.db")
+            canonicalBackup.inputStream().use { input ->
+                FileOutputStream(pendingRestore).use { output ->
                     input.copyTo(output)
                 }
             }
-            
-            AppLogger.info(tag, "Database restored from ${backupFile.absolutePath}")
-            Result.success(Unit)
+
+            AppLogger.warn(tag, "Restore staged at ${pendingRestore.absolutePath}; restart-time restore is required to avoid closing the active database")
+            Result.failure(IllegalStateException("Restore was staged but not applied while the app database is active"))
         } catch (e: Exception) {
             AppLogger.error(tag, "Restore failed: ${e.message}", e)
             Result.failure(e)
@@ -93,7 +95,13 @@ class DatabaseBackupManager @Inject constructor(
      * Delete a specific backup file.
      */
     fun deleteBackup(backupFile: File): Boolean {
-        return if (backupFile.delete()) {
+        val canonicalBackup = backupFile.canonicalFile
+        val canonicalBackupDir = backupDir.canonicalFile
+        if (!canonicalBackup.path.startsWith(canonicalBackupDir.path + File.separator)) {
+            AppLogger.warn(tag, "Refusing to delete file outside backup directory: ${backupFile.absolutePath}")
+            return false
+        }
+        return if (canonicalBackup.delete()) {
             AppLogger.info(tag, "Backup deleted: ${backupFile.absolutePath}")
             true
         } else {

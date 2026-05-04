@@ -2,6 +2,7 @@ package com.opentasker.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
@@ -38,6 +39,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.error
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import com.opentasker.ui.theme.DesignSystem
@@ -88,7 +94,10 @@ fun TextFieldWithError(
             } else null,
             modifier = Modifier
                 .fillMaxWidth()
-                .defaultMinSize(minHeight = DesignSystem.ComponentSize.buttonMedium),
+                .defaultMinSize(minHeight = DesignSystem.ComponentSize.buttonMedium)
+                .semantics {
+                    error?.let { this.error(it) }
+                },
             shape = RoundedCornerShape(DesignSystem.Radii.sm),
             singleLine = singleLine,
             maxLines = maxLines,
@@ -111,7 +120,9 @@ fun TextFieldWithError(
                 text = error,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(start = DesignSystem.Spacing.md)
+                modifier = Modifier
+                    .padding(start = DesignSystem.Spacing.md)
+                    .semantics { liveRegion = LiveRegionMode.Polite }
             )
         } else if (helperText != null) {
             Spacer(modifier = Modifier.height(DesignSystem.Spacing.xs))
@@ -148,9 +159,17 @@ fun LoadingButton(
         ButtonVariant.Text -> ButtonDefaults.textButtonColors()
     }
     
+    val stateDescription = when {
+        isLoading -> "$text in progress"
+        !enabled -> "$text disabled"
+        else -> text
+    }
+
     Button(
         onClick = onClick,
-        modifier = modifier.defaultMinSize(minHeight = DesignSystem.ComponentSize.buttonMedium),
+        modifier = modifier
+            .defaultMinSize(minHeight = DesignSystem.ComponentSize.buttonMedium)
+            .semantics { contentDescription = stateDescription },
         enabled = enabled && !isLoading,
         colors = buttonColors,
         shape = RoundedCornerShape(DesignSystem.Radii.md),
@@ -282,9 +301,10 @@ fun ErrorState(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(DesignSystem.Spacing.lg),
+            .padding(DesignSystem.Spacing.lg)
+            .semantics { liveRegion = LiveRegionMode.Polite },
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+        verticalArrangement = Arrangement.Center
     ) {
         Icon(
             Icons.Default.Error,
@@ -301,7 +321,10 @@ fun ErrorState(
         )
         if (onRetry != null) {
             Spacer(modifier = Modifier.height(DesignSystem.Spacing.md))
-            TextButton(onClick = onRetry) {
+            TextButton(
+                onClick = onRetry,
+                modifier = Modifier.semantics { contentDescription = "Retry loading this content" }
+            ) {
                 Text("Retry")
             }
         }
@@ -313,6 +336,6 @@ fun ErrorState(
  * Visual feedback for disabled UI elements.
  */
 fun Modifier.disabledAlpha(disabled: Boolean): Modifier =
-    if (disabled) this.then(Modifier.background(Color.Black.copy(alpha = 0.2f))) else this
+    if (disabled) this.then(Modifier.background(Color.Black.copy(alpha = DesignSystem.Opacity.disabled))) else this
 
 

@@ -2,9 +2,12 @@ package com.opentasker.automation.action.impl
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.media.RingtoneManager
 import android.os.Build
+import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.opentasker.automation.core.ActionDefinition
@@ -41,6 +44,15 @@ class NotificationAction(private val context: Context) : ActionDefinition {
             val body = config.config["body"] as String? ?: "Rule executed"
             val sound = config.config["sound"] as Boolean? ?: true
             val vibrate = config.config["vibrate"] as Boolean? ?: true
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+            ) {
+                return ActionResult(
+                    success = false,
+                    message = "Notification permission is not granted",
+                    executionTimeMs = System.currentTimeMillis() - startTime
+                )
+            }
 
             showNotification(title, body, sound, vibrate)
 
