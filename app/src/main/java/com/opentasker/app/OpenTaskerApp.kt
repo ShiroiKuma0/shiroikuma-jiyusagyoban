@@ -78,13 +78,6 @@ class OpenTaskerApp : Application() {
         ActionRegistry.register(ScreenOffAction())
         ActionRegistry.register(WakeAction())
         ActionRegistry.register(LogAction())
-        
-        // Calendar & clipboard actions
-        ActionRegistry.register(ReadCalendarEventsAction())
-        ActionRegistry.register(CreateCalendarEventAction())
-        ActionRegistry.register(ReadClipboardAction())
-        ActionRegistry.register(WriteClipboardAction())
-        ActionRegistry.register(BluetoothDiscoveryAction())
     }
 
     private fun registerContextSources() {
