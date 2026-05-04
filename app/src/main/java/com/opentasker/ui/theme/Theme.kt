@@ -13,31 +13,52 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 // AMOLED-black palette with Catppuccin Mocha accents.
-private val Mauve = Color(0xFFCBA6F7)
-private val Sapphire = Color(0xFF74C7EC)
-private val Green = Color(0xFFA6E3A1)
-private val Red = Color(0xFFF38BA8)
-private val Text = Color(0xFFCDD6F4)
-private val Surface0 = Color(0xFF11111B)
+// Optimized for premium dark theme with excellent contrast and visual hierarchy.
+private val Mauve = Color(0xFFCBA6F7)          // Primary - vibrant purple
+private val Sapphire = Color(0xFF74C7EC)       // Secondary - cool blue
+private val Green = Color(0xFFA6E3A1)          // Tertiary - fresh green
+private val Red = Color(0xFFF38BA8)            // Error - warm red
+private val Peach = Color(0xFFFFB4A2)          // Warning accent
+private val Text = Color(0xFFCDD6F4)           // Primary text - light lavender
+private val TextSecondary = Color(0xFFA6ADC8)  // Secondary text - muted lavender
+private val Surface0 = Color(0xFF11111B)       // Primary surface
+private val Surface1 = Color(0xFF1E1E2E)       // Elevated surface
+private val Overlay0 = Color(0xFF45475A)       // Subtle overlay
 
 private val Amoled = darkColorScheme(
-    primary = Mauve,
-    secondary = Sapphire,
-    tertiary = Green,
-    error = Red,
-    background = Color.Black,
-    surface = Surface0,
-    onPrimary = Color.Black,
+    primary = Mauve,                           // Primary actions, active states
+    onPrimary = Color.Black,                   // Text on primary
+    primaryContainer = Mauve.copy(alpha = 0.12f), // Subtle primary background
+    onPrimaryContainer = Mauve,
+    secondary = Sapphire,                      // Secondary actions
     onSecondary = Color.Black,
+    secondaryContainer = Sapphire.copy(alpha = 0.12f),
+    onSecondaryContainer = Sapphire,
+    tertiary = Green,                          // Tertiary actions, success states
     onTertiary = Color.Black,
+    tertiaryContainer = Green.copy(alpha = 0.12f),
+    onTertiaryContainer = Green,
+    error = Red,                               // Error states
+    onError = Color.Black,
+    errorContainer = Red.copy(alpha = 0.12f),
+    onErrorContainer = Red,
+    background = Color.Black,                  // True AMOLED black for status bar
     onBackground = Text,
+    surface = Surface0,                        // Main surface color
     onSurface = Text,
+    surfaceVariant = Surface1,                 // Elevated surfaces
+    onSurfaceVariant = TextSecondary,
+    outline = Overlay0,                        // Borders and dividers
+    outlineVariant = Overlay0.copy(alpha = 0.5f),
 )
 
 private val Light = lightColorScheme(
     primary = Color(0xFF8839EF),
     secondary = Color(0xFF209FB5),
     tertiary = Color(0xFF40A02B),
+    background = Color(0xFFFAFAFA),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF1E1E2E),
 )
 
 @Composable
