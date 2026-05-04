@@ -23,23 +23,25 @@ class ActionExecutorImpl @Inject constructor() : ActionExecutor {
      * @param actions List of action configurations to execute
      * @param registry Action registry for lookup (currently unused, kept for interface compatibility)
      * @param parallel If true, execute actions concurrently; if false, execute sequentially
-     * @return List of execution results
+     * @return List of (actionId, result) pairs
      */
     override suspend fun execute(
         actions: List<ActionConfig>,
         registry: ActionRegistry,
-        parallel: Boolean = false
-    ): List<ActionResult> {
+        parallel: Boolean
+    ): List<Pair<String, ActionResult>> {
         return try {
-            if (parallel) {
+            val results = if (parallel) {
                 executeParallel(actions)
             } else {
                 executeSequential(actions)
             }
+            // Pair each action with its result
+            actions.zip(results).map { (action, result) -> action.id to result }
         } catch (e: Exception) {
             AppLogger.error(tag, "Error during action execution", e)
             listOf(
-                ActionResult(
+                "error" to ActionResult(
                     success = false,
                     message = "Execution error: ${e.message}",
                     executionTimeMs = 0L
