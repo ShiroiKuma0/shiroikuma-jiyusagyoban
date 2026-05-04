@@ -53,6 +53,25 @@ class OpenTaskerApp : Application() {
         ActionRegistry.register(AppendFileAction())
         ActionRegistry.register(DeleteFileAction())
         ActionRegistry.register(ListFilesAction())
+        
+        ActionRegistry.register(HttpGetAction())
+        ActionRegistry.register(HttpPostAction())
+        ActionRegistry.register(PingAction())
+        ActionRegistry.register(DownloadAction())
+        
+        ActionRegistry.register(PlaySoundAction())
+        ActionRegistry.register(StopSoundAction())
+        ActionRegistry.register(PauseSoundAction())
+        ActionRegistry.register(NextTrackAction())
+        ActionRegistry.register(PreviousTrackAction())
+        ActionRegistry.register(MuteAction())
+        
+        ActionRegistry.register(VibrateAction())
+        ActionRegistry.register(RebootAction())
+        ActionRegistry.register(LockDeviceAction())
+        ActionRegistry.register(ScreenOffAction())
+        ActionRegistry.register(WakeAction())
+        ActionRegistry.register(LogAction())
     }
 
     private fun registerContextSources() {
