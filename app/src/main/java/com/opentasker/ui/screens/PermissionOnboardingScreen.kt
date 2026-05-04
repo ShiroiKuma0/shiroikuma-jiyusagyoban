@@ -247,6 +247,18 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
             requiredFor = "Location and WiFi contexts",
         ),
         PermissionSetupItem(
+            title = "Nearby WiFi devices",
+            body = "Needed on Android 13 and newer for WiFi-aware automations. SSID visibility can still require location access.",
+            granted = Build.VERSION.SDK_INT < 33 || hasPermission(context, Manifest.permission.NEARBY_WIFI_DEVICES),
+            actionLabel = "Request",
+            action = if (Build.VERSION.SDK_INT >= 33) {
+                PermissionAction.RuntimePermission(Manifest.permission.NEARBY_WIFI_DEVICES)
+            } else {
+                PermissionAction.None
+            },
+            requiredFor = "WiFi contexts",
+        ),
+        PermissionSetupItem(
             title = "Background location",
             body = "Needed only when geofence automations must work while OpenTasker is not visible.",
             granted = Build.VERSION.SDK_INT < 29 || hasPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION),

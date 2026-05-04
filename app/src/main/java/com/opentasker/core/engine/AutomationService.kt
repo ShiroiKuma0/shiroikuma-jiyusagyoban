@@ -12,6 +12,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.opentasker.app.MainActivity
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.automation.network.WiFiNetworkMonitor
 import com.opentasker.automation.scheduler.TimeEventScheduler
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.storage.toEntity
@@ -34,6 +35,7 @@ class AutomationService : Service() {
     private val scope = CoroutineScope(Dispatchers.Main + job)
     private val db by lazy { OpenTaskerApp_NoHilt.db }
     private val timeEventScheduler by lazy { TimeEventScheduler(this) }
+    private val wifiNetworkMonitor by lazy { WiFiNetworkMonitor(this, OpenTaskerApp_NoHilt.automationEngine) }
     
     private val matchers = Collections.synchronizedMap(mutableMapOf<Long, ProfileMatcher>())
     private val profileCooldowns = Collections.synchronizedMap(mutableMapOf<Long, Long>()) // profileId -> cooldownUntilMs
@@ -45,6 +47,7 @@ class AutomationService : Service() {
         super.onCreate()
         startForegroundCompat()
         timeEventScheduler.scheduleNextMinute()
+        wifiNetworkMonitor.start()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -61,6 +64,7 @@ class AutomationService : Service() {
         matchers.clear()
         profileCooldowns.clear()
         timeEventScheduler.cancel()
+        wifiNetworkMonitor.stop()
         job.cancel()
         super.onDestroy()
     }

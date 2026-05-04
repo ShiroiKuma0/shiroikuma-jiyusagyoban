@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.5 — 2026-05-04
+
+WiFi trigger hardening pass.
+
+- Replaced the manifest `CONNECTIVITY_CHANGE` receiver with a lifecycle-owned `ConnectivityManager.NetworkCallback`.
+- Added WiFi event dispatch from the foreground automation service with duplicate-state suppression.
+- Added Android 13 nearby WiFi devices permission metadata and setup checklist coverage.
+- Added SSID normalization tests for quoted and unknown platform values.
+- Updated README/roadmap metadata for platform-safe WiFi monitoring.
+
 ## v0.2.4 — 2026-05-04
 
 Exact alarm hardening pass.
