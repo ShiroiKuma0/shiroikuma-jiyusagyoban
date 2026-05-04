@@ -259,10 +259,10 @@ fun ExecutionLogCard(log: ExecutionLog) {
                 }
             }
             
-            if (log.details.isNotEmpty()) {
+            if ((log.message ?: "").isNotEmpty()) {
                 Divider(modifier = Modifier.padding(vertical = 4.dp))
                 Text(
-                    text = log.details,
+                    text = log.message,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
