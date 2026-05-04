@@ -94,8 +94,6 @@ data class TriggerConfig(
     val id: String = UUID.randomUUID().toString(),
     val type: String, // "time", "geofence", "wifi", "battery", etc.
     val displayName: String = "", // User-friendly name
-    @RawValue
-    val config: Map<String, Any> = emptyMap(), // Type-specific configuration as JSON-friendly map
     val enabled: Boolean = true
 ) : Parcelable
 
@@ -104,8 +102,6 @@ data class ConstraintConfig(
     val id: String = UUID.randomUUID().toString(),
     val type: String, // "battery", "time_range", "location", "wifi", etc.
     val displayName: String = "",
-    @RawValue
-    val config: Map<String, Any> = emptyMap(),
     val enabled: Boolean = true
 ) : Parcelable
 
@@ -114,8 +110,6 @@ data class ActionConfig(
     val id: String = UUID.randomUUID().toString(),
     val type: String, // "notification", "intent", "toggle_wifi", etc.
     val displayName: String = "",
-    @RawValue
-    val config: Map<String, Any> = emptyMap(),
     val enabled: Boolean = true
 ) : Parcelable
 
