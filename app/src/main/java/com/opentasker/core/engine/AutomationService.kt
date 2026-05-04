@@ -83,20 +83,20 @@ class AutomationService : Service() {
         
         val task = db.taskDao().getById(profile.enterTaskId) ?: return
         val domain = task.toDomain()
-        runTask(domain, profile.id, profile.cooldownMinutes)
+        runTask(domain, profile.id, profile.cooldownSec)
     }
 
     private suspend fun onProfileDeactivated(profile: com.opentasker.core.model.Profile) {
         if (profile.exitTaskId == null || profile.exitTaskId <= 0) return
         val task = db.taskDao().getById(profile.exitTaskId) ?: return
         val domain = task.toDomain()
-        runTask(domain, profile.id, profile.cooldownMinutes)
+        runTask(domain, profile.id, profile.cooldownSec)
     }
 
     private suspend fun runTask(
         task: com.opentasker.core.model.Task,
         profileId: Long,
-        cooldownMinutes: Int
+        cooldownSec: Int
     ) {
         val variables = VariableStore()
         val ctx = ActionContext(this, variables) { msg ->
@@ -111,7 +111,7 @@ class AutomationService : Service() {
             taskName = task.name,
             durationMs = report.durationMs,
             success = report.success,
-            message = report.message ?: ""
+            message = report.status
         )
         db.runLogDao().insert(logEntry.toEntity())
         
@@ -121,8 +121,8 @@ class AutomationService : Service() {
         )
         
         // Apply cooldown
-        if (cooldownMinutes > 0) {
-            profileCooldowns[profileId] = System.currentTimeMillis() + (cooldownMinutes * 60 * 1000)
+        if (cooldownSec > 0) {
+            profileCooldowns[profileId] = System.currentTimeMillis() + (cooldownSec * 1000)
         }
     }
 

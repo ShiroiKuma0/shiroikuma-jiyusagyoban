@@ -1,5 +1,6 @@
 package com.opentasker.core.engine.variables
 
+import com.opentasker.core.engine.VariableStore
 import java.util.regex.Pattern
 import kotlin.math.floor
 
