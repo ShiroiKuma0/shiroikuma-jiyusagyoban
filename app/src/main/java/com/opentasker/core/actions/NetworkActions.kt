@@ -63,7 +63,7 @@ class HttpPostAction : Action {
  *
  * Args:
  *   - "host": hostname or IP
- *   - "timeout_sec": optional timeout
+ *   - "timeout_sec": optional timeout (default: 5)
  *   - "var": variable to store result (true/false)
  */
 class PingAction : Action {
@@ -73,13 +73,15 @@ class PingAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val host = args["host"] ?: return ActionResult.Failure("missing host")
         val varName = args["var"] ?: "result"
+        val timeoutMs = (args["timeout_sec"]?.toIntOrNull() ?: 5) * 1000
         return try {
-            val reachable = java.net.InetAddress.getByName(host).isReachable(5000)
+            val reachable = java.net.InetAddress.getByName(host).isReachable(timeoutMs)
             ctx.variables.set(varName, reachable.toString())
             ctx.logger("Ping $host → $reachable")
             ActionResult.Success
         } catch (e: Exception) {
             ctx.variables.set(varName, "false")
+            ctx.logger("Ping $host failed: ${e.message}")
             ActionResult.Success
         }
     }
@@ -91,6 +93,7 @@ class PingAction : Action {
  * Args:
  *   - "url": download URL
  *   - "path": destination file path
+ *   - "timeout_sec": optional timeout (default: 30)
  */
 class DownloadAction : Action {
     override val id = "net.download"
@@ -99,8 +102,9 @@ class DownloadAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val url = args["url"] ?: return ActionResult.Failure("missing url")
         val path = args["path"] ?: return ActionResult.Failure("missing path")
-        ctx.logger("Download $url → $path")
-        // TODO: Implement with URLConnection and progress callback
+        val timeout = (args["timeout_sec"]?.toIntOrNull() ?: 30) * 1000
+        ctx.logger("Download $url → $path (timeout: ${timeout}ms)")
+        // TODO: Implement with URLConnection, configurable timeout, and progress callback
         return ActionResult.Success
     }
 }
