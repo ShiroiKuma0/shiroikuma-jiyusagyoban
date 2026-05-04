@@ -10,6 +10,10 @@ import com.opentasker.automation.core.DefaultTriggerRegistry
 import com.opentasker.automation.action.impl.IntentAction
 import com.opentasker.automation.action.impl.NotificationAction
 import com.opentasker.automation.action.impl.ShellAction
+import com.opentasker.automation.constraint.impl.NetworkConstraint
+import com.opentasker.automation.constraint.impl.ScreenStateConstraint
+import com.opentasker.automation.constraint.impl.TimeConstraint
+import com.opentasker.automation.constraint.impl.VariableConstraint
 import com.opentasker.automation.core.ActionExecutor
 import com.opentasker.automation.core.ActionRegistry
 import com.opentasker.automation.core.ConstraintEvaluator
@@ -52,9 +56,13 @@ object AutomationModule {
 
     @Singleton
     @Provides
-    fun provideConstraintRegistry(): ConstraintRegistry {
-        return DefaultConstraintRegistry()
-        // TODO: Register constraint implementations as they're added
+    fun provideConstraintRegistry(@ApplicationContext context: Context): ConstraintRegistry {
+        return DefaultConstraintRegistry().apply {
+            register(TimeConstraint())
+            register(ScreenStateConstraint(context))
+            register(VariableConstraint())
+            register(NetworkConstraint(context))
+        }
     }
 
     @Singleton
@@ -116,4 +124,20 @@ object AutomationModule {
 
     @Provides
     fun provideShellAction(): ShellAction = ShellAction()
+
+    // ========== INDIVIDUAL CONSTRAINTS ==========
+
+    @Provides
+    fun provideTimeConstraint(): TimeConstraint = TimeConstraint()
+
+    @Provides
+    fun provideScreenStateConstraint(@ApplicationContext context: Context): ScreenStateConstraint =
+        ScreenStateConstraint(context)
+
+    @Provides
+    fun provideVariableConstraint(): VariableConstraint = VariableConstraint()
+
+    @Provides
+    fun provideNetworkConstraint(@ApplicationContext context: Context): NetworkConstraint =
+        NetworkConstraint(context)
 }
