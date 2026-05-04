@@ -9,7 +9,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import com.opentasker.app.OpenTaskerApp
+import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.storage.toEntity
 import kotlinx.coroutines.CoroutineScope
@@ -28,7 +28,7 @@ import java.util.Collections
 class AutomationService : Service() {
     private val job = Job()
     private val scope = CoroutineScope(Dispatchers.Main + job)
-    private val db by lazy { OpenTaskerApp.db }
+    private val db by lazy { OpenTaskerApp_NoHilt.db }
     
     private val matchers = Collections.synchronizedMap(mutableMapOf<Long, ProfileMatcher>())
     private val profileCooldowns = Collections.synchronizedMap(mutableMapOf<Long, Long>()) // profileId -> cooldownUntilMs
