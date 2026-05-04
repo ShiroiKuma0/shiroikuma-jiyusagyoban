@@ -110,37 +110,40 @@ fun ConstraintTypeCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(4.dp),
-        shape = RoundedCornerShape(8.dp),
+            .padding(horizontal = 4.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
-        )
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+        ),
+        onClick = onClick
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = constraint.name,
-                    style = MaterialTheme.typography.titleSmall
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = constraint.description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2
                 )
             }
-            IconButton(onClick = onClick) {
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = "Select ${constraint.name}"
-                )
-            }
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = "Select ${constraint.name}",
+                tint = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
 }
