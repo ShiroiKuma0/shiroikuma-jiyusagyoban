@@ -3,6 +3,7 @@ package com.opentasker.app
 import android.app.Application
 import androidx.room.Room
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.DatabaseMigrations
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
@@ -29,7 +30,11 @@ class OpenTaskerApp : Application() {
                 AppDatabase::class.java,
                 "opentasker.db"
             )
-                .fallbackToDestructiveMigration() // For development; remove in production
+                // Add migrations for schema evolution
+                .addMigrations(*DatabaseMigrations.getAllMigrations())
+                // For dev/testing: fallback to destructive only as last resort
+                // Remove for production after schema stabilizes
+                .fallbackToDestructiveMigration()
                 .build()
         }
     }
