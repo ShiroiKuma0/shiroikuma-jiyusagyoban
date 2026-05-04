@@ -31,16 +31,13 @@ jobs:
           cmdline-tools-version: latest
           accept-android-sdk-licenses: true
       
-      - name: Make gradlew executable
-        run: |
-          dos2unix ./gradlew || true
-          sed -i 's/\r$//' ./gradlew
-          chmod +x ./gradlew
-          # Verify gradlew
-          head -5 ./gradlew
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.9
       
       - name: Build release APK
-        run: ./gradlew assembleRelease
+        run: gradle assembleRelease
       
       - name: Rename APK
         run: |
