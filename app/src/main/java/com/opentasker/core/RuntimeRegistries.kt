@@ -12,6 +12,7 @@ import com.opentasker.core.actions.HttpPostAction
 import com.opentasker.core.actions.KillAppAction
 import com.opentasker.core.actions.LaunchAppAction
 import com.opentasker.core.actions.LaunchIntentAction
+import com.opentasker.core.actions.LocalePluginSettingAction
 import com.opentasker.core.actions.ListFilesAction
 import com.opentasker.core.actions.LockDeviceAction
 import com.opentasker.core.actions.LogAction
@@ -66,6 +67,7 @@ private fun registerBuiltInActions() {
         MobileDataAction(),
         ScreenTimeoutAction(),
         LaunchAppAction(),
+        LocalePluginSettingAction(),
         KillAppAction(),
         GoHomeAction(),
         OpenUrlAction(),

@@ -22,7 +22,7 @@ Research identifies **high-priority v0.3 items** and **strategic v0.4+ additions
 ## Phase 2 Key Findings — Harvest (80-200 raw items)
 
 ### Action Library Expansion (30+ gaps identified)
-**Current at v0.2.12:** 39 registered action definitions with capability gating; some restricted Android operations are intentionally blocked or setup-required.
+**Current at v0.2.14:** 40 registered action definitions with capability gating; some restricted Android operations are intentionally blocked or setup-required.
 **Market research findings:**
 - **Tasker reference:** ~350 built-in actions (broad but niche)
 - **Macrodroid:** ~200 actions (similar breadth)

@@ -25,6 +25,15 @@
         xmlns:tools="http://schemas.android.com/tools" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
+    <queries>
+        <intent>
+            <action android:name="com.twofortyfouram.locale.intent.action.EDIT_SETTING" />
+        </intent>
+        <intent>
+            <action android:name="com.twofortyfouram.locale.intent.action.EDIT_CONDITION" />
+        </intent>
+    </queries>
+
     <application
         android:name=".OpenTaskerApp_NoHilt"
         android:label="OpenTasker"
