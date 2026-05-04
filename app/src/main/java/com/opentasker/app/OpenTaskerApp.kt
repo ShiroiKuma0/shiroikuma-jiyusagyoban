@@ -75,11 +75,11 @@ class OpenTaskerApp : Application() {
     }
 
     private fun registerContextSources() {
-        ContextSourceRegistry.register(ApplicationContextSource())
-        ContextSourceRegistry.register(TimeContextSource())
+        ContextSourceRegistry.register(ApplicationContextSourceImpl())
+        ContextSourceRegistry.register(TimeContextSourceImpl())
         ContextSourceRegistry.register(DayContextSource())
         ContextSourceRegistry.register(LocationContextSource())
-        ContextSourceRegistry.register(StateContextSource())
-        ContextSourceRegistry.register(EventContextSource())
+        ContextSourceRegistry.register(StateContextSourceImpl())
+        ContextSourceRegistry.register(EventContextSourceImpl())
     }
 }

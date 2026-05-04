@@ -9,6 +9,11 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import com.opentasker.app.OpenTaskerApp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 /**
  * Foreground service that hosts the trigger engine.
@@ -18,16 +23,76 @@ import androidx.core.app.NotificationCompat
  * automation engine to evaluate triggers reliably.
  */
 class AutomationService : Service() {
+    private val job = Job()
+    private val scope = CoroutineScope(Dispatchers.Main + job)
+    private val db by lazy { OpenTaskerApp.db }
+    
+    private val matchers = mutableMapOf<Long, ProfileMatcher>()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         startForegroundCompat()
-        // TODO: load enabled profiles + subscribe to ContextSources
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        scope.launch {
+            reloadProfiles()
+        }
+        return START_STICKY
+    }
+
+    override fun onDestroy() {
+        job.cancel()
+        super.onDestroy()
+    }
+
+    private suspend fun reloadProfiles() {
+        val profiles = db.profileDao().getAllEnabled()
+        for (profile in profiles) {
+            val domain = profile.toDomain()
+            val matcher = ProfileMatcher(this, domain)
+
+            scope.launch {
+                matcher.stateChanges().collect { change ->
+                    when (change) {
+                        is ProfileStateChange.Activated -> onProfileActivated(domain)
+                        is ProfileStateChange.Deactivated -> onProfileDeactivated(domain)
+                    }
+                }
+            }
+
+            matchers[domain.id] = matcher
+        }
+    }
+
+    private suspend fun onProfileActivated(profile: com.opentasker.core.model.Profile) {
+        if (profile.enterTaskId <= 0) return
+        val task = db.taskDao().getById(profile.enterTaskId) ?: return
+        val domain = task.toDomain()
+        runTask(domain)
+    }
+
+    private suspend fun onProfileDeactivated(profile: com.opentasker.core.model.Profile) {
+        if (profile.exitTaskId == null || profile.exitTaskId <= 0) return
+        val task = db.taskDao().getById(profile.exitTaskId) ?: return
+        val domain = task.toDomain()
+        runTask(domain)
+    }
+
+    private suspend fun runTask(task: com.opentasker.core.model.Task) {
+        val variables = VariableStore()
+        val ctx = ActionContext(this, variables) { msg ->
+            android.util.Log.i("OpenTasker", msg)
+        }
+        val runner = TaskRunner(ctx)
+        val report = runner.run(task)
+        android.util.Log.i(
+            "OpenTasker",
+            "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)"
+        )
+    }
 
     private fun startForegroundCompat() {
         val nm = getSystemService(NotificationManager::class.java)

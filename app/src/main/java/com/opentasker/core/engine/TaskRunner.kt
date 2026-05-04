@@ -2,13 +2,10 @@ package com.opentasker.core.engine
 
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
+import java.util.Date
 
 /**
  * Executes a Task's action list with flow control and variable expansion.
- *
- * Flow control is achieved by special action ids (e.g. "flow.if", "flow.endif",
- * "flow.for", "flow.goto", "flow.stop", "flow.wait"). The runner walks the list
- * with a program counter so loops and gotos work without recursion.
  */
 class TaskRunner(
     private val ctx: ActionContext,
@@ -31,9 +28,11 @@ class TaskRunner(
         }
         return TaskRunReport(
             taskId = task.id,
+            taskName = task.name,
             startedAt = started,
             durationMs = System.currentTimeMillis() - started,
             results = results,
+            success = results.all { it is ActionResult.Success || it is ActionResult.Skip }
         )
     }
 
@@ -48,7 +47,9 @@ class TaskRunner(
 
 data class TaskRunReport(
     val taskId: Long,
+    val taskName: String,
     val startedAt: Long,
     val durationMs: Long,
     val results: List<ActionResult>,
+    val success: Boolean,
 )
