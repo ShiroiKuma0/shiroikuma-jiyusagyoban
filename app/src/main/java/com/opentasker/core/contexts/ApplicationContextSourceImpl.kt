@@ -2,11 +2,13 @@ package com.opentasker.core.contexts
 
 import android.content.Context
 import android.app.usage.UsageStatsManager
-import android.os.Build
+import android.util.Log
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Real ApplicationContextSource using UsageStatsManager to track foreground app.
@@ -21,30 +23,30 @@ class ApplicationContextSourceImpl : ContextSource {
 
     override fun events(app: Context): Flow<ContextEvent> = callbackFlow {
         var lastForeground = ""
-        val usm = if (Build.VERSION.SDK_INT >= 30) {
-            app.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
-        } else {
-            null
-        }
+        val usm = app.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
 
         // Emit initial state
         trySend(ContextEvent(type, false, mapOf("foreground" to "")))
 
-        // Poll foreground app every 500ms
-        while (!isClosedForSend) {
-            try {
-                val foreground = getCurrentForegroundApp(app, usm)
-                if (foreground != lastForeground) {
-                    lastForeground = foreground
-                    trySend(ContextEvent(type, true, mapOf("foreground" to foreground)))
+        val pollJob = launch {
+            // Poll foreground app every 500ms
+            while (isActive) {
+                try {
+                    val foreground = getCurrentForegroundApp(app, usm)
+                    if (foreground != lastForeground) {
+                        lastForeground = foreground
+                        trySend(ContextEvent(type, true, mapOf("foreground" to foreground)))
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Foreground app polling failed", e)
                 }
-            } catch (e: Exception) {
-                // silently continue
+                delay(500)
             }
-            delay(500)
         }
 
-        awaitClose()
+        awaitClose {
+            pollJob.cancel()
+        }
     }
 
     private fun getCurrentForegroundApp(app: Context, usm: UsageStatsManager?): String {
@@ -56,5 +58,9 @@ class ApplicationContextSourceImpl : ContextSource {
         } catch (e: Exception) {
             return ""
         }
+    }
+
+    companion object {
+        private const val TAG = "ApplicationContextSource"
     }
 }

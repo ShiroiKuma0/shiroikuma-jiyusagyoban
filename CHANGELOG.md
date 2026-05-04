@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.2.7 — 2026-05-04
+
+Runtime registry and stub-failure hardening pass.
+
+- Registered built-in action implementations and context sources during app startup.
+- Aligned runtime action IDs with the action metadata IDs saved by the Compose editor.
+- Replaced success-shaped action stubs with real behavior where practical and explicit unsupported failures where Android requires privileged access.
+- Implemented notification, intent launch, SMS send, volume, media-key, HTTP POST, and HTTPS download execution paths.
+- Removed unused placeholder context source files and stopped silently swallowing application-context polling errors.
+- Added unit coverage to ensure every UI action metadata ID has a runtime action implementation.
+
 ## v0.2.6 — 2026-05-04
 
 App-open trigger hardening pass.

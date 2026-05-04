@@ -1,13 +1,13 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.6-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.7-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.6** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scenes, and variables — without the proprietary lock-in.
+**OpenTasker v0.2.7** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scenes, and variables — without the proprietary lock-in.
 
-> **Status:** v0.2.6 restores active profile/task/action/context/run-log management, adds setup checks, and uses platform-safe monitors for time, WiFi, and app-open trigger events.
+> **Status:** v0.2.7 restores active profile/task/action/context/run-log management, adds setup checks, uses platform-safe trigger monitors, and registers built-in runtime actions without success-shaped stubs.
 
 ---
 
@@ -22,6 +22,7 @@
 ✅ **Scheduled time ticks** — AlarmManager exact scheduling when allowed, inexact fallback when Android denies exact alarms  
 ✅ **WiFi trigger monitor** — dynamic NetworkCallback path instead of restricted manifest connectivity broadcasts  
 ✅ **App-open monitor** — foreground-service-owned UsageStats polling with explicit missing-permission pause behavior  
+✅ **Runtime action registry** — UI action IDs map to real implementations or explicit unsupported failures  
 ✅ **Database persistence** — Room DAOs with StateFlow live updates  
 ✅ **Action metadata system** — dynamic form generation for all 43 actions  
 ✅ **Context configuration** — UI for all 6 context families (app, time, day, location, state, event)  
@@ -91,7 +92,7 @@ Release APKs are unsigned unless `OPEN_TASKER_RELEASE_KEYSTORE`, `OPEN_TASKER_RE
 ## Next Phase (v0.3)
 
 1. **Capability gating** — hide or explain unsupported platform actions before execution
-2. **Unsupported stub cleanup** — replace success-shaped stubs with real implementations or explicit failures
+2. **Capability annotations** — hide or explain privileged/unimplemented actions before users add them
 3. **Variable inspector** — display task runtime variables during execution
 4. **Tasker import** — `.prj.xml` parser for profile migration
 5. **Plugin SDK** — stable AIDL interface for custom actions

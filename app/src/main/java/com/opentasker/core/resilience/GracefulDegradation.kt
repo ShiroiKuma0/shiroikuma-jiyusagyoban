@@ -21,33 +21,33 @@ object GracefulDegradation {
     private const val TAG = "GracefulDegradation"
     
     /**
-     * Get an action from registry, or return a no-op stub if missing.
+     * Get an action from registry, or return an explicit failure if missing.
      */
     fun getActionOrStub(actionId: String): Action {
         val action = ActionRegistry.get(actionId)
         if (action == null) {
-            AppLogger.warn(TAG, "Action '$actionId' not found in registry, using no-op stub")
-            return NoOpAction(actionId)
+            AppLogger.warn(TAG, "Action '$actionId' not found in registry")
+            return MissingAction(actionId)
         }
         return action
     }
     
     /**
-     * Get a context source from registry, or return a no-op stub if missing.
+     * Get a context source from registry, or return a non-matching source if missing.
      */
     fun getContextSourceOrStub(contextType: String): ContextSource {
         val source = ContextSourceRegistry.get(contextType)
         if (source == null) {
-            AppLogger.warn(TAG, "Context source '$contextType' not found in registry, using no-op stub")
-            return NoOpContextSource(contextType)
+            AppLogger.warn(TAG, "Context source '$contextType' not found in registry")
+            return MissingContextSource(contextType)
         }
         return source
     }
     
     /**
-     * No-op action that logs and succeeds without doing anything.
+     * Missing action that fails honestly instead of reporting success.
      */
-    private class NoOpAction(private val actionId: String) : Action {
+    private class MissingAction(private val actionId: String) : Action {
         override val id: String = actionId
         override val category = ActionCategory.SYSTEM
         
@@ -55,19 +55,19 @@ object GracefulDegradation {
             ctx: ActionContext,
             args: Map<String, String>
         ): ActionResult {
-            AppLogger.warn(TAG, "No-op action executed: $actionId (action not available)")
-            return ActionResult.Skip
+            AppLogger.warn(TAG, "Missing action executed: $actionId")
+            return ActionResult.Failure("Action '$actionId' is not registered")
         }
     }
     
     /**
-     * No-op context source that never matches.
+     * Missing context source that never matches.
      */
-    private class NoOpContextSource(private val contextType: String) : ContextSource {
+    private class MissingContextSource(private val contextType: String) : ContextSource {
         override val type: String = contextType
         
         override fun events(app: Context): Flow<ContextEvent> {
-            AppLogger.warn(TAG, "No-op context source: $contextType (context source not available)")
+            AppLogger.warn(TAG, "Missing context source: $contextType")
             return flowOf(ContextEvent(contextType, false, emptyMap()))
         }
     }

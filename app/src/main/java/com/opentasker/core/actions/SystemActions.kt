@@ -17,7 +17,7 @@ import com.opentasker.core.engine.ActionResult
  *   - "millis": duration in milliseconds
  */
 class VibrateAction : Action {
-    override val id = "haptic.vibrate"
+    override val id = "vibrate"
     override val category = ActionCategory.NOTIFICATION
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
@@ -53,14 +53,13 @@ class VibrateAction : Action {
  *   - "mode": "recovery", "bootloader", or blank for normal reboot
  */
 class RebootAction : Action {
-    override val id = "system.reboot"
+    override val id = "reboot"
     override val category = ActionCategory.SYSTEM
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val mode = args["mode"]?.ifBlank { null }
         ctx.logger("Reboot${mode?.let { " ($it)" } ?: ""}")
-        // TODO: Implement via PowerManager.reboot() (requires REBOOT permission)
-        return ActionResult.Success
+        return ActionResult.Failure("Reboot requires privileged device-owner or system app access")
     }
 }
 
@@ -68,13 +67,12 @@ class RebootAction : Action {
  * Lock device (secure lock).
  */
 class LockDeviceAction : Action {
-    override val id = "system.lock"
+    override val id = "lock"
     override val category = ActionCategory.SYSTEM
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         ctx.logger("Lock device")
-        // TODO: Implement via DevicePolicyManager.lockNow()
-        return ActionResult.Success
+        return ActionResult.Failure("Device lock requires a configured DevicePolicyManager admin")
     }
 }
 
@@ -82,13 +80,12 @@ class LockDeviceAction : Action {
  * Turn off screen.
  */
 class ScreenOffAction : Action {
-    override val id = "display.off"
+    override val id = "screen.off"
     override val category = ActionCategory.SETTINGS
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         ctx.logger("Screen off")
-        // TODO: Implement via PowerManager.goToSleep() with appropriate flags
-        return ActionResult.Success
+        return ActionResult.Failure("Screen-off requires privileged power management access")
     }
 }
 
@@ -99,14 +96,13 @@ class ScreenOffAction : Action {
  *   - "duration_sec": how long to keep screen on
  */
 class WakeAction : Action {
-    override val id = "display.wake"
+    override val id = "wake"
     override val category = ActionCategory.SETTINGS
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val dur = args["duration_sec"]?.toLongOrNull() ?: 10L
         ctx.logger("Wake (${dur}s)")
-        // TODO: Implement via PowerManager.newWakeLock(SCREEN_DIM_WAKE_LOCK)
-        return ActionResult.Success
+        return ActionResult.Failure("Screen wake requires a foreground activity or privileged wake flow")
     }
 }
 
@@ -117,7 +113,7 @@ class WakeAction : Action {
  *   - "message": text to log
  */
 class LogAction : Action {
-    override val id = "log.write"
+    override val id = "log"
     override val category = ActionCategory.SYSTEM
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
