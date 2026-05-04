@@ -78,11 +78,11 @@ interface Action {
 }
 ```
 
-`ActionContext` exposes the application context, variable store, current task scope, and a logger. Plugin support is planned; the current runtime is the built-in action registry plus capability metadata for unsupported or setup-required Android operations.
+`ActionContext` exposes the application context, variable store, current task scope, and a logger. The current runtime is the built-in action registry, capability metadata for unsupported or setup-required Android operations, and a conservative Locale setting-plugin dispatch action.
 
-### Plugin SDK
+### Plugin host
 
-Locale-compatible plugin hosting is a roadmap item, not an active compiled feature. The architecture reserves a plugin boundary through stable action IDs, capability checks, and the `Action` interface, but no public AIDL/plugin host should be documented as shipped until the roadmap plugin item lands.
+Locale-compatible setting-plugin dispatch is active through `plugin.locale.fire`. It accepts only explicit package names and string-only JSON bundle values before dispatching `com.twofortyfouram.locale.intent.action.FIRE_SETTING`. Interactive plugin configuration, condition query execution, and richer plugin callbacks are still roadmap items.
 
 ## Why these choices
 

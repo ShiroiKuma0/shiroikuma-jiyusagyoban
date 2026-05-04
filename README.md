@@ -1,25 +1,26 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.13-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.14-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.13** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, and actions are active now; scenes, variable tooling, imports, and plugins are planned.
+**OpenTasker v0.2.14** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, JSON bundles, and a conservative Locale plugin host baseline are active now; scenes, variable tooling, and broader plugin UX are planned.
 
-> **Status:** v0.2.13 adds a versioned OpenTasker JSON bundle format for deterministic export/import planning, while keeping guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
+> **Status:** v0.2.14 adds explicit-package Locale setting plugin dispatch with safe bundle parsing, while keeping JSON bundles, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
 
 ---
 
 ## Highlights
 
 ✅ **Core engine operational** — profiles → contexts → tasks → actions pipeline  
-✅ **39 registered action definitions** — supported actions run, restricted actions are gated or fail explicitly  
+✅ **40 registered action definitions** — supported actions run, restricted actions are gated or fail explicitly  
 ✅ **Reactive context sources** — app foreground, time, state, event, WiFi, and app-open monitoring are wired; day/location are planned runtime work  
 ✅ **AMOLED-first** — Catppuccin Mocha palette, light theme toggle  
 ✅ **Compose UI reintegration started** — active navigation now manages profiles, tasks, actions, contexts, and run logs from Room  
 ✅ **Profile templates** — guided starter profiles with variable slots, safety notes, and disabled-by-default installation  
 ✅ **Open JSON bundles** — schema-versioned profile/task/context/action/variable/scene export and import planning  
+✅ **Locale plugin host baseline** — explicit setting-plugin dispatch with package validation, bundle limits, and timeout wrapping  
 ✅ **Setup checklist** — notifications, exact alarms, battery optimization, usage access, notification access, overlays, location, Bluetooth, SMS, and DND access  
 ✅ **Scheduled time ticks** — AlarmManager exact scheduling when allowed, inexact fallback when Android denies exact alarms  
 ✅ **WiFi trigger monitor** — dynamic NetworkCallback path instead of restricted manifest connectivity broadcasts  
@@ -29,7 +30,7 @@
 ✅ **Run log traces** — task history includes action-level status, duration, and failure reasons  
 ✅ **Regression coverage** — cron parsing and variable scoping edge cases are test-covered  
 ✅ **Database persistence** — Room DAOs with StateFlow live updates  
-✅ **Action metadata system** — dynamic form generation for all 39 registered action definitions  
+✅ **Action metadata system** — dynamic form generation for all 40 registered action definitions  
 ✅ **Context configuration UI** — editor supports all 6 context families while runtime support continues to harden by family  
 ✅ **100% Kotlin** — modern, type-safe, coroutine-friendly  
 ✅ **Profile execution** — AutomationService wired to TaskRunner for context triggers  
@@ -49,7 +50,7 @@ ContextSources (app, time, state, event)
   ↓
 TaskRunner (executes action list)
   ↓
-ActionRegistry (built-ins + capability gates; plugin SDK planned)
+ActionRegistry (built-ins + capability gates + Locale setting plugin dispatch)
   ↓
 Room DB (persistent storage)
 ```
@@ -58,7 +59,7 @@ Room DB (persistent storage)
 - **Runtime-wired now:** Application foreground detection, time ticks, device state broadcasts, event broadcasts, WiFi network changes, and app-open monitoring.
 - **Configured in UI but still being hardened:** Day schedules and location/geofence contexts.
 
-### Actions (39 registered definitions)
+### Actions (40 registered definitions)
 | Category | Count | Examples |
 |----------|-------|----------|
 | Settings | 7 | WiFi, Bluetooth, brightness, volume, airplane, mobile data, screen timeout |
@@ -70,6 +71,7 @@ Room DB (persistent storage)
 | Notification | 2 | notification/toast, TTS speak |
 | Variable | 1 | set variable |
 | Flow | 1 | wait |
+| Plugin | 1 | Locale setting dispatch |
 
 Some actions are intentionally disabled or marked setup-required because Android restricts normal apps from changing airplane mode, mobile data, screenshots, reboot, screen-off, and similar privileged operations.
 
