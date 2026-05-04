@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.14 — 2026-05-04
+
+Locale plugin host baseline.
+
+- Added Locale/Tasker-compatible setting plugin dispatch through a new `plugin.locale.fire` action.
+- Added explicit package validation, string-only JSON bundle decoding, bundle size limits, blurb handling, and timeout wrapping.
+- Added plugin discovery metadata for Locale edit-setting/edit-condition packages and requested permission disclosure.
+- Added manifest package visibility queries for Locale-compatible plugin discovery.
+- Documented the supported plugin host surface and added parser/trust-boundary unit tests.
+
 ## v0.2.13 — 2026-05-04
 
 Open JSON bundle baseline.

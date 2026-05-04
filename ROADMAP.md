@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.13. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.14. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-04  
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.13  
+**Current app version:** 0.2.14  
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -216,6 +216,7 @@ Key local constraints:
 
 ### X3 - Locale-compatible plugin host
 
+**Status:** Baseline completed in v0.2.14. Added explicit-package Locale setting dispatch, safe string-only bundle parsing, timeout validation, plugin discovery metadata, package visibility queries, docs, and trust-boundary tests. Condition query execution remains a later hardening item.  
 **Description:** Implement the Locale/Tasker host intent contract for condition and setting plugins, with safe result handling, permission disclosure, timeout/cancellation, and a sample plugin validation harness.  
 **Sources:** Locale SDK [S7], Termux:Tasker [S3], Tasker plugin sample [S8], Pocket Casts plugin module [S8].  
 **Category:** plugin ecosystem, integrations, security.  
