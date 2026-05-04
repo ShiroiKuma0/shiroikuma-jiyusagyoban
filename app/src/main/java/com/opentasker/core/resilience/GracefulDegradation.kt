@@ -56,7 +56,7 @@ object GracefulDegradation {
             args: Map<String, String>
         ): ActionResult {
             AppLogger.warn(TAG, "No-op action executed: $actionId (action not available)")
-            return ActionResult.Skip("Action $actionId not available")
+            return ActionResult.Skip
         }
     }
     
