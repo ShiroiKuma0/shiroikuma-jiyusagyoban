@@ -1,5 +1,7 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Alignment
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,25 +10,28 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.TextOverflow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.TaskAlt
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.Divider
+import androidx.compose.material3.ElevatedButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -90,29 +95,76 @@ fun ProfileListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Profiles") }
+                title = { 
+                    Text(
+                        "Profiles",
+                        style = MaterialTheme.typography.headlineMedium
+                    ) 
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                )
             )
         },
         floatingActionButton = {
-            Button(onClick = onCreateProfile) {
-                Icon(Icons.Filled.Add, contentDescription = "Add")
-                Text("New Profile")
+            FloatingActionButton(
+                onClick = onCreateProfile,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = "Add new profile")
             }
         }
     ) { inner ->
         Column(modifier = Modifier
             .fillMaxSize()
             .padding(inner)
-            .padding(16.dp)
         ) {
             if (profiles.isEmpty()) {
-                Text(
-                    "No profiles yet. Create one to get started!",
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
+                // Premium empty state
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        Icons.Filled.Info,
+                        contentDescription = null,
+                        modifier = Modifier.height(48.dp),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "No profiles yet",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Create your first automation profile to get started",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    ElevatedButton(onClick = onCreateProfile) {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("New Profile")
+                    }
+                }
             } else {
-                LazyColumn {
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .padding(top = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     items(profiles, key = { it.id }) { profile ->
                         ProfileCardItem(
                             profile = profile,
@@ -130,20 +182,57 @@ fun ProfileListScreen(
                 }
             }
             
-            // Navigation buttons
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onManageTasks, modifier = Modifier.fillMaxWidth()) {
-                Text("Manage Tasks")
-            }
-            Button(onClick = onBatchOperations, modifier = Modifier.fillMaxWidth()) {
-                Text("Batch Operations")
-            }
-            Button(onClick = onViewRunLog, modifier = Modifier.fillMaxWidth()) {
-                Text("View Run Log")
+            // Bottom navigation bar - premium redesign
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 8.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    PremiumNavButton(
+                        label = "Tasks",
+                        onClick = onManageTasks,
+                        modifier = Modifier.weight(1f)
+                    )
+                    PremiumNavButton(
+                        label = "Batch",
+                        onClick = onBatchOperations,
+                        modifier = Modifier.weight(1f)
+                    )
+                    PremiumNavButton(
+                        label = "Log",
+                        onClick = onViewRunLog,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
     }
 }
+
+@Composable
+private fun PremiumNavButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(40.dp),
+        shape = RoundedCornerShape(6.dp)
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1
+        )
+    }
 }
 
 @Composable
@@ -156,28 +245,41 @@ fun ProfileCardItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
+            .height(72.dp),
+        shape = RoundedCornerShape(10.dp),
+        onClick = { onEdit(profile) }
     ) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+                .fillMaxSize()
+                .padding(12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(profile.name, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "${profile.contexts.size} contexts",
-                    style = MaterialTheme.typography.labelSmall
+                    profile.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "${profile.contexts.size} context${if (profile.contexts.size == 1) "" else "s"}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            Spacer(modifier = Modifier.width(8.dp))
             Switch(
                 checked = profile.enabled,
                 onCheckedChange = { onToggle(profile, it) }
             )
-            IconButton(onClick = { onDelete(profile) }) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete")
+            IconButton(
+                onClick = { onDelete(profile) },
+                modifier = Modifier.height(24.dp)
+            ) {
+                Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
             }
         }
     }
