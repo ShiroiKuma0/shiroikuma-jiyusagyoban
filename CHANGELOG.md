@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.10 — 2026-05-04
+
+Regression-test hardening pass.
+
+- Hardened cron step/range parsing so malformed expressions fail closed instead of throwing.
+- Added tests for malformed cron steps and valid minute/hour cron matching.
+- Added tests for variable scope shadowing and missing-variable expansion.
+- Updated README/roadmap metadata for the expanded regression coverage.
+
 ## v0.2.9 — 2026-05-04
 
 Run log tracing baseline.

@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.9. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.10. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-04  
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.9  
+**Current app version:** 0.2.10  
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -25,7 +25,7 @@ Key local constraints:
 | Contexts | Time ticks use app-owned AlarmManager scheduling, WiFi events use dynamic NetworkCallback, and app-open events use foreground-service-owned UsageStats polling; other context sources still rely on restricted Android APIs or incomplete implementations | Permission/onboarding and platform-safe replacements remain P0/P1 |
 | Persistence | Room schema export now exists; backup/restore hardened | Migration tests and upgrade strategy can be built on this |
 | Release | Debug/release builds pass locally; release signing is env-var driven | F-Droid/Play readiness still needs policy and reproducibility work |
-| Docs | README was corrected to v0.2.9; old roadmap/notes overclaimed v0.3/v0.4 completion | Roadmap tiers below supersede old milestone claims |
+| Docs | README was corrected to v0.2.10; old roadmap/notes overclaimed v0.3/v0.4 completion | Roadmap tiers below supersede old milestone claims |
 
 ---
 
@@ -160,6 +160,7 @@ Key local constraints:
 
 ### N9 - Add high-value regression tests around platform and parser boundaries
 
+**Status:** Baseline completed in v0.2.10. Added regression tests around cron parsing and variable scoping, and hardened malformed cron step/range handling to fail closed.  
 **Description:** Add focused JVM/unit tests for variable expansion limits, malformed action parameters, capability gating, scheduler fallback decisions, import/export schema validation, repository migrations, and stub-failure behavior. Add instrumentation tests only for flows that cannot be covered on JVM.  
 **Sources:** Easer admits broad test gaps [S1], Room schema/migration guidance [S35], existing local validation tests [L4].  
 **Category:** testing, reliability, dev-experience.  
