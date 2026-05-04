@@ -94,30 +94,33 @@ data class TriggerConfig(
     val id: String = UUID.randomUUID().toString(),
     val type: String, // "time", "geofence", "wifi", "battery", etc.
     val displayName: String = "", // User-friendly name
-    val enabled: Boolean = true,
+    val enabled: Boolean = true
+) : Parcelable {
     @Transient
-    val config: Map<String, Any> = emptyMap() // Runtime configuration map (not serialized)
-) : Parcelable
+    var config: Map<String, Any> = emptyMap() // Runtime-only config, not serialized
+}
 
 @Parcelize
 data class ConstraintConfig(
     val id: String = UUID.randomUUID().toString(),
     val type: String, // "battery", "time_range", "location", "wifi", etc.
     val displayName: String = "",
-    val enabled: Boolean = true,
+    val enabled: Boolean = true
+) : Parcelable {
     @Transient
-    val config: Map<String, Any> = emptyMap()
-) : Parcelable
+    var config: Map<String, Any> = emptyMap()
+}
 
 @Parcelize
 data class ActionConfig(
     val id: String = UUID.randomUUID().toString(),
     val type: String, // "notification", "intent", "toggle_wifi", etc.
     val displayName: String = "",
-    val enabled: Boolean = true,
+    val enabled: Boolean = true
+) : Parcelable {
     @Transient
-    val config: Map<String, Any> = emptyMap()
-) : Parcelable
+    var config: Map<String, Any> = emptyMap()
+}
 
 // ============================================================================
 // CONSTRAINT GROUPS - Boolean logic for constraints (AND/OR)
