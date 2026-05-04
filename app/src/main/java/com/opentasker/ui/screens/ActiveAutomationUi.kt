@@ -61,6 +61,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.room.withTransaction
 import com.opentasker.core.actions.ActionField
 import com.opentasker.core.actions.ActionMetadata
 import com.opentasker.core.actions.ActionMetadataRegistry
@@ -75,6 +76,9 @@ import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.toEntity
+import com.opentasker.core.templates.ProfileTemplate
+import com.opentasker.core.templates.ProfileTemplateCatalog
+import com.opentasker.core.templates.TemplateAvailability
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -171,6 +175,15 @@ class ActiveAutomationViewModel(private val db: AppDatabase) : ViewModel() {
         db.profileDao().delete(profile.toEntity())
     }
 
+    fun installProfileTemplate(template: ProfileTemplate, slotValues: Map<String, String>) =
+        launchWithMessage("Template installed as a disabled profile") {
+            val applied = template.instantiate(slotValues)
+            db.withTransaction {
+                val taskId = db.taskDao().insert(applied.task.toEntity())
+                db.profileDao().insert(applied.profile.copy(enterTaskId = taskId).toEntity())
+            }
+        }
+
     private fun launchWithMessage(successMessage: String, block: suspend () -> Unit) {
         viewModelScope.launch {
             runCatching { block() }
@@ -207,6 +220,8 @@ fun ActiveAutomationUi(
     var showCreateTaskDialog by remember { mutableStateOf(false) }
     var profileDialog by remember { mutableStateOf<Profile?>(null) }
     var showCreateProfileDialog by remember { mutableStateOf(false) }
+    var showTemplateDialog by remember { mutableStateOf(false) }
+    var selectedTemplate by remember { mutableStateOf<ProfileTemplate?>(null) }
     var actionPickerTask by remember { mutableStateOf<Task?>(null) }
     var actionEdit by remember { mutableStateOf<ActionEditState?>(null) }
     var contextPickerProfile by remember { mutableStateOf<Profile?>(null) }
@@ -288,6 +303,7 @@ fun ActiveAutomationUi(
                     showCreateTaskDialog = true
                 },
                 onCreateProfile = { showCreateProfileDialog = true },
+                onBrowseTemplates = { showTemplateDialog = true },
                 onEditProfile = { profileDialog = it },
                 onDeleteProfile = viewModel::deleteProfile,
                 onToggleProfile = { profile, enabled ->
@@ -369,6 +385,28 @@ fun ActiveAutomationUi(
         )
     }
 
+    if (showTemplateDialog) {
+        TemplatePickerDialog(
+            onDismiss = { showTemplateDialog = false },
+            onSelect = { template ->
+                showTemplateDialog = false
+                selectedTemplate = template
+            },
+        )
+    }
+
+    selectedTemplate?.let { template ->
+        TemplateSlotDialog(
+            template = template,
+            onDismiss = { selectedTemplate = null },
+            onInstall = { values ->
+                viewModel.installProfileTemplate(template, values)
+                selectedTemplate = null
+                screen = OpenTaskerScreen.Profiles
+            },
+        )
+    }
+
     profileDialog?.let { profile ->
         ProfileEditorDialog(
             profile = profile,
@@ -446,6 +484,7 @@ private fun ProfilesScreen(
     tasks: List<Task>,
     onCreateTaskFirst: () -> Unit,
     onCreateProfile: () -> Unit,
+    onBrowseTemplates: () -> Unit,
     onEditProfile: (Profile) -> Unit,
     onDeleteProfile: (Profile) -> Unit,
     onToggleProfile: (Profile, Boolean) -> Unit,
@@ -456,10 +495,12 @@ private fun ProfilesScreen(
 ) {
     if (tasks.isEmpty()) {
         EmptyState(
-            title = "Create a task first",
-            body = "Profiles need an enter task before they can be saved. Create a task, then return here to attach contexts and enable automation.",
-            actionLabel = "Create Task",
-            onAction = onCreateTaskFirst,
+            title = "Start with a template or task",
+            body = "Templates create a disabled profile plus its starter task in one step. Use a blank task if you want to build everything manually.",
+            actionLabel = "Browse Templates",
+            onAction = onBrowseTemplates,
+            secondaryActionLabel = "Create Blank Task",
+            onSecondaryAction = onCreateTaskFirst,
             contentPadding = contentPadding,
         )
         return
@@ -467,9 +508,11 @@ private fun ProfilesScreen(
     if (profiles.isEmpty()) {
         EmptyState(
             title = "No profiles yet",
-            body = "Profiles connect contexts to tasks. Create one, add contexts, and enable it when it is ready to run.",
-            actionLabel = "Create Profile",
-            onAction = onCreateProfile,
+            body = "Profiles connect contexts to tasks. Start from a curated template or create a blank profile and attach contexts yourself.",
+            actionLabel = "Browse Templates",
+            onAction = onBrowseTemplates,
+            secondaryActionLabel = "Create Blank Profile",
+            onSecondaryAction = onCreateProfile,
             contentPadding = contentPadding,
         )
         return
@@ -482,6 +525,9 @@ private fun ProfilesScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        item {
+            TemplatePromptCard(onBrowseTemplates)
+        }
         items(profiles, key = { it.id }) { profile ->
             val enterTaskName = tasks.firstOrNull { it.id == profile.enterTaskId }?.name ?: "Missing task #${profile.enterTaskId}"
             ProfileCard(
@@ -494,6 +540,32 @@ private fun ProfilesScreen(
                 onEditContext = { index, context -> onEditContext(profile, index, context) },
                 onDeleteContext = { index -> onDeleteContext(profile, index) },
             )
+        }
+    }
+}
+
+@Composable
+private fun TemplatePromptCard(onBrowseTemplates: () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.38f)),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Templates", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Create safe starter profiles with slot-based names, contexts, and task actions.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            OutlinedButton(onClick = onBrowseTemplates) {
+                Text("Browse")
+            }
         }
     }
 }
@@ -818,6 +890,8 @@ private fun EmptyState(
     actionLabel: String?,
     onAction: (() -> Unit)?,
     contentPadding: PaddingValues,
+    secondaryActionLabel: String? = null,
+    onSecondaryAction: (() -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier
@@ -847,7 +921,114 @@ private fun EmptyState(
                 Text(actionLabel)
             }
         }
+        if (secondaryActionLabel != null && onSecondaryAction != null) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = onSecondaryAction) {
+                Text(secondaryActionLabel)
+            }
+        }
     }
+}
+
+@Composable
+private fun TemplatePickerDialog(
+    onDismiss: () -> Unit,
+    onSelect: (ProfileTemplate) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Profile Templates") },
+        text = {
+            LazyColumn(
+                modifier = Modifier.height(460.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                items(ProfileTemplateCatalog.all, key = { it.id }) { template ->
+                    val status = when (template.availability) {
+                        TemplateAvailability.Ready -> "Ready"
+                        TemplateAvailability.RequiresSetup -> "Needs setup"
+                        TemplateAvailability.Planned -> "Planned"
+                    }
+                    Card(
+                        onClick = { onSelect(template) },
+                        enabled = template.installable,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(template.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                                AssistChip(onClick = {}, label = { Text(status) })
+                            }
+                            Text(template.category, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                            Text(template.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(template.safetyNote, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+    )
+}
+
+@Composable
+private fun TemplateSlotDialog(
+    template: ProfileTemplate,
+    onDismiss: () -> Unit,
+    onInstall: (Map<String, String>) -> Unit,
+) {
+    var values by remember(template.id) { mutableStateOf(template.defaults()) }
+    val missingRequired = template.slots.any { it.required && values[it.key].isNullOrBlank() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(template.title) },
+        text = {
+            LazyColumn(
+                modifier = Modifier.height(420.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                item {
+                    Text(template.summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Text(
+                            "Profiles created from templates start disabled so you can review permissions, actions, and contexts before enabling.",
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+                items(template.slots, key = { it.key }) { slot ->
+                    OutlinedTextField(
+                        value = values[slot.key].orEmpty(),
+                        onValueChange = { values = values + (slot.key to it) },
+                        label = { Text(slot.label + if (slot.required) " *" else "") },
+                        placeholder = slot.hint?.let { { Text(it) } },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = !missingRequired && template.installable,
+                onClick = { onInstall(values) },
+            ) {
+                Text("Create Disabled Profile")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable
