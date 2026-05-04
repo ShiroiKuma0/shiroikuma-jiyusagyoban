@@ -7,7 +7,7 @@ import com.opentasker.core.storage.DatabaseMigrations
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
-class OpenTaskerApp : Application() {
+open class OpenTaskerApp : Application() {
     companion object {
         private var _db: AppDatabase? = null
         
