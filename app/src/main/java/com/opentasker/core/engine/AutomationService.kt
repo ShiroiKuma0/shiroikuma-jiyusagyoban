@@ -153,7 +153,7 @@ class AutomationService : Service() {
             taskName = task.name,
             durationMs = report.durationMs,
             success = report.success,
-            message = ""
+            message = report.traces.toRunLogMessage()
         )
         db.runLogDao().insert(logEntry.toEntity())
         
