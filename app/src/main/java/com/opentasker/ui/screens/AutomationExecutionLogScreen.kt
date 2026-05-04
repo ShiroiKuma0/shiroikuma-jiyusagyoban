@@ -3,6 +3,7 @@ package com.opentasker.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -12,12 +13,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.opentasker.automation.model.ExecutionLog
+import com.opentasker.ui.theme.DesignSystem
 import java.text.SimpleDateFormat
 import java.util.*
 
 /**
  * Screen for viewing execution logs of automation rules.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun AutomationExecutionLogScreen(
     logs: List<ExecutionLog> = emptyList(),
@@ -53,17 +56,17 @@ fun AutomationExecutionLogScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    shape = RoundedCornerShape(8.dp),
+                        .padding(horizontal = DesignSystem.Spacing.md, vertical = DesignSystem.Spacing.sm),
+                    shape = RoundedCornerShape(DesignSystem.Radii.md),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            .padding(DesignSystem.Spacing.md),
+                        horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         FilterChip(
@@ -73,7 +76,7 @@ fun AutomationExecutionLogScreen(
                             },
                             label = { Text("Successful") },
                             leadingIcon = if (filterBySuccess == true) {
-                                { Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                { Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(DesignSystem.ComponentSize.iconSmall)) }
                             } else null
                         )
                         FilterChip(
@@ -83,7 +86,7 @@ fun AutomationExecutionLogScreen(
                             },
                             label = { Text("Failed") },
                             leadingIcon = if (filterBySuccess == false) {
-                                { Icon(Icons.Default.Error, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                { Icon(Icons.Default.Error, contentDescription = null, modifier = Modifier.size(DesignSystem.ComponentSize.iconSmall)) }
                             } else null
                         )
                         if (filterByRule != null || filterBySuccess != null) {
@@ -95,7 +98,7 @@ fun AutomationExecutionLogScreen(
                                 },
                                 label = { Text("Clear filters") },
                                 leadingIcon = {
-                                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(DesignSystem.ComponentSize.iconSmall))
                                 }
                             )
                         }
@@ -110,8 +113,8 @@ fun AutomationExecutionLogScreen(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(DesignSystem.Spacing.md),
+                    verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)
                 ) {
                     items(filteredLogs) { log ->
                         ExecutionLogCard(log = log)
@@ -127,24 +130,24 @@ fun EmptyLogState() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(40.dp),
+            .padding(DesignSystem.Spacing.xxl),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
             imageVector = Icons.Default.HistoryToggleOff,
             contentDescription = null,
-            modifier = Modifier.size(72.dp),
+            modifier = Modifier.size(DesignSystem.ComponentSize.iconXLarge),
             tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
         )
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(DesignSystem.Spacing.xl))
         Text(
             "No execution history yet",
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(DesignSystem.Spacing.md))
         Text(
             "Execution logs will appear here once your automation rules begin running. Create a rule and enable it to see logs.",
             style = MaterialTheme.typography.bodyMedium,
@@ -158,22 +161,21 @@ fun EmptyLogState() {
 @Composable
 fun ExecutionLogCard(log: ExecutionLog) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
         colors = CardDefaults.cardColors(
             containerColor = if (log.success) 
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                MaterialTheme.colorScheme.surfaceVariant
             else 
                 MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
-        )
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = DesignSystem.Elevation.sm)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(DesignSystem.Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -183,13 +185,13 @@ fun ExecutionLogCard(log: ExecutionLog) {
                 Column(modifier = Modifier.weight(1f)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)
                     ) {
                         Icon(
                             imageVector = if (log.success) Icons.Default.CheckCircle else Icons.Default.Error,
                             contentDescription = null,
                             tint = if (log.success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(DesignSystem.ComponentSize.iconMedium)
                         )
                         Column {
                             Text(
@@ -212,7 +214,7 @@ fun ExecutionLogCard(log: ExecutionLog) {
             
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.lg),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
