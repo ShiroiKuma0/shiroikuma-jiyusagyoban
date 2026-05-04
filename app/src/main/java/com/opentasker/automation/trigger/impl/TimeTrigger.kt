@@ -51,16 +51,22 @@ class TimeTrigger : TriggerDefinition {
     private fun matches(field: String, value: Int): Boolean {
         return when {
             field == "*" -> true
-            field.contains(",") -> value in field.split(",").map { it.toIntOrNull() ?: -1 }
-            field.contains("-") -> {
-                val (min, max) = field.split("-").map { it.toIntOrNull() ?: -1 }
-                value in min..max
-            }
+            field.contains(",") -> field.split(",").any { matches(it, value) }
             field.contains("/") -> {
-                val (base, step) = field.split("/")
+                val parts = field.split("/", limit = 2)
+                if (parts.size != 2) return false
+                val (base, step) = parts
                 val stepVal = step.toIntOrNull() ?: return false
+                if (stepVal <= 0) return false
                 val baseVal = if (base == "*") 0 else base.toIntOrNull() ?: return false
                 (value - baseVal) % stepVal == 0
+            }
+            field.contains("-") -> {
+                val parts = field.split("-", limit = 2)
+                if (parts.size != 2) return false
+                val min = parts[0].toIntOrNull() ?: return false
+                val max = parts[1].toIntOrNull() ?: return false
+                min <= max && value in min..max
             }
             else -> field.toIntOrNull() == value
         }
