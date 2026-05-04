@@ -26,5 +26,6 @@ interface VariableDao {
     @Update suspend fun update(v: VariableEntity)
     @Delete suspend fun delete(v: VariableEntity)
     @Query("SELECT * FROM variables WHERE name = :name") suspend fun get(name: String): VariableEntity?
+    @Query("SELECT * FROM variables") suspend fun getAll(): List<VariableEntity>
     @Query("SELECT * FROM variables WHERE isGlobal = 1") suspend fun getAllGlobal(): List<VariableEntity>
 }

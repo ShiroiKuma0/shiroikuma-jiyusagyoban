@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.12. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.13. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-04  
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.12  
+**Current app version:** 0.2.13  
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -203,6 +203,7 @@ Key local constraints:
 
 ### X2 - Open JSON import/export with schema versioning
 
+**Status:** Completed in v0.2.13. Added schema-versioned bundle models, deterministic export ordering, capability metadata, validation/import warnings, Room-backed import/export with ID remapping, and format documentation.  
 **Description:** Define a portable JSON bundle for profiles, tasks, actions, contexts, variables, and metadata. Include schema version, app version, capability requirements, lossy import warnings, and deterministic ordering for diffs.  
 **Sources:** Node-RED JSON flows [S9], Huginn scenarios [S11], MacroDroid/Automate opaque export pain [S17][S18], F-Droid reproducibility goals [S31].  
 **Category:** data, migration, docs, distribution.  
