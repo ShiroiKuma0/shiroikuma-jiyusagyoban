@@ -23,6 +23,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -32,10 +33,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
 import com.opentasker.core.model.Profile
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.toEntity
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.launch
 
 /**
  * ViewModel for profile list screen.
@@ -72,6 +75,7 @@ fun ProfileListScreen(
         factory = ProfileListViewModelFactory(db)
     )
     val profiles by viewModel.profiles.collectAsState()
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -104,7 +108,13 @@ fun ProfileListScreen(
                             profile = profile,
                             onEdit = { onEditProfile(profile) },
                             onDelete = { onDeleteProfile(profile) },
-                            onToggle = { _, _ -> /* TODO: toggle enabled in DB */ }
+                            onToggle = { updatedProfile, enabled ->
+                                scope.launch {
+                                    db.profileDao().update(
+                                        updatedProfile.copy(enabled = enabled).toEntity()
+                                    )
+                                }
+                            }
                         )
                     }
                 }
