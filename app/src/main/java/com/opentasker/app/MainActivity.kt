@@ -8,6 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -20,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.opentasker.automation.model.AutomationRule
+import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.toEntity
@@ -175,7 +177,7 @@ class MainActivity : ComponentActivity() {
                     }
                     is Screen.ActionPicker -> {
                         ActionPickerScreen(
-                            onActionSelected = { action ->
+                            onActionSelected = { action: ActionSpec ->
                                 currentScreen = Screen.ActionEditor(action)
                             },
                             onCancel = { currentScreen = Screen.TaskEditor(currentEditingTask) },
@@ -271,13 +273,13 @@ class MainActivity : ComponentActivity() {
             setContent {
                 OpenTaskerTheme {
                     Surface(
-                        modifier = androidx.compose.foundation.layout.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
                     ) {
                         Column(
-                            modifier = androidx.compose.foundation.layout.padding(16.dp),
-                            verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
-                            horizontalAlignment = androidx.compose.foundation.layout.Alignment.CenterHorizontally
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text("Failed to initialize OpenTasker", style = MaterialTheme.typography.headlineSmall)
                             Text(e.message ?: "Unknown error", style = MaterialTheme.typography.bodyMedium)
