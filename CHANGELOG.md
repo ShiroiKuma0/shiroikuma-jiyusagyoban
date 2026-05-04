@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.2.2 — 2026-05-04
+
+Active UI reintegration pass.
+
+- Replaced the launcher-only status screen with a live Compose management UI.
+- Added profile creation, editing, enable/disable toggling, deletion, and context attachment backed by Room.
+- Added task creation, editing, deletion, and action add/edit/delete flows driven by the action metadata registry.
+- Restored run-log browsing inside the active APK.
+- Registered built-in action metadata during app startup so dynamic action forms are populated.
+- Updated README/version metadata to reflect the active UI state.
+
 ## v0.2.1 — 2026-05-04
 
 Production hardening pass.
