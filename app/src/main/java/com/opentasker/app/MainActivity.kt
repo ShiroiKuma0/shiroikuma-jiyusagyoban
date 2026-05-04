@@ -28,6 +28,7 @@ class MainActivity : ComponentActivity() {
             val db = OpenTaskerApp.db
             OpenTaskerTheme {
                 var currentScreen by remember { mutableStateOf<Screen>(Screen.ProfileList) }
+                var currentEditingTask by remember { mutableStateOf<Task?>(null) }
                 val scope = rememberCoroutineScope()
 
                 when (val screen = currentScreen) {
@@ -60,8 +61,9 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     is Screen.TaskEditor -> {
+                        if (currentEditingTask == null) currentEditingTask = screen.task
                         TaskEditorScreen(
-                            task = screen.task,
+                            task = currentEditingTask,
                             onSave = { task ->
                                 scope.launch {
                                     if (task.id == 0L) {
@@ -69,10 +71,17 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         db.taskDao().update(task.toEntity())
                                     }
+                                    currentEditingTask = null
                                     currentScreen = Screen.ProfileList
                                 }
                             },
-                            onBack = { currentScreen = Screen.ProfileList },
+                            onBack = {
+                                currentEditingTask = null
+                                currentScreen = Screen.ProfileList
+                            },
+                            onTaskUpdated = { updatedTask ->
+                                currentEditingTask = updatedTask
+                            },
                             onAddAction = { currentScreen = Screen.ActionPicker },
                         )
                     }
@@ -81,16 +90,19 @@ class MainActivity : ComponentActivity() {
                             onActionSelected = { action ->
                                 currentScreen = Screen.ActionEditor(action)
                             },
-                            onCancel = { currentScreen = Screen.TaskEditor(null) },
+                            onCancel = { currentScreen = Screen.TaskEditor(currentEditingTask) },
                         )
                     }
                     is Screen.ActionEditor -> {
                         ActionEditorScreen(
                             actionSpec = screen.actionSpec,
                             onSave = { action ->
-                                // For now, just go back to task editor
-                                // In a real implementation, we'd pass the action back to TaskEditor
-                                currentScreen = Screen.TaskEditor(null)
+                                if (currentEditingTask != null) {
+                                    currentEditingTask = currentEditingTask!!.copy(
+                                        actions = currentEditingTask!!.actions + action
+                                    )
+                                }
+                                currentScreen = Screen.TaskEditor(currentEditingTask)
                             },
                             onCancel = { currentScreen = Screen.ActionPicker },
                         )

@@ -148,6 +148,7 @@ fun TaskEditorScreen(
     task: Task?,
     onSave: (Task) -> Unit,
     onBack: () -> Unit,
+    onTaskUpdated: (Task) -> Unit = {},
     onAddAction: () -> Unit = {},
 ) {
     var name by remember { mutableStateOf(task?.name ?: "") }
