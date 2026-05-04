@@ -33,8 +33,11 @@ jobs:
       
       - name: Make gradlew executable
         run: |
-          dos2unix ./gradlew || sed -i 's/\r$//' ./gradlew
+          dos2unix ./gradlew || true
+          sed -i 's/\r$//' ./gradlew
           chmod +x ./gradlew
+          # Verify gradlew
+          head -5 ./gradlew
       
       - name: Build release APK
         run: ./gradlew assembleRelease
