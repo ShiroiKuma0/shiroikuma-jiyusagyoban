@@ -43,7 +43,7 @@ class ActionExecutorImpl @Inject constructor() {
             listOf(
                 ActionExecutionResult(
                     success = false,
-                    actionId = 0L,
+                    actionId = "",
                     error = "Execution error: ${e.message}"
                 )
             )
@@ -136,6 +136,6 @@ class ActionExecutorImpl @Inject constructor() {
  */
 data class ActionExecutionResult(
     val success: Boolean,
-    val actionId: Long = 0,
+    val actionId: String = "",
     val error: String? = null
 )
