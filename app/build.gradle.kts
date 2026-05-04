@@ -19,7 +19,7 @@ android {
     }
 
     signingConfigs {
-        create("release") {
+        getByName("debug") {
             storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
             storePassword = "android"
             keyAlias = "androiddebugkey"
@@ -32,7 +32,9 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("release")
+            // Use debug signing config for testing purposes
+            // For Play Store releases, replace with an upload key
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
