@@ -1,13 +1,13 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.1-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.0** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scenes, and variables — without the proprietary lock-in.
+**OpenTasker v0.2.1** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scenes, and variables — without the proprietary lock-in.
 
-> **Status:** v0.2.0 complete with full UI layer: profile/task CRUD, action editor (43 types), context picker, database persistence via Room. Engine fully operational with context sources. Ready for automation execution and run log visualization.
+> **Status:** v0.2.1 is a production-hardening build. The active APK currently ships a minimal Compose status screen while the richer CRUD screens remain in source snapshots pending reintegration. Core automation/storage code compiles, unit tests run, and debug/release APKs build with R8 enabled.
 
 ---
 
@@ -17,13 +17,13 @@
 ✅ **43 built-in actions** — settings, apps, files, network, media, system  
 ✅ **Reactive contexts** — battery, headphones, screen, WiFi, app foreground, time, SMS/events  
 ✅ **AMOLED-first** — Catppuccin Mocha palette, light theme toggle  
-✅ **Compose UI** — full CRUD for profiles/tasks/contexts/actions with dynamic forms  
+⏳ **Compose UI reintegration** — full CRUD screens exist as source snapshots and need to be restored into the active navigation graph  
 ✅ **Database persistence** — Room DAOs with StateFlow live updates  
 ✅ **Action metadata system** — dynamic form generation for all 43 actions  
 ✅ **Context configuration** — UI for all 6 context families (app, time, day, location, state, event)  
 ✅ **100% Kotlin** — modern, type-safe, coroutine-friendly  
-⏳ **Profile execution** — AutomationService wired to TaskRunner for context triggers  
-⏳ **Run log viewer** — real-time StateFlow-based execution history  
+✅ **Profile execution** — AutomationService wired to TaskRunner for context triggers  
+✅ **Run log persistence** — task execution history is written to Room  
 ⏳ **Tasker compat** — architecture matches for future `.prj.xml` import
 
 ---
@@ -70,9 +70,9 @@ Room DB (persistent storage)
 ```bash
 git clone https://github.com/SysAdminDoc/OpenTasker
 cd OpenTasker
-./gradlew assembleDebug
+./gradlew :app:testDebugUnitTest :app:assembleDebug
 # or Release:
-./gradlew assembleRelease
+./gradlew :app:assembleRelease
 ```
 
 Install on device:
@@ -80,14 +80,14 @@ Install on device:
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Signed release APK attached to each [GitHub Release](https://github.com/SysAdminDoc/OpenTasker/releases).
+Release APKs are unsigned unless `OPEN_TASKER_RELEASE_KEYSTORE`, `OPEN_TASKER_RELEASE_KEYSTORE_PASSWORD`, `OPEN_TASKER_RELEASE_KEY_ALIAS`, and `OPEN_TASKER_RELEASE_KEY_PASSWORD` are set in the build environment.
 
 ---
 
 ## Next Phase (v0.3)
 
-1. **Profile execution** — wire AutomationService to ProfileMatcher and TaskRunner
-2. **Run log viewer** — StateFlow-based real-time task execution display
+1. **UI reintegration** — restore the richer profile/task/context/action screens into the active APK navigation graph
+2. **Permission onboarding** — explain and request Usage Stats, notifications, location, overlay, and settings-write access from the app
 3. **Variable inspector** — display task runtime variables during execution
 4. **Tasker import** — `.prj.xml` parser for profile migration
 5. **Plugin SDK** — stable AIDL interface for custom actions

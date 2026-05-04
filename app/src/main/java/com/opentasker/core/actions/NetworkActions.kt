@@ -4,6 +4,7 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import java.net.HttpURLConnection
 import java.net.URL
 
 /**
@@ -21,15 +22,24 @@ class HttpGetAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val url = args["url"] ?: return ActionResult.Failure("missing url")
         val varName = args["var"] ?: "result"
-        val timeout = (args["timeout_sec"]?.toIntOrNull() ?: 10) * 1000
+        val timeout = (args["timeout_sec"]?.toIntOrNull() ?: 10).coerceIn(1, 60) * 1000
         return try {
-            val response = URL(url).openConnection().apply {
-                connectTimeout = timeout
-                readTimeout = timeout
-            }.getInputStream().bufferedReader().use { it.readText() }
-            ctx.variables.set(varName, response)
-            ctx.logger("HTTP GET $url → \$$varName")
-            ActionResult.Success
+            val parsedUrl = URL(url)
+            if (parsedUrl.protocol != "https") return ActionResult.Failure("only https URLs are allowed")
+            val connection = parsedUrl.openConnection() as HttpURLConnection
+            try {
+                val response = connection.apply {
+                    connectTimeout = timeout
+                    readTimeout = timeout
+                    requestMethod = "GET"
+                    instanceFollowRedirects = false
+                }.getInputStream().bufferedReader().use { it.readText() }
+                ctx.variables.set(varName, response)
+                ctx.logger("HTTP GET ${parsedUrl.host} to \$$varName")
+                ActionResult.Success
+            } finally {
+                connection.disconnect()
+            }
         } catch (e: Exception) {
             ActionResult.Failure("request failed: ${e.message}")
         }
@@ -73,7 +83,8 @@ class PingAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val host = args["host"] ?: return ActionResult.Failure("missing host")
         val varName = args["var"] ?: "result"
-        val timeoutMs = (args["timeout_sec"]?.toIntOrNull() ?: 5) * 1000
+        if (!HOST_PATTERN.matches(host)) return ActionResult.Failure("invalid host")
+        val timeoutMs = (args["timeout_sec"]?.toIntOrNull() ?: 5).coerceIn(1, 30) * 1000
         return try {
             val reachable = java.net.InetAddress.getByName(host).isReachable(timeoutMs)
             ctx.variables.set(varName, reachable.toString())
@@ -86,6 +97,8 @@ class PingAction : Action {
         }
     }
 }
+
+private val HOST_PATTERN = Regex("^[A-Za-z0-9.-]{1,253}$")
 
 /**
  * Download file from URL.

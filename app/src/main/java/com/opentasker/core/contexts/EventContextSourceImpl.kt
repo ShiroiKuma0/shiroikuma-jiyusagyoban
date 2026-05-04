@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.Context.RECEIVER_EXPORTED
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -39,8 +39,10 @@ class EventContextSourceImpl : ContextSource {
             addAction(Intent.ACTION_BOOT_COMPLETED)
         }
 
-        app.registerReceiver(receiver, filter, RECEIVER_EXPORTED)
+        ContextCompat.registerReceiver(app, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
 
-        awaitClose { app.unregisterReceiver(receiver) }
+        awaitClose {
+            runCatching { app.unregisterReceiver(receiver) }
+        }
     }
 }

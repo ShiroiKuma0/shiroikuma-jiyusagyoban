@@ -15,9 +15,11 @@ Parity-with-Tasker tracker + FOSS-first feature roadmap. Items grouped by milest
 - [x] RunLogEntry database persistence (task execution history)
 - [x] RunLogScreen with live StateFlow updates
 - [x] Cooldown logic: prevent profile re-trigger within N minutes
-- [ ] **BUILD FIX:** Resolve Gradle wrapper issue (PowerShell path parsing with `--` in username)
+- [x] **BUILD FIX:** Resolve Gradle wrapper issue (PowerShell path parsing with `--` in username)
 - [ ] **TESTING:** End-to-end execution test on device (context match → task run → log entry)
 - [ ] **RELEASE:** Build signed APK, push v0.3.0 tag, create GitHub release
+- [x] **HARDENING:** Remove broken Hilt runtime entrypoints, enable R8 release builds, add validation tests, and harden unsafe action paths
+- [ ] **UI REINTEGRATION:** Restore the richer CRUD screens from source snapshots into active navigation; current APK uses a minimal status screen
 
 **Dependencies:** None (all engine pieces in place as of v0.3-dev commit)
 

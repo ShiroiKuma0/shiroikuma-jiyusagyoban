@@ -8,6 +8,17 @@ plugins {
     id("com.google.dagger.hilt.android")
 }
 
+val releaseKeystorePath = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE")
+val releaseKeystorePassword = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE_PASSWORD")
+val releaseKeyAlias = System.getenv("OPEN_TASKER_RELEASE_KEY_ALIAS")
+val releaseKeyPassword = System.getenv("OPEN_TASKER_RELEASE_KEY_PASSWORD")
+val hasReleaseSigning = listOf(
+    releaseKeystorePath,
+    releaseKeystorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword
+).all { !it.isNullOrBlank() }
+
 android {
     namespace = "com.opentasker.app"
     compileSdk = 35
@@ -16,8 +27,8 @@ android {
         applicationId = "com.opentasker.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 3
+        versionName = "0.2.1"
     }
 
     signingConfigs {
@@ -27,16 +38,22 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseKeystorePath!!)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Use debug signing config for testing purposes
-            // For Play Store releases, replace with an upload key
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
     }
 
@@ -53,11 +70,19 @@ android {
 
     kotlinOptions { jvmTarget = "17" }
 
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+    arg("room.incremental", "true")
 }
 
 dependencies {
@@ -95,4 +120,6 @@ dependencies {
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
     implementation("com.google.code.gson:gson:2.11.0")
+
+    testImplementation("junit:junit:4.13.2")
 }

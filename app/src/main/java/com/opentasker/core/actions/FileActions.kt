@@ -21,9 +21,10 @@ class ReadFileAction : Action {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         val varName = args["var"] ?: "result"
         return try {
-            val content = File(path).readText()
+            val file = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside OpenTasker files")
+            val content = file.readText()
             ctx.variables.set(varName, content)
-            ctx.logger("Read $path → \$$varName")
+            ctx.logger("Read ${file.name} to \$$varName")
             ActionResult.Success
         } catch (e: Exception) {
             ActionResult.Failure("read failed: ${e.message}")
@@ -46,8 +47,10 @@ class WriteFileAction : Action {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         val text = args["text"] ?: ""
         return try {
-            File(path).writeText(text)
-            ctx.logger("Write $path")
+            val file = safeUserFile(ctx, path) ?: return ActionResult.Failure("path is outside OpenTasker files")
+            file.parentFile?.mkdirs()
+            file.writeText(text)
+            ctx.logger("Write ${file.name}")
             ActionResult.Success
         } catch (e: Exception) {
             ActionResult.Failure("write failed: ${e.message}")
@@ -70,8 +73,10 @@ class AppendFileAction : Action {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         val text = args["text"] ?: ""
         return try {
-            File(path).appendText(text)
-            ctx.logger("Append to $path")
+            val file = safeUserFile(ctx, path) ?: return ActionResult.Failure("path is outside OpenTasker files")
+            file.parentFile?.mkdirs()
+            file.appendText(text)
+            ctx.logger("Append to ${file.name}")
             ActionResult.Success
         } catch (e: Exception) {
             ActionResult.Failure("append failed: ${e.message}")
@@ -92,9 +97,14 @@ class DeleteFileAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         return try {
-            File(path).delete()
-            ctx.logger("Delete $path")
-            ActionResult.Success
+            val file = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside OpenTasker files")
+            if (!file.isFile) return ActionResult.Failure("delete only supports files")
+            if (file.delete()) {
+                ctx.logger("Delete ${file.name}")
+                ActionResult.Success
+            } else {
+                ActionResult.Failure("delete failed")
+            }
         } catch (e: Exception) {
             ActionResult.Failure("delete failed: ${e.message}")
         }
@@ -117,13 +127,23 @@ class ListFilesAction : Action {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         val varName = args["var"] ?: "result"
         return try {
-            val dir = File(path)
+            val dir = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside OpenTasker files")
+            if (!dir.isDirectory) return ActionResult.Failure("path is not a directory")
             val files = dir.listFiles()?.joinToString("\n") { it.name } ?: ""
             ctx.variables.set(varName, files)
-            ctx.logger("List $path → \$$varName")
+            ctx.logger("List ${dir.name} to \$$varName")
             ActionResult.Success
         } catch (e: Exception) {
             ActionResult.Failure("list failed: ${e.message}")
         }
     }
+}
+
+private fun safeUserFile(ctx: ActionContext, path: String, mustExist: Boolean = false): File? {
+    if (path.isBlank() || path.contains('\u0000')) return null
+    val baseDir = File(ctx.app.filesDir, "user_files").canonicalFile
+    val requested = File(baseDir, path.trimStart('/', '\\')).canonicalFile
+    if (!requested.path.startsWith(baseDir.path + File.separator) && requested != baseDir) return null
+    if (mustExist && !requested.exists()) return null
+    return requested
 }

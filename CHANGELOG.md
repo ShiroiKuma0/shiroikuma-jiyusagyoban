@@ -1,6 +1,20 @@
 # Changelog
 
-## v0.2.0 — 2026-05-14
+## v0.2.1 — 2026-05-04
+
+Production hardening pass.
+
+- Fixed Windows and Linux Gradle bootstrap scripts so builds work from paths containing `--`.
+- Aligned app version metadata and README badge to the shipped APK version.
+- Re-enabled release minification and resource shrinking while keeping unsigned release builds possible without local secrets.
+- Consolidated release CI and added a push/PR build workflow.
+- Removed tracked local build artifacts and machine-specific configuration from the repository.
+- Replaced broken Hilt runtime entrypoints with the active non-Hilt application singleton wiring.
+- Hardened shell, intent, file, network, notification, settings, geofence, receiver, backup, and JSON parsing paths.
+- Added Room schema export and focused validation unit tests.
+- Improved shared Compose component semantics and light-theme error contrast.
+
+## v0.2.0 — 2026-05-04
 
 Full UI layer with database integration and action editor.
 

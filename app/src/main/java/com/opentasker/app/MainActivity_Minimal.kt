@@ -19,7 +19,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.opentasker.ui.theme.OpenTaskerTheme
 
 /**
@@ -54,7 +53,6 @@ class MainActivityMinimal : ComponentActivity() {
                         Text(
                             text = "OpenTasker",
                             style = MaterialTheme.typography.displaySmall,
-                            fontSize = 36.sp,
                             color = MaterialTheme.colorScheme.onBackground,
                             modifier = Modifier.padding(top = 32.dp)
                         )
@@ -67,7 +65,7 @@ class MainActivityMinimal : ComponentActivity() {
                         )
                         
                         Text(
-                            text = "v0.1.0",
+                            text = "v${BuildConfig.VERSION_NAME}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 16.dp)

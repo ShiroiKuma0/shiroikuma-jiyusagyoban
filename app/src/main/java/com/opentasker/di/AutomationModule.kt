@@ -1,6 +1,7 @@
 package com.opentasker.di
 
 import android.content.Context
+import androidx.room.Room
 import com.opentasker.automation.core.AutomationEngine
 import com.opentasker.automation.core.DefaultActionExecutor
 import com.opentasker.automation.core.DefaultActionRegistry
@@ -23,6 +24,9 @@ import com.opentasker.automation.core.TriggerMatcher
 import com.opentasker.automation.core.TriggerRegistry
 import com.opentasker.automation.data.repository.AutomationRuleRepository
 import com.opentasker.automation.data.repository.ExecutionLogRepository
+import com.opentasker.automation.data.AutomationDatabase
+import com.opentasker.automation.data.dao.AutomationRuleDao
+import com.opentasker.automation.data.dao.ExecutionLogDao
 import com.opentasker.automation.trigger.impl.AppOpenTrigger
 import com.opentasker.automation.trigger.impl.BatteryTrigger
 import com.opentasker.automation.trigger.impl.GeofenceTrigger
@@ -42,6 +46,34 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object AutomationModule {
+
+    @Singleton
+    @Provides
+    fun provideAutomationDatabase(@ApplicationContext context: Context): AutomationDatabase {
+        return Room.databaseBuilder(
+            context,
+            AutomationDatabase::class.java,
+            "automation.db"
+        ).build()
+    }
+
+    @Singleton
+    @Provides
+    fun provideAutomationRuleDao(db: AutomationDatabase): AutomationRuleDao = db.automationRuleDao()
+
+    @Singleton
+    @Provides
+    fun provideExecutionLogDao(db: AutomationDatabase): ExecutionLogDao = db.executionLogDao()
+
+    @Singleton
+    @Provides
+    fun provideAutomationRuleRepository(dao: AutomationRuleDao): AutomationRuleRepository =
+        AutomationRuleRepository(dao)
+
+    @Singleton
+    @Provides
+    fun provideExecutionLogRepository(dao: ExecutionLogDao): ExecutionLogRepository =
+        ExecutionLogRepository(dao)
 
     // ========== REGISTRIES ==========
 

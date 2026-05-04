@@ -3,8 +3,6 @@ package com.opentasker.automation.action.impl
 import com.opentasker.automation.core.ActionDefinition
 import com.opentasker.automation.model.ActionConfig
 import com.opentasker.automation.model.ActionResult
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.util.concurrent.TimeUnit
 
 /**
@@ -25,7 +23,15 @@ class ShellAction : ActionDefinition {
                     executionTimeMs = 0
                 )
 
-            val timeout = (config.config["timeout"] as Number?)?.toLong() ?: 30L
+            val timeout = ((config.config["timeout"] as Number?)?.toLong() ?: 30L).coerceIn(1L, MAX_TIMEOUT_SECONDS)
+            val validationError = validateCommand(command)
+            if (validationError != null) {
+                return ActionResult(
+                    success = false,
+                    message = validationError,
+                    executionTimeMs = System.currentTimeMillis() - startTime
+                )
+            }
 
             val result = executeCommand(command, timeout)
 
@@ -51,13 +57,16 @@ class ShellAction : ActionDefinition {
 
     private fun executeCommand(command: String, timeoutSeconds: Long): CommandResult {
         return try {
-            val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
+            val parts = command.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+            val process = ProcessBuilder(parts)
+                .redirectErrorStream(false)
+                .start()
 
             // Wait for process with timeout
             val finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
 
             if (!finished) {
-                process.destroy()
+                process.destroyForcibly()
                 return CommandResult(
                     exitCode = -1,
                     output = null,
@@ -88,4 +97,29 @@ class ShellAction : ActionDefinition {
         val output: String?,
         val error: String?
     )
+
+    private fun validateCommand(command: String): String? {
+        val trimmed = command.trim()
+        if (trimmed.isBlank()) return "Command cannot be empty"
+        if (trimmed.length > MAX_COMMAND_LENGTH) return "Command exceeds $MAX_COMMAND_LENGTH characters"
+        if (FORBIDDEN_TOKENS.any { trimmed.contains(it) }) {
+            return "Shell control operators are not allowed"
+        }
+        val executable = trimmed.substringBefore(' ')
+        if (executable !in ALLOWED_COMMANDS) {
+            return "Command '$executable' is not in the safe command allowlist"
+        }
+        if (!trimmed.matches(SAFE_COMMAND_PATTERN)) {
+            return "Command contains unsupported characters"
+        }
+        return null
+    }
+
+    companion object {
+        private const val MAX_TIMEOUT_SECONDS = 30L
+        private const val MAX_COMMAND_LENGTH = 512
+        private val ALLOWED_COMMANDS = setOf("echo", "getprop", "id", "logcat", "ping", "pm", "settings")
+        private val FORBIDDEN_TOKENS = listOf(";", "&&", "||", "|", "`", "$(", ">", "<", "\n", "\r")
+        private val SAFE_COMMAND_PATTERN = Regex("^[A-Za-z0-9_./:=@,%+\\-\\s]+$")
+    }
 }
