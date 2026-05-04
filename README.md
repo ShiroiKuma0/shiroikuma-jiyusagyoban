@@ -1,13 +1,13 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.11-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.12-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.11** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, and actions are active now; scenes, variable tooling, imports, and plugins are planned.
+**OpenTasker v0.2.12** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, and actions are active now; scenes, variable tooling, imports, and plugins are planned.
 
-> **Status:** v0.2.11 restores active profile/task/action/context/run-log management, adds setup checks, uses platform-safe trigger monitors, gates unsupported actions, records action-level run log traces, and keeps public docs aligned with the compiled APK.
+> **Status:** v0.2.12 adds curated profile templates with slot-based setup and safe install gating, while keeping profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
 
 ---
 
@@ -18,6 +18,7 @@
 ✅ **Reactive context sources** — app foreground, time, state, event, WiFi, and app-open monitoring are wired; day/location are planned runtime work  
 ✅ **AMOLED-first** — Catppuccin Mocha palette, light theme toggle  
 ✅ **Compose UI reintegration started** — active navigation now manages profiles, tasks, actions, contexts, and run logs from Room  
+✅ **Profile templates** — guided starter profiles with variable slots, safety notes, and disabled-by-default installation  
 ✅ **Setup checklist** — notifications, exact alarms, battery optimization, usage access, notification access, overlays, location, Bluetooth, SMS, and DND access  
 ✅ **Scheduled time ticks** — AlarmManager exact scheduling when allowed, inexact fallback when Android denies exact alarms  
 ✅ **WiFi trigger monitor** — dynamic NetworkCallback path instead of restricted manifest connectivity broadcasts  
@@ -97,9 +98,9 @@ Release APKs are unsigned unless `OPEN_TASKER_RELEASE_KEYSTORE`, `OPEN_TASKER_RE
 1. **Context predicate evaluation** — make app/time/day/state config matching explicit and test-covered
 2. **Run log filters** — filter history by task, profile, status, and failure reason
 3. **Variable inspector** — display task runtime variables during execution
-4. **Tasker import** — `.prj.xml` parser for profile migration
-5. **Plugin SDK** — stable AIDL interface for custom actions
-6. **Scheduled task editor** — richer schedule templates and validation
+4. **Open JSON import/export** — portable profile/task/template bundles with schema versioning
+5. **Tasker import** — `.prj.xml` parser for profile migration
+6. **Plugin SDK** — stable AIDL interface for custom actions
 
 ---
 

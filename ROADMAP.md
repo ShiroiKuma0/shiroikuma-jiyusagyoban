@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.11. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.12. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-04  
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.11  
+**Current app version:** 0.2.12  
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -190,6 +190,7 @@ Key local constraints:
 
 ### X1 - Profile templates and guided creation wizard
 
+**Status:** Completed in v0.2.12. Added a template catalog, guided slot form, disabled-by-default Room installation, safety notes, and planned-template gating for calendar/NFC/external-intent patterns that do not have runtime trigger support yet.  
 **Description:** Ship curated on-device templates with variable slots: work-hours DND, headphones connected media profile, low-battery saver, meeting mode from calendar, nightstand NFC sleep mode, WiFi arrival profile, app usage reminder, and "find my phone" notification/action patterns.  
 **Sources:** MacroDroid wizard/templates [S17], Home Assistant blueprints [S12], n8n templates [S10], Node-RED flow sharing [S9].  
 **Category:** UX, docs, accessibility.  
