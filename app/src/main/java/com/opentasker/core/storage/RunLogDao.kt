@@ -21,7 +21,15 @@ data class RunLogEntity(
     fun toDomain() = RunLogEntry(id, taskId, taskName, timestamp, durationMs, success, message)
 }
 
-fun RunLogEntry.toEntity() = RunLogEntity(id, taskId, taskName, timestamp, durationMs, success, message)
+fun RunLogEntry.toEntity() = RunLogEntity(
+    id = id,
+    taskId = taskId,
+    taskName = taskName,
+    timestamp = timestamp,
+    durationMs = durationMs,
+    success = success,
+    message = message
+)
 
 @Dao
 interface RunLogDao {
