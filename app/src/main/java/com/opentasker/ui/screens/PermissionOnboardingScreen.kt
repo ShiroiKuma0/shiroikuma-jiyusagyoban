@@ -1,7 +1,6 @@
 package com.opentasker.ui.screens
 
 import android.Manifest
-import android.app.AppOpsManager
 import android.app.NotificationManager
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -10,7 +9,6 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
-import android.os.Process
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -52,6 +50,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.opentasker.core.permissions.UsageAccess
 import com.opentasker.core.scheduling.ExactAlarmSupport
 
 private data class PermissionSetupItem(
@@ -215,7 +214,7 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         PermissionSetupItem(
             title = "Usage access",
             body = "Needed to detect foreground apps without an accessibility service.",
-            granted = hasUsageStatsAccess(context),
+            granted = UsageAccess.hasUsageStatsAccess(context),
             actionLabel = "Open settings",
             action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)),
             requiredFor = "Application contexts",
@@ -311,17 +310,6 @@ private fun hasPermission(context: Context, permission: String): Boolean =
 private fun ignoresBatteryOptimizations(context: Context): Boolean {
     val powerManager = context.getSystemService(PowerManager::class.java)
     return powerManager.isIgnoringBatteryOptimizations(context.packageName)
-}
-
-private fun hasUsageStatsAccess(context: Context): Boolean {
-    val appOps = context.getSystemService(AppOpsManager::class.java)
-    val mode = if (Build.VERSION.SDK_INT >= 29) {
-        appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)
-    } else {
-        @Suppress("DEPRECATION")
-        appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)
-    }
-    return mode == AppOpsManager.MODE_ALLOWED
 }
 
 private fun hasNotificationListenerAccess(context: Context): Boolean {
