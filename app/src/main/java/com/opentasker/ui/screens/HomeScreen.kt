@@ -8,6 +8,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.opentasker.ui.theme.ComponentSize
+import com.opentasker.ui.theme.Radii
+import com.opentasker.ui.theme.Spacing
 
 /**
  * Home screen providing navigation to main app sections.
@@ -24,7 +27,7 @@ fun HomeScreen(
             TopAppBar(
                 title = { 
                     Column {
-                        Text("OpenTasker", style = MaterialTheme.typography.headlineSmall)
+                        Text("OpenTasker", style = MaterialTheme.typography.headlineMedium)
                         Text(
                             "Automation Platform",
                             style = MaterialTheme.typography.labelSmall,
@@ -42,8 +45,8 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.Top)
+                .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xl, Alignment.Top)
         ) {
             Text(
                 text = "What would you like to do?",
@@ -53,7 +56,7 @@ fun HomeScreen(
             
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
                 // Automation Rules card
                 NavigationCard(
@@ -101,35 +104,36 @@ fun NavigationCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(120.dp),
-        shape = RoundedCornerShape(12.dp),
+            .height(ComponentSize.buttonXLarge + Spacing.lg),
+        shape = RoundedCornerShape(Radii.md),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         ),
-        onClick = onClick
+        onClick = onClick,
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(Spacing.lg),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
                 modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    modifier = Modifier.size(44.dp),
+                    modifier = Modifier.size(ComponentSize.iconLarge),
                     tint = MaterialTheme.colorScheme.primary
                 )
                 
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                 ) {
                     Text(
                         text = title,
@@ -148,7 +152,7 @@ fun NavigationCard(
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier.size(ComponentSize.iconMedium),
                 tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
             )
         }
