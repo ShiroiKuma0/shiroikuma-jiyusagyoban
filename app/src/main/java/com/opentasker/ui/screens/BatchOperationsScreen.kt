@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.opentasker.core.model.Profile
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.toEntity
+import com.opentasker.ui.theme.DesignSystem
 import kotlinx.coroutines.launch
 
 /**
@@ -84,7 +85,7 @@ fun BatchOperationsScreen(
                 onQueryChange = { searchQuery = it },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp)
+                    .padding(DesignSystem.Spacing.md)
             )
             
             // Batch action buttons
@@ -92,10 +93,10 @@ fun BatchOperationsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(8.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
-                        .padding(8.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                        .padding(DesignSystem.Spacing.md)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(DesignSystem.Radii.md))
+                        .padding(DesignSystem.Spacing.md),
+                    horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)
                 ) {
                     Button(onClick = {
                         // Enable all selected
@@ -108,11 +109,9 @@ fun BatchOperationsScreen(
                         }
                     }, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.Done, contentDescription = null)
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(DesignSystem.Spacing.xs))
                         Text("Enable", maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    
-                    Spacer(modifier = Modifier.width(4.dp))
                     
                     Button(onClick = {
                         // Disable all selected
@@ -125,11 +124,9 @@ fun BatchOperationsScreen(
                         }
                     }, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.Block, contentDescription = null)
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(DesignSystem.Spacing.xs))
                         Text("Disable", maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    
-                    Spacer(modifier = Modifier.width(4.dp))
                     
                     Button(
                         onClick = { showDeleteDialog = true },
@@ -147,7 +144,7 @@ fun BatchOperationsScreen(
             
             // Profile list with checkboxes
             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(filtered, key = { it.id }) { profile ->
+                    items(filtered, key = { it.id }) { profile ->
                     BatchOperationProfileCard(
                         profile = profile,
                         isSelected = profile.id in selectedIds,
@@ -160,7 +157,7 @@ fun BatchOperationsScreen(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .padding(horizontal = DesignSystem.Spacing.md, vertical = DesignSystem.Spacing.xs)
                     )
                 }
             }
@@ -209,15 +206,15 @@ private fun BatchOperationProfileCard(
 ) {
     Surface(
         modifier = modifier
-            .height(64.dp)
+            .height(DesignSystem.ComponentSize.listItemHeight)
             .clickable { onSelectionChange(!isSelected) },
         color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(8.dp)
+        shape = RoundedCornerShape(DesignSystem.Radii.md)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp),
+                .padding(DesignSystem.Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -225,11 +222,11 @@ private fun BatchOperationProfileCard(
             Checkbox(
                 checked = isSelected,
                 onCheckedChange = onSelectionChange,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(DesignSystem.ComponentSize.checkboxSize)
             )
             
             // Profile info
-            Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+            Column(modifier = Modifier.weight(1f).padding(start = DesignSystem.Spacing.md)) {
                 Text(
                     text = profile.name,
                     style = MaterialTheme.typography.bodyMedium,
@@ -246,10 +243,10 @@ private fun BatchOperationProfileCard(
             // Status indicator
             Box(
                 modifier = Modifier
-                    .size(12.dp)
+                    .size(DesignSystem.ComponentSize.statusIndicator)
                     .background(
                         color = if (profile.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                        shape = RoundedCornerShape(6.dp)
+                        shape = RoundedCornerShape(DesignSystem.Radii.pill)
                     )
             )
         }
