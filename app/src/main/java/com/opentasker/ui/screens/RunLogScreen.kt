@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +40,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.ui.theme.DesignSystem
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -93,24 +95,24 @@ fun RunLogScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(40.dp),
+                        .padding(DesignSystem.Spacing.xxl),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
                     Icon(
                         Icons.Filled.Info,
                         contentDescription = null,
-                        modifier = Modifier.size(72.dp),
+                        modifier = Modifier.size(DesignSystem.ComponentSize.iconXLarge),
                         tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                     )
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(DesignSystem.Spacing.xl))
                     Text(
                         "No execution history yet",
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(DesignSystem.Spacing.md))
                     Text(
                         "Execution history appears here when profiles and tasks run. Enable a profile and execute its tasks to see logs.",
                         style = MaterialTheme.typography.bodyMedium,
@@ -123,9 +125,9 @@ fun RunLogScreen(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp)
-                        .padding(top = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(horizontal = DesignSystem.Spacing.md)
+                        .padding(top = DesignSystem.Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)
                 ) {
                     items(logs) { entry ->
                         RunLogEntryItem(entry)
@@ -145,33 +147,33 @@ fun RunLogEntryItem(entry: RunLogEntry) {
 
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(10.dp),
+            .fillMaxWidth(),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
         colors = androidx.compose.material3.CardDefaults.cardColors(
             containerColor = if (entry.success)
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                MaterialTheme.colorScheme.surfaceVariant
             else
                 MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
-        )
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = DesignSystem.Elevation.sm)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(DesignSystem.Spacing.lg),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)
                 ) {
                     Icon(
                         imageVector = if (entry.success) Icons.Filled.CheckCircle else Icons.Filled.Error,
                         contentDescription = null,
                         tint = statusColor,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(DesignSystem.ComponentSize.iconMedium)
                     )
                     Text(
                         entry.taskName,
@@ -181,7 +183,7 @@ fun RunLogEntryItem(entry: RunLogEntry) {
                         modifier = Modifier.weight(1f)
                     )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(DesignSystem.Spacing.sm))
                 if (entry.message.isNotEmpty()) {
                     Text(
                         entry.message,
@@ -190,7 +192,7 @@ fun RunLogEntryItem(entry: RunLogEntry) {
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(DesignSystem.Spacing.xs))
                 }
                 Text(
                     timeStr,
@@ -200,14 +202,14 @@ fun RunLogEntryItem(entry: RunLogEntry) {
             }
             Surface(
                 color = statusColor.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(6.dp),
-                modifier = Modifier.padding(start = 12.dp)
+                shape = RoundedCornerShape(DesignSystem.Radii.xs),
+                modifier = Modifier.padding(start = DesignSystem.Spacing.md)
             ) {
                 Text(
                         statusText,
                         style = MaterialTheme.typography.labelSmall,
                         color = statusColor,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        modifier = Modifier.padding(horizontal = DesignSystem.Spacing.sm, vertical = DesignSystem.Spacing.xs)
                     )
                 }
                 Text(
