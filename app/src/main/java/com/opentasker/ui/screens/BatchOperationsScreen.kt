@@ -15,6 +15,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.model.Profile
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.toEntity
+import kotlinx.coroutines.launch
 
 /**
  * Screen for batch operations on profiles: multi-select, enable/disable/delete all.
@@ -25,10 +27,12 @@ fun BatchOperationsScreen(
     db: AppDatabase,
     onBack: () -> Unit
 ) {
-    val allProfiles by db.profileDao().getAllLive().collectAsState(emptyList())
+    val allProfileEntities by db.profileDao().getAllAsFlow().collectAsState(emptyList())
+    val allProfiles = allProfileEntities.map { it.toDomain() }
     
     var searchQuery by remember { mutableStateOf("") }
-    var selectedIds by remember { mutableStateOf(setOf<String>()) }
+    var selectedIds by remember { mutableStateOf(setOf<Long>()) }
+    val scope = rememberCoroutineScope()
     
     val filtered = allProfiles.filter { profile ->
         searchQuery.isEmpty() || profile.name.contains(searchQuery, ignoreCase = true)
@@ -83,11 +87,13 @@ fun BatchOperationsScreen(
                 ) {
                     Button(onClick = {
                         // Enable all selected
-                        selectedIds.forEach { id ->
-                            val profile = allProfiles.find { it.id == id } ?: return@forEach
-                            db.profileDao().insertOrUpdate(profile.copy(enabled = true))
+                        scope.launch {
+                            selectedIds.forEach { id ->
+                                val profile = allProfiles.find { it.id == id } ?: return@forEach
+                                db.profileDao().insertOrUpdate(profile.copy(enabled = true).toEntity())
+                            }
+                            selectedIds = emptySet()
                         }
-                        selectedIds = emptySet()
                     }, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.Done, contentDescription = null)
                         Spacer(modifier = Modifier.width(4.dp))
@@ -98,11 +104,13 @@ fun BatchOperationsScreen(
                     
                     Button(onClick = {
                         // Disable all selected
-                        selectedIds.forEach { id ->
-                            val profile = allProfiles.find { it.id == id } ?: return@forEach
-                            db.profileDao().insertOrUpdate(profile.copy(enabled = false))
+                        scope.launch {
+                            selectedIds.forEach { id ->
+                                val profile = allProfiles.find { it.id == id } ?: return@forEach
+                                db.profileDao().insertOrUpdate(profile.copy(enabled = false).toEntity())
+                            }
+                            selectedIds = emptySet()
                         }
-                        selectedIds = emptySet()
                     }, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.Block, contentDescription = null)
                         Spacer(modifier = Modifier.width(4.dp))
@@ -156,11 +164,13 @@ fun BatchOperationsScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        selectedIds.forEach { id ->
-                            db.profileDao().delete(allProfiles.find { it.id == id } ?: return@forEach)
+                        scope.launch {
+                            selectedIds.forEach { id ->
+                                db.profileDao().delete(allProfiles.find { it.id == id }?.toEntity() ?: return@forEach)
+                            }
+                            selectedIds = emptySet()
+                            showDeleteDialog = false
                         }
-                        selectedIds = emptySet()
-                        showDeleteDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error

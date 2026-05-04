@@ -111,7 +111,7 @@ class AutomationService : Service() {
             taskName = task.name,
             durationMs = report.durationMs,
             success = report.success,
-            message = report.status
+            message = ""
         )
         db.runLogDao().insert(logEntry.toEntity())
         
