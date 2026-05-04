@@ -2,6 +2,7 @@ package com.opentasker.automation.model
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
+import kotlinx.parcelize.RawValue
 import java.util.UUID
 
 /**
