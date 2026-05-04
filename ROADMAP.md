@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.1. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.2. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-04  
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.1  
+**Current app version:** 0.2.2  
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -13,19 +13,19 @@ Source-backed product roadmap for OpenTasker v0.2.1. This file reconciles the cu
 
 OpenTasker is an Android/Kotlin automation app targeting API 35 with Jetpack Compose, Material 3, Room, Coroutines, WorkManager, DataStore, Gson, and Hilt dependencies. The project goal is a privacy-first, fully on-device, open-source Tasker/MacroDroid/Automate alternative.
 
-The active APK is materially narrower than older documentation implied. `MainActivity.kt` currently ships a minimal status screen, while richer CRUD/editor screens exist as `.kt.bak` source snapshots and are not compiled. The automation engine, Room persistence, registries, validation, release minification, schema export, GitHub Actions validation, and hardened action paths are real, but the user-facing product is not yet the complete automation editor described by earlier roadmap entries.
+The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, and run logs. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating/onboarding remains required before public beta claims.
 
 Key local constraints:
 
 | Area | Current truth | Roadmap implication |
 |---|---|---|
-| UI | Minimal active status UI; richer Compose screens are snapshots | UI reintegration is P0, not polish |
+| UI | Active profile/task/action/context/run-log management UI is restored; advanced stale snapshots remain unused | Continue hardening UI with capability gating and platform onboarding |
 | Engine | Foreground automation service and registries are wired through `OpenTaskerApp_NoHilt` | Keep non-Hilt runtime stable until Hilt migration is deliberate |
 | Actions | Several actions are implemented and hardened, but several classes still contain success-shaped stubs | Stub replacement must precede "action library" marketing |
 | Contexts | Some context sources rely on restricted Android APIs or incomplete implementations | Permission/onboarding and platform-safe replacements are P0/P1 |
 | Persistence | Room schema export now exists; backup/restore hardened | Migration tests and upgrade strategy can be built on this |
 | Release | Debug/release builds pass locally; release signing is env-var driven | F-Droid/Play readiness still needs policy and reproducibility work |
-| Docs | README was corrected to v0.2.1; old roadmap/notes overclaimed v0.3/v0.4 completion | Roadmap tiers below supersede old milestone claims |
+| Docs | README was corrected to v0.2.2; old roadmap/notes overclaimed v0.3/v0.4 completion | Roadmap tiers below supersede old milestone claims |
 
 ---
 
@@ -56,6 +56,7 @@ Key local constraints:
 
 ### N1 - Reintegrate the active automation UI
 
+**Status:** Baseline completed in v0.2.2. Active navigation now manages profiles, tasks, action lists, context lists, and run logs against Room; deeper platform capability gating continues under N2/N7.  
 **Description:** Restore the richer profile/task/action/context CRUD screens from source snapshots into active navigation, or rebuild equivalent screens using the current hardened engine and repositories.  
 **Sources:** Local repo state [L1], MacroDroid wizard simplicity [S17], Tasker learning-curve signal [S16], Home Assistant visual editor/blueprints [S12].  
 **Category:** UX, reliability, dev-experience.  
