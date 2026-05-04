@@ -25,7 +25,7 @@ class ActionExecutorImpl @Inject constructor() : ActionExecutor {
      * @param parallel If true, execute actions concurrently; if false, execute sequentially
      * @return List of execution results
      */
-    suspend fun execute(
+    override suspend fun execute(
         actions: List<ActionConfig>,
         registry: ActionRegistry,
         parallel: Boolean = false

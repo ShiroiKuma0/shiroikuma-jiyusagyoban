@@ -55,7 +55,7 @@ class AutomationEngine @Inject constructor(
 
                 // Load all enabled rules that belong to active profiles
                 val allRules = ruleRepository.getAllEnabled()
-                val rules = allRules.filter { activeProfiles.getOrDefault(it.profileId, false) }
+                val rules: List<AutomationRule> = allRules.filter { activeProfiles.getOrDefault(it.profileId, false) }
 
                 if (rules.isEmpty()) {
                     log("No active profiles or rules found")
@@ -106,6 +106,9 @@ class AutomationEngine @Inject constructor(
             // Step 4: Log execution
             val status = if (actionResults.all { it.success }) ExecutionStatus.SUCCESS else ExecutionStatus.FAILURE
             val successCount = actionResults.count { it.success }
+            val pairedResults = actionResults.mapIndexed { idx, result ->
+                (rule.actions.getOrNull(idx)?.id ?: "unknown-$idx") to result
+            }.toList()
             val executionLog = ExecutionLog(
                 ruleId = rule.id,
                 ruleName = rule.name,
@@ -115,9 +118,7 @@ class AutomationEngine @Inject constructor(
                 status = status,
                 message = "Executed $successCount/${rule.actions.size} actions",
                 executionTimeMs = executionTimeMs,
-                actionResults = actionResults.mapIndexed { idx, result ->
-                    rule.actions.getOrNull(idx)?.id ?: "unknown-$idx" to result
-                }
+                actionResults = pairedResults
             )
             logRepository.insert(executionLog)
 
