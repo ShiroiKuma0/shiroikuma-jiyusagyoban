@@ -10,7 +10,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +29,7 @@ import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileEditorScreen(
     profile: Profile?,
@@ -37,6 +38,8 @@ fun ProfileEditorScreen(
 ) {
     var name by remember { mutableStateOf(profile?.name ?: "") }
     var enterTaskId by remember { mutableStateOf(profile?.enterTaskId ?: 0L) }
+    var exitTaskId by remember { mutableStateOf(profile?.exitTaskId) }
+    var cooldownSec by remember { mutableStateOf(profile?.cooldownSec?.toString() ?: "0") }
 
     Scaffold(
         topBar = {
@@ -76,13 +79,26 @@ fun ProfileEditorScreen(
             )
             // TODO: Task picker
 
+            OutlinedTextField(
+                value = cooldownSec,
+                onValueChange = { cooldownSec = it },
+                label = { Text("Cooldown (seconds)") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+            )
+
             Button(
                 onClick = {
                     onSave(
                         Profile(
                             id = profile?.id ?: 0,
                             name = name,
+                            enabled = profile?.enabled ?: true,
+                            contexts = profile?.contexts ?: emptyList(),
                             enterTaskId = enterTaskId,
+                            exitTaskId = exitTaskId,
+                            cooldownSec = cooldownSec.toIntOrNull() ?: 0
                         )
                     )
                 },
@@ -96,6 +112,7 @@ fun ProfileEditorScreen(
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun TaskEditorScreen(
     task: Task?,
@@ -130,7 +147,7 @@ fun TaskEditorScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Divider(modifier = Modifier.padding(top = 16.dp))
+            HorizontalDivider(modifier = Modifier.padding(top = 16.dp))
 
             Text(
                 "Actions (${actions.size})",

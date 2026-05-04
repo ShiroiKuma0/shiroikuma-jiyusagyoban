@@ -39,4 +39,5 @@ interface ProfileDao {
     @Query("SELECT * FROM profiles WHERE id = :id") suspend fun getById(id: Long): ProfileEntity?
     @Query("SELECT * FROM profiles") suspend fun getAll(): List<ProfileEntity>
     @Query("SELECT * FROM profiles WHERE enabled = 1") suspend fun getAllEnabled(): List<ProfileEntity>
+    @Query("SELECT * FROM profiles") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<ProfileEntity>>
 }

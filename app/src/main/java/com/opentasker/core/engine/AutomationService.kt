@@ -59,6 +59,7 @@ class AutomationService : Service() {
                     when (change) {
                         is ProfileStateChange.Activated -> onProfileActivated(domain)
                         is ProfileStateChange.Deactivated -> onProfileDeactivated(domain)
+                        else -> {} // no-op for other states
                     }
                 }
             }

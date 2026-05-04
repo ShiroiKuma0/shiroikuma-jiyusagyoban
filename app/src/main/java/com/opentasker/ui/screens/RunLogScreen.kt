@@ -36,6 +36,7 @@ class RunLogViewModel(private val db: AppDatabase) : ViewModel() {
     // TODO: load logs from DB, expose as StateFlow for live updates
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun RunLogScreen(
     onBack: () -> Unit,

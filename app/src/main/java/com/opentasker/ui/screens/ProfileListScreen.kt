@@ -27,27 +27,52 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewModelScope
 import com.opentasker.core.model.Profile
 import com.opentasker.core.storage.AppDatabase
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
 
 /**
  * ViewModel for profile list screen.
  */
 class ProfileListViewModel(private val db: AppDatabase) : ViewModel() {
-    fun profiles(): Flow<List<Profile>> = flowOf(emptyList())
-    // TODO: load profiles from DB and expose as StateFlow for live updates
+    val profiles: StateFlow<List<Profile>> = db.profileDao()
+        .getAllAsFlow()
+        .map { entities -> entities.map { it.toDomain() } }
+        .stateIn(
+            scope = viewModelScope,
+            started = kotlinx.coroutines.flow.SharingStarted.Lazily,
+            initialValue = emptyList()
+        )
 }
 
+class ProfileListViewModelFactory(private val db: AppDatabase) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(ProfileListViewModel::class.java)) {
+            return ProfileListViewModel(db) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileListScreen(
+    db: AppDatabase,
     onCreateProfile: () -> Unit,
     onEditProfile: (Profile) -> Unit,
     onDeleteProfile: (Profile) -> Unit,
-    viewModel: ProfileListViewModel = viewModel(),
 ) {
+    val viewModel: ProfileListViewModel = viewModel(
+        factory = ProfileListViewModelFactory(db)
+    )
+    val profiles by viewModel.profiles.collectAsState()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -66,12 +91,24 @@ fun ProfileListScreen(
             .padding(inner)
             .padding(16.dp)
         ) {
-            Text(
-                "No profiles yet.",
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-            // TODO: LazyColumn with profiles list
+            if (profiles.isEmpty()) {
+                Text(
+                    "No profiles yet. Create one to get started!",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+            } else {
+                LazyColumn {
+                    items(profiles, key = { it.id }) { profile ->
+                        ProfileCardItem(
+                            profile = profile,
+                            onEdit = { onEditProfile(profile) },
+                            onDelete = { onDeleteProfile(profile) },
+                            onToggle = { _, _ -> /* TODO: toggle enabled in DB */ }
+                        )
+                    }
+                }
+            }
         }
     }
 }

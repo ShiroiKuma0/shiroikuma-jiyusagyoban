@@ -46,9 +46,13 @@ class TimeContextSourceImpl : ContextSource {
 fun timeMatches(from: String, to: String): Boolean {
     val cal = Calendar.getInstance()
     val now = cal.get(Calendar.HOUR_OF_DAY) * 100 + cal.get(Calendar.MINUTE)
-    val (fh, fm) = from.split(":").let { it[0].toInt() * 100 to it.getOrNull(1)?.toInt() ?: 0 }
-    val (th, tm) = to.split(":").let { it[0].toInt() * 100 to it.getOrNull(1)?.toInt() ?: 0 }
-    val fromMin = fh + fm / 100
-    val toMin = th + tm / 100
+    val fromParts = from.split(":").map { it.toInt() }
+    val toParts = to.split(":").map { it.toInt() }
+    val fh = fromParts[0] * 100
+    val fm = fromParts.getOrNull(1) ?: 0
+    val th = toParts[0] * 100
+    val tm = toParts.getOrNull(1) ?: 0
+    val fromMin = fh + fm
+    val toMin = th + tm
     return if (fromMin <= toMin) now in fromMin..toMin else (now >= fromMin || now <= toMin)
 }

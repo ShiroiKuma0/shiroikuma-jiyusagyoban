@@ -38,6 +38,7 @@ class VariablesViewModel(private val db: AppDatabase) : ViewModel() {
     // TODO: load variables from DB
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun VariablesScreen(
     onBack: () -> Unit,
@@ -104,6 +105,7 @@ fun VariablesScreen(
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,

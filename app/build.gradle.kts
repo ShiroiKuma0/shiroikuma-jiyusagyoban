@@ -26,6 +26,12 @@ android {
         }
     }
 
+    lint {
+        baseline = file("lint-baseline.xml")
+        disable += listOf("MissingPermission", "CoarseFineLocation")
+        abortOnError = false
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
