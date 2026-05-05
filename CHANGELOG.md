@@ -13,6 +13,8 @@ Dependency modernization.
 - Upgraded the compatible runtime-support dependency subset: Core KTX `1.16.0`, DataStore `1.2.1`, Coroutines `1.10.2`, Kotlinx Serialization JSON `1.9.0`, and Gson `2.14.0`; newer Core KTX waits for API 36 / AGP 8.9.1, and Kotlinx Serialization `1.10.x+` waits for the Kotlin `2.3.x` compiler line.
 - Upgraded the compiler alignment set to Kotlin/Compose plugin `2.2.21` and KSP `2.2.21-2.0.5`, migrating Gradle configuration from deprecated `kotlinOptions` to `compilerOptions`.
 - Deferred Kotlin `2.3.21`/KSP `2.3.7` because Hilt `2.52` cannot load the new KSP task class, while Hilt `2.59.2` requires AGP 9.0+.
+- Upgraded the Android build toolchain to Gradle wrapper `8.13`, AGP `8.13.2`, compile SDK `36`, and Build Tools `36.0.0`, while keeping target SDK `35`.
+- Verified the AGP/API 36 batch with debug Kotlin/unit tests, debug androidTest compile, debug APK/lint, F-Droid release profile with metadata checks, and install/start smoke on `SM-S938B`; the previous release R8 Kotlin metadata warnings are gone.
 
 ## v0.2.58 - 2026-05-05
 
