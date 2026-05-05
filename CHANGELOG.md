@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+Dependency modernization.
+
+- Upgraded Hilt/Dagger from `2.46` to the intermediate `2.52` line while leaving Kotlin, KSP, AGP, Room, and runtime startup wiring unchanged.
+- Verified the Hilt batch with debug Kotlin/unit tests, debug androidTest compile, debug APK/lint, and the F-Droid release profile.
+
 ## v0.2.58 - 2026-05-05
 
 Tasker XML import UI and F-Droid release verification.
