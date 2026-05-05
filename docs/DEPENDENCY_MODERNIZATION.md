@@ -20,7 +20,7 @@ OpenTasker centralizes Gradle plugin and library versions in `gradle/libs.versio
 | WorkManager | 2.9.1 |
 | DataStore | 1.1.1 |
 | Coroutines | 1.9.0 |
-| Hilt / Dagger | 2.46 |
+| Hilt / Dagger | 2.52 |
 | AndroidX Hilt Navigation Compose | 1.2.0 |
 | Kotlinx Serialization JSON | 1.7.3 |
 | Gson | 2.11.0 |
@@ -30,7 +30,7 @@ OpenTasker centralizes Gradle plugin and library versions in `gradle/libs.versio
 
 ## Upgrade Order
 
-1. Hilt/Dagger through an intermediate compatible version while the runtime still starts through `OpenTaskerApp_NoHilt`.
+1. Hilt/Dagger through an intermediate compatible version while the runtime still starts through `OpenTaskerApp_NoHilt`. Completed with `2.52` after Maven Central showed the current line extends through `2.59.2`.
 2. Room with exported-schema review and migration-test execution.
 3. WorkManager with service/scheduler smoke testing.
 4. Compose BOM, Activity Compose, Lifecycle, and Navigation Compose together with UI smoke testing.
@@ -60,3 +60,7 @@ git diff --check
 ```
 
 When a device or emulator is available, add startup/navigation smoke coverage before committing UI, compiler, Room, WorkManager, or AGP upgrade batches.
+
+## Batch Log
+
+- 2026-05-05: Upgraded Hilt/Dagger from `2.46` to `2.52` as the first intermediate generated-code batch. Verified `:app:compileDebugKotlin :app:compileDebugUnitTestKotlin :app:testDebugUnitTest`, then reran `:app:compileDebugAndroidTestKotlin :app:assembleDebug :app:lintDebug` serially after a parallel Gradle run raced on merged-manifest outputs, and verified `-PopenTaskerDistribution=fdroid :app:assembleRelease :app:verifyFdroidReadiness :app:verifyFdroidMetadata`.

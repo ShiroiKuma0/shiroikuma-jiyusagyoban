@@ -333,7 +333,7 @@ Key local constraints:
 
 ### X12 - Dependency modernization plan
 
-**Status:** Baseline completed in v0.2.23. Plugin and library versions are centralized in `gradle/libs.versions.toml`, Gradle declarations use catalog aliases, and `docs/DEPENDENCY_MODERNIZATION.md` defines the staged upgrade order and verification gate. Actual version bumps remain separate follow-up batches.
+**Status:** Baseline completed in v0.2.23. Plugin and library versions are centralized in `gradle/libs.versions.toml`, Gradle declarations use catalog aliases, and `docs/DEPENDENCY_MODERNIZATION.md` defines the staged upgrade order and verification gate. First follow-up batch upgraded Hilt/Dagger from `2.46` to intermediate `2.52` while leaving Kotlin/KSP/AGP and runtime startup unchanged. Remaining version bumps are Room, WorkManager, Compose/AndroidX UI libraries, runtime support libraries, Kotlin/KSP/compiler alignment, and AGP.
 **Description:** Upgrade dependencies in staged, reversible steps: Hilt/Dagger through an intermediate compatible release, Room, WorkManager, Compose BOM, Coroutines, Kotlin/KSP/Compose plugin alignment, and AGP only when build/reproducibility constraints are clear.  
 **Sources:** Kotlin releases [S37], AGP releases [S38], Dagger releases [S39], Room releases [S35], WorkManager releases [S40], Compose releases [S41].  
 **Category:** dev-experience, security, testing, distribution.  
