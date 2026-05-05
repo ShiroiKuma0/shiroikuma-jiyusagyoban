@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.30 - 2026-05-05
+
+Template expression engine baseline.
+
+- Added a pure `TemplateExpressionEngine` for bounded `{{ ... }}` template expansion.
+- Added task/event/global scope precedence, explicit scope prefixes, array indexing/count/join support, and JSON path reads from scoped values.
+- Added safe string and math pipe functions with traces and warnings for debugging expansion behavior.
+- Added fail-closed limits for template length, expression count, function chains, resolved value size, output size, and unknown functions.
+- Documented the template expression baseline and added regression coverage for scope, defaults, string/math transforms, JSON paths, arrays, and expansion limits.
+
 ## v0.2.29 - 2026-05-05
 
 FOSS geofence evaluator baseline.

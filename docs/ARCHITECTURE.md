@@ -28,6 +28,7 @@ Tasker's source is **not public**. This architecture is reconstructed from the u
 │  - ProfileMatcher  (evaluates active set)             │
 │  - TaskRunner      (executes actions, flow control)   │
 │  - VariableStore   (global + per-task locals)         │
+│  - TemplateExpressionEngine (bounded {{ ... }} eval)  │
 │  - ContextSources  (Flow<ContextEvent> per type)      │
 │  - NotificationListenerService -> event source bridge │
 │  - MainActivity NFC intents -> event source bridge    │
@@ -72,6 +73,8 @@ Calendar and sun triggers are represented as Event contexts. Calendar polling us
 Location contexts use `FossGeofenceEvaluator` for Play-services-free geofence math. The active matcher supports Haversine distance, radius, optional max accuracy, and dwell-time checks when a location event supplies latitude, longitude, accuracy, observed time, and inside-since metadata. A live background location source and persisted dwell-state engine remain future work.
 
 Tasker XML import is intentionally staged through the OpenTasker JSON bundle model. `TaskerXmlImporter` parses common Tasker task/profile/variable structures into a bundle plus migration report, preserves unmapped Tasker actions as explicit unsupported placeholders, and reports skipped contexts, profiles, and scenes before any Room write path is invoked.
+
+Template expressions are staged as a pure engine before runtime-wide adoption. `TemplateExpressionEngine` evaluates bounded `{{ ... }}` expressions with task, event, and global variable scopes, explicit scope prefixes, arrays, JSON path reads, safe string/math functions, traces, and warnings. It does not execute user code, shell commands, or regexes, and unknown functions preserve the original token so unsupported expressions fail closed. The current `%var` `VariableStore` expansion path remains active until action argument wiring and run-log debugger UI can adopt the new traces deliberately.
 
 Profile sharing is staged through the same bundle model. `ProfileShareLibrary` creates offline share manifests with stable slugs, counts, unverified trust state, capability/import safety findings, and GitHub Discussions submission markdown. It does not publish to a network, claim template verification, or bypass bundle validation.
 
