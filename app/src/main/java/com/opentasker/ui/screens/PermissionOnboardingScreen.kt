@@ -12,28 +12,31 @@ import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -43,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -91,7 +95,9 @@ fun PermissionOnboardingScreen(
     }
 
     val items = remember(context, refreshTick) { buildPermissionItems(context) }
+    val orderedItems = remember(items) { items.sortedWith(compareBy<PermissionSetupItem> { it.granted }.thenBy { it.title }) }
     val grantedCount = items.count { it.granted }
+    val progress = if (items.isEmpty()) 0f else grantedCount.toFloat() / items.size.toFloat()
 
     LazyColumn(
         modifier = Modifier
@@ -103,21 +109,47 @@ fun PermissionOnboardingScreen(
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)),
-                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.66f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+                shape = RoundedCornerShape(18.dp),
             ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Setup checklist", style = MaterialTheme.typography.headlineSmall)
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Setup checklist", style = MaterialTheme.typography.headlineSmall)
+                            Text(
+                                "OpenTasker can run with missing access, but affected automations stay gated until setup is complete.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        PermissionStatusPill(
+                            if (grantedCount == items.size) "Ready" else "${items.size - grantedCount} pending",
+                            if (grantedCount == items.size) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.70f),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        PermissionMetric("$grantedCount", "Ready", Modifier.weight(1f))
+                        PermissionMetric("${items.size - grantedCount}", "Needs setup", Modifier.weight(1f))
+                    }
                     Text(
-                        "$grantedCount of ${items.size} access checks are ready. OpenTasker degrades safely when access is missing; affected actions and contexts may not run until configured.",
-                        style = MaterialTheme.typography.bodyMedium,
+                        "Pending items are listed first. Return here after changing Android settings to refresh the checklist.",
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
         }
 
-        items(items, key = { it.title }) { item ->
+        items(orderedItems, key = { it.title }) { item ->
             PermissionSetupCard(
                 item = item,
                 onRunAction = {
@@ -138,46 +170,111 @@ private fun PermissionSetupCard(
     onRunAction: () -> Unit,
 ) {
     Card(
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (item.granted) {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
             } else {
-                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.20f)
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.18f)
             },
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (item.granted) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f) else MaterialTheme.colorScheme.error.copy(alpha = 0.26f),
         ),
         shape = RoundedCornerShape(16.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(
-                    if (item.granted) Icons.Filled.CheckCircle else Icons.Filled.Error,
-                    contentDescription = null,
-                    tint = if (item.granted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                )
+                Surface(
+                    color = if (item.granted) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.error.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(
+                        1.dp,
+                        if (item.granted) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.28f) else MaterialTheme.colorScheme.error.copy(alpha = 0.24f),
+                    ),
+                ) {
+                    Box(modifier = Modifier.padding(9.dp), contentAlignment = Alignment.Center) {
+                        Icon(
+                            if (item.granted) Icons.Filled.CheckCircle else Icons.Filled.Error,
+                            contentDescription = null,
+                            tint = if (item.granted) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
                 Column(Modifier.weight(1f)) {
                     Text(item.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
                         if (item.granted) "Ready" else "Needs setup",
                         style = MaterialTheme.typography.labelMedium,
-                        color = if (item.granted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                        color = if (item.granted) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
                     )
                 }
+                PermissionStatusPill(
+                    if (item.granted) "Ready" else "Required",
+                    if (item.granted) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                )
             }
             Text(item.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            AssistChip(onClick = {}, label = { Text(item.requiredFor) })
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (item.granted) {
-                    OutlinedButton(onClick = onRunAction) {
-                        Text("Ready")
-                    }
-                } else {
-                    Button(onClick = onRunAction) {
-                        Text(item.actionLabel)
-                    }
+            PermissionRequirement(label = item.requiredFor)
+            if (!item.granted) {
+                Button(onClick = onRunAction, modifier = Modifier.fillMaxWidth()) {
+                    Text(item.actionLabel)
                 }
-                Spacer(Modifier.width(1.dp))
+            } else if (item.action is PermissionAction.SettingsIntent && item.title == "App visibility") {
+                OutlinedButton(onClick = onRunAction, modifier = Modifier.fillMaxWidth()) {
+                    Text("Review app settings")
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun PermissionMetric(value: String, label: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(value, style = MaterialTheme.typography.titleMedium)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun PermissionStatusPill(label: String, color: Color) {
+    Surface(
+        color = color.copy(alpha = 0.14f),
+        shape = RoundedCornerShape(999.dp),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.32f)),
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = color,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+        )
+    }
+}
+
+@Composable
+private fun PermissionRequirement(label: String) {
+    Surface(
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+        )
     }
 }
 
@@ -230,7 +327,7 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         PermissionSetupItem(
             title = "Overlay access",
             body = "Needed for scene overlays and controls displayed over other apps.",
-            granted = Build.VERSION.SDK_INT < 23 || Settings.canDrawOverlays(context),
+            granted = Settings.canDrawOverlays(context),
             actionLabel = "Open settings",
             action = PermissionAction.SettingsIntent(
                 Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}")),

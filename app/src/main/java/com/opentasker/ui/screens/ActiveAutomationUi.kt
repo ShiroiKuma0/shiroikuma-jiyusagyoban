@@ -1,6 +1,9 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -9,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,8 +26,8 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
@@ -54,6 +58,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -111,6 +116,36 @@ private data class ContextEditState(
     val index: Int? = null,
     val existing: ContextSpec? = null,
 )
+
+private sealed interface DeleteTarget {
+    val title: String
+    val body: String
+    val confirmLabel: String
+
+    data class ProfileTarget(val profile: Profile) : DeleteTarget {
+        override val title = "Delete profile?"
+        override val body = "This removes \"${profile.name}\" and its contexts. The linked task remains available."
+        override val confirmLabel = "Delete Profile"
+    }
+
+    data class TaskTarget(val task: Task) : DeleteTarget {
+        override val title = "Delete task?"
+        override val body = "This permanently removes \"${task.name}\" and its ${task.actions.size} action${plural(task.actions.size)}."
+        override val confirmLabel = "Delete Task"
+    }
+
+    data class ActionTarget(val task: Task, val index: Int, val action: ActionSpec) : DeleteTarget {
+        override val title = "Remove action?"
+        override val body = "This removes step ${index + 1} from \"${task.name}\". Remaining actions keep their order."
+        override val confirmLabel = "Remove Action"
+    }
+
+    data class ContextTarget(val profile: Profile, val index: Int, val context: ContextSpec) : DeleteTarget {
+        override val title = "Remove context?"
+        override val body = "This removes the ${context.type.name.lowercase()} condition from \"${profile.name}\"."
+        override val confirmLabel = "Remove Context"
+    }
+}
 
 class ActiveAutomationViewModel(private val db: AppDatabase) : ViewModel() {
     val profiles: StateFlow<List<Profile>> = db.profileDao()
@@ -228,9 +263,17 @@ fun ActiveAutomationUi(
     var actionEdit by remember { mutableStateOf<ActionEditState?>(null) }
     var contextPickerProfile by remember { mutableStateOf<Profile?>(null) }
     var contextEdit by remember { mutableStateOf<ContextEditState?>(null) }
+    var pendingDelete by remember { mutableStateOf<DeleteTarget?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
+    }
+
+    val headerDetail = when (screen) {
+        OpenTaskerScreen.Profiles -> "${profiles.count { it.enabled }} enabled - ${profiles.size} total"
+        OpenTaskerScreen.Tasks -> "${tasks.sumOf { it.actions.size }} actions - ${tasks.size} tasks"
+        OpenTaskerScreen.Setup -> "Permission and reliability checks"
+        OpenTaskerScreen.RunLog -> "${runLogs.size} recent entries"
     }
 
     Scaffold(
@@ -242,9 +285,11 @@ fun ActiveAutomationUi(
                     Column {
                         Text("OpenTasker", maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
-                            screen.label,
+                            "${screen.label} - $headerDetail",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 },
@@ -264,7 +309,7 @@ fun ActiveAutomationUi(
                         }
                     },
                 ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Create profile")
+                    Icon(Icons.Filled.Add, contentDescription = if (tasks.isEmpty()) "Create task first" else "Create profile")
                 }
 
                 OpenTaskerScreen.Tasks -> FloatingActionButton(onClick = { showCreateTaskDialog = true }) {
@@ -291,6 +336,7 @@ fun ActiveAutomationUi(
                             Icon(icon, contentDescription = null)
                         },
                         label = { Text(destination.label) },
+                        alwaysShowLabel = true,
                     )
                 }
             }
@@ -300,6 +346,7 @@ fun ActiveAutomationUi(
             OpenTaskerScreen.Profiles -> ProfilesScreen(
                 profiles = profiles,
                 tasks = tasks,
+                runLogs = runLogs,
                 onCreateTaskFirst = {
                     screen = OpenTaskerScreen.Tasks
                     showCreateTaskDialog = true
@@ -307,7 +354,7 @@ fun ActiveAutomationUi(
                 onCreateProfile = { showCreateProfileDialog = true },
                 onBrowseTemplates = { showTemplateDialog = true },
                 onEditProfile = { profileDialog = it },
-                onDeleteProfile = viewModel::deleteProfile,
+                onDeleteProfile = { pendingDelete = DeleteTarget.ProfileTarget(it) },
                 onToggleProfile = { profile, enabled ->
                     viewModel.updateProfile(profile.copy(enabled = enabled), "Profile ${if (enabled) "enabled" else "disabled"}")
                 },
@@ -316,10 +363,9 @@ fun ActiveAutomationUi(
                     contextEdit = ContextEditState(profile, context.type, index, context)
                 },
                 onDeleteContext = { profile, index ->
-                    viewModel.updateProfile(
-                        profile.copy(contexts = profile.contexts.filterIndexed { i, _ -> i != index }),
-                        "Context removed",
-                    )
+                    profile.contexts.getOrNull(index)?.let { context ->
+                        pendingDelete = DeleteTarget.ContextTarget(profile, index, context)
+                    }
                 },
                 contentPadding = innerPadding,
             )
@@ -328,7 +374,7 @@ fun ActiveAutomationUi(
                 tasks = tasks,
                 onCreateTask = { showCreateTaskDialog = true },
                 onEditTask = { taskDialog = it },
-                onDeleteTask = viewModel::deleteTask,
+                onDeleteTask = { pendingDelete = DeleteTarget.TaskTarget(it) },
                 onAddAction = { actionPickerTask = it },
                 onEditAction = { task, index, action ->
                     ActionMetadataRegistry.get(action.type)?.let { metadata ->
@@ -336,10 +382,9 @@ fun ActiveAutomationUi(
                     }
                 },
                 onDeleteAction = { task, index ->
-                    viewModel.updateTask(
-                        task.copy(actions = task.actions.filterIndexed { i, _ -> i != index }),
-                        "Action removed",
-                    )
+                    task.actions.getOrNull(index)?.let { action ->
+                        pendingDelete = DeleteTarget.ActionTarget(task, index, action)
+                    }
                 },
                 contentPadding = innerPadding,
             )
@@ -351,6 +396,28 @@ fun ActiveAutomationUi(
 
             OpenTaskerScreen.RunLog -> RunLogScreenContent(runLogs, innerPadding)
         }
+    }
+
+    pendingDelete?.let { target ->
+        DeleteConfirmationDialog(
+            target = target,
+            onDismiss = { pendingDelete = null },
+            onConfirm = {
+                when (target) {
+                    is DeleteTarget.ProfileTarget -> viewModel.deleteProfile(target.profile)
+                    is DeleteTarget.TaskTarget -> viewModel.deleteTask(target.task)
+                    is DeleteTarget.ActionTarget -> viewModel.updateTask(
+                        target.task.copy(actions = target.task.actions.filterIndexed { i, _ -> i != target.index }),
+                        "Action removed",
+                    )
+                    is DeleteTarget.ContextTarget -> viewModel.updateProfile(
+                        target.profile.copy(contexts = target.profile.contexts.filterIndexed { i, _ -> i != target.index }),
+                        "Context removed",
+                    )
+                }
+                pendingDelete = null
+            },
+        )
     }
 
     if (showCreateTaskDialog) {
@@ -485,6 +552,7 @@ fun ActiveAutomationUi(
 private fun ProfilesScreen(
     profiles: List<Profile>,
     tasks: List<Task>,
+    runLogs: List<RunLogEntry>,
     onCreateTaskFirst: () -> Unit,
     onCreateProfile: () -> Unit,
     onBrowseTemplates: () -> Unit,
@@ -529,6 +597,14 @@ private fun ProfilesScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
+            WorkspaceSummaryCard(
+                profiles = profiles,
+                tasks = tasks,
+                runLogs = runLogs,
+                onBrowseTemplates = onBrowseTemplates,
+            )
+        }
+        item {
             TemplatePromptCard(onBrowseTemplates)
         }
         items(profiles, key = { it.id }) { profile ->
@@ -548,9 +624,168 @@ private fun ProfilesScreen(
 }
 
 @Composable
+private fun WorkspaceSummaryCard(
+    profiles: List<Profile>,
+    tasks: List<Task>,
+    runLogs: List<RunLogEntry>,
+    onBrowseTemplates: () -> Unit,
+) {
+    val enabledProfiles = profiles.count { it.enabled }
+    val configuredContexts = profiles.sumOf { it.contexts.size }
+    val totalActions = tasks.sumOf { it.actions.size }
+    val recentFailure = runLogs.firstOrNull { !it.success }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
+        shape = RoundedCornerShape(18.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text("Automation workspace", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "Review readiness before enabling profiles. Templates stay disabled until you approve them.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                StatusPill(
+                    label = if (enabledProfiles > 0) "$enabledProfiles live" else "Paused",
+                    color = if (enabledProfiles > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                SummaryMetric("${profiles.size}", "Profiles", Modifier.weight(1f))
+                SummaryMetric("$configuredContexts", "Contexts", Modifier.weight(1f))
+                SummaryMetric("$totalActions", "Actions", Modifier.weight(1f))
+            }
+            if (recentFailure != null) {
+                InlineNotice(
+                    title = "Recent failure",
+                    body = "${recentFailure.taskName}: ${recentFailure.message.ifBlank { "Review the run log for details." }}",
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            OutlinedButton(onClick = onBrowseTemplates, modifier = Modifier.fillMaxWidth()) {
+                Text("Browse Starter Templates")
+            }
+        }
+    }
+}
+
+@Composable
+private fun TaskLibrarySummaryCard(tasks: List<Task>, onCreateTask: () -> Unit) {
+    val totalActions = tasks.sumOf { it.actions.size }
+    val emptyTasks = tasks.count { it.actions.isEmpty() }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+        shape = RoundedCornerShape(18.dp),
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text("Task library", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "Build reusable action sequences, then attach them to profiles when the order and permissions are ready.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Button(onClick = onCreateTask) {
+                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Task")
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                SummaryMetric("${tasks.size}", "Tasks", Modifier.weight(1f))
+                SummaryMetric("$totalActions", "Actions", Modifier.weight(1f))
+                SummaryMetric("$emptyTasks", "Need actions", Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SummaryMetric(value: String, label: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(value, style = MaterialTheme.typography.titleMedium)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun StatusPill(
+    label: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        color = color.copy(alpha = 0.14f),
+        shape = RoundedCornerShape(999.dp),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.34f)),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = color,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+        )
+    }
+}
+
+@Composable
+private fun InlineNotice(title: String, body: String, color: Color) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = color.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.26f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Icon(
+                if (color == MaterialTheme.colorScheme.error) Icons.Filled.Error else Icons.Filled.Info,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(20.dp),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+                Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
 private fun TemplatePromptCard(onBrowseTemplates: () -> Unit) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.38f)),
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)),
         shape = RoundedCornerShape(16.dp),
     ) {
         Row(
@@ -561,7 +796,7 @@ private fun TemplatePromptCard(onBrowseTemplates: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text("Templates", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Create safe starter profiles with slot-based names, contexts, and task actions.",
+                    "Create starter profiles with named slots, clear safety notes, and disabled-by-default review.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -585,8 +820,15 @@ private fun ProfileCard(
     onDeleteContext: (Int) -> Unit,
 ) {
     Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (profile.enabled) 0.72f else 0.42f),
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (profile.enabled) 0.72f else 0.46f),
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (profile.enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.24f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f),
         ),
         shape = RoundedCornerShape(16.dp),
     ) {
@@ -599,14 +841,18 @@ private fun ProfileCard(
                 Switch(checked = profile.enabled, onCheckedChange = onToggle)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(onClick = {}, label = { Text("${profile.contexts.size} context${plural(profile.contexts.size)}") })
-                AssistChip(onClick = {}, label = { Text("${profile.cooldownSec}s cooldown") })
-                AssistChip(onClick = {}, label = { Text(profile.automationMode.name.lowercase()) })
+                StatusPill(
+                    label = if (profile.enabled) "Enabled" else "Paused",
+                    color = if (profile.enabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                StatusPill("${profile.contexts.size} context${plural(profile.contexts.size)}", MaterialTheme.colorScheme.primary)
+                StatusPill("${profile.cooldownSec}s cooldown", MaterialTheme.colorScheme.secondary)
             }
+            StatusPill(profile.automationMode.name.lowercase(), MaterialTheme.colorScheme.onSurfaceVariant)
             if (profile.contexts.isEmpty()) {
-                Text(
-                    "No contexts yet. This profile will not match until at least one context is added.",
-                    style = MaterialTheme.typography.bodySmall,
+                InlineNotice(
+                    title = "Profile cannot match yet",
+                    body = "Add at least one context before relying on this profile.",
                     color = MaterialTheme.colorScheme.error,
                 )
             } else {
@@ -618,21 +864,23 @@ private fun ProfileCard(
                     )
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onEdit) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Filled.Edit, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Edit")
                 }
-                OutlinedButton(onClick = onAddContext) {
+                OutlinedButton(onClick = onAddContext, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Filled.Add, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
-                    Text("Context")
+                    Text("Add Context")
                 }
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onDelete) {
                     Icon(Icons.Filled.Delete, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
-                    Text("Delete")
+                    Text("Delete Profile")
                 }
             }
         }
@@ -667,6 +915,9 @@ private fun TasksScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        item {
+            TaskLibrarySummaryCard(tasks = tasks, onCreateTask = onCreateTask)
+        }
         items(tasks, key = { it.id }) { task ->
             TaskCard(
                 task = task,
@@ -690,7 +941,11 @@ private fun TaskCard(
     onDeleteAction: (Int) -> Unit,
 ) {
     Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
         shape = RoundedCornerShape(16.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -698,16 +953,23 @@ private fun TaskCard(
                 Column(Modifier.weight(1f)) {
                     Text(task.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        "${task.actions.size} action${plural(task.actions.size)} - priority ${task.priority} - ${task.collisionMode.name.lowercase()}",
+                        "Priority ${task.priority} - ${task.collisionMode.name.lowercase().replace('_', ' ')}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatusPill("${task.actions.size} action${plural(task.actions.size)}", MaterialTheme.colorScheme.primary)
+                    StatusPill("Priority ${task.priority}", MaterialTheme.colorScheme.secondary)
+                }
+                StatusPill(task.collisionMode.name.lowercase().replace('_', ' '), MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             if (task.actions.isEmpty()) {
-                Text(
-                    "No actions yet. Add at least one action before attaching this task to an enabled profile.",
-                    style = MaterialTheme.typography.bodySmall,
+                InlineNotice(
+                    title = "Task has no actions",
+                    body = "Add at least one action before attaching this task to an enabled profile.",
                     color = MaterialTheme.colorScheme.error,
                 )
             } else {
@@ -720,21 +982,23 @@ private fun TaskCard(
                     )
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onEdit) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Filled.Edit, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Edit")
                 }
-                OutlinedButton(onClick = onAddAction) {
+                OutlinedButton(onClick = onAddAction, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Filled.Add, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
-                    Text("Action")
+                    Text("Add Action")
                 }
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onDelete) {
                     Icon(Icons.Filled.Delete, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
-                    Text("Delete")
+                    Text("Delete Task")
                 }
             }
         }
@@ -754,14 +1018,16 @@ private fun ActionRow(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            StatusPill("#${index + 1}", MaterialTheme.colorScheme.secondary)
             Column(Modifier.weight(1f)) {
-                Text("${index + 1}. ${action.label ?: metadata?.name ?: action.type}", style = MaterialTheme.typography.titleSmall)
+                Text(action.label ?: metadata?.name ?: action.type, style = MaterialTheme.typography.titleSmall)
                 Text(
                     action.args.entries.joinToString { "${it.key}=${it.value}" }.ifBlank { metadata?.description ?: "No arguments" },
                     style = MaterialTheme.typography.bodySmall,
@@ -770,9 +1036,10 @@ private fun ActionRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (capability.level != CapabilityLevel.Supported) {
-                    AssistChip(
-                        onClick = {},
-                        label = { Text(if (capability.level == CapabilityLevel.Unsupported) "Unsupported" else "Needs setup") },
+                    Spacer(Modifier.height(6.dp))
+                    StatusPill(
+                        if (capability.level == CapabilityLevel.Unsupported) "Unsupported" else "Needs setup",
+                        if (capability.level == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                     )
                 }
             }
@@ -780,7 +1047,7 @@ private fun ActionRow(
                 Icon(Icons.Filled.Edit, contentDescription = "Edit action")
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete action")
+                Icon(Icons.Filled.Delete, contentDescription = "Delete action", tint = MaterialTheme.colorScheme.error)
             }
         }
     }
@@ -796,10 +1063,11 @@ private fun ContextRow(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Column(Modifier.weight(1f)) {
@@ -813,13 +1081,13 @@ private fun ContextRow(
                 )
             }
             if (context.invert) {
-                AssistChip(onClick = {}, label = { Text("Inverted") })
+                StatusPill("Inverted", MaterialTheme.colorScheme.secondary)
             }
             IconButton(onClick = onEdit) {
                 Icon(Icons.Filled.Edit, contentDescription = "Edit context")
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete context")
+                Icon(Icons.Filled.Delete, contentDescription = "Delete context", tint = MaterialTheme.colorScheme.error)
             }
         }
     }
@@ -844,8 +1112,53 @@ private fun RunLogScreenContent(logs: List<RunLogEntry>, contentPadding: Padding
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        item {
+            RunLogSummaryCard(logs)
+        }
         items(logs, key = { it.id }) { entry ->
             RunLogCard(entry)
+        }
+    }
+}
+
+@Composable
+private fun RunLogSummaryCard(logs: List<RunLogEntry>) {
+    val failures = logs.count { !it.success }
+    val latest = logs.firstOrNull()
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+        shape = RoundedCornerShape(18.dp),
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text("Execution history", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "Recent runs with duration and failure details.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                StatusPill(
+                    if (failures == 0) "Healthy" else "$failures failed",
+                    if (failures == 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                SummaryMetric("${logs.size}", "Entries", Modifier.weight(1f))
+                SummaryMetric("${logs.count { it.success }}", "Succeeded", Modifier.weight(1f))
+                SummaryMetric("$failures", "Failed", Modifier.weight(1f))
+            }
+            latest?.let {
+                Text(
+                    "Latest: ${it.taskName}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
@@ -856,12 +1169,17 @@ private fun RunLogCard(entry: RunLogEntry) {
         SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(entry.timestamp))
     }
     Card(
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (entry.success) {
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
             } else {
                 MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.32f)
             },
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (entry.success) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f) else MaterialTheme.colorScheme.error.copy(alpha = 0.30f),
         ),
         shape = RoundedCornerShape(16.dp),
     ) {
@@ -882,7 +1200,7 @@ private fun RunLogCard(entry: RunLogEntry) {
                     Text(entry.message, style = MaterialTheme.typography.bodyMedium, maxLines = 8, overflow = TextOverflow.Ellipsis)
                 }
             }
-            Text("${entry.durationMs} ms", style = MaterialTheme.typography.labelMedium)
+            StatusPill("${entry.durationMs} ms", if (entry.success) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error)
         }
     }
 }
@@ -901,18 +1219,27 @@ private fun EmptyState(
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding)
-            .padding(32.dp),
+            .padding(28.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(
-            Icons.Filled.Info,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-        )
+        Surface(
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+            shape = RoundedCornerShape(18.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)),
+        ) {
+            Box(modifier = Modifier.padding(14.dp), contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Filled.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(30.dp),
+                )
+            }
+        }
         Spacer(Modifier.height(20.dp))
         Text(title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
         Text(
             body,
             style = MaterialTheme.typography.bodyMedium,
@@ -921,17 +1248,62 @@ private fun EmptyState(
         )
         if (actionLabel != null && onAction != null) {
             Spacer(Modifier.height(24.dp))
-            Button(onClick = onAction) {
+            Button(onClick = onAction, modifier = Modifier.fillMaxWidth()) {
                 Text(actionLabel)
             }
         }
         if (secondaryActionLabel != null && onSecondaryAction != null) {
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = onSecondaryAction) {
+            OutlinedButton(onClick = onSecondaryAction, modifier = Modifier.fillMaxWidth()) {
                 Text(secondaryActionLabel)
             }
         }
     }
+}
+
+@Composable
+private fun DeleteConfirmationDialog(
+    target: DeleteTarget,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                Icons.Filled.Delete,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+            )
+        },
+        title = { Text(target.title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(target.body, style = MaterialTheme.typography.bodyMedium)
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.24f),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.24f)),
+                ) {
+                    Text(
+                        "This action cannot be undone.",
+                        modifier = Modifier.padding(12.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+            ) {
+                Text(target.confirmLabel)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable
@@ -941,7 +1313,7 @@ private fun TemplatePickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Profile Templates") },
+        title = { Text("Starter templates") },
         text = {
             LazyColumn(
                 modifier = Modifier.height(460.dp),
@@ -957,6 +1329,15 @@ private fun TemplatePickerDialog(
                         onClick = { onSelect(template) },
                         enabled = template.installable,
                         modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (template.installable) {
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.66f)
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f)
+                            },
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)),
+                        shape = RoundedCornerShape(14.dp),
                     ) {
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Row(
@@ -965,7 +1346,14 @@ private fun TemplatePickerDialog(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 Text(template.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                                AssistChip(onClick = {}, label = { Text(status) })
+                                StatusPill(
+                                    status,
+                                    when (template.availability) {
+                                        TemplateAvailability.Ready -> MaterialTheme.colorScheme.tertiary
+                                        TemplateAvailability.RequiresSetup -> MaterialTheme.colorScheme.primary
+                                        TemplateAvailability.Planned -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                )
                             }
                             Text(template.category, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                             Text(template.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1028,7 +1416,7 @@ private fun TemplateSlotDialog(
                 enabled = !missingRequired && template.installable,
                 onClick = { onInstall(values) },
             ) {
-                Text("Create Disabled Profile")
+                Text("Create for Review")
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
@@ -1043,19 +1431,36 @@ private fun TaskEditorDialog(
 ) {
     var name by remember(task?.id) { mutableStateOf(task?.name.orEmpty()) }
     var priority by remember(task?.id) { mutableStateOf((task?.priority ?: 5).toString()) }
-    val canSave = name.isNotBlank()
+    val parsedPriority = priority.toIntOrNull()
+    val canSave = name.isNotBlank() && parsedPriority != null && parsedPriority in 0..10
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (task == null) "Create Task" else "Edit Task") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true)
-                OutlinedTextField(value = priority, onValueChange = { priority = it.filter(Char::isDigit) }, label = { Text("Priority 0-10") }, singleLine = true)
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Task name") },
+                    placeholder = { Text("Morning focus mode") },
+                    supportingText = { Text("Use a clear verb or outcome so profiles stay easy to scan.") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = priority,
+                    onValueChange = { priority = it.filter(Char::isDigit).take(2) },
+                    label = { Text("Priority") },
+                    supportingText = { Text(if (parsedPriority == null || parsedPriority !in 0..10) "Enter a value from 0 to 10." else "Higher priority tasks run first when queues compete.") },
+                    isError = parsedPriority == null || parsedPriority !in 0..10,
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         },
         confirmButton = {
-            Button(enabled = canSave, onClick = { onSave(name, priority.toIntOrNull() ?: 5) }) {
+            Button(enabled = canSave, onClick = { onSave(name, parsedPriority ?: 5) }) {
                 Text("Save")
             }
         },
@@ -1076,47 +1481,75 @@ private fun ProfileEditorDialog(
     var enterTaskId by remember(profile?.id, tasks) { mutableStateOf(initialTaskId) }
     var cooldown by remember(profile?.id) { mutableStateOf((profile?.cooldownSec ?: 0).toString()) }
     var automationMode by remember(profile?.id) { mutableStateOf(profile?.automationMode ?: AutomationMode.SINGLE) }
-    val canSave = name.isNotBlank() && enterTaskId > 0
+    val parsedCooldown = cooldown.toIntOrNull()
+    val canSave = name.isNotBlank() && enterTaskId > 0 && (cooldown.isBlank() || parsedCooldown != null)
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (profile == null) "Create Profile" else "Edit Profile") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Enabled", modifier = Modifier.weight(1f))
-                    Switch(checked = enabled, onCheckedChange = { enabled = it })
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Profile name") },
+                    placeholder = { Text("Weekday work mode") },
+                    supportingText = { Text("Profiles read best when they describe the situation they detect.") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Enable after saving", style = MaterialTheme.typography.labelLarge)
+                            Text(
+                                "Leave off until contexts and actions are reviewed.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(checked = enabled, onCheckedChange = { enabled = it })
+                    }
                 }
                 Text("Enter task", style = MaterialTheme.typography.labelLarge)
                 tasks.forEach { task ->
-                    OutlinedButton(
+                    SelectableOption(
+                        title = task.name,
+                        body = "${task.actions.size} action${plural(task.actions.size)}",
+                        selected = task.id == enterTaskId,
                         onClick = { enterTaskId = task.id },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(if (task.id == enterTaskId) "${task.name} selected" else task.name)
-                    }
+                    )
                 }
                 OutlinedTextField(
                     value = cooldown,
-                    onValueChange = { cooldown = it.filter(Char::isDigit) },
+                    onValueChange = { cooldown = it.filter(Char::isDigit).take(5) },
                     label = { Text("Cooldown seconds") },
+                    supportingText = { Text(if (cooldown.isNotBlank() && parsedCooldown == null) "Enter seconds as a whole number." else "Prevents rapid re-triggering after a match.") },
+                    isError = cooldown.isNotBlank() && parsedCooldown == null,
                     singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 Text("Re-trigger behavior", style = MaterialTheme.typography.labelLarge)
                 AutomationMode.entries.forEach { mode ->
-                    OutlinedButton(
+                    val label = mode.name.lowercase().replaceFirstChar { it.uppercase() }
+                    SelectableOption(
+                        title = label,
+                        body = automationModeDescription(mode),
+                        selected = mode == automationMode,
                         onClick = { automationMode = mode },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        val label = mode.name.lowercase().replaceFirstChar { it.uppercase() }
-                        Text(if (mode == automationMode) "$label selected" else "$label - ${automationModeDescription(mode)}")
-                    }
+                    )
                 }
             }
         },
         confirmButton = {
-            Button(enabled = canSave, onClick = { onSave(name, enabled, enterTaskId, cooldown.toIntOrNull() ?: 0, automationMode) }) {
+            Button(enabled = canSave, onClick = { onSave(name, enabled, enterTaskId, parsedCooldown ?: 0, automationMode) }) {
                 Text("Save")
             }
         },
@@ -1125,44 +1558,104 @@ private fun ProfileEditorDialog(
 }
 
 @Composable
+private fun SelectableOption(
+    title: String,
+    body: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.36f) else Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.55f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.60f),
+        ),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.labelLarge)
+                Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (selected) {
+                StatusPill("Selected", MaterialTheme.colorScheme.primary)
+            }
+        }
+    }
+}
+
+@Composable
 private fun ActionPickerDialog(
     onDismiss: () -> Unit,
     onSelect: (ActionMetadata) -> Unit,
 ) {
-    val actions = remember { ActionMetadataRegistry.all().sortedWith(compareBy({ it.category }, { it.name })) }
+    val actionGroups = remember {
+        ActionMetadataRegistry.all()
+            .groupBy { it.category }
+            .toSortedMap()
+            .map { (category, actions) -> category to actions.sortedBy { it.name } }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Action") },
+        title = { Text("Add action") },
         text = {
             LazyColumn(
                 modifier = Modifier.height(420.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(actions, key = { it.id }) { metadata ->
-                    val capability = ActionCapabilityRegistry.get(metadata.id)
-                    Card(
-                        onClick = { onSelect(metadata) },
-                        enabled = capability.canAdd,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Column(Modifier.padding(12.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Text(metadata.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                                if (capability.level != CapabilityLevel.Supported) {
-                                    AssistChip(
-                                        onClick = {},
-                                        label = { Text(if (capability.level == CapabilityLevel.Unsupported) "Unsupported" else "Setup") },
-                                    )
+                actionGroups.forEach { (category, actions) ->
+                    item(key = "category-$category") {
+                        Text(
+                            category,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                    items(actions, key = { it.id }) { metadata ->
+                        val capability = ActionCapabilityRegistry.get(metadata.id)
+                        Card(
+                            onClick = { onSelect(metadata) },
+                            enabled = capability.canAdd,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (capability.canAdd) {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
+                                },
+                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)),
+                            shape = RoundedCornerShape(14.dp),
+                        ) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Text(metadata.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                                    if (capability.level != CapabilityLevel.Supported) {
+                                        StatusPill(
+                                            if (capability.level == CapabilityLevel.Unsupported) "Unsupported" else "Setup",
+                                            if (capability.level == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
                                 }
-                            }
-                            Text(metadata.category, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                            Text(metadata.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            if (capability.level != CapabilityLevel.Supported) {
-                                Text(capability.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                                Text(metadata.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (capability.level != CapabilityLevel.Supported) {
+                                    Text(capability.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                                }
                             }
                         }
                     }
@@ -1218,7 +1711,14 @@ private fun ActionConfigDialog(
                         }
                     }
                     Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(value = label, onValueChange = { label = it }, label = { Text("Label") }, singleLine = true)
+                    OutlinedTextField(
+                        value = label,
+                        onValueChange = { label = it },
+                        label = { Text("Action label") },
+                        supportingText = { Text("Shown in task steps and run-log traces.") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
                 items(state.metadata.fields, key = { it.key }) { field ->
                     ActionFieldInput(
@@ -1256,9 +1756,23 @@ private fun ActionConfigDialog(
 private fun ActionFieldInput(field: ActionField, value: String, onChange: (String) -> Unit) {
     val label = field.label + if (field.required) " *" else ""
     when (field.fieldType) {
-        FieldType.CHECKBOX -> Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(label, modifier = Modifier.weight(1f))
-            Switch(checked = value.toBoolean(), onCheckedChange = { onChange(it.toString()) })
+        FieldType.CHECKBOX -> Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(label, style = MaterialTheme.typography.labelLarge)
+                    field.hint?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Switch(checked = value.toBoolean(), onCheckedChange = { onChange(it.toString()) })
+            }
         }
 
         FieldType.MULTILINE -> OutlinedTextField(
@@ -1266,6 +1780,7 @@ private fun ActionFieldInput(field: ActionField, value: String, onChange: (Strin
             onValueChange = onChange,
             label = { Text(label) },
             placeholder = field.hint?.let { { Text(it) } },
+            supportingText = if (field.required) {{ Text("Required") }} else null,
             minLines = 3,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -1275,6 +1790,7 @@ private fun ActionFieldInput(field: ActionField, value: String, onChange: (Strin
             onValueChange = { onChange(it.filter { ch -> ch.isDigit() || ch == '-' || ch == '.' }) },
             label = { Text(label) },
             placeholder = field.hint?.let { { Text(it) } },
+            supportingText = if (field.required) {{ Text("Required") }} else null,
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -1285,6 +1801,7 @@ private fun ActionFieldInput(field: ActionField, value: String, onChange: (Strin
             onValueChange = onChange,
             label = { Text(label) },
             placeholder = field.hint?.let { { Text(it) } },
+            supportingText = if (field.required) {{ Text("Required") }} else null,
             singleLine = field.fieldType != FieldType.MULTILINE,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -1295,12 +1812,18 @@ private fun ActionFieldInput(field: ActionField, value: String, onChange: (Strin
 private fun ContextTypePickerDialog(onDismiss: () -> Unit, onSelect: (ContextType) -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Context") },
+        title = { Text("Add context") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ContextType.entries.forEach { type ->
-                    Card(onClick = { onSelect(type) }, modifier = Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(12.dp)) {
+                    Card(
+                        onClick = { onSelect(type) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)),
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(type.name.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleSmall)
                             Text(contextDescription(type), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -1337,9 +1860,25 @@ private fun ContextConfigDialog(
                 item {
                     Text(contextDescription(state.type), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(12.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Invert match", modifier = Modifier.weight(1f))
-                        Switch(checked = invert, onCheckedChange = { invert = it })
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Invert match", style = MaterialTheme.typography.labelLarge)
+                                Text(
+                                    "Run when this context is not true.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Switch(checked = invert, onCheckedChange = { invert = it })
+                        }
                     }
                     HorizontalDivider()
                 }
