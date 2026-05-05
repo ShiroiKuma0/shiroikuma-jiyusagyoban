@@ -70,6 +70,79 @@ class TaskRunnerConditionTest {
     }
 
     @Test
+    fun runsActionWhenTemplateConditionEvaluatesTrue() = runBlocking {
+        var ran = false
+        ActionRegistry.register(
+            object : Action {
+                override val id = "test.condition.template"
+                override val category = ActionCategory.FLOW
+
+                override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+                    ran = true
+                    return ActionResult.Success
+                }
+            }
+        )
+
+        val variables = VariableStore().apply {
+            set("mode", "on")
+            set("payload", """{"status":"ready"}""")
+        }
+        val report = TaskRunner(ActionContext(ContextWrapper(null), variables)).run(
+            Task(
+                name = "Template condition",
+                actions = listOf(
+                    ActionSpec(
+                        type = "test.condition.template",
+                        condition = "{{ mode }} == on",
+                    ),
+                    ActionSpec(
+                        type = "test.condition.template",
+                        condition = "{{ payload.status }} == ready",
+                    ),
+                ),
+            )
+        )
+
+        assertTrue(ran)
+        assertTrue(report.success)
+        assertEquals(2, report.results.size)
+    }
+
+    @Test
+    fun skipsActionWhenTemplateConditionHasWarnings() = runBlocking {
+        var ran = false
+        ActionRegistry.register(
+            object : Action {
+                override val id = "test.condition.template.warning"
+                override val category = ActionCategory.FLOW
+
+                override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+                    ran = true
+                    return ActionResult.Success
+                }
+            }
+        )
+
+        val variables = VariableStore().apply { set("mode", "on") }
+        val report = TaskRunner(ActionContext(ContextWrapper(null), variables)).run(
+            Task(
+                name = "Template condition warning",
+                actions = listOf(
+                    ActionSpec(
+                        type = "test.condition.template.warning",
+                        condition = "{{ mode | shell:\"echo\" }} == on",
+                    )
+                ),
+            )
+        )
+
+        assertFalse(ran)
+        assertTrue(report.success)
+        assertTrue(report.results.single() is ActionResult.Skip)
+    }
+
+    @Test
     fun expandsActionArgumentsWithOperators() = runBlocking {
         var capturedMessage: String? = null
         ActionRegistry.register(

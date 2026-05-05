@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.34 - 2026-05-05
+
+Template condition expansion.
+
+- Added bounded `{{ ... }}` expansion to action conditions before legacy predicate evaluation.
+- Preserved legacy `%var` condition behavior and applied template expansion only when a condition contains template tokens.
+- Made template condition warnings fail closed by skipping the action instead of running on an unsafe or unknown expression.
+- Added regression coverage for template conditions, JSON path conditions, and warning-based condition skips.
+
 ## v0.2.33 - 2026-05-05
 
 Per-expression template diagnostics.
