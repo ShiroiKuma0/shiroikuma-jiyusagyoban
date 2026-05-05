@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -49,7 +50,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.model.Scene
@@ -153,6 +156,16 @@ fun SceneLibraryScreen(
                 onAddElement = { elementEditor = SceneElementEditorState(scene = scene) },
                 onEditElement = { index, element -> elementEditor = SceneElementEditorState(scene, index, element) },
                 onDeleteElement = { index, element -> pendingElementDelete = SceneElementEditorState(scene, index, element) },
+                onMoveElement = { index, element ->
+                    onUpdateScene(
+                        scene.copy(
+                            elements = scene.elements.mapIndexed { i, existing ->
+                                if (i == index) element else existing
+                            },
+                        ),
+                        "Element moved",
+                    )
+                },
                 onDelete = { onDeleteScene(scene) },
             )
         }
@@ -246,6 +259,7 @@ private fun SceneCard(
     onAddElement: () -> Unit,
     onEditElement: (Int, SceneElement) -> Unit,
     onDeleteElement: (Int, SceneElement) -> Unit,
+    onMoveElement: (Int, SceneElement) -> Unit,
     onDelete: () -> Unit,
 ) {
     val taskNames = remember(tasks) { tasks.associate { it.id to it.name } }
@@ -272,7 +286,14 @@ private fun SceneCard(
                 }
             }
 
-            ScenePreviewBox(scene)
+            ScenePreviewBox(
+                scene = scene,
+                onMoveElement = { index, xDp, yDp ->
+                    scene.elements.getOrNull(index)?.let { element ->
+                        onMoveElement(index, element.copy(xDp = xDp, yDp = yDp))
+                    }
+                },
+            )
 
             OutlinedButton(onClick = onAddElement, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.Add, contentDescription = null)
@@ -306,7 +327,10 @@ private fun SceneCard(
 }
 
 @Composable
-private fun ScenePreviewBox(scene: Scene) {
+private fun ScenePreviewBox(
+    scene: Scene,
+    onMoveElement: (Int, Int, Int) -> Unit,
+) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -321,13 +345,14 @@ private fun ScenePreviewBox(scene: Scene) {
                 Text("No elements", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val canvasWidth = maxWidth.value
                     val canvasHeight = SceneCanvasProjector.projectedHeight(
                         scene = scene,
-                        canvasWidth = maxWidth.value,
+                        canvasWidth = canvasWidth,
                         minHeight = 96f,
                         maxHeight = 280f,
                     )
-                    val projections = SceneCanvasProjector.project(scene, maxWidth.value, canvasHeight)
+                    val projections = SceneCanvasProjector.project(scene, canvasWidth, canvasHeight)
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -338,8 +363,15 @@ private fun ScenePreviewBox(scene: Scene) {
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
                     ) {
                         Box(Modifier.fillMaxSize()) {
-                            projections.forEach { projection ->
-                                SceneCanvasElement(projection)
+                            projections.forEachIndexed { index, projection ->
+                                SceneCanvasElement(
+                                    scene = scene,
+                                    index = index,
+                                    projection = projection,
+                                    canvasWidth = canvasWidth,
+                                    canvasHeight = canvasHeight,
+                                    onMoveElement = onMoveElement,
+                                )
                             }
                         }
                     }
@@ -350,8 +382,18 @@ private fun ScenePreviewBox(scene: Scene) {
 }
 
 @Composable
-private fun SceneCanvasElement(projection: com.opentasker.core.scenes.SceneCanvasElementProjection) {
+private fun SceneCanvasElement(
+    scene: Scene,
+    index: Int,
+    projection: com.opentasker.core.scenes.SceneCanvasElementProjection,
+    canvasWidth: Float,
+    canvasHeight: Float,
+    onMoveElement: (Int, Int, Int) -> Unit,
+) {
     val element = projection.element
+    val density = LocalDensity.current
+    var dragX by remember(scene.id, element.id, projection.x, projection.y) { mutableStateOf(0f) }
+    var dragY by remember(scene.id, element.id, projection.x, projection.y) { mutableStateOf(0f) }
     val color = when (element.type) {
         SceneElementType.BUTTON -> MaterialTheme.colorScheme.primary
         SceneElementType.TEXT -> MaterialTheme.colorScheme.tertiary
@@ -361,11 +403,37 @@ private fun SceneCanvasElement(projection: com.opentasker.core.scenes.SceneCanva
     }
     Surface(
         modifier = Modifier
-            .offset(x = projection.x.dp, y = projection.y.dp)
+            .offset(x = (projection.x + dragX).dp, y = (projection.y + dragY).dp)
             .size(
                 width = projection.width.coerceAtLeast(12f).dp,
                 height = projection.height.coerceAtLeast(12f).dp,
-            ),
+            )
+            .pointerInput(scene.id, element.id, projection.x, projection.y, canvasWidth, canvasHeight, density.density) {
+                detectDragGestures(
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        dragX += dragAmount.x / density.density
+                        dragY += dragAmount.y / density.density
+                    },
+                    onDragEnd = {
+                        val (xDp, yDp) = SceneCanvasProjector.scenePositionForCanvasOffset(
+                            scene = scene,
+                            element = element,
+                            canvasX = projection.x + dragX,
+                            canvasY = projection.y + dragY,
+                            canvasWidth = canvasWidth,
+                            canvasHeight = canvasHeight,
+                        )
+                        dragX = 0f
+                        dragY = 0f
+                        onMoveElement(index, xDp, yDp)
+                    },
+                    onDragCancel = {
+                        dragX = 0f
+                        dragY = 0f
+                    },
+                )
+            },
         color = color.copy(alpha = 0.14f),
         shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, color.copy(alpha = 0.52f)),
