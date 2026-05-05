@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.55 - 2026-05-05
+
+NFC write-helper flow.
+
+- Added an NFC tag write session that arms a one-time NDEF text-record write and consumes the next scanned tag while armed.
+- Supports writable and formattable NDEF tags with size/read-only failure messages surfaced through the write session.
+- Added an NFC write helper card to the Event context editor when `event=nfc` is selected.
+- MainActivity now gives armed writes priority over normal NFC trigger publication.
+- Added JVM coverage for NFC write-label normalization and payload-size estimation.
+
 ## v0.2.54 - 2026-05-05
 
 Locale plugin validation harness.
