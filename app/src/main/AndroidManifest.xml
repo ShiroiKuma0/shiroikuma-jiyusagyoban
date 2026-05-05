@@ -37,7 +37,7 @@
         android:name="com.opentasker.permission.AUTOMATION"
         android:description="@string/permission_automation_description"
         android:label="@string/permission_automation_label"
-        android:protectionLevel="normal" />
+        android:protectionLevel="signature" />
 
     <queries>
         <intent>
