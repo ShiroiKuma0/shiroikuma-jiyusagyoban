@@ -2,6 +2,8 @@ package com.opentasker.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -168,6 +171,12 @@ private fun FlowGraphCard(
                 )
             }
 
+            FlowCanvasOverview(
+                graph = graph,
+                profileNode = profileNode,
+                onNodeTargetSelected = onNodeTargetSelected,
+            )
+
             if (graph.contextNodes.isNotEmpty()) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     items(graph.contextNodes, key = { it.id }) { node ->
@@ -202,6 +211,116 @@ private fun FlowGraphCard(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FlowCanvasOverview(
+    graph: AutomationFlowGraph,
+    profileNode: AutomationFlowNode,
+    onNodeTargetSelected: (AutomationFlowTarget) -> Unit,
+) {
+    val scrollState = rememberScrollState()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(scrollState)
+            .padding(vertical = 2.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FlowCanvasLane(
+            label = "Contexts",
+            nodes = graph.contextNodes,
+            onNodeTargetSelected = onNodeTargetSelected,
+        )
+        FlowCanvasLane(
+            label = "Profile",
+            nodes = listOf(profileNode),
+            onNodeTargetSelected = onNodeTargetSelected,
+        )
+        graph.enterTaskNode?.let { taskNode ->
+            FlowCanvasLane(
+                label = "Enter",
+                nodes = listOf(taskNode) + graph.actionNodesFor(taskNode.id),
+                onNodeTargetSelected = onNodeTargetSelected,
+            )
+        }
+        graph.exitTaskNode?.let { taskNode ->
+            FlowCanvasLane(
+                label = "Exit",
+                nodes = listOf(taskNode) + graph.actionNodesFor(taskNode.id),
+                onNodeTargetSelected = onNodeTargetSelected,
+            )
+        }
+    }
+}
+
+@Composable
+private fun FlowCanvasLane(
+    label: String,
+    nodes: List<AutomationFlowNode>,
+    onNodeTargetSelected: (AutomationFlowTarget) -> Unit,
+) {
+    if (nodes.isEmpty()) return
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            modifier = Modifier.width(68.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        nodes.forEach { node ->
+            FlowCanvasNode(node = node, onNodeTargetSelected = onNodeTargetSelected)
+        }
+    }
+}
+
+@Composable
+private fun FlowCanvasNode(
+    node: AutomationFlowNode,
+    onNodeTargetSelected: (AutomationFlowTarget) -> Unit,
+) {
+    val color = nodeColor(node.kind, node.muted)
+    val target = node.target
+    Surface(
+        modifier = Modifier
+            .widthIn(min = 128.dp, max = 184.dp)
+            .then(
+                if (target != null) {
+                    Modifier.clickable { onNodeTargetSelected(target) }
+                } else {
+                    Modifier
+                }
+            ),
+        color = color.copy(alpha = if (node.muted) 0.07f else 0.10f),
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, color.copy(alpha = if (node.muted) 0.20f else 0.30f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                displayTitle(node),
+                style = MaterialTheme.typography.labelMedium,
+                color = if (node.muted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            node.condition?.let {
+                Text(
+                    "if",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    maxLines = 1,
+                )
             }
         }
     }
