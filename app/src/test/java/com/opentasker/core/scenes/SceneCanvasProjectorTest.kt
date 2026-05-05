@@ -45,4 +45,28 @@ class SceneCanvasProjectorTest {
         assertEquals(24f, projection.height, 0.001f)
         assertEquals(element, projection.element)
     }
+
+    @Test
+    fun scenePositionForCanvasOffsetClampsInsideScene() {
+        val element = SceneElement(
+            id = 2,
+            type = SceneElementType.BUTTON,
+            xDp = 0,
+            yDp = 0,
+            widthDp = 80,
+            heightDp = 40,
+        )
+        val scene = Scene(id = 1, name = "Panel", widthDp = 200, heightDp = 100, elements = listOf(element))
+
+        val position = SceneCanvasProjector.scenePositionForCanvasOffset(
+            scene = scene,
+            element = element,
+            canvasX = 190f,
+            canvasY = 90f,
+            canvasWidth = 200f,
+            canvasHeight = 100f,
+        )
+
+        assertEquals(120 to 60, position)
+    }
 }
