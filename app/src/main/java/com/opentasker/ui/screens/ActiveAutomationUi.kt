@@ -106,6 +106,7 @@ import java.util.Locale
 private enum class OpenTaskerScreen(val label: String) {
     Profiles("Profiles"),
     Tasks("Tasks"),
+    Flow("Flow"),
     Inspector("Inspector"),
     Setup("Setup"),
     RunLog("Run Log"),
@@ -280,6 +281,7 @@ fun ActiveAutomationUi(
     val headerDetail = when (screen) {
         OpenTaskerScreen.Profiles -> "${profiles.count { it.enabled }} enabled - ${profiles.size} total"
         OpenTaskerScreen.Tasks -> "${tasks.sumOf { it.actions.size }} actions - ${tasks.size} tasks"
+        OpenTaskerScreen.Flow -> "${profiles.size} profiles - ${tasks.size} tasks"
         OpenTaskerScreen.Inspector -> "Live context health"
         OpenTaskerScreen.Setup -> "Permission and reliability checks"
         OpenTaskerScreen.RunLog -> "${runLogs.size} recent entries"
@@ -325,6 +327,7 @@ fun ActiveAutomationUi(
                     Icon(Icons.Filled.Add, contentDescription = "Create task")
                 }
 
+                OpenTaskerScreen.Flow,
                 OpenTaskerScreen.Inspector,
                 OpenTaskerScreen.Setup,
                 OpenTaskerScreen.RunLog -> Unit
@@ -340,6 +343,7 @@ fun ActiveAutomationUi(
                             val icon = when (destination) {
                                 OpenTaskerScreen.Profiles -> Icons.Filled.CheckCircle
                                 OpenTaskerScreen.Tasks -> Icons.Filled.Edit
+                                OpenTaskerScreen.Flow -> Icons.Filled.Info
                                 OpenTaskerScreen.Inspector -> Icons.Filled.Info
                                 OpenTaskerScreen.Setup -> Icons.Filled.Settings
                                 OpenTaskerScreen.RunLog -> Icons.Filled.Info
@@ -397,6 +401,12 @@ fun ActiveAutomationUi(
                         pendingDelete = DeleteTarget.ActionTarget(task, index, action)
                     }
                 },
+                contentPadding = innerPadding,
+            )
+
+            OpenTaskerScreen.Flow -> AutomationFlowScreen(
+                profiles = profiles,
+                tasks = tasks,
                 contentPadding = innerPadding,
             )
 
