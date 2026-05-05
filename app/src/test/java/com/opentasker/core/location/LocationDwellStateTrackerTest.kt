@@ -91,9 +91,11 @@ class LocationDwellStateTrackerTest {
         val first = LocationDwellStateKey.from(7, 1, config)
         val sameDifferentOrder = LocationDwellStateKey.from(7, 1, config.toList().reversed().toMap())
         val changedRadius = LocationDwellStateKey.from(7, 1, config + ("radiusMeters" to "250"))
+        val profilePrefix = LocationDwellStateKey.profilePrefix(7)
 
         assertEquals(first, sameDifferentOrder)
-        assertTrue(first.storageKey.startsWith("profile:7:context:1:"))
+        assertEquals("profile:7:", profilePrefix)
+        assertTrue(first.storageKey.startsWith("${profilePrefix}context:1:"))
         assertTrue(first.storageKey.length > "profile:7:context:1:".length)
         assertFalse(first == changedRadius)
     }

@@ -1,6 +1,6 @@
 # FOSS Geofencing Baseline
 
-OpenTasker v0.2.38 has a Play-services-free geofence path for Location contexts. It combines a platform `LocationManager` source with the pure evaluator added in v0.2.29, persisted dwell state added in v0.2.37, and Context Inspector dwell detail added in v0.2.38; it is still not a device-verified background geofence reliability claim.
+OpenTasker v0.2.39 has a Play-services-free geofence path for Location contexts. It combines a platform `LocationManager` source with the pure evaluator added in v0.2.29, persisted dwell state added in v0.2.37, Context Inspector dwell detail added in v0.2.38, and stale dwell-key cleanup added in v0.2.39; it is still not a device-verified background geofence reliability claim.
 
 ## Active Scope
 
@@ -11,6 +11,7 @@ OpenTasker v0.2.38 has a Play-services-free geofence path for Location contexts.
 - Emits fail-closed setup events for missing foreground location permission, disabled providers, unavailable location service, and source errors.
 - Persists `insideSinceEpochMs` per profile/context/config so dwell timers can survive process restarts.
 - Uses a config hash in dwell-state keys so edited geofences do not reuse stale inside-since state.
+- Clears profile-scoped persisted dwell keys when a profile is deleted or its context list changes.
 - Clears persisted dwell state when a valid sample leaves the radius.
 - Preserves previous inside-since state across low-accuracy samples that are inside the radius but blocked by max-accuracy policy.
 - Shows profile/context-specific dwell status in Context Inspector rows: inside elapsed time, outside reset, accuracy-blocked, or unknown.
@@ -43,6 +44,5 @@ OpenTasker v0.2.38 has a Play-services-free geofence path for Location contexts.
 
 1. Tune provider cadence and battery behavior with device evidence.
 2. Expand setup/policy copy after real foreground/background verification.
-3. Add cleanup or migration for stale dwell keys if profile/context deletion starts leaving meaningful residue.
-4. Add device-backed smoke coverage for foreground and background location behavior.
-5. Verify behavior on a device before making public geofence reliability claims.
+3. Add device-backed smoke coverage for foreground and background location behavior.
+4. Verify behavior on a device before making public geofence reliability claims.

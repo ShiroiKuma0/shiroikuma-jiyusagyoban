@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import android.content.Context
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -61,6 +62,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -80,6 +82,7 @@ import com.opentasker.core.engine.RunLogActionDiagnostic
 import com.opentasker.core.engine.RunLogOutcome
 import com.opentasker.core.engine.outcome
 import com.opentasker.core.engine.toRunLogDiagnostics
+import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.ContextSpec
@@ -164,7 +167,12 @@ private sealed interface DeleteTarget {
     }
 }
 
-class ActiveAutomationViewModel(private val db: AppDatabase) : ViewModel() {
+class ActiveAutomationViewModel(
+    private val db: AppDatabase,
+    appContext: Context,
+) : ViewModel() {
+    private val locationDwellStateStore = LocationDwellStateStore(appContext)
+
     val profiles: StateFlow<List<Profile>> = db.profileDao()
         .getAllAsFlow()
         .map { entities -> entities.map { it.toDomain() }.sortedBy { it.name.lowercase() } }
@@ -241,11 +249,17 @@ class ActiveAutomationViewModel(private val db: AppDatabase) : ViewModel() {
 
     fun updateProfile(profile: Profile, message: String = "Profile updated") =
         launchWithMessage(message) {
+            val previous = profile.id.takeIf { it > 0L }
+                ?.let { db.profileDao().getById(it)?.toDomain() }
+            if (previous != null && previous.contexts != profile.contexts) {
+                locationDwellStateStore.clearProfile(profile.id)
+            }
             db.profileDao().update(profile.toEntity())
         }
 
     fun deleteProfile(profile: Profile) = launchWithMessage("Profile deleted") {
         db.profileDao().delete(profile.toEntity())
+        locationDwellStateStore.clearProfile(profile.id)
     }
 
     fun installProfileTemplate(template: ProfileTemplate, slotValues: Map<String, String>) =
@@ -266,11 +280,14 @@ class ActiveAutomationViewModel(private val db: AppDatabase) : ViewModel() {
     }
 }
 
-class ActiveAutomationViewModelFactory(private val db: AppDatabase) : ViewModelProvider.Factory {
+class ActiveAutomationViewModelFactory(
+    private val db: AppDatabase,
+    private val appContext: Context,
+) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ActiveAutomationViewModel::class.java)) {
-            return ActiveAutomationViewModel(db) as T
+            return ActiveAutomationViewModel(db, appContext) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }
@@ -281,8 +298,9 @@ class ActiveAutomationViewModelFactory(private val db: AppDatabase) : ViewModelP
 fun ActiveAutomationUi(
     db: AppDatabase,
     modifier: Modifier = Modifier,
-    viewModel: ActiveAutomationViewModel = viewModel(factory = ActiveAutomationViewModelFactory(db)),
 ) {
+    val context = LocalContext.current.applicationContext
+    val viewModel: ActiveAutomationViewModel = viewModel(factory = ActiveAutomationViewModelFactory(db, context))
     val profiles by viewModel.profiles.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
     val scenes by viewModel.scenes.collectAsState()
