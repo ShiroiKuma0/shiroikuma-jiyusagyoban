@@ -49,4 +49,28 @@ class LocalePluginBundleCodecTest {
 
         assertTrue(error is IllegalArgumentException)
     }
+
+    @Test
+    fun parsesConditionResultCodes() {
+        val satisfied = LocalePluginConditionResultParser.parse(
+            LocalePluginContract.RESULT_CONDITION_SATISFIED,
+            "com.example.plugin",
+        )
+        val unsatisfied = LocalePluginConditionResultParser.parse(
+            LocalePluginContract.RESULT_CONDITION_UNSATISFIED,
+            "com.example.plugin",
+        )
+        val unknown = LocalePluginConditionResultParser.parse(
+            LocalePluginContract.RESULT_CONDITION_UNKNOWN,
+            "com.example.plugin",
+        )
+        val unrecognized = LocalePluginConditionResultParser.parse(999, "com.example.plugin")
+
+        assertEquals(LocalePluginConditionState.Satisfied, satisfied.state)
+        assertEquals(LocalePluginConditionState.Unsatisfied, unsatisfied.state)
+        assertEquals(LocalePluginConditionState.Unknown, unknown.state)
+        assertEquals(LocalePluginConditionState.Unknown, unrecognized.state)
+        assertTrue(satisfied.satisfied)
+        assertTrue(unrecognized.message.contains("unrecognized result code"))
+    }
 }
