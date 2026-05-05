@@ -31,6 +31,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.actions.ActionMetadataRegistry
@@ -150,7 +152,9 @@ private fun FlowGraphCard(
     val profileNode = graph.nodes.first { it.kind == AutomationFlowNodeKind.PROFILE }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = graph.accessibilitySummary() },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)),
         shape = RoundedCornerShape(18.dp),
@@ -292,6 +296,7 @@ private fun FlowCanvasNode(
     Surface(
         modifier = Modifier
             .widthIn(min = 128.dp, max = 184.dp)
+            .semantics { contentDescription = node.accessibilityLabel() }
             .then(
                 if (target != null) {
                     Modifier.clickable { onNodeTargetSelected(target) }
@@ -354,6 +359,7 @@ private fun FlowNodeView(
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .semantics { contentDescription = node.accessibilityLabel() }
             .then(
                 if (target != null) {
                     Modifier.clickable { onNodeTargetSelected(target) }

@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-05
 
-OpenTasker v0.2.24 added a read-only Flow tab backed by a pure graph model. The current unreleased L1 work keeps that view read-only while adding node deep links, conditional action visualization, and a compact scrollable lane overview.
+OpenTasker v0.2.24 added a read-only Flow tab backed by a pure graph model. The current unreleased L1 work keeps that view read-only while adding node deep links, conditional action visualization, a compact scrollable lane overview, and screen-reader summaries.
 
 ## Scope
 
@@ -15,6 +15,7 @@ OpenTasker v0.2.24 added a read-only Flow tab backed by a pure graph model. The 
 - Selectable nodes deep-link to the existing profile, context, task, or action dialogs; missing task references open the owning profile for repair.
 - Conditional actions carry first-class condition text and render `if ...` incoming edge labels plus compact node markers.
 - Each profile graph includes a horizontally scrollable lane overview for context, profile, enter-task, and exit-task lanes.
+- Graph cards and node surfaces expose deterministic accessibility labels through Compose semantics.
 
 ## Non-Goals
 
@@ -31,6 +32,7 @@ OpenTasker v0.2.24 added a read-only Flow tab backed by a pure graph model. The 
 - `AutomationFlowEdge` entries for context requirements, enter/exit task links, and action order.
 - `AutomationFlowTarget` entries for nodes that can open an existing editor.
 - Conditional action metadata used by incoming edge labels and node badges.
+- Accessibility summaries for whole graphs plus profile/context/task/action node labels.
 - Warning strings for incomplete graph inputs.
 
 The model is kept outside Compose so later graph editing, export previews, and tests can reuse it.
@@ -39,5 +41,5 @@ The model is kept outside Compose so later graph editing, export previews, and t
 
 1. Add future flow-control branch/subflow visualization once those action types exist.
 2. Add zoom gestures only if the scrollable lane overview proves useful on real profile data.
-3. Add accessibility labels and text summaries for complex graphs before exposing drag/drop editing.
+3. Validate the summaries against real complex graphs before exposing drag/drop editing.
 4. Add mutation commands only after graph targets and summaries are stable against real profile data.
