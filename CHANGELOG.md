@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.51 - 2026-05-05
+
+Locale condition unknown-state handling.
+
+- Added a bounded in-memory last-known-state cache for Locale condition plugin query results.
+- Resolves `RESULT_CONDITION_UNKNOWN` to the last known state for the same plugin package and guarded bundle.
+- Treats unknown condition results without history as unsatisfied instead of exposing an ambiguous success path.
+- Added JVM coverage for last-known fallback, no-history behavior, and bundle-scoped cache keys.
+
 ## v0.2.50 - 2026-05-05
 
 Locale condition plugin query baseline.

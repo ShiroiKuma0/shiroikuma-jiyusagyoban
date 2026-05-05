@@ -2,7 +2,7 @@
 
 OpenTasker includes a conservative Locale/Tasker-compatible plugin host baseline for setting and condition plugins.
 
-## Supported in v0.2.50
+## Supported in v0.2.51
 
 - Discovers packages that expose Locale edit-setting or edit-condition activities.
 - Discovers explicit setting and condition broadcast receiver permission metadata for disclosure.
@@ -11,6 +11,8 @@ OpenTasker includes a conservative Locale/Tasker-compatible plugin host baseline
 - Sends `com.twofortyfouram.locale.intent.action.FIRE_SETTING` only to the resolved receiver component in the configured package.
 - Sends `com.twofortyfouram.locale.intent.action.QUERY_CONDITION` only to the resolved receiver component in the configured package.
 - Parses Locale result codes `16` satisfied, `17` unsatisfied, and `18` unknown.
+- Resolves `unknown` with a bounded best-effort last-known-state cache for the same plugin package and bundle.
+- Treats `unknown` without matching history as `unsatisfied`.
 - Can store the condition result as `satisfied`, `unsatisfied`, or `unknown` in a task variable.
 - Accepts a string-only JSON object and converts it into the Locale bundle extra.
 - Adds a short blurb extra for plugin/user visibility.
@@ -19,7 +21,6 @@ OpenTasker includes a conservative Locale/Tasker-compatible plugin host baseline
 ## Not yet supported
 
 - Interactive plugin configuration activity results.
-- Last-known-value caching for `RESULT_CONDITION_UNKNOWN`.
 - Host handling for plugin `REQUEST_QUERY` broadcasts.
 - Third-party plugin allowlists/denylists.
 - Plugin-provided variable expansion or progress callbacks.
