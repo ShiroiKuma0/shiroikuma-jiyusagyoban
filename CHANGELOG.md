@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.43 - 2026-05-05
+
+Location device evidence harness.
+
+- Added `tools/collect-location-evidence.ps1` to collect adb-backed foreground-service, permission, location, logcat, and battery snapshots for Location/geofence verification.
+- The harness writes timestamped JSON summaries and raw evidence files under ignored `build/device-evidence/location/`.
+- Supports optional permission grants and an app-to-home sample to verify the foreground automation service remains active while the app is backgrounded.
+- Verified the harness against connected API 36 device `SM-S938B`; a 10-second home/background sample kept `AutomationService` foreground with `specialUse|location` and recorded battery snapshots.
+
 ## v0.2.42 - 2026-05-05
 
 Foreground service launch repair.
