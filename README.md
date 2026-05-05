@@ -1,13 +1,13 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.27-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.28-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.27** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scene library management, read-only flow graphs, JSON bundles, Tasker XML import planning, F-Droid build readiness, dependency version governance, optional Shizuku readiness, optional Termux script readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; variable tooling, elevated backends, script execution, and broader plugin UX are planned.
+**OpenTasker v0.2.28** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scene library management, read-only flow graphs, JSON bundles, profile sharing manifests, Tasker XML import planning, F-Droid build readiness, dependency version governance, optional Shizuku readiness, optional Termux script readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; variable tooling, elevated backends, script execution, and broader plugin UX are planned.
 
-> **Status:** v0.2.27 adds a gated Termux script action, Termux/Termux:Tasker package visibility, and optional setup/status detection while keeping script execution blocked until dispatch, permission handling, output capture, and audit logging are implemented. It keeps Shizuku readiness, the Scenes tab, Flow tab, centralized dependency governance, F-Droid distribution profile, Tasker XML import planning, local calendar/sun triggers, NFC tag events, notification listener events, context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
+> **Status:** v0.2.28 adds an offline profile-share manifest that summarizes JSON bundles, reports capability/import safety findings, and prepares GitHub Discussions submission markdown without network publishing or verified-template claims. It keeps Termux script readiness, Shizuku readiness, the Scenes tab, Flow tab, centralized dependency governance, F-Droid distribution profile, Tasker XML import planning, local calendar/sun triggers, NFC tag events, notification listener events, context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
 
 ---
 
@@ -24,6 +24,7 @@
 ✅ **Shizuku readiness** — optional package/status detection and elevated-action hints without executing privileged calls
 ✅ **Termux scripting readiness** — optional Termux/Termux:Tasker detection and a blocked script action without arbitrary execution
 ✅ **Open JSON bundles** — schema-versioned profile/task/context/action/variable/scene export and import planning  
+✅ **Profile sharing manifests** — offline share summaries with safety findings and GitHub Discussions submission text
 ✅ **Tasker XML import planning** — common Tasker task/profile/variable XML converts to OpenTasker bundles with migration warnings
 ✅ **F-Droid readiness** — property-based `fdroid` profile, dependency-policy check, and metadata draft
 ✅ **Dependency governance** — Gradle version catalog centralizes plugin/library versions before staged upgrades
@@ -118,9 +119,10 @@ Release APKs are unsigned unless `OPEN_TASKER_RELEASE_KEYSTORE`, `OPEN_TASKER_RE
 3. **Flow graph deep links** — node selection that opens the relevant profile, task, context, or action editor
 4. **Shizuku API opt-in backend** — explicit user opt-in, permission request, isolated execution, and run-log audit trail
 5. **Termux script dispatch** — explicit permission flow, script allowlisting, stdout/stderr capture, and output variable mapping
-6. **Locale condition queries** — complete query execution for condition plugins with timeout and result handling
-7. **Tasker import UI** — file picker, migration preview, and import confirmation around the parser baseline
-8. **F-Droid submission hardening** — release tag discipline, fdroidserver lint/build, and reproducible binary comparison
+6. **Sharing preview UI** — import warnings, screenshots, permissions, and local review before importing community bundles
+7. **Locale condition queries** — complete query execution for condition plugins with timeout and result handling
+8. **Tasker import UI** — file picker, migration preview, and import confirmation around the parser baseline
+9. **F-Droid submission hardening** — release tag discipline, fdroidserver lint/build, and reproducible binary comparison
 
 ---
 

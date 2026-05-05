@@ -41,7 +41,7 @@ Tasker's source is **not public**. This architecture is reconstructed from the u
 │  Storage (Room + DataStore)                           │
 │  - Profiles, Tasks, Actions, Scenes, Variables        │
 │  - Run log                                            │
-│  - OpenTasker JSON bundles / Tasker XML import plans  │
+│  - OpenTasker JSON bundles / share manifests / import │
 ├───────────────────────────────────────────────────────┤
 │  Platform                                             │
 │  - AutomationService (foreground)                     │
@@ -69,6 +69,8 @@ NFC tag triggers are represented as Event contexts with `event=nfc`. `MainActivi
 Calendar and sun triggers are represented as Event contexts. Calendar polling uses `CalendarContract.Instances` only when `READ_CALENDAR` is granted and emits redacted metadata such as calendar name, busy/upcoming state, all-day flag, and minutes until start/end, without event titles or descriptions. Sunrise/sunset filters evaluate minute ticks against user-provided latitude/longitude, offset minutes, and trigger windows.
 
 Tasker XML import is intentionally staged through the OpenTasker JSON bundle model. `TaskerXmlImporter` parses common Tasker task/profile/variable structures into a bundle plus migration report, preserves unmapped Tasker actions as explicit unsupported placeholders, and reports skipped contexts, profiles, and scenes before any Room write path is invoked.
+
+Profile sharing is staged through the same bundle model. `ProfileShareLibrary` creates offline share manifests with stable slugs, counts, unverified trust state, capability/import safety findings, and GitHub Discussions submission markdown. It does not publish to a network, claim template verification, or bypass bundle validation.
 
 The read-only visual flow baseline is generated from active domain models. `AutomationFlowGraphBuilder` maps each profile into context, profile, enter-task, exit-task, action, edge, and missing-reference nodes so the Compose Flow tab can show graph structure without mutating profile/task data.
 
