@@ -25,8 +25,8 @@ import kotlinx.coroutines.launch
  * stay in [com.opentasker.core.location.FossGeofenceEvaluator].
  */
 class LocationContextSourceImpl(
-    private val minTimeMs: Long = DEFAULT_MIN_TIME_MS,
-    private val minDistanceMeters: Float = DEFAULT_MIN_DISTANCE_METERS,
+    private val requestPolicy: LocationProviderRequestPolicy = LocationProviderRequestPolicy.balanced(),
+    private val setupRecheckMs: Long = DEFAULT_SETUP_RECHECK_MS,
 ) : ContextSource {
     override val type = LocationContextEvents.TYPE
 
@@ -119,10 +119,11 @@ class LocationContextSourceImpl(
             }
 
             providers.forEach { provider ->
+                val cadence = requestPolicy.cadenceFor(provider)
                 locationManager.requestLocationUpdates(
                     provider,
-                    minTimeMs,
-                    minDistanceMeters,
+                    cadence.minTimeMs,
+                    cadence.minDistanceMeters,
                     listener,
                     Looper.getMainLooper(),
                 )
@@ -139,6 +140,9 @@ class LocationContextSourceImpl(
                             "setup" to "waiting_for_location",
                             "reason" to "Live location source is registered and waiting for the first GPS or network fix.",
                             "providers" to providers.joinToString(","),
+                            "cadence" to providers.joinToString(";") { provider ->
+                                requestPolicy.cadenceFor(provider).toMetadata(provider)
+                            },
                         ),
                     ),
                 )
@@ -154,8 +158,8 @@ class LocationContextSourceImpl(
                             reason = "location_source_error",
                             detail = error.message ?: error::class.java.simpleName,
                         )
-                    }
-                delay(SETUP_RECHECK_MS)
+                }
+                delay(setupRecheckMs)
             }
         }
 
@@ -183,8 +187,41 @@ class LocationContextSourceImpl(
             .filter { provider -> runCatching { locationManager.isProviderEnabled(provider) }.getOrDefault(false) }
 
     companion object {
-        private const val DEFAULT_MIN_TIME_MS = 60_000L
-        private const val DEFAULT_MIN_DISTANCE_METERS = 50f
-        private const val SETUP_RECHECK_MS = 30_000L
+        private const val DEFAULT_SETUP_RECHECK_MS = 60_000L
+    }
+}
+
+data class LocationProviderCadence(
+    val minTimeMs: Long,
+    val minDistanceMeters: Float,
+) {
+    init {
+        require(minTimeMs > 0L) { "minTimeMs must be positive" }
+        require(minDistanceMeters >= 0f) { "minDistanceMeters must be non-negative" }
+    }
+
+    fun toMetadata(provider: String): String =
+        "$provider:${minTimeMs}ms/${minDistanceMeters.toInt()}m"
+}
+
+data class LocationProviderRequestPolicy(
+    private val gps: LocationProviderCadence,
+    private val network: LocationProviderCadence,
+    private val fallback: LocationProviderCadence,
+) {
+    fun cadenceFor(provider: String): LocationProviderCadence =
+        when (provider) {
+            LocationManager.GPS_PROVIDER -> gps
+            LocationManager.NETWORK_PROVIDER -> network
+            else -> fallback
+        }
+
+    companion object {
+        fun balanced(): LocationProviderRequestPolicy =
+            LocationProviderRequestPolicy(
+                gps = LocationProviderCadence(minTimeMs = 180_000L, minDistanceMeters = 100f),
+                network = LocationProviderCadence(minTimeMs = 90_000L, minDistanceMeters = 150f),
+                fallback = LocationProviderCadence(minTimeMs = 180_000L, minDistanceMeters = 150f),
+            )
     }
 }
