@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.27 - 2026-05-05
+
+Termux script readiness baseline.
+
+- Added a gated `script.termux.run` action with metadata and a runtime failure path that does not execute scripts.
+- Added Termux and Termux:Tasker package visibility and optional setup status detection.
+- Added Setup checklist copy for the Termux script bridge while excluding it from required readiness progress.
+- Documented the non-executing scripting baseline and added tests for package constants, manifest queries, and capability gating.
+
 ## v0.2.26 - 2026-05-05
 
 Shizuku readiness baseline.

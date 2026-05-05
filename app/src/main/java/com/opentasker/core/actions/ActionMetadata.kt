@@ -132,6 +132,22 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "script.termux.run",
+            name = "Run Termux Script",
+            description = "Plan a Termux:Tasker script run; blocked until the script backend is implemented",
+            category = "Script",
+            fields = listOf(
+                ActionField("executable", "Executable", required = true, hint = "~/.termux/tasker/my_script"),
+                ActionField("arguments", "Arguments", FieldType.MULTILINE, hint = "Optional shell-style arguments"),
+                ActionField("workingDirectory", "Working directory", hint = "Optional Termux working directory"),
+                ActionField("stdin", "Standard input", FieldType.MULTILINE, hint = "Optional stdin payload"),
+                ActionField("capturePrefix", "Output variable prefix", hint = "%script"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "tasker.unsupported",
             name = "Unsupported Tasker Action",
             description = "Placeholder for a Tasker action that could not be safely mapped during import",

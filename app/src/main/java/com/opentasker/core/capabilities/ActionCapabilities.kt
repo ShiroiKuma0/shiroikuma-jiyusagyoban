@@ -1,6 +1,7 @@
 package com.opentasker.core.capabilities
 
 import com.opentasker.core.power.ShizukuPowerBackend
+import com.opentasker.core.scripting.TermuxScriptBackend
 
 enum class CapabilityLevel {
     Supported,
@@ -37,6 +38,11 @@ object ActionCapabilityRegistry {
         "lock" to ActionCapability(CapabilityLevel.Unsupported, "Device lock requires configured device-admin support."),
         "screen.off" to elevatedUnsupported("screen.off", "Screen-off requires privileged power management access."),
         "wake" to elevatedUnsupported("wake", "Wake requires a foreground activity or privileged wake flow."),
+        TermuxScriptBackend.ACTION_ID to ActionCapability(
+            CapabilityLevel.Unsupported,
+            TermuxScriptBackend.hintForAction(TermuxScriptBackend.ACTION_ID)?.message
+                ?: "Termux script backend is not active.",
+        ),
         "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported OpenTasker action."),
     )
 
