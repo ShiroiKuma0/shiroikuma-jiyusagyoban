@@ -77,7 +77,9 @@ import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.actions.FieldType
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
+import com.opentasker.core.contexts.CalendarSunEventPresets
 import com.opentasker.core.contexts.DaySchedule
+import com.opentasker.core.contexts.EventContextPreset
 import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.contexts.contextConfigSummary
 import com.opentasker.core.engine.ActionTraceStatus
@@ -2380,6 +2382,21 @@ private fun ContextConfigDialog(
                             )
                         }
                     }
+                    val eventPresets = if (state.type == ContextType.EVENT) {
+                        CalendarSunEventPresets.presetsFor(config["event"].orEmpty())
+                    } else {
+                        emptyList()
+                    }
+                    if (eventPresets.isNotEmpty()) {
+                        item("event-presets") {
+                            EventPresetRow(
+                                presets = eventPresets,
+                                onApply = { preset ->
+                                    config = CalendarSunEventPresets.applyPreset(config, preset)
+                                },
+                            )
+                        }
+                    }
                 }
             }
         },
@@ -2487,6 +2504,23 @@ private fun NfcWriteHelperCard(
             }
             message?.takeIf { it.isNotBlank() }?.let { value ->
                 Text(value, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EventPresetRow(
+    presets: List<EventContextPreset>,
+    onApply: (EventContextPreset) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Presets", style = MaterialTheme.typography.labelLarge)
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(presets, key = { it.id }) { preset ->
+                OutlinedButton(onClick = { onApply(preset) }) {
+                    Text(preset.label)
+                }
             }
         }
     }
