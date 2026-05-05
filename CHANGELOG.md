@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.57 - 2026-05-05
+
+Calendar and sun device smoke evidence.
+
+- Added `tools/collect-calendar-sun-evidence.ps1` to capture adb calendar/sun smoke evidence.
+- The harness launches OpenTasker, optionally grants Calendar access, captures package/service/provider evidence, and can require Calendar permission, CalendarProvider access, and foreground `AutomationService` state.
+- Verified the debug app on API 36 device `SM-S938B` with evidence `build/device-evidence/calendar-sun/20260505-152622`.
+- The smoke run confirmed `READ_CALENDAR` was granted, CalendarProvider calendar and instance queries succeeded, and `AutomationService` was foreground after app launch.
+- Patched the new adb evidence scripts for Windows PowerShell 5.1 process-argument compatibility.
+
 ## v0.2.56 - 2026-05-05
 
 Calendar and sun context presets.
