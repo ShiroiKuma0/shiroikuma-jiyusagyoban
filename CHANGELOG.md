@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.41 - 2026-05-05
+
+Location policy disclosures.
+
+- Added shared Android location policy disclosure copy for Setup and Context Inspector.
+- Explains that Android 11+ background location is granted from app settings instead of the foreground permission dialog.
+- Explains that approximate foreground access limits background precision.
+- Adds Android 14+ foreground-service location gating copy when foreground and background location prerequisites are ready.
+- Added JVM coverage for the location disclosure policy text.
+
 ## v0.2.40 - 2026-05-05
 
 Geofence cadence tuning.
