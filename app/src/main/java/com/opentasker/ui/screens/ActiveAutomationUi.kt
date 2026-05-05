@@ -1522,6 +1522,36 @@ private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
                     MaterialTheme.colorScheme.error,
                 )
             }
+            if (trace.templateExpressions.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    trace.templateExpressions.take(3).forEach { expression ->
+                        Text(
+                            "${expression.argName}: ${expression.expression} -> ${expression.value} (${expression.source})",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        expression.warning?.let { warning ->
+                            Text(
+                                warning,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    if (trace.templateExpressions.size > 3) {
+                        Text(
+                            "${trace.templateExpressions.size - 3} more template expression(s)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
         }
     }
 }

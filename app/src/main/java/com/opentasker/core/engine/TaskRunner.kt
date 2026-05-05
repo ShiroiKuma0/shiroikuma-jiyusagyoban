@@ -162,7 +162,7 @@ fun ActionExecutionTrace.toSummaryLine(): String =
 
 fun List<ActionExecutionTrace>.toRunLogMessage(maxLines: Int = 8): String {
     if (isEmpty()) return "No actions executed"
-    val visible = take(maxLines).joinToString("\n") { it.toSummaryLine() }
+    val visible = take(maxLines).flatMap { it.toRunLogLines() }.joinToString("\n")
     val remaining = size - maxLines
     return if (remaining > 0) "$visible\n... $remaining more action(s)" else visible
 }
@@ -200,9 +200,30 @@ private fun ActionExecutionTrace.traceDetailSuffix(): String {
     return if (details.isEmpty()) "" else " (${details.joinToString("; ")})"
 }
 
+private fun ActionExecutionTrace.toRunLogLines(): List<String> = buildList {
+    add(toSummaryLine())
+    argumentExpansions
+        .flatMap { it.toTemplateDiagnosticLines() }
+        .take(MAX_TEMPLATE_TRACE_LINES_PER_ACTION)
+        .forEach(::add)
+}
+
+private fun ActionArgumentExpansionTrace.toTemplateDiagnosticLines(): List<String> =
+    expressions.map { expressionTrace ->
+        val sensitive = isSensitiveArgName(argName)
+        listOf(
+            TEMPLATE_TRACE_PREFIX,
+            argName.toLogField(),
+            expressionTrace.source.name.lowercase().toLogField(),
+            if (sensitive) REDACTED_VALUE else expressionTrace.expression.toLogField(),
+            if (sensitive) REDACTED_VALUE else expressionTrace.value.toLogField(),
+            expressionTrace.warning.orEmpty().toLogField(),
+        ).joinToString("\t")
+    }
+
 private fun summarizeArgValue(argName: String, value: String): String {
-    if (SENSITIVE_ARG_TOKENS.any { token -> argName.contains(token, ignoreCase = true) }) {
-        return "<redacted>"
+    if (isSensitiveArgName(argName)) {
+        return REDACTED_VALUE
     }
     val singleLine = value.replace(Regex("""\s+"""), " ").trim()
     return if (singleLine.length <= MAX_SUMMARY_VALUE_LENGTH) {
@@ -212,6 +233,19 @@ private fun summarizeArgValue(argName: String, value: String): String {
     }
 }
 
+private fun String.toLogField(): String =
+    replace('\t', ' ')
+        .replace('\r', ' ')
+        .replace('\n', ' ')
+        .replace(Regex("""\s+"""), " ")
+        .trim()
+        .let { value ->
+            if (value.length <= MAX_TEMPLATE_TRACE_FIELD_LENGTH) value else value.take(MAX_TEMPLATE_TRACE_FIELD_LENGTH) + "..."
+        }
+
+private fun isSensitiveArgName(argName: String): Boolean =
+    SENSITIVE_ARG_TOKENS.any { token -> argName.contains(token, ignoreCase = true) }
+
 private val SENSITIVE_ARG_TOKENS = listOf(
     "authorization",
     "cookie",
@@ -220,5 +254,9 @@ private val SENSITIVE_ARG_TOKENS = listOf(
     "secret",
     "token",
 )
+private const val TEMPLATE_TRACE_PREFIX = "Template:"
+private const val REDACTED_VALUE = "<redacted>"
 private const val MAX_SUMMARY_ARGS = 4
 private const val MAX_SUMMARY_VALUE_LENGTH = 80
+private const val MAX_TEMPLATE_TRACE_LINES_PER_ACTION = 8
+private const val MAX_TEMPLATE_TRACE_FIELD_LENGTH = 120

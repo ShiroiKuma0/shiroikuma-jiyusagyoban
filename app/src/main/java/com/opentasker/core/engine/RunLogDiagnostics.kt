@@ -28,6 +28,15 @@ data class RunLogActionDiagnostic(
     val message: String,
     val argumentSummary: String? = null,
     val templateWarningCount: Int = 0,
+    val templateExpressions: List<RunLogTemplateDiagnostic> = emptyList(),
+)
+
+data class RunLogTemplateDiagnostic(
+    val argName: String,
+    val source: String,
+    val expression: String,
+    val value: String,
+    val warning: String? = null,
 )
 
 fun RunLogEntry.outcome(): RunLogOutcome {
@@ -84,6 +93,15 @@ fun String.toRunLogDiagnostics(): RunLogDiagnostics {
                 line.startsWith(SOURCE_PREFIX, ignoreCase = true) -> source = line.valueAfterPrefix(SOURCE_PREFIX)
                 line.startsWith(DECISION_PREFIX, ignoreCase = true) -> decision = line.valueAfterPrefix(DECISION_PREFIX)
                 line.startsWith(REASON_PREFIX, ignoreCase = true) -> reason = line.valueAfterPrefix(REASON_PREFIX)
+                line.startsWith(TEMPLATE_TRACE_PREFIX, ignoreCase = true) -> {
+                    val template = parseTemplateTraceLine(line)
+                    if (template != null && traces.isNotEmpty()) {
+                        val previous = traces.removeAt(traces.lastIndex)
+                        traces += previous.copy(templateExpressions = previous.templateExpressions + template)
+                    } else {
+                        details.add(line)
+                    }
+                }
                 else -> parseTraceLine(line)?.let(traces::add) ?: details.add(line)
             }
         }
@@ -148,6 +166,20 @@ private fun parseTraceMessage(message: String): ParsedTraceMessage {
     )
 }
 
+private fun parseTemplateTraceLine(line: String): RunLogTemplateDiagnostic? {
+    val parts = line.split('\t', limit = TEMPLATE_TRACE_SPLIT_LIMIT)
+    if (parts.size < TEMPLATE_TRACE_MIN_FIELD_COUNT || !parts.first().equals(TEMPLATE_TRACE_PREFIX, ignoreCase = true)) {
+        return null
+    }
+    return RunLogTemplateDiagnostic(
+        argName = parts[1].trim().takeIf { it.isNotBlank() } ?: return null,
+        source = parts[2].trim().takeIf { it.isNotBlank() } ?: return null,
+        expression = parts[3].trim(),
+        value = parts[4].trim(),
+        warning = parts.getOrNull(5)?.trim()?.takeIf { it.isNotBlank() },
+    )
+}
+
 private data class ParsedTraceMessage(
     val message: String,
     val argumentSummary: String? = null,
@@ -160,5 +192,8 @@ private const val DECISION_PREFIX = "Decision:"
 private const val REASON_PREFIX = "Reason:"
 private const val ARGUMENTS_DETAIL_PREFIX = "args:"
 private const val TEMPLATE_WARNINGS_DETAIL_PREFIX = "template warnings:"
+private const val TEMPLATE_TRACE_PREFIX = "Template:"
+private const val TEMPLATE_TRACE_MIN_FIELD_COUNT = 5
+private const val TEMPLATE_TRACE_SPLIT_LIMIT = 6
 private const val SKIPPED_DECISION = "Skipped"
 private const val LEGACY_EXTERNAL_SOURCE = "External intent"

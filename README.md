@@ -1,13 +1,13 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.32-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.33-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.32** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, runtime template argument expansion, template run-log diagnostics, FOSS geofence evaluation, scene library management, read-only flow graphs, JSON bundles, profile sharing manifests, Tasker XML import planning, F-Droid build readiness, dependency version governance, optional Shizuku readiness, optional Termux script readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; variable debugger UI, elevated backends, script execution, and broader plugin UX are planned.
+**OpenTasker v0.2.33** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, runtime template argument expansion, per-expression template diagnostics, FOSS geofence evaluation, scene library management, read-only flow graphs, JSON bundles, profile sharing manifests, Tasker XML import planning, F-Droid build readiness, dependency version governance, optional Shizuku readiness, optional Termux script readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; condition-template adoption, elevated backends, script execution, and broader plugin UX are planned.
 
-> **Status:** v0.2.32 surfaces template expansion details in run-log diagnostics, including sanitized expanded arguments and template warning counts per action step. It keeps runtime `{{ ... }}` action argument expansion, FOSS geofence evaluation, profile sharing manifests, Termux script readiness, Shizuku readiness, the Scenes tab, Flow tab, centralized dependency governance, F-Droid distribution profile, Tasker XML import planning, local calendar/sun triggers, NFC tag events, notification listener events, context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
+> **Status:** v0.2.33 persists and renders individual template expression diagnostics per action step, including argument name, source scope, expression, resolved value, and warnings with sensitive argument redaction. It keeps runtime `{{ ... }}` action argument expansion, FOSS geofence evaluation, profile sharing manifests, Termux script readiness, Shizuku readiness, the Scenes tab, Flow tab, centralized dependency governance, F-Droid distribution profile, Tasker XML import planning, local calendar/sun triggers, NFC tag events, notification listener events, context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
 
 ---
 
@@ -39,7 +39,7 @@
 ✅ **App-open monitor** — foreground-service-owned UsageStats polling with explicit missing-permission pause behavior  
 ✅ **Runtime action registry** — UI action IDs map to real implementations or explicit unsupported failures  
 ✅ **Capability gating** — action picker marks setup requirements and blocks unsupported privileged actions  
-✅ **Run log traces** — task history includes action-level status, duration, failure reasons, sanitized template expansions, and warning counts
+✅ **Run log traces** — task history includes action-level status, duration, failure reasons, sanitized template expansions, warning counts, and per-expression diagnostics
 ✅ **Context inspector** — live source health, latest observed values, and per-profile match explanations<br>
 ✅ **Notification listener events** — notification access can feed `event=notification` contexts with package/title/body filters<br>
 ✅ **NFC tag events** — tag scans can feed `event=nfc` contexts with normalized tag ID matching<br>
@@ -117,7 +117,7 @@ Release APKs are unsigned unless `OPEN_TASKER_RELEASE_KEYSTORE`, `OPEN_TASKER_RE
 ## Next Phase (v0.3)
 
 1. **Dependency modernization batches** — staged AndroidX/Kotlin/Room/WorkManager updates with device verification
-2. **Variable debugger UI** — expose individual template expressions, source scopes, missing values, and warnings in run details
+2. **Condition template adoption** — decide whether profile/action conditions should move from legacy `%var` predicates to bounded templates
 3. **Scene element editor** — add text/button/slider/image controls and task binding pickers before overlay launch
 4. **Flow graph deep links** — node selection that opens the relevant profile, task, context, or action editor
 5. **Shizuku API opt-in backend** — explicit user opt-in, permission request, isolated execution, and run-log audit trail

@@ -56,13 +56,18 @@ class RunLogDiagnosticsTest {
     fun traceParserExtractsTemplateArgumentDetails() {
         val diagnostics = (
             "Source: Profile: Morning\n" +
-                "1. success: Notify [notify.show] 5ms - Completed (args: message=Hi Ada, token=<redacted>; template warnings: 1)"
+                "1. success: Notify [notify.show] 5ms - Completed (args: message=Hi Ada, token=<redacted>; template warnings: 1)\n" +
+                "Template:\tmessage\tglobal\tname | upper\tADA\t"
             ).toRunLogDiagnostics()
 
         val trace = diagnostics.traces.single()
         assertEquals("Completed", trace.message)
         assertEquals("message=Hi Ada, token=<redacted>", trace.argumentSummary)
         assertEquals(1, trace.templateWarningCount)
+        assertEquals("message", trace.templateExpressions.single().argName)
+        assertEquals("global", trace.templateExpressions.single().source)
+        assertEquals("name | upper", trace.templateExpressions.single().expression)
+        assertEquals("ADA", trace.templateExpressions.single().value)
     }
 
     @Test
