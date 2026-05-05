@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.24 - 2026-05-05
+
+Visual flow baseline.
+
+- Added a pure automation flow graph model that maps profiles to contexts, enter/exit tasks, actions, edges, and warnings.
+- Added an optional Flow tab that renders read-only per-profile graphs from the active Room data without replacing the list/form editor.
+- Added graph warnings for missing tasks, empty contexts, and empty task lanes.
+- Documented the visual flow baseline and updated roadmap/version metadata for L1.
+- Added unit coverage for enter chains, exit chains, missing task references, and empty-context warnings.
+
 ## v0.2.23 - 2026-05-05
 
 Dependency modernization baseline.
