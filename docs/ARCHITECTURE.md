@@ -48,7 +48,7 @@ Tasker's source is **not public**. This architecture is reconstructed from the u
 │  - AutomationService (foreground)                     │
 │  - AlarmManager exact/inexact time ticks              │
 │  - NetworkCallback / BroadcastReceivers / UsageStats  │
-│  - FOSS geofence radius/accuracy/dwell evaluator      │
+│  - FOSS location source + geofence evaluator          │
 │  - Optional Shizuku manager readiness detection       │
 │  - Optional Termux script bridge readiness detection  │
 └───────────────────────────────────────────────────────┘
@@ -70,7 +70,7 @@ NFC tag triggers are represented as Event contexts with `event=nfc`. `MainActivi
 
 Calendar and sun triggers are represented as Event contexts. Calendar polling uses `CalendarContract.Instances` only when `READ_CALENDAR` is granted and emits redacted metadata such as calendar name, busy/upcoming state, all-day flag, and minutes until start/end, without event titles or descriptions. Sunrise/sunset filters evaluate minute ticks against user-provided latitude/longitude, offset minutes, and trigger windows.
 
-Location contexts use `FossGeofenceEvaluator` for Play-services-free geofence math. The active matcher supports Haversine distance, radius, optional max accuracy, and dwell-time checks when a location event supplies latitude, longitude, accuracy, observed time, and inside-since metadata. A live background location source and persisted dwell-state engine remain future work.
+Location contexts use `LocationContextSourceImpl` and `FossGeofenceEvaluator` for a Play-services-free geofence path. The source emits Android framework GPS/network fixes and fail-closed setup events for missing permission, disabled providers, unavailable services, or source errors. The active matcher supports Haversine distance, radius, optional max accuracy, and dwell-time checks when a location event supplies latitude, longitude, accuracy, observed time, and inside-since metadata. Persisted dwell state, battery tuning, and device-verified background reliability remain future work.
 
 Tasker XML import is intentionally staged through the OpenTasker JSON bundle model. `TaskerXmlImporter` parses common Tasker task/profile/variable structures into a bundle plus migration report, preserves unmapped Tasker actions as explicit unsupported placeholders, and reports skipped contexts, profiles, and scenes before any Room write path is invoked.
 

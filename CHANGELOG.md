@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.36 - 2026-05-05
+
+Live FOSS location source baseline.
+
+- Added a registered `location` context source backed by Android `LocationManager`, with GPS/network providers and last-known-fix seeding.
+- Added fail-closed source events for missing permissions, disabled providers, unavailable services, and source errors.
+- Declared the Android 14+ location foreground-service contract while keeping background geofence reliability gated behind background location and device verification.
+- Updated Setup and Context Inspector copy for foreground, approximate, precise, and background location states.
+- Added regression coverage for location event metadata, runtime source registration, and manifest foreground-service location declarations.
+
 ## v0.2.35 - 2026-05-05
 
 Template regex policy.

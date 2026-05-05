@@ -370,8 +370,8 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
         PermissionSetupItem(
             title = "Foreground location",
-            body = "Needed for location contexts and WiFi SSID visibility on modern Android.",
-            granted = hasPermission(context, Manifest.permission.ACCESS_FINE_LOCATION),
+            body = "Needed for live Location contexts and WiFi SSID visibility on modern Android. Approximate access can emit lower-precision fixes; precise access improves radius matching.",
+            granted = hasAnyLocationPermission(context),
             actionLabel = "Request",
             action = PermissionAction.RuntimePermission(Manifest.permission.ACCESS_FINE_LOCATION),
             requiredFor = "Location and WiFi contexts",
@@ -390,7 +390,7 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
         PermissionSetupItem(
             title = "Background location",
-            body = "Needed only when geofence automations must work while OpenTasker is not visible.",
+            body = "Needed only when geofence automations must keep evaluating after OpenTasker is no longer visible. Public reliability still needs device verification.",
             granted = Build.VERSION.SDK_INT < 29 || hasPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION),
             actionLabel = "Open app settings",
             action = PermissionAction.SettingsIntent(appDetailsIntent(context)),
@@ -467,6 +467,10 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
 
 private fun hasPermission(context: Context, permission: String): Boolean =
     ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
+private fun hasAnyLocationPermission(context: Context): Boolean =
+    hasPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ||
+        hasPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
 
 private fun ignoresBatteryOptimizations(context: Context): Boolean {
     val powerManager = context.getSystemService(PowerManager::class.java)
