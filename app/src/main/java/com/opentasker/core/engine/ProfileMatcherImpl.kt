@@ -3,7 +3,9 @@ package com.opentasker.core.engine
 import android.content.Context
 import com.opentasker.core.contexts.ContextMatchEvaluator
 import com.opentasker.core.contexts.ContextSourceRegistry
+import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.logging.AppLogger
+import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -26,18 +28,24 @@ class ProfileMatcher(
 ) {
     private val tag = "ProfileMatcher[${profile.name}]"
     private val performanceThresholdMs = 1000L // Warn if evaluation takes > 1 second
+    private val locationDwellStateStore = LocationDwellStateStore(app)
     
     fun stateChanges(): Flow<ProfileStateChange> {
         if (profile.contexts.isEmpty()) {
             return emptyFlow()
         }
 
-        val flows = profile.contexts.map { spec ->
+        val flows = profile.contexts.mapIndexed { index, spec ->
             val sourceType = ContextMatchEvaluator.sourceKey(spec.type)
             val source = sourceType?.let(ContextSourceRegistry::get)
             if (source != null) {
                 source.events(app).map { event ->
-                    val matched = ContextMatchEvaluator.matches(spec, event)
+                    val preparedEvent = if (spec.type == ContextType.LOCATION) {
+                        locationDwellStateStore.enrich(profile.id, index, spec, event)
+                    } else {
+                        event
+                    }
+                    val matched = ContextMatchEvaluator.matches(spec, preparedEvent)
                     if (spec.invert) !matched else matched
                 }
             } else {

@@ -1,13 +1,13 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.36-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.37-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.36** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, runtime template argument and condition expansion, per-expression template diagnostics, explicit regex template policy, FOSS geofence evaluation with a live platform location source, scene library management, read-only flow graphs, JSON bundles, profile sharing manifests, Tasker XML import planning, F-Droid build readiness, dependency version governance, optional Shizuku readiness, optional Termux script readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; persisted geofence dwell state, device-verified background reliability, elevated backends, script execution, and broader plugin UX are planned.
+**OpenTasker v0.2.37** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, runtime template argument and condition expansion, per-expression template diagnostics, explicit regex template policy, FOSS geofence evaluation with a live platform location source and persisted dwell state, scene library management, read-only flow graphs, JSON bundles, profile sharing manifests, Tasker XML import planning, F-Droid build readiness, dependency version governance, optional Shizuku readiness, optional Termux script readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; device-verified background reliability, elevated backends, script execution, and broader plugin UX are planned.
 
-> **Status:** v0.2.36 opens the next L6 geofencing slice by registering a FOSS `LocationManager` source for Location contexts, adding Android 14+ foreground-service location declarations, and updating setup/inspector copy while keeping background reliability claims gated behind background permission, dwell persistence, and device verification. It keeps template conditions, per-expression template diagnostics, runtime action argument expansion, FOSS geofence evaluation, profile sharing manifests, Termux script readiness, Shizuku readiness, the Scenes tab, Flow tab, centralized dependency governance, F-Droid distribution profile, Tasker XML import planning, local calendar/sun triggers, NFC tag events, notification listener events, context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
+> **Status:** v0.2.37 continues L6 by persisting geofence inside-since state per profile/context/config before Location context matching, so dwell timers can survive process restarts. It keeps the FOSS `LocationManager` source, Android 14+ foreground-service location declarations, setup/inspector copy, template conditions, per-expression template diagnostics, runtime action argument expansion, FOSS geofence evaluation, profile sharing manifests, Termux script readiness, Shizuku readiness, the Scenes tab, Flow tab, centralized dependency governance, F-Droid distribution profile, Tasker XML import planning, local calendar/sun triggers, NFC tag events, notification listener events, context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active. Background geofence reliability still needs device verification.
 
 ---
 
@@ -15,9 +15,9 @@
 
 ✅ **Core engine operational** — profiles → contexts → tasks → actions pipeline  
 ✅ **42 registered action definitions** — supported actions run, restricted/script/import-placeholder actions are gated or fail explicitly
-✅ **Reactive context sources** — app foreground, time, state, event, WiFi, app-open monitoring, notifications, NFC tag scans, calendar windows, sunrise/sunset matching, and platform location fixes are wired; day schedules and geofence persistence remain planned runtime work
+✅ **Reactive context sources** — app foreground, time, state, event, WiFi, app-open monitoring, notifications, NFC tag scans, calendar windows, sunrise/sunset matching, and platform location fixes are wired; day schedules and device-verified background geofencing remain planned runtime work
 ✅ **Template expression runtime** — action arguments and conditions support bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math functions, traces, and warnings
-✅ **FOSS geofence source/evaluator** — Location context matching supports platform GPS/network fixes, radius, accuracy, and dwell checks without Play Services
+✅ **FOSS geofence source/evaluator** — Location context matching supports platform GPS/network fixes, radius, accuracy, and persisted dwell checks without Play Services
 ✅ **AMOLED-first** — Catppuccin Mocha palette, light theme toggle  
 ✅ **Compose UI reintegration started** — active navigation now manages profiles, tasks, actions, contexts, and run logs from Room  
 ✅ **Profile templates** — guided starter profiles with variable slots, safety notes, and disabled-by-default installation  
@@ -73,7 +73,7 @@ Room DB (persistent storage)
 
 ### Contexts
 - **Runtime-wired now:** Application foreground detection, time ticks, device state broadcasts, event broadcasts, WiFi network changes, app-open monitoring, notification listener events, NFC tag events, calendar windows, sunrise/sunset event filters, and platform location fixes.
-- **Configured in UI but still being hardened:** Day schedules and location/geofence contexts. Location matching now receives FOSS platform GPS/network events and supports radius, accuracy, and dwell evaluation; persisted dwell state and device-verified background reliability remain planned runtime work.
+- **Configured in UI but still being hardened:** Day schedules and location/geofence contexts. Location matching now receives FOSS platform GPS/network events and supports radius, accuracy, and persisted dwell evaluation; device-verified background reliability remains planned runtime work.
 
 ### Actions (42 registered definitions)
 | Category | Count | Examples |
@@ -117,7 +117,7 @@ Release APKs are unsigned unless `OPEN_TASKER_RELEASE_KEYSTORE`, `OPEN_TASKER_RE
 ## Next Phase (v0.3)
 
 1. **Dependency modernization batches** — staged AndroidX/Kotlin/Room/WorkManager updates with device verification
-2. **Geofence durability** — persisted dwell state, battery tuning, policy copy, and device-verified background behavior
+2. **Geofence durability** — battery tuning, policy copy, inspector dwell details, and device-verified background behavior
 3. **Scene element editor** — add text/button/slider/image controls and task binding pickers before overlay launch
 4. **Flow graph deep links** — node selection that opens the relevant profile, task, context, or action editor
 5. **Shizuku API opt-in backend** — explicit user opt-in, permission request, isolated execution, and run-log audit trail

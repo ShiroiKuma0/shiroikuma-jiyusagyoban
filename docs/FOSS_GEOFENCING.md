@@ -1,6 +1,6 @@
 # FOSS Geofencing Baseline
 
-OpenTasker v0.2.36 has a Play-services-free geofence path for Location contexts. It combines a platform `LocationManager` source with the pure evaluator added in v0.2.29; it is still not a device-verified background geofence reliability claim.
+OpenTasker v0.2.37 has a Play-services-free geofence path for Location contexts. It combines a platform `LocationManager` source with the pure evaluator added in v0.2.29 and persisted dwell state added in v0.2.37; it is still not a device-verified background geofence reliability claim.
 
 ## Active Scope
 
@@ -9,6 +9,10 @@ OpenTasker v0.2.36 has a Play-services-free geofence path for Location contexts.
 - Uses Android framework GPS and network providers instead of Google Play Services.
 - Seeds matching from the best last-known GPS/network fix when one is available.
 - Emits fail-closed setup events for missing foreground location permission, disabled providers, unavailable location service, and source errors.
+- Persists `insideSinceEpochMs` per profile/context/config so dwell timers can survive process restarts.
+- Uses a config hash in dwell-state keys so edited geofences do not reuse stale inside-since state.
+- Clears persisted dwell state when a valid sample leaves the radius.
+- Preserves previous inside-since state across low-accuracy samples that are inside the radius but blocked by max-accuracy policy.
 - Evaluates `latitude`, `longitude`, and `radiusMeters` Location context config.
 - Supports aliases: `lat`, `lon`, `lng`, and `radius`.
 - Supports optional `maxAccuracyMeters` or `maxAccuracy` config.
@@ -22,7 +26,6 @@ OpenTasker v0.2.36 has a Play-services-free geofence path for Location contexts.
 ## Non-Goals
 
 - No Google Play Services geofencing dependency.
-- No persisted dwell-state tracker.
 - No public background-location reliability claim.
 - No battery optimization strategy for location polling.
 - No Play flavor split.
@@ -37,8 +40,8 @@ OpenTasker v0.2.36 has a Play-services-free geofence path for Location contexts.
 
 ## Next Work
 
-1. Persist inside/outside state per geofence so dwell time survives process restarts.
-2. Surface geofence-specific dwell state in the Context Inspector.
-3. Tune provider cadence and battery behavior with device evidence.
-4. Expand setup/policy copy after real foreground/background verification.
+1. Surface geofence-specific dwell state in the Context Inspector.
+2. Tune provider cadence and battery behavior with device evidence.
+3. Expand setup/policy copy after real foreground/background verification.
+4. Add cleanup or migration for stale dwell keys if profile/context deletion starts leaving meaningful residue.
 5. Verify behavior on a device before making public geofence reliability claims.
