@@ -274,6 +274,31 @@ print(json.dumps(summary, ensure_ascii=False))
     return $result | ConvertFrom-Json
 }
 
+function Test-RunLogEvidencePattern {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$RunLog,
+        [Parameter(Mandatory = $true)]
+        [object]$RoomSummary,
+        [Parameter(Mandatory = $true)]
+        [string]$Pattern
+    )
+
+    $fields = @(
+        [string]$RunLog.taskName,
+        [string]$RunLog.message
+    )
+
+    if ($RoomSummary.PSObject.Properties.Name -contains "tasks") {
+        $task = @($RoomSummary.tasks | Where-Object { [string]$_.id -eq [string]$RunLog.taskId } | Select-Object -First 1)
+        if ($task.Count -gt 0) {
+            $fields += [string]$task[0].actionsJson
+        }
+    }
+
+    return @($fields | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and $_ -match $Pattern }).Count -gt 0
+}
+
 $adbCheck = Get-Command adb -ErrorAction SilentlyContinue
 if (-not $adbCheck) {
     throw "adb was not found on PATH."
@@ -457,10 +482,10 @@ if (-not [string]::IsNullOrWhiteSpace($RequireRunLogMessagePattern)) {
         throw "Run-log requirement could not be checked because Room summary is unavailable. Evidence: $script:OutputDir"
     }
     $matchingRunLogs = @($roomSummary.recentRunLogs | Where-Object {
-        $_.timestamp -ge $evidenceStartedAtEpochMs -and $_.message -match $RequireRunLogMessagePattern
+        $_.timestamp -ge $evidenceStartedAtEpochMs -and (Test-RunLogEvidencePattern -RunLog $_ -RoomSummary $roomSummary -Pattern $RequireRunLogMessagePattern)
     })
     if ($matchingRunLogs.Count -eq 0) {
-        throw "Run logs did not contain required pattern '$RequireRunLogMessagePattern' after evidence start. Evidence: $script:OutputDir"
+        throw "Run logs did not contain required task, action, or message pattern '$RequireRunLogMessagePattern' after evidence start. Evidence: $script:OutputDir"
     }
 }
 

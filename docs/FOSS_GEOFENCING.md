@@ -1,6 +1,6 @@
 # FOSS Geofencing Baseline
 
-OpenTasker v0.2.45 has a Play-services-free geofence path for Location contexts. It combines a platform `LocationManager` source with the pure evaluator added in v0.2.29, persisted dwell state added in v0.2.37, Context Inspector dwell detail added in v0.2.38, stale dwell-key cleanup added in v0.2.39, balanced provider cadence added in v0.2.40, shared Android location policy disclosures added in v0.2.41, app-launch foreground-service startup repaired in v0.2.42, the adb-backed device evidence harness added in v0.2.43, a setup-required disabled Location evidence template added in v0.2.44, and run-log/logcat evidence assertions added in v0.2.45; it is still not a device-verified background geofence reliability claim.
+OpenTasker v0.2.46 has a Play-services-free geofence path for Location contexts. It combines a platform `LocationManager` source with the pure evaluator added in v0.2.29, persisted dwell state added in v0.2.37, Context Inspector dwell detail added in v0.2.38, stale dwell-key cleanup added in v0.2.39, balanced provider cadence added in v0.2.40, shared Android location policy disclosures added in v0.2.41, app-launch foreground-service startup repaired in v0.2.42, the adb-backed device evidence harness added in v0.2.43, a setup-required disabled Location evidence template added in v0.2.44, run-log/logcat evidence assertions added in v0.2.45, and API 36 background Location event-delivery smoke evidence added in v0.2.46; it is still not a broad device-verified background geofence reliability claim.
 
 ## Active Scope
 
@@ -10,7 +10,8 @@ OpenTasker v0.2.45 has a Play-services-free geofence path for Location contexts.
 - API 36 device smoke confirmed app launch starts the service foreground with `specialUse|location` when foreground/background location permissions and device location are enabled.
 - Includes a disabled-by-default `Location evidence log` template with latitude, longitude, radius, max-accuracy, dwell, and log-action defaults for later event-delivery smoke tests.
 - `tools/collect-location-evidence.ps1` collects repeatable adb evidence for Location/geofence verification, including permission state, foreground-service type, app-to-home service persistence, logcat tail, location dumps, battery dumps, and batterystats snapshots.
-- The evidence collector snapshots debug Room data through `run-as`, writes `room-summary.json`, and can require matching recent run-log or logcat evidence before a run passes.
+- The evidence collector snapshots debug Room data through `run-as`, writes `room-summary.json`, and can require matching recent run-log task, action, message, or logcat evidence before a run passes.
+- API 36 device evidence `build/device-evidence/location/20260505-085413` verified actual background Location event delivery for the installed/enabled `Location evidence log` template: while the app was sent home, `AutomationService` remained foreground with `specialUse|location`, the shell-owned GPS test provider delivered the template coordinates to OpenTasker, and Room recorded a successful `Location evidence log Task` run after evidence collection started.
 - A 10-second API 36 harness run with the app sent home kept `AutomationService` foreground with `specialUse|location` and captured battery before/after snapshots; the short USB-powered sample is evidence that the harness works, not a battery optimization claim.
 - Uses Android framework GPS and network providers instead of Google Play Services.
 - Seeds matching from the best last-known GPS/network fix when one is available.
@@ -54,13 +55,13 @@ OpenTasker v0.2.45 has a Play-services-free geofence path for Location contexts.
 Run the adb evidence collector from the repo root after installing the APK on a connected device:
 
 ```powershell
-.\tools\collect-location-evidence.ps1 -SampleSeconds 600 -GrantLocationPermissions -SendHomeDuringSample -RequireRunLogMessagePattern "Location evidence log|Log location evidence"
+.\tools\collect-location-evidence.ps1 -SampleSeconds 600 -GrantLocationPermissions -SendHomeDuringSample -RequireRunLogMessagePattern "Location evidence log|Location evidence matched|Log location evidence"
 ```
 
-For actual Location event-delivery verification, install the `Location evidence log` template, adjust the coordinates/radius to the test site, grant foreground/background location prerequisites, enable the created profile, then run the collector while the service is backgrounded. The script writes timestamped output under ignored `build/device-evidence/location/`, including `room-summary.json` when debug `run-as` and local Python/SQLite are available. Use longer unplugged samples for battery work; short USB-powered samples only prove the harness and foreground-service state checks are functioning.
+For actual Location event-delivery verification, install the `Location evidence log` template, adjust the coordinates/radius to the test site, grant foreground/background location prerequisites, enable the created profile, then run the collector while the service is backgrounded. The script writes timestamped output under ignored `build/device-evidence/location/`, including `room-summary.json` when debug `run-as` and local Python/SQLite are available. Use longer unplugged samples for battery work; short USB-powered samples only prove the harness, event-delivery, and foreground-service state checks are functioning.
 
 ## Next Work
 
-1. Install, configure, and enable the `Location evidence log` template on a device, then extend smoke coverage from foreground-service persistence to actual background Location event delivery.
-2. Run longer unplugged provider-cadence and battery samples with `tools/collect-location-evidence.ps1`.
-3. Verify behavior on a device before making public geofence reliability claims.
+1. Run longer unplugged provider-cadence and battery samples with `tools/collect-location-evidence.ps1`.
+2. Repeat background Location delivery on additional device/API/provider combinations.
+3. Verify longer behavior before making public geofence reliability claims.

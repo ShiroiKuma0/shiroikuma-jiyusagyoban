@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.46 - 2026-05-05
+
+Background Location delivery evidence.
+
+- Verified the installed/enabled `Location evidence log` template on connected API 36 device `SM-S938B` with the app sent home.
+- Used a shell-owned GPS test provider to deliver the template coordinates while `AutomationService` stayed foreground with `specialUse|location`.
+- Captured Room evidence under `build/device-evidence/location/20260505-085413` showing a successful `Location evidence log Task` run log after evidence collection started.
+- Extended `tools/collect-location-evidence.ps1` so `-RequireRunLogMessagePattern` can match the recent run-log message, task name, or the triggered task's action JSON.
+
 ## v0.2.45 - 2026-05-05
 
 Location event evidence assertions.
