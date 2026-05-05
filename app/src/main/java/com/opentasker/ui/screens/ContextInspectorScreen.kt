@@ -584,9 +584,9 @@ private fun contextSourceSetup(context: Context, key: String): ContextSourceSetu
         ContextSourceSetup(
             ready = true,
             detail = if (notificationReady) {
-                "Boot, system, and notification events are registered. Notification text is kept in-memory for matching and is not written to run logs."
+                "Boot, system, notification, and NFC events are registered. Notification text is kept in-memory for matching and is not written to run logs."
             } else {
-                "Boot and system events are registered. Notification events need Notification Access in Setup before Android will bind the listener."
+                "Boot, system, and NFC events are registered. Notification events need Notification Access in Setup before Android will bind the listener."
             },
         )
     }

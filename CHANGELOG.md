@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.19 - 2026-05-05
+
+NFC tag trigger baseline.
+
+- Added an NFC event bridge that accepts tag/tech/NDEF discovery intents and emits `event=nfc` context events with normalized tag IDs.
+- Routed cold-start and foreground NFC intents through `MainActivity` into the existing Event context source.
+- Added NFC tag ID filtering to Event contexts and exposed an NFC tag ID field in the context editor.
+- Promoted the nightstand NFC sleep template from planned to setup-required installation.
+- Updated inspector/setup copy, roadmap/docs/version metadata, and regression tests for NFC matching and template installation.
+
 ## v0.2.18 - 2026-05-05
 
 Notification listener trigger baseline.

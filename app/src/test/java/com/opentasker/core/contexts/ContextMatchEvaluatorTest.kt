@@ -140,4 +140,21 @@ class ContextMatchEvaluatorTest {
             )
         )
     }
+
+    @Test
+    fun nfcEventMatchesNormalizedTagIds() {
+        val event = ContextEvent(
+            "event",
+            true,
+            mapOf("event" to "nfc", "tagId" to "04AABBCC"),
+        )
+        val matchingSpec = ContextSpec(
+            ContextType.EVENT,
+            mapOf("event" to "nfc", "tagId" to "04:aa-bb cc, 01020304"),
+        )
+        val wrongTagSpec = matchingSpec.copy(config = matchingSpec.config + ("tagId" to "01020304"))
+
+        assertTrue(ContextMatchEvaluator.matches(matchingSpec, event))
+        assertFalse(ContextMatchEvaluator.matches(wrongTagSpec, event))
+    }
 }
