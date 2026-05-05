@@ -55,6 +55,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.opentasker.core.location.LocationPolicyDisclosures
 import com.opentasker.core.permissions.UsageAccess
 import com.opentasker.core.power.ShizukuPowerBackend
 import com.opentasker.core.scheduling.ExactAlarmSupport
@@ -370,7 +371,7 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
         PermissionSetupItem(
             title = "Foreground location",
-            body = "Needed for live Location contexts and WiFi SSID visibility on modern Android. Approximate access can emit lower-precision fixes; precise access improves radius matching.",
+            body = LocationPolicyDisclosures.foregroundSetupBody,
             granted = hasAnyLocationPermission(context),
             actionLabel = "Request",
             action = PermissionAction.RuntimePermission(Manifest.permission.ACCESS_FINE_LOCATION),
@@ -390,7 +391,7 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
         PermissionSetupItem(
             title = "Background location",
-            body = "Needed only when geofence automations must keep evaluating after OpenTasker is no longer visible. Public reliability still needs device verification.",
+            body = LocationPolicyDisclosures.backgroundSetupBody(Build.VERSION.SDK_INT),
             granted = Build.VERSION.SDK_INT < 29 || hasPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION),
             actionLabel = "Open app settings",
             action = PermissionAction.SettingsIntent(appDetailsIntent(context)),
