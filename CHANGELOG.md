@@ -6,10 +6,11 @@ Dependency modernization.
 
 - Upgraded Hilt/Dagger from `2.46` to the intermediate `2.52` line while leaving Kotlin, KSP, AGP, Room, and runtime startup wiring unchanged.
 - Verified the Hilt batch with debug Kotlin/unit tests, debug androidTest compile, debug APK/lint, and the F-Droid release profile.
-- Upgraded Room from `2.6.1` to `2.7.2` on the existing `androidx.room` artifact line; Room `2.8.x` is deferred until the Kotlinx Serialization/runtime-support batch, and Room 3.0 remains a separate future migration because it uses the new `androidx.room3` group.
+- Upgraded Room from `2.6.1` to `2.7.2` on the existing `androidx.room` artifact line; Room `2.8.x` is deferred until the Kotlin/KSP/compiler batch, and Room 3.0 remains a separate future migration because it uses the new `androidx.room3` group.
 - Verified the Room batch with connected migration instrumentation tests on `SM-S938B`.
 - Upgraded WorkManager from `2.9.1` to `2.11.2`; no active workers are registered yet, so this batch is dependency/build compatibility only and passed the standard dependency gate.
 - Upgraded the stable Compose/AndroidX UI dependency set within the current API 35 / AGP 8.7 constraints: Compose BOM `2025.07.00` and Activity Compose `1.10.1`; newer Activity/Navigation lines are deferred because they require API 36 and AGP 8.9.1, while Compose BOM `2025.08.01+`, Hilt Navigation Compose `1.3.0`, and Lifecycle `2.9.x+` are deferred because they resolve Lifecycle lint checks that need a newer AGP/Kotlin analysis stack.
+- Upgraded the compatible runtime-support dependency subset: Core KTX `1.16.0`, DataStore `1.2.1`, and Gson `2.14.0`; newer Core KTX waits for API 36 / AGP 8.9.1, and Coroutines/Kotlinx Serialization wait for the Kotlin compiler alignment batch.
 
 ## v0.2.58 - 2026-05-05
 
