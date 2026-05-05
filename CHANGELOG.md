@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.28 - 2026-05-05
+
+Profile sharing manifest baseline.
+
+- Added a pure profile-share manifest model for OpenTasker bundles with stable slugs, counts, trust state, and submission metadata.
+- Added safety findings for unsupported/setup-required actions, schema warnings, lossy import warnings, and missing screenshots.
+- Added GitHub Discussions submission markdown generation without adding network publishing or verified-template claims.
+- Documented the sharing baseline and added unit coverage for manifest counts, blockers, slug validation, and submission text.
+
 ## v0.2.27 - 2026-05-05
 
 Termux script readiness baseline.
