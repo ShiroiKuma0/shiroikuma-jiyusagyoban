@@ -51,6 +51,46 @@ class LocalePluginBundleCodecTest {
     }
 
     @Test
+    fun encodesBundleJsonDeterministically() {
+        val json = LocalePluginBundleCodec.encodeStringBundle(
+            mapOf(
+                "zeta" to "last",
+                "alpha" to "first",
+            )
+        )
+
+        assertEquals("""{"alpha":"first","zeta":"last"}""", json)
+    }
+
+    @Test
+    fun sanitizesPrimitiveConfigurationResultValues() {
+        val values = LocalePluginBundleCodec.sanitizeBundleValues(
+            mapOf(
+                "text" to "hello",
+                "enabled" to true,
+                "count" to 3,
+                "ratio" to 1.5,
+            )
+        )
+
+        assertEquals("hello", values["text"])
+        assertEquals("true", values["enabled"])
+        assertEquals("3", values["count"])
+        assertEquals("1.5", values["ratio"])
+    }
+
+    @Test
+    fun rejectsNestedConfigurationResultValues() {
+        val error = runCatching {
+            LocalePluginBundleCodec.sanitizeBundleValues(
+                mapOf("nested" to mapOf("unsafe" to "value"))
+            )
+        }.exceptionOrNull()
+
+        assertTrue(error is IllegalStateException || error is IllegalArgumentException)
+    }
+
+    @Test
     fun parsesConditionResultCodes() {
         val satisfied = LocalePluginConditionResultParser.parse(
             LocalePluginContract.RESULT_CONDITION_SATISFIED,
