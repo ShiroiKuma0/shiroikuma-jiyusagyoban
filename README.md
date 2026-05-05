@@ -7,7 +7,7 @@
 
 **OpenTasker v0.2.16** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, JSON bundles, external automation intents, and a conservative Locale plugin host baseline are active now; scenes, variable tooling, and broader plugin UX are planned.
 
-> **Status:** v0.2.16 adds per-profile automation modes for single, restart, queued, and parallel re-triggers, while keeping permission-scoped external intents, Locale plugin dispatch, JSON bundles, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
+> **Status:** v0.2.16 adds per-profile automation modes for single, restart, queued, and parallel re-triggers, while keeping signature-scoped external intents, Locale plugin dispatch, JSON bundles, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
 
 ---
 
@@ -21,7 +21,7 @@
 ✅ **Profile templates** — guided starter profiles with variable slots, safety notes, and disabled-by-default installation  
 ✅ **Open JSON bundles** — schema-versioned profile/task/context/action/variable/scene export and import planning  
 ✅ **Locale plugin host baseline** — explicit setting-plugin dispatch with package validation, bundle limits, and timeout wrapping  
-✅ **External automation target** — permission-scoped intents to run tasks, toggle profiles, query status, and pass variables  
+✅ **External automation target** — signature-scoped intents to run tasks, toggle profiles, query status, and pass variables
 ✅ **Automation modes** — per-profile single, restart, queued, and parallel re-trigger behavior  
 ✅ **Setup checklist** — notifications, exact alarms, battery optimization, usage access, notification access, overlays, location, Bluetooth, SMS, and DND access  
 ✅ **Scheduled time ticks** — AlarmManager exact scheduling when allowed, inexact fallback when Android denies exact alarms  

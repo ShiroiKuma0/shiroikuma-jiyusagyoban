@@ -25,7 +25,7 @@ git diff --check
 
 | ID | Area | Priority | Status | Goal | Exit criteria |
 |---|---|---:|---|---|---|
-| P1 | External automation security | Critical | Not started | Prevent arbitrary third-party apps from running tasks or toggling profiles just by declaring OpenTasker's normal permission. | External callers require explicit user trust, a stronger permission model, or a signed/allowlisted integration path; tests cover accepted and rejected requests. |
+| P1 | External automation security | Critical | Done | Prevent arbitrary third-party apps from running tasks or toggling profiles just by declaring OpenTasker's normal permission. | External callers require explicit user trust, a stronger permission model, or a signed/allowlisted integration path; tests cover accepted and rejected requests. |
 | P2 | UI architecture split | High | Not started | Split the active Compose automation UI into maintainable screen, editor, state, and component modules. | `ActiveAutomationUi.kt` is reduced to routing/composition glue; major screens have focused files and targeted previews/tests where practical. |
 | P3 | Stale UI snapshot cleanup | High | Done | Remove unused `.kt.bak` screens from active source packages so the canonical UI surface is unambiguous. | Historical snapshots live outside `app/src/main/java`; the app compiles without stale screen files in source navigation. |
 | P4 | Lint debt reduction | High | Started | Reduce warning noise so lint can stay useful and CI can eventually fail on real issues. | Known local warnings are either fixed, narrowed, or intentionally documented; no broad suppressions are added for fixable issues. |
@@ -51,6 +51,7 @@ git diff --check
 ## Notes
 
 - External automation is the highest-risk product surface because it can trigger user-defined actions. Compatibility with legitimate automation integrations must be preserved deliberately, not assumed.
+- External automation is now signature-scoped at the manifest permission level, with a regression test covering the permission and exported receiver contract. Future broader third-party compatibility should use an explicit user trust model rather than reverting to a normal permission.
 - The active UI is functional but too concentrated. Refactors should keep the current user workflows recognizable while reducing file size and state coupling.
 - Lint dependency warnings should be handled in grouped upgrade branches rather than one large version jump.
 - Initial lint cleanup reduced `lintDebug` from 31 warnings to 22 warnings. The remaining warnings are dependency/target-SDK modernization items and obsolete Navigation lint checks that should be handled under P5.

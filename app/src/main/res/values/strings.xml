@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">OpenTasker</string>
     <string name="permission_automation_label">Control OpenTasker automations</string>
-    <string name="permission_automation_description">Allows another app to run OpenTasker tasks, toggle profiles, and query automation status through documented intents.</string>
+    <string name="permission_automation_description">Allows same-signer integrations to run OpenTasker tasks, toggle profiles, and query automation status through documented intents.</string>
     <string name="error_prefix">Error: %1$s</string>
     <string name="success_prefix">Success: %1$s</string>
 </resources>
