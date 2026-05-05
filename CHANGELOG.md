@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.38 - 2026-05-05
+
+Context Inspector dwell detail.
+
+- Added per-profile Location observation enrichment in the Context Inspector using the same persisted dwell state as runtime matching.
+- Added location check rows that show inside, outside, accuracy-blocked, or unknown dwell status with elapsed time against configured dwell duration.
+- Kept source cards raw while profile check rows display geofence-specific dwell metadata for the selected profile/context.
+- Added regression coverage for transformed Location observations during profile inspection.
+
 ## v0.2.37 - 2026-05-05
 
 Persisted geofence dwell state.
