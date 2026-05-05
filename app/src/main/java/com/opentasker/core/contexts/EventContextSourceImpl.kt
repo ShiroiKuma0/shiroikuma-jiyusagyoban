@@ -16,6 +16,9 @@ import kotlinx.coroutines.flow.merge
  * Supported events:
  *   - "sms_received": incoming SMS
  *   - "notification": notification posted (requires NotificationListenerService)
+ *   - "calendar": local CalendarProvider event windows (requires READ_CALENDAR)
+ *   - "sun_tick": local minute tick used by sunrise/sunset event filters
+ *   - "nfc": NFC tag scan
  *   - "boot_completed": device boot
  *   - "intent": arbitrary intent action (configurable)
  */
@@ -26,6 +29,7 @@ class EventContextSourceImpl : ContextSource {
         systemBroadcastEvents(app),
         NotificationContextEvents.events,
         NfcContextEvents.events,
+        CalendarSunContextEvents.events(app),
     )
 
     private fun systemBroadcastEvents(app: Context): Flow<ContextEvent> = callbackFlow {

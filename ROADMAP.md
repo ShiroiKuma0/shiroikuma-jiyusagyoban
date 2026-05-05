@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.19. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.20. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-05
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.19
+**Current app version:** 0.2.20
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -13,7 +13,7 @@ Source-backed product roadmap for OpenTasker v0.2.19. This file reconciles the c
 
 OpenTasker is an Android/Kotlin automation app targeting API 35 with Jetpack Compose, Material 3, Room, Coroutines, WorkManager, DataStore, Gson, and Hilt dependencies. The project goal is a privacy-first, fully on-device, open-source Tasker/MacroDroid/Automate alternative.
 
-The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, run logs, setup/onboarding status, live context inspection, notification listener event triggers, and NFC tag event triggers. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
+The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, run logs, setup/onboarding status, live context inspection, notification listener event triggers, NFC tag event triggers, and calendar/sun event triggers. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
 
 Key local constraints:
 
@@ -22,7 +22,7 @@ Key local constraints:
 | UI | Active profile/task/action/context/run-log/setup/inspector management UI is restored; advanced stale snapshots remain unused | Continue hardening UI with capability gating |
 | Engine | Foreground automation service and registries are wired through `OpenTaskerApp_NoHilt` | Keep non-Hilt runtime stable until Hilt migration is deliberate |
 | Actions | Built-in action IDs align with UI metadata, success-shaped stubs fail honestly, and the UI now blocks unsupported privileged actions | Capability registry can expand into context and permission-aware execution gates |
-| Contexts | Time ticks use app-owned AlarmManager scheduling, WiFi events use dynamic NetworkCallback, app-open events use foreground-service-owned UsageStats polling, notification posts can emit filtered Event contexts, and NFC tag scans can emit tag-filtered Event contexts; other context sources still rely on restricted Android APIs or incomplete implementations | Permission/onboarding and platform-safe replacements remain P0/P1 |
+| Contexts | Time ticks use app-owned AlarmManager scheduling, WiFi events use dynamic NetworkCallback, app-open events use foreground-service-owned UsageStats polling, notification posts can emit filtered Event contexts, NFC tag scans can emit tag-filtered Event contexts, and local calendar/sun ticks can emit filtered Event contexts; other context sources still rely on restricted Android APIs or incomplete implementations | Permission/onboarding and platform-safe replacements remain P0/P1 |
 | Persistence | Room schema export now exists; backup/restore hardened | Migration tests and upgrade strategy can be built on this |
 | Release | Debug/release builds pass locally; release signing is env-var driven | F-Droid/Play readiness still needs policy and reproducibility work |
 | Docs | README and architecture docs were corrected to v0.2.11; stale checkpoint/audit files that overclaimed old snapshots were removed | Roadmap tiers below supersede old milestone claims |
@@ -190,7 +190,7 @@ Key local constraints:
 
 ### X1 - Profile templates and guided creation wizard
 
-**Status:** Completed in v0.2.12. Added a template catalog, guided slot form, disabled-by-default Room installation, safety notes, and planned-template gating for trigger patterns that did not have runtime support yet; the NFC template was promoted to setup-required installation in v0.2.19.
+**Status:** Completed in v0.2.12. Added a template catalog, guided slot form, disabled-by-default Room installation, safety notes, and planned-template gating for trigger patterns that did not have runtime support yet; the NFC template was promoted to setup-required installation in v0.2.19 and the calendar template was promoted in v0.2.20.
 **Description:** Ship curated on-device templates with variable slots: work-hours DND, headphones connected media profile, low-battery saver, meeting mode from calendar, nightstand NFC sleep mode, WiFi arrival profile, app usage reminder, and "find my phone" notification/action patterns.  
 **Sources:** MacroDroid wizard/templates [S17], Home Assistant blueprints [S12], n8n templates [S10], Node-RED flow sharing [S9].  
 **Category:** UX, docs, accessibility.  
@@ -294,6 +294,7 @@ Key local constraints:
 
 ### X9 - Calendar and sun triggers
 
+**Status:** Baseline completed in v0.2.20. Added local CalendarProvider polling through the Event context source, redacted `event=calendar` metadata for busy current/upcoming events, state/calendar/before-window filters, sunrise/sunset matching from configured latitude/longitude plus offset/window settings, Calendar access onboarding, Event editor fields, a setup-required meeting-mode template, and regression tests. Remaining polish is device smoke coverage and richer calendar/sun presets.
 **Description:** Add calendar-event triggers ("during meeting", "before next event") and sunrise/sunset triggers with offsets. Keep calendar data local and log only redacted event metadata by default.  
 **Sources:** Home Assistant calendar/sun triggers [S12], MacroDroid/Automate calendar support [S17][S18], Android calendar permission model.  
 **Category:** UX, platform/OS, privacy.  

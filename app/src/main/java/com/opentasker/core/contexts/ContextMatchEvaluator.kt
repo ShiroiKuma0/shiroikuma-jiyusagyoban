@@ -2,6 +2,8 @@ package com.opentasker.core.contexts
 
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Calendar
 import java.util.Locale
 import kotlin.math.atan2
@@ -93,8 +95,40 @@ object ContextMatchEvaluator {
     private fun matchesEvent(spec: ContextSpec, event: ContextEvent): Boolean {
         val actualEvent = event.metadata["event"].orEmpty()
         val expectedEvent = spec.config["event"]?.trim().orEmpty()
+        if (expectedEvent.isSunEvent()) {
+            return matchesSunEvent(spec, event, expectedEvent)
+        }
         if (expectedEvent.isNotBlank() && !actualEvent.equals(expectedEvent, ignoreCase = true)) {
             return false
+        }
+
+        val expectedStates = firstConfig(spec, "state", "calendarState")
+            .splitCsv()
+            .map { it.lowercase(Locale.US) }
+            .toSet()
+        if (expectedStates.isNotEmpty()) {
+            val actualState = event.metadata["state"].orEmpty().lowercase(Locale.US)
+            if (actualState !in expectedStates) return false
+        }
+
+        val calendarAllowlist = firstConfig(spec, "calendar", "calendars")
+            .splitCsv()
+            .map { it.lowercase(Locale.US) }
+            .toSet()
+        if (calendarAllowlist.isNotEmpty()) {
+            val actualCalendar = event.metadata["calendar"].orEmpty().lowercase(Locale.US)
+            if (actualCalendar !in calendarAllowlist) return false
+        }
+
+        val beforeMinutes = firstConfig(spec, "beforeMinutes", "withinMinutes").toIntOrNull()
+        if (beforeMinutes != null) {
+            val minutesUntilStart = event.metadata["minutesUntilStart"]?.toIntOrNull() ?: return false
+            if (minutesUntilStart !in 0..beforeMinutes) return false
+        }
+
+        spec.config["allDay"]?.toBooleanStrictOrNull()?.let { expectedAllDay ->
+            val actualAllDay = event.metadata["allDay"]?.toBooleanStrictOrNull() ?: return false
+            if (actualAllDay != expectedAllDay) return false
         }
 
         val packageAllowlist = firstConfig(spec, "package", "packages", "apps")
@@ -129,6 +163,23 @@ object ContextMatchEvaluator {
         val filter = spec.config["filter"]?.trim().orEmpty()
         if (filter.isBlank()) return actualEvent.isNotBlank()
         return event.metadata.values.any { textMatches(it, filter, regex) }
+    }
+
+    private fun matchesSunEvent(spec: ContextSpec, event: ContextEvent, expectedEvent: String): Boolean {
+        if (!event.metadata["event"].orEmpty().equals("sun_tick", ignoreCase = true)) return false
+        val latitude = firstConfig(spec, "latitude", "lat").toDoubleOrNull() ?: return false
+        val longitude = firstConfig(spec, "longitude", "lon", "lng").toDoubleOrNull() ?: return false
+        val date = event.metadata["date"]?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            ?: LocalDate.now()
+        val zone = event.metadata["zone"]?.let { runCatching { ZoneId.of(it) }.getOrNull() }
+            ?: ZoneId.systemDefault()
+        val currentMinute = event.metadata["time"]?.let(::parseClockMinutes) ?: currentMinuteOfDay()
+        val baseMinute = SunEventCalculator.eventMinuteOfDay(date, latitude, longitude, expectedEvent, zone) ?: return false
+        val offset = firstConfig(spec, "offsetMinutes", "offset").toIntOrNull() ?: 0
+        val window = (firstConfig(spec, "windowMinutes", "window").toIntOrNull() ?: 1).coerceIn(1, 180)
+        val start = Math.floorMod(baseMinute + offset, MINUTES_PER_DAY)
+        val end = Math.floorMod(start + window - 1, MINUTES_PER_DAY)
+        return minuteInWindow(currentMinute, start, end)
     }
 
     private fun firstConfig(spec: ContextSpec, vararg keys: String): String =
@@ -210,4 +261,8 @@ object ContextMatchEvaluator {
 
     private const val MAX_REGEX_PATTERN_CHARS = 160
     private const val MAX_REGEX_INPUT_CHARS = 1_000
+    private const val MINUTES_PER_DAY = 24 * 60
 }
+
+private fun String.isSunEvent(): Boolean =
+    equals("sunrise", ignoreCase = true) || equals("sunset", ignoreCase = true)
