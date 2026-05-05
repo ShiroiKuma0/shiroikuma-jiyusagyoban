@@ -75,6 +75,11 @@ import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.actions.FieldType
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
+import com.opentasker.core.engine.ActionTraceStatus
+import com.opentasker.core.engine.RunLogActionDiagnostic
+import com.opentasker.core.engine.RunLogOutcome
+import com.opentasker.core.engine.outcome
+import com.opentasker.core.engine.toRunLogDiagnostics
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.ContextSpec
@@ -1212,13 +1217,12 @@ private fun RunLogFilterCard(
                     )
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                RunLogStatusFilter.entries.forEach { filter ->
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                items(RunLogStatusFilter.entries.toList(), key = { it.name }) { filter ->
                     RunLogFilterChip(
                         label = filter.label,
                         selected = statusFilter == filter,
                         onClick = { onStatusFilterChange(filter) },
-                        modifier = Modifier.weight(1f),
                     )
                 }
             }
@@ -1269,7 +1273,9 @@ private fun RunLogFilterChip(
 
 @Composable
 private fun RunLogSummaryCard(logs: List<RunLogEntry>) {
-    val failures = logs.count { !it.success }
+    val outcomes = remember(logs) { logs.map { it.outcome() } }
+    val failures = outcomes.count { it == RunLogOutcome.Failed }
+    val skipped = outcomes.count { it == RunLogOutcome.Skipped }
     val latest = logs.firstOrNull()
 
     Card(
@@ -1289,14 +1295,23 @@ private fun RunLogSummaryCard(logs: List<RunLogEntry>) {
                     )
                 }
                 StatusPill(
-                    if (failures == 0) "Healthy" else "$failures failed",
-                    if (failures == 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                    when {
+                        failures > 0 -> "$failures failed"
+                        skipped > 0 -> "$skipped skipped"
+                        else -> "Healthy"
+                    },
+                    when {
+                        failures > 0 -> MaterialTheme.colorScheme.error
+                        skipped > 0 -> MaterialTheme.colorScheme.secondary
+                        else -> MaterialTheme.colorScheme.tertiary
+                    },
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                SummaryMetric("${logs.size}", "Entries", Modifier.weight(1f))
-                SummaryMetric("${logs.count { it.success }}", "Succeeded", Modifier.weight(1f))
-                SummaryMetric("$failures", "Failed", Modifier.weight(1f))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                item { SummaryMetric("${logs.size}", "Entries", Modifier.width(104.dp)) }
+                item { SummaryMetric("${outcomes.count { it == RunLogOutcome.Succeeded }}", "Succeeded", Modifier.width(104.dp)) }
+                item { SummaryMetric("$failures", "Failed", Modifier.width(104.dp)) }
+                item { SummaryMetric("$skipped", "Skipped", Modifier.width(104.dp)) }
             }
             latest?.let {
                 Text(
@@ -1314,18 +1329,30 @@ private fun RunLogCard(entry: RunLogEntry) {
     val time = remember(entry.timestamp) {
         SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(entry.timestamp))
     }
+    val diagnostics = remember(entry.message) { entry.message.toRunLogDiagnostics() }
+    val hasStructuredDiagnostics = diagnostics.source != null || diagnostics.decision != null || diagnostics.traces.isNotEmpty()
+    val outcome = remember(entry.success, entry.message) { entry.outcome() }
+    val accent = when (outcome) {
+        RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.primary
+        RunLogOutcome.Failed -> MaterialTheme.colorScheme.error
+        RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondary
+    }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (entry.success) {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
-            } else {
-                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.32f)
-            },
+            containerColor = when (outcome) {
+                RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+                RunLogOutcome.Failed -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.32f)
+                RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.36f)
+            }
         ),
         border = BorderStroke(
             1.dp,
-            if (entry.success) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f) else MaterialTheme.colorScheme.error.copy(alpha = 0.30f),
+            when (outcome) {
+                RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)
+                RunLogOutcome.Failed -> MaterialTheme.colorScheme.error.copy(alpha = 0.30f)
+                RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.34f)
+            },
         ),
         shape = RoundedCornerShape(16.dp),
     ) {
@@ -1335,18 +1362,94 @@ private fun RunLogCard(entry: RunLogEntry) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Icon(
-                if (entry.success) Icons.Filled.CheckCircle else Icons.Filled.Error,
+                when (outcome) {
+                    RunLogOutcome.Succeeded -> Icons.Filled.CheckCircle
+                    RunLogOutcome.Failed -> Icons.Filled.Error
+                    RunLogOutcome.Skipped -> Icons.Filled.Info
+                },
                 contentDescription = null,
-                tint = if (entry.success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                tint = accent,
             )
             Column(Modifier.weight(1f)) {
                 Text(entry.taskName, style = MaterialTheme.typography.titleMedium)
                 Text(time, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (entry.message.isNotBlank()) {
-                    Text(entry.message, style = MaterialTheme.typography.bodyMedium, maxLines = 8, overflow = TextOverflow.Ellipsis)
+                diagnostics.source?.let { source ->
+                    Text(
+                        "Source: $source",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (hasStructuredDiagnostics && diagnostics.detailLines.isNotEmpty()) {
+                    Text(
+                        diagnostics.detailLines.joinToString("  "),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                diagnostics.reason?.let { reason ->
+                    Text(reason, style = MaterialTheme.typography.bodyMedium, color = accent)
+                }
+                if (diagnostics.traces.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        diagnostics.traces.take(4).forEach { trace ->
+                            RunLogTraceRow(trace)
+                        }
+                        if (diagnostics.traces.size > 4) {
+                            Text(
+                                "${diagnostics.traces.size - 4} more action(s)",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                } else if (diagnostics.detailLines.isNotEmpty()) {
+                    Text(
+                        diagnostics.detailLines.joinToString("\n"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 6,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
-            StatusPill("${entry.durationMs} ms", if (entry.success) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error)
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                StatusPill(outcome.label, accent)
+                StatusPill("${entry.durationMs} ms", accent)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
+    val color = when (trace.status) {
+        ActionTraceStatus.SUCCESS -> MaterialTheme.colorScheme.primary
+        ActionTraceStatus.FAILURE -> MaterialTheme.colorScheme.error
+        ActionTraceStatus.SKIPPED -> MaterialTheme.colorScheme.secondary
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        StatusPill(trace.status.readableName(), color)
+        Column(Modifier.weight(1f)) {
+            Text(
+                "${trace.index + 1}. ${trace.label}",
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                "${trace.actionType} - ${trace.durationMs} ms - ${trace.message}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -2101,5 +2204,8 @@ private fun runLogTaskOptions(logs: List<RunLogEntry>, tasks: List<Task>): List<
         .map { (taskId, entries) -> taskId to (taskNames[taskId] ?: entries.first().taskName) }
         .sortedWith(compareBy<Pair<Long, String>> { it.second.lowercase() }.thenBy { it.first })
 }
+
+private fun ActionTraceStatus.readableName(): String =
+    name.lowercase().replaceFirstChar { it.titlecase(Locale.getDefault()) }
 
 private fun plural(count: Int): String = if (count == 1) "" else "s"
