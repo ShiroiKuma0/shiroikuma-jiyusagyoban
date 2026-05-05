@@ -16,7 +16,7 @@ OpenTasker centralizes Gradle plugin and library versions in `gradle/libs.versio
 | Activity Compose | 1.9.3 |
 | Lifecycle | 2.8.7 |
 | Navigation Compose | 2.8.4 |
-| Room | 2.6.1 |
+| Room | 2.7.2 |
 | WorkManager | 2.9.1 |
 | DataStore | 1.1.1 |
 | Coroutines | 1.9.0 |
@@ -31,7 +31,7 @@ OpenTasker centralizes Gradle plugin and library versions in `gradle/libs.versio
 ## Upgrade Order
 
 1. Hilt/Dagger through an intermediate compatible version while the runtime still starts through `OpenTaskerApp_NoHilt`. Completed with `2.52` after Maven Central showed the current line extends through `2.59.2`.
-2. Room with exported-schema review and migration-test execution.
+2. Room with exported-schema review and migration-test execution. Completed on the existing `androidx.room` 2.x line with `2.7.2`; Room `2.8.x` needs a later Kotlinx Serialization/runtime-support batch, and Room 3.0 uses a new artifact group that remains a separate migration decision.
 3. WorkManager with service/scheduler smoke testing.
 4. Compose BOM, Activity Compose, Lifecycle, and Navigation Compose together with UI smoke testing.
 5. Coroutines, DataStore, Kotlinx Serialization, and Gson in small runtime-focused batches.
@@ -64,3 +64,4 @@ When a device or emulator is available, add startup/navigation smoke coverage be
 ## Batch Log
 
 - 2026-05-05: Upgraded Hilt/Dagger from `2.46` to `2.52` as the first intermediate generated-code batch. Verified `:app:compileDebugKotlin :app:compileDebugUnitTestKotlin :app:testDebugUnitTest`, then reran `:app:compileDebugAndroidTestKotlin :app:assembleDebug :app:lintDebug` serially after a parallel Gradle run raced on merged-manifest outputs, and verified `-PopenTaskerDistribution=fdroid :app:assembleRelease :app:verifyFdroidReadiness :app:verifyFdroidMetadata`.
+- 2026-05-05: Upgraded Room from `2.6.1` to `2.7.2` on the existing `androidx.room` artifact line. A trial upgrade to `2.8.4` failed during KSP schema export with a `kotlinx.serialization` generated-serializer ABI mismatch, so `2.8.x` is deferred until the runtime-support/Kotlinx Serialization batch. Room 3.0 stays out of this batch because it uses the new `androidx.room3` group. Verified debug Kotlin/unit tests, debug androidTest compile, debug APK/lint, F-Droid release profile, and `:app:connectedDebugAndroidTest` on `SM-S938B - 16` with the two migration tests passing.
