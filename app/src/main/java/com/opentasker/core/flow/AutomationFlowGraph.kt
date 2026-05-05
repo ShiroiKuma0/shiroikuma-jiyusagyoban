@@ -36,6 +36,19 @@ data class AutomationFlowGraph(
 
     fun incomingEdgeLabel(nodeId: String): String? =
         edges.firstOrNull { it.toId == nodeId }?.label
+
+    fun accessibilitySummary(): String {
+        val actionCount = nodes.count { it.kind == AutomationFlowNodeKind.ACTION }
+        val enterTask = enterTaskNode?.title ?: "missing enter task"
+        val exitTask = exitTaskNode?.title ?: "no exit task"
+        val warningText = if (warnings.isEmpty()) {
+            "no warnings"
+        } else {
+            "${warnings.size} warning${plural(warnings.size)}"
+        }
+        return "$title: ${contextNodes.size} context${plural(contextNodes.size)}, " +
+            "$actionCount action${plural(actionCount)}, enter task $enterTask, exit task $exitTask, $warningText."
+    }
 }
 
 data class AutomationFlowNode(
@@ -46,7 +59,19 @@ data class AutomationFlowNode(
     val muted: Boolean = false,
     val target: AutomationFlowTarget? = null,
     val condition: String? = null,
-)
+) {
+    fun accessibilityLabel(): String {
+        val kindName = kind.name.lowercase().replace('_', ' ')
+        val parts = buildList {
+            add(kindName)
+            add(title)
+            detail?.takeUnless { it.isBlank() }?.let(::add)
+            condition?.takeUnless { it.isBlank() }?.let { add("condition if $it") }
+            if (muted) add("inactive")
+        }
+        return parts.joinToString(". ")
+    }
+}
 
 enum class AutomationFlowNodeKind {
     PROFILE,
