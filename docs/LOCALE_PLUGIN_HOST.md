@@ -2,12 +2,14 @@
 
 OpenTasker includes a conservative Locale/Tasker-compatible plugin host baseline for setting and condition plugins.
 
-## Supported in v0.2.52
+## Supported in v0.2.53
 
 - Discovers packages that expose Locale edit-setting or edit-condition activities.
 - Discovers explicit setting and condition broadcast receiver permission metadata for disclosure.
 - Resolves explicit edit-setting and edit-condition configuration activities.
 - Parses successful configuration results into deterministic string-only JSON and bounded blurb text.
+- Listens for `com.twofortyfouram.locale.intent.action.REQUEST_QUERY` while the foreground runtime is subscribed to Event contexts.
+- Emits sanitized `event=locale_request_query` context events with `activityClass` and deterministic `bundleJson` metadata.
 - Adds the `plugin.locale.fire` action for explicit setting-plugin dispatch.
 - Adds the `plugin.locale.query` action for explicit condition-plugin ordered broadcasts.
 - Sends `com.twofortyfouram.locale.intent.action.FIRE_SETTING` only to the resolved receiver component in the configured package.
@@ -23,7 +25,7 @@ OpenTasker includes a conservative Locale/Tasker-compatible plugin host baseline
 ## Not yet supported
 
 - Interactive plugin configuration activity results.
-- Host handling for plugin `REQUEST_QUERY` broadcasts.
+- Persisted plugin-backed Condition context rows that automatically re-query on `REQUEST_QUERY`.
 - Third-party plugin allowlists/denylists.
 - Plugin-provided variable expansion or progress callbacks.
 
@@ -34,5 +36,6 @@ OpenTasker includes a conservative Locale/Tasker-compatible plugin host baseline
 - Fail closed if a package does not expose exactly one configuration activity for the requested Locale edit action.
 - Never accept nested JSON, parcelables, serialized objects, or arbitrary extras from user input.
 - Never preserve nested, parcelable, serialized, null, or arbitrary object values from plugin configuration results.
+- Treat `REQUEST_QUERY` broadcasts as untrusted triggers; sanitize metadata before exposing it to Event contexts.
 - Surface plugin package and requested permissions before users enable plugin-backed profiles.
 - Treat plugin execution as third-party code and keep it behind explicit user configuration.

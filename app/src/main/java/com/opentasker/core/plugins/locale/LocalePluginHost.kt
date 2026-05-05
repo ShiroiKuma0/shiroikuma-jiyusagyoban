@@ -30,8 +30,11 @@ object LocalePluginContract {
     const val ACTION_QUERY_CONDITION = "com.twofortyfouram.locale.intent.action.QUERY_CONDITION"
     const val ACTION_REQUEST_QUERY = "com.twofortyfouram.locale.intent.action.REQUEST_QUERY"
     const val EXTRA_BUNDLE = "com.twofortyfouram.locale.intent.extra.BUNDLE"
-    const val EXTRA_BLURB = "com.twofortyfouram.locale.intent.extra.BLURB"
-    const val EXTRA_ACTIVITY_CLASS_NAME = "com.twofortyfouram.locale.intent.extra.ACTIVITY"
+    const val EXTRA_STRING_BLURB = "com.twofortyfouram.locale.intent.extra.BLURB"
+    const val EXTRA_STRING_ACTIVITY_CLASS_NAME = "com.twofortyfouram.locale.intent.extra.ACTIVITY"
+    const val EXTRA_STRING_BREADCRUMB = "com.twofortyfouram.locale.intent.extra.BREADCRUMB"
+    const val EXTRA_BLURB = EXTRA_STRING_BLURB
+    const val EXTRA_ACTIVITY_CLASS_NAME = EXTRA_STRING_ACTIVITY_CLASS_NAME
     const val RESULT_CONDITION_SATISFIED = 16
     const val RESULT_CONDITION_UNSATISFIED = 17
     const val RESULT_CONDITION_UNKNOWN = 18
