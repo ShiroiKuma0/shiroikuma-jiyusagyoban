@@ -130,6 +130,19 @@ fun registerActionMetadata() {
         )
     )
 
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "tasker.unsupported",
+            name = "Unsupported Tasker Action",
+            description = "Placeholder for a Tasker action that could not be safely mapped during import",
+            category = "Import",
+            fields = listOf(
+                ActionField("taskerCode", "Tasker action code", required = true),
+                ActionField("summary", "Import note", FieldType.MULTILINE),
+            )
+        )
+    )
+
     // Settings actions
     ActionMetadataRegistry.register(
         ActionMetadata(

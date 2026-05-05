@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.20. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.21. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-05
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.20
+**Current app version:** 0.2.21
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -13,7 +13,7 @@ Source-backed product roadmap for OpenTasker v0.2.20. This file reconciles the c
 
 OpenTasker is an Android/Kotlin automation app targeting API 35 with Jetpack Compose, Material 3, Room, Coroutines, WorkManager, DataStore, Gson, and Hilt dependencies. The project goal is a privacy-first, fully on-device, open-source Tasker/MacroDroid/Automate alternative.
 
-The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, run logs, setup/onboarding status, live context inspection, notification listener event triggers, NFC tag event triggers, and calendar/sun event triggers. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
+The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, run logs, setup/onboarding status, live context inspection, notification listener event triggers, NFC tag event triggers, calendar/sun event triggers, and a Tasker XML-to-OpenTasker-bundle migration parser. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
 
 Key local constraints:
 
@@ -307,6 +307,7 @@ Key local constraints:
 
 ### X10 - Tasker XML import with migration report
 
+**Status:** Baseline completed in v0.2.21. Added a secure Tasker XML parser that converts common task/profile/variable XML into an OpenTasker JSON bundle, preserves unmapped actions as explicit unsupported placeholders, reports mapped actions, skipped profiles, unsupported contexts, scene exclusions, variable losses, and capability warnings, and includes regression tests. Remaining work is the user-facing file picker, preview, and confirmed Room import flow.
 **Description:** Parse Tasker `.prj.xml`/`.tsk.xml` exports into OpenTasker JSON/Room entities. Show mapped actions, unsupported actions, variable losses, scene exclusions, and required permissions before import.  
 **Sources:** Tasker market dominance [S16], migration friction from competitors [S17][S18], open JSON strategy [S9][S11].  
 **Category:** migration, UX, data.  
