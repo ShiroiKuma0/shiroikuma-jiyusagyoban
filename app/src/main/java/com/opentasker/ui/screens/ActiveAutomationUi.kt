@@ -86,6 +86,7 @@ import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.RunLogEntry
+import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.toEntity
@@ -107,6 +108,7 @@ private enum class OpenTaskerScreen(val label: String) {
     Profiles("Profiles"),
     Tasks("Tasks"),
     Flow("Flow"),
+    Scenes("Scenes"),
     Inspector("Inspector"),
     Setup("Setup"),
     RunLog("Run Log"),
@@ -143,6 +145,12 @@ private sealed interface DeleteTarget {
         override val confirmLabel = "Delete Task"
     }
 
+    data class SceneTarget(val scene: Scene) : DeleteTarget {
+        override val title = "Delete scene?"
+        override val body = "This permanently removes \"${scene.name}\" and its ${scene.elements.size} element${plural(scene.elements.size)}."
+        override val confirmLabel = "Delete Scene"
+    }
+
     data class ActionTarget(val task: Task, val index: Int, val action: ActionSpec) : DeleteTarget {
         override val title = "Remove action?"
         override val body = "This removes step ${index + 1} from \"${task.name}\". Remaining actions keep their order."
@@ -163,6 +171,11 @@ class ActiveAutomationViewModel(private val db: AppDatabase) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val tasks: StateFlow<List<Task>> = db.taskDao()
+        .getAllAsFlow()
+        .map { entities -> entities.map { it.toDomain() }.sortedBy { it.name.lowercase() } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val scenes: StateFlow<List<Scene>> = db.sceneDao()
         .getAllAsFlow()
         .map { entities -> entities.map { it.toDomain() }.sortedBy { it.name.lowercase() } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -197,6 +210,20 @@ class ActiveAutomationViewModel(private val db: AppDatabase) : ViewModel() {
                 .onSuccess { events.send("Task deleted") }
                 .onFailure { events.send("Error: ${it.message ?: "Task delete failed"}") }
         }
+    }
+
+    fun createScene(name: String, widthDp: Int, heightDp: Int) = launchWithMessage("Scene created") {
+        db.sceneDao().insert(
+            Scene(
+                name = name.trim(),
+                widthDp = widthDp.coerceIn(120, 1440),
+                heightDp = heightDp.coerceIn(80, 2560),
+            ).toEntity()
+        )
+    }
+
+    fun deleteScene(scene: Scene) = launchWithMessage("Scene deleted") {
+        db.sceneDao().delete(scene.toEntity())
     }
 
     fun createProfile(name: String, enabled: Boolean, enterTaskId: Long, cooldownSec: Int, automationMode: AutomationMode) =
@@ -258,6 +285,7 @@ fun ActiveAutomationUi(
 ) {
     val profiles by viewModel.profiles.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
+    val scenes by viewModel.scenes.collectAsState()
     val runLogs by viewModel.runLogs.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -282,6 +310,7 @@ fun ActiveAutomationUi(
         OpenTaskerScreen.Profiles -> "${profiles.count { it.enabled }} enabled - ${profiles.size} total"
         OpenTaskerScreen.Tasks -> "${tasks.sumOf { it.actions.size }} actions - ${tasks.size} tasks"
         OpenTaskerScreen.Flow -> "${profiles.size} profiles - ${tasks.size} tasks"
+        OpenTaskerScreen.Scenes -> "${scenes.sumOf { it.elements.size }} elements - ${scenes.size} scenes"
         OpenTaskerScreen.Inspector -> "Live context health"
         OpenTaskerScreen.Setup -> "Permission and reliability checks"
         OpenTaskerScreen.RunLog -> "${runLogs.size} recent entries"
@@ -328,6 +357,7 @@ fun ActiveAutomationUi(
                 }
 
                 OpenTaskerScreen.Flow,
+                OpenTaskerScreen.Scenes,
                 OpenTaskerScreen.Inspector,
                 OpenTaskerScreen.Setup,
                 OpenTaskerScreen.RunLog -> Unit
@@ -344,6 +374,7 @@ fun ActiveAutomationUi(
                                 OpenTaskerScreen.Profiles -> Icons.Filled.CheckCircle
                                 OpenTaskerScreen.Tasks -> Icons.Filled.Edit
                                 OpenTaskerScreen.Flow -> Icons.Filled.Info
+                                OpenTaskerScreen.Scenes -> Icons.Filled.Edit
                                 OpenTaskerScreen.Inspector -> Icons.Filled.Info
                                 OpenTaskerScreen.Setup -> Icons.Filled.Settings
                                 OpenTaskerScreen.RunLog -> Icons.Filled.Info
@@ -410,6 +441,14 @@ fun ActiveAutomationUi(
                 contentPadding = innerPadding,
             )
 
+            OpenTaskerScreen.Scenes -> SceneLibraryScreen(
+                scenes = scenes,
+                tasks = tasks,
+                onCreateScene = viewModel::createScene,
+                onDeleteScene = { pendingDelete = DeleteTarget.SceneTarget(it) },
+                contentPadding = innerPadding,
+            )
+
             OpenTaskerScreen.Setup -> PermissionOnboardingScreen(
                 contentPadding = innerPadding,
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
@@ -429,6 +468,7 @@ fun ActiveAutomationUi(
                 when (target) {
                     is DeleteTarget.ProfileTarget -> viewModel.deleteProfile(target.profile)
                     is DeleteTarget.TaskTarget -> viewModel.deleteTask(target.task)
+                    is DeleteTarget.SceneTarget -> viewModel.deleteScene(target.scene)
                     is DeleteTarget.ActionTarget -> viewModel.updateTask(
                         target.task.copy(actions = target.task.actions.filterIndexed { i, _ -> i != target.index }),
                         "Action removed",

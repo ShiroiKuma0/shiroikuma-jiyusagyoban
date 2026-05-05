@@ -1,13 +1,13 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.24-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.25-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.24** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, read-only flow graphs, JSON bundles, Tasker XML import planning, F-Droid build readiness, dependency version governance, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; scenes, variable tooling, and broader plugin UX are planned.
+**OpenTasker v0.2.25** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scene library management, read-only flow graphs, JSON bundles, Tasker XML import planning, F-Droid build readiness, dependency version governance, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; variable tooling and broader plugin UX are planned.
 
-> **Status:** v0.2.24 adds an optional Flow tab backed by a pure profile/task graph model, while keeping centralized dependency governance, the F-Droid distribution profile, Tasker XML import planning, local calendar/sun triggers, NFC tag events, notification listener events, the context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
+> **Status:** v0.2.25 adds a Room-backed Scenes tab with creation/deletion, overlay-readiness status, element previews, and validation for dimensions/bounds/task bindings, while keeping the Flow tab, centralized dependency governance, the F-Droid distribution profile, Tasker XML import planning, local calendar/sun triggers, NFC tag events, notification listener events, the context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
 
 ---
 
@@ -19,6 +19,7 @@
 ✅ **AMOLED-first** — Catppuccin Mocha palette, light theme toggle  
 ✅ **Compose UI reintegration started** — active navigation now manages profiles, tasks, actions, contexts, and run logs from Room  
 ✅ **Profile templates** — guided starter profiles with variable slots, safety notes, and disabled-by-default installation  
+✅ **Scene library baseline** — Room-backed scene list/create/delete with validation and overlay readiness
 ✅ **Read-only flow graphs** — optional Flow tab maps profiles to contexts, enter/exit tasks, action steps, and warnings
 ✅ **Open JSON bundles** — schema-versioned profile/task/context/action/variable/scene export and import planning  
 ✅ **Tasker XML import planning** — common Tasker task/profile/variable XML converts to OpenTasker bundles with migration warnings
@@ -110,11 +111,11 @@ Release APKs are unsigned unless `OPEN_TASKER_RELEASE_KEYSTORE`, `OPEN_TASKER_RE
 ## Next Phase (v0.3)
 
 1. **Dependency modernization batches** — staged AndroidX/Kotlin/Room/WorkManager updates with device verification
-2. **Flow graph deep links** — node selection that opens the relevant profile, task, context, or action editor
-3. **Locale condition queries** — complete query execution for condition plugins with timeout and result handling
-4. **Tasker import UI** — file picker, migration preview, and import confirmation around the parser baseline
-5. **F-Droid submission hardening** — release tag discipline, fdroidserver lint/build, and reproducible binary comparison
-6. **Calendar/sun polish** — richer presets, calendar privacy review, and device-level smoke coverage
+2. **Scene element editor** — add text/button/slider/image controls and task binding pickers before overlay launch
+3. **Flow graph deep links** — node selection that opens the relevant profile, task, context, or action editor
+4. **Locale condition queries** — complete query execution for condition plugins with timeout and result handling
+5. **Tasker import UI** — file picker, migration preview, and import confirmation around the parser baseline
+6. **F-Droid submission hardening** — release tag discipline, fdroidserver lint/build, and reproducible binary comparison
 
 ---
 

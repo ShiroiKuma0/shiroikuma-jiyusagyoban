@@ -38,4 +38,5 @@ interface SceneDao {
     @Delete suspend fun delete(s: SceneEntity)
     @Query("SELECT * FROM scenes WHERE id = :id") suspend fun getById(id: Long): SceneEntity?
     @Query("SELECT * FROM scenes") suspend fun getAll(): List<SceneEntity>
+    @Query("SELECT * FROM scenes") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<SceneEntity>>
 }
