@@ -8,12 +8,12 @@ OpenTasker centralizes Gradle plugin and library versions in `gradle/libs.versio
 
 | Area | Version |
 |---|---:|
-| Gradle wrapper | 8.13 |
-| Android Gradle Plugin | 8.13.2 |
+| Gradle wrapper | 9.4.1 |
+| Android Gradle Plugin | 9.2.1 |
 | Compile SDK / Build Tools | 36 / 36.0.0 |
 | Target SDK | 35 |
-| Kotlin / Compose compiler plugin | 2.2.21 |
-| KSP | 2.2.21-2.0.5 |
+| Kotlin / Compose compiler plugin | 2.3.21 |
+| KSP | 2.3.7 |
 | Compose BOM | 2026.04.01 |
 | AndroidX Core KTX | 1.18.0 |
 | Activity Compose | 1.13.0 |
@@ -23,9 +23,9 @@ OpenTasker centralizes Gradle plugin and library versions in `gradle/libs.versio
 | WorkManager | 2.11.2 |
 | DataStore | 1.2.1 |
 | Coroutines | 1.10.2 |
-| Hilt / Dagger | 2.52 |
+| Hilt / Dagger | 2.59.2 |
 | AndroidX Hilt Navigation Compose | 1.3.0 |
-| Kotlinx Serialization JSON | 1.9.0 |
+| Kotlinx Serialization JSON | 1.11.0 |
 | Gson | 2.14.0 |
 | AndroidX Test Runner | 1.7.0 |
 | AndroidX Test JUnit | 1.3.0 |
@@ -33,14 +33,15 @@ OpenTasker centralizes Gradle plugin and library versions in `gradle/libs.versio
 
 ## Upgrade Order
 
-1. Hilt/Dagger through an intermediate compatible version while the runtime still starts through `OpenTaskerApp_NoHilt`. Completed with `2.52` after Maven Central showed the current line extends through `2.59.2`.
+1. Hilt/Dagger through an intermediate compatible version while the runtime still starts through `OpenTaskerApp_NoHilt`. Completed first with `2.52`, then with `2.59.2` after the AGP 9 batch satisfied the newer Hilt plugin requirement.
 2. Room with exported-schema review and migration-test execution. Completed on the existing `androidx.room` 2.x line with `2.8.4` after Kotlin/KSP alignment; Room 3.0 uses a new artifact group that remains a separate migration decision.
 3. WorkManager with service/scheduler smoke testing. Completed with `2.11.2`; no active WorkManager workers are currently registered in source, so verification focuses on build/lint/release profile stability.
 4. Compose BOM, Activity Compose, Lifecycle, Navigation Compose, and Hilt Navigation Compose together with UI smoke testing. Completed the API 36-unblocked stable set with Compose BOM `2026.04.01`, Activity Compose `1.13.0`, Lifecycle `2.10.0`, Navigation Compose `2.9.8`, and Hilt Navigation Compose `1.3.0` after the AGP `8.13.2` batch resolved the earlier Lifecycle lint incompatibility.
-5. AndroidX Core KTX, Coroutines, DataStore, Kotlinx Serialization, and Gson in small runtime-focused batches. Completed the Kotlin/API-compatible stable subset with Core KTX `1.18.0`, DataStore `1.2.1`, Coroutines `1.10.2`, Kotlinx Serialization JSON `1.9.0`, and Gson `2.14.0`; Kotlinx Serialization `1.10.x+` still requires Kotlin `2.3.x`.
-6. Kotlin, KSP, and the Compose compiler plugin as one aligned compiler batch. Completed with Kotlin/Compose plugin `2.2.21`, KSP `2.2.21-2.0.5`, and Gradle `compilerOptions` DSL. Kotlin `2.3.21` plus KSP `2.3.7` is deferred because Hilt `2.52` cannot load the new KSP task class, while Hilt `2.59.2` requires AGP 9.0+.
-7. Android Gradle Plugin only after debug, release, lint, and F-Droid profile builds are stable under the previous batches. Completed with Gradle wrapper `8.13`, AGP `8.13.2`, compile SDK `36`, and Build Tools `36.0.0` while keeping target SDK `35`. This clears the Kotlin `2.2` R8 support gap without opting into AGP 9's new DSL and built-in Kotlin defaults.
-8. API 36-unblocked AndroidX dependency follow-ups. Completed with the latest stable Core KTX, Activity, Navigation, Lifecycle, Compose BOM, and Hilt Navigation Compose lines available from official Maven metadata on 2026-05-05. Remaining dependency modernization is the AGP 9 / Hilt / Kotlin `2.3.x` compatibility stack and the separate Room 3 artifact-group migration decision.
+5. AndroidX Core KTX, Coroutines, DataStore, Kotlinx Serialization, and Gson in small runtime-focused batches. Completed the Kotlin/API-compatible stable subset with Core KTX `1.18.0`, DataStore `1.2.1`, Coroutines `1.10.2`, Kotlinx Serialization JSON `1.11.0`, and Gson `2.14.0`.
+6. Kotlin, KSP, and the Compose compiler plugin as one aligned compiler batch. Completed first with Kotlin/Compose plugin `2.2.21`, KSP `2.2.21-2.0.5`, and Gradle `compilerOptions` DSL, then advanced to Kotlin/Compose plugin `2.3.21` and KSP `2.3.7` once AGP 9 allowed Hilt `2.59.2`.
+7. Android Gradle Plugin only after debug, release, lint, and F-Droid profile builds are stable under the previous batches. Completed first with Gradle wrapper `8.13`, AGP `8.13.2`, compile SDK `36`, and Build Tools `36.0.0`, then advanced to Gradle wrapper `9.4.1` and AGP `9.2.1` while keeping compile SDK `36`, Build Tools `36.0.0`, and target SDK `35`. The AGP 9 batch keeps `android.builtInKotlin=false` and `android.newDsl=false` as temporary compatibility flags so the explicit Kotlin plugin setup can remain intact.
+8. API 36-unblocked AndroidX dependency follow-ups. Completed with the latest stable Core KTX, Activity, Navigation, Lifecycle, Compose BOM, and Hilt Navigation Compose lines available from official Maven metadata on 2026-05-05.
+9. Built-in Kotlin and AGP new DSL migration. Remaining before AGP 10: remove the explicit `org.jetbrains.kotlin.android` compatibility path, drop `android.builtInKotlin=false` and `android.newDsl=false`, and move any legacy variant API users to Android Components APIs. Room 3 remains a separate artifact-group migration decision.
 
 ## Risk Rules
 
@@ -75,3 +76,4 @@ When a device or emulator is available, add startup/navigation smoke coverage be
 - 2026-05-05: Upgraded the compiler-aligned dependency set to Kotlin/Compose plugin `2.2.21`, KSP `2.2.21-2.0.5`, Room `2.8.4`, Coroutines `1.10.2`, and Kotlinx Serialization JSON `1.9.0`; migrated the Android module from deprecated `kotlinOptions` to `compilerOptions`. Kotlin `2.3.21` plus KSP `2.3.7` was deferred because Hilt `2.52` cannot load the new KSP task class, and Hilt `2.59.2` requires AGP 9.0+. Verified debug Kotlin/unit tests, debug androidTest compile, debug APK/lint, and F-Droid release profile. Release minification passed but emitted R8 Kotlin metadata warnings under AGP `8.7.2`, so the AGP/API 36 batch is next.
 - 2026-05-05: Upgraded the Android build toolchain to Gradle wrapper `8.13`, AGP `8.13.2`, compile SDK `36`, and Build Tools `36.0.0`, keeping target SDK `35`. AGP `8.13.2` was chosen over AGP 9.x to satisfy Kotlin `2.2` R8 support and API 36 requirements without adopting AGP 9's new DSL/built-in Kotlin behavior in the same batch. Verified AAR metadata, debug Kotlin/unit tests, debug androidTest compile, debug APK, lint, F-Droid release profile with metadata checks, and install/start smoke on `SM-S938B - 16` with `AutomationService` foreground. The previous AGP `8.7.2` release R8 Kotlin metadata warnings are gone.
 - 2026-05-05: Upgraded the API 36-unblocked AndroidX stable set: Core KTX `1.16.0` to `1.18.0`, Compose BOM `2025.07.00` to `2026.04.01`, Activity Compose `1.10.1` to `1.13.0`, Lifecycle `2.8.7` to `2.10.0`, Navigation Compose `2.8.4` to `2.9.8`, and Hilt Navigation Compose `1.2.0` to `1.3.0`. Verified AAR metadata, debug Kotlin/unit tests, debug androidTest compile, debug APK/lint, F-Droid release profile with metadata checks, and install/start smoke on `SM-S938B - 16` with `AutomationService` foreground.
+- 2026-05-05: Upgraded the AGP 9 compatibility stack to Gradle wrapper `9.4.1`, AGP `9.2.1`, Hilt/Dagger `2.59.2`, Kotlin/Compose plugin `2.3.21`, KSP `2.3.7`, and Kotlinx Serialization JSON `1.11.0`. Added temporary AGP 9 compatibility flags `android.builtInKotlin=false` and `android.newDsl=false` because the explicit Kotlin plugin is not compatible with AGP 9's new DSL; these flags emit deprecation warnings and must be removed before AGP 10 by migrating to built-in Kotlin and Android Components/new DSL APIs. Verified AAR metadata, debug Kotlin/unit tests, debug androidTest compile, debug APK/lint, F-Droid release profile with metadata checks, and install/start smoke on `SM-S938B - 16` with `AutomationService` foreground.
