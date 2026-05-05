@@ -5,6 +5,7 @@ import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -66,5 +67,41 @@ class TaskRunnerConditionTest {
         }
 
         assertTrue(result.exceptionOrNull() is CancellationException)
+    }
+
+    @Test
+    fun expandsActionArgumentsWithOperators() = runBlocking {
+        var capturedMessage: String? = null
+        ActionRegistry.register(
+            object : Action {
+                override val id = "test.argument.expand"
+                override val category = ActionCategory.FLOW
+
+                override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+                    capturedMessage = args["message"]
+                    return ActionResult.Success
+                }
+            }
+        )
+
+        val variables = VariableStore().apply {
+            set("count", "2")
+            setArray("items", listOf("alpha", "beta"))
+        }
+
+        val report = TaskRunner(ActionContext(ContextWrapper(null), variables)).run(
+            Task(
+                name = "Argument expansion",
+                actions = listOf(
+                    ActionSpec(
+                        type = "test.argument.expand",
+                        args = mapOf("message" to "Count %count(+3), second %items(1)"),
+                    )
+                ),
+            )
+        )
+
+        assertTrue(report.success)
+        assertEquals("Count 5, second beta", capturedMessage)
     }
 }
