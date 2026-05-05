@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.material3.MaterialTheme
+import androidx.core.content.ContextCompat
 import com.opentasker.core.contexts.NfcContextEvents
+import com.opentasker.core.engine.AutomationService
 import com.opentasker.ui.screens.ActiveAutomationUi
 import com.opentasker.ui.theme.OpenTaskerTheme
 
@@ -30,6 +32,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        startAutomationService()
         handleNfcIntent(intent)
     }
 
@@ -43,6 +46,14 @@ class MainActivity : ComponentActivity() {
         if (intent == null) return
         if (NfcContextEvents.publishFromIntent(intent)) {
             Log.d("MainActivity", "NFC tag event accepted")
+        }
+    }
+
+    private fun startAutomationService() {
+        runCatching {
+            ContextCompat.startForegroundService(this, Intent(this, AutomationService::class.java))
+        }.onFailure { error ->
+            Log.e("MainActivity", "Failed to start OpenTasker automation service", error)
         }
     }
 }
