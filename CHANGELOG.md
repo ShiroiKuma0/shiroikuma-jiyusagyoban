@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.35 - 2026-05-05
+
+Template regex policy.
+
+- Made regex-like template functions (`match`, `matches`, `regex`, and `replace`) explicitly unsupported.
+- Preserved fail-closed behavior by keeping the original template token when regex-like functions are used.
+- Kept existing bounded legacy `%var(regex:...)` behavior separate from the new template engine.
+- Added regression coverage for explicit regex-template rejection.
+
 ## v0.2.34 - 2026-05-05
 
 Template condition expansion.
