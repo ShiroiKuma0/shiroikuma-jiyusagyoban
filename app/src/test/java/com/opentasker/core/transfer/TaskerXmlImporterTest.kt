@@ -3,6 +3,7 @@ package com.opentasker.core.transfer
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.model.ContextType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -122,5 +123,46 @@ class TaskerXmlImporterTest {
         val action = report.bundle.tasks.single().actions.single()
         assertEquals("flow.wait", action.type)
         assertEquals("5000", action.args["millis"])
+    }
+
+    @Test
+    fun buildsPreviewAndDisabledConfirmedImportBundle() {
+        val report = TaskerXmlImporter.parse(
+            rawXml = """
+                <TaskerData>
+                    <Task sr="task1">
+                        <id>1</id>
+                        <nme>Notify</nme>
+                        <Action><code>548</code><Str sr="arg0">Ready</Str></Action>
+                        <Action><code>9999</code></Action>
+                    </Task>
+                    <Profile sr="prof1">
+                        <id>2</id>
+                        <nme>Morning</nme>
+                        <mid0>1</mid0>
+                        <Time><from>08:00</from><to>09:00</to></Time>
+                    </Profile>
+                </TaskerData>
+            """.trimIndent(),
+            appVersion = "0.2.58",
+            importedAtEpochMs = 123L,
+        )
+
+        val preview = TaskerImportPlanner.preview(report)
+
+        assertTrue(preview.canImport)
+        assertEquals(1, preview.sourceTaskCount)
+        assertEquals(1, preview.sourceProfileCount)
+        assertEquals(1, preview.importTaskCount)
+        assertEquals(1, preview.importProfileCount)
+        assertEquals(1, preview.mappedActionCount)
+        assertEquals(1, preview.unsupportedActionCount)
+        assertTrue(preview.capabilityWarnings.any { it.contains("tasker.unsupported") })
+        assertTrue(report.bundle.profiles.single().enabled)
+
+        val confirmedBundle = TaskerImportPlanner.confirmedBundle(report)
+
+        assertFalse(confirmedBundle.profiles.single().enabled)
+        assertTrue(confirmedBundle.metadata.warnings.any { it.contains("disabled by default") })
     }
 }

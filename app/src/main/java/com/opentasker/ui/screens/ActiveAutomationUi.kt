@@ -1,6 +1,9 @@
 package com.opentasker.ui.screens
 
 import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -71,6 +74,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.withTransaction
+import com.opentasker.app.BuildConfig
 import com.opentasker.core.actions.ActionField
 import com.opentasker.core.actions.ActionMetadata
 import com.opentasker.core.actions.ActionMetadataRegistry
@@ -98,9 +102,15 @@ import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.toEntity
+import com.opentasker.core.transfer.OpenTaskerBundleRepository
+import com.opentasker.core.transfer.TaskerImportPlanner
+import com.opentasker.core.transfer.TaskerImportPreview
+import com.opentasker.core.transfer.TaskerXmlImportReport
+import com.opentasker.core.transfer.TaskerXmlImporter
 import com.opentasker.core.templates.ProfileTemplate
 import com.opentasker.core.templates.ProfileTemplateCatalog
 import com.opentasker.core.templates.TemplateAvailability
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -108,9 +118,14 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+private const val TASKER_XML_IMPORT_MAX_BYTES = 4 * 1024 * 1024
+private val TASKER_XML_MIME_TYPES = arrayOf("application/xml", "text/xml", "text/*", "*/*")
 
 private enum class OpenTaskerScreen(val label: String) {
     Profiles("Profiles"),
@@ -134,6 +149,11 @@ private data class ContextEditState(
     val type: ContextType,
     val index: Int? = null,
     val existing: ContextSpec? = null,
+)
+
+internal data class TaskerImportReviewState(
+    val report: TaskerXmlImportReport,
+    val preview: TaskerImportPreview,
 )
 
 private sealed interface DeleteTarget {
@@ -174,9 +194,10 @@ private sealed interface DeleteTarget {
 
 class ActiveAutomationViewModel(
     private val db: AppDatabase,
-    appContext: Context,
+    private val appContext: Context,
 ) : ViewModel() {
     private val locationDwellStateStore = LocationDwellStateStore(appContext)
+    private val bundleRepository = OpenTaskerBundleRepository(db)
 
     val profiles: StateFlow<List<Profile>> = db.profileDao()
         .getAllAsFlow()
@@ -200,6 +221,12 @@ class ActiveAutomationViewModel(
 
     private val events = Channel<String>(Channel.BUFFERED)
     val messages = events.receiveAsFlow()
+
+    internal var taskerImportReview by mutableStateOf<TaskerImportReviewState?>(null)
+        private set
+
+    var taskerImportBusy by mutableStateOf(false)
+        private set
 
     fun createTask(name: String, priority: Int) = launchWithMessage("Task created") {
         db.taskDao().insert(Task(name = name.trim(), priority = priority.coerceIn(0, 10)).toEntity())
@@ -276,6 +303,53 @@ class ActiveAutomationViewModel(
             }
         }
 
+    fun previewTaskerXml(uri: Uri, appVersion: String) {
+        viewModelScope.launch {
+            if (taskerImportBusy) return@launch
+            taskerImportBusy = true
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val rawXml = readBoundedTaskerXml(appContext, uri)
+                    val report = TaskerXmlImporter.parse(rawXml = rawXml, appVersion = appVersion)
+                    TaskerImportReviewState(report = report, preview = TaskerImportPlanner.preview(report))
+                }
+            }
+                .onSuccess {
+                    taskerImportReview = it
+                    events.send("Tasker XML ready for review")
+                }
+                .onFailure { events.send("Error: ${it.message ?: "Tasker XML import preview failed"}") }
+            taskerImportBusy = false
+        }
+    }
+
+    fun clearTaskerImportReview() {
+        if (!taskerImportBusy) {
+            taskerImportReview = null
+        }
+    }
+
+    fun confirmTaskerImport(report: TaskerXmlImportReport) {
+        viewModelScope.launch {
+            if (taskerImportBusy) return@launch
+            taskerImportBusy = true
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    bundleRepository.importBundle(TaskerImportPlanner.confirmedBundle(report))
+                }
+            }
+                .onSuccess { importReport ->
+                    taskerImportReview = null
+                    events.send(
+                        "Imported ${importReport.insertedTasks} task${plural(importReport.insertedTasks)}, " +
+                            "${importReport.insertedProfiles} disabled profile${plural(importReport.insertedProfiles)}"
+                    )
+                }
+                .onFailure { events.send("Error: ${it.message ?: "Tasker XML import failed"}") }
+            taskerImportBusy = false
+        }
+    }
+
     private fun launchWithMessage(successMessage: String, block: suspend () -> Unit) {
         viewModelScope.launch {
             runCatching { block() }
@@ -324,6 +398,11 @@ fun ActiveAutomationUi(
     var contextPickerProfile by remember { mutableStateOf<Profile?>(null) }
     var contextEdit by remember { mutableStateOf<ContextEditState?>(null) }
     var pendingDelete by remember { mutableStateOf<DeleteTarget?>(null) }
+    val taskerImportReview = viewModel.taskerImportReview
+    val taskerImportBusy = viewModel.taskerImportBusy
+    val taskerXmlLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { viewModel.previewTaskerXml(it, BuildConfig.VERSION_NAME) }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
@@ -422,6 +501,8 @@ fun ActiveAutomationUi(
                 },
                 onCreateProfile = { showCreateProfileDialog = true },
                 onBrowseTemplates = { showTemplateDialog = true },
+                onImportTaskerXml = { taskerXmlLauncher.launch(TASKER_XML_MIME_TYPES) },
+                taskerImportBusy = taskerImportBusy,
                 onEditProfile = { profileDialog = it },
                 onDeleteProfile = { pendingDelete = DeleteTarget.ProfileTarget(it) },
                 onToggleProfile = { profile, enabled ->
@@ -503,6 +584,15 @@ fun ActiveAutomationUi(
                 }
                 pendingDelete = null
             },
+        )
+    }
+
+    taskerImportReview?.let { state ->
+        TaskerImportReviewDialog(
+            state = state,
+            busy = taskerImportBusy,
+            onDismiss = viewModel::clearTaskerImportReview,
+            onConfirm = { viewModel.confirmTaskerImport(state.report) },
         )
     }
 
@@ -642,6 +732,8 @@ private fun ProfilesScreen(
     onCreateTaskFirst: () -> Unit,
     onCreateProfile: () -> Unit,
     onBrowseTemplates: () -> Unit,
+    onImportTaskerXml: () -> Unit,
+    taskerImportBusy: Boolean,
     onEditProfile: (Profile) -> Unit,
     onDeleteProfile: (Profile) -> Unit,
     onToggleProfile: (Profile, Boolean) -> Unit,
@@ -653,11 +745,14 @@ private fun ProfilesScreen(
     if (tasks.isEmpty()) {
         EmptyState(
             title = "Start with a template or task",
-            body = "Templates create a disabled profile plus its starter task in one step. Use a blank task if you want to build everything manually.",
-            actionLabel = "Browse Templates",
-            onAction = onBrowseTemplates,
-            secondaryActionLabel = "Create Blank Task",
-            onSecondaryAction = onCreateTaskFirst,
+            body = "Import an existing Tasker XML export, start from a guided template, or create a blank task if you want to build everything manually.",
+            actionLabel = if (taskerImportBusy) "Reading Tasker XML..." else "Import Tasker XML",
+            onAction = onImportTaskerXml,
+            actionEnabled = !taskerImportBusy,
+            secondaryActionLabel = "Browse Templates",
+            onSecondaryAction = onBrowseTemplates,
+            tertiaryActionLabel = "Create Blank Task",
+            onTertiaryAction = onCreateTaskFirst,
             contentPadding = contentPadding,
         )
         return
@@ -665,11 +760,14 @@ private fun ProfilesScreen(
     if (profiles.isEmpty()) {
         EmptyState(
             title = "No profiles yet",
-            body = "Profiles connect contexts to tasks. Start from a curated template or create a blank profile and attach contexts yourself.",
-            actionLabel = "Browse Templates",
-            onAction = onBrowseTemplates,
-            secondaryActionLabel = "Create Blank Profile",
-            onSecondaryAction = onCreateProfile,
+            body = "Profiles connect contexts to tasks. Import Tasker XML, start from a curated template, or create a blank profile and attach contexts yourself.",
+            actionLabel = if (taskerImportBusy) "Reading Tasker XML..." else "Import Tasker XML",
+            onAction = onImportTaskerXml,
+            actionEnabled = !taskerImportBusy,
+            secondaryActionLabel = "Browse Templates",
+            onSecondaryAction = onBrowseTemplates,
+            tertiaryActionLabel = "Create Blank Profile",
+            onTertiaryAction = onCreateProfile,
             contentPadding = contentPadding,
         )
         return
@@ -688,6 +786,8 @@ private fun ProfilesScreen(
                 tasks = tasks,
                 runLogs = runLogs,
                 onBrowseTemplates = onBrowseTemplates,
+                onImportTaskerXml = onImportTaskerXml,
+                taskerImportBusy = taskerImportBusy,
             )
         }
         item {
@@ -709,12 +809,35 @@ private fun ProfilesScreen(
     }
 }
 
+private fun readBoundedTaskerXml(context: Context, uri: Uri): String {
+    val stream = context.contentResolver.openInputStream(uri)
+        ?: error("Unable to open selected Tasker XML file")
+    ByteArrayOutputStream().use { output ->
+        stream.use { input ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            var totalBytes = 0
+            while (true) {
+                val read = input.read(buffer)
+                if (read == -1) break
+                totalBytes += read
+                require(totalBytes <= TASKER_XML_IMPORT_MAX_BYTES) {
+                    "Tasker XML file is larger than ${TASKER_XML_IMPORT_MAX_BYTES / (1024 * 1024)} MB"
+                }
+                output.write(buffer, 0, read)
+            }
+        }
+        return output.toString(Charsets.UTF_8.name())
+    }
+}
+
 @Composable
 private fun WorkspaceSummaryCard(
     profiles: List<Profile>,
     tasks: List<Task>,
     runLogs: List<RunLogEntry>,
     onBrowseTemplates: () -> Unit,
+    onImportTaskerXml: () -> Unit,
+    taskerImportBusy: Boolean,
 ) {
     val enabledProfiles = profiles.count { it.enabled }
     val configuredContexts = profiles.sumOf { it.contexts.size }
@@ -757,8 +880,17 @@ private fun WorkspaceSummaryCard(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
-            OutlinedButton(onClick = onBrowseTemplates, modifier = Modifier.fillMaxWidth()) {
-                Text("Browse Starter Templates")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = onBrowseTemplates, modifier = Modifier.weight(1f)) {
+                    Text("Templates")
+                }
+                OutlinedButton(
+                    onClick = onImportTaskerXml,
+                    enabled = !taskerImportBusy,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(if (taskerImportBusy) "Reading XML" else "Import Tasker")
+                }
             }
         }
     }
@@ -1586,8 +1718,13 @@ private fun EmptyState(
     actionLabel: String?,
     onAction: (() -> Unit)?,
     contentPadding: PaddingValues,
+    actionEnabled: Boolean = true,
     secondaryActionLabel: String? = null,
     onSecondaryAction: (() -> Unit)? = null,
+    secondaryActionEnabled: Boolean = true,
+    tertiaryActionLabel: String? = null,
+    onTertiaryAction: (() -> Unit)? = null,
+    tertiaryActionEnabled: Boolean = true,
 ) {
     Column(
         modifier = Modifier
@@ -1622,14 +1759,28 @@ private fun EmptyState(
         )
         if (actionLabel != null && onAction != null) {
             Spacer(Modifier.height(24.dp))
-            Button(onClick = onAction, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = onAction, enabled = actionEnabled, modifier = Modifier.fillMaxWidth()) {
                 Text(actionLabel)
             }
         }
         if (secondaryActionLabel != null && onSecondaryAction != null) {
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = onSecondaryAction, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = onSecondaryAction,
+                enabled = secondaryActionEnabled,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Text(secondaryActionLabel)
+            }
+        }
+        if (tertiaryActionLabel != null && onTertiaryAction != null) {
+            Spacer(Modifier.height(8.dp))
+            TextButton(
+                onClick = onTertiaryAction,
+                enabled = tertiaryActionEnabled,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(tertiaryActionLabel)
             }
         }
     }
@@ -1677,6 +1828,121 @@ private fun DeleteConfirmationDialog(
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun TaskerImportReviewDialog(
+    state: TaskerImportReviewState,
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val preview = state.preview
+    val migrationWarnings = (preview.warnings + preview.lossyWarnings).distinct()
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        title = { Text("Review Tasker import") },
+        text = {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                item {
+                    Text(
+                        "Imported profiles will be created disabled so actions, contexts, and permissions can be reviewed before use.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        SummaryMetric("${preview.importTaskCount}", "Tasks", Modifier.weight(1f))
+                        SummaryMetric("${preview.importProfileCount}", "Profiles", Modifier.weight(1f))
+                        SummaryMetric("${preview.importVariableCount}", "Variables", Modifier.weight(1f))
+                    }
+                }
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        SummaryMetric("${preview.sourceTaskCount}", "Src tasks", Modifier.weight(1f))
+                        SummaryMetric("${preview.sourceProfileCount}", "Src profiles", Modifier.weight(1f))
+                        SummaryMetric("${preview.sourceSceneCount}", "Scenes", Modifier.weight(1f))
+                    }
+                }
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        StatusPill("${preview.mappedActionCount} mapped", MaterialTheme.colorScheme.tertiary)
+                        StatusPill("${preview.unsupportedActionCount} unsupported", MaterialTheme.colorScheme.error)
+                    }
+                }
+                if (preview.capabilityWarnings.isNotEmpty()) {
+                    item {
+                        TaskerImportListSection(
+                            title = "Capability review",
+                            values = preview.capabilityWarnings,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+                if (migrationWarnings.isNotEmpty()) {
+                    item {
+                        TaskerImportListSection(
+                            title = "Migration warnings",
+                            values = migrationWarnings,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+                if (state.report.unsupportedActions.isNotEmpty()) {
+                    item {
+                        TaskerImportListSection(
+                            title = "Unsupported Tasker actions",
+                            values = state.report.unsupportedActions.map {
+                                "${it.taskName} step ${it.actionIndex + 1}: code ${it.taskerCode}"
+                            },
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+                if (state.report.mappedActions.isNotEmpty()) {
+                    item {
+                        TaskerImportListSection(
+                            title = "Mapped actions",
+                            values = state.report.mappedActions.map {
+                                "${it.taskName}: ${it.taskerCode} -> ${it.openTaskerActionId}"
+                            },
+                            color = MaterialTheme.colorScheme.tertiary,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = preview.canImport && !busy,
+                onClick = onConfirm,
+            ) {
+                Text(if (busy) "Importing..." else "Import for Review")
+            }
+        },
+        dismissButton = {
+            TextButton(enabled = !busy, onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
+}
+
+@Composable
+private fun TaskerImportListSection(
+    title: String,
+    values: List<String>,
+    color: Color,
+) {
+    InlineNotice(
+        title = title,
+        body = values.take(5).joinToString("\n") + if (values.size > 5) "\n${values.size - 5} more" else "",
+        color = color,
     )
 }
 
