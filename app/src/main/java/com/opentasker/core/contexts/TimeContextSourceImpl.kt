@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import java.util.Calendar
+import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -33,7 +34,10 @@ class TimeContextSourceImpl : ContextSource {
                         ContextEvent(
                             type,
                             true,
-                            mapOf("time" to "%02d:%02d".format(cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE)))
+                            mapOf(
+                                "time" to "%02d:%02d".format(cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE)),
+                                "day" to dayToken(cal),
+                            )
                         )
                     )
                 }
@@ -45,16 +49,21 @@ class TimeContextSourceImpl : ContextSource {
     }
 }
 
+private fun dayToken(calendar: Calendar): String =
+    calendar.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.SHORT, Locale.US)?.uppercase(Locale.US).orEmpty()
+
 fun timeMatches(from: String, to: String): Boolean {
     val cal = Calendar.getInstance()
-    val now = cal.get(Calendar.HOUR_OF_DAY) * 100 + cal.get(Calendar.MINUTE)
-    val fromParts = from.split(":").map { it.toInt() }
-    val toParts = to.split(":").map { it.toInt() }
-    val fh = fromParts[0] * 100
-    val fm = fromParts.getOrNull(1) ?: 0
-    val th = toParts[0] * 100
-    val tm = toParts.getOrNull(1) ?: 0
-    val fromMin = fh + fm
-    val toMin = th + tm
+    val now = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
+    val fromMin = parseClockMinutes(from) ?: return false
+    val toMin = parseClockMinutes(to) ?: return false
     return if (fromMin <= toMin) now in fromMin..toMin else (now >= fromMin || now <= toMin)
+}
+
+private fun parseClockMinutes(value: String): Int? {
+    val parts = value.trim().split(":")
+    val hour = parts.getOrNull(0)?.toIntOrNull() ?: return null
+    val minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
+    if (hour !in 0..23 || minute !in 0..59) return null
+    return hour * 60 + minute
 }
