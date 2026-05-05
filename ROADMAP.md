@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.22. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.23. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-05
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.22
+**Current app version:** 0.2.23
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -13,7 +13,7 @@ Source-backed product roadmap for OpenTasker v0.2.22. This file reconciles the c
 
 OpenTasker is an Android/Kotlin automation app targeting API 35 with Jetpack Compose, Material 3, Room, Coroutines, WorkManager, DataStore, Gson, and Hilt dependencies. The project goal is a privacy-first, fully on-device, open-source Tasker/MacroDroid/Automate alternative.
 
-The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, run logs, setup/onboarding status, live context inspection, notification listener event triggers, NFC tag event triggers, calendar/sun event triggers, a Tasker XML-to-OpenTasker-bundle migration parser, and a F-Droid readiness build profile. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
+The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, run logs, setup/onboarding status, live context inspection, notification listener event triggers, NFC tag event triggers, calendar/sun event triggers, a Tasker XML-to-OpenTasker-bundle migration parser, a F-Droid readiness build profile, and centralized Gradle dependency version governance. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
 
 Key local constraints:
 
@@ -333,6 +333,7 @@ Key local constraints:
 
 ### X12 - Dependency modernization plan
 
+**Status:** Baseline completed in v0.2.23. Plugin and library versions are centralized in `gradle/libs.versions.toml`, Gradle declarations use catalog aliases, and `docs/DEPENDENCY_MODERNIZATION.md` defines the staged upgrade order and verification gate. Actual version bumps remain separate follow-up batches.
 **Description:** Upgrade dependencies in staged, reversible steps: Hilt/Dagger through an intermediate compatible release, Room, WorkManager, Compose BOM, Coroutines, Kotlin/KSP/Compose plugin alignment, and AGP only when build/reproducibility constraints are clear.  
 **Sources:** Kotlin releases [S37], AGP releases [S38], Dagger releases [S39], Room releases [S35], WorkManager releases [S40], Compose releases [S41].  
 **Category:** dev-experience, security, testing, distribution.  
