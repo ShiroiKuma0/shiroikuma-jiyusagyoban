@@ -31,6 +31,7 @@ Tasker's source is **not public**. This architecture is reconstructed from the u
 │  - ContextSources  (Flow<ContextEvent> per type)      │
 │  - NotificationListenerService -> event source bridge │
 │  - MainActivity NFC intents -> event source bridge    │
+│  - CalendarProvider / sun ticks -> event source bridge│
 ├───────────────────────────────────────────────────────┤
 │  Action Library                                       │
 │  - Action interface + registry                        │
@@ -61,6 +62,8 @@ The Context Inspector UI separately observes registered `ContextSource` flows an
 Notification listener triggers are represented as Event contexts with `event=notification`. The listener pushes in-memory events containing package, title, and body previews; Android logs include package and character counts only, not notification text.
 
 NFC tag triggers are represented as Event contexts with `event=nfc`. `MainActivity` accepts tag, tech, and NDEF discovery intents, normalizes the scanned tag ID, and pushes an in-memory event that profiles can filter with `tagId`.
+
+Calendar and sun triggers are represented as Event contexts. Calendar polling uses `CalendarContract.Instances` only when `READ_CALENDAR` is granted and emits redacted metadata such as calendar name, busy/upcoming state, all-day flag, and minutes until start/end, without event titles or descriptions. Sunrise/sunset filters evaluate minute ticks against user-provided latitude/longitude, offset minutes, and trigger windows.
 
 ### Persistence schema (Room)
 

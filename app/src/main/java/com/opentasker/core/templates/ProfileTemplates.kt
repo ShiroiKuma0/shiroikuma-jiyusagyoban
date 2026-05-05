@@ -220,15 +220,15 @@ object ProfileTemplateCatalog {
         ProfileTemplate(
             id = "meeting-mode-calendar",
             title = "Meeting mode from calendar",
-            summary = "Calendar-driven focus template planned for CalendarProvider context support.",
+            summary = "Lower notification volume while a named calendar has a busy event.",
             category = "Calendar",
-            availability = TemplateAvailability.Planned,
-            safetyNote = "Blocked until calendar context support and permission copy are implemented.",
+            availability = TemplateAvailability.RequiresSetup,
+            safetyNote = "Creates a disabled profile. Requires Calendar access plus DND/volume access before enabling.",
             slots = listOf(
                 TemplateSlot("calendar", "Calendar name", "Work"),
             ),
             contexts = listOf(
-                TemplateContext(ContextType.EVENT, mapOf("event" to "calendar", "filter" to "{calendar}")),
+                TemplateContext(ContextType.EVENT, mapOf("event" to "calendar", "state" to "during", "calendar" to "{calendar}")),
             ),
             actions = listOf(
                 TemplateAction("volume.set", "Lower notification volume", mapOf("stream" to "notification", "level" to "0")),

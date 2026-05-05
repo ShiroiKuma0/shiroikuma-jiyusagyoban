@@ -2175,9 +2175,16 @@ private fun contextFields(type: ContextType): List<ActionField> = when (type) {
         ActionField("value", "Expected value", required = true, hint = "true, home-ssid, 80"),
     )
     ContextType.EVENT -> listOf(
-        ActionField("event", "Event type", required = true, hint = "boot_completed, sms_received, notification"),
+        ActionField("event", "Event type", required = true, hint = "boot_completed, notification, nfc, calendar, sunrise, sunset"),
+        ActionField("state", "Event state", hint = "during, upcoming"),
+        ActionField("calendar", "Calendar name", hint = "Work"),
+        ActionField("beforeMinutes", "Before minutes", FieldType.NUMBER, hint = "15"),
         ActionField("package", "Package allowlist", hint = "com.example.app, com.chat.app"),
         ActionField("tagId", "NFC tag ID", hint = "04AABBCC"),
+        ActionField("latitude", "Latitude", FieldType.NUMBER, hint = "40.7128"),
+        ActionField("longitude", "Longitude", FieldType.NUMBER, hint = "-74.0060"),
+        ActionField("offsetMinutes", "Sun offset minutes", FieldType.NUMBER, hint = "-30"),
+        ActionField("windowMinutes", "Sun window minutes", FieldType.NUMBER, hint = "5"),
         ActionField("title", "Title contains", hint = "Optional notification title text"),
         ActionField("body", "Body contains", hint = "Optional notification body text"),
         ActionField("filter", "Any metadata filter", hint = "Optional text/package/action filter"),
@@ -2205,7 +2212,7 @@ private fun contextDescription(type: ContextType): String = when (type) {
     ContextType.DAY -> "Matches on selected days of the week."
     ContextType.LOCATION -> "Matches near a latitude/longitude radius."
     ContextType.STATE -> "Matches a device state such as battery, charging, screen, or WiFi."
-    ContextType.EVENT -> "Matches a one-shot event such as boot, SMS, notification, NFC, or intent."
+    ContextType.EVENT -> "Matches a one-shot event such as boot, SMS, notification, NFC, calendar, sun, or intent."
 }
 
 private fun runLogTaskOptions(logs: List<RunLogEntry>, tasks: List<Task>): List<Pair<Long, String>> {
