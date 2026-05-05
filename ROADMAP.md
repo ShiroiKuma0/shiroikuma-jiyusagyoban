@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.21. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.22. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-05
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.21
+**Current app version:** 0.2.22
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -13,7 +13,7 @@ Source-backed product roadmap for OpenTasker v0.2.21. This file reconciles the c
 
 OpenTasker is an Android/Kotlin automation app targeting API 35 with Jetpack Compose, Material 3, Room, Coroutines, WorkManager, DataStore, Gson, and Hilt dependencies. The project goal is a privacy-first, fully on-device, open-source Tasker/MacroDroid/Automate alternative.
 
-The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, run logs, setup/onboarding status, live context inspection, notification listener event triggers, NFC tag event triggers, calendar/sun event triggers, and a Tasker XML-to-OpenTasker-bundle migration parser. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
+The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, run logs, setup/onboarding status, live context inspection, notification listener event triggers, NFC tag event triggers, calendar/sun event triggers, a Tasker XML-to-OpenTasker-bundle migration parser, and a F-Droid readiness build profile. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
 
 Key local constraints:
 
@@ -320,6 +320,7 @@ Key local constraints:
 
 ### X11 - F-Droid readiness track
 
+**Status:** Baseline completed in v0.2.22. Added a property-based `openTaskerDistribution=fdroid` build profile, pinned build tools, `BuildConfig.DISTRIBUTION`, proprietary dependency-family verification through `verifyFdroidReadiness`, CI coverage for the F-Droid release profile, F-Droid readiness docs, and a draft fdroiddata metadata file. Remaining work is release-tag discipline, local fdroidserver lint/build, and reproducible binary comparison against a signed upstream APK.
 **Description:** Add an `fdroid` build profile/flavor policy, pin reproducible build inputs where needed, avoid proprietary geofencing dependencies in F-Droid artifacts, document metadata, and verify unsigned release APK reproducibility assumptions.  
 **Sources:** F-Droid reproducible builds [S31], F-Droid inclusion policy [S32], platform audit [L3].  
 **Category:** distribution/packaging, security, docs.  
