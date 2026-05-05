@@ -66,7 +66,12 @@ class TaskRunner(
 
     private fun shouldRun(spec: ActionSpec): Boolean {
         val condition = spec.condition?.trim()?.takeIf { it.isNotBlank() } ?: return true
-        return ctx.variables.evaluateCondition(condition)
+        val legacyExpanded = ctx.variables.expand(condition)
+        if (!legacyExpanded.contains("{{")) return ctx.variables.evaluateCondition(legacyExpanded)
+
+        val expanded = templateExpressionEngine.expand(legacyExpanded, ctx.variables.toTemplateScope(ctx.eventVariables))
+        if (expanded.warnings.isNotEmpty()) return false
+        return ctx.variables.evaluateCondition(expanded.value)
     }
 
     private fun traceFor(
