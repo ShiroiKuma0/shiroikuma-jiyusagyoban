@@ -45,6 +45,7 @@
         android:protectionLevel="signature" />
 
     <queries>
+        <package android:name="moe.shizuku.privileged.api" />
         <intent>
             <action android:name="com.twofortyfouram.locale.intent.action.EDIT_SETTING" />
         </intent>

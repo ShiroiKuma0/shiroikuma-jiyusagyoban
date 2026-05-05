@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -55,6 +56,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.opentasker.core.permissions.UsageAccess
+import com.opentasker.core.power.ShizukuPowerBackend
 import com.opentasker.core.scheduling.ExactAlarmSupport
 
 private data class PermissionSetupItem(
@@ -64,6 +66,7 @@ private data class PermissionSetupItem(
     val actionLabel: String,
     val action: PermissionAction,
     val requiredFor: String,
+    val optional: Boolean = false,
 )
 
 private sealed interface PermissionAction {
@@ -95,9 +98,13 @@ fun PermissionOnboardingScreen(
     }
 
     val items = remember(context, refreshTick) { buildPermissionItems(context) }
-    val orderedItems = remember(items) { items.sortedWith(compareBy<PermissionSetupItem> { it.granted }.thenBy { it.title }) }
-    val grantedCount = items.count { it.granted }
-    val progress = if (items.isEmpty()) 0f else grantedCount.toFloat() / items.size.toFloat()
+    val orderedItems = remember(items) {
+        items.sortedWith(compareBy<PermissionSetupItem> { it.optional }.thenBy { it.granted }.thenBy { it.title })
+    }
+    val requiredItems = remember(items) { items.filterNot { it.optional } }
+    val grantedCount = requiredItems.count { it.granted }
+    val pendingCount = requiredItems.size - grantedCount
+    val progress = if (requiredItems.isEmpty()) 0f else grantedCount.toFloat() / requiredItems.size.toFloat()
 
     LazyColumn(
         modifier = Modifier
@@ -124,8 +131,8 @@ fun PermissionOnboardingScreen(
                             )
                         }
                         PermissionStatusPill(
-                            if (grantedCount == items.size) "Ready" else "${items.size - grantedCount} pending",
-                            if (grantedCount == items.size) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+                            if (pendingCount == 0) "Ready" else "$pendingCount pending",
+                            if (pendingCount == 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
                         )
                     }
                     LinearProgressIndicator(
@@ -138,10 +145,10 @@ fun PermissionOnboardingScreen(
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         PermissionMetric("$grantedCount", "Ready", Modifier.weight(1f))
-                        PermissionMetric("${items.size - grantedCount}", "Needs setup", Modifier.weight(1f))
+                        PermissionMetric("$pendingCount", "Needs setup", Modifier.weight(1f))
                     }
                     Text(
-                        "Pending items are listed first. Return here after changing Android settings to refresh the checklist.",
+                        "Pending required items are listed first. Optional integrations are listed after required setup.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -169,10 +176,22 @@ private fun PermissionSetupCard(
     item: PermissionSetupItem,
     onRunAction: () -> Unit,
 ) {
+    val stateLabel = when {
+        item.optional && item.granted -> "Detected"
+        item.optional -> "Optional"
+        item.granted -> "Ready"
+        else -> "Needs setup"
+    }
+    val stateColor = when {
+        item.optional && item.granted -> MaterialTheme.colorScheme.tertiary
+        item.optional -> MaterialTheme.colorScheme.secondary
+        item.granted -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.error
+    }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (item.granted) {
+            containerColor = if (item.granted || item.optional) {
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
             } else {
                 MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.18f)
@@ -180,25 +199,29 @@ private fun PermissionSetupCard(
         ),
         border = BorderStroke(
             1.dp,
-            if (item.granted) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f) else MaterialTheme.colorScheme.error.copy(alpha = 0.26f),
+            if (item.granted || item.optional) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f) else MaterialTheme.colorScheme.error.copy(alpha = 0.26f),
         ),
         shape = RoundedCornerShape(16.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Surface(
-                    color = if (item.granted) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.error.copy(alpha = 0.12f),
+                    color = stateColor.copy(alpha = 0.14f),
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(
                         1.dp,
-                        if (item.granted) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.28f) else MaterialTheme.colorScheme.error.copy(alpha = 0.24f),
+                        stateColor.copy(alpha = 0.28f),
                     ),
                 ) {
                     Box(modifier = Modifier.padding(9.dp), contentAlignment = Alignment.Center) {
                         Icon(
-                            if (item.granted) Icons.Filled.CheckCircle else Icons.Filled.Error,
+                            when {
+                                item.granted -> Icons.Filled.CheckCircle
+                                item.optional -> Icons.Filled.Info
+                                else -> Icons.Filled.Error
+                            },
                             contentDescription = null,
-                            tint = if (item.granted) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                            tint = stateColor,
                             modifier = Modifier.size(22.dp),
                         )
                     }
@@ -206,18 +229,18 @@ private fun PermissionSetupCard(
                 Column(Modifier.weight(1f)) {
                     Text(item.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        if (item.granted) "Ready" else "Needs setup",
+                        stateLabel,
                         style = MaterialTheme.typography.labelMedium,
-                        color = if (item.granted) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                        color = stateColor,
                     )
                 }
                 PermissionStatusPill(
-                    if (item.granted) "Ready" else "Required",
-                    if (item.granted) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                    stateLabel,
+                    stateColor,
                 )
             }
             Text(item.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            PermissionRequirement(label = item.requiredFor)
+            PermissionRequirement(label = if (item.optional) "Optional: ${item.requiredFor}" else item.requiredFor)
             if (!item.granted) {
                 Button(onClick = onRunAction, modifier = Modifier.fillMaxWidth()) {
                     Text(item.actionLabel)
@@ -279,6 +302,7 @@ private fun PermissionRequirement(label: String) {
 }
 
 private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
+    val shizukuStatus = ShizukuPowerBackend.inspect(context)
     return listOf(
         PermissionSetupItem(
             title = "Notifications",
@@ -399,6 +423,21 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
             requiredFor = "DND actions",
         ),
         PermissionSetupItem(
+            title = "Shizuku power mode",
+            body = "${shizukuStatus.summary} Elevated actions remain blocked until the backend is implemented and explicitly enabled.",
+            granted = shizukuStatus.managerInstalled,
+            actionLabel = if (shizukuStatus.managerInstalled) "Open app settings" else "Open setup guide",
+            action = PermissionAction.SettingsIntent(
+                if (shizukuStatus.managerInstalled) {
+                    packageDetailsIntent(ShizukuPowerBackend.MANAGER_PACKAGE)
+                } else {
+                    Intent(Intent.ACTION_VIEW, Uri.parse(ShizukuPowerBackend.SETUP_URL))
+                },
+            ),
+            requiredFor = "Elevated actions",
+            optional = true,
+        ),
+        PermissionSetupItem(
             title = "App visibility",
             body = "Android package visibility limits app lookup. If app selection fails, review app-info permissions and future query filters.",
             granted = true,
@@ -428,7 +467,10 @@ private fun hasNotificationPolicyAccess(context: Context): Boolean {
 }
 
 private fun appDetailsIntent(context: Context): Intent =
-    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+    packageDetailsIntent(context.packageName)
+
+private fun packageDetailsIntent(packageName: String): Intent =
+    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
 
 private fun openSettingsIntent(context: Context, intent: Intent, onMessage: (String) -> Unit) {
     try {

@@ -1,13 +1,13 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.25-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.26-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.25** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scene library management, read-only flow graphs, JSON bundles, Tasker XML import planning, F-Droid build readiness, dependency version governance, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; variable tooling and broader plugin UX are planned.
+**OpenTasker v0.2.26** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scene library management, read-only flow graphs, JSON bundles, Tasker XML import planning, F-Droid build readiness, dependency version governance, optional Shizuku readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; variable tooling, elevated backends, and broader plugin UX are planned.
 
-> **Status:** v0.2.25 adds a Room-backed Scenes tab with creation/deletion, overlay-readiness status, element previews, and validation for dimensions/bounds/task bindings, while keeping the Flow tab, centralized dependency governance, the F-Droid distribution profile, Tasker XML import planning, local calendar/sun triggers, NFC tag events, notification listener events, the context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
+> **Status:** v0.2.26 adds Shizuku manager package visibility, optional setup/status detection, and elevated-action hints while keeping restricted actions blocked until an opt-in backend is implemented. It keeps the Scenes tab, Flow tab, centralized dependency governance, F-Droid distribution profile, Tasker XML import planning, local calendar/sun triggers, NFC tag events, notification listener events, context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
 
 ---
 
@@ -21,6 +21,7 @@
 ✅ **Profile templates** — guided starter profiles with variable slots, safety notes, and disabled-by-default installation  
 ✅ **Scene library baseline** — Room-backed scene list/create/delete with validation and overlay readiness
 ✅ **Read-only flow graphs** — optional Flow tab maps profiles to contexts, enter/exit tasks, action steps, and warnings
+✅ **Shizuku readiness** — optional package/status detection and elevated-action hints without executing privileged calls
 ✅ **Open JSON bundles** — schema-versioned profile/task/context/action/variable/scene export and import planning  
 ✅ **Tasker XML import planning** — common Tasker task/profile/variable XML converts to OpenTasker bundles with migration warnings
 ✅ **F-Droid readiness** — property-based `fdroid` profile, dependency-policy check, and metadata draft
@@ -85,7 +86,7 @@ Room DB (persistent storage)
 | Plugin | 1 | Locale setting dispatch |
 | Import | 1 | unsupported Tasker action placeholder |
 
-Some actions are intentionally disabled or marked setup-required because Android restricts normal apps from changing airplane mode, mobile data, screenshots, reboot, screen-off, and similar privileged operations.
+Some actions are intentionally disabled or marked setup-required because Android restricts normal apps from changing airplane mode, mobile data, screenshots, reboot, screen-off, and similar privileged operations. Shizuku manager detection is available only as a readiness signal; OpenTasker does not request Shizuku permission or execute elevated commands yet.
 
 ---
 
@@ -113,9 +114,10 @@ Release APKs are unsigned unless `OPEN_TASKER_RELEASE_KEYSTORE`, `OPEN_TASKER_RE
 1. **Dependency modernization batches** — staged AndroidX/Kotlin/Room/WorkManager updates with device verification
 2. **Scene element editor** — add text/button/slider/image controls and task binding pickers before overlay launch
 3. **Flow graph deep links** — node selection that opens the relevant profile, task, context, or action editor
-4. **Locale condition queries** — complete query execution for condition plugins with timeout and result handling
-5. **Tasker import UI** — file picker, migration preview, and import confirmation around the parser baseline
-6. **F-Droid submission hardening** — release tag discipline, fdroidserver lint/build, and reproducible binary comparison
+4. **Shizuku API opt-in backend** — explicit user opt-in, permission request, isolated execution, and run-log audit trail
+5. **Locale condition queries** — complete query execution for condition plugins with timeout and result handling
+6. **Tasker import UI** — file picker, migration preview, and import confirmation around the parser baseline
+7. **F-Droid submission hardening** — release tag discipline, fdroidserver lint/build, and reproducible binary comparison
 
 ---
 
