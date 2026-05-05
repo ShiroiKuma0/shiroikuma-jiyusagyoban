@@ -1,6 +1,6 @@
 # FOSS Geofencing Baseline
 
-OpenTasker v0.2.39 has a Play-services-free geofence path for Location contexts. It combines a platform `LocationManager` source with the pure evaluator added in v0.2.29, persisted dwell state added in v0.2.37, Context Inspector dwell detail added in v0.2.38, and stale dwell-key cleanup added in v0.2.39; it is still not a device-verified background geofence reliability claim.
+OpenTasker v0.2.40 has a Play-services-free geofence path for Location contexts. It combines a platform `LocationManager` source with the pure evaluator added in v0.2.29, persisted dwell state added in v0.2.37, Context Inspector dwell detail added in v0.2.38, stale dwell-key cleanup added in v0.2.39, and balanced provider cadence added in v0.2.40; it is still not a device-verified background geofence reliability claim.
 
 ## Active Scope
 
@@ -8,6 +8,8 @@ OpenTasker v0.2.39 has a Play-services-free geofence path for Location contexts.
 - Registers `LocationContextSourceImpl` as the runtime `location` source.
 - Uses Android framework GPS and network providers instead of Google Play Services.
 - Seeds matching from the best last-known GPS/network fix when one is available.
+- Requests GPS updates at a 180-second/100-meter cadence and network updates at a 90-second/150-meter cadence by default.
+- Rechecks setup readiness every 60 seconds while the source is active.
 - Emits fail-closed setup events for missing foreground location permission, disabled providers, unavailable location service, and source errors.
 - Persists `insideSinceEpochMs` per profile/context/config so dwell timers can survive process restarts.
 - Uses a config hash in dwell-state keys so edited geofences do not reuse stale inside-since state.
@@ -29,7 +31,7 @@ OpenTasker v0.2.39 has a Play-services-free geofence path for Location contexts.
 
 - No Google Play Services geofencing dependency.
 - No public background-location reliability claim.
-- No battery optimization strategy for location polling.
+- No device-verified battery optimization claim for location polling.
 - No Play flavor split.
 - No device-verified geofence reliability statement yet.
 
@@ -42,7 +44,7 @@ OpenTasker v0.2.39 has a Play-services-free geofence path for Location contexts.
 
 ## Next Work
 
-1. Tune provider cadence and battery behavior with device evidence.
+1. Validate provider cadence and battery behavior with device evidence.
 2. Expand setup/policy copy after real foreground/background verification.
 3. Add device-backed smoke coverage for foreground and background location behavior.
 4. Verify behavior on a device before making public geofence reliability claims.
