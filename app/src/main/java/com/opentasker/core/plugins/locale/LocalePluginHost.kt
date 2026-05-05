@@ -20,6 +20,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.longOrNull
+import java.util.LinkedHashMap
 import kotlin.coroutines.resume
 
 object LocalePluginContract {
@@ -132,17 +133,68 @@ object LocalePluginConditionResultParser {
     }
 }
 
+data class LocalePluginConditionCacheKey(
+    val packageName: String,
+    val bundleValues: Map<String, String>,
+)
+
+class LocalePluginConditionStateCache(
+    private val maxEntries: Int = 128,
+) {
+    private val knownStates = object : LinkedHashMap<LocalePluginConditionCacheKey, LocalePluginConditionState>(
+        maxEntries,
+        0.75f,
+        true,
+    ) {
+        override fun removeEldestEntry(
+            eldest: MutableMap.MutableEntry<LocalePluginConditionCacheKey, LocalePluginConditionState>?,
+        ): Boolean = size > maxEntries
+    }
+
+    @Synchronized
+    fun resolve(
+        key: LocalePluginConditionCacheKey,
+        rawResult: LocalePluginConditionResult,
+    ): LocalePluginConditionResult {
+        return when (rawResult.state) {
+            LocalePluginConditionState.Satisfied,
+            LocalePluginConditionState.Unsatisfied -> {
+                knownStates[key] = rawResult.state
+                rawResult
+            }
+            LocalePluginConditionState.Unknown -> {
+                val lastKnown = knownStates[key]
+                if (lastKnown == null) {
+                    rawResult.copy(
+                        state = LocalePluginConditionState.Unsatisfied,
+                        message = "${rawResult.message} No last known result is available; treating unknown as unsatisfied.",
+                    )
+                } else {
+                    rawResult.copy(
+                        state = lastKnown,
+                        message = "${rawResult.message} Using last known ${lastKnown.serializedName} result.",
+                    )
+                }
+            }
+        }
+    }
+
+    companion object {
+        val Shared = LocalePluginConditionStateCache()
+    }
+}
+
 class LocalePluginHost(
     private val appContext: Context,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val conditionStateCache: LocalePluginConditionStateCache = LocalePluginConditionStateCache.Shared,
 ) {
     suspend fun fireSetting(request: LocalePluginRequest): LocalePluginResult {
         LocalePluginBundleCodec.validatePackageName(request.packageName)
         require(request.timeoutMs in 1_000..30_000) { "Plugin timeout must be between 1000 and 30000 ms." }
 
-        val pluginBundle = LocalePluginBundleCodec.toBundle(
-            LocalePluginBundleCodec.decodeStringBundle(request.bundleJson)
-        )
+        val bundleValues = LocalePluginBundleCodec.decodeStringBundle(request.bundleJson)
+        val pluginBundle = LocalePluginBundleCodec.toBundle(bundleValues)
         val target = resolveBroadcastTarget(request.packageName, LocalePluginContract.ACTION_FIRE_SETTING)
         val component = target.component ?: return LocalePluginResult(false, target.message)
         val intent = pluginBroadcastIntent(
@@ -164,8 +216,11 @@ class LocalePluginHost(
         LocalePluginBundleCodec.validatePackageName(request.packageName)
         require(request.timeoutMs in 1_000..30_000) { "Plugin timeout must be between 1000 and 30000 ms." }
 
-        val pluginBundle = LocalePluginBundleCodec.toBundle(
-            LocalePluginBundleCodec.decodeStringBundle(request.bundleJson)
+        val bundleValues = LocalePluginBundleCodec.decodeStringBundle(request.bundleJson)
+        val pluginBundle = LocalePluginBundleCodec.toBundle(bundleValues)
+        val cacheKey = LocalePluginConditionCacheKey(
+            packageName = request.packageName,
+            bundleValues = bundleValues.toSortedMap(),
         )
         val target = resolveBroadcastTarget(request.packageName, LocalePluginContract.ACTION_QUERY_CONDITION)
         val component = target.component ?: return LocalePluginConditionResult(
@@ -184,7 +239,10 @@ class LocalePluginHost(
                 suspendCancellableCoroutine { continuation ->
                     val resultReceiver = object : BroadcastReceiver() {
                         override fun onReceive(context: Context, intent: Intent?) {
-                            val result = LocalePluginConditionResultParser.parse(resultCode, request.packageName)
+                            val result = conditionStateCache.resolve(
+                                cacheKey,
+                                LocalePluginConditionResultParser.parse(resultCode, request.packageName),
+                            )
                             if (continuation.isActive) continuation.resume(result)
                         }
                     }

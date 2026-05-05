@@ -73,4 +73,69 @@ class LocalePluginBundleCodecTest {
         assertTrue(satisfied.satisfied)
         assertTrue(unrecognized.message.contains("unrecognized result code"))
     }
+
+    @Test
+    fun conditionStateCacheFallsBackToLastKnownStateForUnknown() {
+        val cache = LocalePluginConditionStateCache()
+        val key = LocalePluginConditionCacheKey("com.example.plugin", mapOf("mode" to "work"))
+
+        cache.resolve(
+            key,
+            LocalePluginConditionResultParser.parse(
+                LocalePluginContract.RESULT_CONDITION_SATISFIED,
+                "com.example.plugin",
+            ),
+        )
+        val resolved = cache.resolve(
+            key,
+            LocalePluginConditionResultParser.parse(
+                LocalePluginContract.RESULT_CONDITION_UNKNOWN,
+                "com.example.plugin",
+            ),
+        )
+
+        assertEquals(LocalePluginConditionState.Satisfied, resolved.state)
+        assertTrue(resolved.message.contains("last known satisfied"))
+    }
+
+    @Test
+    fun conditionStateCacheTreatsUnknownWithoutHistoryAsUnsatisfied() {
+        val cache = LocalePluginConditionStateCache()
+        val key = LocalePluginConditionCacheKey("com.example.plugin", mapOf("mode" to "work"))
+
+        val resolved = cache.resolve(
+            key,
+            LocalePluginConditionResultParser.parse(
+                LocalePluginContract.RESULT_CONDITION_UNKNOWN,
+                "com.example.plugin",
+            ),
+        )
+
+        assertEquals(LocalePluginConditionState.Unsatisfied, resolved.state)
+        assertTrue(resolved.message.contains("No last known result"))
+    }
+
+    @Test
+    fun conditionStateCacheScopesHistoryByBundle() {
+        val cache = LocalePluginConditionStateCache()
+        val work = LocalePluginConditionCacheKey("com.example.plugin", mapOf("mode" to "work"))
+        val home = LocalePluginConditionCacheKey("com.example.plugin", mapOf("mode" to "home"))
+
+        cache.resolve(
+            work,
+            LocalePluginConditionResultParser.parse(
+                LocalePluginContract.RESULT_CONDITION_SATISFIED,
+                "com.example.plugin",
+            ),
+        )
+        val resolved = cache.resolve(
+            home,
+            LocalePluginConditionResultParser.parse(
+                LocalePluginContract.RESULT_CONDITION_UNKNOWN,
+                "com.example.plugin",
+            ),
+        )
+
+        assertEquals(LocalePluginConditionState.Unsatisfied, resolved.state)
+    }
 }
