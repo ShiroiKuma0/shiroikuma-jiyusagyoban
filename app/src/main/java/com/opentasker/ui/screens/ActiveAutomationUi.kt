@@ -52,6 +52,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -1478,7 +1479,7 @@ private fun ProfileEditorDialog(
     val initialTaskId = profile?.enterTaskId ?: tasks.firstOrNull()?.id ?: 0L
     var name by remember(profile?.id) { mutableStateOf(profile?.name.orEmpty()) }
     var enabled by remember(profile?.id) { mutableStateOf(profile?.enabled ?: true) }
-    var enterTaskId by remember(profile?.id, tasks) { mutableStateOf(initialTaskId) }
+    var enterTaskId by remember(profile?.id, tasks) { mutableLongStateOf(initialTaskId) }
     var cooldown by remember(profile?.id) { mutableStateOf((profile?.cooldownSec ?: 0).toString()) }
     var automationMode by remember(profile?.id) { mutableStateOf(profile?.automationMode ?: AutomationMode.SINGLE) }
     val parsedCooldown = cooldown.toIntOrNull()

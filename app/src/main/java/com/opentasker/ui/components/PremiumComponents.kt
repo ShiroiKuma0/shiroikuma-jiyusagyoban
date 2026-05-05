@@ -61,12 +61,12 @@ fun TextFieldWithError(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
+    modifier: Modifier = Modifier,
     error: String? = null,
     helperText: String? = null,
     placeholder: String? = null,
     singleLine: Boolean = true,
     maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
-    modifier: Modifier = Modifier,
     enabled: Boolean = true,
     readOnly: Boolean = false,
     leadingIcon: @Composable (() -> Unit)? = null,
@@ -238,8 +238,8 @@ fun LoadingSkeleton(
 @Composable
 fun StateBadge(
     text: String,
+    modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.primary,
-    modifier: Modifier = Modifier
 ) {
     Surface(
         modifier = modifier,
@@ -295,8 +295,8 @@ fun LoadingIndicator(
 @Composable
 fun ErrorState(
     message: String,
+    modifier: Modifier = Modifier,
     onRetry: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier

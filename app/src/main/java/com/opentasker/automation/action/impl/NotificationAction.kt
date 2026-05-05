@@ -7,9 +7,9 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.media.RingtoneManager
 import android.os.Build
-import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.opentasker.automation.core.ActionDefinition
 import com.opentasker.automation.model.ActionConfig
 import com.opentasker.automation.model.ActionResult
@@ -23,18 +23,15 @@ class NotificationAction(private val context: Context) : ActionDefinition {
     override val displayName = "Show Notification"
 
     init {
-        // Create notification channel for Android 8+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Automation Notifications",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "Notifications from automation rules"
-            }
-            val manager = context.getSystemService(NotificationManager::class.java)
-            manager?.createNotificationChannel(channel)
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            "Automation Notifications",
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = "Notifications from automation rules"
         }
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager?.createNotificationChannel(channel)
     }
 
     override suspend fun execute(config: ActionConfig): ActionResult {
