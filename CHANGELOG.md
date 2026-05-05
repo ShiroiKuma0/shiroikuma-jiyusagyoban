@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.54 - 2026-05-05
+
+Locale plugin validation harness.
+
+- Added `tools/validate-locale-plugin.ps1` to capture adb evidence for an installed Locale/Tasker-compatible plugin package.
+- The harness records package path, `dumpsys package`, resolver command output, contract-action checks, and a structured `summary.json`.
+- Supports required setting/condition contract checks and an optional synthetic `REQUEST_QUERY` broadcast to OpenTasker.
+- Documented the harness as the repeatable sample-plugin validation path for X3 follow-up testing.
+
 ## v0.2.53 - 2026-05-05
 
 Locale request-query event handling.
