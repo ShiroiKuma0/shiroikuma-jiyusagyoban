@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.57. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.58. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-05
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.57
+**Current app version:** 0.2.58
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -307,7 +307,7 @@ Key local constraints:
 
 ### X10 - Tasker XML import with migration report
 
-**Status:** Baseline completed in v0.2.21. Added a secure Tasker XML parser that converts common task/profile/variable XML into an OpenTasker JSON bundle, preserves unmapped actions as explicit unsupported placeholders, reports mapped actions, skipped profiles, unsupported contexts, scene exclusions, variable losses, and capability warnings, and includes regression tests. Remaining work is the user-facing file picker, preview, and confirmed Room import flow.
+**Status:** Completed in v0.2.58. v0.2.21 added a secure Tasker XML parser that converts common task/profile/variable XML into an OpenTasker JSON bundle, preserves unmapped actions as explicit unsupported placeholders, reports mapped actions, skipped profiles, unsupported contexts, scene exclusions, variable losses, and capability warnings, and includes regression tests. v0.2.58 adds the user-facing document picker, bounded XML preview, migration/capability review dialog, confirmed Room import path, and disabled-by-default imported profiles.
 **Description:** Parse Tasker `.prj.xml`/`.tsk.xml` exports into OpenTasker JSON/Room entities. Show mapped actions, unsupported actions, variable losses, scene exclusions, and required permissions before import.  
 **Sources:** Tasker market dominance [S16], migration friction from competitors [S17][S18], open JSON strategy [S9][S11].  
 **Category:** migration, UX, data.  
