@@ -2175,8 +2175,12 @@ private fun contextFields(type: ContextType): List<ActionField> = when (type) {
         ActionField("value", "Expected value", required = true, hint = "true, home-ssid, 80"),
     )
     ContextType.EVENT -> listOf(
-        ActionField("event", "Event type", required = true, hint = "boot, sms, intent"),
-        ActionField("filter", "Filter", hint = "Optional text/package/action filter"),
+        ActionField("event", "Event type", required = true, hint = "boot_completed, sms_received, notification"),
+        ActionField("package", "Package allowlist", hint = "com.example.app, com.chat.app"),
+        ActionField("title", "Title contains", hint = "Optional notification title text"),
+        ActionField("body", "Body contains", hint = "Optional notification body text"),
+        ActionField("filter", "Any metadata filter", hint = "Optional text/package/action filter"),
+        ActionField("regex", "Use regex matching", FieldType.CHECKBOX),
     )
 }
 
@@ -2200,7 +2204,7 @@ private fun contextDescription(type: ContextType): String = when (type) {
     ContextType.DAY -> "Matches on selected days of the week."
     ContextType.LOCATION -> "Matches near a latitude/longitude radius."
     ContextType.STATE -> "Matches a device state such as battery, charging, screen, or WiFi."
-    ContextType.EVENT -> "Matches a one-shot event such as boot, SMS, or intent."
+    ContextType.EVENT -> "Matches a one-shot event such as boot, SMS, notification, or intent."
 }
 
 private fun runLogTaskOptions(logs: List<RunLogEntry>, tasks: List<Task>): List<Pair<Long, String>> {

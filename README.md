@@ -1,13 +1,13 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.17-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.18-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.17** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, JSON bundles, external automation intents, context inspection, and a conservative Locale plugin host baseline are active now; scenes, variable tooling, and broader plugin UX are planned.
+**OpenTasker v0.2.18** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, JSON bundles, external automation intents, context inspection, notification listener triggers, and a conservative Locale plugin host baseline are active now; scenes, variable tooling, and broader plugin UX are planned.
 
-> **Status:** v0.2.17 adds a context inspector for live source health, latest values, setup state, and profile match explanations, while keeping per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, JSON bundles, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
+> **Status:** v0.2.18 adds notification listener events for `event=notification` profiles with package/title/body filters and bounded regex matching, while keeping the context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, JSON bundles, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
 
 ---
 
@@ -30,7 +30,8 @@
 ✅ **Runtime action registry** — UI action IDs map to real implementations or explicit unsupported failures  
 ✅ **Capability gating** — action picker marks setup requirements and blocks unsupported privileged actions  
 ✅ **Run log traces** — task history includes action-level status, duration, and failure reasons  
-✅ **Context inspector** — live source health, latest observed values, and per-profile match explanations
+✅ **Context inspector** — live source health, latest observed values, and per-profile match explanations<br>
+✅ **Notification listener events** — notification access can feed `event=notification` contexts with package/title/body filters<br>
 ✅ **Regression coverage** — cron parsing and variable scoping edge cases are test-covered  
 ✅ **Database persistence** — Room DAOs with StateFlow live updates  
 ✅ **Action metadata system** — dynamic form generation for all 40 registered action definitions  
@@ -101,12 +102,12 @@ Release APKs are unsigned unless `OPEN_TASKER_RELEASE_KEYSTORE`, `OPEN_TASKER_RE
 
 ## Next Phase (v0.3)
 
-1. **Notification listener trigger** — notification-access context with filters and redacted logging
-2. **NFC trigger** — tag matching and write-helper flow for offline physical automations
-3. **Calendar and sun triggers** — local calendar windows plus sunrise/sunset offsets
-4. **Tasker import** — `.prj.xml` parser with an honest migration report
-5. **F-Droid readiness** — flavor policy, reproducibility assumptions, metadata, and release checks
-6. **Dependency modernization** — staged AndroidX/Kotlin/Room/WorkManager updates with device verification
+1. **NFC trigger** — tag matching and write-helper flow for offline physical automations
+2. **Calendar and sun triggers** — local calendar windows plus sunrise/sunset offsets
+3. **Tasker import** — `.prj.xml` parser with an honest migration report
+4. **F-Droid readiness** — flavor policy, reproducibility assumptions, metadata, and release checks
+5. **Dependency modernization** — staged AndroidX/Kotlin/Room/WorkManager updates with device verification
+6. **Locale condition queries** — complete query execution for condition plugins with timeout and result handling
 
 ---
 

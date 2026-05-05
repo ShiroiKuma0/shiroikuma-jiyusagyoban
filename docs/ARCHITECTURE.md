@@ -29,6 +29,7 @@ Tasker's source is **not public**. This architecture is reconstructed from the u
 │  - TaskRunner      (executes actions, flow control)   │
 │  - VariableStore   (global + per-task locals)         │
 │  - ContextSources  (Flow<ContextEvent> per type)      │
+│  - NotificationListenerService -> event source bridge │
 ├───────────────────────────────────────────────────────┤
 │  Action Library                                       │
 │  - Action interface + registry                        │
@@ -55,6 +56,8 @@ Tasker's source is **not public**. This architecture is reconstructed from the u
 5. Actions return a `Result` (Success / Failure / Skip) — `TaskRunner` decides whether to halt based on the action's "Continue Task After Error" flag.
 
 The Context Inspector UI separately observes registered `ContextSource` flows and applies the same `ContextMatchEvaluator` rules to persisted profiles. It does not dispatch tasks; it explains current source health, latest values, and why each profile would or would not match.
+
+Notification listener triggers are represented as Event contexts with `event=notification`. The listener pushes in-memory events containing package, title, and body previews; Android logs include package and character counts only, not notification text.
 
 ### Persistence schema (Room)
 
