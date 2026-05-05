@@ -319,4 +319,7 @@ class ArrayStore {
     fun joinWith(name: String, delimiter: String): String {
         return arrays[name]?.joinToString(delimiter) ?: ""
     }
+
+    fun snapshot(): Map<String, List<String>> =
+        arrays.mapValues { (_, values) -> values.toList() }
 }
