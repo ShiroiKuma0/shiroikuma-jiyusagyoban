@@ -1,20 +1,20 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.26-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.27-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.26** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scene library management, read-only flow graphs, JSON bundles, Tasker XML import planning, F-Droid build readiness, dependency version governance, optional Shizuku readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; variable tooling, elevated backends, and broader plugin UX are planned.
+**OpenTasker v0.2.27** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scene library management, read-only flow graphs, JSON bundles, Tasker XML import planning, F-Droid build readiness, dependency version governance, optional Shizuku readiness, optional Termux script readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; variable tooling, elevated backends, script execution, and broader plugin UX are planned.
 
-> **Status:** v0.2.26 adds Shizuku manager package visibility, optional setup/status detection, and elevated-action hints while keeping restricted actions blocked until an opt-in backend is implemented. It keeps the Scenes tab, Flow tab, centralized dependency governance, F-Droid distribution profile, Tasker XML import planning, local calendar/sun triggers, NFC tag events, notification listener events, context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
+> **Status:** v0.2.27 adds a gated Termux script action, Termux/Termux:Tasker package visibility, and optional setup/status detection while keeping script execution blocked until dispatch, permission handling, output capture, and audit logging are implemented. It keeps Shizuku readiness, the Scenes tab, Flow tab, centralized dependency governance, F-Droid distribution profile, Tasker XML import planning, local calendar/sun triggers, NFC tag events, notification listener events, context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
 
 ---
 
 ## Highlights
 
 ✅ **Core engine operational** — profiles → contexts → tasks → actions pipeline  
-✅ **41 registered action definitions** — supported actions run, restricted/import-placeholder actions are gated or fail explicitly
+✅ **42 registered action definitions** — supported actions run, restricted/script/import-placeholder actions are gated or fail explicitly
 ✅ **Reactive context sources** — app foreground, time, state, event, WiFi, app-open monitoring, notifications, NFC tag scans, calendar windows, and sunrise/sunset matching are wired; day/location are planned runtime work
 ✅ **AMOLED-first** — Catppuccin Mocha palette, light theme toggle  
 ✅ **Compose UI reintegration started** — active navigation now manages profiles, tasks, actions, contexts, and run logs from Room  
@@ -22,6 +22,7 @@
 ✅ **Scene library baseline** — Room-backed scene list/create/delete with validation and overlay readiness
 ✅ **Read-only flow graphs** — optional Flow tab maps profiles to contexts, enter/exit tasks, action steps, and warnings
 ✅ **Shizuku readiness** — optional package/status detection and elevated-action hints without executing privileged calls
+✅ **Termux scripting readiness** — optional Termux/Termux:Tasker detection and a blocked script action without arbitrary execution
 ✅ **Open JSON bundles** — schema-versioned profile/task/context/action/variable/scene export and import planning  
 ✅ **Tasker XML import planning** — common Tasker task/profile/variable XML converts to OpenTasker bundles with migration warnings
 ✅ **F-Droid readiness** — property-based `fdroid` profile, dependency-policy check, and metadata draft
@@ -42,7 +43,7 @@
 ✅ **Calendar and sun events** — Calendar access feeds redacted `event=calendar` windows; coordinate-based `sunrise`/`sunset` filters support offsets<br>
 ✅ **Regression coverage** — cron parsing and variable scoping edge cases are test-covered  
 ✅ **Database persistence** — Room DAOs with StateFlow live updates  
-✅ **Action metadata system** — dynamic form generation for all 41 registered action definitions
+✅ **Action metadata system** — dynamic form generation for all 42 registered action definitions
 ✅ **Context configuration UI** — editor supports all 6 context families while runtime support continues to harden by family  
 ✅ **100% Kotlin** — modern, type-safe, coroutine-friendly  
 ✅ **Profile execution** — AutomationService wired to TaskRunner for context triggers  
@@ -71,7 +72,7 @@ Room DB (persistent storage)
 - **Runtime-wired now:** Application foreground detection, time ticks, device state broadcasts, event broadcasts, WiFi network changes, app-open monitoring, notification listener events, NFC tag events, calendar windows, and sunrise/sunset event filters.
 - **Configured in UI but still being hardened:** Day schedules and location/geofence contexts.
 
-### Actions (41 registered definitions)
+### Actions (42 registered definitions)
 | Category | Count | Examples |
 |----------|-------|----------|
 | Settings | 7 | WiFi, Bluetooth, brightness, volume, airplane, mobile data, screen timeout |
@@ -84,9 +85,10 @@ Room DB (persistent storage)
 | Variable | 1 | set variable |
 | Flow | 1 | wait |
 | Plugin | 1 | Locale setting dispatch |
+| Script | 1 | gated Termux script run |
 | Import | 1 | unsupported Tasker action placeholder |
 
-Some actions are intentionally disabled or marked setup-required because Android restricts normal apps from changing airplane mode, mobile data, screenshots, reboot, screen-off, and similar privileged operations. Shizuku manager detection is available only as a readiness signal; OpenTasker does not request Shizuku permission or execute elevated commands yet.
+Some actions are intentionally disabled or marked setup-required because Android restricts normal apps from changing airplane mode, mobile data, screenshots, reboot, screen-off, and similar privileged operations. Shizuku manager detection and Termux script bridge detection are available only as readiness signals; OpenTasker does not request Shizuku permission, request Termux `RUN_COMMAND`, execute elevated commands, or run scripts yet.
 
 ---
 
@@ -115,9 +117,10 @@ Release APKs are unsigned unless `OPEN_TASKER_RELEASE_KEYSTORE`, `OPEN_TASKER_RE
 2. **Scene element editor** — add text/button/slider/image controls and task binding pickers before overlay launch
 3. **Flow graph deep links** — node selection that opens the relevant profile, task, context, or action editor
 4. **Shizuku API opt-in backend** — explicit user opt-in, permission request, isolated execution, and run-log audit trail
-5. **Locale condition queries** — complete query execution for condition plugins with timeout and result handling
-6. **Tasker import UI** — file picker, migration preview, and import confirmation around the parser baseline
-7. **F-Droid submission hardening** — release tag discipline, fdroidserver lint/build, and reproducible binary comparison
+5. **Termux script dispatch** — explicit permission flow, script allowlisting, stdout/stderr capture, and output variable mapping
+6. **Locale condition queries** — complete query execution for condition plugins with timeout and result handling
+7. **Tasker import UI** — file picker, migration preview, and import confirmation around the parser baseline
+8. **F-Droid submission hardening** — release tag discipline, fdroidserver lint/build, and reproducible binary comparison
 
 ---
 

@@ -45,6 +45,8 @@
         android:protectionLevel="signature" />
 
     <queries>
+        <package android:name="com.termux" />
+        <package android:name="com.termux.tasker" />
         <package android:name="moe.shizuku.privileged.api" />
         <intent>
             <action android:name="com.twofortyfouram.locale.intent.action.EDIT_SETTING" />

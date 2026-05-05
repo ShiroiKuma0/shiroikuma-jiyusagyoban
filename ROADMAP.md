@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.26. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.27. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-05
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.26
+**Current app version:** 0.2.27
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -13,7 +13,7 @@ Source-backed product roadmap for OpenTasker v0.2.26. This file reconciles the c
 
 OpenTasker is an Android/Kotlin automation app targeting API 35 with Jetpack Compose, Material 3, Room, Coroutines, WorkManager, DataStore, Gson, and Hilt dependencies. The project goal is a privacy-first, fully on-device, open-source Tasker/MacroDroid/Automate alternative.
 
-The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, scenes, run logs, setup/onboarding status, read-only flow graphs, live context inspection, notification listener event triggers, NFC tag event triggers, calendar/sun event triggers, a Tasker XML-to-OpenTasker-bundle migration parser, a F-Droid readiness build profile, centralized Gradle dependency version governance, and optional Shizuku readiness status for elevated-action planning. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
+The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, scenes, run logs, setup/onboarding status, read-only flow graphs, live context inspection, notification listener event triggers, NFC tag event triggers, calendar/sun event triggers, a Tasker XML-to-OpenTasker-bundle migration parser, a F-Droid readiness build profile, centralized Gradle dependency version governance, optional Shizuku readiness status for elevated-action planning, and optional Termux script readiness status for future scripting. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
 
 Key local constraints:
 
@@ -389,6 +389,7 @@ Key local constraints:
 
 ### L4 - Sandboxed scripting escape hatch
 
+**Status:** Baseline completed in v0.2.27. Added a gated `script.termux.run` action, runtime failure path, Termux and Termux:Tasker package visibility/status detection, optional setup checklist status, and docs/tests. OpenTasker still does not request `com.termux.permission.RUN_COMMAND`, dispatch Termux intents, run scripts, parse stdout/stderr, or map script output variables.
 **Description:** Provide a first-class "Run Script" action through Termux integration initially, with structured stdout/stderr/exit-code capture and variable output parsing. Consider embedded JS only after threat modeling.  
 **Sources:** Termux:Tasker [S3], n8n code node [S10], AppDaemon sandbox model [S15], openHAB scripting [S13].  
 **Category:** integrations, security, dev-experience.  
