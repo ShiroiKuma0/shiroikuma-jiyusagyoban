@@ -31,8 +31,8 @@ val hasReleaseSigning = listOf(
 
 android {
     namespace = "com.opentasker.app"
-    compileSdk = 35
-    buildToolsVersion = "35.0.0"
+    compileSdk = 36
+    buildToolsVersion = "36.0.0"
 
     defaultConfig {
         applicationId = "com.opentasker.app"
