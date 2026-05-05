@@ -1,10 +1,10 @@
 package com.opentasker.core.engine
 
 import android.content.Context
+import com.opentasker.core.contexts.ContextMatchEvaluator
 import com.opentasker.core.contexts.ContextSourceRegistry
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.Profile
-import com.opentasker.core.storage.AppDatabase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.emptyFlow
 
 /**
  * Watches a Profile's contexts and emits state transitions.
@@ -28,14 +29,15 @@ class ProfileMatcher(
     
     fun stateChanges(): Flow<ProfileStateChange> {
         if (profile.contexts.isEmpty()) {
-            return kotlinx.coroutines.flow.emptyFlow()
+            return emptyFlow()
         }
 
         val flows = profile.contexts.map { spec ->
-            val source = ContextSourceRegistry.get(spec.type.name.lowercase())
+            val sourceType = ContextMatchEvaluator.sourceKey(spec.type)
+            val source = sourceType?.let(ContextSourceRegistry::get)
             if (source != null) {
                 source.events(app).map { event ->
-                    val matched = event.matched
+                    val matched = ContextMatchEvaluator.matches(spec, event)
                     if (spec.invert) !matched else matched
                 }
             } else {
@@ -45,7 +47,7 @@ class ProfileMatcher(
         }
 
         return if (flows.isEmpty()) {
-            kotlinx.coroutines.flow.emptyFlow()
+            emptyFlow()
         } else {
             combine(flows) { allMatches ->
                 val startTime = System.currentTimeMillis()

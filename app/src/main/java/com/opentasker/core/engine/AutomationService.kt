@@ -148,23 +148,24 @@ class AutomationService : Service() {
         profile: com.opentasker.core.model.Profile,
         task: Task,
     ) {
-        if (!tryReserveCooldown(profile.id, profile.cooldownSec)) return
-
         when (profile.automationMode) {
             AutomationMode.SINGLE -> {
                 if (profileTaskJobs[profile.id]?.isActive == true) {
                     android.util.Log.i("OpenTasker", "Profile ${profile.id} already running; SINGLE mode skipped retrigger")
                     return
                 }
+                if (!tryReserveCooldown(profile.id, profile.cooldownSec)) return
                 profileTaskJobs[profile.id] = launchTrackedTask(profile.id, task)
             }
 
             AutomationMode.RESTART -> {
+                if (!tryReserveCooldown(profile.id, profile.cooldownSec)) return
                 profileTaskJobs[profile.id]?.cancel()
                 profileTaskJobs[profile.id] = launchTrackedTask(profile.id, task)
             }
 
             AutomationMode.QUEUED -> {
+                if (!tryReserveCooldown(profile.id, profile.cooldownSec)) return
                 if (profileTaskJobs[profile.id]?.isActive == true) {
                     synchronized(queuedProfileTasks) {
                         queuedProfileTasks.getOrPut(profile.id) { ArrayDeque() }.add(task)
@@ -176,6 +177,7 @@ class AutomationService : Service() {
             }
 
             AutomationMode.PARALLEL -> {
+                if (!tryReserveCooldown(profile.id, profile.cooldownSec)) return
                 scope.launch { runTask(task, profile.id) }
             }
         }

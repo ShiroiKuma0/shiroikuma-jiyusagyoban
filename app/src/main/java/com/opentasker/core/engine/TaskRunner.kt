@@ -2,7 +2,7 @@ package com.opentasker.core.engine
 
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
-import java.util.Date
+import kotlinx.coroutines.CancellationException
 
 /**
  * Executes a Task's action list with flow control and variable expansion.
@@ -41,14 +41,29 @@ class TaskRunner(
 
     private suspend fun runOne(index: Int, spec: ActionSpec): Pair<ActionResult, ActionExecutionTrace> {
         val started = System.currentTimeMillis()
+        if (!shouldRun(spec)) {
+            val result = ActionResult.Skip
+            return result to traceFor(index, spec, started, result)
+        }
+
         val action = ActionRegistry.get(spec.type)
             ?: ActionResult.Failure("unknown action: ${spec.type}").let { result ->
                 return result to traceFor(index, spec, started, result)
             }
         val expandedArgs = spec.args.mapValues { ctx.variables.expand(it.value) }
-        val result = runCatching { action.run(ctx, expandedArgs) }
-            .getOrElse { ActionResult.Failure("threw: ${it.message}", it) }
+        val result = try {
+            action.run(ctx, expandedArgs)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            ActionResult.Failure("threw: ${e.message}", e)
+        }
         return result to traceFor(index, spec, started, result)
+    }
+
+    private fun shouldRun(spec: ActionSpec): Boolean {
+        val condition = spec.condition?.trim()?.takeIf { it.isNotBlank() } ?: return true
+        return ctx.variables.evaluateCondition(condition)
     }
 
     private fun traceFor(
