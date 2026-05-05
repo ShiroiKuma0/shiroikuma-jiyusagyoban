@@ -219,7 +219,7 @@ private fun FlowTaskLane(
     FlowEdgeLabel(label)
     FlowNodeView(taskNode, onNodeTargetSelected)
     graph.actionNodesFor(taskNode.id).forEachIndexed { index, actionNode ->
-        FlowEdgeLabel(if (index == 0) "step ${index + 1}" else "then")
+        FlowEdgeLabel(graph.incomingEdgeLabel(actionNode.id) ?: if (index == 0) "step ${index + 1}" else "then")
         FlowNodeView(actionNode, onNodeTargetSelected)
     }
 }
@@ -266,6 +266,19 @@ private fun FlowNodeView(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            node.condition?.let { condition ->
+                FlowStatusPill(
+                    label = "Conditional",
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+                Text(
+                    "if $condition",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -287,6 +300,8 @@ private fun FlowEdgeLabel(label: String) {
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

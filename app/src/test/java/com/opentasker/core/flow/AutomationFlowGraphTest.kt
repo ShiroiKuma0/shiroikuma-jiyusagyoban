@@ -93,4 +93,29 @@ class AutomationFlowGraphTest {
         assertEquals(listOf("Step 1: dnd.set"), graph.actionNodesFor("enter-task:10").map { it.title })
         assertEquals(listOf("Step 1: dnd.set"), graph.actionNodesFor("exit-task:11").map { it.title })
     }
+
+    @Test
+    fun buildMarksConditionalActionsAndIncomingEdges() {
+        val enterTask = Task(
+            id = 20,
+            name = "Battery guard",
+            actions = listOf(
+                ActionSpec(type = "notify.show", label = "Battery warning", condition = "%battery < 20"),
+                ActionSpec(type = "flow.wait", args = mapOf("millis" to "500")),
+            ),
+        )
+        val profile = Profile(
+            id = 4,
+            name = "Low battery",
+            contexts = listOf(ContextSpec(ContextType.STATE, mapOf("key" to "battery"))),
+            enterTaskId = enterTask.id,
+        )
+
+        val graph = AutomationFlowGraphBuilder.build(profile, listOf(enterTask))
+        val actionNodes = graph.actionNodesFor("enter-task:20")
+
+        assertEquals("%battery < 20", actionNodes.first().condition)
+        assertEquals("if %battery < 20", graph.incomingEdgeLabel("enter-task:20:action:0"))
+        assertEquals("then", graph.incomingEdgeLabel("enter-task:20:action:1"))
+    }
 }
