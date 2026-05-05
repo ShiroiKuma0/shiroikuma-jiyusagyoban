@@ -1,5 +1,7 @@
 package com.opentasker.core.capabilities
 
+import com.opentasker.core.power.ShizukuPowerBackend
+
 enum class CapabilityLevel {
     Supported,
     RequiresSetup,
@@ -24,19 +26,25 @@ object ActionCapabilityRegistry {
         "bluetooth.toggle" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Bluetooth permission and may be limited on newer Android versions."),
         "brightness.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access."),
         "volume.set" to ActionCapability(CapabilityLevel.RequiresSetup, "May be blocked by Do Not Disturb policy access."),
-        "airplane.toggle" to ActionCapability(CapabilityLevel.Unsupported, "Airplane mode changes require system or device-owner privileges."),
-        "mobile.toggle" to ActionCapability(CapabilityLevel.Unsupported, "Mobile data changes require carrier, system, or device-owner privileges."),
+        "airplane.toggle" to elevatedUnsupported("airplane.toggle", "Airplane mode changes require system or device-owner privileges."),
+        "mobile.toggle" to elevatedUnsupported("mobile.toggle", "Mobile data changes require carrier, system, or device-owner privileges."),
         "sms.send" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires SMS permission and Play policy review."),
-        "screenshot.take" to ActionCapability(CapabilityLevel.Unsupported, "Screenshots require MediaProjection consent or privileged shell access."),
+        "screenshot.take" to elevatedUnsupported("screenshot.take", "Screenshots require MediaProjection consent or privileged shell access."),
         "sound.play" to ActionCapability(CapabilityLevel.Unsupported, "Direct media playback is not implemented yet."),
         "media.mute" to ActionCapability(CapabilityLevel.RequiresSetup, "May be blocked by Do Not Disturb policy access."),
         "tts.speak" to ActionCapability(CapabilityLevel.Unsupported, "Text-to-speech is not implemented yet."),
-        "reboot" to ActionCapability(CapabilityLevel.Unsupported, "Reboot requires privileged device-owner or system app access."),
+        "reboot" to elevatedUnsupported("reboot", "Reboot requires privileged device-owner or system app access."),
         "lock" to ActionCapability(CapabilityLevel.Unsupported, "Device lock requires configured device-admin support."),
-        "screen.off" to ActionCapability(CapabilityLevel.Unsupported, "Screen-off requires privileged power management access."),
-        "wake" to ActionCapability(CapabilityLevel.Unsupported, "Wake requires a foreground activity or privileged wake flow."),
+        "screen.off" to elevatedUnsupported("screen.off", "Screen-off requires privileged power management access."),
+        "wake" to elevatedUnsupported("wake", "Wake requires a foreground activity or privileged wake flow."),
         "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported OpenTasker action."),
     )
 
     fun get(actionId: String): ActionCapability = capabilities[actionId] ?: supported
+
+    private fun elevatedUnsupported(actionId: String, reason: String): ActionCapability =
+        ActionCapability(
+            CapabilityLevel.Unsupported,
+            "$reason ${ShizukuPowerBackend.hintForAction(actionId)?.message ?: "Optional elevated backend is not active."}",
+        )
 }
