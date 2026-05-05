@@ -10,7 +10,7 @@ import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.TaskRunner
 import com.opentasker.core.engine.VariableStore
-import com.opentasker.core.engine.toRunLogMessage
+import com.opentasker.core.engine.runLogMessage
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.storage.toEntity
 import kotlinx.coroutines.CoroutineScope
@@ -75,7 +75,8 @@ class AutomationTargetReceiver : BroadcastReceiver() {
             ?: return failure("Task not found. Provide ${AutomationTargetContract.EXTRA_TASK_ID} or ${AutomationTargetContract.EXTRA_TASK_NAME}.")
 
         val variables = VariableStore()
-        extractVariables(intent.extras).forEach { (name, value) -> variables.set(name, value) }
+        val suppliedVariables = extractVariables(intent.extras)
+        suppliedVariables.forEach { (name, value) -> variables.set(name, value) }
         val runner = TaskRunner(
             ActionContext(appContext, variables) { message ->
                 Log.i(TAG, "External task ${task.id}: $message")
@@ -86,9 +87,14 @@ class AutomationTargetReceiver : BroadcastReceiver() {
             RunLogEntry(
                 taskId = task.id,
                 taskName = task.name,
+                timestamp = report.startedAt,
                 durationMs = report.durationMs,
                 success = report.success,
-                message = "External intent\n${report.traces.toRunLogMessage()}",
+                message = runLogMessage(
+                    source = "External intent",
+                    metadata = listOf("Variables: ${suppliedVariables.size} provided"),
+                    traces = report.traces,
+                ),
             ).toEntity()
         )
 
