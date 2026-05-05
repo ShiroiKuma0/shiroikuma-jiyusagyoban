@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -395,7 +396,7 @@ fun ActiveAutomationUi(
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
             )
 
-            OpenTaskerScreen.RunLog -> RunLogScreenContent(runLogs, innerPadding)
+            OpenTaskerScreen.RunLog -> RunLogScreenContent(runLogs, tasks, innerPadding)
         }
     }
 
@@ -1095,7 +1096,7 @@ private fun ContextRow(
 }
 
 @Composable
-private fun RunLogScreenContent(logs: List<RunLogEntry>, contentPadding: PaddingValues) {
+private fun RunLogScreenContent(logs: List<RunLogEntry>, tasks: List<Task>, contentPadding: PaddingValues) {
     if (logs.isEmpty()) {
         EmptyState(
             title = "No execution history yet",
@@ -1107,9 +1108,11 @@ private fun RunLogScreenContent(logs: List<RunLogEntry>, contentPadding: Padding
         return
     }
     var statusFilter by remember { mutableStateOf(RunLogStatusFilter.All) }
+    var taskIdFilter by remember { mutableStateOf<Long?>(null) }
     var query by remember { mutableStateOf("") }
-    val filteredLogs = remember(logs, statusFilter, query) {
-        filterRunLogs(logs, RunLogFilterState(status = statusFilter, query = query))
+    val taskOptions = remember(logs, tasks) { runLogTaskOptions(logs, tasks) }
+    val filteredLogs = remember(logs, statusFilter, taskIdFilter, query) {
+        filterRunLogs(logs, RunLogFilterState(status = statusFilter, taskId = taskIdFilter, query = query))
     }
     LazyColumn(
         modifier = Modifier
@@ -1127,6 +1130,9 @@ private fun RunLogScreenContent(logs: List<RunLogEntry>, contentPadding: Padding
                 visibleCount = filteredLogs.size,
                 statusFilter = statusFilter,
                 onStatusFilterChange = { statusFilter = it },
+                taskOptions = taskOptions,
+                selectedTaskId = taskIdFilter,
+                onTaskFilterChange = { taskIdFilter = it },
                 query = query,
                 onQueryChange = { query = it },
             )
@@ -1152,6 +1158,9 @@ private fun RunLogFilterCard(
     visibleCount: Int,
     statusFilter: RunLogStatusFilter,
     onStatusFilterChange: (RunLogStatusFilter) -> Unit,
+    taskOptions: List<Pair<Long, String>>,
+    selectedTaskId: Long?,
+    onTaskFilterChange: (Long?) -> Unit,
     query: String,
     onQueryChange: (String) -> Unit,
 ) {
@@ -1175,10 +1184,11 @@ private fun RunLogFilterCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (statusFilter != RunLogStatusFilter.All || query.isNotBlank()) {
+                if (statusFilter != RunLogStatusFilter.All || selectedTaskId != null || query.isNotBlank()) {
                     TextButton(
                         onClick = {
                             onStatusFilterChange(RunLogStatusFilter.All)
+                            onTaskFilterChange(null)
                             onQueryChange("")
                         },
                     ) {
@@ -1186,32 +1196,30 @@ private fun RunLogFilterCard(
                     }
                 }
             }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                item {
+                    RunLogFilterChip(
+                        label = "Any task",
+                        selected = selectedTaskId == null,
+                        onClick = { onTaskFilterChange(null) },
+                    )
+                }
+                items(taskOptions, key = { it.first }) { (taskId, taskName) ->
+                    RunLogFilterChip(
+                        label = taskName,
+                        selected = selectedTaskId == taskId,
+                        onClick = { onTaskFilterChange(taskId) },
+                    )
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 RunLogStatusFilter.entries.forEach { filter ->
-                    OutlinedButton(
+                    RunLogFilterChip(
+                        label = filter.label,
+                        selected = statusFilter == filter,
                         onClick = { onStatusFilterChange(filter) },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = if (statusFilter == filter) {
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
-                            } else {
-                                Color.Transparent
-                            },
-                            contentColor = MaterialTheme.colorScheme.onSurface,
-                        ),
-                        border = BorderStroke(
-                            1.dp,
-                            if (statusFilter == filter) {
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.58f)
-                            } else {
-                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)
-                            },
-                        ),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 9.dp),
-                    ) {
-                        Text(filter.label, style = MaterialTheme.typography.labelMedium)
-                    }
+                    )
                 }
             }
             OutlinedTextField(
@@ -1223,6 +1231,39 @@ private fun RunLogFilterCard(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+    }
+}
+
+@Composable
+private fun RunLogFilterChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = if (selected) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
+            } else {
+                Color.Transparent
+            },
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (selected) {
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.58f)
+            } else {
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)
+            },
+        ),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 9.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -2051,6 +2092,14 @@ private fun contextDescription(type: ContextType): String = when (type) {
     ContextType.LOCATION -> "Matches near a latitude/longitude radius."
     ContextType.STATE -> "Matches a device state such as battery, charging, screen, or WiFi."
     ContextType.EVENT -> "Matches a one-shot event such as boot, SMS, or intent."
+}
+
+private fun runLogTaskOptions(logs: List<RunLogEntry>, tasks: List<Task>): List<Pair<Long, String>> {
+    val taskNames = tasks.associate { it.id to it.name }
+    return logs
+        .groupBy { it.taskId }
+        .map { (taskId, entries) -> taskId to (taskNames[taskId] ?: entries.first().taskName) }
+        .sortedWith(compareBy<Pair<Long, String>> { it.second.lowercase() }.thenBy { it.first })
 }
 
 private fun plural(count: Int): String = if (count == 1) "" else "s"

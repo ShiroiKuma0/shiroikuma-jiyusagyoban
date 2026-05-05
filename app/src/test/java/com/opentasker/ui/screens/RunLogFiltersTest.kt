@@ -41,9 +41,9 @@ class RunLogFiltersTest {
     @Test
     fun combinesStatusAndQueryFilters() {
         val logs = listOf(
-            log(taskName = "Morning", success = true, message = "WiFi connected"),
-            log(taskName = "Commute", success = false, message = "WiFi permission missing"),
-            log(taskName = "Bedtime", success = false, message = "DND denied"),
+            log(taskId = 1, taskName = "Morning", success = true, message = "WiFi connected"),
+            log(taskId = 2, taskName = "Commute", success = false, message = "WiFi permission missing"),
+            log(taskId = 3, taskName = "Bedtime", success = false, message = "DND denied"),
         )
 
         val filtered = filterRunLogs(
@@ -54,12 +54,30 @@ class RunLogFiltersTest {
         assertEquals(listOf("Commute"), filtered.map { it.taskName })
     }
 
+    @Test
+    fun filtersLogsByTaskId() {
+        val logs = listOf(
+            log(taskId = 10, taskName = "Morning", success = true),
+            log(taskId = 11, taskName = "Morning", success = false),
+            log(taskId = 10, taskName = "Morning", success = false, message = "Second run"),
+        )
+
+        val filtered = filterRunLogs(
+            logs,
+            RunLogFilterState(taskId = 10),
+        )
+
+        assertEquals(listOf("Morning", "Morning"), filtered.map { it.taskName })
+        assertEquals(listOf(10L, 10L), filtered.map { it.taskId })
+    }
+
     private fun log(
         taskName: String,
+        taskId: Long = taskName.hashCode().toLong(),
         success: Boolean = true,
         message: String = "",
     ) = RunLogEntry(
-        taskId = taskName.hashCode().toLong(),
+        taskId = taskId,
         taskName = taskName,
         durationMs = 10,
         success = success,

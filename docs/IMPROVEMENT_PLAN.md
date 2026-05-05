@@ -83,4 +83,4 @@ OpenTasker should not compete by feature count alone. The stronger position is p
 - Instrumented migration-test scaffolding exists for `AppDatabase` 1->2 and `AutomationDatabase` version 1, and the verification gate now compiles androidTest sources. Full completion of P9 still needs emulator execution in CI or a local Android target.
 - The first dependency modernization batch updates AndroidX test libraries to support migration-test coverage. Room remains on 2.6.1 until the Kotlin serialization/runtime stack is upgraded together.
 - A local `connectedDebugAndroidTest` attempt found device `R5CY34G070L`, but Android rejected debug APK installation with `INSTALL_FAILED_UPDATE_INCOMPATIBLE` because an existing `com.opentasker.app` install is signed differently. Do not clear that install without explicit user approval.
-- Run-log filtering is started: users can filter all/succeeded/failed runs and search by task name or message, with unit coverage for the filtering rules.
+- Run-log filtering is started: users can filter all/succeeded/failed runs, narrow history by task, and search by task name or message, with unit coverage for the filtering rules.
