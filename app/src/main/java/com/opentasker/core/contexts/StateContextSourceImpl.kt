@@ -82,21 +82,21 @@ class StateContextSourceImpl : ContextSource {
  *   - "wifi=connected" / "wifi=disconnected"
  */
 fun stateMatches(predicate: String, state: Map<String, String>): Boolean {
-    val (key, op, value) = if ("=" in predicate) {
-        val parts = predicate.split("=")
-        Triple(parts[0], "=", parts[1])
-    } else if (">=" in predicate) {
-        val parts = predicate.split(">=")
+    val (key, op, value) = if (">=" in predicate) {
+        val parts = predicate.split(">=", limit = 2)
         Triple(parts[0], ">=", parts[1])
     } else if ("<=" in predicate) {
-        val parts = predicate.split("<=")
+        val parts = predicate.split("<=", limit = 2)
         Triple(parts[0], "<=", parts[1])
     } else if (">" in predicate) {
-        val parts = predicate.split(">")
+        val parts = predicate.split(">", limit = 2)
         Triple(parts[0], ">", parts[1])
     } else if ("<" in predicate) {
-        val parts = predicate.split("<")
+        val parts = predicate.split("<", limit = 2)
         Triple(parts[0], "<", parts[1])
+    } else if ("=" in predicate) {
+        val parts = predicate.split("=", limit = 2)
+        Triple(parts[0], "=", parts[1])
     } else {
         return false
     }

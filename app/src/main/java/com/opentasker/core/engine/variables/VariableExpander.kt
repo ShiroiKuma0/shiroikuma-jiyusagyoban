@@ -38,7 +38,7 @@ class VariableExpander {
         val ternaryMatch = TERNARY_PATTERN.find(expr)
         if (ternaryMatch != null) {
             val (condition, trueVal, falseVal) = ternaryMatch.destructured
-            val result = evaluateCondition(condition, variableStore, arrayStore)
+            val result = evaluateConditionInternal(condition, variableStore, arrayStore)
             return if (result) trueVal else falseVal
         }
 
@@ -150,7 +150,14 @@ class VariableExpander {
         }
     }
 
-    private fun evaluateCondition(cond: String, store: VariableStore, arrays: ArrayStore): Boolean {
+    fun evaluateCondition(cond: String, variableStore: VariableStore, arrayStore: ArrayStore): Boolean =
+        try {
+            evaluateConditionInternal(cond, variableStore, arrayStore)
+        } catch (e: Exception) {
+            false
+        }
+
+    private fun evaluateConditionInternal(cond: String, store: VariableStore, arrays: ArrayStore): Boolean {
         // Simple comparison operators: ==, !=, <, >, <=, >=
         return when {
             cond.contains("==") -> {

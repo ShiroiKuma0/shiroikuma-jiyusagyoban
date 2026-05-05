@@ -89,6 +89,10 @@ class VariableStore {
         return expander.expand(expr, this, arrayStore)
     }
 
+    fun evaluateCondition(expr: String): Boolean {
+        return expander.evaluateCondition(expr, this, arrayStore)
+    }
+
     private fun isGlobalName(name: String): Boolean =
         name.isNotEmpty() && name[0].isUpperCase()
 }
