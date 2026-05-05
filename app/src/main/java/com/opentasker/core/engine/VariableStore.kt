@@ -58,24 +58,9 @@ class VariableStore {
         arrayStore.put(name, values)
     }
 
-    /** Expand all %var references in [s] using the current scope chain. */
+    /** Expand all variable references in [s] using the current scope chain. */
     fun expand(s: String): String {
-        if ('%' !in s) return s
-        val out = StringBuilder(s.length)
-        var i = 0
-        while (i < s.length) {
-            val c = s[i]
-            if (c == '%' && i + 1 < s.length && s[i + 1].isLetter()) {
-                var j = i + 1
-                while (j < s.length && (s[j].isLetterOrDigit() || s[j] == '_')) j++
-                val name = s.substring(i + 1, j)
-                out.append(get(name) ?: "")
-                i = j
-            } else {
-                out.append(c); i++
-            }
-        }
-        return out.toString()
+        return expander.expand(s, this, arrayStore)
     }
 
     /**
@@ -86,7 +71,7 @@ class VariableStore {
      * - "(x > 5) ? yes : no" → conditional
      */
     fun expandWithOperators(expr: String): String {
-        return expander.expand(expr, this, arrayStore)
+        return expand(expr)
     }
 
     fun evaluateCondition(expr: String): Boolean {
