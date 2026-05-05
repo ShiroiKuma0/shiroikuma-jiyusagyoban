@@ -48,6 +48,7 @@ Tasker's source is **not public**. This architecture is reconstructed from the u
 │  - AlarmManager exact/inexact time ticks              │
 │  - NetworkCallback / BroadcastReceivers / UsageStats  │
 │  - Optional Shizuku manager readiness detection       │
+│  - Optional Termux script bridge readiness detection  │
 └───────────────────────────────────────────────────────┘
 ```
 
@@ -74,6 +75,8 @@ The read-only visual flow baseline is generated from active domain models. `Auto
 Scenes are persisted in Room and exposed through a conservative Scenes tab. The active baseline creates and deletes scene shells, previews persisted elements, validates geometry and task bindings through `SceneValidator`, and shows overlay permission readiness without launching overlay windows.
 
 The Shizuku readiness baseline is intentionally non-executing. `ShizukuPowerBackend` only checks whether the Shizuku manager package is visible and installed, exposes optional setup status in the Setup screen, and annotates elevated-action candidates in capability messages. OpenTasker does not link the Shizuku API, request Shizuku permission, execute shell commands, or enable privileged actions in this baseline.
+
+The Termux scripting baseline is also non-executing. `TermuxScriptBackend` checks package visibility for Termux and Termux:Tasker, the Setup screen reports optional script-bridge readiness, and `script.termux.run` exists as a gated action with an explicit runtime failure path. OpenTasker does not request `com.termux.permission.RUN_COMMAND`, dispatch Termux intents, capture stdout/stderr, or map script output variables in this baseline.
 
 The F-Droid distribution path is property-based rather than a product flavor. `-PopenTaskerDistribution=fdroid` sets `BuildConfig.DISTRIBUTION`, keeps existing Gradle variant names stable, and is paired with `verifyFdroidReadiness` to block common proprietary dependency families before release-profile builds.
 

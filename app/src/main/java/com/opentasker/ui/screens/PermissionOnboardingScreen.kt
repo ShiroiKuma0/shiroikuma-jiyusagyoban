@@ -58,6 +58,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.opentasker.core.permissions.UsageAccess
 import com.opentasker.core.power.ShizukuPowerBackend
 import com.opentasker.core.scheduling.ExactAlarmSupport
+import com.opentasker.core.scripting.TermuxScriptBackend
 
 private data class PermissionSetupItem(
     val title: String,
@@ -303,6 +304,7 @@ private fun PermissionRequirement(label: String) {
 
 private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
     val shizukuStatus = ShizukuPowerBackend.inspect(context)
+    val termuxStatus = TermuxScriptBackend.inspect(context)
     return listOf(
         PermissionSetupItem(
             title = "Notifications",
@@ -435,6 +437,21 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
                 },
             ),
             requiredFor = "Elevated actions",
+            optional = true,
+        ),
+        PermissionSetupItem(
+            title = "Termux script bridge",
+            body = "${termuxStatus.summary} Script actions remain blocked until permission handling, execution isolation, output capture, and audit logging are implemented.",
+            granted = termuxStatus.bridgeInstalled,
+            actionLabel = if (termuxStatus.bridgeInstalled) "Open app settings" else "Open setup guide",
+            action = PermissionAction.SettingsIntent(
+                if (termuxStatus.bridgeInstalled) {
+                    packageDetailsIntent(TermuxScriptBackend.TERMUX_TASKER_PACKAGE)
+                } else {
+                    Intent(Intent.ACTION_VIEW, Uri.parse(TermuxScriptBackend.SETUP_URL))
+                },
+            ),
+            requiredFor = "Script actions",
             optional = true,
         ),
         PermissionSetupItem(
