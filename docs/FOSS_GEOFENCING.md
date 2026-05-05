@@ -11,7 +11,8 @@ OpenTasker v0.2.48 has a Play-services-free geofence path for Location contexts.
 - Includes a disabled-by-default `Location evidence log` template with latitude, longitude, radius, max-accuracy, dwell, and log-action defaults for later event-delivery smoke tests.
 - `tools/collect-location-evidence.ps1` collects repeatable adb evidence for Location/geofence verification, including permission state, foreground-service type, app-to-home service persistence, logcat tail, location dumps, structured battery state/deltas, batterystats snapshots, and provider-cadence evidence.
 - The evidence collector snapshots debug Room data through `run-as`, writes `room-summary.json`, and can require matching recent run-log task/action/message evidence, logcat evidence, expected GPS/network cadence evidence, unplugged battery state during an active sample, or recent unplugged battery history after USB reconnect before a run passes.
-- API 36 device evidence `build/device-evidence/location/20260505-125057` captured a recent unplugged interval from `2026-05-05T12:48:23.598` to `2026-05-05T12:50:14.389`, about 111 seconds. That confirms the post-reconnect parser can see the interval but does not satisfy the 600-second longer-sample threshold.
+- API 36 device evidence `build/device-evidence/location/20260505-143254` captured a recent unplugged interval from `2026-05-05T14:21:53.052` to `2026-05-05T14:32:08.107`, lasting 615.055 seconds. That satisfies the 600-second post-reconnect history gate, keeps `AutomationService` foreground with `specialUse|location` after relaunch, and confirms GPS/network cadence evidence is present.
+- API 36 device evidence `build/device-evidence/location/20260505-125057` captured a shorter recent unplugged interval from `2026-05-05T12:48:23.598` to `2026-05-05T12:50:14.389`, about 111 seconds. That confirmed the post-reconnect parser could see the interval but did not satisfy the 600-second longer-sample threshold.
 - API 36 device evidence `build/device-evidence/location/20260505-120448` verified the v0.2.47 harness gates on a USB-powered sample: the summary records plug state and battery deltas, and `-RequireProviderCadenceEvidence` found expected OpenTasker GPS/network cadence evidence. Because the sample was plugged in, it is tooling evidence only, not battery reliability evidence.
 - API 36 device evidence `build/device-evidence/location/20260505-085413` verified actual background Location event delivery for the installed/enabled `Location evidence log` template: while the app was sent home, `AutomationService` remained foreground with `specialUse|location`, the shell-owned GPS test provider delivered the template coordinates to OpenTasker, and Room recorded a successful `Location evidence log Task` run after evidence collection started.
 - A 10-second API 36 harness run with the app sent home kept `AutomationService` foreground with `specialUse|location` and captured battery before/after snapshots; the short USB-powered sample is evidence that the harness works, not a battery optimization claim.
@@ -64,6 +65,5 @@ For actual Location event-delivery verification, install the `Location evidence 
 
 ## Next Work
 
-1. Run longer unplugged provider-cadence and battery samples with `tools/collect-location-evidence.ps1`.
-2. Repeat background Location delivery on additional device/API/provider combinations.
-3. Verify longer behavior before making public geofence reliability claims.
+1. Repeat background Location delivery on additional device/API/provider combinations.
+2. Verify broader behavior before making public geofence reliability claims.
