@@ -1,8 +1,8 @@
 # Template Expressions
 
-OpenTasker v0.2.33 includes bounded template expression support for action arguments and per-expression run-log trace reporting.
+OpenTasker v0.2.34 includes bounded template expression support for action arguments, action conditions, and per-expression run-log trace reporting.
 
-The engine is implemented in `TemplateExpressionEngine` and evaluates `{{ ... }}` expressions against caller-provided task, event, global, and array scopes. `TaskRunner` applies legacy `%var` expansion first, then applies template expansion to action arguments, and stores sanitized summaries, warnings, and per-argument expression traces in `ActionExecutionTrace`. Run-log diagnostics parse those summaries into structured fields so the UI can show expanded arguments, source scopes, expression values, and template warning counts separately from the action result message.
+The engine is implemented in `TemplateExpressionEngine` and evaluates `{{ ... }}` expressions against caller-provided task, event, global, and array scopes. `TaskRunner` applies legacy `%var` expansion first, then applies template expansion to action arguments and conditions. Argument expansion stores sanitized summaries, warnings, and per-argument expression traces in `ActionExecutionTrace`. Run-log diagnostics parse those summaries into structured fields so the UI can show expanded arguments, source scopes, expression values, and template warning counts separately from the action result message.
 
 ## Scope Model
 
@@ -85,4 +85,4 @@ The baseline is intentionally small and fail-closed:
 
 Action arguments support template expansion at runtime. Run-log trace rows show sanitized expanded values only for arguments that used template expressions, redacting sensitive argument names such as `token`, `key`, `secret`, `cookie`, and `password`. Individual expression lines are persisted under each action trace and include the argument name, source scope, expression, resolved value, and optional warning.
 
-Conditions still use the legacy `%var` condition evaluator. Condition-template adoption and regex-specific template policy remain future L7 work.
+Conditions can use templates before the existing predicate evaluator, for example `{{ mode }} == on` or `{{ payload.status }} == ready`. Template warnings in conditions fail closed by skipping the action. Regex-specific template policy remains future L7 work.
