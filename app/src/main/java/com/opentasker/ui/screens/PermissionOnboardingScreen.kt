@@ -318,11 +318,19 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
         PermissionSetupItem(
             title = "Notification access",
-            body = "Needed for future notification-text triggers and rich notification matching.",
+            body = "Needed for notification-text triggers and rich notification matching.",
             granted = hasNotificationListenerAccess(context),
             actionLabel = "Open settings",
             action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)),
             requiredFor = "Notification triggers",
+        ),
+        PermissionSetupItem(
+            title = "Calendar access",
+            body = "Needed for local calendar-window triggers. OpenTasker only emits redacted calendar metadata to matching.",
+            granted = hasPermission(context, Manifest.permission.READ_CALENDAR),
+            actionLabel = "Request",
+            action = PermissionAction.RuntimePermission(Manifest.permission.READ_CALENDAR),
+            requiredFor = "Calendar triggers",
         ),
         PermissionSetupItem(
             title = "Overlay access",

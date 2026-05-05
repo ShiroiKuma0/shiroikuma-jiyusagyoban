@@ -581,12 +581,18 @@ private fun contextSourceSetup(context: Context, key: String): ContextSourceSetu
     }
     "event" -> {
         val notificationReady = hasNotificationListenerAccess(context)
+        val calendarReady = hasPermission(context, Manifest.permission.READ_CALENDAR)
+        val calendarDetail = if (calendarReady) {
+            "Calendar events can be matched with redacted metadata."
+        } else {
+            "Calendar triggers need Calendar access in Setup; sunrise/sunset matching uses configured coordinates."
+        }
         ContextSourceSetup(
             ready = true,
             detail = if (notificationReady) {
-                "Boot, system, notification, and NFC events are registered. Notification text is kept in-memory for matching and is not written to run logs."
+                "Boot, system, notification, NFC, calendar, and sun events are registered. Notification text is kept in-memory for matching and is not written to run logs. $calendarDetail"
             } else {
-                "Boot, system, and NFC events are registered. Notification events need Notification Access in Setup before Android will bind the listener."
+                "Boot, system, NFC, calendar, and sun events are registered. Notification events need Notification Access in Setup before Android will bind the listener. $calendarDetail"
             },
         )
     }

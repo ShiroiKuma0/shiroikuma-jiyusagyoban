@@ -157,4 +157,57 @@ class ContextMatchEvaluatorTest {
         assertTrue(ContextMatchEvaluator.matches(matchingSpec, event))
         assertFalse(ContextMatchEvaluator.matches(wrongTagSpec, event))
     }
+
+    @Test
+    fun calendarEventMatchesCalendarStateAndBeforeWindowFilters() {
+        val event = ContextEvent(
+            "event",
+            true,
+            mapOf(
+                "event" to "calendar",
+                "state" to "upcoming",
+                "calendar" to "Work",
+                "minutesUntilStart" to "10",
+            ),
+        )
+        val matchingSpec = ContextSpec(
+            ContextType.EVENT,
+            mapOf("event" to "calendar", "state" to "upcoming", "calendar" to "work", "beforeMinutes" to "15"),
+        )
+        val tooLateSpec = matchingSpec.copy(config = matchingSpec.config + ("beforeMinutes" to "5"))
+        val wrongCalendarSpec = matchingSpec.copy(config = matchingSpec.config + ("calendar" to "Personal"))
+
+        assertTrue(ContextMatchEvaluator.matches(matchingSpec, event))
+        assertFalse(ContextMatchEvaluator.matches(tooLateSpec, event))
+        assertFalse(ContextMatchEvaluator.matches(wrongCalendarSpec, event))
+    }
+
+    @Test
+    fun sunEventsMatchConfiguredOffsetWindow() {
+        val event = ContextEvent(
+            "event",
+            true,
+            mapOf(
+                "event" to "sun_tick",
+                "date" to "2026-06-21",
+                "time" to "05:27",
+                "zone" to "America/New_York",
+            ),
+        )
+        val matchingSpec = ContextSpec(
+            ContextType.EVENT,
+            mapOf(
+                "event" to "sunrise",
+                "latitude" to "40.7128",
+                "longitude" to "-74.0060",
+                "windowMinutes" to "5",
+            ),
+        )
+        val offsetSpec = matchingSpec.copy(config = matchingSpec.config + ("offsetMinutes" to "30"))
+        val wrongEventSpec = matchingSpec.copy(config = matchingSpec.config + ("event" to "sunset"))
+
+        assertTrue(ContextMatchEvaluator.matches(matchingSpec, event))
+        assertFalse(ContextMatchEvaluator.matches(offsetSpec, event))
+        assertFalse(ContextMatchEvaluator.matches(wrongEventSpec, event))
+    }
 }

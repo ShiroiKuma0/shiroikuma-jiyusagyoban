@@ -64,7 +64,7 @@ class ProfileTemplateCatalogTest {
     fun plannedTemplatesAreVisibleButNotInstallable() {
         val planned = ProfileTemplateCatalog.all.filter { it.availability == TemplateAvailability.Planned }
 
-        assertEquals(2, planned.size)
+        assertEquals(1, planned.size)
         planned.forEach { template ->
             assertFalse(template.installable)
             var failed = false
@@ -89,5 +89,20 @@ class ProfileTemplateCatalogTest {
         assertEquals(ContextType.EVENT, context.type)
         assertEquals("nfc", context.config["event"])
         assertEquals("04AABBCC", context.config["tagId"])
+    }
+
+    @Test
+    fun calendarTemplateInstallsWithRedactedCalendarEventContext() {
+        val template = ProfileTemplateCatalog.get("meeting-mode-calendar")!!
+
+        assertTrue(template.installable)
+
+        val applied = template.instantiate(template.defaults())
+        val context = applied.profile.contexts.single()
+
+        assertEquals(ContextType.EVENT, context.type)
+        assertEquals("calendar", context.config["event"])
+        assertEquals("during", context.config["state"])
+        assertEquals("Work", context.config["calendar"])
     }
 }

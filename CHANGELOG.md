@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.20 - 2026-05-05
+
+Calendar and sun trigger baseline.
+
+- Added a local CalendarProvider event bridge that emits redacted `event=calendar` metadata for busy current or upcoming events.
+- Added sunrise/sunset matching with user-provided latitude/longitude, offset minutes, and bounded trigger windows.
+- Added Calendar access onboarding, Event context editor fields for calendar/sun filters, and Inspector setup copy.
+- Promoted the meeting-mode calendar template from planned to setup-required installation.
+- Updated roadmap/docs/version metadata and regression tests for calendar filtering, sun calculations, and template installation.
+
 ## v0.2.19 - 2026-05-05
 
 NFC tag trigger baseline.

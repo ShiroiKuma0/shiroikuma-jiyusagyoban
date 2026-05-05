@@ -1,13 +1,13 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.19-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.20-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.19** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, JSON bundles, external automation intents, context inspection, notification listener triggers, NFC tag triggers, and a conservative Locale plugin host baseline are active now; scenes, variable tooling, and broader plugin UX are planned.
+**OpenTasker v0.2.20** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, JSON bundles, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; scenes, variable tooling, and broader plugin UX are planned.
 
-> **Status:** v0.2.19 adds NFC tag events for `event=nfc` profiles with tag ID filtering and a setup-required nightstand NFC template, while keeping notification listener events, the context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, JSON bundles, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
+> **Status:** v0.2.20 adds local calendar and sunrise/sunset Event contexts with redacted calendar metadata, coordinate-based sun offsets, and a setup-required meeting-mode template, while keeping NFC tag events, notification listener events, the context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, JSON bundles, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
 
 ---
 
@@ -15,7 +15,7 @@
 
 ✅ **Core engine operational** — profiles → contexts → tasks → actions pipeline  
 ✅ **40 registered action definitions** — supported actions run, restricted actions are gated or fail explicitly  
-✅ **Reactive context sources** — app foreground, time, state, event, WiFi, app-open monitoring, notifications, and NFC tag scans are wired; day/location are planned runtime work
+✅ **Reactive context sources** — app foreground, time, state, event, WiFi, app-open monitoring, notifications, NFC tag scans, calendar windows, and sunrise/sunset matching are wired; day/location are planned runtime work
 ✅ **AMOLED-first** — Catppuccin Mocha palette, light theme toggle  
 ✅ **Compose UI reintegration started** — active navigation now manages profiles, tasks, actions, contexts, and run logs from Room  
 ✅ **Profile templates** — guided starter profiles with variable slots, safety notes, and disabled-by-default installation  
@@ -33,6 +33,7 @@
 ✅ **Context inspector** — live source health, latest observed values, and per-profile match explanations<br>
 ✅ **Notification listener events** — notification access can feed `event=notification` contexts with package/title/body filters<br>
 ✅ **NFC tag events** — tag scans can feed `event=nfc` contexts with normalized tag ID matching<br>
+✅ **Calendar and sun events** — Calendar access feeds redacted `event=calendar` windows; coordinate-based `sunrise`/`sunset` filters support offsets<br>
 ✅ **Regression coverage** — cron parsing and variable scoping edge cases are test-covered  
 ✅ **Database persistence** — Room DAOs with StateFlow live updates  
 ✅ **Action metadata system** — dynamic form generation for all 40 registered action definitions  
@@ -61,7 +62,7 @@ Room DB (persistent storage)
 ```
 
 ### Contexts
-- **Runtime-wired now:** Application foreground detection, time ticks, device state broadcasts, event broadcasts, WiFi network changes, app-open monitoring, notification listener events, and NFC tag events.
+- **Runtime-wired now:** Application foreground detection, time ticks, device state broadcasts, event broadcasts, WiFi network changes, app-open monitoring, notification listener events, NFC tag events, calendar windows, and sunrise/sunset event filters.
 - **Configured in UI but still being hardened:** Day schedules and location/geofence contexts.
 
 ### Actions (40 registered definitions)
@@ -103,12 +104,12 @@ Release APKs are unsigned unless `OPEN_TASKER_RELEASE_KEYSTORE`, `OPEN_TASKER_RE
 
 ## Next Phase (v0.3)
 
-1. **Calendar and sun triggers** — local calendar windows plus sunrise/sunset offsets
-2. **NFC write-helper polish** — optional tag-writing flow around the active tag ID trigger baseline
-3. **Tasker import** — `.prj.xml` parser with an honest migration report
-4. **F-Droid readiness** — flavor policy, reproducibility assumptions, metadata, and release checks
-5. **Dependency modernization** — staged AndroidX/Kotlin/Room/WorkManager updates with device verification
-6. **Locale condition queries** — complete query execution for condition plugins with timeout and result handling
+1. **Tasker import** — `.prj.xml` parser with an honest migration report
+2. **F-Droid readiness** — flavor policy, reproducibility assumptions, metadata, and release checks
+3. **Dependency modernization** — staged AndroidX/Kotlin/Room/WorkManager updates with device verification
+4. **Locale condition queries** — complete query execution for condition plugins with timeout and result handling
+5. **Calendar/sun polish** — richer presets, calendar privacy review, and device-level smoke coverage
+6. **NFC write-helper polish** — optional tag-writing flow around the active tag ID trigger baseline
 
 ---
 
