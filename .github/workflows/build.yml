@@ -2,6 +2,8 @@ name: Build
 
 on:
   push:
+    branches:
+      - '**'
   pull_request:
 
 jobs:
@@ -14,6 +16,20 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
+      - name: Create debug keystore
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            "$JAVA_HOME/bin/keytool" -genkeypair -v \
+              -keystore "$HOME/.android/debug.keystore" \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
       - name: Test and build
         run: chmod +x ./gradlew && ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease :app:verifyFdroidReadiness :app:verifyFdroidMetadata --console=plain
       - name: F-Droid profile build
