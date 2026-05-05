@@ -77,6 +77,8 @@ import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.actions.FieldType
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
+import com.opentasker.core.contexts.DaySchedule
+import com.opentasker.core.contexts.contextConfigSummary
 import com.opentasker.core.engine.ActionTraceStatus
 import com.opentasker.core.engine.RunLogActionDiagnostic
 import com.opentasker.core.engine.RunLogOutcome
@@ -1154,7 +1156,7 @@ private fun ContextRow(
             Column(Modifier.weight(1f)) {
                 Text(context.type.name.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleSmall)
                 Text(
-                    context.config.entries.joinToString { "${it.key}=${it.value}" }.ifBlank { "No configuration" },
+                    contextConfigSummary(context),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
@@ -2178,6 +2180,97 @@ private fun ActionFieldInput(field: ActionField, value: String, onChange: (Strin
 }
 
 @Composable
+private fun DayScheduleInput(value: String, onChange: (String) -> Unit) {
+    val selected = DaySchedule.parse(value)
+    val canonical = DaySchedule.canonicalize(selected).orEmpty()
+    val allDays = DaySchedule.orderedDays.toSet()
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Day schedule", style = MaterialTheme.typography.labelLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            DayPresetButton(
+                label = "Daily",
+                selected = selected == allDays,
+                onClick = { onChange(DaySchedule.canonicalize(allDays).orEmpty()) },
+                modifier = Modifier.weight(1f),
+            )
+            DayPresetButton(
+                label = "Weekdays",
+                selected = selected == DaySchedule.weekdays,
+                onClick = { onChange(DaySchedule.canonicalize(DaySchedule.weekdays).orEmpty()) },
+                modifier = Modifier.weight(1f),
+            )
+            DayPresetButton(
+                label = "Weekend",
+                selected = selected == DaySchedule.weekends,
+                onClick = { onChange(DaySchedule.canonicalize(DaySchedule.weekends).orEmpty()) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        listOf(
+            listOf("MON", "TUE", "WED"),
+            listOf("THU", "FRI", "SAT", "SUN"),
+        ).forEach { rowDays ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                rowDays.forEach { day ->
+                    DayPresetButton(
+                        label = day,
+                        selected = day in selected,
+                        onClick = {
+                            val next = if (day in selected) selected - day else selected + day
+                            onChange(DaySchedule.canonicalize(next).orEmpty())
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+        OutlinedTextField(
+            value = value,
+            onValueChange = { onChange(it) },
+            label = { Text("Days *") },
+            placeholder = { Text("weekdays, weekends, MON-FRI") },
+            supportingText = {
+                Text(
+                    when {
+                        value.isBlank() -> "Select at least one day."
+                        canonical.isBlank() -> "Use weekdays, weekends, every day, or day tokens/ranges."
+                        else -> DaySchedule.displayLabel(value)
+                    },
+                )
+            },
+            isError = value.isNotBlank() && canonical.isBlank(),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@Composable
+private fun DayPresetButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier,
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f) else Color.Transparent,
+            contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.62f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f),
+        ),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+    ) {
+        Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
 private fun ContextTypePickerDialog(onDismiss: () -> Unit, onSelect: (ContextType) -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2216,7 +2309,9 @@ private fun ContextConfigDialog(
         mutableStateOf(defaultContextConfig(state.type) + (state.existing?.config ?: emptyMap()))
     }
     val fields = contextFields(state.type)
-    val missingRequired = fields.any { it.required && config[it.key].isNullOrBlank() }
+    val saveConfig = contextConfigForSave(state.type, config)
+    val missingRequired = fields.any { it.required && config[it.key].isNullOrBlank() } ||
+        (state.type == ContextType.DAY && saveConfig["days"].isNullOrBlank())
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2251,19 +2346,28 @@ private fun ContextConfigDialog(
                     }
                     HorizontalDivider()
                 }
-                items(fields, key = { it.key }) { field ->
-                    ActionFieldInput(
-                        field = field,
-                        value = config[field.key].orEmpty(),
-                        onChange = { value -> config = config + (field.key to value) },
-                    )
+                if (state.type == ContextType.DAY) {
+                    item("day-schedule") {
+                        DayScheduleInput(
+                            value = config["days"].orEmpty(),
+                            onChange = { value -> config = config + ("days" to value) },
+                        )
+                    }
+                } else {
+                    items(fields, key = { it.key }) { field ->
+                        ActionFieldInput(
+                            field = field,
+                            value = config[field.key].orEmpty(),
+                            onChange = { value -> config = config + (field.key to value) },
+                        )
+                    }
                 }
             }
         },
         confirmButton = {
             Button(
                 enabled = !missingRequired,
-                onClick = { onSave(ContextSpec(state.type, config.filterValues { it.isNotBlank() }, invert)) },
+                onClick = { onSave(ContextSpec(state.type, saveConfig, invert)) },
             ) {
                 Text("Save")
             }
@@ -2278,7 +2382,7 @@ private fun contextFields(type: ContextType): List<ActionField> = when (type) {
         ActionField("start", "Start HH:mm", required = true, hint = "09:00"),
         ActionField("end", "End HH:mm", required = true, hint = "17:00"),
     )
-    ContextType.DAY -> listOf(ActionField("days", "Days", required = true, hint = "MON,TUE,WED,THU,FRI"))
+    ContextType.DAY -> listOf(ActionField("days", "Days", required = true, hint = "weekdays, weekends, MON-FRI"))
     ContextType.LOCATION -> listOf(
         ActionField("latitude", "Latitude", FieldType.NUMBER, required = true),
         ActionField("longitude", "Longitude", FieldType.NUMBER, required = true),
@@ -2308,6 +2412,17 @@ private fun contextFields(type: ContextType): List<ActionField> = when (type) {
     )
 }
 
+private fun contextConfigForSave(type: ContextType, config: Map<String, String>): Map<String, String> {
+    val nonBlank = config.filterValues { it.isNotBlank() }
+    if (type != ContextType.DAY) return nonBlank
+    val canonicalDays = DaySchedule.canonicalize(config["days"].orEmpty()).orEmpty()
+    return if (canonicalDays.isBlank()) {
+        nonBlank - "days"
+    } else {
+        nonBlank + ("days" to canonicalDays)
+    }
+}
+
 private fun defaultContextConfig(type: ContextType): Map<String, String> = when (type) {
     ContextType.TIME -> mapOf("start" to "09:00", "end" to "17:00")
     ContextType.DAY -> mapOf("days" to "MON,TUE,WED,THU,FRI")
@@ -2325,7 +2440,7 @@ private fun automationModeDescription(mode: AutomationMode): String = when (mode
 private fun contextDescription(type: ContextType): String = when (type) {
     ContextType.APPLICATION -> "Matches when an app is detected in the foreground."
     ContextType.TIME -> "Matches during a clock time window."
-    ContextType.DAY -> "Matches on selected days of the week."
+    ContextType.DAY -> "Matches on selected days, presets, or weekday/weekend ranges."
     ContextType.LOCATION -> "Matches near a latitude/longitude radius with optional accuracy and dwell checks."
     ContextType.STATE -> "Matches a device state such as battery, charging, screen, or WiFi."
     ContextType.EVENT -> "Matches a one-shot event such as boot, SMS, notification, NFC, calendar, sun, or intent."

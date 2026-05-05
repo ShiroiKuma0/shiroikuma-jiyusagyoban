@@ -117,6 +117,18 @@ class ContextInspectorTest {
     }
 
     @Test
+    fun dayConfigSummaryUsesReadableScheduleLabels() {
+        assertEquals(
+            "Weekdays",
+            contextConfigSummary(ContextSpec(ContextType.DAY, mapOf("days" to "MON-FRI"))),
+        )
+        assertEquals(
+            "Weekends; inverted",
+            contextConfigSummary(ContextSpec(ContextType.DAY, mapOf("days" to "weekends"), invert = true)),
+        )
+    }
+
+    @Test
     fun setupRequiredSourceDoesNotCountAsMatchingProfile() {
         val profile = Profile(
             id = 4,

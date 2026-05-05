@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.49 - 2026-05-05
+
+Day schedule polish.
+
+- Added a shared `DaySchedule` parser for day contexts with canonical weekday order, weekday/weekend/daily aliases, numeric day tokens, and inclusive day ranges such as `MON-FRI`.
+- Updated Day context matching to use the shared parser so imported, typed, and UI-created schedules evaluate consistently.
+- Replaced raw Day context editing with quick presets, individual day toggles, canonical save output, and validation that blocks invalid day schedules before saving.
+- Improved profile and inspector summaries so Day contexts show human-readable labels such as `Weekdays`, `Weekends`, or `Every day`.
+- Added JVM coverage for day aliases, wrapped ranges, numeric tokens, and ContextMatchEvaluator day matching.
+
 ## v0.2.48 - 2026-05-05
 
 Post-reconnect unplugged evidence checks.

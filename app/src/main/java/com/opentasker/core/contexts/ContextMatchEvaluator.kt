@@ -60,12 +60,10 @@ object ContextMatchEvaluator {
     }
 
     private fun matchesDay(spec: ContextSpec, event: ContextEvent): Boolean {
-        val configuredDays = firstConfig(spec, "days", "day").splitCsv()
-            .mapNotNull(::normalizeDayToken)
-            .toSet()
-        if (configuredDays.isEmpty()) return false
-        val currentDay = event.metadata["day"]?.let(::normalizeDayToken) ?: currentDayToken()
-        return currentDay in configuredDays
+        val configuredDays = firstConfig(spec, "days", "day")
+        if (configuredDays.isBlank()) return false
+        val currentDay = event.metadata["day"] ?: DaySchedule.currentDayToken()
+        return DaySchedule.matches(configuredDays, currentDay)
     }
 
     private fun matchesLocation(spec: ContextSpec, event: ContextEvent): Boolean {
@@ -204,31 +202,6 @@ object ContextMatchEvaluator {
     private fun minuteInWindow(current: Int?, start: Int, end: Int): Boolean {
         current ?: return false
         return if (start <= end) current in start..end else current >= start || current <= end
-    }
-
-    private fun normalizeDayToken(value: String): String? = when (value.trim().uppercase(Locale.US)) {
-        "SUN", "SUNDAY", "0", "7" -> "SUN"
-        "MON", "MONDAY", "1" -> "MON"
-        "TUE", "TUESDAY", "2" -> "TUE"
-        "WED", "WEDNESDAY", "3" -> "WED"
-        "THU", "THURSDAY", "4" -> "THU"
-        "FRI", "FRIDAY", "5" -> "FRI"
-        "SAT", "SATURDAY", "6" -> "SAT"
-        else -> null
-    }
-
-    private fun currentDayToken(): String {
-        val calendar = Calendar.getInstance()
-        return when (calendar.get(Calendar.DAY_OF_WEEK)) {
-            Calendar.SUNDAY -> "SUN"
-            Calendar.MONDAY -> "MON"
-            Calendar.TUESDAY -> "TUE"
-            Calendar.WEDNESDAY -> "WED"
-            Calendar.THURSDAY -> "THU"
-            Calendar.FRIDAY -> "FRI"
-            Calendar.SATURDAY -> "SAT"
-            else -> "SUN"
-        }
     }
 
     private fun normalizeStateKey(key: String): String = when (key.lowercase(Locale.US)) {
