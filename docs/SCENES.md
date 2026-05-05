@@ -11,6 +11,7 @@ OpenTasker v0.2.25 exposed the existing scene persistence model through a safe a
 - Scene cards can add, edit, and remove button, text, slider, and image elements.
 - Element dialogs edit dp bounds, type-specific config, tap task binding, and long-press task binding.
 - New elements use `SceneElementDrafts` defaults for stable JSON IDs, safe initial bounds, and type-specific starter config.
+- Scene previews render a scaled canvas projection of element bounds using `SceneCanvasProjector`.
 - Scene cards show dimensions, element counts, element bounds, and task bindings.
 - `SceneValidator` reports invalid scene dimensions, empty scenes, invalid element geometry, out-of-bounds elements, and missing tap/long-press task references.
 - The UI shows whether Android overlay access is currently granted.
@@ -18,13 +19,11 @@ OpenTasker v0.2.25 exposed the existing scene persistence model through a safe a
 ## Not Active Yet
 
 - Drag/drop layout editing.
-- Scaled canvas layout preview.
 - Overlay window launch.
 - Background foreground-service overlay behavior.
 - Android 15 overlay runtime policy handling beyond setup visibility.
 
 ## Next Scene Work
 
-1. Add a scaled canvas preview with element positions.
-2. Add drag/drop layout editing only after the form-backed element editor is stable.
-3. Add explicit overlay launch only after permission, disclosure, and Android 15 behavior checks are implemented.
+1. Add drag/drop layout editing only after the form-backed element editor is stable.
+2. Add explicit overlay launch only after permission, disclosure, and Android 15 behavior checks are implemented.
