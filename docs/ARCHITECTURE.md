@@ -41,6 +41,7 @@ Tasker's source is **not public**. This architecture is reconstructed from the u
 │  Storage (Room + DataStore)                           │
 │  - Profiles, Tasks, Actions, Scenes, Variables        │
 │  - Run log                                            │
+│  - OpenTasker JSON bundles / Tasker XML import plans  │
 ├───────────────────────────────────────────────────────┤
 │  Platform                                             │
 │  - AutomationService (foreground)                     │
@@ -64,6 +65,8 @@ Notification listener triggers are represented as Event contexts with `event=not
 NFC tag triggers are represented as Event contexts with `event=nfc`. `MainActivity` accepts tag, tech, and NDEF discovery intents, normalizes the scanned tag ID, and pushes an in-memory event that profiles can filter with `tagId`.
 
 Calendar and sun triggers are represented as Event contexts. Calendar polling uses `CalendarContract.Instances` only when `READ_CALENDAR` is granted and emits redacted metadata such as calendar name, busy/upcoming state, all-day flag, and minutes until start/end, without event titles or descriptions. Sunrise/sunset filters evaluate minute ticks against user-provided latitude/longitude, offset minutes, and trigger windows.
+
+Tasker XML import is intentionally staged through the OpenTasker JSON bundle model. `TaskerXmlImporter` parses common Tasker task/profile/variable structures into a bundle plus migration report, preserves unmapped Tasker actions as explicit unsupported placeholders, and reports skipped contexts, profiles, and scenes before any Room write path is invoked.
 
 ### Persistence schema (Room)
 

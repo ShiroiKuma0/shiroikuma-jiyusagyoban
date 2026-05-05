@@ -34,6 +34,7 @@ import com.opentasker.core.actions.ScreenshotAction
 import com.opentasker.core.actions.SendSmsAction
 import com.opentasker.core.actions.SetVariableAction
 import com.opentasker.core.actions.StopSoundAction
+import com.opentasker.core.actions.TaskerUnsupportedAction
 import com.opentasker.core.actions.VibrateAction
 import com.opentasker.core.actions.VolumeAction
 import com.opentasker.core.actions.WaitAction
@@ -94,6 +95,7 @@ private fun registerBuiltInActions() {
         ScreenOffAction(),
         WakeAction(),
         LogAction(),
+        TaskerUnsupportedAction(),
     ).forEach(ActionRegistry::register)
 }
 

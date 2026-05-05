@@ -27,6 +27,7 @@ Top-level fields:
 - Scenes import after tasks; missing element task links are dropped with a lossy warning.
 - Unsupported schema versions are rejected before writing.
 - Unsupported or setup-required actions are preserved, but capability requirements are surfaced in metadata/warnings.
+- Tasker XML import first converts into this bundle model plus a migration report; Room import should happen only after the report is reviewed.
 
 ## Stability rules
 
