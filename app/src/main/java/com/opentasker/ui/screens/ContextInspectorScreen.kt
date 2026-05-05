@@ -57,6 +57,7 @@ import com.opentasker.core.contexts.ProfileInspection
 import com.opentasker.core.contexts.inspectProfiles
 import com.opentasker.core.contexts.toContextSourceLabel
 import com.opentasker.core.location.LocationDwellStateStore
+import com.opentasker.core.location.LocationPolicyDisclosures
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.permissions.UsageAccess
@@ -615,14 +616,13 @@ private fun contextSourceSetup(context: Context, key: String): ContextSourceSetu
         val providerEnabled = hasEnabledLocationProvider(context)
         ContextSourceSetup(
             ready = foreground && providerEnabled,
-            detail = when {
-                foreground && !providerEnabled -> "Location permission is granted, but GPS and network location providers are disabled."
-                foreground && background && precise -> "Live FOSS location source is registered with precise foreground and background location permission."
-                foreground && background -> "Live FOSS location source is registered with approximate foreground and background location permission."
-                foreground && precise -> "Live FOSS location source can emit while OpenTasker is running; background location is still needed for long-running geofence reliability."
-                foreground -> "Live FOSS location source can emit approximate fixes while OpenTasker is running; background location and precise access are still missing."
-                else -> "Foreground location permission is missing; live location contexts remain blocked until setup is complete."
-            },
+            detail = LocationPolicyDisclosures.sourceSetupDetail(
+                foreground = foreground,
+                precise = precise,
+                background = background,
+                providerEnabled = providerEnabled,
+                apiLevel = Build.VERSION.SDK_INT,
+            ),
         )
     }
     else -> ContextSourceSetup(ready = true, detail = "Source setup status is not specialized yet.")
