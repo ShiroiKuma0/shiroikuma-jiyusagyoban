@@ -66,8 +66,12 @@ function Invoke-Adb {
 
     $process = New-Object System.Diagnostics.Process
     $process.StartInfo.FileName = "adb"
-    foreach ($arg in $allArgs) {
-        [void]$process.StartInfo.ArgumentList.Add($arg)
+    if ($process.StartInfo.PSObject.Properties.Name -contains "ArgumentList") {
+        foreach ($arg in $allArgs) {
+            [void]$process.StartInfo.ArgumentList.Add($arg)
+        }
+    } else {
+        $process.StartInfo.Arguments = Join-ProcessArguments -ArgList $allArgs
     }
     $process.StartInfo.RedirectStandardOutput = $true
     $process.StartInfo.RedirectStandardError = $true
@@ -87,6 +91,17 @@ function Invoke-Adb {
         StdOut = $stdout.TrimEnd()
         StdErr = $stderr.TrimEnd()
     }
+}
+
+function Join-ProcessArguments {
+    param([string[]]$ArgList)
+    ($ArgList | ForEach-Object {
+        if ($_ -match '[\s"]') {
+            '"' + ($_ -replace '"', '\"') + '"'
+        } else {
+            $_
+        }
+    }) -join " "
 }
 
 function Save-Text {
