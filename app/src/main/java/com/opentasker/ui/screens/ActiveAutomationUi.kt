@@ -91,6 +91,7 @@ import com.opentasker.core.engine.RunLogActionDiagnostic
 import com.opentasker.core.engine.RunLogOutcome
 import com.opentasker.core.engine.outcome
 import com.opentasker.core.engine.toRunLogDiagnostics
+import com.opentasker.core.flow.AutomationFlowTarget
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.AutomationMode
@@ -403,6 +404,50 @@ fun ActiveAutomationUi(
     val taskerXmlLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.previewTaskerXml(it, BuildConfig.VERSION_NAME) }
     }
+    val openFlowTarget: (AutomationFlowTarget) -> Unit = { target ->
+        var opened = true
+        when (target) {
+            is AutomationFlowTarget.Profile -> {
+                profiles.firstOrNull { it.id == target.profileId }?.let { profile ->
+                    screen = OpenTaskerScreen.Profiles
+                    profileDialog = profile
+                } ?: run { opened = false }
+            }
+
+            is AutomationFlowTarget.Context -> {
+                val profile = profiles.firstOrNull { it.id == target.profileId }
+                val contextSpec = profile?.contexts?.getOrNull(target.index)
+                if (profile != null && contextSpec != null) {
+                    screen = OpenTaskerScreen.Profiles
+                    contextEdit = ContextEditState(profile, contextSpec.type, target.index, contextSpec)
+                } else {
+                    opened = false
+                }
+            }
+
+            is AutomationFlowTarget.Task -> {
+                tasks.firstOrNull { it.id == target.taskId }?.let { task ->
+                    screen = OpenTaskerScreen.Tasks
+                    taskDialog = task
+                } ?: run { opened = false }
+            }
+
+            is AutomationFlowTarget.Action -> {
+                val task = tasks.firstOrNull { it.id == target.taskId }
+                val action = task?.actions?.getOrNull(target.index)
+                val metadata = action?.let { ActionMetadataRegistry.get(it.type) }
+                if (task != null && action != null && metadata != null) {
+                    screen = OpenTaskerScreen.Tasks
+                    actionEdit = ActionEditState(task, metadata, target.index, action)
+                } else {
+                    opened = false
+                }
+            }
+        }
+        if (!opened) {
+            scope.launch { snackbarHostState.showSnackbar("Flow target no longer exists") }
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
@@ -543,6 +588,7 @@ fun ActiveAutomationUi(
                 profiles = profiles,
                 tasks = tasks,
                 contentPadding = innerPadding,
+                onNodeTargetSelected = openFlowTarget,
             )
 
             OpenTaskerScreen.Scenes -> SceneLibraryScreen(

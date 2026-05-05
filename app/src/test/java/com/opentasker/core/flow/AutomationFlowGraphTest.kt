@@ -35,8 +35,18 @@ class AutomationFlowGraphTest {
 
         assertEquals("Home arrival", graph.title)
         assertEquals(1, graph.contextNodes.size)
+        assertEquals(AutomationFlowTarget.Profile(1), graph.nodes.first { it.kind == AutomationFlowNodeKind.PROFILE }.target)
+        assertEquals(AutomationFlowTarget.Context(1, 0), graph.contextNodes.single().target)
         assertEquals("Arrive home", graph.enterTaskNode?.title)
+        assertEquals(AutomationFlowTarget.Task(10), graph.enterTaskNode?.target)
         assertEquals(listOf("Welcome", "Step 2: flow.wait"), graph.actionNodesFor("enter-task:10").map { it.title })
+        assertEquals(
+            listOf(
+                AutomationFlowTarget.Action(10, 0),
+                AutomationFlowTarget.Action(10, 1),
+            ),
+            graph.actionNodesFor("enter-task:10").map { it.target },
+        )
         assertTrue(graph.edges.any { it.fromId == "profile:1:context:0" && it.toId == "profile:1" })
         assertTrue(graph.edges.any { it.fromId == "enter-task:10" && it.toId == "enter-task:10:action:0" })
         assertTrue(graph.warnings.isEmpty())
@@ -55,6 +65,10 @@ class AutomationFlowGraphTest {
         val graph = AutomationFlowGraphBuilder.build(profile, emptyList())
 
         assertEquals(2, graph.nodes.count { it.kind == AutomationFlowNodeKind.MISSING })
+        assertEquals(
+            listOf(AutomationFlowTarget.Profile(2), AutomationFlowTarget.Profile(2)),
+            graph.nodes.filter { it.kind == AutomationFlowNodeKind.MISSING }.map { it.target },
+        )
         assertTrue(graph.warnings.contains("Profile has no contexts."))
         assertTrue(graph.warnings.contains("Enter task 404 is missing."))
         assertTrue(graph.warnings.contains("Exit task 405 is missing."))
