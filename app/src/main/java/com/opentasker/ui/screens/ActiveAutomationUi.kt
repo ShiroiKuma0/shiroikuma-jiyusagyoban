@@ -263,6 +263,10 @@ class ActiveAutomationViewModel(
         )
     }
 
+    fun updateScene(scene: Scene, message: String = "Scene updated") = launchWithMessage(message) {
+        db.sceneDao().update(scene.toEntity())
+    }
+
     fun deleteScene(scene: Scene) = launchWithMessage("Scene deleted") {
         db.sceneDao().delete(scene.toEntity())
     }
@@ -613,6 +617,7 @@ fun ActiveAutomationUi(
                 scenes = scenes,
                 tasks = tasks,
                 onCreateScene = viewModel::createScene,
+                onUpdateScene = viewModel::updateScene,
                 onDeleteScene = { pendingDelete = DeleteTarget.SceneTarget(it) },
                 contentPadding = innerPadding,
             )
