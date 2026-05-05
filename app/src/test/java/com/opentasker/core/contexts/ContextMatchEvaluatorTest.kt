@@ -76,9 +76,10 @@ class ContextMatchEvaluatorTest {
 
     @Test
     fun dayContextMatchesConfiguredDayTokens() {
-        val spec = ContextSpec(ContextType.DAY, config = mapOf("days" to "MON,WED,FRI"))
+        val spec = ContextSpec(ContextType.DAY, config = mapOf("days" to "MON-WED,FRI"))
 
         assertTrue(ContextMatchEvaluator.matches(spec, ContextEvent("time", true, mapOf("day" to "wed"))))
+        assertTrue(ContextMatchEvaluator.matches(spec, ContextEvent("time", true, mapOf("day" to "1"))))
         assertFalse(ContextMatchEvaluator.matches(spec, ContextEvent("time", true, mapOf("day" to "SUN"))))
     }
 
