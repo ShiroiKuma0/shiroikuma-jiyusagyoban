@@ -237,15 +237,15 @@ object ProfileTemplateCatalog {
         ProfileTemplate(
             id = "nightstand-nfc-sleep",
             title = "Nightstand NFC sleep mode",
-            summary = "NFC-tag sleep routine planned for NFC trigger support.",
+            summary = "Dim screen and lower media volume when a known NFC tag is scanned.",
             category = "Sleep",
-            availability = TemplateAvailability.Planned,
-            safetyNote = "Blocked until NFC trigger support is implemented.",
+            availability = TemplateAvailability.RequiresSetup,
+            safetyNote = "Creates a disabled profile. Requires NFC hardware and Write Settings/volume access before enabling.",
             slots = listOf(
-                TemplateSlot("tag", "NFC tag label", "Nightstand"),
+                TemplateSlot("tagId", "NFC tag ID", "04AABBCC", hint = "Scan a tag and copy its ID from Inspector"),
             ),
             contexts = listOf(
-                TemplateContext(ContextType.EVENT, mapOf("event" to "nfc", "filter" to "{tag}")),
+                TemplateContext(ContextType.EVENT, mapOf("event" to "nfc", "tagId" to "{tagId}")),
             ),
             actions = listOf(
                 TemplateAction("brightness.set", "Dim screen", mapOf("level" to "24")),

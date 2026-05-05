@@ -106,6 +106,16 @@ object ContextMatchEvaluator {
             if (actualPackage !in packageAllowlist) return false
         }
 
+        val configuredTagIds = firstConfig(spec, "tagId", "tagIds", "tag")
+            .splitCsv()
+            .map(NfcContextEvents::normalizeTagId)
+            .filter { it.isNotBlank() }
+            .toSet()
+        if (configuredTagIds.isNotEmpty()) {
+            val actualTagId = NfcContextEvents.normalizeTagId(event.metadata["tagId"].orEmpty())
+            if (actualTagId !in configuredTagIds) return false
+        }
+
         val regex = spec.config["regex"]?.toBooleanStrictOrNull() ?: false
         val titleFilter = spec.config["title"]?.trim().orEmpty()
         if (titleFilter.isNotBlank() && !textMatches(event.metadata["title"].orEmpty(), titleFilter, regex)) {
