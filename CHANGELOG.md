@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.25 - 2026-05-05
+
+Scene library baseline.
+
+- Added a Room-backed Scenes tab that lists persisted scenes and supports safe scene creation/deletion.
+- Added scene validation for positive dimensions, empty scenes, element bounds, and missing tap/long-press task bindings.
+- Added scene cards with canvas summaries, element/binding previews, overlay-permission readiness status, and validation messages.
+- Documented the scene baseline and updated roadmap/version metadata for L2.
+- Added unit coverage for scene validation warnings, geometry errors, missing task references, and valid bounded elements.
+
 ## v0.2.24 - 2026-05-05
 
 Visual flow baseline.
