@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.29 - 2026-05-05
+
+FOSS geofence evaluator baseline.
+
+- Added a pure `FossGeofenceEvaluator` with Haversine distance, radius checks, optional max accuracy, and dwell-time evaluation.
+- Wired active Location context matching through the FOSS evaluator without adding Play Services dependencies.
+- Added Location editor fields for max accuracy and dwell seconds.
+- Reused the same evaluator for the older geofence trigger distance path and added regression coverage for radius, accuracy, dwell, and active context matching.
+
 ## v0.2.28 - 2026-05-05
 
 Profile sharing manifest baseline.

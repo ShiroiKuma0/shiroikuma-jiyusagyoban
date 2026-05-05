@@ -43,6 +43,38 @@ class ContextMatchEvaluatorTest {
     }
 
     @Test
+    fun locationContextUsesFossGeofenceAccuracyAndDwell() {
+        val spec = ContextSpec(
+            type = ContextType.LOCATION,
+            config = mapOf(
+                "latitude" to "40.7580",
+                "longitude" to "-73.9855",
+                "radiusMeters" to "150",
+                "maxAccuracyMeters" to "50",
+                "dwellSeconds" to "300",
+            ),
+        )
+
+        val matchingEvent = ContextEvent(
+            "location",
+            true,
+            mapOf(
+                "latitude" to "40.7581",
+                "longitude" to "-73.9856",
+                "accuracyMeters" to "25",
+                "observedAtEpochMs" to "600000",
+                "insideSinceEpochMs" to "0",
+            ),
+        )
+        val inaccurateEvent = matchingEvent.copy(metadata = matchingEvent.metadata + ("accuracyMeters" to "75"))
+        val noDwellEvent = matchingEvent.copy(metadata = matchingEvent.metadata + ("insideSinceEpochMs" to "400000"))
+
+        assertTrue(ContextMatchEvaluator.matches(spec, matchingEvent))
+        assertFalse(ContextMatchEvaluator.matches(spec, inaccurateEvent))
+        assertFalse(ContextMatchEvaluator.matches(spec, noDwellEvent))
+    }
+
+    @Test
     fun dayContextMatchesConfiguredDayTokens() {
         val spec = ContextSpec(ContextType.DAY, config = mapOf("days" to "MON,WED,FRI"))
 
