@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.23 - 2026-05-05
+
+Dependency modernization baseline.
+
+- Added a Gradle version catalog for Android, Kotlin, Compose, Room, WorkManager, Coroutines, Hilt, Gson, and test dependency versions.
+- Converted root and app Gradle plugin/dependency declarations to catalog aliases without changing dependency versions.
+- Documented the staged dependency modernization order, risk rules, and verification gates for future upgrade batches.
+- Updated F-Droid draft metadata and version metadata for the centralized dependency baseline.
+
 ## v0.2.22 - 2026-05-05
 
 F-Droid readiness baseline.
