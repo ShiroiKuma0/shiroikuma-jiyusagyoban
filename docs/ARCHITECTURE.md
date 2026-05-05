@@ -59,7 +59,7 @@ Tasker's source is **not public**. This architecture is reconstructed from the u
 1. `AutomationService` starts on boot, loads all enabled `Profile`s.
 2. Each `Profile` subscribes to its `Context` sources (cold `Flow`s exposed by `ContextSources`).
 3. `ProfileMatcher` keeps a per-profile boolean state. When all contexts in a profile transition `false → true`, it submits the entry task; on `true → false`, the exit task.
-4. `TaskRunner` walks the action list, expanding `%vars` against `VariableStore`, executing actions sequentially, and writing action-level trace summaries to the run log.
+4. `TaskRunner` walks the action list, expanding legacy `%vars` and bounded `{{ ... }}` templates against `VariableStore`/`TemplateExpressionEngine`, executing actions sequentially, and writing action-level trace summaries to the run log.
 5. Actions return a `Result` (Success / Failure / Skip) — `TaskRunner` decides whether to halt based on the action's "Continue Task After Error" flag.
 
 The Context Inspector UI separately observes registered `ContextSource` flows and applies the same `ContextMatchEvaluator` rules to persisted profiles. It does not dispatch tasks; it explains current source health, latest values, and why each profile would or would not match.
@@ -74,7 +74,7 @@ Location contexts use `FossGeofenceEvaluator` for Play-services-free geofence ma
 
 Tasker XML import is intentionally staged through the OpenTasker JSON bundle model. `TaskerXmlImporter` parses common Tasker task/profile/variable structures into a bundle plus migration report, preserves unmapped Tasker actions as explicit unsupported placeholders, and reports skipped contexts, profiles, and scenes before any Room write path is invoked.
 
-Template expressions are staged as a pure engine before runtime-wide adoption. `TemplateExpressionEngine` evaluates bounded `{{ ... }}` expressions with task, event, and global variable scopes, explicit scope prefixes, arrays, JSON path reads, safe string/math functions, traces, and warnings. It does not execute user code, shell commands, or regexes, and unknown functions preserve the original token so unsupported expressions fail closed. The current `%var` `VariableStore` expansion path remains active until action argument wiring and run-log debugger UI can adopt the new traces deliberately.
+Template expressions are staged through the task runner action-argument path. `TemplateExpressionEngine` evaluates bounded `{{ ... }}` expressions with task, event, and global variable scopes, explicit scope prefixes, arrays, JSON path reads, safe string/math functions, traces, and warnings. It does not execute user code, shell commands, or regexes, and unknown functions preserve the original token so unsupported expressions fail closed. `TaskRunner` applies legacy `%var` expansion first, then template expansion, then records sanitized expanded-argument summaries and warning counts in action traces. A richer variable debugger UI and condition-template adoption remain future work.
 
 Profile sharing is staged through the same bundle model. `ProfileShareLibrary` creates offline share manifests with stable slugs, counts, unverified trust state, capability/import safety findings, and GitHub Discussions submission markdown. It does not publish to a network, claim template verification, or bypass bundle validation.
 

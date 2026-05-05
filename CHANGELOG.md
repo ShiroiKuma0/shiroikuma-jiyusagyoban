@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.31 - 2026-05-05
+
+Runtime template argument expansion.
+
+- Wired action argument expansion through the bounded `TemplateExpressionEngine` after legacy `%var` expansion.
+- Added `VariableStore` template snapshots for task-local, event, global, and array scopes.
+- Added sanitized expanded-argument summaries, template warnings, and per-argument expansion traces to `ActionExecutionTrace`.
+- Redacted sensitive argument names such as tokens, keys, secrets, cookies, and passwords from run-log summaries.
+- Added regression coverage for runtime template expansion, event scope lookup, array lookup, warning propagation, and summary redaction.
+
 ## v0.2.30 - 2026-05-05
 
 Template expression engine baseline.
