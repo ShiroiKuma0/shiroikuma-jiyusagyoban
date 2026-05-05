@@ -7,24 +7,32 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -42,7 +50,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
+import com.opentasker.core.model.SceneElementType
 import com.opentasker.core.model.Task
+import com.opentasker.core.scenes.SceneElementDrafts
 import com.opentasker.core.scenes.SceneIssue
 import com.opentasker.core.scenes.SceneIssueSeverity
 import com.opentasker.core.scenes.SceneValidator
@@ -52,10 +62,13 @@ fun SceneLibraryScreen(
     scenes: List<Scene>,
     tasks: List<Task>,
     onCreateScene: (String, Int, Int) -> Unit,
+    onUpdateScene: (Scene, String) -> Unit,
     onDeleteScene: (Scene) -> Unit,
     contentPadding: PaddingValues,
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
+    var elementEditor by remember { mutableStateOf<SceneElementEditorState?>(null) }
+    var pendingElementDelete by remember { mutableStateOf<SceneElementEditorState?>(null) }
     val sortedScenes = remember(scenes) { scenes.sortedBy { it.name.lowercase() } }
 
     if (showCreateDialog) {
@@ -64,6 +77,44 @@ fun SceneLibraryScreen(
             onSave = { name, widthDp, heightDp ->
                 onCreateScene(name, widthDp, heightDp)
                 showCreateDialog = false
+            },
+        )
+    }
+
+    elementEditor?.let { state ->
+        SceneElementEditorDialog(
+            state = state,
+            tasks = tasks,
+            onDismiss = { elementEditor = null },
+            onSave = { element ->
+                val updatedScene = if (state.index == null) {
+                    state.scene.copy(elements = state.scene.elements + element)
+                } else {
+                    state.scene.copy(
+                        elements = state.scene.elements.mapIndexed { index, existing ->
+                            if (index == state.index) element else existing
+                        },
+                    )
+                }
+                onUpdateScene(updatedScene, if (state.index == null) "Element added" else "Element updated")
+                elementEditor = null
+            },
+        )
+    }
+
+    pendingElementDelete?.let { state ->
+        SceneElementDeleteDialog(
+            state = state,
+            onDismiss = { pendingElementDelete = null },
+            onConfirm = {
+                val index = state.index
+                if (index != null) {
+                    onUpdateScene(
+                        state.scene.copy(elements = state.scene.elements.filterIndexed { i, _ -> i != index }),
+                        "Element removed",
+                    )
+                }
+                pendingElementDelete = null
             },
         )
     }
@@ -94,11 +145,20 @@ fun SceneLibraryScreen(
             SceneCard(
                 scene = scene,
                 tasks = tasks,
+                onAddElement = { elementEditor = SceneElementEditorState(scene = scene) },
+                onEditElement = { index, element -> elementEditor = SceneElementEditorState(scene, index, element) },
+                onDeleteElement = { index, element -> pendingElementDelete = SceneElementEditorState(scene, index, element) },
                 onDelete = { onDeleteScene(scene) },
             )
         }
     }
 }
+
+private data class SceneElementEditorState(
+    val scene: Scene,
+    val index: Int? = null,
+    val element: SceneElement? = null,
+)
 
 @Composable
 private fun SceneEmptyState(
@@ -178,6 +238,9 @@ private fun SceneOverviewCard(
 private fun SceneCard(
     scene: Scene,
     tasks: List<Task>,
+    onAddElement: () -> Unit,
+    onEditElement: (Int, SceneElement) -> Unit,
+    onDeleteElement: (Int, SceneElement) -> Unit,
     onDelete: () -> Unit,
 ) {
     val taskNames = remember(tasks) { tasks.associate { it.id to it.name } }
@@ -206,16 +269,20 @@ private fun SceneCard(
 
             ScenePreviewBox(scene)
 
+            OutlinedButton(onClick = onAddElement, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.Add, contentDescription = null)
+                Spacer(Modifier.width(6.dp))
+                Text("Add Element")
+            }
+
             if (scene.elements.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    scene.elements.take(6).forEach { element ->
-                        SceneElementRow(element, taskNames)
-                    }
-                    if (scene.elements.size > 6) {
-                        Text(
-                            "${scene.elements.size - 6} more element${plural(scene.elements.size - 6)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    scene.elements.forEachIndexed { index, element ->
+                        SceneElementRow(
+                            element = element,
+                            taskNames = taskNames,
+                            onEdit = { onEditElement(index, element) },
+                            onDelete = { onDeleteElement(index, element) },
                         )
                     }
                 }
@@ -255,7 +322,7 @@ private fun ScenePreviewBox(scene: Scene) {
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)),
                     ) {
                         Text(
-                            "${element.type.name.lowercase()} at ${element.xDp},${element.yDp} size ${element.widthDp}x${element.heightDp}",
+                            "${sceneElementTypeLabel(element.type)} at ${element.xDp},${element.yDp} size ${element.widthDp}x${element.heightDp}",
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -271,27 +338,323 @@ private fun ScenePreviewBox(scene: Scene) {
 private fun SceneElementRow(
     element: SceneElement,
     taskNames: Map<Long, String>,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f),
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)),
     ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(element.type.name.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelLarge)
-            Text(
-                "Bounds ${element.xDp},${element.yDp} ${element.widthDp}x${element.heightDp} dp",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            listOfNotNull(
-                element.tapTaskId?.let { "Tap: ${taskNames[it] ?: "missing #$it"}" },
-                element.longPressTaskId?.let { "Long press: ${taskNames[it] ?: "missing #$it"}" },
-            ).forEach { binding ->
-                Text(binding, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(
+            Modifier.padding(12.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(sceneElementTypeLabel(element.type), style = MaterialTheme.typography.labelLarge)
+                sceneElementSummary(element)?.let { summary ->
+                    Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                }
+                Text(
+                    "Bounds ${element.xDp},${element.yDp} ${element.widthDp}x${element.heightDp} dp",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                listOfNotNull(
+                    element.tapTaskId?.let { "Tap: ${taskNames[it] ?: "missing #$it"}" },
+                    element.longPressTaskId?.let { "Long press: ${taskNames[it] ?: "missing #$it"}" },
+                ).forEach { binding ->
+                    Text(binding, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Row {
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Filled.Edit, contentDescription = "Edit element")
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Delete element", tint = MaterialTheme.colorScheme.error)
+                }
             }
         }
     }
+}
+
+@Composable
+private fun SceneElementDeleteDialog(
+    state: SceneElementEditorState,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val element = state.element
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Remove element?") },
+        text = {
+            Text(
+                "This removes the ${element?.type?.let(::sceneElementTypeLabel) ?: "selected"} element from \"${state.scene.name}\".",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) { Text("Remove") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}
+
+@Composable
+private fun SceneElementEditorDialog(
+    state: SceneElementEditorState,
+    tasks: List<Task>,
+    onDismiss: () -> Unit,
+    onSave: (SceneElement) -> Unit,
+) {
+    val initial = remember(state) {
+        state.element ?: SceneElementDrafts.defaultElement(state.scene, SceneElementType.BUTTON)
+    }
+    var type by remember(state) { mutableStateOf(initial.type.takeIf { it in SceneElementDrafts.editableTypes } ?: SceneElementType.BUTTON) }
+    var x by remember(state) { mutableStateOf(initial.xDp.toString()) }
+    var y by remember(state) { mutableStateOf(initial.yDp.toString()) }
+    var width by remember(state) { mutableStateOf(initial.widthDp.toString()) }
+    var height by remember(state) { mutableStateOf(initial.heightDp.toString()) }
+    var label by remember(state) {
+        mutableStateOf(initial.config["label"] ?: initial.config["text"] ?: "")
+    }
+    var sliderMin by remember(state) { mutableStateOf(initial.config["min"] ?: "0") }
+    var sliderMax by remember(state) { mutableStateOf(initial.config["max"] ?: "100") }
+    var sliderValue by remember(state) { mutableStateOf(initial.config["value"] ?: "50") }
+    var imageSource by remember(state) { mutableStateOf(initial.config["source"] ?: "") }
+    var tapTaskId by remember(state) { mutableStateOf(initial.tapTaskId) }
+    var longPressTaskId by remember(state) { mutableStateOf(initial.longPressTaskId) }
+
+    val parsedX = x.toIntOrNull()
+    val parsedY = y.toIntOrNull()
+    val parsedWidth = width.toIntOrNull()
+    val parsedHeight = height.toIntOrNull()
+    val parsedSliderMin = sliderMin.toIntOrNull()
+    val parsedSliderMax = sliderMax.toIntOrNull()
+    val parsedSliderValue = sliderValue.toIntOrNull()
+    val sliderValid = type != SceneElementType.SLIDER ||
+        (parsedSliderMin != null && parsedSliderMax != null && parsedSliderValue != null && parsedSliderMin <= parsedSliderMax)
+    val canSave = parsedX != null &&
+        parsedY != null &&
+        parsedWidth != null &&
+        parsedHeight != null &&
+        parsedX >= 0 &&
+        parsedY >= 0 &&
+        parsedWidth > 0 &&
+        parsedHeight > 0 &&
+        sliderValid
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (state.index == null) "Add Element" else "Edit Element") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 560.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                SceneElementTypeSelector(
+                    selected = type,
+                    onSelect = { selected ->
+                        type = selected
+                        val defaults = SceneElementDrafts.defaultElement(state.scene, selected)
+                        width = defaults.widthDp.toString()
+                        height = defaults.heightDp.toString()
+                        label = defaults.config["label"] ?: defaults.config["text"] ?: ""
+                        sliderMin = defaults.config["min"] ?: "0"
+                        sliderMax = defaults.config["max"] ?: "100"
+                        sliderValue = defaults.config["value"] ?: "50"
+                        imageSource = defaults.config["source"] ?: ""
+                    },
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    NumberField("X dp", x, { x = it.filter(Char::isDigit).take(4) }, parsedX == null, Modifier.weight(1f))
+                    NumberField("Y dp", y, { y = it.filter(Char::isDigit).take(4) }, parsedY == null, Modifier.weight(1f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    NumberField(
+                        label = "Width dp",
+                        value = width,
+                        onValueChange = { width = it.filter(Char::isDigit).take(4) },
+                        isError = parsedWidth == null || parsedWidth <= 0,
+                        modifier = Modifier.weight(1f),
+                    )
+                    NumberField(
+                        label = "Height dp",
+                        value = height,
+                        onValueChange = { height = it.filter(Char::isDigit).take(4) },
+                        isError = parsedHeight == null || parsedHeight <= 0,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                when (type) {
+                    SceneElementType.TEXT -> OutlinedTextField(
+                        value = label,
+                        onValueChange = { label = it.take(80) },
+                        label = { Text("Text") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    SceneElementType.BUTTON -> OutlinedTextField(
+                        value = label,
+                        onValueChange = { label = it.take(48) },
+                        label = { Text("Button label") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    SceneElementType.SLIDER -> {
+                        OutlinedTextField(
+                            value = label,
+                            onValueChange = { label = it.take(48) },
+                            label = { Text("Slider label") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            NumberField("Min", sliderMin, { sliderMin = it.filter(Char::isDigit).take(5) }, parsedSliderMin == null, Modifier.weight(1f))
+                            NumberField("Max", sliderMax, { sliderMax = it.filter(Char::isDigit).take(5) }, parsedSliderMax == null || (parsedSliderMin != null && parsedSliderMax < parsedSliderMin), Modifier.weight(1f))
+                            NumberField("Value", sliderValue, { sliderValue = it.filter(Char::isDigit).take(5) }, parsedSliderValue == null, Modifier.weight(1f))
+                        }
+                    }
+
+                    SceneElementType.IMAGE -> OutlinedTextField(
+                        value = imageSource,
+                        onValueChange = { imageSource = it.take(160) },
+                        label = { Text("Image label or URI") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    else -> Unit
+                }
+                SceneTaskBindingSelector(
+                    label = "Tap task",
+                    tasks = tasks,
+                    selectedTaskId = tapTaskId,
+                    onSelect = { tapTaskId = it },
+                )
+                SceneTaskBindingSelector(
+                    label = "Long-press task",
+                    tasks = tasks,
+                    selectedTaskId = longPressTaskId,
+                    onSelect = { longPressTaskId = it },
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = canSave,
+                onClick = {
+                    onSave(
+                        SceneElement(
+                            id = initial.id,
+                            type = type,
+                            xDp = parsedX ?: 0,
+                            yDp = parsedY ?: 0,
+                            widthDp = parsedWidth ?: 1,
+                            heightDp = parsedHeight ?: 1,
+                            config = elementConfig(type, label, sliderMin, sliderMax, sliderValue, imageSource),
+                            tapTaskId = tapTaskId,
+                            longPressTaskId = longPressTaskId,
+                        ),
+                    )
+                },
+            ) {
+                Text(if (state.index == null) "Add" else "Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}
+
+@Composable
+private fun SceneElementTypeSelector(
+    selected: SceneElementType,
+    onSelect: (SceneElementType) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+            Text(sceneElementTypeLabel(selected), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            SceneElementDrafts.editableTypes.forEach { type ->
+                DropdownMenuItem(
+                    text = { Text(sceneElementTypeLabel(type)) },
+                    onClick = {
+                        onSelect(type)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SceneTaskBindingSelector(
+    label: String,
+    tasks: List<Task>,
+    selectedTaskId: Long?,
+    onSelect: (Long?) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val taskNames = remember(tasks) { tasks.associate { it.id to it.name } }
+    Box {
+        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                "$label: ${selectedTaskId?.let { taskNames[it] ?: "missing #$it" } ?: "None"}",
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text("None") },
+                onClick = {
+                    onSelect(null)
+                    expanded = false
+                },
+            )
+            tasks.sortedBy { it.name.lowercase() }.forEach { task ->
+                DropdownMenuItem(
+                    text = { Text(task.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    onClick = {
+                        onSelect(task.id)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NumberField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    isError: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        isError = isError,
+        singleLine = true,
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -396,6 +759,53 @@ private fun SceneEditorDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         },
     )
+}
+
+private fun sceneElementTypeLabel(type: SceneElementType): String = when (type) {
+    SceneElementType.BUTTON -> "Button"
+    SceneElementType.TEXT -> "Text"
+    SceneElementType.SLIDER -> "Slider"
+    SceneElementType.IMAGE -> "Image"
+    else -> type.name.lowercase().replace("_", " ").replaceFirstChar { it.uppercase() }
+}
+
+private fun sceneElementSummary(element: SceneElement): String? = when (element.type) {
+    SceneElementType.TEXT -> element.config["text"]?.takeIf { it.isNotBlank() }
+    SceneElementType.BUTTON -> element.config["label"]?.takeIf { it.isNotBlank() }
+    SceneElementType.SLIDER -> {
+        val label = element.config["label"].orEmpty().ifBlank { "Slider" }
+        val value = element.config["value"].orEmpty().ifBlank { "0" }
+        val min = element.config["min"].orEmpty().ifBlank { "0" }
+        val max = element.config["max"].orEmpty().ifBlank { "100" }
+        "$label: $value ($min-$max)"
+    }
+    SceneElementType.IMAGE -> element.config["source"]?.takeIf { it.isNotBlank() }
+    else -> null
+}
+
+private fun elementConfig(
+    type: SceneElementType,
+    label: String,
+    sliderMin: String,
+    sliderMax: String,
+    sliderValue: String,
+    imageSource: String,
+): Map<String, String> = when (type) {
+    SceneElementType.TEXT -> mapOf("text" to label.ifBlank { "Text" })
+    SceneElementType.BUTTON -> mapOf("label" to label.ifBlank { "Button" })
+    SceneElementType.SLIDER -> {
+        val min = sliderMin.toIntOrNull() ?: 0
+        val max = (sliderMax.toIntOrNull() ?: 100).coerceAtLeast(min)
+        val value = (sliderValue.toIntOrNull() ?: min).coerceIn(min, max)
+        mapOf(
+            "label" to label.ifBlank { "Slider" },
+            "min" to min.toString(),
+            "max" to max.toString(),
+            "value" to value.toString(),
+        )
+    }
+    SceneElementType.IMAGE -> mapOf("source" to imageSource.ifBlank { "Image" })
+    else -> emptyMap()
 }
 
 private fun plural(count: Int): String = if (count == 1) "" else "s"
