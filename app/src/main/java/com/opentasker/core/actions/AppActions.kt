@@ -134,7 +134,9 @@ class ScreenshotAction : Action {
     override val category = ActionCategory.APP
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val path = args["path"] ?: "/sdcard/screenshot.png"
+        val path = args["path"]
+            ?: ctx.app.getExternalFilesDir(null)?.resolve("screenshot.png")?.absolutePath
+            ?: "app-specific external storage/screenshot.png"
         ctx.logger("Screenshot: $path")
         return ActionResult.Failure("Screenshot capture requires MediaProjection consent or privileged shell access")
     }
