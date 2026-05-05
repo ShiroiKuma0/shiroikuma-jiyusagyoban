@@ -1,6 +1,6 @@
 # FOSS Geofencing Baseline
 
-OpenTasker v0.2.44 has a Play-services-free geofence path for Location contexts. It combines a platform `LocationManager` source with the pure evaluator added in v0.2.29, persisted dwell state added in v0.2.37, Context Inspector dwell detail added in v0.2.38, stale dwell-key cleanup added in v0.2.39, balanced provider cadence added in v0.2.40, shared Android location policy disclosures added in v0.2.41, app-launch foreground-service startup repaired in v0.2.42, the adb-backed device evidence harness added in v0.2.43, and a setup-required disabled Location evidence template added in v0.2.44; it is still not a device-verified background geofence reliability claim.
+OpenTasker v0.2.45 has a Play-services-free geofence path for Location contexts. It combines a platform `LocationManager` source with the pure evaluator added in v0.2.29, persisted dwell state added in v0.2.37, Context Inspector dwell detail added in v0.2.38, stale dwell-key cleanup added in v0.2.39, balanced provider cadence added in v0.2.40, shared Android location policy disclosures added in v0.2.41, app-launch foreground-service startup repaired in v0.2.42, the adb-backed device evidence harness added in v0.2.43, a setup-required disabled Location evidence template added in v0.2.44, and run-log/logcat evidence assertions added in v0.2.45; it is still not a device-verified background geofence reliability claim.
 
 ## Active Scope
 
@@ -10,6 +10,7 @@ OpenTasker v0.2.44 has a Play-services-free geofence path for Location contexts.
 - API 36 device smoke confirmed app launch starts the service foreground with `specialUse|location` when foreground/background location permissions and device location are enabled.
 - Includes a disabled-by-default `Location evidence log` template with latitude, longitude, radius, max-accuracy, dwell, and log-action defaults for later event-delivery smoke tests.
 - `tools/collect-location-evidence.ps1` collects repeatable adb evidence for Location/geofence verification, including permission state, foreground-service type, app-to-home service persistence, logcat tail, location dumps, battery dumps, and batterystats snapshots.
+- The evidence collector snapshots debug Room data through `run-as`, writes `room-summary.json`, and can require matching recent run-log or logcat evidence before a run passes.
 - A 10-second API 36 harness run with the app sent home kept `AutomationService` foreground with `specialUse|location` and captured battery before/after snapshots; the short USB-powered sample is evidence that the harness works, not a battery optimization claim.
 - Uses Android framework GPS and network providers instead of Google Play Services.
 - Seeds matching from the best last-known GPS/network fix when one is available.
@@ -53,10 +54,10 @@ OpenTasker v0.2.44 has a Play-services-free geofence path for Location contexts.
 Run the adb evidence collector from the repo root after installing the APK on a connected device:
 
 ```powershell
-.\tools\collect-location-evidence.ps1 -SampleSeconds 600 -GrantLocationPermissions -SendHomeDuringSample
+.\tools\collect-location-evidence.ps1 -SampleSeconds 600 -GrantLocationPermissions -SendHomeDuringSample -RequireRunLogMessagePattern "Location evidence log|Log location evidence"
 ```
 
-For actual Location event-delivery verification, install the `Location evidence log` template, adjust the coordinates/radius to the test site, grant foreground/background location prerequisites, enable the created profile, then run the collector while the service is backgrounded. The script writes timestamped output under ignored `build/device-evidence/location/`. Use longer unplugged samples for battery work; short USB-powered samples only prove the harness and foreground-service state checks are functioning.
+For actual Location event-delivery verification, install the `Location evidence log` template, adjust the coordinates/radius to the test site, grant foreground/background location prerequisites, enable the created profile, then run the collector while the service is backgrounded. The script writes timestamped output under ignored `build/device-evidence/location/`, including `room-summary.json` when debug `run-as` and local Python/SQLite are available. Use longer unplugged samples for battery work; short USB-powered samples only prove the harness and foreground-service state checks are functioning.
 
 ## Next Work
 
