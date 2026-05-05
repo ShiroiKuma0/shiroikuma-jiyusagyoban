@@ -27,7 +27,7 @@ Top-level fields:
 - Scenes import after tasks; missing element task links are dropped with a lossy warning.
 - Unsupported schema versions are rejected before writing.
 - Unsupported or setup-required actions are preserved, but capability requirements are surfaced in metadata/warnings.
-- Tasker XML import first converts into this bundle model plus a migration report; Room import should happen only after the report is reviewed.
+- Tasker XML import first converts into this bundle model plus a migration report; the Profiles import UI writes to Room only after the report is reviewed and keeps imported profiles disabled by default.
 - Profile sharing manifests wrap this bundle model with slug, counts, unverified trust state, safety findings, screenshot counts, and GitHub Discussions submission copy before any community import UI exists.
 
 ## Stability rules

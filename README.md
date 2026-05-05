@@ -1,13 +1,13 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.57-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.58-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.57** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, day schedule presets/ranges, runtime template argument and condition expansion, per-expression template diagnostics, explicit regex template policy, FOSS geofence evaluation with a live platform location source, a disabled Location evidence template, app-launch service startup, adb-backed location/calendar/sun evidence collection, provider-cadence, unplugged-sample, and post-reconnect unplugged-history gates, background Location event-delivery smoke evidence, balanced provider cadence, policy-aware location setup copy, persisted dwell state, inspector dwell details, and stale-key cleanup, scene library management, read-only flow graphs, JSON bundles, profile sharing manifests, Tasker XML import planning, F-Droid build readiness, dependency version governance, optional Shizuku readiness, optional Termux script readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers and write helper, calendar/sun triggers with editor presets, and conservative Locale setting/condition plugin host actions with an adb validation harness are active now; broad device-verified background geofence reliability, elevated backends, script execution, and broader plugin UX are planned.
+**OpenTasker v0.2.58** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, day schedule presets/ranges, runtime template argument and condition expansion, per-expression template diagnostics, explicit regex template policy, FOSS geofence evaluation with a live platform location source, a disabled Location evidence template, app-launch service startup, adb-backed location/calendar/sun evidence collection, provider-cadence, unplugged-sample, and post-reconnect unplugged-history gates, background Location event-delivery smoke evidence, balanced provider cadence, policy-aware location setup copy, persisted dwell state, inspector dwell details, and stale-key cleanup, scene library management, read-only flow graphs, JSON bundles, profile sharing manifests, Tasker XML import UI, F-Droid build readiness, dependency version governance, optional Shizuku readiness, optional Termux script readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers and write helper, calendar/sun triggers with editor presets, and conservative Locale setting/condition plugin host actions with an adb validation harness are active now; broad device-verified background geofence reliability, elevated backends, script execution, and broader plugin UX are planned.
 
-> **Status:** v0.2.57 adds a calendar/sun adb evidence harness and verified the debug app on API 36 device `SM-S938B`; evidence `build/device-evidence/calendar-sun/20260505-152622` shows Calendar access granted, CalendarProvider calendar/instance queries succeeding, and `AutomationService` foreground after launch. v0.2.56 adds calendar and sunrise/sunset presets to the Event context editor. v0.2.48 evidence `build/device-evidence/location/20260505-143254` shows a 615.055-second recent unplugged interval that satisfied the 600-second post-reconnect history gate with GPS/network provider cadence evidence present. These remain single-device data points, not broad background geofence reliability claims.
+> **Status:** v0.2.58 adds a Tasker XML document-picker import flow with bounded preview, migration/capability warnings, confirmed Room import, and disabled-by-default imported profiles. v0.2.57 adds a calendar/sun adb evidence harness and verified the debug app on API 36 device `SM-S938B`; evidence `build/device-evidence/calendar-sun/20260505-152622` shows Calendar access granted, CalendarProvider calendar/instance queries succeeding, and `AutomationService` foreground after launch. v0.2.48 evidence `build/device-evidence/location/20260505-143254` shows a 615.055-second recent unplugged interval that satisfied the 600-second post-reconnect history gate with GPS/network provider cadence evidence present. These remain single-device data points, not broad background geofence reliability claims.
 
 ---
 
@@ -27,7 +27,7 @@
 ✅ **Termux scripting readiness** — optional Termux/Termux:Tasker detection and a blocked script action without arbitrary execution
 ✅ **Open JSON bundles** — schema-versioned profile/task/context/action/variable/scene export and import planning  
 ✅ **Profile sharing manifests** — offline share summaries with safety findings and GitHub Discussions submission text
-✅ **Tasker XML import planning** — common Tasker task/profile/variable XML converts to OpenTasker bundles with migration warnings
+✅ **Tasker XML import UI** — Tasker XML files can be selected, previewed with migration/capability warnings, and imported into Room as disabled profiles for review
 ✅ **F-Droid readiness** — property-based `fdroid` profile, dependency-policy check, and metadata draft
 ✅ **Dependency governance** — Gradle version catalog centralizes plugin/library versions before staged upgrades
 ✅ **Locale plugin host baseline** — explicit setting-plugin dispatch, condition-plugin query execution, configuration result parsing, request-query events, package validation, bundle limits, last-known unknown-state fallback, timeout wrapping, and adb validation harness
@@ -51,7 +51,7 @@
 ✅ **100% Kotlin** — modern, type-safe, coroutine-friendly  
 ✅ **Profile execution** — AutomationService wired to TaskRunner for context triggers  
 ✅ **Run log persistence** — task execution history is written to Room  
-⏳ **Tasker compat** — architecture matches for future `.prj.xml` import
+✅ **Tasker compat** — `.prj.xml`/`.tsk.xml` exports can be previewed and imported through a disabled-by-default review flow
 
 ---
 
@@ -123,9 +123,8 @@ Release APKs are unsigned unless `OPEN_TASKER_RELEASE_KEYSTORE`, `OPEN_TASKER_RE
 5. **Shizuku API opt-in backend** — explicit user opt-in, permission request, isolated execution, and run-log audit trail
 6. **Termux script dispatch** — explicit permission flow, script allowlisting, stdout/stderr capture, and output variable mapping
 7. **Sharing preview UI** — import warnings, screenshots, permissions, and local review before importing community bundles
-8. **Locale condition queries** — complete query execution for condition plugins with timeout and result handling
-9. **Tasker import UI** — file picker, migration preview, and import confirmation around the parser baseline
-10. **F-Droid submission hardening** — release tag discipline, fdroidserver lint/build, and reproducible binary comparison
+8. **Locale condition UX** — plugin-backed Condition context rows and clearer setup/error surfaces
+9. **F-Droid submission hardening** — release tag discipline, fdroidserver lint/build, and reproducible binary comparison
 
 ---
 

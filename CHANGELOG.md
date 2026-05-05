@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.58 - 2026-05-05
+
+Tasker XML import UI.
+
+- Added a user-facing Tasker XML import flow to the Profiles screen using Android's document picker.
+- The preview reads selected XML with a bounded 4 MB limit, parses it through the existing secure Tasker importer, and shows source counts, import counts, mapped/unsupported actions, migration warnings, and capability review notes.
+- Confirmed imports now reuse the existing Room-backed OpenTasker bundle repository and create imported Tasker profiles disabled by default for review.
+- Added a pure `TaskerImportPlanner` for preview summaries and disabled-by-default confirmed bundles with JVM coverage.
+
 ## v0.2.57 - 2026-05-05
 
 Calendar and sun device smoke evidence.
