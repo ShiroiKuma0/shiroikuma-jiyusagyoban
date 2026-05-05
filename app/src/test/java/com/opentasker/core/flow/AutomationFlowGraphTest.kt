@@ -118,4 +118,31 @@ class AutomationFlowGraphTest {
         assertEquals("if %battery < 20", graph.incomingEdgeLabel("enter-task:20:action:0"))
         assertEquals("then", graph.incomingEdgeLabel("enter-task:20:action:1"))
     }
+
+    @Test
+    fun accessibilitySummaryIncludesLaneCountsAndConditionalNodeState() {
+        val enterTask = Task(
+            id = 21,
+            name = "Guarded task",
+            actions = listOf(ActionSpec(type = "notify.show", condition = "%armed = true")),
+        )
+        val profile = Profile(
+            id = 5,
+            name = "Armed profile",
+            contexts = listOf(ContextSpec(ContextType.STATE, mapOf("key" to "armed"))),
+            enterTaskId = enterTask.id,
+        )
+
+        val graph = AutomationFlowGraphBuilder.build(profile, listOf(enterTask))
+        val actionNode = graph.actionNodesFor("enter-task:21").single()
+
+        assertEquals(
+            "Armed profile: 1 context, 1 action, enter task Guarded task, exit task no exit task, no warnings.",
+            graph.accessibilitySummary(),
+        )
+        assertEquals(
+            "action. Step 1: notify.show. notify.show. condition if %armed = true",
+            actionNode.accessibilityLabel(),
+        )
+    }
 }
