@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.37 - 2026-05-05
+
+Persisted geofence dwell state.
+
+- Added profile/context-scoped Location dwell keys with config hashes so edited geofences do not reuse stale inside-since state.
+- Added a pure dwell-state tracker that preserves `insideSinceEpochMs` across accurate inside samples and clears it when a sample leaves the radius.
+- Persisted dwell state in app-local preferences so dwell timers can survive process restarts.
+- Wired ProfileMatcher to enrich Location context events with persisted dwell metadata before FOSS geofence evaluation.
+- Added regression coverage for first-entry persistence, dwell carry-forward, outside clearing, low-accuracy preservation, and stable key hashing.
+
 ## v0.2.36 - 2026-05-05
 
 Live FOSS location source baseline.
