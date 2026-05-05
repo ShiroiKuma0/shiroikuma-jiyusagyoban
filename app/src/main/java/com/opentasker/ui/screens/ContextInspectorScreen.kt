@@ -56,6 +56,7 @@ import com.opentasker.core.contexts.ContextSourceStatus
 import com.opentasker.core.contexts.ProfileInspection
 import com.opentasker.core.contexts.inspectProfiles
 import com.opentasker.core.contexts.toContextSourceLabel
+import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.permissions.UsageAccess
@@ -84,6 +85,7 @@ class ContextInspectorViewModel(
     private val latestEvents = MutableStateFlow<Map<String, ContextEventObservation>>(emptyMap())
     private val sourceErrors = MutableStateFlow<Map<String, String>>(emptyMap())
     private val refreshTick = MutableStateFlow(clock())
+    private val locationDwellStateStore = LocationDwellStateStore(appContext, clock)
 
     private val profiles: StateFlow<List<Profile>> = db.profileDao()
         .getAllAsFlow()
@@ -100,7 +102,13 @@ class ContextInspectorViewModel(
         ContextInspectionSnapshot(
             generatedAtMs = now,
             sources = sources,
-            profiles = inspectProfiles(profiles, sources),
+            profiles = inspectProfiles(profiles, sources) { profile, index, spec, observation ->
+                if (spec.type == ContextType.LOCATION) {
+                    observation.copy(event = locationDwellStateStore.enrich(profile.id, index, spec, observation.event))
+                } else {
+                    observation
+                }
+            },
         )
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyContextInspectionSnapshot(clock()))
@@ -392,6 +400,9 @@ private fun ContextCheckRow(
                 InspectorStatusPill(if (check.effectiveMatched) "Match" else "No match", color)
             }
             Text(check.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            locationDwellDetail(check, nowMs)?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             check.lastObservation?.let {
                 Text(
                     "Observed ${formatRelativeTime(it.observedAtMs, nowMs)}",
@@ -654,4 +665,45 @@ private fun formatRelativeTime(observedAtMs: Long, nowMs: Long): String {
 private fun formatAbsoluteTime(observedAtMs: Long, nowMs: Long): String {
     val formatted = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(observedAtMs))
     return "$formatted - ${formatRelativeTime(observedAtMs, nowMs)}"
+}
+
+private fun locationDwellDetail(check: com.opentasker.core.contexts.ContextCheck, nowMs: Long): String? {
+    if (check.spec.type != ContextType.LOCATION) return null
+    val observation = check.lastObservation ?: return null
+    val metadata = observation.event.metadata
+    val state = metadata["dwellState"] ?: return null
+    val dwellMillis = parseDwellMillis(check.spec.config)
+    val target = dwellMillis.takeIf { it > 0L }?.let { " of ${formatDuration(it)}" }.orEmpty()
+    val observedAt = metadata["observedAtEpochMs"]?.toLongOrNull() ?: observation.observedAtMs
+    val insideSince = metadata["insideSinceEpochMs"]?.toLongOrNull()
+    val insideFor = insideSince?.let { formatDuration((observedAt - it).coerceAtLeast(0L)) }
+
+    return when (state) {
+        "inside" -> insideFor?.let { "Dwell: inside for $it$target." } ?: "Dwell: inside; waiting for a stable entry time."
+        "accuracy_blocked" -> insideFor?.let {
+            "Dwell: latest fix is inside but blocked by accuracy; retained timer at $it$target."
+        } ?: "Dwell: latest fix is inside but blocked by accuracy."
+        "outside" -> "Dwell: outside radius; timer reset."
+        "unknown" -> "Dwell: waiting for valid geofence config and location metadata."
+        else -> null
+    }
+}
+
+private fun parseDwellMillis(config: Map<String, String>): Long {
+    val millis = firstConfig(config, "dwellMillis", "dwellMs").toLongOrNull()
+    if (millis != null) return millis.coerceAtLeast(0L)
+    val seconds = firstConfig(config, "dwellSeconds", "dwellSec").toLongOrNull()
+    return seconds?.coerceAtLeast(0L)?.times(1_000L) ?: 0L
+}
+
+private fun firstConfig(config: Map<String, String>, vararg keys: String): String =
+    keys.firstNotNullOfOrNull { config[it]?.trim()?.takeIf(String::isNotBlank) }.orEmpty()
+
+private fun formatDuration(ms: Long): String {
+    val seconds = (ms / 1000L).coerceAtLeast(0L)
+    return when {
+        seconds < 60 -> "${seconds}s"
+        seconds < 3_600 -> "${seconds / 60}m ${seconds % 60}s"
+        else -> "${seconds / 3_600}h ${(seconds % 3_600) / 60}m"
+    }
 }

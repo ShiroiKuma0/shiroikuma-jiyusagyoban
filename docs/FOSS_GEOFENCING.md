@@ -1,6 +1,6 @@
 # FOSS Geofencing Baseline
 
-OpenTasker v0.2.37 has a Play-services-free geofence path for Location contexts. It combines a platform `LocationManager` source with the pure evaluator added in v0.2.29 and persisted dwell state added in v0.2.37; it is still not a device-verified background geofence reliability claim.
+OpenTasker v0.2.38 has a Play-services-free geofence path for Location contexts. It combines a platform `LocationManager` source with the pure evaluator added in v0.2.29, persisted dwell state added in v0.2.37, and Context Inspector dwell detail added in v0.2.38; it is still not a device-verified background geofence reliability claim.
 
 ## Active Scope
 
@@ -13,6 +13,7 @@ OpenTasker v0.2.37 has a Play-services-free geofence path for Location contexts.
 - Uses a config hash in dwell-state keys so edited geofences do not reuse stale inside-since state.
 - Clears persisted dwell state when a valid sample leaves the radius.
 - Preserves previous inside-since state across low-accuracy samples that are inside the radius but blocked by max-accuracy policy.
+- Shows profile/context-specific dwell status in Context Inspector rows: inside elapsed time, outside reset, accuracy-blocked, or unknown.
 - Evaluates `latitude`, `longitude`, and `radiusMeters` Location context config.
 - Supports aliases: `lat`, `lon`, `lng`, and `radius`.
 - Supports optional `maxAccuracyMeters` or `maxAccuracy` config.
@@ -40,8 +41,8 @@ OpenTasker v0.2.37 has a Play-services-free geofence path for Location contexts.
 
 ## Next Work
 
-1. Surface geofence-specific dwell state in the Context Inspector.
-2. Tune provider cadence and battery behavior with device evidence.
-3. Expand setup/policy copy after real foreground/background verification.
-4. Add cleanup or migration for stale dwell keys if profile/context deletion starts leaving meaningful residue.
+1. Tune provider cadence and battery behavior with device evidence.
+2. Expand setup/policy copy after real foreground/background verification.
+3. Add cleanup or migration for stale dwell keys if profile/context deletion starts leaving meaningful residue.
+4. Add device-backed smoke coverage for foreground and background location behavior.
 5. Verify behavior on a device before making public geofence reliability claims.
