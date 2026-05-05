@@ -1106,6 +1106,11 @@ private fun RunLogScreenContent(logs: List<RunLogEntry>, contentPadding: Padding
         )
         return
     }
+    var statusFilter by remember { mutableStateOf(RunLogStatusFilter.All) }
+    var query by remember { mutableStateOf("") }
+    val filteredLogs = remember(logs, statusFilter, query) {
+        filterRunLogs(logs, RunLogFilterState(status = statusFilter, query = query))
+    }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1116,8 +1121,107 @@ private fun RunLogScreenContent(logs: List<RunLogEntry>, contentPadding: Padding
         item {
             RunLogSummaryCard(logs)
         }
-        items(logs, key = { it.id }) { entry ->
+        item {
+            RunLogFilterCard(
+                totalCount = logs.size,
+                visibleCount = filteredLogs.size,
+                statusFilter = statusFilter,
+                onStatusFilterChange = { statusFilter = it },
+                query = query,
+                onQueryChange = { query = it },
+            )
+        }
+        if (filteredLogs.isEmpty()) {
+            item {
+                InlineNotice(
+                    title = "No matching runs",
+                    body = "Adjust the status filter or search text to review more execution history.",
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+        items(filteredLogs, key = { it.id }) { entry ->
             RunLogCard(entry)
+        }
+    }
+}
+
+@Composable
+private fun RunLogFilterCard(
+    totalCount: Int,
+    visibleCount: Int,
+    statusFilter: RunLogStatusFilter,
+    onStatusFilterChange: (RunLogStatusFilter) -> Unit,
+    query: String,
+    onQueryChange: (String) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Find runs", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "$visibleCount of $totalCount shown",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (statusFilter != RunLogStatusFilter.All || query.isNotBlank()) {
+                    TextButton(
+                        onClick = {
+                            onStatusFilterChange(RunLogStatusFilter.All)
+                            onQueryChange("")
+                        },
+                    ) {
+                        Text("Clear")
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                RunLogStatusFilter.entries.forEach { filter ->
+                    OutlinedButton(
+                        onClick = { onStatusFilterChange(filter) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = if (statusFilter == filter) {
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
+                            } else {
+                                Color.Transparent
+                            },
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                        ),
+                        border = BorderStroke(
+                            1.dp,
+                            if (statusFilter == filter) {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.58f)
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)
+                            },
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 9.dp),
+                    ) {
+                        Text(filter.label, style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                label = { Text("Search task or message") },
+                placeholder = { Text("permission, WiFi, task name") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
