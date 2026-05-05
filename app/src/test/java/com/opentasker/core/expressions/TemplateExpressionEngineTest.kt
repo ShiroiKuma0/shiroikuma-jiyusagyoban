@@ -91,6 +91,17 @@ class TemplateExpressionEngineTest {
     }
 
     @Test
+    fun regexFunctionsAreExplicitlyUnsupported() {
+        val result = engine.expand(
+            template = "{{ title | regex:\"(Open).*\" }}",
+            scope = TemplateScope(task = mapOf("title" to "OpenTasker")),
+        )
+
+        assertEquals("{{ title | regex:\"(Open).*\" }}", result.value)
+        assertTrue(result.warnings.any { it.contains("Regex template function 'regex' is intentionally unsupported") })
+    }
+
+    @Test
     fun resolvedValueLimitPreventsExpansionAbuse() {
         val limitedEngine = TemplateExpressionEngine(
             TemplateExpressionLimits(maxResolvedValueLength = 8),

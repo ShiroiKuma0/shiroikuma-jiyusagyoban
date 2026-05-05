@@ -421,6 +421,10 @@ class TemplateExpressionEngine(
                     FunctionApplication(current.copy(value = joined, missing = false))
                 }
             }
+            "match", "matches", "regex", "replace" -> FunctionApplication(
+                current,
+                preserveReason = "Regex template function '$name' is intentionally unsupported.",
+            )
             else -> FunctionApplication(current, preserveReason = "Unknown template function '$name'.")
         }
     }

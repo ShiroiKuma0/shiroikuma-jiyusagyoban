@@ -1,6 +1,6 @@
 # Template Expressions
 
-OpenTasker v0.2.34 includes bounded template expression support for action arguments, action conditions, and per-expression run-log trace reporting.
+OpenTasker v0.2.35 includes bounded template expression support for action arguments, action conditions, per-expression run-log trace reporting, and explicit regex policy.
 
 The engine is implemented in `TemplateExpressionEngine` and evaluates `{{ ... }}` expressions against caller-provided task, event, global, and array scopes. `TaskRunner` applies legacy `%var` expansion first, then applies template expansion to action arguments and conditions. Argument expansion stores sanitized summaries, warnings, and per-argument expression traces in `ActionExecutionTrace`. Run-log diagnostics parse those summaries into structured fields so the UI can show expanded arguments, source scopes, expression values, and template warning counts separately from the action result message.
 
@@ -75,7 +75,7 @@ The baseline is intentionally small and fail-closed:
 
 - No user code execution.
 - No shell commands.
-- No regex functions in this template engine.
+- No regex functions in this template engine; `match`, `matches`, `regex`, and `replace` preserve the original token and emit warnings.
 - Unknown functions preserve the original `{{ ... }}` token and emit a warning.
 - Missing values expand to an empty string unless a `default` pipe is present.
 - Template length, expression length, expression count, function chain length, JSON depth, resolved value length, and final output length are bounded.
@@ -85,4 +85,4 @@ The baseline is intentionally small and fail-closed:
 
 Action arguments support template expansion at runtime. Run-log trace rows show sanitized expanded values only for arguments that used template expressions, redacting sensitive argument names such as `token`, `key`, `secret`, `cookie`, and `password`. Individual expression lines are persisted under each action trace and include the argument name, source scope, expression, resolved value, and optional warning.
 
-Conditions can use templates before the existing predicate evaluator, for example `{{ mode }} == on` or `{{ payload.status }} == ready`. Template warnings in conditions fail closed by skipping the action. Regex-specific template policy remains future L7 work.
+Conditions can use templates before the existing predicate evaluator, for example `{{ mode }} == on` or `{{ payload.status }} == ready`. Template warnings in conditions fail closed by skipping the action. Regex stays limited to the existing bounded `%var(regex:...)` operator path rather than the new template engine.
