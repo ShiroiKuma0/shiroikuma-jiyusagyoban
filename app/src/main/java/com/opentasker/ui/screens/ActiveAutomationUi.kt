@@ -78,6 +78,7 @@ import com.opentasker.core.actions.FieldType
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.contexts.DaySchedule
+import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.contexts.contextConfigSummary
 import com.opentasker.core.engine.ActionTraceStatus
 import com.opentasker.core.engine.RunLogActionDiagnostic
@@ -2308,10 +2309,17 @@ private fun ContextConfigDialog(
     var config by remember(state.existing, state.type) {
         mutableStateOf(defaultContextConfig(state.type) + (state.existing?.config ?: emptyMap()))
     }
+    var nfcWriteMessage by remember { mutableStateOf<String?>(null) }
     val fields = contextFields(state.type)
     val saveConfig = contextConfigForSave(state.type, config)
     val missingRequired = fields.any { it.required && config[it.key].isNullOrBlank() } ||
         (state.type == ContextType.DAY && saveConfig["days"].isNullOrBlank())
+
+    LaunchedEffect(Unit) {
+        NfcTagWriteSession.results.collect { result ->
+            nfcWriteMessage = result.message
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2360,6 +2368,17 @@ private fun ContextConfigDialog(
                             value = config[field.key].orEmpty(),
                             onChange = { value -> config = config + (field.key to value) },
                         )
+                    }
+                    if (state.type == ContextType.EVENT && config["event"].equals("nfc", ignoreCase = true)) {
+                        item("nfc-write-helper") {
+                            NfcWriteHelperCard(
+                                tagId = config["tagId"].orEmpty(),
+                                message = nfcWriteMessage,
+                                onArm = { label ->
+                                    nfcWriteMessage = NfcTagWriteSession.armTextRecord(label).message
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -2428,6 +2447,49 @@ private fun defaultContextConfig(type: ContextType): Map<String, String> = when 
     ContextType.DAY -> mapOf("days" to "MON,TUE,WED,THU,FRI")
     ContextType.LOCATION -> mapOf("radiusMeters" to "100")
     else -> emptyMap()
+}
+
+@Composable
+private fun NfcWriteHelperCard(
+    tagId: String,
+    message: String?,
+    onArm: (String) -> Unit,
+) {
+    val label = if (tagId.isBlank()) {
+        "OpenTasker NFC trigger"
+    } else {
+        "OpenTasker NFC trigger $tagId"
+    }
+
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.32f),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("NFC write helper", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        "Arms a one-time NDEF text write for the next scanned tag.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                OutlinedButton(onClick = { onArm(label) }) {
+                    Text("Arm")
+                }
+            }
+            message?.takeIf { it.isNotBlank() }?.let { value ->
+                Text(value, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
 }
 
 private fun automationModeDescription(mode: AutomationMode): String = when (mode) {
