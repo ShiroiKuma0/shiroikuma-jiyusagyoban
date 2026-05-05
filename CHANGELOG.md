@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.33 - 2026-05-05
+
+Per-expression template diagnostics.
+
+- Persisted bounded per-expression template trace lines beneath action trace summaries.
+- Parsed template trace lines back into structured run-log diagnostics with argument name, source scope, expression, value, and optional warning.
+- Rendered individual template expressions in Run Log trace rows, including source scope and redacted values for sensitive arguments.
+- Added regression coverage for persisted template trace lines, sensitive expression redaction, and structured parsing.
+
 ## v0.2.32 - 2026-05-05
 
 Template run-log diagnostics.
