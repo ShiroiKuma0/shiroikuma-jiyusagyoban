@@ -1,8 +1,10 @@
 package com.opentasker.automation.app
 
+import android.annotation.SuppressLint
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import com.opentasker.automation.core.AutomationEngine
 import com.opentasker.automation.model.AutomationEvent
@@ -97,9 +99,10 @@ class AppUsageMonitor(
         private const val LOOKBACK_WINDOW_MS = 10_000L
 
         @Suppress("DEPRECATION")
+        @SuppressLint("InlinedApi")
         private fun isForegroundEvent(eventType: Int): Boolean =
-            eventType == UsageEvents.Event.ACTIVITY_RESUMED ||
-                eventType == UsageEvents.Event.MOVE_TO_FOREGROUND
+            eventType == UsageEvents.Event.MOVE_TO_FOREGROUND ||
+                (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && eventType == UsageEvents.Event.ACTIVITY_RESUMED)
 
         internal fun selectLatestForegroundPackage(events: List<ForegroundUsageEvent>): String? =
             events

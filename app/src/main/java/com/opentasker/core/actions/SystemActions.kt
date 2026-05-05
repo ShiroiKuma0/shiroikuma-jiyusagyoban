@@ -32,12 +32,7 @@ class VibrateAction : Action {
                 ctx.app.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
             } ?: return ActionResult.Failure("vibrator not available")
 
-            if (Build.VERSION.SDK_INT >= 26) {
-                vibrator.vibrate(VibrationEffect.createOneShot(millis, VibrationEffect.DEFAULT_AMPLITUDE))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(millis)
-            }
+            vibrator.vibrate(VibrationEffect.createOneShot(millis, VibrationEffect.DEFAULT_AMPLITUDE))
             ctx.logger("Vibrate ${millis}ms")
             ActionResult.Success
         } catch (e: Exception) {
