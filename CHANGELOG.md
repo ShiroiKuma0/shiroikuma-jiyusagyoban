@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.53 - 2026-05-05
+
+Locale request-query event handling.
+
+- Added a foreground-runtime listener for Locale `ACTION_REQUEST_QUERY` broadcasts from condition plugins.
+- Emits sanitized `event=locale_request_query` context events with the requested condition activity class and deterministic bundle JSON.
+- Rejects blank or malformed activity class names and reuses primitive-only bundle sanitization for request-query payloads.
+- Added package visibility for `REQUEST_QUERY` and JVM coverage for request-query event construction.
+
 ## v0.2.52 - 2026-05-05
 
 Locale plugin configuration result handling.

@@ -62,6 +62,9 @@
         <intent>
             <action android:name="com.twofortyfouram.locale.intent.action.QUERY_CONDITION" />
         </intent>
+        <intent>
+            <action android:name="com.twofortyfouram.locale.intent.action.REQUEST_QUERY" />
+        </intent>
     </queries>
 
     <application

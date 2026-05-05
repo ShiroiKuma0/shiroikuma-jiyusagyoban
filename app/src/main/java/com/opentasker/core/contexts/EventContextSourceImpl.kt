@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import androidx.core.content.ContextCompat
+import com.opentasker.core.plugins.locale.LocalePluginRequestQueryEvents
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.merge
  *   - "calendar": local CalendarProvider event windows (requires READ_CALENDAR)
  *   - "sun_tick": local minute tick used by sunrise/sunset event filters
  *   - "nfc": NFC tag scan
+ *   - "locale_request_query": Locale condition plugin requested a host query
  *   - "boot_completed": device boot
  *   - "intent": arbitrary intent action (configurable)
  */
@@ -30,6 +32,7 @@ class EventContextSourceImpl : ContextSource {
         NotificationContextEvents.events,
         NfcContextEvents.events,
         CalendarSunContextEvents.events(app),
+        LocalePluginRequestQueryEvents.events(app),
     )
 
     private fun systemBroadcastEvents(app: Context): Flow<ContextEvent> = callbackFlow {
