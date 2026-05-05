@@ -179,6 +179,40 @@ object ProfileTemplateCatalog {
             ),
         ),
         ProfileTemplate(
+            id = "location-evidence-log",
+            title = "Location evidence log",
+            summary = "Log when the device enters a configured test radius for Location verification.",
+            category = "Location",
+            availability = TemplateAvailability.RequiresSetup,
+            safetyNote = "Creates a disabled profile. Requires foreground/background location permissions and device Location before enabling.",
+            slots = listOf(
+                TemplateSlot("latitude", "Latitude", "40.7580", hint = "Decimal degrees"),
+                TemplateSlot("longitude", "Longitude", "-73.9855", hint = "Decimal degrees"),
+                TemplateSlot("radiusMeters", "Radius meters", "150", hint = "Meters"),
+                TemplateSlot("maxAccuracyMeters", "Max accuracy meters", "100", hint = "Meters"),
+                TemplateSlot("dwellSeconds", "Dwell seconds", "0", hint = "0 disables dwell"),
+            ),
+            contexts = listOf(
+                TemplateContext(
+                    ContextType.LOCATION,
+                    mapOf(
+                        "latitude" to "{latitude}",
+                        "longitude" to "{longitude}",
+                        "radiusMeters" to "{radiusMeters}",
+                        "maxAccuracyMeters" to "{maxAccuracyMeters}",
+                        "dwellSeconds" to "{dwellSeconds}",
+                    ),
+                ),
+            ),
+            actions = listOf(
+                TemplateAction(
+                    "log",
+                    "Log location evidence",
+                    mapOf("message" to "Location evidence matched {latitude},{longitude} within {radiusMeters}m"),
+                ),
+            ),
+        ),
+        ProfileTemplate(
             id = "app-usage-reminder",
             title = "App usage reminder",
             summary = "Wait after an app opens, then show a reminder notification.",
