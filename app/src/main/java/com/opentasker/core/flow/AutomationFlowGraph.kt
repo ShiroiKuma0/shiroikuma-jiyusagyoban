@@ -41,6 +41,7 @@ data class AutomationFlowNode(
     val title: String,
     val detail: String? = null,
     val muted: Boolean = false,
+    val target: AutomationFlowTarget? = null,
 )
 
 enum class AutomationFlowNodeKind {
@@ -50,6 +51,13 @@ enum class AutomationFlowNodeKind {
     EXIT_TASK,
     ACTION,
     MISSING,
+}
+
+sealed interface AutomationFlowTarget {
+    data class Profile(val profileId: Long) : AutomationFlowTarget
+    data class Context(val profileId: Long, val index: Int) : AutomationFlowTarget
+    data class Task(val taskId: Long) : AutomationFlowTarget
+    data class Action(val taskId: Long, val index: Int) : AutomationFlowTarget
 }
 
 data class AutomationFlowEdge(
@@ -78,6 +86,7 @@ object AutomationFlowGraphBuilder {
                 "Cooldown ${profile.cooldownSec}s",
             ).joinToString(" - "),
             muted = !profile.enabled,
+            target = AutomationFlowTarget.Profile(profile.id),
         )
 
         if (profile.contexts.isEmpty()) {
@@ -86,7 +95,7 @@ object AutomationFlowGraphBuilder {
 
         profile.contexts.forEachIndexed { index, context ->
             val contextNodeId = "profile:${profile.id}:context:$index"
-            nodes += context.toNode(contextNodeId, index)
+            nodes += context.toNode(contextNodeId, profile.id, index)
             edges += AutomationFlowEdge(
                 fromId = contextNodeId,
                 toId = profileNodeId,
@@ -99,6 +108,7 @@ object AutomationFlowGraphBuilder {
             edges = edges,
             warnings = warnings,
             sourceNodeId = profileNodeId,
+            profileId = profile.id,
             profileName = profile.name,
             taskId = profile.enterTaskId,
             task = tasksById[profile.enterTaskId],
@@ -116,6 +126,7 @@ object AutomationFlowGraphBuilder {
                 edges = edges,
                 warnings = warnings,
                 sourceNodeId = profileNodeId,
+                profileId = profile.id,
                 profileName = profile.name,
                 taskId = exitTaskId,
                 task = tasksById[exitTaskId],
@@ -141,6 +152,7 @@ object AutomationFlowGraphBuilder {
         edges: MutableList<AutomationFlowEdge>,
         warnings: MutableList<String>,
         sourceNodeId: String,
+        profileId: Long,
         profileName: String,
         taskId: Long,
         task: Task?,
@@ -155,6 +167,7 @@ object AutomationFlowGraphBuilder {
                 title = "Missing ${edgeLabel} task",
                 detail = "Task id $taskId is referenced by $profileName",
                 muted = true,
+                target = AutomationFlowTarget.Profile(profileId),
             )
             edges += AutomationFlowEdge(sourceNodeId, taskNodeId, edgeLabel)
             return null
@@ -165,6 +178,7 @@ object AutomationFlowGraphBuilder {
             kind = kind,
             title = task.name,
             detail = "${task.actions.size} action${plural(task.actions.size)} - priority ${task.priority}",
+            target = AutomationFlowTarget.Task(taskId),
         )
         edges += AutomationFlowEdge(sourceNodeId, taskNodeId, edgeLabel)
 
@@ -175,7 +189,7 @@ object AutomationFlowGraphBuilder {
         var previousNodeId = taskNodeId
         task.actions.forEachIndexed { index, action ->
             val actionNodeId = "$taskNodeId:action:$index"
-            nodes += action.toNode(actionNodeId, index)
+            nodes += action.toNode(actionNodeId, taskId, index)
             edges += AutomationFlowEdge(
                 fromId = previousNodeId,
                 toId = actionNodeId,
@@ -187,7 +201,7 @@ object AutomationFlowGraphBuilder {
     }
 }
 
-private fun ContextSpec.toNode(id: String, index: Int): AutomationFlowNode =
+private fun ContextSpec.toNode(id: String, profileId: Long, index: Int): AutomationFlowNode =
     AutomationFlowNode(
         id = id,
         kind = AutomationFlowNodeKind.CONTEXT,
@@ -197,9 +211,10 @@ private fun ContextSpec.toNode(id: String, index: Int): AutomationFlowNode =
             config.summaryOrNull(),
         ).joinToString(" - ").ifBlank { "No parameters" },
         muted = invert,
+        target = AutomationFlowTarget.Context(profileId, index),
     )
 
-private fun ActionSpec.toNode(id: String, index: Int): AutomationFlowNode =
+private fun ActionSpec.toNode(id: String, taskId: Long, index: Int): AutomationFlowNode =
     AutomationFlowNode(
         id = id,
         kind = AutomationFlowNodeKind.ACTION,
@@ -210,6 +225,7 @@ private fun ActionSpec.toNode(id: String, index: Int): AutomationFlowNode =
             condition?.takeUnless { it.isBlank() }?.let { "if $it" },
             if (continueOnError) "continues after error" else null,
         ).joinToString(" - "),
+        target = AutomationFlowTarget.Action(taskId, index),
     )
 
 private fun Map<String, String>.summaryOrNull(limit: Int = 3): String? {

@@ -1,6 +1,7 @@
 package com.opentasker.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +35,7 @@ import com.opentasker.core.flow.AutomationFlowGraph
 import com.opentasker.core.flow.AutomationFlowGraphBuilder
 import com.opentasker.core.flow.AutomationFlowNode
 import com.opentasker.core.flow.AutomationFlowNodeKind
+import com.opentasker.core.flow.AutomationFlowTarget
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 
@@ -42,6 +44,7 @@ fun AutomationFlowScreen(
     profiles: List<Profile>,
     tasks: List<Task>,
     contentPadding: PaddingValues,
+    onNodeTargetSelected: (AutomationFlowTarget) -> Unit = {},
 ) {
     val graphs = remember(profiles, tasks) {
         val tasksById = tasks.associateBy { it.id }
@@ -68,7 +71,7 @@ fun AutomationFlowScreen(
             )
         }
         items(graphs, key = { it.profileId }) { graph ->
-            FlowGraphCard(graph)
+            FlowGraphCard(graph = graph, onNodeTargetSelected = onNodeTargetSelected)
         }
     }
 }
@@ -137,7 +140,10 @@ private fun FlowOverviewCard(
 }
 
 @Composable
-private fun FlowGraphCard(graph: AutomationFlowGraph) {
+private fun FlowGraphCard(
+    graph: AutomationFlowGraph,
+    onNodeTargetSelected: (AutomationFlowTarget) -> Unit,
+) {
     val profileNode = graph.nodes.first { it.kind == AutomationFlowNodeKind.PROFILE }
 
     Card(
@@ -165,20 +171,24 @@ private fun FlowGraphCard(graph: AutomationFlowGraph) {
             if (graph.contextNodes.isNotEmpty()) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     items(graph.contextNodes, key = { it.id }) { node ->
-                        FlowNodeView(node = node, modifier = Modifier.widthIn(min = 220.dp, max = 280.dp))
+                        FlowNodeView(
+                            node = node,
+                            onNodeTargetSelected = onNodeTargetSelected,
+                            modifier = Modifier.widthIn(min = 220.dp, max = 280.dp),
+                        )
                     }
                 }
                 FlowEdgeLabel("all context rules")
             }
 
-            FlowNodeView(profileNode)
-            FlowTaskLane(graph, graph.enterTaskNode, "enter")
-            FlowTaskLane(graph, graph.exitTaskNode, "exit")
+            FlowNodeView(profileNode, onNodeTargetSelected)
+            FlowTaskLane(graph, graph.enterTaskNode, "enter", onNodeTargetSelected)
+            FlowTaskLane(graph, graph.exitTaskNode, "exit", onNodeTargetSelected)
 
             val missingNodes = graph.nodes.filter { it.kind == AutomationFlowNodeKind.MISSING }
             missingNodes.forEach { missingNode ->
                 FlowEdgeLabel("missing reference")
-                FlowNodeView(missingNode)
+                FlowNodeView(missingNode, onNodeTargetSelected)
             }
 
             if (graph.warnings.isNotEmpty()) {
@@ -202,25 +212,36 @@ private fun FlowTaskLane(
     graph: AutomationFlowGraph,
     taskNode: AutomationFlowNode?,
     label: String,
+    onNodeTargetSelected: (AutomationFlowTarget) -> Unit,
 ) {
     if (taskNode == null) return
     Spacer(Modifier.height(2.dp))
     FlowEdgeLabel(label)
-    FlowNodeView(taskNode)
+    FlowNodeView(taskNode, onNodeTargetSelected)
     graph.actionNodesFor(taskNode.id).forEachIndexed { index, actionNode ->
         FlowEdgeLabel(if (index == 0) "step ${index + 1}" else "then")
-        FlowNodeView(actionNode)
+        FlowNodeView(actionNode, onNodeTargetSelected)
     }
 }
 
 @Composable
 private fun FlowNodeView(
     node: AutomationFlowNode,
+    onNodeTargetSelected: (AutomationFlowTarget) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val color = nodeColor(node.kind, node.muted)
+    val target = node.target
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (target != null) {
+                    Modifier.clickable { onNodeTargetSelected(target) }
+                } else {
+                    Modifier
+                }
+            ),
         color = color.copy(alpha = if (node.muted) 0.08f else 0.12f),
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, color.copy(alpha = if (node.muted) 0.22f else 0.34f)),
