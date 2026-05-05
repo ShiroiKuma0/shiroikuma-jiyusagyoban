@@ -50,6 +50,17 @@ data class LocalePluginResult(
     val message: String,
 )
 
+data class LocalePluginEditIntentResult(
+    val success: Boolean,
+    val intent: Intent? = null,
+    val message: String,
+)
+
+data class LocalePluginConfigurationResult(
+    val bundleJson: String,
+    val blurb: String,
+)
+
 enum class LocalePluginConditionState(val resultCode: Int, val serializedName: String) {
     Satisfied(LocalePluginContract.RESULT_CONDITION_SATISFIED, "satisfied"),
     Unsatisfied(LocalePluginContract.RESULT_CONDITION_UNSATISFIED, "unsatisfied"),
@@ -106,6 +117,37 @@ object LocalePluginBundleCodec {
             putString(key, value)
         }
     }
+
+    fun encodeStringBundle(values: Map<String, String>): String {
+        val obj = JsonObject(
+            values.toSortedMap().mapValues { (_, value) -> JsonPrimitive(value) }
+        )
+        return obj.toString()
+    }
+
+    @Suppress("DEPRECATION")
+    fun fromBundle(bundle: Bundle): Map<String, String> =
+        sanitizeBundleValues(
+            bundle.keySet().associateWith { key -> bundle.get(key) }
+        )
+
+    fun sanitizeBundleValues(values: Map<String, Any?>): Map<String, String> =
+        values.entries.associate { (key, value) ->
+            require(key.isNotBlank()) { "Plugin bundle keys must not be blank." }
+            val stringValue = when (value) {
+                is String -> value
+                is Boolean -> value.toString()
+                is Byte -> value.toString()
+                is Short -> value.toString()
+                is Int -> value.toString()
+                is Long -> value.toString()
+                is Float -> value.toString()
+                is Double -> value.toString()
+                null -> error("Plugin bundle values must not be null.")
+                else -> error("Plugin bundle values must be primitive strings, numbers, or booleans.")
+            }
+            key to stringValue
+        }
 }
 
 object LocalePluginConditionResultParser {
@@ -129,6 +171,20 @@ object LocalePluginConditionResultParser {
                     }
                 }
             },
+        )
+    }
+}
+
+object LocalePluginConfigurationResultParser {
+    fun parse(resultCode: Int, data: Intent?): LocalePluginConfigurationResult {
+        require(resultCode == Activity.RESULT_OK) { "Locale plugin configuration was canceled." }
+        val resultIntent = requireNotNull(data) { "Locale plugin configuration returned no result intent." }
+        val bundle = resultIntent.getBundleExtra(LocalePluginContract.EXTRA_BUNDLE)
+            ?: error("Locale plugin configuration returned no bundle.")
+        val values = LocalePluginBundleCodec.fromBundle(bundle)
+        return LocalePluginConfigurationResult(
+            bundleJson = LocalePluginBundleCodec.encodeStringBundle(values),
+            blurb = resultIntent.getStringExtra(LocalePluginContract.EXTRA_BLURB).orEmpty().take(120),
         )
     }
 }
@@ -189,6 +245,12 @@ class LocalePluginHost(
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val conditionStateCache: LocalePluginConditionStateCache = LocalePluginConditionStateCache.Shared,
 ) {
+    fun buildEditSettingIntent(packageName: String): LocalePluginEditIntentResult =
+        buildEditIntent(packageName, LocalePluginContract.ACTION_EDIT_SETTING, "setting")
+
+    fun buildEditConditionIntent(packageName: String): LocalePluginEditIntentResult =
+        buildEditIntent(packageName, LocalePluginContract.ACTION_EDIT_CONDITION, "condition")
+
     suspend fun fireSetting(request: LocalePluginRequest): LocalePluginResult {
         LocalePluginBundleCodec.validatePackageName(request.packageName)
         require(request.timeoutMs in 1_000..30_000) { "Plugin timeout must be between 1000 and 30000 ms." }
@@ -298,6 +360,33 @@ class LocalePluginHost(
             )
         }
     }
+
+    private fun buildEditIntent(
+        packageName: String,
+        action: String,
+        label: String,
+    ): LocalePluginEditIntentResult {
+        LocalePluginBundleCodec.validatePackageName(packageName)
+        val activities = queryEditActivities(appContext.packageManager, packageName, action)
+        return when (activities.size) {
+            0 -> LocalePluginEditIntentResult(
+                success = false,
+                message = "No Locale $label configuration activity found for $packageName.",
+            )
+            1 -> {
+                val component = activities.single()
+                LocalePluginEditIntentResult(
+                    success = true,
+                    intent = Intent(action).setComponent(component),
+                    message = "Resolved Locale $label configuration activity ${component.flattenToShortString()}.",
+                )
+            }
+            else -> LocalePluginEditIntentResult(
+                success = false,
+                message = "Multiple Locale $label configuration activities found for $packageName; refusing ambiguous plugin configuration.",
+            )
+        }
+    }
 }
 
 class LocalePluginDiscovery(private val appContext: Context) {
@@ -369,6 +458,19 @@ private fun queryBroadcastReceivers(
             )
         }
         .sortedBy { it.component.className }
+
+private fun queryEditActivities(
+    pm: PackageManager,
+    packageName: String,
+    action: String,
+): List<ComponentName> =
+    pm.queryIntentActivities(Intent(action).setPackage(packageName), PackageManager.MATCH_DEFAULT_ONLY)
+        .mapNotNull { resolveInfo ->
+            val activityInfo = resolveInfo.activityInfo ?: return@mapNotNull null
+            if (activityInfo.packageName != packageName) return@mapNotNull null
+            ComponentName(packageName, activityInfo.name.toClassName(packageName))
+        }
+        .sortedBy { it.className }
 
 private fun String.toClassName(packageName: String): String = when {
     startsWith(".") -> packageName + this

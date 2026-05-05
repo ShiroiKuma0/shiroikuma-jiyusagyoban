@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.52 - 2026-05-05
+
+Locale plugin configuration result handling.
+
+- Added explicit edit-setting and edit-condition intent resolution for Locale-compatible plugin configuration activities.
+- Fails closed when a plugin package exposes no matching configuration activity or multiple ambiguous activities.
+- Added guarded configuration result parsing that accepts only primitive bundle values and emits deterministic JSON plus bounded blurb text.
+- Reused the same string-only bundle safety policy for plugin-returned configuration data, rejecting null, nested, parcelable, and arbitrary object values.
+- Added JVM coverage for deterministic bundle JSON encoding and primitive-only configuration result sanitization.
+
 ## v0.2.51 - 2026-05-05
 
 Locale condition unknown-state handling.
