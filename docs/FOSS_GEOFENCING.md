@@ -1,6 +1,6 @@
 # FOSS Geofencing Baseline
 
-OpenTasker v0.2.43 has a Play-services-free geofence path for Location contexts. It combines a platform `LocationManager` source with the pure evaluator added in v0.2.29, persisted dwell state added in v0.2.37, Context Inspector dwell detail added in v0.2.38, stale dwell-key cleanup added in v0.2.39, balanced provider cadence added in v0.2.40, shared Android location policy disclosures added in v0.2.41, app-launch foreground-service startup repaired in v0.2.42, and the adb-backed device evidence harness added in v0.2.43; it is still not a device-verified background geofence reliability claim.
+OpenTasker v0.2.44 has a Play-services-free geofence path for Location contexts. It combines a platform `LocationManager` source with the pure evaluator added in v0.2.29, persisted dwell state added in v0.2.37, Context Inspector dwell detail added in v0.2.38, stale dwell-key cleanup added in v0.2.39, balanced provider cadence added in v0.2.40, shared Android location policy disclosures added in v0.2.41, app-launch foreground-service startup repaired in v0.2.42, the adb-backed device evidence harness added in v0.2.43, and a setup-required disabled Location evidence template added in v0.2.44; it is still not a device-verified background geofence reliability claim.
 
 ## Active Scope
 
@@ -8,6 +8,7 @@ OpenTasker v0.2.43 has a Play-services-free geofence path for Location contexts.
 - Registers `LocationContextSourceImpl` as the runtime `location` source.
 - Starts the foreground automation service from app launch and boot.
 - API 36 device smoke confirmed app launch starts the service foreground with `specialUse|location` when foreground/background location permissions and device location are enabled.
+- Includes a disabled-by-default `Location evidence log` template with latitude, longitude, radius, max-accuracy, dwell, and log-action defaults for later event-delivery smoke tests.
 - `tools/collect-location-evidence.ps1` collects repeatable adb evidence for Location/geofence verification, including permission state, foreground-service type, app-to-home service persistence, logcat tail, location dumps, battery dumps, and batterystats snapshots.
 - A 10-second API 36 harness run with the app sent home kept `AutomationService` foreground with `specialUse|location` and captured battery before/after snapshots; the short USB-powered sample is evidence that the harness works, not a battery optimization claim.
 - Uses Android framework GPS and network providers instead of Google Play Services.
@@ -55,10 +56,10 @@ Run the adb evidence collector from the repo root after installing the APK on a 
 .\tools\collect-location-evidence.ps1 -SampleSeconds 600 -GrantLocationPermissions -SendHomeDuringSample
 ```
 
-The script writes timestamped output under ignored `build/device-evidence/location/`. Use longer unplugged samples for battery work; short USB-powered samples only prove the harness and foreground-service state checks are functioning.
+For actual Location event-delivery verification, install the `Location evidence log` template, adjust the coordinates/radius to the test site, grant foreground/background location prerequisites, enable the created profile, then run the collector while the service is backgrounded. The script writes timestamped output under ignored `build/device-evidence/location/`. Use longer unplugged samples for battery work; short USB-powered samples only prove the harness and foreground-service state checks are functioning.
 
 ## Next Work
 
-1. Run longer unplugged provider-cadence and battery samples with `tools/collect-location-evidence.ps1`.
-2. Extend device-backed smoke coverage from foreground-service persistence to actual background Location event delivery.
+1. Install, configure, and enable the `Location evidence log` template on a device, then extend smoke coverage from foreground-service persistence to actual background Location event delivery.
+2. Run longer unplugged provider-cadence and battery samples with `tools/collect-location-evidence.ps1`.
 3. Verify behavior on a device before making public geofence reliability claims.
