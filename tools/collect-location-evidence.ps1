@@ -8,7 +8,9 @@ param(
     [switch]$SendHomeDuringSample,
     [switch]$SkipLaunch,
     [string]$RequireRunLogMessagePattern,
-    [string]$RequireLogcatPattern
+    [string]$RequireLogcatPattern,
+    [switch]$RequireProviderCadenceEvidence,
+    [switch]$RequireUnpluggedSample
 )
 
 Set-StrictMode -Version Latest
@@ -136,17 +138,194 @@ function Get-ShellText {
     return $result.StdOut
 }
 
+function Get-DumpField {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Text,
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    $match = [regex]::Match($Text, "(?m)^\s*$([regex]::Escape($Name)):\s*(.+)$")
+    if ($match.Success) {
+        return $match.Groups[1].Value.Trim()
+    }
+    return $null
+}
+
+function ConvertTo-NullableInt {
+    param([object]$Value)
+
+    if ($null -eq $Value) {
+        return $null
+    }
+
+    $parsed = 0
+    if ([int]::TryParse(([string]$Value).Trim(), [ref]$parsed)) {
+        return $parsed
+    }
+    return $null
+}
+
+function ConvertTo-NullableLong {
+    param([object]$Value)
+
+    if ($null -eq $Value) {
+        return $null
+    }
+
+    $parsed = 0L
+    if ([long]::TryParse(([string]$Value).Trim(), [ref]$parsed)) {
+        return $parsed
+    }
+    return $null
+}
+
+function ConvertTo-NullableBool {
+    param([object]$Value)
+
+    if ($null -eq $Value) {
+        return $null
+    }
+
+    switch (([string]$Value).Trim().ToLowerInvariant()) {
+        "true" { return $true }
+        "false" { return $false }
+        default { return $null }
+    }
+}
+
+function Convert-BatteryStatusName {
+    param([object]$Status)
+
+    switch ([string]$Status) {
+        "1" { return "unknown" }
+        "2" { return "charging" }
+        "3" { return "discharging" }
+        "4" { return "not_charging" }
+        "5" { return "full" }
+        default {
+            if ($null -eq $Status) {
+                return $null
+            }
+            return [string]$Status
+        }
+    }
+}
+
+function Get-MapValue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Map,
+        [Parameter(Mandatory = $true)]
+        [string]$Key
+    )
+
+    if ($Map -is [System.Collections.IDictionary] -and $Map.Contains($Key)) {
+        return $Map[$Key]
+    }
+    if ($Map.PSObject.Properties.Name -contains $Key) {
+        return $Map.$Key
+    }
+    return $null
+}
+
 function Parse-BatteryDump {
     param([string]$Text)
 
     $fields = [ordered]@{}
     foreach ($name in @("level", "scale", "status", "health", "plugged", "temperature", "voltage")) {
-        $match = [regex]::Match($Text, "(?m)^\s*$([regex]::Escape($name)):\s*(.+)$")
-        if ($match.Success) {
-            $fields[$name] = $match.Groups[1].Value.Trim()
+        $value = Get-DumpField -Text $Text -Name $name
+        if ($null -ne $value) {
+            $fields[$name] = $value
         }
     }
+
+    $acPowered = ConvertTo-NullableBool (Get-DumpField -Text $Text -Name "AC powered")
+    $usbPowered = ConvertTo-NullableBool (Get-DumpField -Text $Text -Name "USB powered")
+    $wirelessPowered = ConvertTo-NullableBool (Get-DumpField -Text $Text -Name "Wireless powered")
+    $dockPowered = ConvertTo-NullableBool (Get-DumpField -Text $Text -Name "Dock powered")
+    $pluggedCode = ConvertTo-NullableInt (Get-MapValue -Map $fields -Key "plugged")
+    $plugTypeSummary = ConvertTo-NullableInt (Get-DumpField -Text $Text -Name "mSecPlugTypeSummary")
+    $levelPercent = ConvertTo-NullableInt (Get-MapValue -Map $fields -Key "level")
+    $scale = ConvertTo-NullableInt (Get-MapValue -Map $fields -Key "scale")
+    $temperatureTenthsC = ConvertTo-NullableInt (Get-MapValue -Map $fields -Key "temperature")
+    $voltageMv = ConvertTo-NullableInt (Get-MapValue -Map $fields -Key "voltage")
+    $chargeCounterMicroampHours = ConvertTo-NullableLong (Get-DumpField -Text $Text -Name "Charge counter")
+    if ($null -eq $chargeCounterMicroampHours) {
+        $chargeCounterMicroampHours = ConvertTo-NullableLong (Get-DumpField -Text $Text -Name "charge counter")
+    }
+    $currentNowMicroamps = ConvertTo-NullableLong (Get-DumpField -Text $Text -Name "current now")
+
+    $isPlugged = @($acPowered, $usbPowered, $wirelessPowered, $dockPowered) -contains $true
+    if (-not $isPlugged -and $null -ne $pluggedCode) {
+        $isPlugged = $pluggedCode -ne 0
+    }
+    if (-not $isPlugged -and $null -ne $plugTypeSummary) {
+        $isPlugged = $plugTypeSummary -ne 0
+    }
+
+    $statusName = Convert-BatteryStatusName (Get-MapValue -Map $fields -Key "status")
+    $fields["statusName"] = $statusName
+    $fields["levelPercent"] = $levelPercent
+    $fields["scaleNumeric"] = $scale
+    $fields["temperatureTenthsC"] = $temperatureTenthsC
+    $fields["voltageMv"] = $voltageMv
+    $fields["chargeCounterMicroampHours"] = $chargeCounterMicroampHours
+    $fields["currentNowMicroamps"] = $currentNowMicroamps
+    $fields["acPowered"] = $acPowered
+    $fields["usbPowered"] = $usbPowered
+    $fields["wirelessPowered"] = $wirelessPowered
+    $fields["dockPowered"] = $dockPowered
+    $fields["plugTypeSummary"] = $plugTypeSummary
+    $fields["isPlugged"] = [bool]$isPlugged
+    $fields["plugState"] = if ($isPlugged) { "plugged" } else { "unplugged" }
     return $fields
+}
+
+function Compare-BatterySamples {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Before,
+        [Parameter(Mandatory = $true)]
+        [object]$After,
+        [long]$BeforeEpochMs,
+        [long]$AfterEpochMs
+    )
+
+    $beforeLevel = Get-MapValue -Map $Before -Key "levelPercent"
+    $afterLevel = Get-MapValue -Map $After -Key "levelPercent"
+    $beforeCharge = Get-MapValue -Map $Before -Key "chargeCounterMicroampHours"
+    $afterCharge = Get-MapValue -Map $After -Key "chargeCounterMicroampHours"
+    $beforeVoltage = Get-MapValue -Map $Before -Key "voltageMv"
+    $afterVoltage = Get-MapValue -Map $After -Key "voltageMv"
+    $elapsedMs = $AfterEpochMs - $BeforeEpochMs
+
+    $levelDelta = $null
+    if ($null -ne $beforeLevel -and $null -ne $afterLevel) {
+        $levelDelta = [int]$afterLevel - [int]$beforeLevel
+    }
+
+    $chargeDelta = $null
+    if ($null -ne $beforeCharge -and $null -ne $afterCharge) {
+        $chargeDelta = [long]$afterCharge - [long]$beforeCharge
+    }
+
+    $voltageDelta = $null
+    if ($null -ne $beforeVoltage -and $null -ne $afterVoltage) {
+        $voltageDelta = [int]$afterVoltage - [int]$beforeVoltage
+    }
+
+    [ordered]@{
+        elapsedSeconds = [math]::Round($elapsedMs / 1000.0, 3)
+        levelDeltaPercent = $levelDelta
+        chargeCounterDeltaMicroampHours = $chargeDelta
+        voltageDeltaMv = $voltageDelta
+        beforePlugState = Get-MapValue -Map $Before -Key "plugState"
+        afterPlugState = Get-MapValue -Map $After -Key "plugState"
+        beforeStatus = Get-MapValue -Map $Before -Key "statusName"
+        afterStatus = Get-MapValue -Map $After -Key "statusName"
+    }
 }
 
 function Parse-ServiceState {
@@ -180,6 +359,42 @@ function Parse-PermissionGrant {
 
     $escaped = [regex]::Escape($Permission)
     return $PackageDump -match "${escaped}:\s+granted=true"
+}
+
+function Parse-OpenTaskerProviderCadenceEvidence {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Text,
+        [Parameter(Mandatory = $true)]
+        [string]$PackageName
+    )
+
+    $packagePattern = [regex]::Escape($PackageName)
+    $gpsRegistration = $Text -match "(?m)^\s+\d+/$packagePattern/[A-Fa-f0-9]+ Request\[@\+3m0s0ms.*minUpdateDistance=100\.0"
+    $networkRegistration = $Text -match "(?m)^\s+\d+/$packagePattern/[A-Fa-f0-9]+ Request\[@\+1m30s0ms.*minUpdateDistance=150\.0"
+    $gpsProviderRequest = $Text -match "(?m)^\s*service:\s+ProviderRequest\[@\+3m0s0ms.*WorkSource\{\d+ $packagePattern\}\]"
+    $networkProviderRequest = $Text -match "(?m)^\s*service:\s+ProviderRequest\[@\+1m30s0ms.*WorkSource\{\d+ $packagePattern\}\]"
+    $gpsHistorical = $Text -match "(?m)^\s+\d+/${packagePattern}:\s+min/max interval = 180s/180s"
+    $networkHistorical = $Text -match "(?m)^\s+\d+/${packagePattern}:\s+min/max interval = 90s/90s"
+
+    [ordered]@{
+        gps = [ordered]@{
+            expectedIntervalSeconds = 180
+            expectedDistanceMeters = 100
+            registrationFound = [bool]$gpsRegistration
+            providerRequestFound = [bool]$gpsProviderRequest
+            historicalAggregateFound = [bool]$gpsHistorical
+            evidenceFound = [bool]($gpsRegistration -or $gpsProviderRequest -or $gpsHistorical)
+        }
+        network = [ordered]@{
+            expectedIntervalSeconds = 90
+            expectedDistanceMeters = 150
+            registrationFound = [bool]$networkRegistration
+            providerRequestFound = [bool]$networkProviderRequest
+            historicalAggregateFound = [bool]$networkHistorical
+            evidenceFound = [bool]($networkRegistration -or $networkProviderRequest -or $networkHistorical)
+        }
+    }
 }
 
 function Copy-AppDatabaseSnapshot {
@@ -349,6 +564,7 @@ if ($GrantLocationPermissions) {
     }
 }
 
+$beforeBatteryCapturedAtEpochMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
 $beforeBattery = Get-ShellText -ShellArgs @("dumpsys", "battery") -AllowFailure
 $beforeStats = Get-ShellText -ShellArgs @("dumpsys", "batterystats", "--charged", $Package) -AllowFailure
 $beforePackage = Get-ShellText -ShellArgs @("dumpsys", "package", $Package) -AllowFailure
@@ -379,6 +595,7 @@ if ($SampleSeconds -gt 0) {
 }
 
 $serviceAfterSample = Get-ShellText -ShellArgs @("dumpsys", "activity", "services", $Package) -AllowFailure
+$afterBatteryCapturedAtEpochMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
 $afterBattery = Get-ShellText -ShellArgs @("dumpsys", "battery") -AllowFailure
 $afterStats = Get-ShellText -ShellArgs @("dumpsys", "batterystats", "--charged", $Package) -AllowFailure
 $afterLocation = Get-ShellText -ShellArgs @("dumpsys", "location") -AllowFailure
@@ -413,6 +630,15 @@ $permissions = [ordered]@{
     notifications = Parse-PermissionGrant -PackageDump $packageAfter -Permission "android.permission.POST_NOTIFICATIONS"
 }
 
+$batteryBeforeSummary = Parse-BatteryDump -Text $beforeBattery
+$batteryAfterSummary = Parse-BatteryDump -Text $afterBattery
+$batterySample = Compare-BatterySamples `
+    -Before $batteryBeforeSummary `
+    -After $batteryAfterSummary `
+    -BeforeEpochMs $beforeBatteryCapturedAtEpochMs `
+    -AfterEpochMs $afterBatteryCapturedAtEpochMs
+$providerCadence = Parse-OpenTaskerProviderCadenceEvidence -Text $afterLocation -PackageName $Package
+
 $summary = [ordered]@{
     collectedAt = (Get-Date).ToString("o")
     evidenceStartedAtEpochMs = $evidenceStartedAtEpochMs
@@ -433,8 +659,12 @@ $summary = [ordered]@{
     permissions = $permissions
     serviceAfterLaunch = Parse-ServiceState -Text $serviceAfterLaunch
     serviceAfterSample = Parse-ServiceState -Text $serviceAfterSample
-    batteryBefore = Parse-BatteryDump -Text $beforeBattery
-    batteryAfter = Parse-BatteryDump -Text $afterBattery
+    batteryBeforeCapturedAtEpochMs = $beforeBatteryCapturedAtEpochMs
+    batteryAfterCapturedAtEpochMs = $afterBatteryCapturedAtEpochMs
+    batteryBefore = $batteryBeforeSummary
+    batteryAfter = $batteryAfterSummary
+    batterySample = $batterySample
+    providerCadence = $providerCadence
     roomDatabase = [ordered]@{
         snapshot = $databaseSnapshot
         summary = $roomSummary
@@ -442,6 +672,8 @@ $summary = [ordered]@{
     requirements = [ordered]@{
         runLogMessagePattern = $RequireRunLogMessagePattern
         logcatPattern = $RequireLogcatPattern
+        providerCadenceEvidence = [bool]$RequireProviderCadenceEvidence
+        unpluggedSample = [bool]$RequireUnpluggedSample
     }
     evidenceFiles = @(
         "battery-before.txt",
@@ -474,6 +706,23 @@ if ($permissions.background -and (-not $launchState.hasLocationType -or -not $la
 if ($SendHomeDuringSample -and (-not $sampleState.automationServiceFound -or -not $sampleState.isForeground)) {
     throw "AutomationService was not foreground after home/background sample. Evidence: $script:OutputDir"
 }
+if ($RequireUnpluggedSample) {
+    $beforePlugged = Get-MapValue -Map $summary.batteryBefore -Key "isPlugged"
+    $afterPlugged = Get-MapValue -Map $summary.batteryAfter -Key "isPlugged"
+    if ($null -eq $beforePlugged -or $null -eq $afterPlugged) {
+        throw "Unplugged sample requirement could not be checked from dumpsys battery. Evidence: $script:OutputDir"
+    }
+    if ($beforePlugged -or $afterPlugged) {
+        throw "Unplugged sample required, but device was plugged before or after sample. Evidence: $script:OutputDir"
+    }
+}
+if ($RequireProviderCadenceEvidence) {
+    $gpsEvidence = Get-MapValue -Map (Get-MapValue -Map $summary.providerCadence -Key "gps") -Key "evidenceFound"
+    $networkEvidence = Get-MapValue -Map (Get-MapValue -Map $summary.providerCadence -Key "network") -Key "evidenceFound"
+    if (-not $gpsEvidence -or -not $networkEvidence) {
+        throw "Location provider cadence evidence did not include expected OpenTasker GPS and network registrations or historical aggregates. Evidence: $script:OutputDir"
+    }
+}
 if (-not [string]::IsNullOrWhiteSpace($RequireLogcatPattern) -and $logcat -notmatch $RequireLogcatPattern) {
     throw "Logcat did not contain required pattern '$RequireLogcatPattern'. Evidence: $script:OutputDir"
 }
@@ -492,6 +741,8 @@ if (-not [string]::IsNullOrWhiteSpace($RequireRunLogMessagePattern)) {
 Write-Host "Evidence written to $script:OutputDir"
 Write-Host "After launch: serviceFound=$($launchState.automationServiceFound) foreground=$($launchState.isForeground) type=$($launchState.typeHex)"
 Write-Host "After sample: serviceFound=$($sampleState.automationServiceFound) foreground=$($sampleState.isForeground) type=$($sampleState.typeHex)"
+Write-Host "Battery: before=$($summary.batteryBefore.levelPercent)% $($summary.batteryBefore.plugState) after=$($summary.batteryAfter.levelPercent)% $($summary.batteryAfter.plugState) delta=$($summary.batterySample.levelDeltaPercent)%"
+Write-Host "Provider cadence: gps=$($summary.providerCadence.gps.evidenceFound) network=$($summary.providerCadence.network.evidenceFound)"
 if ($roomSummary.available) {
     Write-Host "Room summary: profiles=$($roomSummary.counts.profiles) tasks=$($roomSummary.counts.tasks) runLogs=$($roomSummary.counts.run_logs)"
 } else {
