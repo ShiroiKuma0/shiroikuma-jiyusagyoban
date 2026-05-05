@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.21 - 2026-05-05
+
+Tasker XML import baseline.
+
+- Added a secure Tasker XML parser that converts common task/profile/variable structures into an OpenTasker JSON bundle.
+- Added a migration report model with mapped actions, unsupported Tasker action placeholders, skipped profile/context warnings, variable counts, and scene exclusions.
+- Added an explicit unsupported imported Tasker action runtime failure path and capability metadata.
+- Documented the supported import surface and updated roadmap/README/version metadata for X10.
+- Added regression tests for action mapping, unsupported action preservation, profile skipping, variable import, scene warnings, and Wait conversion.
+
 ## v0.2.20 - 2026-05-05
 
 Calendar and sun trigger baseline.

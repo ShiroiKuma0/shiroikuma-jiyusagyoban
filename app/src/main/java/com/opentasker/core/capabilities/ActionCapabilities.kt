@@ -35,6 +35,7 @@ object ActionCapabilityRegistry {
         "lock" to ActionCapability(CapabilityLevel.Unsupported, "Device lock requires configured device-admin support."),
         "screen.off" to ActionCapability(CapabilityLevel.Unsupported, "Screen-off requires privileged power management access."),
         "wake" to ActionCapability(CapabilityLevel.Unsupported, "Wake requires a foreground activity or privileged wake flow."),
+        "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported OpenTasker action."),
     )
 
     fun get(actionId: String): ActionCapability = capabilities[actionId] ?: supported
