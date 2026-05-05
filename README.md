@@ -1,13 +1,13 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.30-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.31-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.30** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, bounded template expressions, FOSS geofence evaluation, scene library management, read-only flow graphs, JSON bundles, profile sharing manifests, Tasker XML import planning, F-Droid build readiness, dependency version governance, optional Shizuku readiness, optional Termux script readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; runtime-wide expression wiring, elevated backends, script execution, and broader plugin UX are planned.
+**OpenTasker v0.2.31** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, runtime template argument expansion, FOSS geofence evaluation, scene library management, read-only flow graphs, JSON bundles, profile sharing manifests, Tasker XML import planning, F-Droid build readiness, dependency version governance, optional Shizuku readiness, optional Termux script readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; variable debugger UI, elevated backends, script execution, and broader plugin UX are planned.
 
-> **Status:** v0.2.30 adds a bounded `{{ ... }}` template expression engine with task/event/global scope precedence, explicit scope prefixes, arrays, JSON path reads, safe string/math functions, traces, and fail-closed limits. It keeps FOSS geofence evaluation, profile sharing manifests, Termux script readiness, Shizuku readiness, the Scenes tab, Flow tab, centralized dependency governance, F-Droid distribution profile, Tasker XML import planning, local calendar/sun triggers, NFC tag events, notification listener events, context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
+> **Status:** v0.2.31 wires bounded `{{ ... }}` template expansion into action arguments after legacy `%var` expansion and records sanitized expansion summaries, warnings, and trace metadata per action step. It keeps FOSS geofence evaluation, profile sharing manifests, Termux script readiness, Shizuku readiness, the Scenes tab, Flow tab, centralized dependency governance, F-Droid distribution profile, Tasker XML import planning, local calendar/sun triggers, NFC tag events, notification listener events, context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
 
 ---
 
@@ -16,7 +16,7 @@
 ✅ **Core engine operational** — profiles → contexts → tasks → actions pipeline  
 ✅ **42 registered action definitions** — supported actions run, restricted/script/import-placeholder actions are gated or fail explicitly
 ✅ **Reactive context sources** — app foreground, time, state, event, WiFi, app-open monitoring, notifications, NFC tag scans, calendar windows, and sunrise/sunset matching are wired; day/location are planned runtime work
-✅ **Template expression baseline** — bounded `{{ ... }}` expansion supports scoped variables, arrays, JSON paths, string/math functions, traces, and warnings
+✅ **Template expression runtime** — action arguments support bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math functions, traces, and warnings
 ✅ **FOSS geofence evaluator** — Location context matching supports radius, accuracy, and dwell checks without Play Services
 ✅ **AMOLED-first** — Catppuccin Mocha palette, light theme toggle  
 ✅ **Compose UI reintegration started** — active navigation now manages profiles, tasks, actions, contexts, and run logs from Room  
@@ -117,7 +117,7 @@ Release APKs are unsigned unless `OPEN_TASKER_RELEASE_KEYSTORE`, `OPEN_TASKER_RE
 ## Next Phase (v0.3)
 
 1. **Dependency modernization batches** — staged AndroidX/Kotlin/Room/WorkManager updates with device verification
-2. **Runtime expression wiring** — adopt the bounded template engine in action argument expansion and run-log debug views
+2. **Variable debugger UI** — expose template traces, missing values, warnings, and sanitized expanded arguments in run details
 3. **Scene element editor** — add text/button/slider/image controls and task binding pickers before overlay launch
 4. **Flow graph deep links** — node selection that opens the relevant profile, task, context, or action editor
 5. **Shizuku API opt-in backend** — explicit user opt-in, permission request, isolated execution, and run-log audit trail

@@ -2,6 +2,7 @@ package com.opentasker.core.engine
 
 import com.opentasker.core.engine.variables.ArrayStore
 import com.opentasker.core.engine.variables.VariableExpander
+import com.opentasker.core.expressions.TemplateScope
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -76,6 +77,19 @@ class VariableStore {
 
     fun evaluateCondition(expr: String): Boolean {
         return expander.evaluateCondition(expr, this, arrayStore)
+    }
+
+    fun toTemplateScope(event: Map<String, String> = emptyMap()): TemplateScope {
+        val taskValues = mutableMapOf<String, String>()
+        synchronized(localStack) {
+            localStack.forEach { scope -> taskValues += scope }
+        }
+        return TemplateScope(
+            global = globals.toMap(),
+            task = taskValues.toMap(),
+            event = event.toMap(),
+            arrays = arrayStore.snapshot(),
+        )
     }
 
     private fun isGlobalName(name: String): Boolean =

@@ -1,8 +1,8 @@
 # Template Expressions
 
-OpenTasker v0.2.30 adds a pure template expression baseline for future action argument expansion and debugger UI work.
+OpenTasker v0.2.31 includes bounded template expression support for action arguments and trace reporting.
 
-The engine is implemented in `TemplateExpressionEngine` and evaluates `{{ ... }}` expressions against caller-provided task, event, global, and array scopes. It is intentionally separate from the active `%var` runtime path until every action/run-log surface can consume expansion traces safely.
+The engine is implemented in `TemplateExpressionEngine` and evaluates `{{ ... }}` expressions against caller-provided task, event, global, and array scopes. `TaskRunner` now applies legacy `%var` expansion first, then applies template expansion to action arguments, and stores sanitized summaries, warnings, and per-argument expression traces in `ActionExecutionTrace`.
 
 ## Scope Model
 
@@ -83,4 +83,6 @@ The baseline is intentionally small and fail-closed:
 
 ## Current Runtime Status
 
-The active task runner still uses the existing `%var` `VariableStore` expansion path. The v0.2.30 baseline provides the parser/evaluator, trace model, and regression coverage needed before wiring template expressions into action arguments, variable debugging, and per-step expanded-argument run logs.
+Action arguments support template expansion at runtime. Run-log summary lines include sanitized expanded values only for arguments that used template expressions, redacting sensitive argument names such as `token`, `key`, `secret`, `cookie`, and `password`.
+
+Conditions still use the legacy `%var` condition evaluator. A richer variable debugger UI, condition-template adoption, and regex-specific template policy remain future L7 work.

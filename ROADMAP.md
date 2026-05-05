@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.30. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.31. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-05
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.30
+**Current app version:** 0.2.31
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -13,7 +13,7 @@ Source-backed product roadmap for OpenTasker v0.2.30. This file reconciles the c
 
 OpenTasker is an Android/Kotlin automation app targeting API 35 with Jetpack Compose, Material 3, Room, Coroutines, WorkManager, DataStore, Gson, and Hilt dependencies. The project goal is a privacy-first, fully on-device, open-source Tasker/MacroDroid/Automate alternative.
 
-The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, scenes, run logs, setup/onboarding status, read-only flow graphs, live context inspection, notification listener event triggers, NFC tag event triggers, calendar/sun event triggers, FOSS geofence radius/accuracy/dwell evaluation, a bounded template expression engine baseline, a Tasker XML-to-OpenTasker-bundle migration parser, OpenTasker bundle share manifests, a F-Droid readiness build profile, centralized Gradle dependency version governance, optional Shizuku readiness status for elevated-action planning, and optional Termux script readiness status for future scripting. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
+The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, scenes, run logs, setup/onboarding status, read-only flow graphs, live context inspection, notification listener event triggers, NFC tag event triggers, calendar/sun event triggers, FOSS geofence radius/accuracy/dwell evaluation, bounded runtime template argument expansion, a Tasker XML-to-OpenTasker-bundle migration parser, OpenTasker bundle share manifests, a F-Droid readiness build profile, centralized Gradle dependency version governance, optional Shizuku readiness status for elevated-action planning, and optional Termux script readiness status for future scripting. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
 
 Key local constraints:
 
@@ -428,7 +428,7 @@ Key local constraints:
 
 ### L7 - Variable/template expression system v2
 
-**Status:** Baseline completed in v0.2.30. Added a pure `TemplateExpressionEngine` for bounded `{{ ... }}` expansion with task/event/global scope precedence, explicit scope prefixes, arrays, JSON path reads, safe string/math functions, traces, warnings, and fail-closed limits. Runtime-wide adoption in action argument expansion, variable debugger UI, regex-specific expression policy, and per-step expanded-argument run-log display remain later L7 slices.
+**Status:** Runtime argument expansion completed in v0.2.31. v0.2.30 added a pure bounded `TemplateExpressionEngine`; v0.2.31 wires action arguments through legacy `%var` expansion and then `{{ ... }}` templates, snapshots task/event/global/array scopes, and records sanitized expanded-argument summaries, template warnings, and per-argument traces in action steps. Variable debugger UI, regex-specific expression policy, condition-template adoption, and richer run-detail rendering remain later L7 slices.
 **Description:** Evolve simple substitution into task-local/global scope, arrays, JSON paths, math/string functions, template expressions, and a debugger that shows expansion at each action step.  
 **Sources:** Tasker variables [S16], Home Assistant Jinja templates [S12], Huginn Liquid templates [S11], Automate variable blocks [S18].  
 **Category:** data, UX, observability.  

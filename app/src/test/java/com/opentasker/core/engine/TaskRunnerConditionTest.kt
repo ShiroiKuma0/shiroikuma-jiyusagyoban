@@ -104,4 +104,94 @@ class TaskRunnerConditionTest {
         assertTrue(report.success)
         assertEquals("Count 5, second beta", capturedMessage)
     }
+
+    @Test
+    fun expandsTemplateActionArgumentsAndRecordsTrace() = runBlocking {
+        var capturedMessage: String? = null
+        ActionRegistry.register(
+            object : Action {
+                override val id = "test.argument.template"
+                override val category = ActionCategory.FLOW
+
+                override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+                    capturedMessage = args["message"]
+                    return ActionResult.Success
+                }
+            }
+        )
+
+        val variables = VariableStore().apply {
+            set("name", "Ada")
+            set("count", "2")
+            set("payload", """{"user":{"city":"London"}}""")
+            setArray("items", listOf("alpha", "beta"))
+        }
+
+        val report = TaskRunner(
+            ActionContext(
+                app = ContextWrapper(null),
+                variables = variables,
+                eventVariables = mapOf("source" to "calendar"),
+            ),
+        ).run(
+            Task(
+                name = "Template expansion",
+                actions = listOf(
+                    ActionSpec(
+                        type = "test.argument.template",
+                        args = mapOf(
+                            "message" to "Hi {{ name | upper }} {{ count | add:3 }} {{ payload.user.city }} {{ items[1] }} {{ event.source }}",
+                        ),
+                    )
+                ),
+            )
+        )
+
+        assertTrue(report.success)
+        assertEquals("Hi ADA 5 London beta calendar", capturedMessage)
+        val expansion = report.traces.single().argumentExpansions.single()
+        assertEquals("message", expansion.argName)
+        assertEquals(5, expansion.expressions.size)
+        assertEquals("message=Hi ADA 5 London beta calendar", report.traces.single().expandedArgSummary)
+    }
+
+    @Test
+    fun templateWarningsAreCarriedIntoActionTraceSummary() = runBlocking {
+        var capturedMessage: String? = null
+        ActionRegistry.register(
+            object : Action {
+                override val id = "test.argument.template.warning"
+                override val category = ActionCategory.FLOW
+
+                override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+                    capturedMessage = args["message"]
+                    return ActionResult.Success
+                }
+            }
+        )
+
+        val variables = VariableStore().apply { set("name", "Ada") }
+
+        val report = TaskRunner(ActionContext(ContextWrapper(null), variables)).run(
+            Task(
+                name = "Template warning",
+                actions = listOf(
+                    ActionSpec(
+                        type = "test.argument.template.warning",
+                        args = mapOf(
+                            "message" to "{{ name | shell:\"echo\" }}",
+                            "token" to "{{ name }}",
+                        ),
+                    )
+                ),
+            )
+        )
+
+        val trace = report.traces.single()
+        assertEquals("{{ name | shell:\"echo\" }}", capturedMessage)
+        assertTrue(trace.templateWarnings.any { it.contains("Unknown template function") })
+        assertTrue(trace.toSummaryLine().contains("message={{ name | shell:\"echo\" }}"))
+        assertTrue(trace.toSummaryLine().contains("token=<redacted>"))
+        assertTrue(trace.toSummaryLine().contains("template warnings: 1"))
+    }
 }

@@ -10,6 +10,7 @@ import java.util.Collections
 class ActionContext(
     val app: Context,
     val variables: VariableStore,
+    val eventVariables: Map<String, String> = emptyMap(),
     val logger: (String) -> Unit = {},
 )
 
