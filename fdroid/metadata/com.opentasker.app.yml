@@ -5,14 +5,14 @@ License: MIT
 AuthorName: OpenTasker contributors
 SourceCode: https://github.com/SysAdminDoc/OpenTasker
 IssueTracker: https://github.com/SysAdminDoc/OpenTasker/issues
-Changelog: https://github.com/SysAdminDoc/OpenTasker/blob/master/CHANGELOG.md
+Changelog: https://github.com/SysAdminDoc/OpenTasker/blob/HEAD/CHANGELOG.md
 
 AutoName: OpenTasker
 Summary: Local-first Android automation
 Description: |-
   OpenTasker is a local-first Android automation app for profiles, contexts,
   tasks, actions, guided templates, open JSON bundles, sharing manifests,
-  Tasker migration planning, FOSS geofence evaluation, runtime template
+  Tasker migration review, FOSS geofence evaluation, runtime template
   argument and condition expansion, per-expression template diagnostics,
   explicit regex template policy, optional Termux script readiness, and
   platform-aware setup checks.
@@ -21,9 +21,9 @@ RepoType: git
 Repo: https://github.com/SysAdminDoc/OpenTasker.git
 
 Builds:
-  - versionName: 0.2.35
-    versionCode: 37
-    commit: TODO_FULL_COMMIT_HASH_FOR_RELEASE
+  - versionName: 0.2.58
+    versionCode: 60
+    commit: 40d0daef29b4ab9b6ee9bc6fc395722bb58fd9c9
     subdir: .
     gradle:
       - yes
@@ -35,5 +35,5 @@ Builds:
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 0.2.35
-CurrentVersionCode: 37
+CurrentVersion: 0.2.58
+CurrentVersionCode: 60
