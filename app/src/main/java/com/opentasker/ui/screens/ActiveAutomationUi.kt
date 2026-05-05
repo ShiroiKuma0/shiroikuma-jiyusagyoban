@@ -1506,6 +1506,22 @@ private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
+            trace.argumentSummary?.let { summary ->
+                Text(
+                    "Expanded: $summary",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (trace.templateWarningCount > 0) {
+                Spacer(Modifier.height(4.dp))
+                StatusPill(
+                    "${trace.templateWarningCount} template warning${plural(trace.templateWarningCount)}",
+                    MaterialTheme.colorScheme.error,
+                )
+            }
         }
     }
 }
