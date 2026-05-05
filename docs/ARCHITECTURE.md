@@ -114,7 +114,7 @@ interface Action {
 }
 ```
 
-`ActionContext` exposes the application context, variable store, current task scope, and a logger. The current runtime is the built-in action registry, capability metadata for unsupported or setup-required Android operations, and a conservative Locale setting-plugin dispatch action.
+`ActionContext` exposes the application context, variable store, current task scope, and a logger. The current runtime is the built-in action registry, capability metadata for unsupported or setup-required Android operations, and conservative Locale setting-plugin dispatch plus condition-plugin query actions.
 
 ### Plugin host
 

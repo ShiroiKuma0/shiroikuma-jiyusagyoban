@@ -1,20 +1,20 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.49-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.50-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.49** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, day schedule presets/ranges, runtime template argument and condition expansion, per-expression template diagnostics, explicit regex template policy, FOSS geofence evaluation with a live platform location source, a disabled Location evidence template, app-launch service startup, adb-backed location evidence collection with run-log/logcat assertions, provider-cadence, unplugged-sample, and post-reconnect unplugged-history gates, background Location event-delivery smoke evidence, balanced provider cadence, policy-aware location setup copy, persisted dwell state, inspector dwell details, and stale-key cleanup, scene library management, read-only flow graphs, JSON bundles, profile sharing manifests, Tasker XML import planning, F-Droid build readiness, dependency version governance, optional Shizuku readiness, optional Termux script readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; broad device-verified background geofence reliability, elevated backends, script execution, and broader plugin UX are planned.
+**OpenTasker v0.2.50** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, day schedule presets/ranges, runtime template argument and condition expansion, per-expression template diagnostics, explicit regex template policy, FOSS geofence evaluation with a live platform location source, a disabled Location evidence template, app-launch service startup, adb-backed location evidence collection with run-log/logcat assertions, provider-cadence, unplugged-sample, and post-reconnect unplugged-history gates, background Location event-delivery smoke evidence, balanced provider cadence, policy-aware location setup copy, persisted dwell state, inspector dwell details, and stale-key cleanup, scene library management, read-only flow graphs, JSON bundles, profile sharing manifests, Tasker XML import planning, F-Droid build readiness, dependency version governance, optional Shizuku readiness, optional Termux script readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and conservative Locale setting and condition plugin host actions are active now; broad device-verified background geofence reliability, elevated backends, script execution, and broader plugin UX are planned.
 
-> **Status:** v0.2.49 polishes Day contexts with shared parsing, weekday/weekend/daily aliases, day ranges, UI presets/toggles, canonical save output, and readable summaries. v0.2.48 adds post-reconnect unplugged-history validation for the Location harness, so a USB-only test setup can unplug the device, reconnect, and fail closed on duration from `dumpsys battery` history. v0.2.46 verified actual background Location event delivery for the installed/enabled `Location evidence log` template on API 36 device `SM-S938B`; evidence `build/device-evidence/location/20260505-085413` shows `AutomationService` stayed foreground with `specialUse|location`, a shell-owned GPS test fix reached OpenTasker while the app was sent home, and Room recorded a successful `Location evidence log Task` run after evidence collection started. v0.2.47 evidence `build/device-evidence/location/20260505-120448` confirms the harness records plug state, battery deltas, and GPS/network cadence evidence. v0.2.48 evidence `build/device-evidence/location/20260505-143254` shows a 615.055-second recent unplugged interval that satisfied the 600-second post-reconnect history gate with GPS/network provider cadence evidence present. This is still a single-device durability data point, not a broad background geofence reliability claim; broader geofence reliability still needs multi-device verification.
+> **Status:** v0.2.50 adds a Locale condition query action with explicit ordered-broadcast receiver targeting, guarded result parsing, optional result-variable storage, and receiver permission metadata for disclosure. v0.2.49 polishes Day contexts with shared parsing, weekday/weekend/daily aliases, day ranges, UI presets/toggles, canonical save output, and readable summaries. v0.2.48 evidence `build/device-evidence/location/20260505-143254` shows a 615.055-second recent unplugged interval that satisfied the 600-second post-reconnect history gate with GPS/network provider cadence evidence present. This is still a single-device durability data point, not a broad background geofence reliability claim; broader geofence reliability still needs multi-device verification.
 
 ---
 
 ## Highlights
 
 ✅ **Core engine operational** — profiles → contexts → tasks → actions pipeline  
-✅ **42 registered action definitions** — supported actions run, restricted/script/import-placeholder actions are gated or fail explicitly
+✅ **43 registered action definitions** — supported actions run, restricted/script/import-placeholder actions are gated or fail explicitly
 ✅ **Reactive context sources** — app foreground, time, day schedules, state, event, WiFi, app-open monitoring, notifications, NFC tag scans, calendar windows, sunrise/sunset matching, and platform location fixes are wired; broader device-verified background geofencing remains planned runtime work
 ✅ **Template expression runtime** — action arguments and conditions support bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math functions, traces, and warnings
 ✅ **FOSS geofence source/evaluator** — Location context matching supports platform GPS/network fixes, balanced provider cadence, policy disclosures, radius, accuracy, persisted dwell checks, stale-key cleanup, inspector dwell detail, a Location evidence template, adb run-log/logcat evidence collection, provider-cadence/unplugged-sample/post-reconnect history gates, and API 36 background event-delivery smoke evidence without Play Services
@@ -30,7 +30,7 @@
 ✅ **Tasker XML import planning** — common Tasker task/profile/variable XML converts to OpenTasker bundles with migration warnings
 ✅ **F-Droid readiness** — property-based `fdroid` profile, dependency-policy check, and metadata draft
 ✅ **Dependency governance** — Gradle version catalog centralizes plugin/library versions before staged upgrades
-✅ **Locale plugin host baseline** — explicit setting-plugin dispatch with package validation, bundle limits, and timeout wrapping  
+✅ **Locale plugin host baseline** — explicit setting-plugin dispatch and condition-plugin query execution with package validation, bundle limits, result parsing, and timeout wrapping
 ✅ **External automation target** — signature-scoped intents to run tasks, toggle profiles, query status, and pass variables
 ✅ **Automation modes** — per-profile single, restart, queued, and parallel re-trigger behavior  
 ✅ **Setup checklist** — notifications, exact alarms, battery optimization, usage access, notification access, overlays, location, Bluetooth, SMS, and DND access  
@@ -46,7 +46,7 @@
 ✅ **Calendar and sun events** — Calendar access feeds redacted `event=calendar` windows; coordinate-based `sunrise`/`sunset` filters support offsets<br>
 ✅ **Regression coverage** — cron parsing, variable scoping, and template expression edge cases are test-covered
 ✅ **Database persistence** — Room DAOs with StateFlow live updates  
-✅ **Action metadata system** — dynamic form generation for all 42 registered action definitions
+✅ **Action metadata system** — dynamic form generation for all 43 registered action definitions
 ✅ **Context configuration UI** — editor supports all 6 context families while runtime support continues to harden by family  
 ✅ **100% Kotlin** — modern, type-safe, coroutine-friendly  
 ✅ **Profile execution** — AutomationService wired to TaskRunner for context triggers  
@@ -66,7 +66,7 @@ ContextSources (app, time, state, event, location)
   ↓
 TaskRunner (executes action list)
   ↓
-ActionRegistry (built-ins + capability gates + Locale setting plugin dispatch)
+ActionRegistry (built-ins + capability gates + Locale setting and condition plugin dispatch)
   ↓
 Room DB (persistent storage)
 ```
@@ -75,7 +75,7 @@ Room DB (persistent storage)
 - **Runtime-wired now:** Application foreground detection, time ticks, day schedules with presets/ranges, device state broadcasts, event broadcasts, WiFi network changes, app-open monitoring, notification listener events, NFC tag events, calendar windows, sunrise/sunset event filters, and platform location fixes.
 - **Configured in UI but still being hardened:** Location/geofence contexts. Location matching now receives FOSS platform GPS/network events and supports radius, accuracy, persisted dwell evaluation, a focused API 36 background event-delivery smoke test, and harness gates for provider cadence plus unplugged battery samples or post-reconnect battery history; broader multi-device reliability evidence remains planned runtime work.
 
-### Actions (42 registered definitions)
+### Actions (43 registered definitions)
 | Category | Count | Examples |
 |----------|-------|----------|
 | Settings | 7 | WiFi, Bluetooth, brightness, volume, airplane, mobile data, screen timeout |
@@ -87,7 +87,7 @@ Room DB (persistent storage)
 | Notification | 2 | notification/toast, TTS speak |
 | Variable | 1 | set variable |
 | Flow | 1 | wait |
-| Plugin | 1 | Locale setting dispatch |
+| Plugin | 2 | Locale setting dispatch, Locale condition query |
 | Script | 1 | gated Termux script run |
 | Import | 1 | unsupported Tasker action placeholder |
 

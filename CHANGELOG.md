@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.50 - 2026-05-05
+
+Locale condition plugin query baseline.
+
+- Added `plugin.locale.query` to issue explicit `QUERY_CONDITION` ordered broadcasts to Locale/Tasker-compatible condition plugin receivers.
+- Added guarded parsing for Locale condition result codes: satisfied, unsatisfied, unknown, and unrecognized-result fail-closed handling.
+- Hardened Locale setting execution to resolve a single explicit receiver component before dispatch instead of broadcasting to an entire package.
+- Extended Locale plugin discovery metadata with setting/condition receiver permissions for future disclosure UI.
+- Added package-visibility queries for Locale execution receivers and JVM coverage for condition result-code mapping.
+
 ## v0.2.49 - 2026-05-05
 
 Day schedule polish.
