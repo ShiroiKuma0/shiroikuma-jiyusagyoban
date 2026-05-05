@@ -70,6 +70,8 @@ Tasker XML import is intentionally staged through the OpenTasker JSON bundle mod
 
 The F-Droid distribution path is property-based rather than a product flavor. `-PopenTaskerDistribution=fdroid` sets `BuildConfig.DISTRIBUTION`, keeps existing Gradle variant names stable, and is paired with `verifyFdroidReadiness` to block common proprietary dependency families before release-profile builds.
 
+Gradle plugin and library versions are centralized in `gradle/libs.versions.toml`. Dependency modernization is handled as staged upgrade batches so Kotlin/KSP/Compose compiler alignment, Room schema risk, WorkManager runtime behavior, Hilt startup drift, AGP release output changes, and the F-Droid profile can be verified independently.
+
 ### Persistence schema (Room)
 
 | Table | Key fields |

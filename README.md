@@ -1,13 +1,13 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.22-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.23-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.22** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, JSON bundles, Tasker XML import planning, F-Droid build readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; scenes, variable tooling, and broader plugin UX are planned.
+**OpenTasker v0.2.23** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, JSON bundles, Tasker XML import planning, F-Droid build readiness, dependency version governance, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; scenes, variable tooling, and broader plugin UX are planned.
 
-> **Status:** v0.2.22 adds a F-Droid distribution profile, dependency-policy verification, pinned build tools, CI coverage, and draft fdroiddata metadata, while keeping Tasker XML import planning, local calendar/sun triggers, NFC tag events, notification listener events, the context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
+> **Status:** v0.2.23 centralizes Gradle plugin and library versions in a version catalog and documents staged dependency modernization, while keeping the F-Droid distribution profile, Tasker XML import planning, local calendar/sun triggers, NFC tag events, notification listener events, the context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
 
 ---
 
@@ -22,6 +22,7 @@
 ✅ **Open JSON bundles** — schema-versioned profile/task/context/action/variable/scene export and import planning  
 ✅ **Tasker XML import planning** — common Tasker task/profile/variable XML converts to OpenTasker bundles with migration warnings
 ✅ **F-Droid readiness** — property-based `fdroid` profile, dependency-policy check, and metadata draft
+✅ **Dependency governance** — Gradle version catalog centralizes plugin/library versions before staged upgrades
 ✅ **Locale plugin host baseline** — explicit setting-plugin dispatch with package validation, bundle limits, and timeout wrapping  
 ✅ **External automation target** — signature-scoped intents to run tasks, toggle profiles, query status, and pass variables
 ✅ **Automation modes** — per-profile single, restart, queued, and parallel re-trigger behavior  
@@ -38,7 +39,7 @@
 ✅ **Calendar and sun events** — Calendar access feeds redacted `event=calendar` windows; coordinate-based `sunrise`/`sunset` filters support offsets<br>
 ✅ **Regression coverage** — cron parsing and variable scoping edge cases are test-covered  
 ✅ **Database persistence** — Room DAOs with StateFlow live updates  
-✅ **Action metadata system** — dynamic form generation for all 40 registered action definitions  
+✅ **Action metadata system** — dynamic form generation for all 41 registered action definitions
 ✅ **Context configuration UI** — editor supports all 6 context families while runtime support continues to harden by family  
 ✅ **100% Kotlin** — modern, type-safe, coroutine-friendly  
 ✅ **Profile execution** — AutomationService wired to TaskRunner for context triggers  
@@ -107,7 +108,7 @@ Release APKs are unsigned unless `OPEN_TASKER_RELEASE_KEYSTORE`, `OPEN_TASKER_RE
 
 ## Next Phase (v0.3)
 
-1. **Dependency modernization** — staged AndroidX/Kotlin/Room/WorkManager updates with device verification
+1. **Dependency modernization batches** — staged AndroidX/Kotlin/Room/WorkManager updates with device verification
 2. **Locale condition queries** — complete query execution for condition plugins with timeout and result handling
 3. **Tasker import UI** — file picker, migration preview, and import confirmation around the parser baseline
 4. **F-Droid submission hardening** — release tag discipline, fdroidserver lint/build, and reproducible binary comparison
