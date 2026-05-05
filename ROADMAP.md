@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.35. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.36. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-05
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.35
+**Current app version:** 0.2.36
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -13,7 +13,7 @@ Source-backed product roadmap for OpenTasker v0.2.35. This file reconciles the c
 
 OpenTasker is an Android/Kotlin automation app targeting API 35 with Jetpack Compose, Material 3, Room, Coroutines, WorkManager, DataStore, Gson, and Hilt dependencies. The project goal is a privacy-first, fully on-device, open-source Tasker/MacroDroid/Automate alternative.
 
-The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, scenes, run logs, setup/onboarding status, read-only flow graphs, live context inspection, notification listener event triggers, NFC tag event triggers, calendar/sun event triggers, FOSS geofence radius/accuracy/dwell evaluation, bounded runtime template argument and condition expansion, per-expression template run-log diagnostics, explicit regex template policy, a Tasker XML-to-OpenTasker-bundle migration parser, OpenTasker bundle share manifests, a F-Droid readiness build profile, centralized Gradle dependency version governance, optional Shizuku readiness status for elevated-action planning, and optional Termux script readiness status for future scripting. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
+The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, scenes, run logs, setup/onboarding status, read-only flow graphs, live context inspection, notification listener event triggers, NFC tag event triggers, calendar/sun event triggers, a FOSS platform location source, FOSS geofence radius/accuracy/dwell evaluation, bounded runtime template argument and condition expansion, per-expression template run-log diagnostics, explicit regex template policy, a Tasker XML-to-OpenTasker-bundle migration parser, OpenTasker bundle share manifests, a F-Droid readiness build profile, centralized Gradle dependency version governance, optional Shizuku readiness status for elevated-action planning, and optional Termux script readiness status for future scripting. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
 
 Key local constraints:
 
@@ -22,7 +22,7 @@ Key local constraints:
 | UI | Active profile/task/action/context/run-log/setup/inspector management UI is restored; advanced stale snapshots remain unused | Continue hardening UI with capability gating |
 | Engine | Foreground automation service and registries are wired through `OpenTaskerApp_NoHilt` | Keep non-Hilt runtime stable until Hilt migration is deliberate |
 | Actions | Built-in action IDs align with UI metadata, success-shaped stubs fail honestly, and the UI now blocks unsupported privileged actions | Capability registry can expand into context and permission-aware execution gates |
-| Contexts | Time ticks use app-owned AlarmManager scheduling, WiFi events use dynamic NetworkCallback, app-open events use foreground-service-owned UsageStats polling, notification posts can emit filtered Event contexts, NFC tag scans can emit tag-filtered Event contexts, and local calendar/sun ticks can emit filtered Event contexts; other context sources still rely on restricted Android APIs or incomplete implementations | Permission/onboarding and platform-safe replacements remain P0/P1 |
+| Contexts | Time ticks use app-owned AlarmManager scheduling, WiFi events use dynamic NetworkCallback, app-open events use foreground-service-owned UsageStats polling, notification posts can emit filtered Event contexts, NFC tag scans can emit tag-filtered Event contexts, local calendar/sun ticks can emit filtered Event contexts, and Location contexts can receive platform GPS/network fixes; remaining context work is dwell persistence, day schedule polish, and device verification | Permission/onboarding and platform-safe replacements remain P0/P1 |
 | Persistence | Room schema export now exists; backup/restore hardened | Migration tests and upgrade strategy can be built on this |
 | Release | Debug/release builds pass locally; release signing is env-var driven | F-Droid/Play readiness still needs policy and reproducibility work |
 | Docs | README and architecture docs were corrected to v0.2.11; stale checkpoint/audit files that overclaimed old snapshots were removed | Roadmap tiers below supersede old milestone claims |
@@ -415,7 +415,7 @@ Key local constraints:
 
 ### L6 - Advanced location without proprietary lock-in
 
-**Status:** Baseline completed in v0.2.29. Added a pure `FossGeofenceEvaluator` with Haversine distance, radius checks, optional max accuracy, and dwell-time evaluation, then wired active Location context matching and legacy geofence distance checks through it. Live background location sourcing, policy disclosures, battery tuning, dwell state persistence, and any optional Play-flavor backend remain later L6 slices.
+**Status:** Started across v0.2.29 and v0.2.36. v0.2.29 added a pure `FossGeofenceEvaluator` with Haversine distance, radius checks, optional max accuracy, and dwell-time evaluation, then wired active Location context matching and legacy geofence distance checks through it. v0.2.36 adds a registered FOSS `LocationManager` source with GPS/network providers, fail-closed setup events, setup/inspector policy copy, and Android 14+ foreground-service location declarations. Persisted dwell state, battery tuning, device-level background-location verification, and any optional Play-flavor backend remain later L6 slices.
 **Description:** Implement FOSS-first geofencing through Android location APIs/manual Haversine, dwell time, accuracy tuning, and optional Play flavor backend only if the project explicitly accepts a Play-services flavor split.  
 **Sources:** Android background location policy [S29], F-Droid inclusion policy [S32], Easer/LLAMA location lessons [S1][S21].  
 **Category:** platform/OS, privacy, distribution.  

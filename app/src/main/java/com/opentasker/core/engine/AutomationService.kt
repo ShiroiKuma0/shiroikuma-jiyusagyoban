@@ -1,15 +1,19 @@
 package com.opentasker.core.engine
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.location.LocationManager
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.opentasker.app.MainActivity
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.automation.app.AppUsageMonitor
@@ -346,11 +350,38 @@ class AutomationService : Service() {
             .setOngoing(true)
             .build()
         if (Build.VERSION.SDK_INT >= 34) {
-            startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            startForeground(NOTIF_ID, n, foregroundServiceTypes())
         } else {
             startForeground(NOTIF_ID, n)
         }
     }
+
+    private fun foregroundServiceTypes(): Int {
+        var types = ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+        if (hasBackgroundLocationForegroundServicePrerequisites()) {
+            types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+        }
+        return types
+    }
+
+    private fun hasBackgroundLocationForegroundServicePrerequisites(): Boolean {
+        if (!hasAnyLocationPermission()) return false
+        if (Build.VERSION.SDK_INT >= 29 && !hasPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) return false
+        val locationManager = getSystemService(LocationManager::class.java) ?: return false
+        return if (Build.VERSION.SDK_INT >= 28) {
+            locationManager.isLocationEnabled
+        } else {
+            runCatching { locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) }.getOrDefault(false) ||
+                runCatching { locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) }.getOrDefault(false)
+        }
+    }
+
+    private fun hasAnyLocationPermission(): Boolean =
+        hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) ||
+            hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+
+    private fun hasPermission(permission: String): Boolean =
+        ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
     companion object {
         private const val CHANNEL = "opentasker.engine"

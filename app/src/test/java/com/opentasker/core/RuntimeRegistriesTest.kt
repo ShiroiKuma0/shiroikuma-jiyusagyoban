@@ -2,6 +2,7 @@ package com.opentasker.core
 
 import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.actions.registerActionMetadata
+import com.opentasker.core.contexts.ContextSourceRegistry
 import com.opentasker.core.engine.ActionRegistry
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,5 +18,14 @@ class RuntimeRegistriesTest {
             .filter { ActionRegistry.get(it) == null }
 
         assertTrue("Missing runtime actions: $missing", missing.isEmpty())
+    }
+
+    @Test
+    fun coreContextSourcesIncludeLiveLocationSource() {
+        registerCoreRuntime()
+
+        val registered = ContextSourceRegistry.all().map { it.type }.toSet()
+
+        assertTrue("Location context source must be registered: $registered", "location" in registered)
     }
 }
