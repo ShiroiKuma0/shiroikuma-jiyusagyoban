@@ -10,6 +10,7 @@ enum class RunLogStatusFilter(val label: String) {
 
 data class RunLogFilterState(
     val status: RunLogStatusFilter = RunLogStatusFilter.All,
+    val taskId: Long? = null,
     val query: String = "",
 )
 
@@ -24,10 +25,11 @@ fun filterRunLogs(
             RunLogStatusFilter.Failed -> !entry.success
             RunLogStatusFilter.Succeeded -> entry.success
         }
+        val taskMatches = state.taskId == null || entry.taskId == state.taskId
         val queryMatches = normalizedQuery.isBlank() ||
             entry.taskName.contains(normalizedQuery, ignoreCase = true) ||
             entry.message.contains(normalizedQuery, ignoreCase = true)
 
-        statusMatches && queryMatches
+        statusMatches && taskMatches && queryMatches
     }
 }
