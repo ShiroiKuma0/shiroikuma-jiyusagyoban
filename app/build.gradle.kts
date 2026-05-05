@@ -12,6 +12,8 @@ val releaseKeystorePath = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE")
 val releaseKeystorePassword = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE_PASSWORD")
 val releaseKeyAlias = System.getenv("OPEN_TASKER_RELEASE_KEY_ALIAS")
 val releaseKeyPassword = System.getenv("OPEN_TASKER_RELEASE_KEY_PASSWORD")
+val appVersionCode = 60
+val appVersionName = "0.2.58"
 val allowedDistributions = setOf("standard", "fdroid")
 val selectedDistribution = providers.gradleProperty("openTaskerDistribution")
     .orElse("standard")
@@ -36,8 +38,8 @@ android {
         applicationId = "com.opentasker.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 60
-        versionName = "0.2.58"
+        versionCode = appVersionCode
+        versionName = appVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "DISTRIBUTION", "\"$selectedDistribution\"")
     }
@@ -176,5 +178,71 @@ tasks.register("verifyFdroidReadiness") {
         }
         check(selectedDistribution in allowedDistributions)
         println("F-Droid readiness check passed for distribution=$selectedDistribution")
+    }
+}
+
+tasks.register("verifyFdroidMetadata") {
+    group = "verification"
+    description = "Checks that draft fdroiddata metadata matches the current release contract."
+
+    val metadataFile = rootProject.file("fdroid/metadata/com.opentasker.app.yml")
+    inputs.file(metadataFile)
+
+    doLast {
+        check(metadataFile.isFile) {
+            "Missing F-Droid metadata at ${metadataFile.relativeTo(rootProject.projectDir)}"
+        }
+
+        val metadata = metadataFile.readText()
+        fun valuesFor(key: String): List<String> =
+            Regex("""(?m)^\s*(?:-\s*)?$key:\s*(.+?)\s*$""")
+                .findAll(metadata)
+                .map { match -> match.groupValues[1].trim().trim('"', '\'') }
+                .toList()
+
+        fun requireValue(key: String, expected: String) {
+            val values = valuesFor(key)
+            check(expected in values) {
+                "F-Droid metadata key '$key' expected '$expected' but found ${values.ifEmpty { listOf("<missing>") }}"
+            }
+        }
+
+        requireValue("versionName", appVersionName)
+        requireValue("versionCode", appVersionCode.toString())
+        requireValue("CurrentVersion", appVersionName)
+        requireValue("CurrentVersionCode", appVersionCode.toString())
+        requireValue("Changelog", "https://github.com/SysAdminDoc/OpenTasker/blob/HEAD/CHANGELOG.md")
+
+        val commits = valuesFor("commit")
+        check(commits.size == 1) {
+            "F-Droid metadata must contain exactly one release commit, found ${commits.size}"
+        }
+        val releaseCommit = commits.single()
+        check(Regex("""[0-9a-f]{40}""").matches(releaseCommit)) {
+            "F-Droid metadata commit must be a full 40-character lowercase SHA, found '$releaseCommit'"
+        }
+        check("openTaskerDistribution=fdroid" in metadata) {
+            "F-Droid metadata must build with gradleprops openTaskerDistribution=fdroid"
+        }
+        check(":app:verifyFdroidReadiness" in metadata) {
+            "F-Droid metadata must run :app:verifyFdroidReadiness before assembly"
+        }
+        check("app/build/outputs/apk/release/app-release-unsigned.apk" in metadata) {
+            "F-Droid metadata must point to the unsigned release APK output"
+        }
+
+        if (rootProject.file(".git").exists()) {
+            val process = ProcessBuilder("git", "cat-file", "-e", "$releaseCommit^{commit}")
+                .directory(rootProject.projectDir)
+                .redirectErrorStream(true)
+                .start()
+            val output = process.inputStream.bufferedReader().readText().trim()
+            val exitCode = process.waitFor()
+            check(exitCode == 0) {
+                "F-Droid metadata commit $releaseCommit is not present in this checkout. $output"
+            }
+        }
+
+        println("F-Droid metadata check passed for v$appVersionName ($appVersionCode)")
     }
 }

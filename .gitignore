@@ -6,6 +6,12 @@ local.properties
 .DS_Store
 build/
 app/build/
+fdroid/build/
+fdroid/logs/
+fdroid/repo/
+fdroid/srclibs/
+fdroid/tmp/
+fdroid/unsigned/
 captures/
 .externalNativeBuild/
 .cxx/
