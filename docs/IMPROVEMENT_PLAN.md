@@ -15,6 +15,7 @@ Every completed implementation slice should pass:
 
 ```powershell
 .\gradlew.bat :app:compileDebugKotlin :app:compileDebugUnitTestKotlin
+.\gradlew.bat :app:compileDebugAndroidTestKotlin
 .\gradlew.bat :app:testDebugUnitTest
 .\gradlew.bat :app:assembleDebug
 .\gradlew.bat :app:lintDebug
@@ -29,11 +30,11 @@ git diff --check
 | P2 | UI architecture split | High | Not started | Split the active Compose automation UI into maintainable screen, editor, state, and component modules. | `ActiveAutomationUi.kt` is reduced to routing/composition glue; major screens have focused files and targeted previews/tests where practical. |
 | P3 | Stale UI snapshot cleanup | High | Done | Remove unused `.kt.bak` screens from active source packages so the canonical UI surface is unambiguous. | Historical snapshots live outside `app/src/main/java`; the app compiles without stale screen files in source navigation. |
 | P4 | Lint debt reduction | High | Started | Reduce warning noise so lint can stay useful and CI can eventually fail on real issues. | Known local warnings are either fixed, narrowed, or intentionally documented; no broad suppressions are added for fixable issues. |
-| P5 | Dependency modernization | High | Not started | Upgrade AndroidX, Room, WorkManager, DataStore, Coroutines, Hilt, Navigation, Compose, and Gson in controlled groups. | Dependency updates land in small batches with compile, unit, assemble, lint, and at least one emulator smoke pass for app startup/navigation. |
-| P6 | Emulator and instrumented reliability tests | High | Not started | Cover Android platform behavior that JVM tests cannot verify. | Emulator tests cover setup checklist, profile enable/disable, task execution, run logs, permission-denied flows, and service startup. |
+| P5 | Dependency modernization | High | Started | Upgrade AndroidX, Room, WorkManager, DataStore, Coroutines, Hilt, Navigation, Compose, and Gson in controlled groups. | Dependency updates land in small batches with compile, unit, assemble, lint, and at least one emulator smoke pass for app startup/navigation. |
+| P6 | Emulator and instrumented reliability tests | High | Started | Cover Android platform behavior that JVM tests cannot verify. | Emulator tests cover setup checklist, profile enable/disable, task execution, run logs, permission-denied flows, and service startup. |
 | P7 | Release pipeline hardening | High | Not started | Make CI and release outputs production-grade. | Normal CI runs lint; release workflow validates signing, publishes checksums, uploads artifacts, and produces scoped release notes. |
 | P8 | Run-log/debug UX | Medium | Not started | Make "why did this run or not run?" answerable from the app. | Run logs support filters, source trigger, cooldown/retry decisions, sanitized expanded args, and capability/permission failure reasons. |
-| P9 | Room migration tests | Medium | Not started | Protect user data as schemas evolve. | Migration tests cover all exported schema versions for both Room databases and backup/restore compatibility. |
+| P9 | Room migration tests | Medium | Started | Protect user data as schemas evolve. | Migration tests cover all exported schema versions for both Room databases and backup/restore compatibility. |
 | P10 | Hilt vs non-Hilt architecture | Medium | Not started | Resolve dormant DI drift and keep app startup deterministic. | Either Hilt migration is completed and tested, or unused Hilt surface is removed until needed. |
 | P11 | Action safety boundaries | Medium | Not started | Apply consistent guardrails to shell, intent, file, SMS, settings, and privileged actions. | Destructive and privileged actions have capability checks, permission explanations, scoped-storage behavior, and clear unsupported failures. |
 | P12 | User-facing text centralization | Low | Not started | Improve accessibility, localization readiness, and copy consistency. | Stable labels, errors, empty states, and permission explanations move to string resources where practical. |
@@ -55,3 +56,6 @@ git diff --check
 - The active UI is functional but too concentrated. Refactors should keep the current user workflows recognizable while reducing file size and state coupling.
 - Lint dependency warnings should be handled in grouped upgrade branches rather than one large version jump.
 - Initial lint cleanup reduced `lintDebug` from 31 warnings to 22 warnings. The remaining warnings are dependency/target-SDK modernization items and obsolete Navigation lint checks that should be handled under P5.
+- Instrumented migration-test scaffolding exists for `AppDatabase` 1->2 and `AutomationDatabase` version 1, and the verification gate now compiles androidTest sources. Full completion of P9 still needs emulator execution in CI or a local Android target.
+- The first dependency modernization batch updates AndroidX test libraries to support migration-test coverage. Room remains on 2.6.1 until the Kotlin serialization/runtime stack is upgraded together.
+- A local `connectedDebugAndroidTest` attempt found device `R5CY34G070L`, but Android rejected debug APK installation with `INSTALL_FAILED_UPDATE_INCOMPATIBLE` because an existing `com.opentasker.app` install is signed differently. Do not clear that install without explicit user approval.
