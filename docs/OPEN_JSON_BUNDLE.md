@@ -28,6 +28,7 @@ Top-level fields:
 - Unsupported schema versions are rejected before writing.
 - Unsupported or setup-required actions are preserved, but capability requirements are surfaced in metadata/warnings.
 - Tasker XML import first converts into this bundle model plus a migration report; Room import should happen only after the report is reviewed.
+- Profile sharing manifests wrap this bundle model with slug, counts, unverified trust state, safety findings, screenshot counts, and GitHub Discussions submission copy before any community import UI exists.
 
 ## Stability rules
 
@@ -35,3 +36,4 @@ Top-level fields:
 - Exporters include capability requirements for non-ready actions.
 - Importers never silently repair missing references; every skipped or dropped link is reported.
 - Future schema versions must add migration code before changing field meaning.
+- Sharing manifests must never mark a community bundle as verified until a signing/review workflow exists.
