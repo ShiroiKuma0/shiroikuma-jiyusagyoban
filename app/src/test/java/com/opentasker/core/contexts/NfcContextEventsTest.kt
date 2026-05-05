@@ -1,6 +1,7 @@
 package com.opentasker.core.contexts
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NfcContextEventsTest {
@@ -26,5 +27,20 @@ class NfcContextEventsTest {
         assertEquals("nfc", event.metadata["event"])
         assertEquals("04AABBCC", event.metadata["tagId"])
         assertEquals("android.nfc.tech.Ndef,android.nfc.tech.NfcA", event.metadata["techList"])
+    }
+
+    @Test
+    fun writePlannerNormalizesLabelAndEstimatesPayload() {
+        val plan = NfcTagWritePlanner.planTextRecord("  OpenTasker   Desk Tag  ")
+
+        assertEquals("OpenTasker Desk Tag", plan.text)
+        assertTrue(plan.estimatedBytes > plan.text.length)
+    }
+
+    @Test
+    fun writePlannerUsesDefaultForBlankLabel() {
+        val plan = NfcTagWritePlanner.planTextRecord("   ")
+
+        assertEquals("OpenTasker NFC trigger", plan.text)
     }
 }
