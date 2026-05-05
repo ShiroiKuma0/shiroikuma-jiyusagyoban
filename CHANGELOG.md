@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.42 - 2026-05-05
+
+Foreground service launch repair.
+
+- Started `AutomationService` from `MainActivity` using `ContextCompat.startForegroundService`.
+- Kept boot receiver startup intact while ensuring app launch also activates the automation engine.
+- Logged foreground-service startup failures from the activity path.
+- Added a JVM source contract test for the activity-to-service startup path.
+- Verified on a connected API 36 device that app launch starts the foreground service with the `specialUse|location` type after foreground/background location permissions and device location are enabled.
+
 ## v0.2.41 - 2026-05-05
 
 Location policy disclosures.

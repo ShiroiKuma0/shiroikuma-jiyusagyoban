@@ -1,11 +1,13 @@
 # FOSS Geofencing Baseline
 
-OpenTasker v0.2.41 has a Play-services-free geofence path for Location contexts. It combines a platform `LocationManager` source with the pure evaluator added in v0.2.29, persisted dwell state added in v0.2.37, Context Inspector dwell detail added in v0.2.38, stale dwell-key cleanup added in v0.2.39, balanced provider cadence added in v0.2.40, and shared Android location policy disclosures added in v0.2.41; it is still not a device-verified background geofence reliability claim.
+OpenTasker v0.2.42 has a Play-services-free geofence path for Location contexts. It combines a platform `LocationManager` source with the pure evaluator added in v0.2.29, persisted dwell state added in v0.2.37, Context Inspector dwell detail added in v0.2.38, stale dwell-key cleanup added in v0.2.39, balanced provider cadence added in v0.2.40, shared Android location policy disclosures added in v0.2.41, and app-launch foreground-service startup repaired in v0.2.42; it is still not a device-verified background geofence reliability claim.
 
 ## Active Scope
 
 - Uses Haversine distance through `FossGeofenceEvaluator.distanceMeters`.
 - Registers `LocationContextSourceImpl` as the runtime `location` source.
+- Starts the foreground automation service from app launch and boot.
+- API 36 device smoke confirmed app launch starts the service foreground with `specialUse|location` when foreground/background location permissions and device location are enabled.
 - Uses Android framework GPS and network providers instead of Google Play Services.
 - Seeds matching from the best last-known GPS/network fix when one is available.
 - Requests GPS updates at a 180-second/100-meter cadence and network updates at a 90-second/150-meter cadence by default.
@@ -46,5 +48,5 @@ OpenTasker v0.2.41 has a Play-services-free geofence path for Location contexts.
 ## Next Work
 
 1. Validate provider cadence and battery behavior with device evidence.
-2. Add device-backed smoke coverage for foreground and background location behavior.
+2. Extend device-backed smoke coverage from foreground-service startup to background location behavior.
 3. Verify behavior on a device before making public geofence reliability claims.
