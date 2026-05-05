@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.18 - 2026-05-05
+
+Notification listener trigger baseline.
+
+- Added a `NotificationListenerService` event bridge that emits `event=notification` context events without logging notification text.
+- Merged notification events into the existing Event context source for profile matching and context inspection.
+- Added package allowlists, title/body filters, bounded regex matching, and fail-closed invalid-regex behavior for Event contexts.
+- Expanded the context editor for notification event filters and updated docs/version metadata for the X7 baseline.
+
 ## v0.2.17 - 2026-05-05
 
 Context inspector baseline.

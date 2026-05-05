@@ -82,4 +82,62 @@ class ContextMatchEvaluatorTest {
             )
         )
     }
+
+    @Test
+    fun notificationEventMatchesPackageTitleBodyAndRegexFilters() {
+        val event = ContextEvent(
+            "event",
+            true,
+            mapOf(
+                "event" to "notification",
+                "package" to "com.chat.example",
+                "title" to "Build finished",
+                "body" to "Debug APK is ready",
+            ),
+        )
+        val containsSpec = ContextSpec(
+            ContextType.EVENT,
+            config = mapOf(
+                "event" to "notification",
+                "package" to "com.chat.example,com.mail.example",
+                "title" to "build",
+                "body" to "apk",
+            ),
+        )
+        val regexSpec = ContextSpec(
+            ContextType.EVENT,
+            config = mapOf(
+                "event" to "notification",
+                "filter" to "debug\\s+apk",
+                "regex" to "true",
+            ),
+        )
+        val wrongPackage = containsSpec.copy(config = containsSpec.config + ("package" to "com.other"))
+
+        assertTrue(ContextMatchEvaluator.matches(containsSpec, event))
+        assertTrue(ContextMatchEvaluator.matches(regexSpec, event))
+        assertFalse(ContextMatchEvaluator.matches(wrongPackage, event))
+    }
+
+    @Test
+    fun notificationRegexFiltersFailClosedWhenInvalidOrTooLarge() {
+        val event = ContextEvent(
+            "event",
+            true,
+            mapOf("event" to "notification", "title" to "Hello"),
+        )
+
+        assertFalse(
+            ContextMatchEvaluator.matches(
+                ContextSpec(ContextType.EVENT, mapOf("event" to "notification", "filter" to "[", "regex" to "true")),
+                event,
+            )
+        )
+        assertFalse(
+            ContextMatchEvaluator.matches(
+                ContextSpec(ContextType.EVENT, mapOf("event" to "notification", "filter" to "a".repeat(161), "regex" to "true")),
+                event,
+            )
+        )
+    }
 }

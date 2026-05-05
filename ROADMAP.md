@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.17. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.18. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-05
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.17
+**Current app version:** 0.2.18
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -13,7 +13,7 @@ Source-backed product roadmap for OpenTasker v0.2.17. This file reconciles the c
 
 OpenTasker is an Android/Kotlin automation app targeting API 35 with Jetpack Compose, Material 3, Room, Coroutines, WorkManager, DataStore, Gson, and Hilt dependencies. The project goal is a privacy-first, fully on-device, open-source Tasker/MacroDroid/Automate alternative.
 
-The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, run logs, setup/onboarding status, and live context inspection. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
+The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, run logs, setup/onboarding status, live context inspection, and notification listener event triggers. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
 
 Key local constraints:
 
@@ -22,7 +22,7 @@ Key local constraints:
 | UI | Active profile/task/action/context/run-log/setup/inspector management UI is restored; advanced stale snapshots remain unused | Continue hardening UI with capability gating |
 | Engine | Foreground automation service and registries are wired through `OpenTaskerApp_NoHilt` | Keep non-Hilt runtime stable until Hilt migration is deliberate |
 | Actions | Built-in action IDs align with UI metadata, success-shaped stubs fail honestly, and the UI now blocks unsupported privileged actions | Capability registry can expand into context and permission-aware execution gates |
-| Contexts | Time ticks use app-owned AlarmManager scheduling, WiFi events use dynamic NetworkCallback, and app-open events use foreground-service-owned UsageStats polling; other context sources still rely on restricted Android APIs or incomplete implementations | Permission/onboarding and platform-safe replacements remain P0/P1 |
+| Contexts | Time ticks use app-owned AlarmManager scheduling, WiFi events use dynamic NetworkCallback, app-open events use foreground-service-owned UsageStats polling, and notification posts can emit filtered Event contexts; other context sources still rely on restricted Android APIs or incomplete implementations | Permission/onboarding and platform-safe replacements remain P0/P1 |
 | Persistence | Room schema export now exists; backup/restore hardened | Migration tests and upgrade strategy can be built on this |
 | Release | Debug/release builds pass locally; release signing is env-var driven | F-Droid/Play readiness still needs policy and reproducibility work |
 | Docs | README and architecture docs were corrected to v0.2.11; stale checkpoint/audit files that overclaimed old snapshots were removed | Roadmap tiers below supersede old milestone claims |
@@ -268,6 +268,7 @@ Key local constraints:
 
 ### X7 - Notification listener trigger
 
+**Status:** Baseline completed in v0.2.18. Added a notification listener service that emits `event=notification` context events through the existing Event source, with package allowlists, title/body filters, bounded regex matching, redacted Android logging, setup visibility in the inspector, and regression tests.
 **Description:** Implement notification-access onboarding and a `NotificationListenerService` context with app/source filters, title/body matching, regex option with limits, package allowlists, and redacted logging.  
 **Sources:** Tasker AutoNotification demand [S16], MacroDroid notification triggers [S17], Android notification listener constraints [L3].  
 **Category:** platform/OS, security, UX.  

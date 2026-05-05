@@ -97,9 +97,28 @@ object ContextMatchEvaluator {
             return false
         }
 
+        val packageAllowlist = firstConfig(spec, "package", "packages", "apps")
+            .splitCsv()
+            .map { it.lowercase(Locale.US) }
+            .toSet()
+        if (packageAllowlist.isNotEmpty()) {
+            val actualPackage = event.metadata["package"].orEmpty().lowercase(Locale.US)
+            if (actualPackage !in packageAllowlist) return false
+        }
+
+        val regex = spec.config["regex"]?.toBooleanStrictOrNull() ?: false
+        val titleFilter = spec.config["title"]?.trim().orEmpty()
+        if (titleFilter.isNotBlank() && !textMatches(event.metadata["title"].orEmpty(), titleFilter, regex)) {
+            return false
+        }
+        val bodyFilter = spec.config["body"]?.trim().orEmpty()
+        if (bodyFilter.isNotBlank() && !textMatches(event.metadata["body"].orEmpty(), bodyFilter, regex)) {
+            return false
+        }
+
         val filter = spec.config["filter"]?.trim().orEmpty()
         if (filter.isBlank()) return actualEvent.isNotBlank()
-        return event.metadata.values.any { it.contains(filter, ignoreCase = true) }
+        return event.metadata.values.any { textMatches(it, filter, regex) }
     }
 
     private fun firstConfig(spec: ContextSpec, vararg keys: String): String =
@@ -109,6 +128,14 @@ object ContextMatchEvaluator {
         split(',', ';')
             .map { it.trim() }
             .filter { it.isNotBlank() }
+
+    private fun textMatches(value: String, filter: String, regex: Boolean): Boolean {
+        if (!regex) return value.contains(filter, ignoreCase = true)
+        if (filter.length > MAX_REGEX_PATTERN_CHARS || value.length > MAX_REGEX_INPUT_CHARS) return false
+        return runCatching {
+            Regex(filter, RegexOption.IGNORE_CASE).containsMatchIn(value)
+        }.getOrDefault(false)
+    }
 
     private fun parseClockMinutes(value: String): Int? {
         val parts = value.trim().split(":")
@@ -170,4 +197,7 @@ object ContextMatchEvaluator {
         val c = 2 * atan2(sqrt(a), sqrt(1 - a))
         return earthRadiusMeters * c
     }
+
+    private const val MAX_REGEX_PATTERN_CHARS = 160
+    private const val MAX_REGEX_INPUT_CHARS = 1_000
 }
