@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.40 - 2026-05-05
+
+Geofence cadence tuning.
+
+- Added a balanced location provider request policy for the FOSS `LocationManager` source.
+- Requests GPS updates less aggressively than network updates to reduce baseline location polling pressure.
+- Added cadence metadata to the waiting-for-location setup event for inspector/debug visibility.
+- Extended location setup rechecks from 30 seconds to 60 seconds.
+- Added JVM coverage for cadence defaults and validation.
+
 ## v0.2.39 - 2026-05-05
 
 Geofence dwell cleanup.
