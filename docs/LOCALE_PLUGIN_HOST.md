@@ -2,7 +2,7 @@
 
 OpenTasker includes a conservative Locale/Tasker-compatible plugin host baseline for setting and condition plugins.
 
-## Supported in v0.2.53
+## Supported in v0.2.54
 
 - Discovers packages that expose Locale edit-setting or edit-condition activities.
 - Discovers explicit setting and condition broadcast receiver permission metadata for disclosure.
@@ -21,6 +21,7 @@ OpenTasker includes a conservative Locale/Tasker-compatible plugin host baseline
 - Accepts a string-only JSON object and converts it into the Locale bundle extra.
 - Adds a short blurb extra for plugin/user visibility.
 - Enforces package-name validation, a 16 KB bundle JSON limit, and a 1-30 second timeout wrapper.
+- Provides `tools/validate-locale-plugin.ps1` for adb-backed installed-plugin contract evidence.
 
 ## Not yet supported
 
@@ -28,6 +29,22 @@ OpenTasker includes a conservative Locale/Tasker-compatible plugin host baseline
 - Persisted plugin-backed Condition context rows that automatically re-query on `REQUEST_QUERY`.
 - Third-party plugin allowlists/denylists.
 - Plugin-provided variable expansion or progress callbacks.
+
+## Validation harness
+
+Use the harness against an installed sample plugin:
+
+```powershell
+powershell -File tools/validate-locale-plugin.ps1 -PluginPackage com.example.plugin -RequireSettingSupport -RequireConditionSupport
+```
+
+To exercise OpenTasker's request-query listener with a synthetic broadcast:
+
+```powershell
+powershell -File tools/validate-locale-plugin.ps1 -PluginPackage com.example.plugin -ConditionActivityClass com.example.plugin.ConditionActivity -SendRequestQuery
+```
+
+The harness writes raw adb output and `summary.json` under `build/device-evidence/locale-plugin/<timestamp>`.
 
 ## Safety rules
 
