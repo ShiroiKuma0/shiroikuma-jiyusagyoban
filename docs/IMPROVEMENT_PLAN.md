@@ -33,11 +33,18 @@ git diff --check
 | P5 | Dependency modernization | High | Started | Upgrade AndroidX, Room, WorkManager, DataStore, Coroutines, Hilt, Navigation, Compose, and Gson in controlled groups. | Dependency updates land in small batches with compile, unit, assemble, lint, and at least one emulator smoke pass for app startup/navigation. |
 | P6 | Emulator and instrumented reliability tests | High | Started | Cover Android platform behavior that JVM tests cannot verify. | Emulator tests cover setup checklist, profile enable/disable, task execution, run logs, permission-denied flows, and service startup. |
 | P7 | Release pipeline hardening | High | Not started | Make CI and release outputs production-grade. | Normal CI runs lint; release workflow validates signing, publishes checksums, uploads artifacts, and produces scoped release notes. |
-| P8 | Run-log/debug UX | Medium | Not started | Make "why did this run or not run?" answerable from the app. | Run logs support filters, source trigger, cooldown/retry decisions, sanitized expanded args, and capability/permission failure reasons. |
+| P8 | Run-log/debug UX | Medium | Started | Make "why did this run or not run?" answerable from the app. | Run logs support filters, source trigger, cooldown/retry decisions, sanitized expanded args, and capability/permission failure reasons. |
 | P9 | Room migration tests | Medium | Started | Protect user data as schemas evolve. | Migration tests cover all exported schema versions for both Room databases and backup/restore compatibility. |
 | P10 | Hilt vs non-Hilt architecture | Medium | Not started | Resolve dormant DI drift and keep app startup deterministic. | Either Hilt migration is completed and tested, or unused Hilt surface is removed until needed. |
 | P11 | Action safety boundaries | Medium | Not started | Apply consistent guardrails to shell, intent, file, SMS, settings, and privileged actions. | Destructive and privileged actions have capability checks, permission explanations, scoped-storage behavior, and clear unsupported failures. |
 | P12 | User-facing text centralization | Low | Not started | Improve accessibility, localization readiness, and copy consistency. | Stable labels, errors, empty states, and permission explanations move to string resources where practical. |
+| P13 | Template-first creation | High | Started | Compete with MacroDroid and Home Assistant by reducing blank-canvas setup friction through starter automations. | Starter profiles cover WiFi arrival, low battery, app opened, bedtime, work mode, notification action, and SMS safety examples with setup requirements shown before install. |
+| P14 | Visual rule summaries | High | Not started | Make profiles readable at a glance without opening every editor. | Each profile renders a compact sentence or graph explaining triggers, conditions, actions, inversions, cooldown, and re-trigger behavior. |
+| P15 | Guided builder flow | High | Not started | Offer a MacroDroid-style Trigger -> Conditions -> Actions -> Review creation path while keeping advanced editing available. | New users can create a complete disabled-for-review automation without understanding internal profile/task/context vocabulary first. |
+| P16 | Execution trace depth | High | Started | Move toward Automate/n8n-style step traces for every run. | Run details show step status, duration, input summary, output summary, expanded variables, skip/retry/cooldown decisions, and failure reason. |
+| P17 | Blueprint/share system | Medium | Started | Turn JSON bundles into a polished import/export and sharing experience. | Bundle preview validates required permissions, risky actions, variables, tasks, contexts, and schema compatibility before import. |
+| P18 | Tasker/Locale compatibility | Medium | Started | Make migration from Tasker credible without weakening security. | Tasker project import groundwork, Locale host/target docs, and same-signer or user-approved external-intent integration paths are documented and tested. |
+| P19 | Platform reliability dashboard | High | Started | Show whether Android platform constraints will let automations run reliably. | Setup displays live service health, exact alarm state, battery optimization, usage access, notification access, location/background location, OEM risk, and blocked automation families. |
 
 ## Execution Sequence
 
@@ -48,6 +55,23 @@ git diff --check
 5. Add P6 emulator smoke tests around the screens and services touched by P2.
 6. Modernize dependencies in P5 only after the test net is stronger.
 7. Promote lint into CI under P7 once P4 warning noise is low enough.
+8. Build P8/P16 run-log diagnostics before adding large new automation surface area.
+9. Expand P13 templates and P15 guided creation after diagnostics can explain failures clearly.
+10. Start P14 visual summaries with read-only profile summaries before building a visual flow editor.
+
+## Research-Backed Product Direction
+
+OpenTasker should not compete by feature count alone. The stronger position is private, open-source, on-device Android automation with Tasker-compatible power, MacroDroid-like clarity, Automate-like explainability, and n8n/Home-Assistant-like debugging and templates.
+
+| Reference product | Lesson for OpenTasker | Tracked items |
+|---|---|---|
+| Tasker | Power users expect profiles, tasks, variables, scenes, plugins, imports, and advanced control flow. | P14, P16, P18 |
+| MacroDroid | The trigger/action/constraint creation model lowers setup friction. | P13, P15, P19 |
+| Automate | Visual flows and execution traces make complex automations easier to reason about. | P14, P16 |
+| IFTTT | Discovery and integrations matter, but OpenTasker should avoid cloud dependency. | P13, P17, P18 |
+| Home Assistant | Blueprints reduce blank-canvas friction and make sharing safer. | P13, P17 |
+| n8n and Node-RED | Execution history, debug sidebars, and error handling are product features, not developer extras. | P8, P16 |
+| Android platform | Exact alarms, foreground services, background restrictions, and permission gates are core product constraints. | P6, P11, P19 |
 
 ## Notes
 
@@ -59,3 +83,4 @@ git diff --check
 - Instrumented migration-test scaffolding exists for `AppDatabase` 1->2 and `AutomationDatabase` version 1, and the verification gate now compiles androidTest sources. Full completion of P9 still needs emulator execution in CI or a local Android target.
 - The first dependency modernization batch updates AndroidX test libraries to support migration-test coverage. Room remains on 2.6.1 until the Kotlin serialization/runtime stack is upgraded together.
 - A local `connectedDebugAndroidTest` attempt found device `R5CY34G070L`, but Android rejected debug APK installation with `INSTALL_FAILED_UPDATE_INCOMPATIBLE` because an existing `com.opentasker.app` install is signed differently. Do not clear that install without explicit user approval.
+- Run-log filtering is started: users can filter all/succeeded/failed runs and search by task name or message, with unit coverage for the filtering rules.
