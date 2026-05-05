@@ -16,9 +16,11 @@ import com.opentasker.automation.app.AppUsageMonitor
 import com.opentasker.automation.network.WiFiNetworkMonitor
 import com.opentasker.automation.scheduler.TimeEventScheduler
 import com.opentasker.core.model.AutomationMode
+import com.opentasker.core.model.Profile
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.toEntity
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -145,27 +147,40 @@ class AutomationService : Service() {
     }
 
     private fun dispatchTask(
-        profile: com.opentasker.core.model.Profile,
+        profile: Profile,
         task: Task,
     ) {
         when (profile.automationMode) {
             AutomationMode.SINGLE -> {
                 if (profileTaskJobs[profile.id]?.isActive == true) {
                     android.util.Log.i("OpenTasker", "Profile ${profile.id} already running; SINGLE mode skipped retrigger")
+                    logSkippedRun(profile, task, "Profile is already running in SINGLE mode.")
                     return
                 }
-                if (!tryReserveCooldown(profile.id, profile.cooldownSec)) return
-                profileTaskJobs[profile.id] = launchTrackedTask(profile.id, task)
+                val reservation = reserveCooldown(profile.id, profile.cooldownSec)
+                if (!reservation.accepted) {
+                    logCooldownSkip(profile, task, reservation.remainingMs)
+                    return
+                }
+                profileTaskJobs[profile.id] = launchTrackedTask(profile, task)
             }
 
             AutomationMode.RESTART -> {
-                if (!tryReserveCooldown(profile.id, profile.cooldownSec)) return
+                val reservation = reserveCooldown(profile.id, profile.cooldownSec)
+                if (!reservation.accepted) {
+                    logCooldownSkip(profile, task, reservation.remainingMs)
+                    return
+                }
                 profileTaskJobs[profile.id]?.cancel()
-                profileTaskJobs[profile.id] = launchTrackedTask(profile.id, task)
+                profileTaskJobs[profile.id] = launchTrackedTask(profile, task)
             }
 
             AutomationMode.QUEUED -> {
-                if (!tryReserveCooldown(profile.id, profile.cooldownSec)) return
+                val reservation = reserveCooldown(profile.id, profile.cooldownSec)
+                if (!reservation.accepted) {
+                    logCooldownSkip(profile, task, reservation.remainingMs)
+                    return
+                }
                 if (profileTaskJobs[profile.id]?.isActive == true) {
                     synchronized(queuedProfileTasks) {
                         queuedProfileTasks.getOrPut(profile.id) { ArrayDeque() }.add(task)
@@ -173,49 +188,53 @@ class AutomationService : Service() {
                     android.util.Log.i("OpenTasker", "Profile ${profile.id} queued retrigger")
                     return
                 }
-                profileTaskJobs[profile.id] = launchQueuedTasks(profile.id, task)
+                profileTaskJobs[profile.id] = launchQueuedTasks(profile, task)
             }
 
             AutomationMode.PARALLEL -> {
-                if (!tryReserveCooldown(profile.id, profile.cooldownSec)) return
-                scope.launch { runTask(task, profile.id) }
+                val reservation = reserveCooldown(profile.id, profile.cooldownSec)
+                if (!reservation.accepted) {
+                    logCooldownSkip(profile, task, reservation.remainingMs)
+                    return
+                }
+                scope.launch { runTask(task, profile) }
             }
         }
     }
 
-    private fun launchTrackedTask(profileId: Long, task: Task): Job =
+    private fun launchTrackedTask(profile: Profile, task: Task): Job =
         scope.launch(start = CoroutineStart.DEFAULT) {
             val thisJob = currentCoroutineContext()[Job]
             try {
-                runTask(task, profileId)
+                runTask(task, profile)
             } finally {
                 synchronized(profileTaskJobs) {
-                    if (profileTaskJobs[profileId] == thisJob) {
-                        profileTaskJobs.remove(profileId)
+                    if (profileTaskJobs[profile.id] == thisJob) {
+                        profileTaskJobs.remove(profile.id)
                     }
                 }
             }
         }
 
-    private fun launchQueuedTasks(profileId: Long, firstTask: Task): Job =
+    private fun launchQueuedTasks(profile: Profile, firstTask: Task): Job =
         scope.launch(start = CoroutineStart.DEFAULT) {
             val thisJob = currentCoroutineContext()[Job]
             var nextTask: Task? = firstTask
             try {
                 while (isActive && nextTask != null) {
-                    runTask(requireNotNull(nextTask), profileId)
+                    runTask(requireNotNull(nextTask), profile)
                     nextTask = synchronized(queuedProfileTasks) {
-                        queuedProfileTasks[profileId]?.poll()?.also {
-                            if (queuedProfileTasks[profileId]?.isEmpty() == true) {
-                                queuedProfileTasks.remove(profileId)
+                        queuedProfileTasks[profile.id]?.poll()?.also {
+                            if (queuedProfileTasks[profile.id]?.isEmpty() == true) {
+                                queuedProfileTasks.remove(profile.id)
                             }
                         }
                     }
                 }
             } finally {
                 synchronized(profileTaskJobs) {
-                    if (profileTaskJobs[profileId] == thisJob) {
-                        profileTaskJobs.remove(profileId)
+                    if (profileTaskJobs[profile.id] == thisJob) {
+                        profileTaskJobs.remove(profile.id)
                     }
                 }
             }
@@ -223,7 +242,7 @@ class AutomationService : Service() {
 
     private suspend fun runTask(
         task: Task,
-        profileId: Long
+        profile: Profile,
     ) {
         val variables = VariableStore()
         val ctx = ActionContext(this, variables) { msg ->
@@ -236,11 +255,16 @@ class AutomationService : Service() {
         val logEntry = RunLogEntry(
             taskId = task.id,
             taskName = task.name,
+            timestamp = report.startedAt,
             durationMs = report.durationMs,
             success = report.success,
-            message = report.traces.toRunLogMessage()
+            message = runLogMessage(
+                source = "Profile: ${profile.name}",
+                metadata = profileRunMetadata(profile),
+                traces = report.traces,
+            ),
         )
-        db.runLogDao().insert(logEntry.toEntity())
+        insertRunLog(logEntry)
         
         android.util.Log.i(
             "OpenTasker",
@@ -249,19 +273,59 @@ class AutomationService : Service() {
         
     }
 
-    private fun tryReserveCooldown(profileId: Long, cooldownSec: Int): Boolean {
+    private fun logCooldownSkip(profile: Profile, task: Task, remainingMs: Long) {
+        logSkippedRun(profile, task, "Cooldown active for ${formatRemainingCooldown(remainingMs)}.")
+    }
+
+    private fun logSkippedRun(profile: Profile, task: Task, reason: String) {
+        scope.launch {
+            insertRunLog(
+                RunLogEntry(
+                    taskId = task.id,
+                    taskName = task.name,
+                    durationMs = 0,
+                    success = false,
+                    message = skippedRunLogMessage(
+                        source = "Profile: ${profile.name}",
+                        reason = reason,
+                        metadata = profileRunMetadata(profile),
+                    ),
+                )
+            )
+        }
+    }
+
+    private suspend fun insertRunLog(entry: RunLogEntry) {
+        runCatching { db.runLogDao().insert(entry.toEntity()) }
+            .onFailure { error ->
+                android.util.Log.e("OpenTasker", "Failed to write run log for task ${entry.taskId}", error)
+            }
+    }
+
+    private fun reserveCooldown(profileId: Long, cooldownSec: Int): CooldownReservation {
         val now = System.currentTimeMillis()
         synchronized(profileCooldowns) {
             val cooldownUntil = profileCooldowns[profileId] ?: 0
             if (now < cooldownUntil) {
                 android.util.Log.i("OpenTasker", "Profile $profileId on cooldown, skipping")
-                return false
+                return CooldownReservation(accepted = false, remainingMs = cooldownUntil - now)
             }
             if (cooldownSec > 0) {
                 profileCooldowns[profileId] = now + (cooldownSec * 1000L)
             }
-            return true
+            return CooldownReservation(accepted = true)
         }
+    }
+
+    private fun profileRunMetadata(profile: Profile): List<String> = buildList {
+        add("Profile ID: ${profile.id}")
+        add("Mode: ${profile.automationMode.name.lowercase()}")
+        if (profile.cooldownSec > 0) add("Cooldown: ${profile.cooldownSec}s")
+    }
+
+    private fun formatRemainingCooldown(remainingMs: Long): String {
+        val seconds = TimeUnit.MILLISECONDS.toSeconds(remainingMs).coerceAtLeast(1)
+        return if (seconds == 1L) "1 second" else "$seconds seconds"
     }
 
     private fun startForegroundCompat() {
@@ -293,3 +357,8 @@ class AutomationService : Service() {
         private const val NOTIF_ID = 1001
     }
 }
+
+private data class CooldownReservation(
+    val accepted: Boolean,
+    val remainingMs: Long = 0,
+)

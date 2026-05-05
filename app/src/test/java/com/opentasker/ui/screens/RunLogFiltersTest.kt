@@ -10,6 +10,7 @@ class RunLogFiltersTest {
         val logs = listOf(
             log(taskName = "Morning", success = true),
             log(taskName = "Commute", success = false),
+            log(taskName = "Bedtime", success = false, message = "Decision: Skipped"),
         )
 
         val filtered = filterRunLogs(
@@ -18,6 +19,27 @@ class RunLogFiltersTest {
         )
 
         assertEquals(listOf("Commute"), filtered.map { it.taskName })
+    }
+
+    @Test
+    fun filtersSkippedLogsSeparatelyFromFailures() {
+        val logs = listOf(
+            log(taskName = "Morning", success = false, message = "Decision: Skipped\nReason: Cooldown active."),
+            log(taskName = "Commute", success = false, message = "1. failure: Notify [notify.show] 3ms - Permission denied"),
+            log(taskName = "Bedtime", success = true),
+        )
+
+        val skipped = filterRunLogs(
+            logs,
+            RunLogFilterState(status = RunLogStatusFilter.Skipped),
+        )
+        val failed = filterRunLogs(
+            logs,
+            RunLogFilterState(status = RunLogStatusFilter.Failed),
+        )
+
+        assertEquals(listOf("Morning"), skipped.map { it.taskName })
+        assertEquals(listOf("Commute"), failed.map { it.taskName })
     }
 
     @Test
