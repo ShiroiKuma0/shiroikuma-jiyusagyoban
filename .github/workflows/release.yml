@@ -16,7 +16,9 @@ jobs:
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v4
       - name: Validate
-        run: chmod +x ./gradlew && ./gradlew :app:lint :app:testDebugUnitTest :app:assembleDebug
+        run: chmod +x ./gradlew && ./gradlew :app:lint :app:testDebugUnitTest :app:assembleDebug :app:verifyFdroidReadiness :app:verifyFdroidMetadata
+      - name: Build F-Droid release profile
+        run: ./gradlew -PopenTaskerDistribution=fdroid :app:assembleRelease :app:verifyFdroidReadiness :app:verifyFdroidMetadata
       - name: Build release APK
         run: ./gradlew :app:assembleRelease
       - name: Rename APK

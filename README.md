@@ -28,7 +28,7 @@
 ✅ **Open JSON bundles** — schema-versioned profile/task/context/action/variable/scene export and import planning  
 ✅ **Profile sharing manifests** — offline share summaries with safety findings and GitHub Discussions submission text
 ✅ **Tasker XML import UI** — Tasker XML files can be selected, previewed with migration/capability warnings, and imported into Room as disabled profiles for review
-✅ **F-Droid readiness** — property-based `fdroid` profile, dependency-policy check, and metadata draft
+✅ **F-Droid readiness** — property-based `fdroid` profile, dependency-policy and metadata checks, local fdroidserver lint/build evidence, and APK payload comparison harness
 ✅ **Dependency governance** — Gradle version catalog centralizes plugin/library versions before staged upgrades
 ✅ **Locale plugin host baseline** — explicit setting-plugin dispatch, condition-plugin query execution, configuration result parsing, request-query events, package validation, bundle limits, last-known unknown-state fallback, timeout wrapping, and adb validation harness
 ✅ **External automation target** — signature-scoped intents to run tasks, toggle profiles, query status, and pass variables
@@ -124,7 +124,7 @@ Release APKs are unsigned unless `OPEN_TASKER_RELEASE_KEYSTORE`, `OPEN_TASKER_RE
 6. **Termux script dispatch** — explicit permission flow, script allowlisting, stdout/stderr capture, and output variable mapping
 7. **Sharing preview UI** — import warnings, screenshots, permissions, and local review before importing community bundles
 8. **Locale condition UX** — plugin-backed Condition context rows and clearer setup/error surfaces
-9. **F-Droid submission hardening** — release tag discipline, fdroidserver lint/build, and reproducible binary comparison
+9. **Dependency modernization follow-through** — staged library/plugin upgrades under the existing Gradle version-catalog plan
 
 ---
 
