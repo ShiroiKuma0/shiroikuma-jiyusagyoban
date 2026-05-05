@@ -3,6 +3,7 @@ package com.opentasker.ui.screens
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.os.Build
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -597,14 +598,19 @@ private fun contextSourceSetup(context: Context, key: String): ContextSourceSetu
         )
     }
     "location" -> {
-        val foreground = hasPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+        val foreground = hasAnyLocationPermission(context)
+        val precise = hasPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
         val background = Build.VERSION.SDK_INT < 29 || hasPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        val providerEnabled = hasEnabledLocationProvider(context)
         ContextSourceSetup(
-            ready = foreground && background,
+            ready = foreground && providerEnabled,
             detail = when {
-                foreground && background -> "Location permissions are granted, but no live location source is registered yet."
-                foreground -> "Foreground location is granted; background location is still missing and no live location source is registered yet."
-                else -> "Location permissions are missing and no live location source is registered yet."
+                foreground && !providerEnabled -> "Location permission is granted, but GPS and network location providers are disabled."
+                foreground && background && precise -> "Live FOSS location source is registered with precise foreground and background location permission."
+                foreground && background -> "Live FOSS location source is registered with approximate foreground and background location permission."
+                foreground && precise -> "Live FOSS location source can emit while OpenTasker is running; background location is still needed for long-running geofence reliability."
+                foreground -> "Live FOSS location source can emit approximate fixes while OpenTasker is running; background location and precise access are still missing."
+                else -> "Foreground location permission is missing; live location contexts remain blocked until setup is complete."
             },
         )
     }
@@ -616,6 +622,16 @@ private fun requiredContextSourceKeys(): Set<String> =
 
 private fun hasPermission(context: Context, permission: String): Boolean =
     ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
+private fun hasAnyLocationPermission(context: Context): Boolean =
+    hasPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ||
+        hasPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
+
+private fun hasEnabledLocationProvider(context: Context): Boolean {
+    val locationManager = context.getSystemService(LocationManager::class.java) ?: return false
+    return runCatching { locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) }.getOrDefault(false) ||
+        runCatching { locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) }.getOrDefault(false)
+}
 
 private fun hasNotificationListenerAccess(context: Context): Boolean {
     val enabledListeners = android.provider.Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
