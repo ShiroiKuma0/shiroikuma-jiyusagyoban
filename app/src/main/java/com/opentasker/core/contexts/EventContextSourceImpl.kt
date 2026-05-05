@@ -25,6 +25,7 @@ class EventContextSourceImpl : ContextSource {
     override fun events(app: Context): Flow<ContextEvent> = merge(
         systemBroadcastEvents(app),
         NotificationContextEvents.events,
+        NfcContextEvents.events,
     )
 
     private fun systemBroadcastEvents(app: Context): Flow<ContextEvent> = callbackFlow {

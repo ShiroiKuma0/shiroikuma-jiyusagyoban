@@ -1,6 +1,7 @@
 package com.opentasker.core.templates
 
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
+import com.opentasker.core.model.ContextType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -63,7 +64,7 @@ class ProfileTemplateCatalogTest {
     fun plannedTemplatesAreVisibleButNotInstallable() {
         val planned = ProfileTemplateCatalog.all.filter { it.availability == TemplateAvailability.Planned }
 
-        assertEquals(3, planned.size)
+        assertEquals(2, planned.size)
         planned.forEach { template ->
             assertFalse(template.installable)
             var failed = false
@@ -74,5 +75,19 @@ class ProfileTemplateCatalogTest {
             }
             assertTrue("${template.id} should reject installation", failed)
         }
+    }
+
+    @Test
+    fun nfcTemplateInstallsWithTagIdEventContext() {
+        val template = ProfileTemplateCatalog.get("nightstand-nfc-sleep")!!
+
+        assertTrue(template.installable)
+
+        val applied = template.instantiate(template.defaults())
+        val context = applied.profile.contexts.single()
+
+        assertEquals(ContextType.EVENT, context.type)
+        assertEquals("nfc", context.config["event"])
+        assertEquals("04AABBCC", context.config["tagId"])
     }
 }
