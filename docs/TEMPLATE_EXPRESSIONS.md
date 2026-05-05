@@ -1,8 +1,8 @@
 # Template Expressions
 
-OpenTasker v0.2.31 includes bounded template expression support for action arguments and trace reporting.
+OpenTasker v0.2.32 includes bounded template expression support for action arguments and run-log trace reporting.
 
-The engine is implemented in `TemplateExpressionEngine` and evaluates `{{ ... }}` expressions against caller-provided task, event, global, and array scopes. `TaskRunner` now applies legacy `%var` expansion first, then applies template expansion to action arguments, and stores sanitized summaries, warnings, and per-argument expression traces in `ActionExecutionTrace`.
+The engine is implemented in `TemplateExpressionEngine` and evaluates `{{ ... }}` expressions against caller-provided task, event, global, and array scopes. `TaskRunner` applies legacy `%var` expansion first, then applies template expansion to action arguments, and stores sanitized summaries, warnings, and per-argument expression traces in `ActionExecutionTrace`. Run-log diagnostics parse those summaries into structured fields so the UI can show expanded arguments and template warning counts separately from the action result message.
 
 ## Scope Model
 
@@ -83,6 +83,6 @@ The baseline is intentionally small and fail-closed:
 
 ## Current Runtime Status
 
-Action arguments support template expansion at runtime. Run-log summary lines include sanitized expanded values only for arguments that used template expressions, redacting sensitive argument names such as `token`, `key`, `secret`, `cookie`, and `password`.
+Action arguments support template expansion at runtime. Run-log trace rows show sanitized expanded values only for arguments that used template expressions, redacting sensitive argument names such as `token`, `key`, `secret`, `cookie`, and `password`.
 
-Conditions still use the legacy `%var` condition evaluator. A richer variable debugger UI, condition-template adoption, and regex-specific template policy remain future L7 work.
+Conditions still use the legacy `%var` condition evaluator. A richer variable debugger UI for individual expression traces, condition-template adoption, and regex-specific template policy remain future L7 work.

@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.32 - 2026-05-05
+
+Template run-log diagnostics.
+
+- Parsed template expansion details out of action trace messages into structured run-log diagnostics.
+- Added per-step expanded argument summaries and template warning counts to the Run Log UI.
+- Preserved ordinary parenthesized failure messages while recognizing generated template detail suffixes.
+- Added regression coverage for parsing expanded argument details, warning counts, and normal parenthesized messages.
+
 ## v0.2.31 - 2026-05-05
 
 Runtime template argument expansion.

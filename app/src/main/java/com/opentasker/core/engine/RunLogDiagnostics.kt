@@ -26,6 +26,8 @@ data class RunLogActionDiagnostic(
     val actionType: String,
     val durationMs: Long,
     val message: String,
+    val argumentSummary: String? = null,
+    val templateWarningCount: Int = 0,
 )
 
 fun RunLogEntry.outcome(): RunLogOutcome {
@@ -102,19 +104,61 @@ private fun parseTraceLine(line: String): RunLogActionDiagnostic? {
     val match = tracePattern.matchEntire(line) ?: return null
     val status = runCatching { ActionTraceStatus.valueOf(match.groupValues[2].uppercase()) }.getOrNull()
         ?: return null
+    val parsedMessage = parseTraceMessage(match.groupValues[6])
     return RunLogActionDiagnostic(
         index = match.groupValues[1].toIntOrNull()?.minus(1) ?: return null,
         status = status,
         label = match.groupValues[3],
         actionType = match.groupValues[4],
         durationMs = match.groupValues[5].toLongOrNull() ?: return null,
-        message = match.groupValues[6],
+        message = parsedMessage.message,
+        argumentSummary = parsedMessage.argumentSummary,
+        templateWarningCount = parsedMessage.templateWarningCount,
     )
 }
+
+private fun parseTraceMessage(message: String): ParsedTraceMessage {
+    val detailStart = message.lastIndexOf(" (")
+    if (detailStart == -1 || !message.endsWith(")")) {
+        return ParsedTraceMessage(message)
+    }
+
+    val details = message.substring(detailStart + 2, message.length - 1)
+    val segments = details.split(";").map { it.trim() }.filter { it.isNotBlank() }
+    if (segments.none { it.startsWith(ARGUMENTS_DETAIL_PREFIX) || it.startsWith(TEMPLATE_WARNINGS_DETAIL_PREFIX) }) {
+        return ParsedTraceMessage(message)
+    }
+
+    val argumentSummary = segments
+        .firstOrNull { it.startsWith(ARGUMENTS_DETAIL_PREFIX) }
+        ?.substring(ARGUMENTS_DETAIL_PREFIX.length)
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+    val warningCount = segments
+        .firstOrNull { it.startsWith(TEMPLATE_WARNINGS_DETAIL_PREFIX) }
+        ?.substring(TEMPLATE_WARNINGS_DETAIL_PREFIX.length)
+        ?.trim()
+        ?.toIntOrNull()
+        ?: 0
+
+    return ParsedTraceMessage(
+        message = message.substring(0, detailStart),
+        argumentSummary = argumentSummary,
+        templateWarningCount = warningCount,
+    )
+}
+
+private data class ParsedTraceMessage(
+    val message: String,
+    val argumentSummary: String? = null,
+    val templateWarningCount: Int = 0,
+)
 
 private val tracePattern = Regex("""^(\d+)\. ([a-z]+): (.*?) \[([^]]+)] (\d+)ms - (.*)$""")
 private const val SOURCE_PREFIX = "Source:"
 private const val DECISION_PREFIX = "Decision:"
 private const val REASON_PREFIX = "Reason:"
+private const val ARGUMENTS_DETAIL_PREFIX = "args:"
+private const val TEMPLATE_WARNINGS_DETAIL_PREFIX = "template warnings:"
 private const val SKIPPED_DECISION = "Skipped"
 private const val LEGACY_EXTERNAL_SOURCE = "External intent"
