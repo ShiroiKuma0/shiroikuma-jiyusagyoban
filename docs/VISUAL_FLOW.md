@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-05
 
-OpenTasker v0.2.24 added a read-only Flow tab backed by a pure graph model. The current unreleased L1 work keeps that view read-only while adding node deep links, conditional action visualization, a compact scrollable lane overview, and screen-reader summaries.
+OpenTasker v0.2.24 added a read-only Flow tab backed by a pure graph model. The current unreleased L1 work keeps the graph layout read-only while adding node deep links, conditional action visualization, a compact scrollable lane overview, screen-reader summaries, and mutation shortcuts that reuse existing pickers.
 
 ## Scope
 
@@ -16,6 +16,7 @@ OpenTasker v0.2.24 added a read-only Flow tab backed by a pure graph model. The 
 - Conditional actions carry first-class condition text and render `if ...` incoming edge labels plus compact node markers.
 - Each profile graph includes a horizontally scrollable lane overview for context, profile, enter-task, and exit-task lanes.
 - Graph cards and node surfaces expose deterministic accessibility labels through Compose semantics.
+- Add Context and Add Step commands open the existing context/action pickers for the graph profile or task lane.
 
 ## Non-Goals
 
@@ -42,4 +43,4 @@ The model is kept outside Compose so later graph editing, export previews, and t
 1. Add future flow-control branch/subflow visualization once those action types exist.
 2. Add zoom gestures only if the scrollable lane overview proves useful on real profile data.
 3. Validate the summaries against real complex graphs before exposing drag/drop editing.
-4. Add mutation commands only after graph targets and summaries are stable against real profile data.
+4. Add drag/drop mutation only after picker-backed graph edits are stable against real profile data.

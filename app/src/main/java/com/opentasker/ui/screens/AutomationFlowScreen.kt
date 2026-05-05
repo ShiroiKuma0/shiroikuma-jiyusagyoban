@@ -20,10 +20,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,6 +54,8 @@ fun AutomationFlowScreen(
     tasks: List<Task>,
     contentPadding: PaddingValues,
     onNodeTargetSelected: (AutomationFlowTarget) -> Unit = {},
+    onAddContext: (Long) -> Unit = {},
+    onAddAction: (Long) -> Unit = {},
 ) {
     val graphs = remember(profiles, tasks) {
         val tasksById = tasks.associateBy { it.id }
@@ -76,7 +82,12 @@ fun AutomationFlowScreen(
             )
         }
         items(graphs, key = { it.profileId }) { graph ->
-            FlowGraphCard(graph = graph, onNodeTargetSelected = onNodeTargetSelected)
+            FlowGraphCard(
+                graph = graph,
+                onNodeTargetSelected = onNodeTargetSelected,
+                onAddContext = onAddContext,
+                onAddAction = onAddAction,
+            )
         }
     }
 }
@@ -148,6 +159,8 @@ private fun FlowOverviewCard(
 private fun FlowGraphCard(
     graph: AutomationFlowGraph,
     onNodeTargetSelected: (AutomationFlowTarget) -> Unit,
+    onAddContext: (Long) -> Unit,
+    onAddAction: (Long) -> Unit,
 ) {
     val profileNode = graph.nodes.first { it.kind == AutomationFlowNodeKind.PROFILE }
 
@@ -193,10 +206,11 @@ private fun FlowGraphCard(
                 }
                 FlowEdgeLabel("all context rules")
             }
+            FlowInlineCommand(label = "Add Context", onClick = { onAddContext(graph.profileId) })
 
             FlowNodeView(profileNode, onNodeTargetSelected)
-            FlowTaskLane(graph, graph.enterTaskNode, "enter", onNodeTargetSelected)
-            FlowTaskLane(graph, graph.exitTaskNode, "exit", onNodeTargetSelected)
+            FlowTaskLane(graph, graph.enterTaskNode, "enter", onNodeTargetSelected, onAddAction)
+            FlowTaskLane(graph, graph.exitTaskNode, "exit", onNodeTargetSelected, onAddAction)
 
             val missingNodes = graph.nodes.filter { it.kind == AutomationFlowNodeKind.MISSING }
             missingNodes.forEach { missingNode ->
@@ -217,6 +231,18 @@ private fun FlowGraphCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FlowInlineCommand(
+    label: String,
+    onClick: () -> Unit,
+) {
+    OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Icon(Icons.Filled.Add, contentDescription = null)
+        Spacer(Modifier.width(6.dp))
+        Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -337,6 +363,7 @@ private fun FlowTaskLane(
     taskNode: AutomationFlowNode?,
     label: String,
     onNodeTargetSelected: (AutomationFlowTarget) -> Unit,
+    onAddAction: (Long) -> Unit,
 ) {
     if (taskNode == null) return
     Spacer(Modifier.height(2.dp))
@@ -345,6 +372,9 @@ private fun FlowTaskLane(
     graph.actionNodesFor(taskNode.id).forEachIndexed { index, actionNode ->
         FlowEdgeLabel(graph.incomingEdgeLabel(actionNode.id) ?: if (index == 0) "step ${index + 1}" else "then")
         FlowNodeView(actionNode, onNodeTargetSelected)
+    }
+    (taskNode.target as? AutomationFlowTarget.Task)?.taskId?.let { taskId ->
+        FlowInlineCommand(label = "Add Step", onClick = { onAddAction(taskId) })
     }
 }
 
