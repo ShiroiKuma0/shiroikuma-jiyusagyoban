@@ -56,6 +56,12 @@
         <intent>
             <action android:name="com.twofortyfouram.locale.intent.action.EDIT_CONDITION" />
         </intent>
+        <intent>
+            <action android:name="com.twofortyfouram.locale.intent.action.FIRE_SETTING" />
+        </intent>
+        <intent>
+            <action android:name="com.twofortyfouram.locale.intent.action.QUERY_CONDITION" />
+        </intent>
     </queries>
 
     <application

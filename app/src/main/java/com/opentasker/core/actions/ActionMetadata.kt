@@ -132,6 +132,23 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "plugin.locale.query",
+            name = "Locale Plugin Condition",
+            description = "Query an explicit Locale/Tasker-compatible condition plugin and store its state",
+            category = "Plugin",
+            fields = listOf(
+                ActionField("package", "Plugin package", required = true, hint = "com.example.plugin"),
+                ActionField("bundleJson", "Bundle JSON", FieldType.MULTILINE, hint = "{\"key\":\"value\"}"),
+                ActionField("blurb", "Blurb", hint = "Short user-visible summary"),
+                ActionField("timeoutMs", "Timeout ms", FieldType.NUMBER, hint = "5000"),
+                ActionField("resultVariable", "Result variable", hint = "%plugin_state"),
+                ActionField("requireSatisfied", "Fail unless satisfied", FieldType.CHECKBOX),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "script.termux.run",
             name = "Run Termux Script",
             description = "Plan a Termux:Tasker script run; blocked until the script backend is implemented",

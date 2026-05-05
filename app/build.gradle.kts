@@ -36,8 +36,8 @@ android {
         applicationId = "com.opentasker.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 51
-        versionName = "0.2.49"
+        versionCode = 52
+        versionName = "0.2.50"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "DISTRIBUTION", "\"$selectedDistribution\"")
     }
