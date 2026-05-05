@@ -1,0 +1,36 @@
+Categories:
+  - System
+  - Connectivity
+License: MIT
+AuthorName: OpenTasker contributors
+SourceCode: https://github.com/SysAdminDoc/OpenTasker
+IssueTracker: https://github.com/SysAdminDoc/OpenTasker/issues
+Changelog: https://github.com/SysAdminDoc/OpenTasker/blob/master/CHANGELOG.md
+
+AutoName: OpenTasker
+Summary: Local-first Android automation
+Description: |-
+  OpenTasker is a local-first Android automation app for profiles, contexts,
+  tasks, actions, guided templates, open JSON bundles, Tasker migration planning,
+  and platform-aware setup checks.
+
+RepoType: git
+Repo: https://github.com/SysAdminDoc/OpenTasker.git
+
+Builds:
+  - versionName: 0.2.22
+    versionCode: 24
+    commit: TODO_FULL_COMMIT_HASH_FOR_RELEASE
+    subdir: .
+    gradle:
+      - yes
+    gradleprops:
+      - openTaskerDistribution=fdroid
+    preassemble:
+      - ":app:verifyFdroidReadiness"
+    output: app/build/outputs/apk/release/app-release-unsigned.apk
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 0.2.22
+CurrentVersionCode: 24

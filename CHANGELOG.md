@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.22 - 2026-05-05
+
+F-Droid readiness baseline.
+
+- Added an `openTaskerDistribution=fdroid` Gradle profile without changing existing Android variant names.
+- Pinned Android build tools to `35.0.0` and exposed `BuildConfig.DISTRIBUTION`.
+- Added `verifyFdroidReadiness` to block common proprietary dependency families from the F-Droid profile.
+- Added CI coverage for the F-Droid release profile.
+- Added F-Droid readiness docs and a draft fdroiddata metadata file for `com.opentasker.app`.
+
 ## v0.2.21 - 2026-05-05
 
 Tasker XML import baseline.

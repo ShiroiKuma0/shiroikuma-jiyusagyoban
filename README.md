@@ -1,13 +1,13 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.21-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.22-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.21** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, JSON bundles, Tasker XML import planning, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; scenes, variable tooling, and broader plugin UX are planned.
+**OpenTasker v0.2.22** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, JSON bundles, Tasker XML import planning, F-Droid build readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; scenes, variable tooling, and broader plugin UX are planned.
 
-> **Status:** v0.2.21 adds a Tasker XML parser that produces OpenTasker JSON bundles with an explicit migration report, while keeping local calendar/sun triggers, NFC tag events, notification listener events, the context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
+> **Status:** v0.2.22 adds a F-Droid distribution profile, dependency-policy verification, pinned build tools, CI coverage, and draft fdroiddata metadata, while keeping Tasker XML import planning, local calendar/sun triggers, NFC tag events, notification listener events, the context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
 
 ---
 
@@ -21,6 +21,7 @@
 ✅ **Profile templates** — guided starter profiles with variable slots, safety notes, and disabled-by-default installation  
 ✅ **Open JSON bundles** — schema-versioned profile/task/context/action/variable/scene export and import planning  
 ✅ **Tasker XML import planning** — common Tasker task/profile/variable XML converts to OpenTasker bundles with migration warnings
+✅ **F-Droid readiness** — property-based `fdroid` profile, dependency-policy check, and metadata draft
 ✅ **Locale plugin host baseline** — explicit setting-plugin dispatch with package validation, bundle limits, and timeout wrapping  
 ✅ **External automation target** — signature-scoped intents to run tasks, toggle profiles, query status, and pass variables
 ✅ **Automation modes** — per-profile single, restart, queued, and parallel re-trigger behavior  
@@ -106,10 +107,10 @@ Release APKs are unsigned unless `OPEN_TASKER_RELEASE_KEYSTORE`, `OPEN_TASKER_RE
 
 ## Next Phase (v0.3)
 
-1. **F-Droid readiness** — flavor policy, reproducibility assumptions, metadata, and release checks
-2. **Dependency modernization** — staged AndroidX/Kotlin/Room/WorkManager updates with device verification
-3. **Locale condition queries** — complete query execution for condition plugins with timeout and result handling
-4. **Tasker import UI** — file picker, migration preview, and import confirmation around the parser baseline
+1. **Dependency modernization** — staged AndroidX/Kotlin/Room/WorkManager updates with device verification
+2. **Locale condition queries** — complete query execution for condition plugins with timeout and result handling
+3. **Tasker import UI** — file picker, migration preview, and import confirmation around the parser baseline
+4. **F-Droid submission hardening** — release tag discipline, fdroidserver lint/build, and reproducible binary comparison
 5. **Calendar/sun polish** — richer presets, calendar privacy review, and device-level smoke coverage
 6. **NFC write-helper polish** — optional tag-writing flow around the active tag ID trigger baseline
 

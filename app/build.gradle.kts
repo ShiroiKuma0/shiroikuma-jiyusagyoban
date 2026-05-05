@@ -12,6 +12,14 @@ val releaseKeystorePath = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE")
 val releaseKeystorePassword = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE_PASSWORD")
 val releaseKeyAlias = System.getenv("OPEN_TASKER_RELEASE_KEY_ALIAS")
 val releaseKeyPassword = System.getenv("OPEN_TASKER_RELEASE_KEY_PASSWORD")
+val allowedDistributions = setOf("standard", "fdroid")
+val selectedDistribution = providers.gradleProperty("openTaskerDistribution")
+    .orElse("standard")
+    .get()
+    .lowercase()
+require(selectedDistribution in allowedDistributions) {
+    "Unsupported OpenTasker distribution '$selectedDistribution'. Expected one of: ${allowedDistributions.joinToString()}."
+}
 val hasReleaseSigning = listOf(
     releaseKeystorePath,
     releaseKeystorePassword,
@@ -22,14 +30,16 @@ val hasReleaseSigning = listOf(
 android {
     namespace = "com.opentasker.app"
     compileSdk = 35
+    buildToolsVersion = "35.0.0"
 
     defaultConfig {
         applicationId = "com.opentasker.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 23
-        versionName = "0.2.21"
+        versionCode = 24
+        versionName = "0.2.22"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "DISTRIBUTION", "\"$selectedDistribution\"")
     }
 
     signingConfigs {
@@ -130,4 +140,43 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.room:room-testing:$roomVersion")
+}
+
+tasks.register("verifyFdroidReadiness") {
+    group = "verification"
+    description = "Checks the F-Droid distribution profile for known proprietary dependency families."
+
+    doLast {
+        val forbiddenGroups = setOf(
+            "com.google.android.gms",
+            "com.google.firebase",
+            "com.android.billingclient",
+            "com.facebook.android",
+            "com.adjust.sdk",
+        )
+        val forbiddenNames = setOf(
+            "play-services",
+            "firebase",
+            "billingclient",
+            "crashlytics",
+            "appsflyer",
+        )
+        val forbidden = configurations
+            .flatMap { configuration ->
+                configuration.dependencies.mapNotNull { dependency ->
+                    val group = dependency.group.orEmpty()
+                    val name = dependency.name.lowercase()
+                    val blocked = group in forbiddenGroups || forbiddenNames.any { token -> token in name }
+                    if (blocked) "${configuration.name}:$group:${dependency.name}" else null
+                }
+            }
+            .distinct()
+            .sorted()
+
+        check(forbidden.isEmpty()) {
+            "F-Droid profile includes dependencies that need policy review: ${forbidden.joinToString()}"
+        }
+        check(selectedDistribution in allowedDistributions)
+        println("F-Droid readiness check passed for distribution=$selectedDistribution")
+    }
 }
