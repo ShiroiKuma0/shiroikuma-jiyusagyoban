@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.44 - 2026-05-05
+
+Location evidence template.
+
+- Added a disabled-by-default `Location evidence log` profile template for configuring a test radius with latitude, longitude, radius, max-accuracy, and dwell slots.
+- The template installs as a normal Location context plus a log action, so future device smoke work can verify actual Location event delivery without manual context construction.
+- Kept the template setup-required with explicit foreground/background location and device Location prerequisites.
+- Added JVM coverage for the template catalog entry and generated Location context config.
+
 ## v0.2.43 - 2026-05-05
 
 Location device evidence harness.

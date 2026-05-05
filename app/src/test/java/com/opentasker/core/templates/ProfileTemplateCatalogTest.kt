@@ -18,6 +18,7 @@ class ProfileTemplateCatalogTest {
                 "headphones-media",
                 "low-battery-saver",
                 "wifi-arrival",
+                "location-evidence-log",
                 "app-usage-reminder",
                 "find-my-phone",
                 "meeting-mode-calendar",
@@ -104,5 +105,25 @@ class ProfileTemplateCatalogTest {
         assertEquals("calendar", context.config["event"])
         assertEquals("during", context.config["state"])
         assertEquals("Work", context.config["calendar"])
+    }
+
+    @Test
+    fun locationEvidenceTemplateInstallsWithLocationContext() {
+        val template = ProfileTemplateCatalog.get("location-evidence-log")!!
+
+        assertTrue(template.installable)
+
+        val applied = template.instantiate(template.defaults())
+        val context = applied.profile.contexts.single()
+        val action = applied.task.actions.single()
+
+        assertEquals(ContextType.LOCATION, context.type)
+        assertEquals("40.7580", context.config["latitude"])
+        assertEquals("-73.9855", context.config["longitude"])
+        assertEquals("150", context.config["radiusMeters"])
+        assertEquals("100", context.config["maxAccuracyMeters"])
+        assertEquals("0", context.config["dwellSeconds"])
+        assertEquals("log", action.type)
+        assertTrue(action.args["message"].orEmpty().contains("40.7580,-73.9855"))
     }
 }
