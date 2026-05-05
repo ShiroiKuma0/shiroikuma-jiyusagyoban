@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.56 - 2026-05-05
+
+Calendar and sun context presets.
+
+- Added reusable Event context presets for during-meeting, before-meeting, all-day busy, at sunrise/sunset, and offset sunrise/sunset windows.
+- Added preset controls to the Event context editor when `event=calendar`, `event=sunrise`, or `event=sunset` is selected.
+- Presets preserve unrelated filters such as calendar allowlists while replacing the state/window fields they own.
+- Added JVM coverage for calendar preset coverage, sun offset windows, and preset application behavior.
+
 ## v0.2.55 - 2026-05-05
 
 NFC write-helper flow.
