@@ -6,7 +6,9 @@ param(
     [string]$OutputRoot = "build/device-evidence/location",
     [switch]$GrantLocationPermissions,
     [switch]$SendHomeDuringSample,
-    [switch]$SkipLaunch
+    [switch]$SkipLaunch,
+    [string]$RequireRunLogMessagePattern,
+    [string]$RequireLogcatPattern
 )
 
 Set-StrictMode -Version Latest
@@ -53,6 +55,56 @@ function Invoke-Adb {
         ExitCode = $process.ExitCode
         StdOut = $stdout.TrimEnd()
         StdErr = $stderr.TrimEnd()
+    }
+}
+
+function Invoke-AdbToFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$AdbArgs,
+        [Parameter(Mandatory = $true)]
+        [string]$OutputPath,
+        [switch]$AllowFailure
+    )
+
+    $allArgs = @()
+    if ($script:AdbSerial) {
+        $allArgs += @("-s", $script:AdbSerial)
+    }
+    $allArgs += $AdbArgs
+
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo.FileName = "adb"
+    foreach ($arg in $allArgs) {
+        [void]$process.StartInfo.ArgumentList.Add($arg)
+    }
+    $process.StartInfo.RedirectStandardOutput = $true
+    $process.StartInfo.RedirectStandardError = $true
+    $process.StartInfo.UseShellExecute = $false
+
+    $stderr = ""
+    $file = [System.IO.File]::Open($OutputPath, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write)
+    try {
+        [void]$process.Start()
+        $process.StandardOutput.BaseStream.CopyTo($file)
+        $stderr = $process.StandardError.ReadToEnd()
+        $process.WaitForExit()
+    } finally {
+        $file.Dispose()
+    }
+
+    if ($process.ExitCode -ne 0) {
+        Remove-Item -Path $OutputPath -Force -ErrorAction SilentlyContinue
+        if (-not $AllowFailure) {
+            throw "adb $($allArgs -join ' ') failed with exit code $($process.ExitCode): $stderr"
+        }
+    }
+
+    [pscustomobject]@{
+        Args = $allArgs
+        ExitCode = $process.ExitCode
+        StdErr = $stderr.TrimEnd()
+        OutputPath = $OutputPath
     }
 }
 
@@ -130,6 +182,98 @@ function Parse-PermissionGrant {
     return $PackageDump -match "${escaped}:\s+granted=true"
 }
 
+function Copy-AppDatabaseSnapshot {
+    param([string]$PackageName)
+
+    $files = @(
+        "opentasker.db",
+        "opentasker.db-wal",
+        "opentasker.db-shm"
+    )
+    $copied = @()
+    $errors = @()
+
+    foreach ($file in $files) {
+        $outputName = "room-$file"
+        $outputPath = Join-Path $script:OutputDir $outputName
+        $copy = Invoke-AdbToFile `
+            -AdbArgs @("exec-out", "run-as", $PackageName, "cat", "databases/$file") `
+            -OutputPath $outputPath `
+            -AllowFailure
+        if ($copy.ExitCode -eq 0) {
+            $copied += $outputName
+        } else {
+            $errors += [ordered]@{
+                file = $file
+                stderr = $copy.StdErr
+            }
+        }
+    }
+
+    [ordered]@{
+        copiedFiles = $copied
+        errors = $errors
+    }
+}
+
+function Read-RoomDatabaseSummary {
+    param([string]$DatabasePath)
+
+    $python = Get-Command python -ErrorAction SilentlyContinue
+    if (-not $python) {
+        return [ordered]@{
+            available = $false
+            reason = "python_not_found"
+        }
+    }
+
+    $script = @'
+import json
+import sqlite3
+import sys
+
+db_path = sys.argv[1]
+conn = sqlite3.connect(db_path)
+conn.row_factory = sqlite3.Row
+
+def count(name):
+    try:
+        return conn.execute(f"SELECT COUNT(*) AS c FROM {name}").fetchone()["c"]
+    except sqlite3.Error:
+        return None
+
+def rows(query):
+    try:
+        return [dict(row) for row in conn.execute(query).fetchall()]
+    except sqlite3.Error as exc:
+        return [{"error": str(exc)}]
+
+summary = {
+    "available": True,
+    "counts": {
+        "profiles": count("profiles"),
+        "tasks": count("tasks"),
+        "run_logs": count("run_logs"),
+    },
+    "profiles": rows("SELECT id, name, enabled, enterTaskId, contextsJson FROM profiles ORDER BY id"),
+    "tasks": rows("SELECT id, name, actionsJson FROM tasks ORDER BY id"),
+    "recentRunLogs": rows("SELECT id, taskId, taskName, timestamp, success, message FROM run_logs ORDER BY timestamp DESC LIMIT 20"),
+}
+print(json.dumps(summary, ensure_ascii=False))
+'@
+
+    $result = & $python.Source -c $script $DatabasePath 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        return [ordered]@{
+            available = $false
+            reason = "sqlite_summary_failed"
+            stderr = ($result -join "`n")
+        }
+    }
+
+    return $result | ConvertFrom-Json
+}
+
 $adbCheck = Get-Command adb -ErrorAction SilentlyContinue
 if (-not $adbCheck) {
     throw "adb was not found on PATH."
@@ -161,6 +305,7 @@ if ([System.IO.Path]::IsPathRooted($OutputRoot)) {
 $sessionId = Get-Date -Format "yyyyMMdd-HHmmss"
 $script:OutputDir = Join-Path $outputBase $sessionId
 [void](New-Item -ItemType Directory -Force -Path $script:OutputDir)
+$evidenceStartedAtEpochMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
 
 $grantResults = @()
 if ($GrantLocationPermissions) {
@@ -215,6 +360,16 @@ $afterLocation = Get-ShellText -ShellArgs @("dumpsys", "location") -AllowFailure
 $packageAfter = Get-ShellText -ShellArgs @("dumpsys", "package", $Package) -AllowFailure
 $appOpsAfter = Get-ShellText -ShellArgs @("appops", "get", $Package) -AllowFailure
 $logcat = (Invoke-Adb -AdbArgs @("logcat", "-d", "-t", "1000") -AllowFailure).StdOut
+$databaseSnapshot = Copy-AppDatabaseSnapshot -PackageName $Package
+$roomDatabasePath = Join-Path $script:OutputDir "room-opentasker.db"
+$roomSummary = if (Test-Path $roomDatabasePath) {
+    Read-RoomDatabaseSummary -DatabasePath $roomDatabasePath
+} else {
+    [ordered]@{
+        available = $false
+        reason = "database_not_copied"
+    }
+}
 
 [void](Save-Text -Name "services-after-sample.txt" -Text $serviceAfterSample)
 [void](Save-Text -Name "battery-after.txt" -Text $afterBattery)
@@ -223,6 +378,8 @@ $logcat = (Invoke-Adb -AdbArgs @("logcat", "-d", "-t", "1000") -AllowFailure).St
 [void](Save-Text -Name "package-after.txt" -Text $packageAfter)
 [void](Save-Text -Name "appops-after.txt" -Text $appOpsAfter)
 [void](Save-Text -Name "logcat-tail.txt" -Text $logcat)
+$roomSummaryJson = $roomSummary | ConvertTo-Json -Depth 8
+[void](Save-Text -Name "room-summary.json" -Text $roomSummaryJson)
 
 $permissions = [ordered]@{
     fine = Parse-PermissionGrant -PackageDump $packageAfter -Permission "android.permission.ACCESS_FINE_LOCATION"
@@ -233,6 +390,7 @@ $permissions = [ordered]@{
 
 $summary = [ordered]@{
     collectedAt = (Get-Date).ToString("o")
+    evidenceStartedAtEpochMs = $evidenceStartedAtEpochMs
     serial = $Serial
     package = $Package
     activity = $Activity
@@ -252,6 +410,14 @@ $summary = [ordered]@{
     serviceAfterSample = Parse-ServiceState -Text $serviceAfterSample
     batteryBefore = Parse-BatteryDump -Text $beforeBattery
     batteryAfter = Parse-BatteryDump -Text $afterBattery
+    roomDatabase = [ordered]@{
+        snapshot = $databaseSnapshot
+        summary = $roomSummary
+    }
+    requirements = [ordered]@{
+        runLogMessagePattern = $RequireRunLogMessagePattern
+        logcatPattern = $RequireLogcatPattern
+    }
     evidenceFiles = @(
         "battery-before.txt",
         "batterystats-before.txt",
@@ -264,7 +430,8 @@ $summary = [ordered]@{
         "location-after.txt",
         "package-after.txt",
         "appops-after.txt",
-        "logcat-tail.txt"
+        "logcat-tail.txt",
+        "room-summary.json"
     )
 }
 
@@ -282,8 +449,27 @@ if ($permissions.background -and (-not $launchState.hasLocationType -or -not $la
 if ($SendHomeDuringSample -and (-not $sampleState.automationServiceFound -or -not $sampleState.isForeground)) {
     throw "AutomationService was not foreground after home/background sample. Evidence: $script:OutputDir"
 }
+if (-not [string]::IsNullOrWhiteSpace($RequireLogcatPattern) -and $logcat -notmatch $RequireLogcatPattern) {
+    throw "Logcat did not contain required pattern '$RequireLogcatPattern'. Evidence: $script:OutputDir"
+}
+if (-not [string]::IsNullOrWhiteSpace($RequireRunLogMessagePattern)) {
+    if (-not $roomSummary.available) {
+        throw "Run-log requirement could not be checked because Room summary is unavailable. Evidence: $script:OutputDir"
+    }
+    $matchingRunLogs = @($roomSummary.recentRunLogs | Where-Object {
+        $_.timestamp -ge $evidenceStartedAtEpochMs -and $_.message -match $RequireRunLogMessagePattern
+    })
+    if ($matchingRunLogs.Count -eq 0) {
+        throw "Run logs did not contain required pattern '$RequireRunLogMessagePattern' after evidence start. Evidence: $script:OutputDir"
+    }
+}
 
 Write-Host "Evidence written to $script:OutputDir"
 Write-Host "After launch: serviceFound=$($launchState.automationServiceFound) foreground=$($launchState.isForeground) type=$($launchState.typeHex)"
 Write-Host "After sample: serviceFound=$($sampleState.automationServiceFound) foreground=$($sampleState.isForeground) type=$($sampleState.typeHex)"
+if ($roomSummary.available) {
+    Write-Host "Room summary: profiles=$($roomSummary.counts.profiles) tasks=$($roomSummary.counts.tasks) runLogs=$($roomSummary.counts.run_logs)"
+} else {
+    Write-Host "Room summary unavailable: $($roomSummary.reason)"
+}
 Write-Host "Summary: $summaryPath"

@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.45 - 2026-05-05
+
+Location event evidence assertions.
+
+- Extended `tools/collect-location-evidence.ps1` to snapshot the debug app's Room database through `run-as`.
+- Writes `room-summary.json` with profile, task, and recent run-log counts/details when local Python/SQLite support is available.
+- Added optional `-RequireRunLogMessagePattern` and `-RequireLogcatPattern` checks so a background Location run can fail closed unless execution evidence is present.
+- Kept database capture non-fatal for non-debug or non-`run-as` builds while preserving foreground-service validation.
+
 ## v0.2.44 - 2026-05-05
 
 Location evidence template.
