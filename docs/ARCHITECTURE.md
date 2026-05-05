@@ -22,7 +22,7 @@ Tasker's source is **not public**. This architecture is reconstructed from the u
 ```
 ┌───────────────────────────────────────────────────────┐
 │  UI (Jetpack Compose, Material 3, AMOLED default)     │
-│  - Profiles / Tasks / Setup / Run Log                 │
+│  - Profiles / Tasks / Inspector / Setup / Run Log     │
 ├───────────────────────────────────────────────────────┤
 │  Engine                                               │
 │  - ProfileMatcher  (evaluates active set)             │
@@ -53,6 +53,8 @@ Tasker's source is **not public**. This architecture is reconstructed from the u
 3. `ProfileMatcher` keeps a per-profile boolean state. When all contexts in a profile transition `false → true`, it submits the entry task; on `true → false`, the exit task.
 4. `TaskRunner` walks the action list, expanding `%vars` against `VariableStore`, executing actions sequentially, and writing action-level trace summaries to the run log.
 5. Actions return a `Result` (Success / Failure / Skip) — `TaskRunner` decides whether to halt based on the action's "Continue Task After Error" flag.
+
+The Context Inspector UI separately observes registered `ContextSource` flows and applies the same `ContextMatchEvaluator` rules to persisted profiles. It does not dispatch tasks; it explains current source health, latest values, and why each profile would or would not match.
 
 ### Persistence schema (Room)
 

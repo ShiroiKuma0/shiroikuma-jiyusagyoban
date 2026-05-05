@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.17 - 2026-05-05
+
+Context inspector baseline.
+
+- Added an Inspector tab with live registered context-source health, latest observed values, setup status, and source errors.
+- Added per-profile match explanations that show whether enabled profiles currently match and which context blocks activation.
+- Added a reusable context-inspection model with tests for source health, missing events, all-context matching, and inverted contexts.
+- Updated roadmap, project notes, README metadata, and app version metadata for the X6 baseline.
+
 ## v0.2.16 — 2026-05-04
 
 Automation mode baseline.
