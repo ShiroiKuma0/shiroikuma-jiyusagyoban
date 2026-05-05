@@ -4,6 +4,7 @@ import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -11,7 +12,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -44,6 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,6 +56,7 @@ import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
 import com.opentasker.core.model.SceneElementType
 import com.opentasker.core.model.Task
+import com.opentasker.core.scenes.SceneCanvasProjector
 import com.opentasker.core.scenes.SceneElementDrafts
 import com.opentasker.core.scenes.SceneIssue
 import com.opentasker.core.scenes.SceneIssueSeverity
@@ -315,21 +320,64 @@ private fun ScenePreviewBox(scene: Scene) {
             if (scene.elements.isEmpty()) {
                 Text("No elements", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
-                scene.elements.take(3).forEach { element ->
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val canvasHeight = SceneCanvasProjector.projectedHeight(
+                        scene = scene,
+                        canvasWidth = maxWidth.value,
+                        minHeight = 96f,
+                        maxHeight = 280f,
+                    )
+                    val projections = SceneCanvasProjector.project(scene, maxWidth.value, canvasHeight)
                     Surface(
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .size(width = maxWidth, height = canvasHeight.dp)
+                            .clipToBounds(),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.70f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
                     ) {
-                        Text(
-                            "${sceneElementTypeLabel(element.type)} at ${element.xDp},${element.yDp} size ${element.widthDp}x${element.heightDp}",
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
+                        Box(Modifier.fillMaxSize()) {
+                            projections.forEach { projection ->
+                                SceneCanvasElement(projection)
+                            }
+                        }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SceneCanvasElement(projection: com.opentasker.core.scenes.SceneCanvasElementProjection) {
+    val element = projection.element
+    val color = when (element.type) {
+        SceneElementType.BUTTON -> MaterialTheme.colorScheme.primary
+        SceneElementType.TEXT -> MaterialTheme.colorScheme.tertiary
+        SceneElementType.SLIDER -> MaterialTheme.colorScheme.secondary
+        SceneElementType.IMAGE -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.primary
+    }
+    Surface(
+        modifier = Modifier
+            .offset(x = projection.x.dp, y = projection.y.dp)
+            .size(
+                width = projection.width.coerceAtLeast(12f).dp,
+                height = projection.height.coerceAtLeast(12f).dp,
+            ),
+        color = color.copy(alpha = 0.14f),
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.52f)),
+    ) {
+        Box(Modifier.fillMaxSize().padding(4.dp), contentAlignment = Alignment.Center) {
+            Text(
+                text = sceneElementSummary(element) ?: sceneElementTypeLabel(element.type),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
