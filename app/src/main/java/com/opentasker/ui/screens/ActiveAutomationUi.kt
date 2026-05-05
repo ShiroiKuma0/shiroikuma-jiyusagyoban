@@ -589,6 +589,24 @@ fun ActiveAutomationUi(
                 tasks = tasks,
                 contentPadding = innerPadding,
                 onNodeTargetSelected = openFlowTarget,
+                onAddContext = { profileId ->
+                    val profile = profiles.firstOrNull { it.id == profileId }
+                    if (profile != null) {
+                        screen = OpenTaskerScreen.Profiles
+                        contextPickerProfile = profile
+                    } else {
+                        scope.launch { snackbarHostState.showSnackbar("Flow target no longer exists") }
+                    }
+                },
+                onAddAction = { taskId ->
+                    val task = tasks.firstOrNull { it.id == taskId }
+                    if (task != null) {
+                        screen = OpenTaskerScreen.Tasks
+                        actionPickerTask = task
+                    } else {
+                        scope.launch { snackbarHostState.showSnackbar("Flow target no longer exists") }
+                    }
+                },
             )
 
             OpenTaskerScreen.Scenes -> SceneLibraryScreen(
