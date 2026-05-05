@@ -133,9 +133,9 @@ private enum class OpenTaskerScreen(val label: String) {
     Tasks("Tasks"),
     Flow("Flow"),
     Scenes("Scenes"),
-    Inspector("Inspector"),
+    Inspector("Inspect"),
     Setup("Setup"),
-    RunLog("Run Log"),
+    RunLog("Log"),
 }
 
 private data class ActionEditState(
