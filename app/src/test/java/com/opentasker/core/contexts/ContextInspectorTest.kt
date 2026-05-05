@@ -143,4 +143,58 @@ class ContextInspectorTest {
         assertFalse(result.contexts.single().effectiveMatched)
         assertEquals("Usage access is missing.", result.summary)
     }
+
+    @Test
+    fun profileInspectionCanUseTransformedLocationDwellObservation() {
+        val profile = Profile(
+            id = 5,
+            name = "Office dwell",
+            enabled = true,
+            enterTaskId = 10,
+            contexts = listOf(
+                ContextSpec(
+                    ContextType.LOCATION,
+                    mapOf(
+                        "latitude" to "40.7580",
+                        "longitude" to "-73.9855",
+                        "radiusMeters" to "150",
+                        "dwellSeconds" to "60",
+                    ),
+                ),
+            ),
+        )
+        val source = ContextSourceSnapshot(
+            key = "location",
+            label = "Location",
+            registered = true,
+            setupReady = true,
+            lastObservation = ContextEventObservation(
+                ContextEvent(
+                    "location",
+                    true,
+                    mapOf(
+                        "latitude" to "40.7581",
+                        "longitude" to "-73.9856",
+                        "observedAtEpochMs" to "120000",
+                    ),
+                ),
+                observedAtMs = 120_000L,
+            ),
+        )
+
+        val result = inspectProfiles(listOf(profile), listOf(source)) { _, _, _, observation ->
+            observation.copy(
+                event = observation.event.copy(
+                    metadata = observation.event.metadata + mapOf(
+                        "insideSinceEpochMs" to "0",
+                        "dwellState" to "inside",
+                    ),
+                ),
+            )
+        }.single()
+
+        assertTrue(result.matching)
+        assertEquals("inside", result.contexts.single().lastObservation?.event?.metadata?.get("dwellState"))
+        assertEquals("0", result.contexts.single().lastObservation?.event?.metadata?.get("insideSinceEpochMs"))
+    }
 }

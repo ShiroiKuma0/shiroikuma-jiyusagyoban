@@ -4,6 +4,13 @@ import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.Profile
 import java.util.Locale
 
+typealias ContextObservationTransformer = (
+    profile: Profile,
+    contextIndex: Int,
+    spec: ContextSpec,
+    observation: ContextEventObservation,
+) -> ContextEventObservation
+
 enum class ContextSourceStatus(val label: String) {
     Active("Active"),
     Waiting("Waiting"),
@@ -67,19 +74,21 @@ data class ContextCheck(
 fun inspectProfiles(
     profiles: List<Profile>,
     sourceSnapshots: Collection<ContextSourceSnapshot>,
+    observationTransformer: ContextObservationTransformer = { _, _, _, observation -> observation },
 ): List<ProfileInspection> {
     val sourcesByKey = sourceSnapshots.associateBy { it.key }
     return profiles
-        .map { profile -> inspectProfile(profile, sourcesByKey) }
+        .map { profile -> inspectProfile(profile, sourcesByKey, observationTransformer) }
         .sortedWith(compareBy<ProfileInspection> { !it.enabled }.thenBy { it.profileName.lowercase(Locale.US) })
 }
 
 fun inspectProfile(
     profile: Profile,
     sourcesByKey: Map<String, ContextSourceSnapshot>,
+    observationTransformer: ContextObservationTransformer = { _, _, _, observation -> observation },
 ): ProfileInspection {
     val checks = profile.contexts.mapIndexed { index, spec ->
-        inspectContext(index, spec, sourcesByKey)
+        inspectContextForProfile(profile, index, spec, sourcesByKey, observationTransformer)
     }
     val contextsMatch = checks.isNotEmpty() && checks.all { it.effectiveMatched }
     val matching = profile.enabled && contextsMatch
@@ -105,9 +114,27 @@ fun inspectContext(
     spec: ContextSpec,
     sourcesByKey: Map<String, ContextSourceSnapshot>,
 ): ContextCheck {
+    return inspectContextForProfile(
+        profile = Profile(id = 0, name = "Inspector", enterTaskId = 0),
+        index = index,
+        spec = spec,
+        sourcesByKey = sourcesByKey,
+        observationTransformer = { _, _, _, observation -> observation },
+    )
+}
+
+private fun inspectContextForProfile(
+    profile: Profile,
+    index: Int,
+    spec: ContextSpec,
+    sourcesByKey: Map<String, ContextSourceSnapshot>,
+    observationTransformer: ContextObservationTransformer,
+): ContextCheck {
     val sourceKey = ContextMatchEvaluator.sourceKey(spec.type)
     val snapshot = sourceKey?.let(sourcesByKey::get)
-    val observation = snapshot?.lastObservation
+    val observation = snapshot?.lastObservation?.let {
+        observationTransformer(profile, index, spec, it)
+    }
     val rawMatched = observation?.let { ContextMatchEvaluator.matches(spec, it.event) } ?: false
     val sourceStatus = snapshot?.status ?: ContextSourceStatus.Missing
     val sourceCanMatch = sourceStatus == ContextSourceStatus.Active
