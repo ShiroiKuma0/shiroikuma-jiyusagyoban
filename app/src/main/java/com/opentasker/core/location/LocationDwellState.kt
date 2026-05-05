@@ -113,6 +113,18 @@ class LocationDwellStateStore(
         return event.copy(metadata = update.metadata)
     }
 
+    fun clearProfile(profileId: Long): Int =
+        clearKeysWithPrefix(LocationDwellStateKey.profilePrefix(profileId))
+
+    private fun clearKeysWithPrefix(prefix: String): Int {
+        val keys = prefs.all.keys.filter { it.startsWith(prefix) }
+        if (keys.isEmpty()) return 0
+        prefs.edit().also { editor ->
+            keys.forEach { editor.remove(it) }
+        }.apply()
+        return keys.size
+    }
+
     companion object {
         private const val PREFS_NAME = "opentasker_location_dwell_state"
         private const val MISSING_INSIDE_SINCE = -1L
@@ -121,13 +133,16 @@ class LocationDwellStateStore(
 
 data class LocationDwellStateKey(val storageKey: String) {
     companion object {
+        fun profilePrefix(profileId: Long): String =
+            "profile:$profileId:"
+
         fun from(profileId: Long, contextIndex: Int, config: Map<String, String>): LocationDwellStateKey {
             val configHash = sha256(
                 config.entries
                     .sortedBy { it.key.lowercase(Locale.US) }
                     .joinToString(separator = "\n") { "${it.key.trim()}=${it.value.trim()}" },
             )
-            return LocationDwellStateKey("profile:$profileId:context:$contextIndex:$configHash")
+            return LocationDwellStateKey("${profilePrefix(profileId)}context:$contextIndex:$configHash")
         }
 
         private fun sha256(value: String): String {

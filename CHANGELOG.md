@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.39 - 2026-05-05
+
+Geofence dwell cleanup.
+
+- Added profile-scoped persisted dwell-state cleanup for deleted profiles.
+- Cleared a profile's persisted Location dwell keys when its context list changes, preventing removed or reindexed geofences from retaining stale timers.
+- Routed the active automation view model through the application context so profile edits can maintain location dwell storage.
+- Kept enable/disable and profile metadata edits from resetting dwell timers when contexts are unchanged.
+
 ## v0.2.38 - 2026-05-05
 
 Context Inspector dwell detail.
