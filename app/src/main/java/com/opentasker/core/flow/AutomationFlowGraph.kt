@@ -33,6 +33,9 @@ data class AutomationFlowGraph(
         }
         return orderedIds.mapNotNull { id -> nodes.firstOrNull { it.id == id } }
     }
+
+    fun incomingEdgeLabel(nodeId: String): String? =
+        edges.firstOrNull { it.toId == nodeId }?.label
 }
 
 data class AutomationFlowNode(
@@ -42,6 +45,7 @@ data class AutomationFlowNode(
     val detail: String? = null,
     val muted: Boolean = false,
     val target: AutomationFlowTarget? = null,
+    val condition: String? = null,
 )
 
 enum class AutomationFlowNodeKind {
@@ -193,7 +197,7 @@ object AutomationFlowGraphBuilder {
             edges += AutomationFlowEdge(
                 fromId = previousNodeId,
                 toId = actionNodeId,
-                label = if (index == 0) "step 1" else "then",
+                label = action.edgeLabel(index),
             )
             previousNodeId = actionNodeId
         }
@@ -222,11 +226,16 @@ private fun ActionSpec.toNode(id: String, taskId: Long, index: Int): AutomationF
         detail = listOfNotNull(
             type,
             args.summaryOrNull(),
-            condition?.takeUnless { it.isBlank() }?.let { "if $it" },
             if (continueOnError) "continues after error" else null,
         ).joinToString(" - "),
         target = AutomationFlowTarget.Action(taskId, index),
+        condition = condition?.trim()?.takeUnless { it.isBlank() },
     )
+
+private fun ActionSpec.edgeLabel(index: Int): String {
+    val trimmedCondition = condition?.trim()?.takeUnless { it.isBlank() }
+    return trimmedCondition?.let { "if ${it.safePreview()}" } ?: if (index == 0) "step 1" else "then"
+}
 
 private fun Map<String, String>.summaryOrNull(limit: Int = 3): String? {
     if (isEmpty()) return null
