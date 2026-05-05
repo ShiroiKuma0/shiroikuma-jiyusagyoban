@@ -1,6 +1,7 @@
 package com.opentasker.core.contexts
 
 import com.opentasker.core.model.ContextSpec
+import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import java.util.Locale
 
@@ -156,10 +157,13 @@ private fun inspectContextForProfile(
 }
 
 fun contextConfigSummary(spec: ContextSpec): String {
-    val summary = spec.config.entries
-        .sortedBy { it.key }
-        .joinToString { "${it.key}=${it.value}" }
-        .ifBlank { "No configuration" }
+    val summary = when (spec.type) {
+        ContextType.DAY -> DaySchedule.displayLabel(spec.config["days"] ?: spec.config["day"].orEmpty())
+        else -> spec.config.entries
+            .sortedBy { it.key }
+            .joinToString { "${it.key}=${it.value}" }
+            .ifBlank { "No configuration" }
+    }
     return if (spec.invert) "$summary; inverted" else summary
 }
 
