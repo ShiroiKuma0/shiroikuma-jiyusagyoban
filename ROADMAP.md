@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.28. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.29. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-05
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.28
+**Current app version:** 0.2.29
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -13,7 +13,7 @@ Source-backed product roadmap for OpenTasker v0.2.28. This file reconciles the c
 
 OpenTasker is an Android/Kotlin automation app targeting API 35 with Jetpack Compose, Material 3, Room, Coroutines, WorkManager, DataStore, Gson, and Hilt dependencies. The project goal is a privacy-first, fully on-device, open-source Tasker/MacroDroid/Automate alternative.
 
-The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, scenes, run logs, setup/onboarding status, read-only flow graphs, live context inspection, notification listener event triggers, NFC tag event triggers, calendar/sun event triggers, a Tasker XML-to-OpenTasker-bundle migration parser, OpenTasker bundle share manifests, a F-Droid readiness build profile, centralized Gradle dependency version governance, optional Shizuku readiness status for elevated-action planning, and optional Termux script readiness status for future scripting. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
+The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, scenes, run logs, setup/onboarding status, read-only flow graphs, live context inspection, notification listener event triggers, NFC tag event triggers, calendar/sun event triggers, FOSS geofence radius/accuracy/dwell evaluation, a Tasker XML-to-OpenTasker-bundle migration parser, OpenTasker bundle share manifests, a F-Droid readiness build profile, centralized Gradle dependency version governance, optional Shizuku readiness status for elevated-action planning, and optional Termux script readiness status for future scripting. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
 
 Key local constraints:
 
@@ -415,6 +415,7 @@ Key local constraints:
 
 ### L6 - Advanced location without proprietary lock-in
 
+**Status:** Baseline completed in v0.2.29. Added a pure `FossGeofenceEvaluator` with Haversine distance, radius checks, optional max accuracy, and dwell-time evaluation, then wired active Location context matching and legacy geofence distance checks through it. Live background location sourcing, policy disclosures, battery tuning, dwell state persistence, and any optional Play-flavor backend remain later L6 slices.
 **Description:** Implement FOSS-first geofencing through Android location APIs/manual Haversine, dwell time, accuracy tuning, and optional Play flavor backend only if the project explicitly accepts a Play-services flavor split.  
 **Sources:** Android background location policy [S29], F-Droid inclusion policy [S32], Easer/LLAMA location lessons [S1][S21].  
 **Category:** platform/OS, privacy, distribution.  

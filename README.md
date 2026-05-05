@@ -1,13 +1,13 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.28-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.29-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.28** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, scene library management, read-only flow graphs, JSON bundles, profile sharing manifests, Tasker XML import planning, F-Droid build readiness, dependency version governance, optional Shizuku readiness, optional Termux script readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; variable tooling, elevated backends, script execution, and broader plugin UX are planned.
+**OpenTasker v0.2.29** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, FOSS geofence evaluation, scene library management, read-only flow graphs, JSON bundles, profile sharing manifests, Tasker XML import planning, F-Droid build readiness, dependency version governance, optional Shizuku readiness, optional Termux script readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers, calendar/sun triggers, and a conservative Locale plugin host baseline are active now; variable tooling, elevated backends, script execution, and broader plugin UX are planned.
 
-> **Status:** v0.2.28 adds an offline profile-share manifest that summarizes JSON bundles, reports capability/import safety findings, and prepares GitHub Discussions submission markdown without network publishing or verified-template claims. It keeps Termux script readiness, Shizuku readiness, the Scenes tab, Flow tab, centralized dependency governance, F-Droid distribution profile, Tasker XML import planning, local calendar/sun triggers, NFC tag events, notification listener events, context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
+> **Status:** v0.2.29 adds a Play-services-free geofence evaluator with Haversine radius checks, optional max accuracy, and dwell-time matching for Location contexts. It keeps profile sharing manifests, Termux script readiness, Shizuku readiness, the Scenes tab, Flow tab, centralized dependency governance, F-Droid distribution profile, Tasker XML import planning, local calendar/sun triggers, NFC tag events, notification listener events, context inspector, per-profile automation modes, signature-scoped external intents, Locale plugin dispatch, guided templates, profile/task/action/context/run-log management, setup checks, platform-safe monitors, capability gates, and action-level run log traces active.
 
 ---
 
@@ -16,6 +16,7 @@
 ✅ **Core engine operational** — profiles → contexts → tasks → actions pipeline  
 ✅ **42 registered action definitions** — supported actions run, restricted/script/import-placeholder actions are gated or fail explicitly
 ✅ **Reactive context sources** — app foreground, time, state, event, WiFi, app-open monitoring, notifications, NFC tag scans, calendar windows, and sunrise/sunset matching are wired; day/location are planned runtime work
+✅ **FOSS geofence evaluator** — Location context matching supports radius, accuracy, and dwell checks without Play Services
 ✅ **AMOLED-first** — Catppuccin Mocha palette, light theme toggle  
 ✅ **Compose UI reintegration started** — active navigation now manages profiles, tasks, actions, contexts, and run logs from Room  
 ✅ **Profile templates** — guided starter profiles with variable slots, safety notes, and disabled-by-default installation  
@@ -71,7 +72,7 @@ Room DB (persistent storage)
 
 ### Contexts
 - **Runtime-wired now:** Application foreground detection, time ticks, device state broadcasts, event broadcasts, WiFi network changes, app-open monitoring, notification listener events, NFC tag events, calendar windows, and sunrise/sunset event filters.
-- **Configured in UI but still being hardened:** Day schedules and location/geofence contexts.
+- **Configured in UI but still being hardened:** Day schedules and location/geofence contexts. Location matching supports FOSS radius, accuracy, and dwell evaluation when location events are supplied; a live location source remains planned runtime work.
 
 ### Actions (42 registered definitions)
 | Category | Count | Examples |

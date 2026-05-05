@@ -2,14 +2,11 @@ package com.opentasker.core.contexts
 
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
+import com.opentasker.core.location.FossGeofenceEvaluator
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Calendar
 import java.util.Locale
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
 
 /**
  * Applies a persisted [ContextSpec] to raw context-source events.
@@ -72,14 +69,7 @@ object ContextMatchEvaluator {
     }
 
     private fun matchesLocation(spec: ContextSpec, event: ContextEvent): Boolean {
-        val currentLat = event.metadata["latitude"]?.toDoubleOrNull() ?: return false
-        val currentLon = event.metadata["longitude"]?.toDoubleOrNull() ?: return false
-        val centerLat = firstConfig(spec, "latitude", "lat").toDoubleOrNull() ?: return false
-        val centerLon = firstConfig(spec, "longitude", "lon", "lng").toDoubleOrNull() ?: return false
-        val radiusMeters = firstConfig(spec, "radiusMeters", "radius").toDoubleOrNull()
-            ?.takeIf { it >= 0.0 }
-            ?: return false
-        return distanceMeters(currentLat, currentLon, centerLat, centerLon) <= radiusMeters
+        return FossGeofenceEvaluator.evaluate(spec.config, event.metadata)?.matches == true
     }
 
     private fun matchesState(spec: ContextSpec, event: ContextEvent): Boolean {
@@ -246,17 +236,6 @@ object ContextMatchEvaluator {
         "wifi" -> "wifi"
         "headset" -> "headphones"
         else -> key
-    }
-
-    private fun distanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val earthRadiusMeters = 6_371_000.0
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-        val a = sin(dLat / 2) * sin(dLat / 2) +
-            cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
-            sin(dLon / 2) * sin(dLon / 2)
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        return earthRadiusMeters * c
     }
 
     private const val MAX_REGEX_PATTERN_CHARS = 160

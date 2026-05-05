@@ -2219,6 +2219,8 @@ private fun contextFields(type: ContextType): List<ActionField> = when (type) {
         ActionField("latitude", "Latitude", FieldType.NUMBER, required = true),
         ActionField("longitude", "Longitude", FieldType.NUMBER, required = true),
         ActionField("radiusMeters", "Radius meters", FieldType.NUMBER, required = true, hint = "100"),
+        ActionField("maxAccuracyMeters", "Max accuracy meters", FieldType.NUMBER, hint = "50"),
+        ActionField("dwellSeconds", "Dwell seconds", FieldType.NUMBER, hint = "300"),
     )
     ContextType.STATE -> listOf(
         ActionField("key", "State key", required = true, hint = "battery, wifi, charging, screen"),
@@ -2260,7 +2262,7 @@ private fun contextDescription(type: ContextType): String = when (type) {
     ContextType.APPLICATION -> "Matches when an app is detected in the foreground."
     ContextType.TIME -> "Matches during a clock time window."
     ContextType.DAY -> "Matches on selected days of the week."
-    ContextType.LOCATION -> "Matches near a latitude/longitude radius."
+    ContextType.LOCATION -> "Matches near a latitude/longitude radius with optional accuracy and dwell checks."
     ContextType.STATE -> "Matches a device state such as battery, charging, screen, or WiFi."
     ContextType.EVENT -> "Matches a one-shot event such as boot, SMS, notification, NFC, calendar, sun, or intent."
 }

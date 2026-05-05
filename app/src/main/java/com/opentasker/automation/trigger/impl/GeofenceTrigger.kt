@@ -3,7 +3,7 @@ package com.opentasker.automation.trigger.impl
 import com.opentasker.automation.core.TriggerDefinition
 import com.opentasker.automation.model.AutomationEvent
 import com.opentasker.automation.model.TriggerConfig
-import kotlin.math.sqrt
+import com.opentasker.core.location.FossGeofenceEvaluator
 
 /**
  * Geofence trigger that matches location entry/exit events.
@@ -33,7 +33,7 @@ class GeofenceTrigger : TriggerDefinition {
         val radiusMeters = config.config["radiusMeters"].asDouble() ?: config.config["radius"].asDouble() ?: return false
         if (radiusMeters < 0) return false
 
-        val distance = calculateDistance(
+        val distance = FossGeofenceEvaluator.distanceMeters(
             event.latitude, event.longitude,
             centerLat, centerLon
         )
@@ -42,20 +42,6 @@ class GeofenceTrigger : TriggerDefinition {
         }
 
         return true
-    }
-
-    /**
-     * Calculate distance between two coordinates in meters (Haversine formula).
-     */
-    private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val R = 6371000 // Earth radius in meters
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-        val a = kotlin.math.sin(dLat / 2) * kotlin.math.sin(dLat / 2) +
-                kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
-                kotlin.math.sin(dLon / 2) * kotlin.math.sin(dLon / 2)
-        val c = 2 * kotlin.math.atan2(sqrt(a), sqrt(1 - a))
-        return R * c
     }
 
     private fun Any?.asString(): String? = when (this) {
