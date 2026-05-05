@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.24. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.25. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-05-05
 **Roadmap version:** 2026.05 research pass  
-**Current app version:** 0.2.24
+**Current app version:** 0.2.25
 **Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
 
 ---
@@ -13,7 +13,7 @@ Source-backed product roadmap for OpenTasker v0.2.24. This file reconciles the c
 
 OpenTasker is an Android/Kotlin automation app targeting API 35 with Jetpack Compose, Material 3, Room, Coroutines, WorkManager, DataStore, Gson, and Hilt dependencies. The project goal is a privacy-first, fully on-device, open-source Tasker/MacroDroid/Automate alternative.
 
-The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, run logs, setup/onboarding status, read-only flow graphs, live context inspection, notification listener event triggers, NFC tag event triggers, calendar/sun event triggers, a Tasker XML-to-OpenTasker-bundle migration parser, a F-Droid readiness build profile, and centralized Gradle dependency version governance. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
+The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, scenes, run logs, setup/onboarding status, read-only flow graphs, live context inspection, notification listener event triggers, NFC tag event triggers, calendar/sun event triggers, a Tasker XML-to-OpenTasker-bundle migration parser, a F-Droid readiness build profile, and centralized Gradle dependency version governance. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
 
 Key local constraints:
 
@@ -363,6 +363,7 @@ Key local constraints:
 
 ### L2 - Scene/overlay editor
 
+**Status:** Baseline completed in v0.2.25. Added a Room-backed Scenes tab for scene shell creation/deletion, scene/element previews, overlay-access readiness, and validation of dimensions, bounds, and tap/long-press task references. Element editing, scaled canvas layout, and overlay launch remain later L2 slices.
 **Description:** Build custom UI scenes/overlays with buttons, text, sliders, images, and task bindings. Handle `SYSTEM_ALERT_WINDOW` onboarding and Android 15 background-FGS overlay restrictions.  
 **Sources:** Tasker scenes [S16], AppDaemon dashboard analogy [S15], Android 15 overlay/FGS changes [S36].  
 **Category:** UX, platform/OS, security.  
