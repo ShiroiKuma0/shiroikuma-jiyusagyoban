@@ -75,6 +75,16 @@
                 android:value="OpenTasker automation engine — runs user-defined profiles when their contexts match" />
         </service>
 
+        <service
+            android:name="com.opentasker.core.contexts.NotificationTriggerService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name="com.opentasker.core.engine.BootReceiver"
             android:exported="false">

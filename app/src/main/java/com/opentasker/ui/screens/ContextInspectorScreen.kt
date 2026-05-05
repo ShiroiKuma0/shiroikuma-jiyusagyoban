@@ -579,10 +579,17 @@ private fun contextSourceSetup(context: Context, key: String): ContextSourceSetu
             },
         )
     }
-    "event" -> ContextSourceSetup(
-        ready = true,
-        detail = "Boot and system events are registered; notification and SMS event families still require dedicated hardening.",
-    )
+    "event" -> {
+        val notificationReady = hasNotificationListenerAccess(context)
+        ContextSourceSetup(
+            ready = true,
+            detail = if (notificationReady) {
+                "Boot, system, and notification events are registered. Notification text is kept in-memory for matching and is not written to run logs."
+            } else {
+                "Boot and system events are registered. Notification events need Notification Access in Setup before Android will bind the listener."
+            },
+        )
+    }
     "location" -> {
         val foreground = hasPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
         val background = Build.VERSION.SDK_INT < 29 || hasPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
@@ -603,6 +610,11 @@ private fun requiredContextSourceKeys(): Set<String> =
 
 private fun hasPermission(context: Context, permission: String): Boolean =
     ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
+private fun hasNotificationListenerAccess(context: Context): Boolean {
+    val enabledListeners = android.provider.Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
+    return enabledListeners?.contains(context.packageName, ignoreCase = true) == true
+}
 
 private fun emptyContextInspectionSnapshot(nowMs: Long): ContextInspectionSnapshot =
     ContextInspectionSnapshot(generatedAtMs = nowMs, sources = emptyList(), profiles = emptyList())

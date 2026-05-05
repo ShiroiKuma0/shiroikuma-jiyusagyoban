@@ -8,6 +8,7 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.merge
 
 /**
  * Real EventContextSource using BroadcastReceivers and system intents.
@@ -21,7 +22,12 @@ import kotlinx.coroutines.flow.callbackFlow
 class EventContextSourceImpl : ContextSource {
     override val type = "event"
 
-    override fun events(app: Context): Flow<ContextEvent> = callbackFlow {
+    override fun events(app: Context): Flow<ContextEvent> = merge(
+        systemBroadcastEvents(app),
+        NotificationContextEvents.events,
+    )
+
+    private fun systemBroadcastEvents(app: Context): Flow<ContextEvent> = callbackFlow {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent == null) return
