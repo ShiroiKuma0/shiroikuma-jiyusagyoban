@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.2.48 - 2026-05-05
+
+Post-reconnect unplugged evidence checks.
+
+- Extended `tools/collect-location-evidence.ps1` with `-RequireRecentUnpluggedHistory`, `-MinimumUnpluggedHistorySeconds`, and `-MaximumUnpluggedHistoryAgeMinutes` for workflows where USB ADB is unavailable while the phone is unplugged.
+- Added recent unplugged interval parsing from `dumpsys battery` power and battery-change history so post-reconnect runs can fail closed on duration.
+- Captured post-reconnect API 36 evidence `build/device-evidence/location/20260505-125057`; the device history showed a recent unplugged interval from `2026-05-05T12:48:23.598` to `2026-05-05T12:50:14.389`, about 111 seconds, which is below the 600-second roadmap threshold.
+
 ## v0.2.47 - 2026-05-05
 
 Location durability evidence gates.

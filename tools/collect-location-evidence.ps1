@@ -10,7 +10,10 @@ param(
     [string]$RequireRunLogMessagePattern,
     [string]$RequireLogcatPattern,
     [switch]$RequireProviderCadenceEvidence,
-    [switch]$RequireUnpluggedSample
+    [switch]$RequireUnpluggedSample,
+    [switch]$RequireRecentUnpluggedHistory,
+    [int]$MinimumUnpluggedHistorySeconds = 600,
+    [int]$MaximumUnpluggedHistoryAgeMinutes = 60
 )
 
 Set-StrictMode -Version Latest
@@ -18,6 +21,12 @@ $ErrorActionPreference = "Stop"
 
 if ($SampleSeconds -lt 0) {
     throw "SampleSeconds must be zero or greater."
+}
+if ($MinimumUnpluggedHistorySeconds -lt 1) {
+    throw "MinimumUnpluggedHistorySeconds must be at least 1."
+}
+if ($MaximumUnpluggedHistoryAgeMinutes -lt 1) {
+    throw "MaximumUnpluggedHistoryAgeMinutes must be at least 1."
 }
 
 $script:AdbSerial = $null
@@ -325,6 +334,203 @@ function Compare-BatterySamples {
         afterPlugState = Get-MapValue -Map $After -Key "plugState"
         beforeStatus = Get-MapValue -Map $Before -Key "statusName"
         afterStatus = Get-MapValue -Map $After -Key "statusName"
+    }
+}
+
+function Convert-BatteryHistoryTimestamp {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Value,
+        [Parameter(Mandatory = $true)]
+        [DateTimeOffset]$ReferenceTime
+    )
+
+    $formats = [string[]]@("MM-dd HH:mm:ss.fff", "MM-dd HH:mm:ss")
+    $parsed = [datetime]::MinValue
+    if (-not [datetime]::TryParseExact(
+        $Value.Trim(),
+        $formats,
+        [Globalization.CultureInfo]::InvariantCulture,
+        [Globalization.DateTimeStyles]::None,
+        [ref]$parsed
+    )) {
+        return $null
+    }
+
+    $referenceLocal = $ReferenceTime.LocalDateTime
+    if ($parsed -gt $referenceLocal.AddDays(1)) {
+        $parsed = $parsed.AddYears(-1)
+    } elseif ($parsed -lt $referenceLocal.AddDays(-365)) {
+        $parsed = $parsed.AddYears(1)
+    }
+    return $parsed
+}
+
+function Convert-BatteryHistoryPayloadMap {
+    param([string]$Payload)
+
+    $values = @{}
+    foreach ($match in [regex]::Matches($Payload, "(?<key>[A-Za-z_]+):(?<value>[^,\s]+)")) {
+        $values[$match.Groups["key"].Value] = $match.Groups["value"].Value
+    }
+    return $values
+}
+
+function Test-BatteryHistoryPayloadPlugged {
+    param([object]$Values)
+
+    $knownPowerFields = @("ac", "usb", "wireless", "pogo", "dock")
+    $foundPowerField = $false
+    foreach ($field in $knownPowerFields) {
+        if ($Values.ContainsKey($field)) {
+            $foundPowerField = $true
+            $fieldValue = ConvertTo-NullableBool $Values[$field]
+            if ($fieldValue) {
+                return $true
+            }
+        }
+    }
+
+    if ($foundPowerField) {
+        return $false
+    }
+    return $null
+}
+
+function Convert-BatteryHistoryInterval {
+    param([object]$Interval)
+
+    if ($null -eq $Interval) {
+        return $null
+    }
+
+    [ordered]@{
+        startLocal = $Interval.Start.ToString("yyyy-MM-ddTHH:mm:ss.fff")
+        endLocal = $Interval.End.ToString("yyyy-MM-ddTHH:mm:ss.fff")
+        durationSeconds = $Interval.DurationSeconds
+        startLevelPercent = $Interval.StartEvent.LevelPercent
+        endLevelPercent = $Interval.EndEvent.LevelPercent
+        startStatus = $Interval.StartEvent.StatusName
+        endStatus = $Interval.EndEvent.StatusName
+        startCurrentAvgMicroamps = $Interval.StartEvent.CurrentAvgMicroamps
+        endCurrentAvgMicroamps = $Interval.EndEvent.CurrentAvgMicroamps
+        startChargeCounterMicroampHours = $Interval.StartEvent.ChargeCounterMicroampHours
+        endChargeCounterMicroampHours = $Interval.EndEvent.ChargeCounterMicroampHours
+        startSource = $Interval.StartEvent.Source
+        endSource = $Interval.EndEvent.Source
+    }
+}
+
+function Get-UnpluggedBatteryIntervals {
+    param([object[]]$StateEvents)
+
+    $intervals = @()
+    $activeStart = $null
+    foreach ($stateEvent in @($StateEvents | Sort-Object Timestamp, Source)) {
+        if (-not [bool]$stateEvent.IsPlugged) {
+            if ($null -eq $activeStart) {
+                $activeStart = $stateEvent
+            }
+            continue
+        }
+
+        if ($null -ne $activeStart -and $stateEvent.Timestamp -gt $activeStart.Timestamp) {
+            $intervals += [pscustomobject]@{
+                Start = $activeStart.Timestamp
+                End = $stateEvent.Timestamp
+                DurationSeconds = [math]::Round(($stateEvent.Timestamp - $activeStart.Timestamp).TotalSeconds, 3)
+                StartEvent = $activeStart
+                EndEvent = $stateEvent
+            }
+        }
+        $activeStart = $null
+    }
+
+    return $intervals
+}
+
+function Parse-RecentUnpluggedBatteryHistory {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Text,
+        [int]$MinimumRequiredSeconds,
+        [int]$MaximumAgeMinutes,
+        [DateTimeOffset]$ReferenceTime = [DateTimeOffset]::Now
+    )
+
+    $events = @()
+    $timestampPattern = "(?<timestamp>\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(?:\.\d{3})?)"
+
+    foreach ($match in [regex]::Matches($Text, "(?m)^$timestampPattern\s+(?<event>android\.intent\.action\.ACTION_POWER_(?:DISCONNECTED|CONNECTED))\s*$")) {
+        $timestamp = Convert-BatteryHistoryTimestamp -Value $match.Groups["timestamp"].Value -ReferenceTime $ReferenceTime
+        if ($null -eq $timestamp) {
+            continue
+        }
+        $eventName = $match.Groups["event"].Value
+        $events += [pscustomobject]@{
+            Timestamp = $timestamp
+            IsPlugged = $eventName -eq "android.intent.action.ACTION_POWER_CONNECTED"
+            Source = "power_intent"
+            Event = $eventName
+            LevelPercent = $null
+            StatusName = $null
+            CurrentAvgMicroamps = $null
+            ChargeCounterMicroampHours = $null
+        }
+    }
+
+    foreach ($match in [regex]::Matches($Text, "(?m)^$timestampPattern\s+Sending ACTION_BATTERY_CHANGED:\s+(?<payload>.+)$")) {
+        $timestamp = Convert-BatteryHistoryTimestamp -Value $match.Groups["timestamp"].Value -ReferenceTime $ReferenceTime
+        if ($null -eq $timestamp) {
+            continue
+        }
+        $values = Convert-BatteryHistoryPayloadMap -Payload $match.Groups["payload"].Value
+        $isPlugged = Test-BatteryHistoryPayloadPlugged -Values $values
+        if ($null -eq $isPlugged) {
+            continue
+        }
+        $events += [pscustomobject]@{
+            Timestamp = $timestamp
+            IsPlugged = [bool]$isPlugged
+            Source = "battery_changed"
+            Event = "ACTION_BATTERY_CHANGED"
+            LevelPercent = ConvertTo-NullableInt (Get-MapValue -Map $values -Key "level")
+            StatusName = Convert-BatteryStatusName (Get-MapValue -Map $values -Key "status")
+            CurrentAvgMicroamps = ConvertTo-NullableLong (Get-MapValue -Map $values -Key "current_avg")
+            ChargeCounterMicroampHours = ConvertTo-NullableLong (Get-MapValue -Map $values -Key "cc")
+        }
+    }
+
+    $powerEvents = @($events | Where-Object { $_.Source -eq "power_intent" })
+    $intervals = @(Get-UnpluggedBatteryIntervals -StateEvents $powerEvents)
+    $intervalSource = "power_intent"
+    if ($intervals.Count -eq 0) {
+        $intervals = @(Get-UnpluggedBatteryIntervals -StateEvents $events)
+        $intervalSource = "power_intent_and_battery_changed"
+    }
+
+    $referenceLocal = $ReferenceTime.LocalDateTime
+    $recentCutoff = $referenceLocal.AddMinutes(-$MaximumAgeMinutes)
+    $recentIntervals = @($intervals | Where-Object { $_.End -ge $recentCutoff })
+    $longestComplete = @($intervals | Sort-Object DurationSeconds -Descending | Select-Object -First 1)
+    $longestRecent = @($recentIntervals | Sort-Object DurationSeconds -Descending | Select-Object -First 1)
+    $latestComplete = @($intervals | Sort-Object End -Descending | Select-Object -First 1)
+    $requirementMet = $false
+    if ($longestRecent.Count -gt 0) {
+        $requirementMet = [double]$longestRecent[0].DurationSeconds -ge [double]$MinimumRequiredSeconds
+    }
+
+    [ordered]@{
+        available = $intervals.Count -gt 0
+        minimumRequiredSeconds = $MinimumRequiredSeconds
+        maximumAgeMinutes = $MaximumAgeMinutes
+        intervalSource = $intervalSource
+        completeIntervalCount = $intervals.Count
+        recentCompleteIntervalCount = $recentIntervals.Count
+        longestCompleteInterval = if ($longestComplete.Count -gt 0) { Convert-BatteryHistoryInterval -Interval $longestComplete[0] } else { $null }
+        longestRecentCompleteInterval = if ($longestRecent.Count -gt 0) { Convert-BatteryHistoryInterval -Interval $longestRecent[0] } else { $null }
+        latestCompleteInterval = if ($latestComplete.Count -gt 0) { Convert-BatteryHistoryInterval -Interval $latestComplete[0] } else { $null }
+        requirementMet = [bool]$requirementMet
     }
 }
 
@@ -637,6 +843,10 @@ $batterySample = Compare-BatterySamples `
     -After $batteryAfterSummary `
     -BeforeEpochMs $beforeBatteryCapturedAtEpochMs `
     -AfterEpochMs $afterBatteryCapturedAtEpochMs
+$batteryHistory = Parse-RecentUnpluggedBatteryHistory `
+    -Text $afterBattery `
+    -MinimumRequiredSeconds $MinimumUnpluggedHistorySeconds `
+    -MaximumAgeMinutes $MaximumUnpluggedHistoryAgeMinutes
 $providerCadence = Parse-OpenTaskerProviderCadenceEvidence -Text $afterLocation -PackageName $Package
 
 $summary = [ordered]@{
@@ -664,6 +874,7 @@ $summary = [ordered]@{
     batteryBefore = $batteryBeforeSummary
     batteryAfter = $batteryAfterSummary
     batterySample = $batterySample
+    batteryHistory = $batteryHistory
     providerCadence = $providerCadence
     roomDatabase = [ordered]@{
         snapshot = $databaseSnapshot
@@ -674,6 +885,9 @@ $summary = [ordered]@{
         logcatPattern = $RequireLogcatPattern
         providerCadenceEvidence = [bool]$RequireProviderCadenceEvidence
         unpluggedSample = [bool]$RequireUnpluggedSample
+        recentUnpluggedHistory = [bool]$RequireRecentUnpluggedHistory
+        minimumUnpluggedHistorySeconds = $MinimumUnpluggedHistorySeconds
+        maximumUnpluggedHistoryAgeMinutes = $MaximumUnpluggedHistoryAgeMinutes
     }
     evidenceFiles = @(
         "battery-before.txt",
@@ -716,6 +930,18 @@ if ($RequireUnpluggedSample) {
         throw "Unplugged sample required, but device was plugged before or after sample. Evidence: $script:OutputDir"
     }
 }
+if ($RequireRecentUnpluggedHistory) {
+    if (-not $summary.batteryHistory.available) {
+        throw "Recent unplugged history requirement could not find any complete unplugged intervals in dumpsys battery. Evidence: $script:OutputDir"
+    }
+    if (-not $summary.batteryHistory.requirementMet) {
+        $observed = $null
+        if ($null -ne $summary.batteryHistory.longestRecentCompleteInterval) {
+            $observed = $summary.batteryHistory.longestRecentCompleteInterval.durationSeconds
+        }
+        throw "Recent unplugged history requirement was not met. Required ${MinimumUnpluggedHistorySeconds}s within ${MaximumUnpluggedHistoryAgeMinutes}m; observed longest recent interval ${observed}s. Evidence: $script:OutputDir"
+    }
+}
 if ($RequireProviderCadenceEvidence) {
     $gpsEvidence = Get-MapValue -Map (Get-MapValue -Map $summary.providerCadence -Key "gps") -Key "evidenceFound"
     $networkEvidence = Get-MapValue -Map (Get-MapValue -Map $summary.providerCadence -Key "network") -Key "evidenceFound"
@@ -742,6 +968,16 @@ Write-Host "Evidence written to $script:OutputDir"
 Write-Host "After launch: serviceFound=$($launchState.automationServiceFound) foreground=$($launchState.isForeground) type=$($launchState.typeHex)"
 Write-Host "After sample: serviceFound=$($sampleState.automationServiceFound) foreground=$($sampleState.isForeground) type=$($sampleState.typeHex)"
 Write-Host "Battery: before=$($summary.batteryBefore.levelPercent)% $($summary.batteryBefore.plugState) after=$($summary.batteryAfter.levelPercent)% $($summary.batteryAfter.plugState) delta=$($summary.batterySample.levelDeltaPercent)%"
+if ($summary.batteryHistory.available) {
+    $longestRecentUnplugged = if ($null -ne $summary.batteryHistory.longestRecentCompleteInterval) {
+        "$($summary.batteryHistory.longestRecentCompleteInterval.durationSeconds)s"
+    } else {
+        "none"
+    }
+    Write-Host "Battery history: longestRecentUnplugged=$longestRecentUnplugged requirementMet=$($summary.batteryHistory.requirementMet)"
+} else {
+    Write-Host "Battery history: no complete unplugged intervals found"
+}
 Write-Host "Provider cadence: gps=$($summary.providerCadence.gps.evidenceFound) network=$($summary.providerCadence.network.evidenceFound)"
 if ($roomSummary.available) {
     Write-Host "Room summary: profiles=$($roomSummary.counts.profiles) tasks=$($roomSummary.counts.tasks) runLogs=$($roomSummary.counts.run_logs)"
