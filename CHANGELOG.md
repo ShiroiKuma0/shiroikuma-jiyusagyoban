@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.26 - 2026-05-05
+
+Shizuku readiness baseline.
+
+- Added package visibility and runtime status detection for the Shizuku manager without linking the Shizuku API.
+- Added an optional Setup checklist row for Shizuku power mode that is excluded from required readiness progress.
+- Added elevated-action hints for Shizuku candidates while keeping restricted actions blocked.
+- Documented the safe readiness scope and added tests for status, action hints, and manifest package visibility.
+
 ## v0.2.25 - 2026-05-05
 
 Scene library baseline.

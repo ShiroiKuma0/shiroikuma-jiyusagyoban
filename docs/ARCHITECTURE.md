@@ -36,7 +36,7 @@ Tasker's source is **not public**. This architecture is reconstructed from the u
 │  Action Library                                       │
 │  - Action interface + registry                        │
 │  - Built-ins grouped by category                      │
-│  - Capability gating for restricted actions           │
+│  - Capability gating for restricted/elevated actions  │
 ├───────────────────────────────────────────────────────┤
 │  Storage (Room + DataStore)                           │
 │  - Profiles, Tasks, Actions, Scenes, Variables        │
@@ -47,6 +47,7 @@ Tasker's source is **not public**. This architecture is reconstructed from the u
 │  - AutomationService (foreground)                     │
 │  - AlarmManager exact/inexact time ticks              │
 │  - NetworkCallback / BroadcastReceivers / UsageStats  │
+│  - Optional Shizuku manager readiness detection       │
 └───────────────────────────────────────────────────────┘
 ```
 
@@ -71,6 +72,8 @@ Tasker XML import is intentionally staged through the OpenTasker JSON bundle mod
 The read-only visual flow baseline is generated from active domain models. `AutomationFlowGraphBuilder` maps each profile into context, profile, enter-task, exit-task, action, edge, and missing-reference nodes so the Compose Flow tab can show graph structure without mutating profile/task data.
 
 Scenes are persisted in Room and exposed through a conservative Scenes tab. The active baseline creates and deletes scene shells, previews persisted elements, validates geometry and task bindings through `SceneValidator`, and shows overlay permission readiness without launching overlay windows.
+
+The Shizuku readiness baseline is intentionally non-executing. `ShizukuPowerBackend` only checks whether the Shizuku manager package is visible and installed, exposes optional setup status in the Setup screen, and annotates elevated-action candidates in capability messages. OpenTasker does not link the Shizuku API, request Shizuku permission, execute shell commands, or enable privileged actions in this baseline.
 
 The F-Droid distribution path is property-based rather than a product flavor. `-PopenTaskerDistribution=fdroid` sets `BuildConfig.DISTRIBUTION`, keeps existing Gradle variant names stable, and is paired with `verifyFdroidReadiness` to block common proprietary dependency families before release-profile builds.
 
