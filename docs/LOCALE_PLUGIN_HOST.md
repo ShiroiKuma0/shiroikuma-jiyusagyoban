@@ -2,10 +2,12 @@
 
 OpenTasker includes a conservative Locale/Tasker-compatible plugin host baseline for setting and condition plugins.
 
-## Supported in v0.2.51
+## Supported in v0.2.52
 
 - Discovers packages that expose Locale edit-setting or edit-condition activities.
 - Discovers explicit setting and condition broadcast receiver permission metadata for disclosure.
+- Resolves explicit edit-setting and edit-condition configuration activities.
+- Parses successful configuration results into deterministic string-only JSON and bounded blurb text.
 - Adds the `plugin.locale.fire` action for explicit setting-plugin dispatch.
 - Adds the `plugin.locale.query` action for explicit condition-plugin ordered broadcasts.
 - Sends `com.twofortyfouram.locale.intent.action.FIRE_SETTING` only to the resolved receiver component in the configured package.
@@ -29,6 +31,8 @@ OpenTasker includes a conservative Locale/Tasker-compatible plugin host baseline
 
 - Never dispatch an implicit plugin execution broadcast.
 - Fail closed if a package does not expose exactly one execution receiver for the requested Locale action.
+- Fail closed if a package does not expose exactly one configuration activity for the requested Locale edit action.
 - Never accept nested JSON, parcelables, serialized objects, or arbitrary extras from user input.
+- Never preserve nested, parcelable, serialized, null, or arbitrary object values from plugin configuration results.
 - Surface plugin package and requested permissions before users enable plugin-backed profiles.
 - Treat plugin execution as third-party code and keep it behind explicit user configuration.
