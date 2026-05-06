@@ -1,11 +1,15 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.59. This file reconciles the current local repository state with competitive research across Android automation apps, adjacent workflow engines, Android platform constraints, distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.59 → v0.3.x. Reconciles current repo state with competitive research across Android automation apps, adjacent workflow engines, platform constraints (API 35–36), distribution policy, and dependency changelogs.
 
-**Last updated:** 2026-05-05
-**Roadmap version:** 2026.05 research pass  
+**Last updated:** 2026-05-06
+**Roadmap version:** 2026.05.06 research pass (post-v0.2.59 reconciliation)
 **Current app version:** 0.2.59
-**Planning rule:** items marked "Now" must ship before any public beta claim beyond "minimal automation engine preview."
+**Planning rule:** items marked "Now" must ship before the v0.3.0 public beta claim. Items already completed in 0.2.x are retained in the **Completed Backlog** appendix for traceability and explicitly removed from active tiers.
+
+## Reconciliation note (2026-05-06 pass)
+
+The 2026-05-05 roadmap's `Now (N1–N10)` tier and most of `Next (X1–X12)` shipped across v0.2.2–v0.2.59. They are moved to **Completed Backlog** below and replaced with a fresh `Now` tier targeting v0.3.0 beta criteria. New tier work added from this pass: Android 16 (`specialUse` 6h FGS timeout), Quick Settings Tile trigger/action, predictive-back UX, Macrobenchmark/Baseline Profiles, Health Connect polling trigger (wellness), and broader background-geofence reliability evidence. Sources extended through S48.
 
 ---
 
@@ -52,392 +56,286 @@ Key local constraints:
 
 ---
 
-## Now
+## Now (v0.3.0 beta gate)
 
-### N1 - Reintegrate the active automation UI
+### N1 (2026.05.06) - Android 16 / API 36 readiness pass
 
-**Status:** Baseline completed in v0.2.2. Active navigation now manages profiles, tasks, action lists, context lists, and run logs against Room; deeper platform capability gating continues under N2/N7.  
-**Description:** Restore the richer profile/task/action/context CRUD screens from source snapshots into active navigation, or rebuild equivalent screens using the current hardened engine and repositories.  
-**Sources:** Local repo state [L1], MacroDroid wizard simplicity [S17], Tasker learning-curve signal [S16], Home Assistant visual editor/blueprints [S12].  
-**Category:** UX, reliability, dev-experience.  
-**Impact:** 5 - the app cannot be evaluated as an automation product from the current minimal screen.  
-**Effort:** 4 - much code exists but must be reconciled with current repositories and non-Hilt runtime.  
-**Risk:** Medium; stale snapshots may reference old DI/navigation/state assumptions.  
-**Dependencies:** Keep `OpenTaskerApp_NoHilt` runtime stable; verify all screens compile under current Material/Compose versions.  
-**Novelty:** Parity.  
-**Tier reason:** This is the highest-value correctness fix because docs, screenshots, and usability hinge on it.
+**Status:** Not started. Compile SDK is already 36 (v0.2.59) and the API-36 device smoke runs are in place, but no code recognizes the Android 16 `specialUse` 6-hour FGS timeout, FGS-from-background restrictions, exact-alarm denial regressions, or revised foreground-service "user benefit" expectations.
+**Description:** Add an Android 16 conformance pass that (a) declares all FGS types used (`specialUse`, `location`, `dataSync`) per active code path, (b) instruments the AutomationService for the 6-hour `specialUse` timeout with graceful self-restart and run-log entry, (c) tightens FGS-start callsites to only run when the app is foreground or when permitted by the FGS-from-background allowlist, (d) adds documented Play Console attestation copy for the `specialUse` declaration in case of dual-track distribution, and (e) extends the device-evidence harness with API-36 timeout-recovery and FGS-start-restriction smoke runs.
+**Sources:** Android 15 specialUse timeout/Play attestation [S43], Android 16 behavior changes (FGS, location, exact alarms) [S43], local FGS startup audit [L3], existing Location evidence harness [L6].
+**Category:** platform/OS, reliability, distribution, observability.
+**Impact:** 5 — without this, the next Android release cycle silently breaks long-running automations and risks Play attestation rejection.
+**Effort:** 4 — touches AutomationService lifecycle, capability registry, evidence harness, and docs.
+**Risk:** Medium — self-restart must avoid loops; tests must cover both foreground and background start paths.
+**Dependencies:** Capability registry (done v0.2.8), evidence harness (done v0.2.43–v0.2.48).
+**Novelty:** Parity with platform requirements.
+**Tier reason:** Platform compliance is the single highest-impact correctness item before any beta claim.
 
-### N2 - Add first-run permission and reliability onboarding
+### N2 (2026.05.06) - Background geofence durability evidence across devices/providers
 
-**Status:** Baseline completed in v0.2.3. The active Setup tab shows status and routes users to runtime permission requests or Android special-access settings.  
-**Description:** Add an in-app setup checklist for notification permission, exact alarm access, battery optimization exemption, usage access, notification listener, overlay access, location/background location, Bluetooth/WiFi permissions, SMS, DND access, and package visibility explanations. Each item must show why it is needed, current status, and the exact settings action when Android requires special access.  
-**Sources:** Android notification permission [S26], exact alarm behavior [S25], Play permission declarations [S29][S30][S33], Doze/OEM killing [S22][S28], MacroDroid helper pain [S17].  
-**Category:** UX, reliability, security, platform/OS, distribution.  
-**Impact:** 5 - automations silently fail without these gates.  
-**Effort:** 4 - many settings intents and status probes, but mostly app-layer work.  
-**Risk:** Medium; some OEM settings screens are non-standard.  
-**Dependencies:** UI reintegration; central permission capability model.  
-**Novelty:** Parity plus polish.  
-**Tier reason:** Reliability onboarding is the difference between "works in development" and "works on user phones."
+**Status:** Single-device API-36 evidence captured (v0.2.46–v0.2.48). No multi-device, multi-provider, or multi-OEM data; no Doze/standby-bucket transition evidence; no post-reboot persisted-dwell verification.
+**Description:** Extend `tools/collect-location-evidence.ps1` and the API-36 smoke runs to cover (a) at least three devices spanning Samsung One UI / Pixel stock / a third OEM with documented battery-killer behavior, (b) GPS-only, network-only, and combined provider modes, (c) Doze deep-idle and rare-bucket entries with `dumpsys deviceidle` forced transitions, (d) post-reboot persisted-dwell restoration, and (e) OEM battery-killer audit (One UI Sleeping/Deep Sleep, MIUI MIUI Optimization, ColorOS, Realme). Publish a per-device evidence matrix in `docs/FOSS_GEOFENCING.md`.
+**Sources:** Don't Kill My App [S28], OEM Doze override behavior 2025 [S43], Easer reliability complaints [S1][S48], existing harness [L6].
+**Category:** reliability, platform/OS, observability.
+**Impact:** 5 — current FOSS geofence claim is a single-device data point; broad reliability is the single most-requested missing feature in OSS Tasker alternatives.
+**Effort:** 5 — requires physical-device variety, time, and OEM-by-OEM debug.
+**Risk:** High — some OEMs cannot be reliably tamed without root/Shizuku; results may force a "best-effort" disclosure.
+**Dependencies:** Existing FOSS geofence baseline; capability registry; setup checklist OEM hints.
+**Novelty:** Leapfrog — OSS competitors do not publish this evidence at all.
+**Tier reason:** The product positions itself as a privacy-first FOSS automation engine; without device-verified geofence reliability the headline claim is hollow.
 
-### N3 - Remove `USE_EXACT_ALARM` and harden exact scheduling
+### N3 (2026.05.06) - Quick Settings Tile trigger and tile action
 
-**Status:** Baseline completed in v0.2.4. `USE_EXACT_ALARM` is removed, app-owned time ticks reschedule through `AlarmManager`, and exact-alarm denial falls back to inexact `setWindow()` delivery.  
-**Description:** Keep `SCHEDULE_EXACT_ALARM`, remove `USE_EXACT_ALARM`, add `AlarmManager.canScheduleExactAlarms()` guards, register for permission-state changes, and gracefully degrade to inexact `setWindow()`/WorkManager with clear status text.  
-**Sources:** Android 14 exact alarm docs [S25], platform audit [L3].  
-**Category:** reliability, security, platform/OS, distribution.  
-**Impact:** 5 - wrong exact-alarm declaration can break Play review and scheduling.  
-**Effort:** 2 - contained manifest and scheduler changes.  
-**Risk:** Low; fallback behavior must be explicit.  
-**Dependencies:** Permission onboarding.  
-**Novelty:** Parity.  
-**Tier reason:** This is a high-confidence platform compliance fix.
+**Status:** Not started. No `TileService` is registered.
+**Description:** Add (a) a `TileService` that publishes a user-configurable Quick Settings tile per profile (label, icon, on/off semantics), bound to the existing intent API as a same-signature trigger; (b) a built-in `tile.set` action that updates a tile's label/icon/state from a task; and (c) onboarding copy explaining the manual "Edit tiles" gesture Android requires. Register only when the user opts in.
+**Sources:** Android `TileService` API [S46], Tasker Quick Settings tile feature [S16], MacroDroid tile triggers [S17].
+**Category:** platform/OS, UX, integrations.
+**Impact:** 4 — Quick Settings is a high-frequency, low-friction trigger surface absent from current OSS alternatives.
+**Effort:** 2 — single service + action + small UI.
+**Risk:** Low — well-documented stable API since API 24.
+**Dependencies:** Capability registry; intent API.
+**Novelty:** Parity with Tasker; leapfrog vs Easer.
+**Tier reason:** High value-to-effort ratio; the only Now-tier non-platform-compliance item that ships measurable user value in days.
 
-### N4 - Replace static WiFi connectivity receiver with NetworkCallback
+### N4 (2026.05.06) - Predictive back gesture support
 
-**Status:** Baseline completed in v0.2.5. The manifest `CONNECTIVITY_CHANGE` receiver is gone; AutomationService owns a `ConnectivityManager.NetworkCallback` and emits WiFi trigger events with permission-aware SSID fallback.  
-**Description:** Remove reliance on manifest-declared `CONNECTIVITY_CHANGE`, use dynamic `ConnectivityManager.registerNetworkCallback()`, use `NetworkCapabilities.transportInfo as? WifiInfo` on API 31+, and handle `NEARBY_WIFI_DEVICES`/location permission requirements.  
-**Sources:** Android 7 broadcast restrictions [S24], Android WiFi permission changes [S27], platform audit [L3].  
-**Category:** correctness, reliability, platform/OS.  
-**Impact:** 5 - current manifest receiver is non-functional on the app's entire minSdk range.  
-**Effort:** 3 - requires context source lifecycle integration.  
-**Risk:** Medium; SSID visibility varies by permission/location state.  
-**Dependencies:** Permission model; AutomationService context subscription lifecycle.  
-**Novelty:** Parity.  
-**Tier reason:** A broken trigger family must be fixed before adding new triggers.
+**Status:** Not started. Activity does not opt in to `enableOnBackInvokedCallback`; Compose navigation paths use legacy back behavior.
+**Description:** Opt the activity into the predictive back callback in `AndroidManifest.xml`, audit Compose `BackHandler`/`OnBackPressedCallback` callsites for forward-compat behavior, ensure editor/picker dialogs and the Setup checklist all handle predicted back without losing in-progress edits, and add a regression smoke for the gesture on API 36.
+**Sources:** Predictive back for Compose [S44], Android 15 platform changes [S36].
+**Category:** UX, accessibility, platform/OS.
+**Impact:** 3 — visible polish; without it the app feels behind on flagship devices.
+**Effort:** 2.
+**Risk:** Low — the manifest opt-in is the largest single change.
+**Dependencies:** None.
+**Novelty:** Parity.
+**Tier reason:** Cheap polish that closes a visible gap before beta.
 
-### N5 - Replace or foreground AppOpenService polling
+### N5 (2026.05.06) - Macrobenchmark + Baseline Profile for cold start
 
-**Status:** Baseline completed in v0.2.6. The separate background `AppOpenService` is removed; AutomationService now owns `UsageStatsManager` polling, pauses explicitly when usage access is denied, and emits app opened/closed events on foreground package changes.  
-**Description:** Replace the plain background `AppOpenService` polling loop with a platform-safe usage-stats context source, WorkManager-backed periodic sampling, or a properly declared foreground path where user-visible monitoring is required. Add usage-access onboarding via `ACTION_USAGE_ACCESS_SETTINGS`.  
-**Sources:** UsageStatsManager docs [S34], Android background service limits [S23], platform audit [L3].  
-**Category:** correctness, reliability, performance, platform/OS.  
-**Impact:** 4 - app-open triggers are core automation use cases.  
-**Effort:** 3 - refactor service lifecycle and persistence.  
-**Risk:** Medium; polling too frequently harms battery and standby buckets.  
-**Dependencies:** Permission onboarding; context inspector.  
-**Novelty:** Parity.  
-**Tier reason:** Background polling is brittle on modern Android.
+**Status:** Not started. No benchmark module, no baseline profile shipped.
+**Description:** Add an `app:benchmark` module using `androidx.benchmark.macro` to measure cold start, AutomationService start-to-context-subscription latency, and Profiles tab time-to-first-frame. Generate and ship a Baseline Profile in the release artifact. Wire CI to fail on cold-start regressions beyond a published threshold.
+**Sources:** Macrobenchmark + Baseline Profiles [S47], Compose-Kotlin compatibility map [S41].
+**Category:** performance, dev-experience, testing.
+**Impact:** 3 — measurable startup win on cold launch and after install.
+**Effort:** 3.
+**Risk:** Low — benchmark instability on shared CI runners is the main risk; mitigated by running on connected device only.
+**Dependencies:** Compose/Kotlin upgrade batch already complete (v0.2.59).
+**Novelty:** Leapfrog — OSS competitors do not ship baseline profiles.
+**Tier reason:** Hardens the upgrade work just landed and creates a regression gate for future upgrades.
 
-### N6 - Replace success-shaped stubs with real implementations or explicit unsupported failures
+### N6 (2026.05.06) - Sharing preview UI for community bundles
 
-**Status:** Baseline completed in v0.2.7. Built-in actions and context sources are registered at startup, UI metadata IDs match runtime IDs, several action paths now execute real behavior, and privileged/unimplemented actions fail explicitly instead of reporting success.  
-**Description:** Audit all action/context classes for TODO, placeholder, `return success`, and unimplemented behavior. Each must either perform the action, report a specific permission/platform limitation, or be hidden behind capability checks until implemented.  
-**Sources:** Local source scan [L2], Tasker/MacroDroid action-count expectations [S16][S17], Automate block breadth [S18].  
-**Category:** correctness, UX, observability, testing.  
-**Impact:** 5 - false success corrupts trust and run logs.  
-**Effort:** 4 - multiple action families.  
-**Risk:** Low/Medium; changing false-success to failure may expose existing incomplete paths but improves truthfulness.  
-**Dependencies:** Run log error model; capability registry.  
-**Novelty:** Parity.  
-**Tier reason:** The app must never claim an automation ran when it did not.
+**Status:** Manifest baseline shipped in v0.2.28; no in-app preview screen for incoming community bundles.
+**Description:** Build the import-side review experience promised by L5: dedicated bundle preview screen showing required permissions, action capability warnings, variable scope impact, scene/overlay implications, source attribution, and a clear disabled-by-default install button. Reuse the existing migration-warning component from the Tasker XML import flow.
+**Sources:** Community sharing risks [S5][S10][S16][S17], Tasker XML review flow [L1].
+**Category:** UX, security, plugin ecosystem.
+**Impact:** 4 — the missing piece between "we have an export format" and "users can safely share".
+**Effort:** 3.
+**Risk:** Medium — preview must not silently strip warnings.
+**Dependencies:** Open JSON bundle (done v0.2.13), Tasker import review (done v0.2.58).
+**Novelty:** Parity.
+**Tier reason:** Sharing is a stated v0.3 goal; preview UI is the long pole.
 
-### N7 - Add capability registry and action/context gating
+### N7 (2026.05.06) - Locale Condition Context UX
 
-**Status:** Baseline completed in v0.2.8. A central action capability registry now marks supported/setup-required/unsupported actions, annotates picker/editor rows, and blocks unsupported privileged actions before they are added.  
-**Description:** Centralize platform, permission, API-level, distribution-flavor, and feature-implementation capability checks. Use it to enable/disable UI rows, annotate unsupported actions, explain missing setup, and block execution with actionable errors.  
-**Sources:** Android policy/API constraints [S25][S26][S27][S29][S30][S33], competitors' permission complexity [S16][S17][S18].  
-**Category:** architecture, UX, reliability, security.  
-**Impact:** 5 - prevents unsupported actions from appearing usable.  
-**Effort:** 4 - affects registries, forms, execution, and onboarding.  
-**Risk:** Medium; must avoid duplicating checks across layers.  
-**Dependencies:** UI reintegration; permission onboarding.  
-**Novelty:** Leapfrog.  
-**Tier reason:** It converts Android fragmentation into explicit product behavior.
+**Status:** Engine baseline shipped in v0.2.54 (host condition queries, request-query handling, last-known fallback). No first-class Condition context row exists in the Context picker; users must wire conditions through Locale plugin actions instead of as pure context predicates.
+**Description:** Add a `condition=plugin` Context row that lets users pick a Locale condition plugin, configure it via the plugin's edit activity, and have ProfileMatcher subscribe through the existing host. Surface query results, last-known state, and unknown-state fallback in the Context Inspector.
+**Sources:** Locale SDK [S7], Tasker plugin sample [S8], local plugin host [L1].
+**Category:** plugin ecosystem, UX, observability.
+**Impact:** 4.
+**Effort:** 3.
+**Risk:** Low/Medium — contract already proven by validation harness.
+**Dependencies:** Capability registry; Inspector.
+**Novelty:** Parity.
+**Tier reason:** Closes the asymmetry between setting plugins (usable) and condition plugins (engine-only).
 
-### N8 - Make run logs execution-grade
+### N8 (2026.05.06) - Resolve AGP 9 opt-out flags and Hilt-vs-non-Hilt drift
 
-**Status:** Baseline completed in v0.2.9. Task execution now records action-level trace summaries with status, action type, label, duration, and failure message in run-log entries.  
-**Description:** Expand run logs from task-level completion into step-level traces with action input summary, expanded variables, permission/capability failure reason, duration, retry/cooldown decision, and source trigger. Add filtering by profile/task/error.  
-**Sources:** Node-RED debug sidebar [S9], Huginn agent health/events [S11], Home Assistant state inspector [S12], n8n executions/error handling [S10].  
-**Category:** observability, UX, debugging, testing.  
-**Impact:** 4 - automation users need to understand why a rule did or did not fire.  
-**Effort:** 4 - schema/UI changes plus engine instrumentation.  
-**Risk:** Medium; logs may contain sensitive data, so redaction/export choices matter.  
-**Dependencies:** Capability registry; variable expansion boundaries.  
-**Novelty:** Parity plus polish.  
-**Tier reason:** Debuggability is a core product feature in automation tools.
+**Status:** AGP 9 migrated to built-in Kotlin/new DSL in v0.2.59 with opt-out flags removed. The `OpenTaskerApp_NoHilt` runtime path remains the active app entry while Hilt modules continue to compile but are bypassed. Improvement plan P10 still flagged "not started".
+**Description:** Make a deliberate decision: either complete the Hilt migration (delete `OpenTaskerApp_NoHilt`, route all wiring through `@HiltAndroidApp`, run the existing instrumentation suite) or remove the Hilt module surface entirely until needed. Document the decision and fix any leftover Dagger graph that won't compile under the chosen path.
+**Sources:** Improvement plan P10 [L7], Dagger releases [S39], local DI inventory [L1].
+**Category:** architecture, dev-experience, testing.
+**Impact:** 3 — eliminates a known drift bug class and unblocks future module splits.
+**Effort:** 4.
+**Risk:** Medium — Hilt-only migration is touch-everything; delete is faster but loses optionality.
+**Dependencies:** Dependency modernization (done v0.2.59).
+**Novelty:** Maintenance.
+**Tier reason:** Drift is cheaper to resolve before Room 3 / Compose Material 3 expressive land.
 
-### N9 - Add high-value regression tests around platform and parser boundaries
+### N9 (2026.05.06) - Documentation truth pass post-v0.2.59
 
-**Status:** Baseline completed in v0.2.10. Added regression tests around cron parsing and variable scoping, and hardened malformed cron step/range handling to fail closed.  
-**Description:** Add focused JVM/unit tests for variable expansion limits, malformed action parameters, capability gating, scheduler fallback decisions, import/export schema validation, repository migrations, and stub-failure behavior. Add instrumentation tests only for flows that cannot be covered on JVM.  
-**Sources:** Easer admits broad test gaps [S1], Room schema/migration guidance [S35], existing local validation tests [L4].  
-**Category:** testing, reliability, dev-experience.  
-**Impact:** 4 - prevents regressions in fragile automation paths.  
-**Effort:** 3 - test infrastructure already works.  
-**Risk:** Low.  
-**Dependencies:** Capability registry; migration strategy.  
-**Novelty:** Parity.  
-**Tier reason:** The app is entering platform-fragile behavior; tests should cover those seams.
-
-### N10 - Correct public docs to distinguish active product, source snapshots, and planned features
-
-**Status:** Completed in v0.2.11. README and architecture docs now separate compiled features from planned plugin/import/geofence/day-schedule work, and stale historical checkpoint/audit files were removed.  
-**Description:** Keep README, architecture docs, changelog, and roadmap aligned with the active APK. Avoid claiming full CRUD UI, design-system coverage, action counts, scheduling, or plugin support until compiled and verified.  
-**Sources:** Local docs/source mismatch [L1][L5].  
-**Category:** docs, dev-experience, release.  
-**Impact:** 4 - misleading docs create support debt and release risk.  
-**Effort:** 2.  
-**Risk:** Low.  
-**Dependencies:** UI reintegration status.  
-**Novelty:** Maintenance.  
-**Tier reason:** Truthful docs are part of release hardening.
+**Status:** Stale older snapshots removed in v0.2.11; current README still has a single 1700-character status sentence that is hard to skim. CLAUDE.md still references v0.2.58 status.
+**Description:** Refresh README, CLAUDE.md, ARCHITECTURE.md, and IMPROVEMENT_PLAN.md to reflect v0.2.59. Restructure the README opening from one mega-sentence into a scannable feature list. Sync version strings (CLAUDE.md, badges, fdroid metadata, gradle properties, ROADMAP, CHANGELOG).
+**Sources:** Local repo state [L1][L5], existing improvement plan [L7].
+**Category:** docs, dev-experience.
+**Impact:** 3.
+**Effort:** 2.
+**Risk:** Low.
+**Dependencies:** None.
+**Novelty:** Maintenance.
+**Tier reason:** Truthful, skimmable docs are part of the v0.3 beta gate.
 
 ---
 
-## Next
+## Next (post-v0.3 beta, v0.3.x → v0.4)
 
-### X1 - Profile templates and guided creation wizard
+### X1 (2026.05.06) - Scene editor finishing pass
 
-**Status:** Completed in v0.2.12. Added a template catalog, guided slot form, disabled-by-default Room installation, safety notes, and planned-template gating for trigger patterns that did not have runtime support yet; the NFC template was promoted to setup-required installation in v0.2.19 and the calendar template was promoted in v0.2.20.
-**Description:** Ship curated on-device templates with variable slots: work-hours DND, headphones connected media profile, low-battery saver, meeting mode from calendar, nightstand NFC sleep mode, WiFi arrival profile, app usage reminder, and "find my phone" notification/action patterns.  
-**Sources:** MacroDroid wizard/templates [S17], Home Assistant blueprints [S12], n8n templates [S10], Node-RED flow sharing [S9].  
-**Category:** UX, docs, accessibility.  
-**Impact:** 5.  
-**Effort:** 4.  
-**Risk:** Low/Medium; templates must not request excessive permissions by default.  
-**Dependencies:** Active UI, capability registry, import/export format.  
-**Novelty:** Parity plus polish.  
-**Tier reason:** Solves the blank-canvas problem before adding advanced editors.
+**Status:** Element creation/editing, drag-to-move, and scaled previews shipped in v0.2.59. Resize handles, multi-select layout edits, alignment guides, and overlay launch (`SYSTEM_ALERT_WINDOW`) remain.
+**Description:** Add resize-handle drag, snap-to-grid + alignment guides, multi-select with bulk move/align/delete, then wire scene-launch action through the existing overlay-permission onboarding so a task can show a configured scene. Keep Android 15 background-FGS overlay restrictions in scope.
+**Sources:** Tasker scenes [S16], Android 15 overlay/FGS [S36], Android 16 FGS specialUse [S43].
+**Category:** UX, platform/OS.
+**Impact:** 4.
+**Effort:** 4.
+**Risk:** Medium — overlay launch is policy-sensitive.
+**Dependencies:** N1 (FGS audit), capability registry.
+**Novelty:** Parity.
 
-### X2 - Open JSON import/export with schema versioning
+### X2 (2026.05.06) - Visual flow editor authoring
 
-**Status:** Completed in v0.2.13. Added schema-versioned bundle models, deterministic export ordering, capability metadata, validation/import warnings, Room-backed import/export with ID remapping, and format documentation.  
-**Description:** Define a portable JSON bundle for profiles, tasks, actions, contexts, variables, and metadata. Include schema version, app version, capability requirements, lossy import warnings, and deterministic ordering for diffs.  
-**Sources:** Node-RED JSON flows [S9], Huginn scenarios [S11], MacroDroid/Automate opaque export pain [S17][S18], F-Droid reproducibility goals [S31].  
-**Category:** data, migration, docs, distribution.  
-**Impact:** 5.  
-**Effort:** 4.  
-**Risk:** Medium; schema drift must be planned early.  
-**Dependencies:** Capability registry; Room schema strategy.  
-**Novelty:** Leapfrog for FOSS Android automation.  
-**Tier reason:** Open data is a strategic differentiator and unlocks templates/sharing/import.
+**Status:** Read-only flow graph + node deep links + lane overview shipped v0.2.51–v0.2.59. Authoring (drag-to-add, branch/subflow visualization, conditional-action authoring on the canvas, zoom gestures, drag-mutation) remains.
+**Description:** Add canvas-side authoring: drag from a node palette, route edges between context/enter/exit/action nodes, render explicit conditional-branch and parallel/subflow markers as soon as flow-control action types exist, add pinch-zoom and pan, and persist canvas-side edits back through the existing repositories.
+**Sources:** Automate flowchart [S18], Node-RED flow editor [S9], openHAB Blockly [S13].
+**Category:** UX, accessibility.
+**Impact:** 4.
+**Effort:** 5.
+**Risk:** High — easy to overwhelm beginners; must remain optional alongside the list editor.
+**Dependencies:** Stable flow-control action types; templates; X1.
+**Novelty:** Parity for Android automation; leapfrog among OSS options.
 
-### X3 - Locale-compatible plugin host
+### X3 (2026.05.06) - Shizuku elevated backend (real opt-in execution)
 
-**Status:** Completed in v0.2.54. Added explicit setting and condition receiver targeting, explicit edit-setting/edit-condition activity resolution, guarded configuration result parsing, `plugin.locale.query`, ordered-broadcast result parsing for satisfied/unsatisfied/unknown states, optional result-variable storage, best-effort last-known fallback for `RESULT_CONDITION_UNKNOWN`, sanitized `ACTION_REQUEST_QUERY` event handling, receiver permission metadata for disclosure, package-visibility queries for execution receivers, docs, trust-boundary tests, and `tools/validate-locale-plugin.ps1` for sample-plugin/device validation evidence.
-**Description:** Implement the Locale/Tasker host intent contract for condition and setting plugins, with safe result handling, permission disclosure, timeout/cancellation, and a sample plugin validation harness.  
-**Sources:** Locale SDK [S7], Termux:Tasker [S3], Tasker plugin sample [S8], Pocket Casts plugin module [S8].  
-**Category:** plugin ecosystem, integrations, security.  
-**Impact:** 5.  
-**Effort:** 5.  
-**Risk:** Medium/High; third-party plugins are trust-boundary code and need sandboxed intent validation.  
-**Dependencies:** Capability registry; action result/error model.  
-**Novelty:** Parity.  
-**Tier reason:** Plugin compatibility gives OpenTasker useful integrations before it has hundreds of native actions.
+**Status:** Readiness/detection only (v0.2.26). No Shizuku API dependency, permission request, or shell execution.
+**Description:** Add an opt-in Shizuku integration with explicit user opt-in screen, permission request, isolated `ShizukuShellRunner`, an allowlist of elevated commands (force-stop, secure settings keys, private DNS, mobile data toggle, screen-off), action-level capability flag, run-log audit trail, and a kill-switch in Setup.
+**Sources:** Shizuku [S6], Tasker ADB workarounds [S16].
+**Category:** platform/OS, security, power-user.
+**Impact:** 4.
+**Effort:** 5.
+**Risk:** High — trust boundary; mis-routed commands brick devices.
+**Dependencies:** N1 (FGS / capability), action safety boundaries (P11).
+**Novelty:** Leapfrog vs OSS Easer/Essentials.
 
-### X4 - OpenTasker as automation target
+### X4 (2026.05.06) - Termux scripting dispatch (real execution)
 
-**Status:** Baseline completed in v0.2.15. Added a custom-permission receiver for task execution, profile enable/disable, status queries, variable extras, run-log persistence, docs, and contract tests.  
-**Description:** Expose documented, permission-scoped intents so other apps can trigger profiles/tasks, query profile status, or pass variables into a task. Include examples and security controls for exported receivers/services.  
-**Sources:** openHAB Android Tasker plugin [S5], NetGuard intent API lesson [S6], Locale SDK [S7].  
-**Category:** integrations, security, dev-experience.  
-**Impact:** 4.  
-**Effort:** 3.  
-**Risk:** Medium; exported surfaces must be locked down.  
-**Dependencies:** Stable profile/task IDs; capability registry.  
-**Novelty:** Parity plus openness.  
-**Tier reason:** An automation app should be both a host and a callable component.
+**Status:** Readiness/detection only (v0.2.27). The `script.termux.run` action is gated to fail-closed; no `RUN_COMMAND` request, no stdout/stderr capture.
+**Description:** Add the `com.termux.permission.RUN_COMMAND` request flow, an explicit per-script allowlist with hash pinning, scoped working-directory enforcement, structured stdout/stderr/exit-code capture, output→variable mapping, and a hard cap on dispatch frequency. Document a threat model for Termux as an execution sandbox.
+**Sources:** Termux:Tasker [S3], openHAB scripting [S13], AppDaemon sandbox [S15].
+**Category:** integrations, security.
+**Impact:** 4.
+**Effort:** 4.
+**Risk:** High — arbitrary execution; allowlist + capture must be tested.
+**Dependencies:** Run-log step traces; capability registry.
+**Novelty:** Parity.
 
-### X5 - Automation modes: single, restart, queued, parallel
+### X5 (2026.05.06) - Health Connect polling trigger (wellness)
 
-**Status:** Baseline completed in v0.2.16. Added persisted per-profile automation modes, migration support, UI selection, single/restart/queued/parallel dispatch logic, and profile entity tests.  
-**Description:** Add per-profile re-trigger behavior modeled after Home Assistant automation modes. Current cooldown behavior becomes one policy instead of the whole concurrency model.  
-**Sources:** Home Assistant automation modes [S12], current cooldown logic [L1].  
-**Category:** correctness, reliability, UX.  
-**Impact:** 4.  
-**Effort:** 3.  
-**Risk:** Medium; cancellation and shared variables must be correct.  
-**Dependencies:** TaskRunner cancellation, variable scope.  
-**Novelty:** Leapfrog against many Android apps.  
-**Tier reason:** Retrigger semantics are a hidden reliability bug class.
+**Status:** Not started.
+**Description:** Add a Health Connect read-only polling trigger using `androidx.health.connect.client`. Subscribe via WorkManager periodic worker (default 30 min; user-tunable from 15 min to 24 h within HC quota), fire `event=healthconnect` Context events for sleep stage transitions, heart-rate threshold crossings, step-goal milestones, and exercise-session end. No write paths. Disclose the Play Health Connect permission requirement in Setup.
+**Sources:** Health Connect API + automation triggers (no real-time, polling required) [S45], wellness automation request signal [S17].
+**Category:** integrations, platform/OS, privacy.
+**Impact:** 3.
+**Effort:** 4.
+**Risk:** Medium — Health Connect permissions are sensitive; F-Droid track must NOT ship the dependency by default (capability-flag it under a build flavor or runtime detect).
+**Dependencies:** Capability registry; F-Droid build profile.
+**Novelty:** Leapfrog among FOSS options.
 
-### X6 - Context inspector
+### X6 (2026.05.06) - Variable expression engine v3: arrays, JSON paths, persistence
 
-**Status:** Baseline completed in v0.2.17. Added a live Inspector tab with registered context-source health, latest observed values, setup state, source errors, and per-profile match/blocking explanations backed by a tested pure inspection model.
-**Description:** Add a live screen showing monitored context values, permission status, last update time, source health, and why each enabled profile currently does or does not match.  
-**Sources:** Home Assistant Developer Tools/States [S12], Node-RED debug panel [S9], Huginn agent health [S11].  
-**Category:** observability, UX, debugging.  
-**Impact:** 4.  
-**Effort:** 4.  
-**Risk:** Low/Medium; some context values are sensitive.  
-**Dependencies:** Capability registry; run log instrumentation.  
-**Novelty:** Leapfrog.  
-**Tier reason:** Reduces support burden and makes automation explainable.
+**Status:** v0.2.30–v0.2.35 shipped bounded `{{ ... }}` templates with arrays, JSON paths, math/string functions, traces, and explicit regex rejection. Persistent task-local vs. global vs. event scope is partially modeled; nested-array writes, structured-output persistence, and a debugger step view remain.
+**Description:** Add (a) writeable nested array/JSON paths in the global scope with size limits, (b) a Run-Log expression-debugger view that shows expansion at each action step inline with the existing per-expression diagnostics, and (c) a `var.persist` action that explicitly hardens an in-task variable to global scope.
+**Sources:** Tasker variables [S16], HA Jinja [S12], Huginn Liquid [S11].
+**Category:** data, observability.
+**Impact:** 4.
+**Effort:** 4.
+**Risk:** Medium — engine performance and quota enforcement.
+**Dependencies:** Run log step traces (done v0.2.9); template engine (done v0.2.35).
+**Novelty:** Parity.
 
-### X7 - Notification listener trigger
+### X7 (2026.05.06) - Profile sharing publish channel (post-N6)
 
-**Status:** Baseline completed in v0.2.18. Added a notification listener service that emits `event=notification` context events through the existing Event source, with package allowlists, title/body filters, bounded regex matching, redacted Android logging, setup visibility in the inspector, and regression tests.
-**Description:** Implement notification-access onboarding and a `NotificationListenerService` context with app/source filters, title/body matching, regex option with limits, package allowlists, and redacted logging.  
-**Sources:** Tasker AutoNotification demand [S16], MacroDroid notification triggers [S17], Android notification listener constraints [L3].  
-**Category:** platform/OS, security, UX.  
-**Impact:** 4.  
-**Effort:** 4.  
-**Risk:** Medium; notifications can contain sensitive content.  
-**Dependencies:** Capability registry; privacy redaction model.  
-**Novelty:** Parity.  
-**Tier reason:** Notification-driven automation is a common high-value Android use case.
+**Status:** Manifest + Discussions submission text shipped v0.2.28; in-app preview lands in N6. Network publishing, signed/verified templates, screenshots, and trust UI remain.
+**Description:** After N6 ships, add (a) a curated GitHub-Discussions-backed feed pulled offline, (b) detached-signature support for "verified" templates, and (c) screenshot attachments. Treat the feed as read-only; submission stays through Discussions.
+**Sources:** Taskernet [S16], Node-RED flow library [S9], n8n templates [S10].
+**Category:** plugin ecosystem, distribution.
+**Impact:** 4.
+**Effort:** 5.
+**Risk:** Medium — review burden; trust UI must not imply Google-Play-style vetting.
+**Dependencies:** N6.
+**Novelty:** Leapfrog.
 
-### X8 - NFC trigger
+### X8 (2026.05.06) - Room 3 + AGP 10 prep
 
-**Status:** Write-helper flow completed in v0.2.55. Added NFC tag/tech/NDEF intent handling through `MainActivity`, an in-memory `event=nfc` bridge for the Event context source, normalized tag ID matching, an event-editor tag ID field, a one-time NDEF text-record write helper for writable/formattable tags, a setup-required nightstand NFC template, inspector copy, and regression tests.
-**Description:** Add NFC tag trigger support with tag ID filtering, write-helper flow, and templates for physical-location automations.  
-**Sources:** Home Assistant Android NFC [S4], openHAB Android NFC [S5], Automate NFC support [S18].  
-**Category:** platform/OS, UX, offline.  
-**Impact:** 4.  
-**Effort:** 3.  
-**Risk:** Low; mostly permission/intent handling.  
-**Dependencies:** Active UI; import/export.  
-**Novelty:** Parity.  
-**Tier reason:** NFC is reliable, offline, and avoids many background restrictions.
+**Status:** Room 2.8.4 / AGP 9.2.1 in v0.2.59. Room 3 is alpha-only (`3.0.0-alpha03`); AGP 10 will require dropping the temporary built-in-Kotlin shim that v0.2.59 already removed.
+**Description:** Track Room 3 stable. When stable, plan a single migration commit covering both `androidx.room` databases plus migration tests; until then, monitor and document. Track AGP 10 release-candidate compatibility with Hilt/Kotlin/KSP; do not adopt before the Hilt decision in N8.
+**Sources:** Room releases [S35], AGP releases [S38], Kotlin releases [S37].
+**Category:** dev-experience, data.
+**Impact:** 3.
+**Effort:** 4.
+**Risk:** Medium/High — Room 3 is a data-risk migration.
+**Dependencies:** N8 Hilt decision.
+**Novelty:** Maintenance.
 
-### X9 - Calendar and sun triggers
+### X9 (2026.05.06) - i18n / l10n bootstrap
 
-**Status:** Completed in v0.2.57. Added local CalendarProvider polling through the Event context source, redacted `event=calendar` metadata for busy current/upcoming events, state/calendar/before-window filters, sunrise/sunset matching from configured latitude/longitude plus offset/window settings, Calendar access onboarding, Event editor fields, calendar/sun preset chips, a setup-required meeting-mode template, regression tests, `tools/collect-calendar-sun-evidence.ps1`, and API 36 smoke evidence `build/device-evidence/calendar-sun/20260505-152622` showing Calendar permission, provider queries, and foreground service readiness.
-**Description:** Add calendar-event triggers ("during meeting", "before next event") and sunrise/sunset triggers with offsets. Keep calendar data local and log only redacted event metadata by default.  
-**Sources:** Home Assistant calendar/sun triggers [S12], MacroDroid/Automate calendar support [S17][S18], Android calendar permission model.  
-**Category:** UX, platform/OS, privacy.  
-**Impact:** 4.  
-**Effort:** 4.  
-**Risk:** Medium; calendar contents are sensitive.  
-**Dependencies:** Permission onboarding; privacy redaction.  
-**Novelty:** Parity.  
-**Tier reason:** These are high-frequency real-world automation patterns.
+**Status:** Not started — strings live inline in Compose code per Improvement Plan P12.
+**Description:** Move all user-facing strings to `strings.xml` per existing Compose-friendly patterns, set up a `values-<locale>` skeleton for at least one additional locale, and document the contributor translation workflow (Weblate model from Easer). Capability/error/setup explanations are highest priority because they are user-facing on every onboarding.
+**Sources:** Easer Weblate [S2], Improvement Plan P12 [L7].
+**Category:** accessibility, i18n, dev-experience.
+**Impact:** 3.
+**Effort:** 4.
+**Risk:** Low.
+**Dependencies:** N9 docs pass.
+**Novelty:** Parity.
 
-### X10 - Tasker XML import with migration report
-
-**Status:** Completed in v0.2.58. v0.2.21 added a secure Tasker XML parser that converts common task/profile/variable XML into an OpenTasker JSON bundle, preserves unmapped actions as explicit unsupported placeholders, reports mapped actions, skipped profiles, unsupported contexts, scene exclusions, variable losses, and capability warnings, and includes regression tests. v0.2.58 adds the user-facing document picker, bounded XML preview, migration/capability review dialog, confirmed Room import path, and disabled-by-default imported profiles.
-**Description:** Parse Tasker `.prj.xml`/`.tsk.xml` exports into OpenTasker JSON/Room entities. Show mapped actions, unsupported actions, variable losses, scene exclusions, and required permissions before import.  
-**Sources:** Tasker market dominance [S16], migration friction from competitors [S17][S18], open JSON strategy [S9][S11].  
-**Category:** migration, UX, data.  
-**Impact:** 5.  
-**Effort:** 5.  
-**Risk:** Medium/High; Tasker format breadth is large and lossy import must be honest.  
-**Dependencies:** Open JSON import/export; capability registry; action mapping table.  
-**Novelty:** Leapfrog among FOSS options.  
-**Tier reason:** Captures experienced users without requiring them to rebuild years of workflows.
-
-### X11 - F-Droid readiness track
-
-**Status:** Completed in v0.2.58. v0.2.22 added a property-based `openTaskerDistribution=fdroid` build profile, pinned build tools, `BuildConfig.DISTRIBUTION`, proprietary dependency-family verification through `verifyFdroidReadiness`, CI coverage for the F-Droid release profile, F-Droid readiness docs, and a draft fdroiddata metadata file. v0.2.58 syncs the draft metadata to version `0.2.58` / code `60`, pins it to source commit `40d0daef29b4ab9b6ee9bc6fc395722bb58fd9c9`, adds `verifyFdroidMetadata`, adds release-tag/APK-payload comparison support in `tools/verify-fdroid-release.ps1`, documents the submission checks, and verifies local `fdroid lint` plus WSL fdroidserver 2.4.4 `fdroid build --no-tarball com.opentasker.app:60` with Java 17 and Android SDK 35.
-**Description:** Add an `fdroid` build profile/flavor policy, pin reproducible build inputs where needed, avoid proprietary geofencing dependencies in F-Droid artifacts, document metadata, and verify unsigned release APK reproducibility assumptions.  
-**Sources:** F-Droid reproducible builds [S31], F-Droid inclusion policy [S32], platform audit [L3].  
-**Category:** distribution/packaging, security, docs.  
-**Impact:** 4.  
-**Effort:** 3.  
-**Risk:** Medium; build tooling changes can affect release artifacts.  
-**Dependencies:** Release workflow stability.  
-**Novelty:** Strategic differentiator.  
-**Tier reason:** F-Droid is the natural distribution channel for a privacy-first Android automation app.
-
-### X12 - Dependency modernization plan
-
-**Status:** Completed for stable dependency modernization. Baseline completed in v0.2.23. Plugin and library versions are centralized in `gradle/libs.versions.toml`, Gradle declarations use catalog aliases, and `docs/DEPENDENCY_MODERNIZATION.md` defines the staged upgrade order and verification gate. Follow-up batches upgraded Hilt/Dagger from `2.46` to `2.59.2`, Room from `2.6.1` to `2.8.4` on the existing `androidx.room` line, WorkManager from `2.9.1` to `2.11.2`, the runtime-support subset to Core KTX `1.18.0`, DataStore `1.2.1`, Coroutines `1.10.2`, Kotlinx Serialization JSON `1.11.0`, and Gson `2.14.0`, the compiler set to Kotlin/Compose plugin `2.3.21` plus KSP `2.3.7`, the Android build toolchain to Gradle wrapper `9.4.1`, AGP `9.2.1`, compile SDK `36`, and Build Tools `36.0.0`, the API 36-unblocked Compose/AndroidX UI set to Compose BOM `2026.04.01`, Activity Compose `1.13.0`, Lifecycle `2.10.0`, Navigation Compose `2.9.8`, and Hilt Navigation Compose `1.3.0`, and the AGP 9 build to built-in Kotlin/new DSL without temporary opt-out flags, while keeping target SDK `35` and runtime startup unchanged. Room 3 was reviewed and deferred because the new `androidx.room3:room3-*` artifact group is alpha-only (`3.0.0-alpha03`) and would be a data-risk migration across both persisted databases and migration tests.
-**Description:** Upgrade dependencies in staged, reversible steps: Hilt/Dagger through an intermediate compatible release, Room, WorkManager, Compose BOM, Coroutines, Kotlin/KSP/Compose plugin alignment, and AGP only when build/reproducibility constraints are clear.  
-**Sources:** Kotlin releases [S37], AGP releases [S38], Dagger releases [S39], Room releases [S35], WorkManager releases [S40], Compose releases [S41].  
-**Category:** dev-experience, security, testing, distribution.  
-**Impact:** 3.  
-**Effort:** 4.  
-**Risk:** Medium/High; Hilt migration has known generated-code changes and the app currently bypasses Hilt at runtime.  
-**Dependencies:** Existing build green; tests.  
-**Novelty:** Maintenance.  
-**Tier reason:** Dependency lag should be corrected deliberately, not mixed with feature work.
 
 ---
 
-## Later
+## Completed Backlog (shipped v0.2.0 → v0.2.59)
 
-### L1 - Visual flow/graph editor
+The 2026-05-05 roadmap's `Now (N1–N10)`, `Next (X1–X12)`, and parts of `Later (L1, L2, L4, L6, L7)` were delivered between v0.2.2 and v0.2.59. Each item below cross-references the release that closed it; CHANGELOG.md is canonical for change-level detail.
 
-**Status:** Baseline completed in v0.2.24. Added a pure automation graph model and optional Flow tab that renders profile context nodes, enter/exit task lanes, action step nodes, edges, and incomplete-reference warnings. The current unreleased L1 work adds typed node targets, selectable Flow nodes that open the existing profile/context/task/action editors, missing-task repair routing to the owning profile, first-class conditional action edge labels/node markers, a compact horizontally scrollable lane overview, deterministic accessibility summaries for graph cards and nodes, and picker-backed Add Context/Add Step shortcuts. Branching authoring, future flow-control branch visualization, zoom gestures, and drag/drop canvas mutation remain later L1 slices.
-**Description:** Add an optional visual graph view for branching, parallelism, subflows, and profile chaining while keeping the list/form editor as the primary power-user path.  
-**Sources:** Automate flowchart editor [S18], Node-RED flows [S9], openHAB Blockly [S13], ioBroker Blockly [S14].  
-**Category:** UX, accessibility, plugin ecosystem.  
-**Impact:** 4.  
-**Effort:** 5.  
-**Risk:** High; editor complexity can overwhelm beginners if it becomes mandatory.  
-**Dependencies:** Stable JSON model; templates; active CRUD UI.  
-**Novelty:** Parity.  
-**Tier reason:** Valuable after the simpler editor and templates are reliable.
+| Legacy ID | Title | Shipped in |
+|---|---|---|
+| N1 | Reintegrate the active automation UI | v0.2.2 |
+| N2 | First-run permission and reliability onboarding | v0.2.3 |
+| N3 | Remove `USE_EXACT_ALARM`, harden exact scheduling | v0.2.4 |
+| N4 | Replace static WiFi receiver with NetworkCallback | v0.2.5 |
+| N5 | Replace AppOpenService polling with foreground UsageStats | v0.2.6 |
+| N6 | Replace success-shaped stubs with real impls or honest failures | v0.2.7 |
+| N7 | Capability registry and action/context gating | v0.2.8 |
+| N8 | Execution-grade run logs (step-level traces) | v0.2.9 |
+| N9 | High-value regression tests around platform/parser boundaries | v0.2.10 |
+| N10 | Doc truthfulness pass | v0.2.11 |
+| X1 | Profile templates and guided creation wizard | v0.2.12, v0.2.19 (NFC), v0.2.20 (calendar) |
+| X2 | Open JSON import/export with schema versioning | v0.2.13 |
+| X3 | Locale-compatible plugin host (setting + condition baseline) | v0.2.14, v0.2.49–v0.2.54 |
+| X4 | OpenTasker as automation target (signature-scoped intent API) | v0.2.15 |
+| X5 | Automation modes (single, restart, queued, parallel) | v0.2.16 |
+| X6 | Context inspector | v0.2.17 |
+| X7 | Notification listener trigger | v0.2.18 |
+| X8 | NFC trigger + write helper | v0.2.19, v0.2.55 (write helper) |
+| X9 | Calendar and sun triggers + adb evidence harness | v0.2.20, v0.2.56–v0.2.57 |
+| X10 | Tasker XML import (engine + review UI) | v0.2.21, v0.2.58 |
+| X11 | F-Droid readiness track | v0.2.22, v0.2.58 |
+| X12 | Dependency modernization plan (Hilt, Room, WorkManager, Compose, AGP, K2/KSP) | v0.2.23, v0.2.59 batches |
+| L1 (read-only) | Visual flow/graph editor — read-only model + deep links + lane overview | v0.2.24, v0.2.51–v0.2.59 |
+| L2 (baseline) | Scene/overlay editor — Room baseline + element editing + drag-to-move + scaled previews | v0.2.25, v0.2.59 |
+| L4 (gated) | Sandboxed scripting escape hatch — Termux readiness + gated `script.termux.run` | v0.2.27 |
+| L6 (FOSS baseline) | FOSS geofencing — `LocationManager` source, dwell, evidence harness, API-36 single-device smoke | v0.2.29, v0.2.36–v0.2.48 |
+| L7 | Variable/template expression system v2 — bounded `{{ ... }}` engine | v0.2.30–v0.2.35 |
 
-### L2 - Scene/overlay editor
+Carry-forward open work (now tracked in current Now/Next):
 
-**Status:** Baseline completed in v0.2.25. Added a Room-backed Scenes tab for scene shell creation/deletion, scene/element previews, overlay-access readiness, and validation of dimensions, bounds, and tap/long-press task references. Current unreleased L2 work adds button, text, slider, and image element creation/editing, stable element draft defaults, removable element rows, tap/long-press task binding pickers, scaled canvas previews, and drag-to-move layout edits. Resize handles, multi-select layout editing, and overlay launch remain later L2 slices.
-**Description:** Build custom UI scenes/overlays with buttons, text, sliders, images, and task bindings. Handle `SYSTEM_ALERT_WINDOW` onboarding and Android 15 background-FGS overlay restrictions.  
-**Sources:** Tasker scenes [S16], AppDaemon dashboard analogy [S15], Android 15 overlay/FGS changes [S36].  
-**Category:** UX, platform/OS, security.  
-**Impact:** 4.  
-**Effort:** 5.  
-**Risk:** High; overlays are policy-sensitive and easy to abuse.  
-**Dependencies:** Permission onboarding; active UI; action binding model.  
-**Novelty:** Parity.  
-**Tier reason:** Advanced but not needed for core beta reliability.
-
-### L3 - Optional Shizuku power-user backend
-
-**Status:** Baseline completed in v0.2.26. Added Shizuku manager package visibility/status detection, an optional setup checklist row excluded from required readiness progress, and elevated-action hints for Shizuku candidates. OpenTasker still has no Shizuku API dependency, permission request, shell execution, or enabled privileged action path.
-**Description:** Add an opt-in Shizuku integration for elevated actions such as secure settings, force-stop, private DNS, and restricted system toggles. Keep all core workflows functional without it.  
-**Sources:** Shizuku [S6], Tasker ADB command center [S16], MacroDroid helper workaround [S17].  
-**Category:** platform/OS, security, power-user.  
-**Impact:** 4.  
-**Effort:** 5.  
-**Risk:** High; trust boundary and support complexity are significant.  
-**Dependencies:** Capability registry; elevated-action isolation; docs.  
-**Novelty:** Leapfrog.  
-**Tier reason:** High power-user value but should not distract from non-elevated reliability.
-
-### L4 - Sandboxed scripting escape hatch
-
-**Status:** Baseline completed in v0.2.27. Added a gated `script.termux.run` action, runtime failure path, Termux and Termux:Tasker package visibility/status detection, optional setup checklist status, and docs/tests. OpenTasker still does not request `com.termux.permission.RUN_COMMAND`, dispatch Termux intents, run scripts, parse stdout/stderr, or map script output variables.
-**Description:** Provide a first-class "Run Script" action through Termux integration initially, with structured stdout/stderr/exit-code capture and variable output parsing. Consider embedded JS only after threat modeling.  
-**Sources:** Termux:Tasker [S3], n8n code node [S10], AppDaemon sandbox model [S15], openHAB scripting [S13].  
-**Category:** integrations, security, dev-experience.  
-**Impact:** 4.  
-**Effort:** 4.  
-**Risk:** High; arbitrary execution requires clear user warnings and sandbox boundaries.  
-**Dependencies:** Run log, capability registry, user file/path restrictions.  
-**Novelty:** Parity.  
-**Tier reason:** Power-user unlock after safe core actions are mature.
-
-### L5 - Profile sharing library
-
-**Status:** Baseline completed in v0.2.28. Added an offline `ProfileShareLibrary` manifest for OpenTasker JSON bundles with stable slugs, bundle counts, unverified trust state, capability/import safety findings, and GitHub Discussions submission markdown. Network publishing, signed/verified templates, screenshots UI, and community import review remain later L5 slices.
-**Description:** Build a community sharing path around open JSON bundles: copy/share URL, local import, screenshots/permission warnings, signed/verified templates, and GitHub Discussions as the initial submission channel.  
-**Sources:** Taskernet [S16], MacroDroid template/community [S17], Automate community [S18], Node-RED flow library [S9], n8n templates [S10].  
-**Category:** plugin ecosystem, docs, distribution.  
-**Impact:** 4.  
-**Effort:** 5.  
-**Risk:** Medium/High; imported automations can be dangerous if not reviewed.  
-**Dependencies:** JSON schema, capability warnings, import sandbox.  
-**Novelty:** Leapfrog for OSS Android automation.  
-**Tier reason:** Needs a stable import format and safety UX first.
-
-### L6 - Advanced location without proprietary lock-in
-
-**Status:** Started across v0.2.29, v0.2.36, v0.2.37, v0.2.38, v0.2.39, v0.2.40, v0.2.41, v0.2.42, v0.2.43, v0.2.44, v0.2.45, v0.2.46, v0.2.47, and v0.2.48. v0.2.29 added a pure `FossGeofenceEvaluator` with Haversine distance, radius checks, optional max accuracy, and dwell-time evaluation, then wired active Location context matching and legacy geofence distance checks through it. v0.2.36 adds a registered FOSS `LocationManager` source with GPS/network providers, fail-closed setup events, setup/inspector policy copy, and Android 14+ foreground-service location declarations. v0.2.37 persists inside-since dwell state per profile/context/config before Location context matching. v0.2.38 surfaces dwell state in Context Inspector profile rows. v0.2.39 clears persisted dwell keys when profiles are deleted or their context lists change. v0.2.40 adds a balanced provider request policy for GPS/network updates and less frequent setup rechecks. v0.2.41 centralizes Android 11+/14+ background-location and foreground-service disclosure copy. v0.2.42 fixes app-launch startup for the foreground automation service after device smoke testing exposed that only boot startup was wired, and an API 36 device smoke confirmed app launch starts the service foreground with `specialUse|location` after foreground/background location permissions and device location are enabled. v0.2.43 adds `tools/collect-location-evidence.ps1` for repeatable adb foreground-service, location, logcat, and battery snapshots; a 10-second API 36 home/background sample kept the service foreground with `specialUse|location`. v0.2.44 adds a setup-required disabled Location evidence template that installs a configurable Location context and log action for later background event-delivery smoke tests. v0.2.45 extends the evidence collector with debug Room snapshots, run-log summaries, and optional run-log/logcat pattern assertions. v0.2.46 verifies the installed/enabled `Location evidence log` template on an API 36 device while the app is sent home: a shell-owned GPS test provider delivered the template coordinates, `AutomationService` remained foreground with `specialUse|location`, and Room evidence `build/device-evidence/location/20260505-085413` recorded a successful `Location evidence log Task` run after evidence collection started. v0.2.47 extends the evidence collector with structured battery state/deltas plus fail-closed `-RequireUnpluggedSample` and `-RequireProviderCadenceEvidence` gates; API 36 evidence `build/device-evidence/location/20260505-120448` confirmed the provider-cadence gate and correctly reported the USB-powered sample as plugged tooling evidence. v0.2.48 adds `-RequireRecentUnpluggedHistory` with minimum-duration and maximum-age controls for post-reconnect validation when wireless ADB is unavailable; API 36 evidence `build/device-evidence/location/20260505-125057` captured about 111 seconds of recent unplugged history, below the 600-second roadmap threshold, and follow-up evidence `build/device-evidence/location/20260505-143254` captured 615.055 seconds of recent unplugged history with GPS/network cadence evidence present, satisfying the longer unplugged battery measurement. Broader multi-device/provider reliability verification and any optional Play-flavor backend remain later L6 slices.
-**Description:** Implement FOSS-first geofencing through Android location APIs/manual Haversine, dwell time, accuracy tuning, and optional Play flavor backend only if the project explicitly accepts a Play-services flavor split.  
-**Sources:** Android background location policy [S29], F-Droid inclusion policy [S32], Easer/LLAMA location lessons [S1][S21].  
-**Category:** platform/OS, privacy, distribution.  
-**Impact:** 4.  
-**Effort:** 5.  
-**Risk:** High; background location is policy-sensitive and battery-sensitive.  
-**Dependencies:** Permission onboarding; F-Droid track; privacy policy.  
-**Novelty:** Parity plus FOSS differentiation.  
-**Tier reason:** Important, but background location should not land before disclosure/policy infrastructure.
-
-### L7 - Variable/template expression system v2
-
-**Status:** Completed in v0.2.35. v0.2.30 added a pure bounded `TemplateExpressionEngine`; v0.2.31 wires action arguments through legacy `%var` expansion and then `{{ ... }}` templates; v0.2.32 parses and renders sanitized expanded-argument summaries plus template warning counts; v0.2.33 persists and renders individual expression, source, value, and warning diagnostics; v0.2.34 applies bounded templates to action conditions before legacy predicate evaluation and skips fail-closed on warnings; v0.2.35 makes regex-like template functions explicitly unsupported while keeping bounded legacy `%var(regex:...)` separate.
-**Description:** Evolve simple substitution into task-local/global scope, arrays, JSON paths, math/string functions, template expressions, and a debugger that shows expansion at each action step.  
-**Sources:** Tasker variables [S16], Home Assistant Jinja templates [S12], Huginn Liquid templates [S11], Automate variable blocks [S18].  
-**Category:** data, UX, observability.  
-**Impact:** 4.  
-**Effort:** 5.  
-**Risk:** Medium; expression engines can create performance and injection issues.  
-**Dependencies:** Run log step traces; parser tests.  
-**Novelty:** Parity.  
-**Tier reason:** Deep variables are essential, but unsafe parsing must not outrun validation.
+- Scene resize handles, multi-select, alignment guides, overlay launch → **X1 (Next)**
+- Flow editor authoring (drag/drop, branch viz, zoom) → **X2 (Next)**
+- Shizuku elevated execution → **X3 (Next)**
+- Termux real script dispatch → **X4 (Next)**
+- Multi-device/multi-OEM geofence durability evidence → **N2 (Now)**
+- Locale Condition Context UX → **N7 (Now)**
+- Sharing preview UI → **N6 (Now)**
+- Hilt-vs-non-Hilt drift, AGP-9-flag follow-through → **N8 (Now)**
+- Variable engine v3 (writeable nested paths, debugger view) → **X6 (Next)**
+- Room 3 + AGP 10 prep → **X8 (Next)**
 
 ---
 
@@ -455,6 +353,9 @@ Key local constraints:
 | iOS Shortcuts parity/import concepts | Shortcuts is a strong UX reference | Cross-platform import is likely low-fit for Android-first MVP | [S20] |
 | Usage-duration triggers | App usage time is a useful wellness automation | Requires sensitive UsageStats access and careful privacy UX | [S4][S34] |
 | Phone/call control actions | Common automation request | Play policy and Android API restrictions are high friction | [S30] |
+| Matter / Google Home actor | Bridges OpenTasker to smart-home actuation without HA dependency | Matter SDK on Android is still nascent; commissioning UX is heavy | [S12] |
+| Wear OS 5 watch companion | Wrist triggers and quick-run tiles are competitor parity | Smaller audience; phone-side reliability still ahead | [S17] |
+| App-cloning `POST_NOTIFICATIONS` quirks (Samsung/MIUI dual-app) | Cloned-app users hit silent notify failures | Hard to reproduce without OEM hardware; carry-forward as docs ticket | [S33] |
 
 ---
 
@@ -548,6 +449,17 @@ This matrix captures the research harvest and deduped backlog. "Prevalence" is b
 | Server dependency | Architecture | Common adjacent | Rejected | [S12][S13] |
 | Flow-only UI | UX | Common | Rejected | [S18][S9] |
 | Silent background service behavior | Security/policy | Deprecated | Rejected | [S22][S23][S33] |
+| Android 16 / API 36 readiness (specialUse 6h timeout, FGS-start rules) | Platform/OS | Emerging | Now | [S43] |
+| Multi-device geofence durability evidence | Platform/reliability | Rare in OSS | Now | [L6][S22][S28] |
+| Quick Settings Tile trigger | Platform/UX | Common | Now | [S46][S17] |
+| Predictive back gesture | UX/platform | Emerging | Now | [S44] |
+| Macrobenchmark + Baseline Profile | Performance/dev | Emerging | Now | [S47] |
+| Health Connect polling trigger | Integrations | Rare in automation | Next | [S45] |
+| AGP 9 opt-out flag resolution | Dev-experience | Rare | Now | [S38][L7] |
+| i18n/l10n bootstrap | Accessibility/i18n | Common | Next | [S48][L7] |
+| Wear OS 5 companion | Mobile | Emerging | Under Consideration | [S17] |
+| Matter / Google Home actor | Integrations | Emerging | Under Consideration | [S12] |
+| App-cloning POST_NOTIFICATIONS edge case | Reliability | Rare | Under Consideration | [S33] |
 
 ---
 
@@ -575,11 +487,13 @@ This matrix captures the research harvest and deduped backlog. "Prevalence" is b
 
 - Every roadmap item above has a local evidence tag or source tag.
 - No item depends on a competitor feature claim without a URL or local-repo source in the appendix.
-- Old claims that v0.3/v0.4 UI/features are complete have been superseded by the current active-APK state.
-- Android platform restrictions are treated as product requirements, not implementation details.
+- 2026-05-06 rotation: prior `Now (N1–N10)` and `Next (X1–X12)` items have all shipped (v0.2.2 → v0.2.59) and are archived in the **Completed Backlog** appendix; the active `Now`/`Next` blocks are entirely new and target the v0.3.0 beta gate.
+- Geofence reliability claims remain explicitly gated to evidence already captured under [L6]; broader OEM/multi-device guarantees are not promised — `N2` exists precisely to gather that evidence before any guarantee is stated.
+- Android platform restrictions are treated as product requirements, not implementation details (Android 16 specialUse 6h timeout, FGS-start rules, predictive back, Health Connect lacks real-time triggers — all sourced).
 - F-Droid and Google Play constraints are separated because their acceptable dependency/policy profiles differ.
 - Rejected items are explicitly preserved so they do not silently return as future churn.
-- High-risk ideas are staged after the capability registry, permission onboarding, import/export schema, and run-log improvements that make them safe to ship.
+- High-risk ideas (Shizuku, Termux, plugin host) remain in `Next` only because the capability registry, permission onboarding, run-log redaction, and import/export schema landed in v0.2.x and now make them safe to ship.
+- Category coverage spot-check: security (N1, N6, N8), accessibility/i18n (N4, X9), observability (N5, [L6]), testing (N5, X4 evidence harness), docs (N9, N2), distribution (N1, N8), plugin (X3 carry-forward, X7), mobile/platform (N1, N3, N4, X5), offline/resilience (N2, X4 local exec), multi-user (Under Consideration only — local-first remains center), migration (X6 v3 expressions, Completed Backlog X10), upgrade (N8, X8). No category is empty.
 
 ---
 
@@ -594,6 +508,8 @@ This matrix captures the research harvest and deduped backlog. "Prevalence" is b
 | L3 | Local repo/platform audit: `AndroidManifest.xml`, `AutomationService.kt`, `BootReceiver.kt`, `WiFiEventReceiver.kt`, `AppOpenService.kt`, `GeofenceTrigger.kt`, `build.gradle.kts` |
 | L4 | Local repo: `InputValidationTest.kt`, Room schema export, Gradle validation after hardening |
 | L5 | Local repo: previous roadmap, project notes, and README status mismatch |
+| L6 | Local repo: `tools/collect-location-evidence.ps1`, `docs/FOSS_GEOFENCING.md`, `build/device-evidence/location/*` (single-device API-36 evidence captured during v0.2.36–v0.2.48) |
+| L7 | Local repo: `docs/IMPROVEMENT_PLAN.md` (P10 Hilt drift, P12 i18n carry-forward) |
 
 ### Direct Android automation and plugin sources
 
@@ -601,6 +517,7 @@ This matrix captures the research harvest and deduped backlog. "Prevalence" is b
 |---|---|---|
 | S1 | Easer repository | https://github.com/renyuneyun/Easer |
 | S2 | Easer F-Droid listing | https://f-droid.org/packages/ryey.easer/ |
+| S48 | Easer GitHub issues (last release April 2022, Android 15 incompatibility threads) | https://github.com/renyuneyun/Easer/issues |
 | S3 | Termux:Tasker | https://github.com/termux/termux-tasker |
 | S4 | Home Assistant Android companion | https://github.com/home-assistant/android |
 | S5 | openHAB Android app | https://github.com/openhab/openhab-android |
@@ -650,6 +567,11 @@ This matrix captures the research harvest and deduped backlog. "Prevalence" is b
 | S34 | UsageStatsManager API | https://developer.android.com/reference/android/app/usage/UsageStatsManager |
 | S35 | Room migrations and schema export | https://developer.android.com/training/data-storage/room/migrating-db-versions |
 | S36 | Android 15 behavior changes | https://developer.android.com/about/versions/15/behavior-changes-15 |
+| S43 | Android 16 behavior changes (specialUse 6h timeout, FGS-start rules, Play attestation) | https://developer.android.com/about/versions/16/behavior-changes-all |
+| S44 | Predictive back gesture for Compose | https://developer.android.com/develop/ui/views/animations/predictive-back/predictive-back-jetpack |
+| S45 | Health Connect Android API (no real-time triggers, polling only) | https://developer.android.com/health-and-fitness/guides/health-connect |
+| S46 | Quick Settings `TileService` reference | https://developer.android.com/reference/android/service/quicksettings/TileService |
+| S47 | Macrobenchmark and Baseline Profiles | https://developer.android.com/topic/performance/baselineprofiles/overview |
 
 ### Dependency and build sources
 
