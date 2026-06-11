@@ -8,7 +8,7 @@ import java.util.Collections
  * Base interface for a source of context events (e.g., time, location, app state).
  *
  * Implementations are registered in [ContextSourceRegistry] and emit events
- * whenever their match state changes.
+ * whenever their match state changes or a one-shot event pulse arrives.
  */
 interface ContextSource {
     val type: String

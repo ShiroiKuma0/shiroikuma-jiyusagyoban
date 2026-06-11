@@ -157,6 +157,34 @@ class ContextInspectorTest {
     }
 
     @Test
+    fun eventContextReasonExplainsPulseSemantics() {
+        val profile = Profile(
+            id = 5,
+            name = "NFC tap",
+            enabled = true,
+            enterTaskId = 10,
+            contexts = listOf(ContextSpec(ContextType.EVENT, mapOf("event" to "nfc", "tagId" to "AABB"))),
+        )
+        val source = ContextSourceSnapshot(
+            key = "event",
+            label = "System event",
+            registered = true,
+            lastObservation = ContextEventObservation(
+                ContextEvent("event", true, mapOf("event" to "nfc", "tagId" to "AA:BB")),
+                observedAtMs = 1000,
+            ),
+        )
+
+        val result = inspectProfiles(listOf(profile), listOf(source)).single()
+
+        assertTrue(result.matching)
+        assertEquals(
+            "Latest event satisfies the configuration; event contexts are one-shot pulses and can trigger again on each matching event.",
+            result.contexts.single().reason,
+        )
+    }
+
+    @Test
     fun profileInspectionCanUseTransformedLocationDwellObservation() {
         val profile = Profile(
             id = 5,

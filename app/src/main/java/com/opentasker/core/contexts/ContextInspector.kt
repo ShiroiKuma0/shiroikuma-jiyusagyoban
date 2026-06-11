@@ -192,6 +192,14 @@ private fun contextReason(
     }
     if (observation == null) return "Waiting for the first ${snapshot.label} event."
     if (observation.event.type != sourceKey) return "Latest event came from ${observation.event.type}, not $sourceKey."
+    if (spec.type == ContextType.EVENT) {
+        return when {
+            spec.invert && effectiveMatched -> "Latest event does not satisfy the configuration, so the inverted event context can trigger on this pulse."
+            spec.invert && rawMatched -> "Latest event satisfies the configuration, so the inverted event context blocks this pulse."
+            effectiveMatched -> "Latest event satisfies the configuration; event contexts are one-shot pulses and can trigger again on each matching event."
+            else -> "Latest event does not satisfy the configuration; event contexts wait for the next matching pulse."
+        }
+    }
 
     return when {
         spec.invert && effectiveMatched -> "Latest value does not satisfy the configuration, so the inverted context matches."

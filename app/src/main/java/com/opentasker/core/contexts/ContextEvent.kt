@@ -2,7 +2,7 @@ package com.opentasker.core.contexts
 
 import kotlinx.serialization.Serializable
 
-/** Event fired when a context transitions its match state. */
+/** Context observation emitted by level sources or one-shot event sources. */
 @Serializable
 data class ContextEvent(
     val type: String,
