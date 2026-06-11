@@ -19,6 +19,7 @@ import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.automation.app.AppUsageMonitor
 import com.opentasker.automation.network.WiFiNetworkMonitor
 import com.opentasker.automation.scheduler.TimeEventScheduler
+import com.opentasker.core.contexts.BootContextEvents
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.RunLogEntry
@@ -68,8 +69,12 @@ class AutomationService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val bootCompletedTrigger = intent?.action == ACTION_BOOT_COMPLETED_TRIGGER
         scope.launch {
             reloadProfiles()
+            if (bootCompletedTrigger) {
+                BootContextEvents.publishBootCompleted()
+            }
         }
         return START_STICKY
     }
@@ -384,6 +389,7 @@ class AutomationService : Service() {
         ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
     companion object {
+        const val ACTION_BOOT_COMPLETED_TRIGGER = "com.opentasker.action.BOOT_COMPLETED_TRIGGER"
         private const val CHANNEL = "opentasker.engine"
         private const val NOTIF_ID = 1001
     }
