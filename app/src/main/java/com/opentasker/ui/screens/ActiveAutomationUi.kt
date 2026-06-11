@@ -102,6 +102,7 @@ import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.RunLogRetentionOptions
 import com.opentasker.core.storage.RunLogRetentionPolicy
 import com.opentasker.core.storage.RunLogRetentionSettings
@@ -133,6 +134,15 @@ import java.util.Locale
 
 private const val TASKER_XML_IMPORT_MAX_BYTES = 4 * 1024 * 1024
 private val TASKER_XML_MIME_TYPES = arrayOf("application/xml", "text/xml", "text/*", "*/*")
+private val DATABASE_BACKUP_MIME_TYPES = arrayOf(
+    "application/octet-stream",
+    "application/x-sqlite3",
+    "application/vnd.sqlite3",
+    "*/*",
+)
+
+private fun databaseBackupExportName(): String =
+    "opentasker_backup_${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())}.db"
 
 private enum class OpenTaskerScreen(val label: String) {
     Profiles("Profiles"),
@@ -206,6 +216,7 @@ class ActiveAutomationViewModel(
     private val locationDwellStateStore = LocationDwellStateStore(appContext)
     private val bundleRepository = OpenTaskerBundleRepository(db)
     private val runLogRetentionSettings = RunLogRetentionSettings(appContext)
+    private val databaseBackupManager = DatabaseBackupManager(appContext, db)
 
     val profiles: StateFlow<List<Profile>> = db.profileDao()
         .getAllAsFlow()
@@ -231,6 +242,9 @@ class ActiveAutomationViewModel(
     val messages = events.receiveAsFlow()
 
     var runLogRetentionPolicy by mutableStateOf(runLogRetentionSettings.load())
+        private set
+
+    var backupSetupState by mutableStateOf(loadBackupSetupState(busy = false))
         private set
 
     internal var taskerImportReview by mutableStateOf<TaskerImportReviewState?>(null)
@@ -393,6 +407,54 @@ class ActiveAutomationViewModel(
             minimumTimestamp = policy.minimumTimestamp(System.currentTimeMillis()),
         )
 
+    fun createDatabaseBackup() {
+        viewModelScope.launch {
+            setBackupBusy(true)
+            databaseBackupManager.backup()
+                .onSuccess { backup ->
+                    events.send("Backup created: ${backup.name}")
+                }
+                .onFailure { events.send("Error: ${it.message ?: "Database backup failed"}") }
+            setBackupBusy(false)
+        }
+    }
+
+    fun exportDatabaseBackup(uri: Uri) {
+        viewModelScope.launch {
+            setBackupBusy(true)
+            val backup = databaseBackupManager.backup().getOrElse {
+                events.send("Error: ${it.message ?: "Database backup failed"}")
+                setBackupBusy(false)
+                return@launch
+            }
+            databaseBackupManager.exportBackup(backup, uri)
+                .onSuccess { events.send("Backup exported: ${backup.name}") }
+                .onFailure { events.send("Error: ${it.message ?: "Database backup export failed"}") }
+            setBackupBusy(false)
+        }
+    }
+
+    fun importDatabaseBackup(uri: Uri) {
+        viewModelScope.launch {
+            setBackupBusy(true)
+            databaseBackupManager.stageRestore(uri)
+                .onSuccess { events.send("Backup imported. Restart OpenTasker to apply the restore.") }
+                .onFailure { events.send("Error: ${it.message ?: "Database backup import failed"}") }
+            setBackupBusy(false)
+        }
+    }
+
+    private fun setBackupBusy(busy: Boolean) {
+        backupSetupState = loadBackupSetupState(busy)
+    }
+
+    private fun loadBackupSetupState(busy: Boolean): BackupSetupState =
+        BackupSetupState(
+            busy = busy,
+            latestBackupName = databaseBackupManager.listBackups().firstOrNull()?.name,
+            pendingRestore = databaseBackupManager.hasPendingRestore(),
+        )
+
     private fun launchWithMessage(successMessage: String, block: suspend () -> Unit) {
         viewModelScope.launch {
             runCatching { block() }
@@ -428,6 +490,7 @@ fun ActiveAutomationUi(
     val scenes by viewModel.scenes.collectAsState()
     val runLogs by viewModel.runLogs.collectAsState()
     val runLogRetentionPolicy = viewModel.runLogRetentionPolicy
+    val backupSetupState = viewModel.backupSetupState
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var screen by remember { mutableStateOf(OpenTaskerScreen.Profiles) }
@@ -446,6 +509,14 @@ fun ActiveAutomationUi(
     val taskerImportBusy = viewModel.taskerImportBusy
     val taskerXmlLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.previewTaskerXml(it, BuildConfig.VERSION_NAME) }
+    }
+    val databaseBackupExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri ->
+        uri?.let { viewModel.exportDatabaseBackup(it) }
+    }
+    val databaseBackupImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { viewModel.importDatabaseBackup(it) }
     }
     val openFlowTarget: (AutomationFlowTarget) -> Unit = { target ->
         var opened = true
@@ -664,6 +735,10 @@ fun ActiveAutomationUi(
             OpenTaskerScreen.Setup -> PermissionOnboardingScreen(
                 contentPadding = innerPadding,
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
+                backupState = backupSetupState,
+                onCreateBackup = viewModel::createDatabaseBackup,
+                onExportBackup = { databaseBackupExportLauncher.launch(databaseBackupExportName()) },
+                onImportBackup = { databaseBackupImportLauncher.launch(DATABASE_BACKUP_MIME_TYPES) },
             )
 
             OpenTaskerScreen.Inspector -> ContextInspectorScreen(db = db, contentPadding = innerPadding)
