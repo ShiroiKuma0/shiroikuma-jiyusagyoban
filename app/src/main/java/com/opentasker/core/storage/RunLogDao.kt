@@ -34,12 +34,24 @@ fun RunLogEntry.toEntity() = RunLogEntity(
 @Dao
 interface RunLogDao {
     @Insert suspend fun insert(e: RunLogEntity)
-    @Query("SELECT * FROM run_logs ORDER BY timestamp DESC LIMIT 100")
+    @Query("SELECT * FROM run_logs ORDER BY timestamp DESC, id DESC LIMIT 100")
     suspend fun getRecent(): List<RunLogEntity>
-    @Query("SELECT * FROM run_logs ORDER BY timestamp DESC LIMIT 100")
+    @Query("SELECT * FROM run_logs ORDER BY timestamp DESC, id DESC LIMIT 100")
     fun getRecentFlow(): Flow<List<RunLogEntity>>
-    @Query("SELECT * FROM run_logs WHERE taskId = :taskId ORDER BY timestamp DESC LIMIT 50")
+    @Query("SELECT * FROM run_logs WHERE taskId = :taskId ORDER BY timestamp DESC, id DESC LIMIT 50")
     suspend fun getByTask(taskId: Long): List<RunLogEntity>
-    @Query("DELETE FROM run_logs WHERE timestamp < :before")
-    suspend fun deleteOlderThan(before: Long)
+    @Query(
+        """
+        DELETE FROM run_logs
+        WHERE timestamp < :minimumTimestamp
+            OR id NOT IN (
+                SELECT id FROM run_logs
+                ORDER BY timestamp DESC, id DESC
+                LIMIT :maxEntries
+            )
+        """
+    )
+    suspend fun pruneRetention(maxEntries: Int, minimumTimestamp: Long): Int
+    @Query("SELECT COUNT(*) FROM run_logs")
+    suspend fun count(): Int
 }
