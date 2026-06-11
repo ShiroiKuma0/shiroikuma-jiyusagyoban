@@ -19,6 +19,6 @@ enum class ContextType {
     TIME,          // clock-based window
     DAY,           // weekly schedule
     LOCATION,      // geofence
-    STATE,         // device state (battery, headphones, charging, screen, wifi, ...)
+    STATE,         // device state (battery, headphones, charging, screen, ...)
     EVENT,         // one-shot triggers (SMS received, notification, intent, ...)
 }

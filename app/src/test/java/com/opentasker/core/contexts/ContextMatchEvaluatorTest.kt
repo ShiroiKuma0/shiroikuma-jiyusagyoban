@@ -87,6 +87,10 @@ class ContextMatchEvaluatorTest {
     fun stateContextAppliesConfiguredKeyValueAndNumericPredicates() {
         val keyValue = ContextSpec(ContextType.STATE, config = mapOf("key" to "charging", "value" to "true"))
         val predicate = ContextSpec(ContextType.STATE, config = mapOf("predicate" to "battery_level>=80"))
+        val operatorValue = ContextSpec(
+            ContextType.STATE,
+            config = mapOf("key" to "battery", "operator" to "<=", "value" to "90"),
+        )
         val event = ContextEvent(
             "state",
             true,
@@ -95,7 +99,37 @@ class ContextMatchEvaluatorTest {
 
         assertTrue(ContextMatchEvaluator.matches(keyValue, event))
         assertTrue(ContextMatchEvaluator.matches(predicate, event))
+        assertTrue(ContextMatchEvaluator.matches(operatorValue, event))
         assertFalse(ContextMatchEvaluator.matches(predicate, event.copy(metadata = mapOf("battery_level" to "20"))))
+    }
+
+    @Test
+    fun stateContextMatchesMergedMultiFactStateAndDocumentedAliases() {
+        val headphones = ContextSpec(ContextType.STATE, config = mapOf("key" to "headset", "value" to "connected"))
+        val charging = ContextSpec(ContextType.STATE, config = mapOf("key" to "charging", "value" to "plugged"))
+        val screen = ContextSpec(ContextType.STATE, config = mapOf("predicate" to "screen=on"))
+        val event = ContextEvent(
+            "state",
+            true,
+            metadata = mapOf(
+                "headphones" to "true",
+                "charging" to "true",
+                "screen" to "on",
+                "battery_level" to "35",
+            ),
+        )
+
+        assertTrue(ContextMatchEvaluator.matches(headphones, event))
+        assertTrue(ContextMatchEvaluator.matches(charging, event))
+        assertTrue(ContextMatchEvaluator.matches(screen, event))
+    }
+
+    @Test
+    fun stateNumericPredicatesFailClosedForMalformedThresholds() {
+        val event = mapOf("battery_level" to "15")
+
+        assertFalse(stateMatches("battery_level<not-a-number", event))
+        assertFalse(stateMatches("battery_level>=not-a-number", event))
     }
 
     @Test

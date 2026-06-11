@@ -2762,8 +2762,9 @@ private fun contextFields(type: ContextType): List<ActionField> = when (type) {
         ActionField("dwellSeconds", "Dwell seconds", FieldType.NUMBER, hint = "300"),
     )
     ContextType.STATE -> listOf(
-        ActionField("key", "State key", required = true, hint = "battery, wifi, charging, screen"),
-        ActionField("value", "Expected value", required = true, hint = "true, home-ssid, 80"),
+        ActionField("key", "State key", required = true, hint = "battery_level, charging, headphones, screen"),
+        ActionField("operator", "Operator", hint = "=, >=, <=, >, <"),
+        ActionField("value", "Expected value", required = true, hint = "true/false, connected/disconnected, on/off, 80"),
     )
     ContextType.EVENT -> listOf(
         ActionField("event", "Event type", required = true, hint = "boot_completed, notification, nfc, calendar, sunrise, sunset"),
@@ -2873,7 +2874,7 @@ private fun contextDescription(type: ContextType): String = when (type) {
     ContextType.TIME -> "Matches during a clock time window."
     ContextType.DAY -> "Matches on selected days, presets, or weekday/weekend ranges."
     ContextType.LOCATION -> "Matches near a latitude/longitude radius with optional accuracy and dwell checks."
-    ContextType.STATE -> "Matches a device state such as battery, charging, screen, or WiFi."
+    ContextType.STATE -> "Matches a device state such as battery level, charging, headphones, or screen."
     ContextType.EVENT -> "Matches a one-shot event such as boot, SMS, notification, NFC, calendar, sun, or intent."
 }
 

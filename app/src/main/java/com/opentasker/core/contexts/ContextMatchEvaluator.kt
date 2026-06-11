@@ -75,9 +75,10 @@ object ContextMatchEvaluator {
         if (predicate.isNotBlank()) return stateMatches(predicate, event.metadata)
 
         val key = spec.config["key"]?.trim().orEmpty()
+        val operator = spec.config["operator"]?.trim()?.takeIf { it.isNotBlank() } ?: "="
         val expectedValue = spec.config["value"]?.trim().orEmpty()
         if (key.isBlank() || expectedValue.isBlank()) return false
-        return stateMatches("${normalizeStateKey(key)}=$expectedValue", event.metadata)
+        return stateMatches("$key$operator$expectedValue", event.metadata)
     }
 
     private fun matchesEvent(spec: ContextSpec, event: ContextEvent): Boolean {
@@ -202,13 +203,6 @@ object ContextMatchEvaluator {
     private fun minuteInWindow(current: Int?, start: Int, end: Int): Boolean {
         current ?: return false
         return if (start <= end) current in start..end else current >= start || current <= end
-    }
-
-    private fun normalizeStateKey(key: String): String = when (key.lowercase(Locale.US)) {
-        "battery" -> "battery_level"
-        "wifi" -> "wifi"
-        "headset" -> "headphones"
-        else -> key
     }
 
     private const val MAX_REGEX_PATTERN_CHARS = 160
