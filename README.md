@@ -26,6 +26,7 @@
 ✅ **Shizuku readiness** — optional package/status detection and elevated-action hints without executing privileged calls
 ✅ **Termux scripting readiness** — optional Termux/Termux:Tasker detection and a blocked script action without arbitrary execution
 ✅ **Open JSON bundles** — schema-versioned profile/task/context/action/variable/scene export and import planning  
+✅ **Database backup/restore** — Setup can create local SQLite backups, export a fresh backup with Android's file picker, and import a validated backup for restore on the next app restart
 ✅ **Profile sharing manifests** — offline share summaries with safety findings and GitHub Discussions submission text
 ✅ **Tasker XML import UI** — Tasker XML files can be selected, previewed with migration/capability warnings, and imported into Room as disabled profiles for review
 ✅ **F-Droid readiness** — property-based `fdroid` profile, dependency-policy and metadata checks, local fdroidserver lint/build evidence, and APK payload comparison harness
