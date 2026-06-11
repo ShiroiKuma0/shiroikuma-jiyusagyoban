@@ -9,6 +9,7 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 
 /**
  * Real StateContextSource implementation using BroadcastReceivers.
@@ -24,6 +25,14 @@ class StateContextSourceImpl : ContextSource {
 
     override fun events(app: Context): Flow<ContextEvent> = callbackFlow {
         var lastState: Map<String, String> = emptyMap()
+
+        fun publishPatch(statePatch: Map<String, String>) {
+            val mergedState = mergeStatePatch(lastState, statePatch)
+            if (mergedState != lastState) {
+                lastState = mergedState
+                trySend(ContextEvent(type, true, mergedState))
+            }
+        }
 
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
@@ -48,11 +57,7 @@ class StateContextSourceImpl : ContextSource {
                     Intent.ACTION_SCREEN_OFF -> statePatch["screen"] = "off"
                 }
 
-                val mergedState = mergeStatePatch(lastState, statePatch)
-                if (mergedState != lastState) {
-                    lastState = mergedState
-                    trySend(ContextEvent(type, true, mergedState))
-                }
+                publishPatch(statePatch)
             }
         }
 
@@ -64,8 +69,12 @@ class StateContextSourceImpl : ContextSource {
         }
 
         ContextCompat.registerReceiver(app, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        val deviceStateJob = launch {
+            DeviceStateEvents.events.collect(::publishPatch)
+        }
 
         awaitClose {
+            deviceStateJob.cancel()
             runCatching { app.unregisterReceiver(receiver) }
         }
     }
@@ -101,6 +110,8 @@ fun stateMatches(predicate: String, state: Map<String, String>): Boolean {
     }
 
     val normalizedKey = normalizeStateKey(key)
+    if (normalizedKey == "wifi") return wifiMatches(op, value, state)
+
     val actualValue = state[normalizedKey] ?: return false
     val expectedValue = normalizeStateExpectedValue(normalizedKey, value.trim()) ?: return false
 
@@ -125,13 +136,14 @@ internal fun mergeStatePatch(
 internal fun normalizeStateKey(key: String): String = when (key.trim().lowercase()) {
     "battery" -> "battery_level"
     "headset" -> "headphones"
+    "ssid", "wifi_ssid" -> "wifi"
     else -> key.trim().lowercase()
 }
 
 private fun normalizeStateExpectedValue(key: String, value: String): String? {
     val normalized = value.trim().lowercase()
     return when (key) {
-        "headphones", "wifi" -> when (normalized) {
+        "headphones" -> when (normalized) {
             "connected", "plugged", "plugged_in", "on", "true", "yes" -> "true"
             "disconnected", "unplugged", "off", "false", "no" -> "false"
             else -> null
@@ -146,6 +158,25 @@ private fun normalizeStateExpectedValue(key: String, value: String): String? {
             else -> null
         }
         else -> value.trim()
+    }
+}
+
+private fun wifiMatches(
+    op: String,
+    expectedRaw: String,
+    state: Map<String, String>,
+): Boolean {
+    if (op != "=") return false
+    val expected = expectedRaw.trim()
+    val normalizedExpected = expected.lowercase()
+    val connected = state["wifi_connected"]?.toBooleanStrictOrNull()
+    val actualSsid = state["wifi"]?.takeUnless { it.equals("disconnected", ignoreCase = true) }
+        ?: state["wifi_ssid"].orEmpty()
+
+    return when (normalizedExpected) {
+        "connected", "on", "true", "yes" -> connected == true
+        "disconnected", "off", "false", "no" -> connected == false
+        else -> actualSsid == expected
     }
 }
 

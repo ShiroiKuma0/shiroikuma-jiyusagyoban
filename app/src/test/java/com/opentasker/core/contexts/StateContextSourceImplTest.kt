@@ -1,7 +1,9 @@
 package com.opentasker.core.contexts
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StateContextSourceImplTest {
@@ -40,5 +42,27 @@ class StateContextSourceImplTest {
         val initial = mapOf("screen" to "on")
 
         assertSame(initial, mergeStatePatch(initial, emptyMap()))
+    }
+
+    @Test
+    fun wifiStatePatchSupportsSsidAndConnectedPredicates() {
+        val state = DeviceStateEvents.wifiPatch("OfficeWiFi", connected = true)
+
+        assertEquals("OfficeWiFi", state["wifi"])
+        assertEquals("true", state["wifi_connected"])
+        assertTrue(stateMatches("wifi=OfficeWiFi", state))
+        assertTrue(stateMatches("wifi=connected", state))
+        assertTrue(stateMatches("wifi_ssid=OfficeWiFi", state))
+        assertFalse(stateMatches("wifi=HomeWiFi", state))
+    }
+
+    @Test
+    fun disconnectedWifiStateSupportsDisconnectedPredicate() {
+        val state = DeviceStateEvents.wifiPatch("OfficeWiFi", connected = false)
+
+        assertEquals("disconnected", state["wifi"])
+        assertEquals("false", state["wifi_connected"])
+        assertTrue(stateMatches("wifi=disconnected", state))
+        assertFalse(stateMatches("wifi=OfficeWiFi", state))
     }
 }
