@@ -40,6 +40,7 @@
 ✅ **Runtime action registry** — UI action IDs map to real implementations or explicit unsupported failures  
 ✅ **Capability gating** — action picker marks setup requirements and blocks unsupported privileged actions  
 ✅ **Run log traces** — task history includes action-level status, duration, failure reasons, sanitized template expansions, warning counts, and per-expression diagnostics
+✅ **Run log retention** — task history is bounded by configurable Log tab presets; the default keeps 30 days or 1,000 entries and prunes in the background
 ✅ **Context inspector** — live source health, latest observed values, and per-profile match explanations<br>
 ✅ **Notification listener events** — notification access can feed `event=notification` contexts with package/title/body filters<br>
 ✅ **NFC tag events** — tag scans can feed `event=nfc` contexts with normalized tag ID matching<br>
@@ -50,7 +51,7 @@
 ✅ **Context configuration UI** — editor supports all 6 context families while runtime support continues to harden by family  
 ✅ **100% Kotlin** — modern, type-safe, coroutine-friendly  
 ✅ **Profile execution** — AutomationService wired to TaskRunner for context triggers  
-✅ **Run log persistence** — task execution history is written to Room  
+✅ **Run log persistence** — task execution history is written to Room with configurable retention
 ✅ **Tasker compat** — `.prj.xml`/`.tsk.xml` exports can be previewed and imported through a disabled-by-default review flow
 
 ---
