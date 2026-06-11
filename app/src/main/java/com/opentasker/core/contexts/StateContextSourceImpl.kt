@@ -16,9 +16,8 @@ import kotlinx.coroutines.flow.callbackFlow
  * Matches predicates like:
  *   - "battery_level>=80" (battery percentage)
  *   - "charging=true" (is device charging)
- *   - "headphones=connected" (headphones plugged in)
+ *   - "headphones=connected" or "headphones=true" (headphones plugged in)
  *   - "screen=on" (display state)
- *   - "wifi=connected" (WiFi connected)
  */
 class StateContextSourceImpl : ContextSource {
     override val type = "state"
@@ -29,7 +28,7 @@ class StateContextSourceImpl : ContextSource {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent == null) return
-                val newState = mutableMapOf<String, String>()
+                val statePatch = mutableMapOf<String, String>()
 
                 when (intent.action) {
                     Intent.ACTION_BATTERY_CHANGED -> {
@@ -38,20 +37,21 @@ class StateContextSourceImpl : ContextSource {
                             it == BatteryManager.BATTERY_STATUS_CHARGING ||
                             it == BatteryManager.BATTERY_STATUS_FULL
                         }
-                        newState["battery_level"] = level.toString()
-                        newState["charging"] = isCharging.toString()
+                        statePatch["battery_level"] = level.toString()
+                        statePatch["charging"] = isCharging.toString()
                     }
                     Intent.ACTION_HEADSET_PLUG -> {
                         val state = intent.getIntExtra("state", 0)
-                        newState["headphones"] = (state == 1).toString()
+                        statePatch["headphones"] = (state == 1).toString()
                     }
-                    Intent.ACTION_SCREEN_ON -> newState["screen"] = "on"
-                    Intent.ACTION_SCREEN_OFF -> newState["screen"] = "off"
+                    Intent.ACTION_SCREEN_ON -> statePatch["screen"] = "on"
+                    Intent.ACTION_SCREEN_OFF -> statePatch["screen"] = "off"
                 }
 
-                if (newState.isNotEmpty() && newState != lastState) {
-                    lastState = newState
-                    trySend(ContextEvent(type, true, newState))
+                val mergedState = mergeStatePatch(lastState, statePatch)
+                if (mergedState != lastState) {
+                    lastState = mergedState
+                    trySend(ContextEvent(type, true, mergedState))
                 }
             }
         }
@@ -79,7 +79,6 @@ class StateContextSourceImpl : ContextSource {
  *   - "charging=true" / "charging=false"
  *   - "headphones=connected" / "headphones=disconnected"
  *   - "screen=on" / "screen=off"
- *   - "wifi=connected" / "wifi=disconnected"
  */
 fun stateMatches(predicate: String, state: Map<String, String>): Boolean {
     val (key, op, value) = if (">=" in predicate) {
@@ -101,15 +100,61 @@ fun stateMatches(predicate: String, state: Map<String, String>): Boolean {
         return false
     }
 
-    val actualValue = state[key.trim()] ?: return false
-    val expectedValue = value.trim()
+    val normalizedKey = normalizeStateKey(key)
+    val actualValue = state[normalizedKey] ?: return false
+    val expectedValue = normalizeStateExpectedValue(normalizedKey, value.trim()) ?: return false
 
     return when (op) {
         "=" -> actualValue == expectedValue
-        ">=" -> actualValue.toIntOrNull()?.let { it >= expectedValue.toIntOrNull() ?: 0 } ?: false
-        "<=" -> actualValue.toIntOrNull()?.let { it <= expectedValue.toIntOrNull() ?: 0 } ?: false
-        ">" -> actualValue.toIntOrNull()?.let { it > expectedValue.toIntOrNull() ?: 0 } ?: false
-        "<" -> actualValue.toIntOrNull()?.let { it < expectedValue.toIntOrNull() ?: 0 } ?: false
+        ">=" -> numericCompare(actualValue, expectedValue) { actual, expected -> actual >= expected }
+        "<=" -> numericCompare(actualValue, expectedValue) { actual, expected -> actual <= expected }
+        ">" -> numericCompare(actualValue, expectedValue) { actual, expected -> actual > expected }
+        "<" -> numericCompare(actualValue, expectedValue) { actual, expected -> actual < expected }
         else -> false
     }
+}
+
+internal fun mergeStatePatch(
+    currentState: Map<String, String>,
+    patch: Map<String, String>,
+): Map<String, String> {
+    if (patch.isEmpty()) return currentState
+    return currentState + patch
+}
+
+internal fun normalizeStateKey(key: String): String = when (key.trim().lowercase()) {
+    "battery" -> "battery_level"
+    "headset" -> "headphones"
+    else -> key.trim().lowercase()
+}
+
+private fun normalizeStateExpectedValue(key: String, value: String): String? {
+    val normalized = value.trim().lowercase()
+    return when (key) {
+        "headphones", "wifi" -> when (normalized) {
+            "connected", "plugged", "plugged_in", "on", "true", "yes" -> "true"
+            "disconnected", "unplugged", "off", "false", "no" -> "false"
+            else -> null
+        }
+        "charging" -> when (normalized) {
+            "charging", "plugged", "plugged_in", "on", "true", "yes" -> "true"
+            "discharging", "not_charging", "unplugged", "off", "false", "no" -> "false"
+            else -> null
+        }
+        "screen" -> when (normalized) {
+            "on", "off" -> normalized
+            else -> null
+        }
+        else -> value.trim()
+    }
+}
+
+private inline fun numericCompare(
+    actualValue: String,
+    expectedValue: String,
+    compare: (actual: Int, expected: Int) -> Boolean,
+): Boolean {
+    val actual = actualValue.toIntOrNull() ?: return false
+    val expected = expectedValue.toIntOrNull() ?: return false
+    return compare(actual, expected)
 }

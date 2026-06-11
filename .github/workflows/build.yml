@@ -30,7 +30,7 @@ jobs:
               -validity 10000 \
               -dname "CN=Android Debug,O=Android,C=US"
           fi
-      - name: Test and build
-        run: chmod +x ./gradlew && ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease :app:verifyFdroidReadiness :app:verifyFdroidMetadata --console=plain
+      - name: Test, lint, and build
+        run: chmod +x ./gradlew && ./gradlew :app:lintDebug :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease :app:verifyFdroidReadiness :app:verifyFdroidMetadata --console=plain
       - name: F-Droid profile build
         run: ./gradlew -PopenTaskerDistribution=fdroid :app:assembleRelease :app:verifyFdroidReadiness :app:verifyFdroidMetadata --console=plain
