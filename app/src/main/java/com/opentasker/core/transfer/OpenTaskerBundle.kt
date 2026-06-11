@@ -227,6 +227,7 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
                 }
                 val remappedProfile = profile.copy(
                     id = 0,
+                    enabled = false,
                     enterTaskId = enterTaskId,
                     exitTaskId = profile.exitTaskId?.let { taskIdMap[it] },
                 )
