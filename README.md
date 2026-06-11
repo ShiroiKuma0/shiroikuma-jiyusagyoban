@@ -5,7 +5,7 @@
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.59** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, day schedule presets/ranges, runtime template argument and condition expansion, per-expression template diagnostics, explicit regex template policy, FOSS geofence evaluation with a live platform location source, a disabled Location evidence template, app-launch service startup, adb-backed location/calendar/sun evidence collection, provider-cadence, unplugged-sample, and post-reconnect unplugged-history gates, background Location event-delivery smoke evidence, balanced provider cadence, policy-aware location setup copy, persisted dwell state, inspector dwell details, and stale-key cleanup, scene library management with text/button/slider/image element editing, task binding pickers, scaled canvas previews, and drag-to-move canvas editing, flow graphs with node deep links, conditional action labels, scrollable lane overviews, screen-reader summaries, and picker-backed Add Context/Add Step shortcuts, JSON bundle export/import UI, profile sharing manifests, Tasker XML import UI, F-Droid build readiness, dependency version governance, optional Shizuku readiness, optional Termux script readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers and write helper, calendar/sun triggers with editor presets, and conservative Locale setting/condition plugin host actions with an adb validation harness are active now; broad device-verified background geofence reliability, elevated backends, script execution, and broader plugin UX are planned.
+**OpenTasker v0.2.59** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, day schedule presets/ranges, runtime template argument and condition expansion, per-expression template diagnostics, explicit regex template policy, FOSS geofence evaluation with a live platform location source, a disabled Location evidence template, app-launch service startup, adb-backed location/calendar/sun evidence collection, provider-cadence, unplugged-sample, and post-reconnect unplugged-history gates, background Location event-delivery smoke evidence, balanced provider cadence, policy-aware location setup copy, persisted dwell state, inspector dwell details, and stale-key cleanup, scene library management with text/button/slider/image element editing, task binding pickers, scaled canvas previews, and drag-to-move canvas editing, flow graphs with node deep links, conditional action labels, scrollable lane overviews, screen-reader summaries, and picker-backed Add Context/Add Step shortcuts, JSON bundle export/import UI, profile sharing manifests, Tasker XML import UI, F-Droid and Play distribution checks, dependency version governance, optional Shizuku readiness, optional Termux script readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers and write helper, calendar/sun triggers with editor presets, and conservative Locale setting/condition plugin host actions with an adb validation harness are active now; broad device-verified background geofence reliability, elevated backends, script execution, and broader plugin UX are planned.
 
 > **Status:** v0.2.59 adds Flow graph deep links, conditional edge labels, lane overviews, accessibility summaries, mutation shortcuts, Scene element editing, scaled previews, drag-to-move layout editing, shorter bottom navigation labels, and the API 36 dependency/toolchain follow-up. v0.2.58 adds a Tasker XML document-picker import flow with bounded preview, migration/capability warnings, confirmed Room import, and disabled-by-default imported profiles. v0.2.57 adds a calendar/sun adb evidence harness and verified the debug app on API 36 device `SM-S938B`; evidence `build/device-evidence/calendar-sun/20260505-152622` shows Calendar access granted, CalendarProvider calendar/instance queries succeeding, and `AutomationService` foreground after launch. v0.2.48 evidence `build/device-evidence/location/20260505-143254` shows a 615.055-second recent unplugged interval that satisfied the 600-second post-reconnect history gate with GPS/network provider cadence evidence present. These remain single-device data points, not broad background geofence reliability claims.
 
@@ -29,12 +29,12 @@
 ✅ **Database backup/restore** — Setup can create local SQLite backups, export a fresh backup with Android's file picker, and import a validated backup for restore on the next app restart
 ✅ **Profile sharing manifests** — offline share summaries with safety findings and GitHub Discussions submission text
 ✅ **Tasker XML import UI** — Tasker XML files can be selected, previewed with migration/capability warnings, and imported into Room as disabled profiles for review
-✅ **F-Droid readiness** — property-based `fdroid` profile, dependency-policy and metadata checks, local fdroidserver lint/build evidence, and APK payload comparison harness
+✅ **F-Droid/Play distribution readiness** — property-based `fdroid` and `play` profiles, dependency-policy and metadata checks, local fdroidserver lint/build evidence, Play SMS/phone-state manifest policy gate, and APK payload comparison harness
 ✅ **Dependency governance** — Gradle version catalog centralizes plugin/library versions before staged upgrades
 ✅ **Locale plugin host baseline** — explicit setting-plugin dispatch, condition-plugin query execution, configuration result parsing, request-query events, package validation, bundle limits, last-known unknown-state fallback, timeout wrapping, and adb validation harness
 ✅ **External automation target** — signature-scoped intents to run tasks, toggle profiles, query status, and pass variables
 ✅ **Automation modes** — per-profile single, restart, queued, and parallel re-trigger behavior  
-✅ **Setup checklist** — notifications, exact alarms, battery optimization, usage access, notification access, overlays, location, Bluetooth, SMS, and DND access  
+✅ **Setup checklist** — notifications, exact alarms, battery optimization, usage access, notification access, overlays, location, Bluetooth, SMS when included, and DND access
 ✅ **Scheduled time ticks** — AlarmManager exact scheduling when allowed, inexact fallback when Android denies exact alarms  
 ✅ **WiFi trigger monitor** — dynamic NetworkCallback path instead of restricted manifest connectivity broadcasts  
 ✅ **App-open monitor** — foreground-service-owned UsageStats polling with explicit missing-permission pause behavior  
@@ -93,7 +93,7 @@ Room DB (persistent storage)
 | Script | 1 | gated Termux script run |
 | Import | 1 | unsupported Tasker action placeholder |
 
-Some actions are intentionally disabled or marked setup-required because Android restricts normal apps from changing airplane mode, mobile data, screenshots, reboot, screen-off, and similar privileged operations. Shizuku manager detection and Termux script bridge detection are available only as readiness signals; OpenTasker does not request Shizuku permission, request Termux `RUN_COMMAND`, execute elevated commands, or run scripts yet.
+Some actions are intentionally disabled or marked setup-required because Android restricts normal apps from changing airplane mode, mobile data, screenshots, reboot, screen-off, and similar privileged operations. SMS send remains available in standard/F-Droid builds; Play builds omit SMS and phone-state permissions and mark the SMS action unsupported. Shizuku manager detection and Termux script bridge detection are available only as readiness signals; OpenTasker does not request Shizuku permission, request Termux `RUN_COMMAND`, execute elevated commands, or run scripts yet.
 
 ---
 
@@ -105,6 +105,8 @@ cd OpenTasker
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
 # or Release:
 ./gradlew :app:assembleRelease
+# Play distribution policy check:
+./gradlew -PopenTaskerDistribution=play :app:verifyPlayManifestPolicy
 ```
 
 Install on device:

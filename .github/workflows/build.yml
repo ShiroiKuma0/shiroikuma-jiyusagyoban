@@ -34,3 +34,5 @@ jobs:
         run: chmod +x ./gradlew && ./gradlew :app:lintDebug :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease :app:verifyFdroidReadiness :app:verifyFdroidMetadata --console=plain
       - name: F-Droid profile build
         run: ./gradlew -PopenTaskerDistribution=fdroid :app:assembleRelease :app:verifyFdroidReadiness :app:verifyFdroidMetadata --console=plain
+      - name: Play manifest policy
+        run: ./gradlew -PopenTaskerDistribution=play :app:verifyPlayManifestPolicy --console=plain

@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.telephony.SmsManager
 import androidx.core.content.ContextCompat
+import com.opentasker.app.BuildConfig
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
@@ -106,6 +107,9 @@ class SendSmsAction : Action {
     override val category = ActionCategory.APP
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        if (!BuildConfig.SMS_ACTION_AVAILABLE) {
+            return ActionResult.Failure("SMS action is unavailable in this distribution because SMS permissions are omitted for Play policy compliance")
+        }
         val number = args["number"] ?: return ActionResult.Failure("missing number")
         val message = args["message"] ?: ""
         if (ContextCompat.checkSelfPermission(ctx.app, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
