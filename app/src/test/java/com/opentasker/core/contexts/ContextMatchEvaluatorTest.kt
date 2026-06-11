@@ -145,7 +145,7 @@ class ContextMatchEvaluatorTest {
         assertFalse(
             ContextMatchEvaluator.matches(
                 spec,
-                ContextEvent("event", true, mapOf("event" to "sms_received")),
+                ContextEvent("event", true, mapOf("event" to "notification")),
             )
         )
     }

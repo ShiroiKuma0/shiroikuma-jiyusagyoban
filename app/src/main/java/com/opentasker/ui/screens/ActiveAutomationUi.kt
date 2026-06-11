@@ -2875,7 +2875,7 @@ private fun contextDescription(type: ContextType): String = when (type) {
     ContextType.DAY -> "Matches on selected days, presets, or weekday/weekend ranges."
     ContextType.LOCATION -> "Matches near a latitude/longitude radius with optional accuracy and dwell checks."
     ContextType.STATE -> "Matches a device state such as battery level, charging, headphones, or screen."
-    ContextType.EVENT -> "Matches a one-shot event such as boot, SMS, notification, NFC, calendar, sun, or intent."
+    ContextType.EVENT -> "Matches a one-shot event such as boot, notification, NFC, calendar, sun, or Locale plugin queries."
 }
 
 private fun runLogTaskOptions(logs: List<RunLogEntry>, tasks: List<Task>): List<Pair<Long, String>> {
