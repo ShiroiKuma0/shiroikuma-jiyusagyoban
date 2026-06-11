@@ -13,7 +13,7 @@ val releaseKeyAlias = System.getenv("OPEN_TASKER_RELEASE_KEY_ALIAS")
 val releaseKeyPassword = System.getenv("OPEN_TASKER_RELEASE_KEY_PASSWORD")
 val appVersionCode = 61
 val appVersionName = "0.2.59"
-val allowedDistributions = setOf("standard", "fdroid")
+val allowedDistributions = setOf("standard", "fdroid", "play")
 val selectedDistribution = providers.gradleProperty("openTaskerDistribution")
     .orElse("standard")
     .get()
@@ -21,6 +21,7 @@ val selectedDistribution = providers.gradleProperty("openTaskerDistribution")
 require(selectedDistribution in allowedDistributions) {
     "Unsupported OpenTasker distribution '$selectedDistribution'. Expected one of: ${allowedDistributions.joinToString()}."
 }
+val smsActionAvailable = selectedDistribution != "play"
 val hasReleaseSigning = listOf(
     releaseKeystorePath,
     releaseKeystorePassword,
@@ -41,6 +42,9 @@ android {
         versionName = appVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "DISTRIBUTION", "\"$selectedDistribution\"")
+        buildConfigField("Boolean", "SMS_ACTION_AVAILABLE", smsActionAvailable.toString())
+        manifestPlaceholders["smsPermissionName"] = if (smsActionAvailable) "android.permission.SEND_SMS" else "android.permission.INTERNET"
+        manifestPlaceholders["phoneStatePermissionName"] = if (smsActionAvailable) "android.permission.READ_PHONE_STATE" else "android.permission.ACCESS_NETWORK_STATE"
     }
 
     signingConfigs {
@@ -247,5 +251,32 @@ tasks.register("verifyFdroidMetadata") {
         }
 
         println("F-Droid metadata check passed for v$appVersionName ($appVersionCode)")
+    }
+}
+
+tasks.register("verifyPlayManifestPolicy") {
+    group = "verification"
+    description = "Checks that the Play distribution merged manifest omits SMS and phone-state permissions."
+    dependsOn("processReleaseMainManifest")
+
+    doLast {
+        check(selectedDistribution == "play") {
+            "Run this task with -PopenTaskerDistribution=play"
+        }
+        val manifest = layout.buildDirectory
+            .file("intermediates/merged_manifest/release/processReleaseMainManifest/AndroidManifest.xml")
+            .get()
+            .asFile
+        check(manifest.isFile) {
+            "Release merged manifest not found at ${manifest.relativeTo(projectDir)}"
+        }
+        val manifestText = manifest.readText()
+        check("android.permission.SEND_SMS" !in manifestText) {
+            "Play distribution merged manifest must not contain SEND_SMS"
+        }
+        check("android.permission.READ_PHONE_STATE" !in manifestText) {
+            "Play distribution merged manifest must not contain READ_PHONE_STATE"
+        }
+        println("Play manifest policy check passed: SMS/phone-state permissions are absent.")
     }
 }
