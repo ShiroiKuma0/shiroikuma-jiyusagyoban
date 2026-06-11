@@ -49,8 +49,8 @@ class AutomationService : Service() {
     private val scope = CoroutineScope(Dispatchers.Main + job)
     private val db by lazy { OpenTaskerApp_NoHilt.db }
     private val timeEventScheduler by lazy { TimeEventScheduler(this) }
-    private val wifiNetworkMonitor by lazy { WiFiNetworkMonitor(this, OpenTaskerApp_NoHilt.automationEngine) }
-    private val appUsageMonitor by lazy { AppUsageMonitor(this, OpenTaskerApp_NoHilt.automationEngine) }
+    private val wifiNetworkMonitor by lazy { WiFiNetworkMonitor(this) }
+    private val appUsageMonitor by lazy { AppUsageMonitor(this) }
     
     private val matchers = Collections.synchronizedMap(mutableMapOf<Long, ProfileMatcher>())
     private val profileCooldowns = Collections.synchronizedMap(mutableMapOf<Long, Long>()) // profileId -> cooldownUntilMs

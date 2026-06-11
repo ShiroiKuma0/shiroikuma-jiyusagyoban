@@ -126,22 +126,6 @@
         </receiver>
 
         <receiver
-            android:name="com.opentasker.automation.receiver.BatteryEventReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.BATTERY_CHANGED" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name="com.opentasker.automation.receiver.GeofenceEventReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.opentasker.automation.GEOFENCE_EVENT" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
             android:name="com.opentasker.core.external.AutomationTargetReceiver"
             android:exported="true"
             android:permission="com.opentasker.permission.AUTOMATION">
