@@ -33,6 +33,8 @@ jobs:
         run: chmod +x ./gradlew && ./gradlew :app:lint :app:testDebugUnitTest :app:assembleDebug :app:verifyFdroidReadiness :app:verifyFdroidMetadata
       - name: Build F-Droid release profile
         run: ./gradlew -PopenTaskerDistribution=fdroid :app:assembleRelease :app:verifyFdroidReadiness :app:verifyFdroidMetadata
+      - name: Verify Play manifest policy
+        run: ./gradlew -PopenTaskerDistribution=play :app:verifyPlayManifestPolicy
       - name: Build release APK
         run: ./gradlew :app:assembleRelease
       - name: Rename APK

@@ -1,5 +1,6 @@
 package com.opentasker.core.capabilities
 
+import com.opentasker.app.BuildConfig
 import com.opentasker.core.power.ShizukuPowerBackend
 import com.opentasker.core.scripting.TermuxScriptBackend
 
@@ -30,7 +31,7 @@ object ActionCapabilityRegistry {
         "volume.set" to ActionCapability(CapabilityLevel.RequiresSetup, "May be blocked by Do Not Disturb policy access."),
         "airplane.toggle" to elevatedUnsupported("airplane.toggle", "Airplane mode changes require system or device-owner privileges."),
         "mobile.toggle" to elevatedUnsupported("mobile.toggle", "Mobile data changes require carrier, system, or device-owner privileges."),
-        "sms.send" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires SMS permission and Play policy review."),
+        "sms.send" to smsCapability(),
         "screenshot.take" to elevatedUnsupported("screenshot.take", "Screenshots require MediaProjection consent or privileged shell access."),
         "sound.play" to ActionCapability(CapabilityLevel.Unsupported, "Direct media playback is not implemented yet."),
         "media.mute" to ActionCapability(CapabilityLevel.RequiresSetup, "May be blocked by Do Not Disturb policy access."),
@@ -48,6 +49,13 @@ object ActionCapabilityRegistry {
     )
 
     fun get(actionId: String): ActionCapability = capabilities[actionId] ?: supported
+
+    private fun smsCapability(): ActionCapability =
+        if (BuildConfig.SMS_ACTION_AVAILABLE) {
+            ActionCapability(CapabilityLevel.RequiresSetup, "Requires SMS permission; Play builds omit SMS actions for policy compliance.")
+        } else {
+            ActionCapability(CapabilityLevel.Unsupported, "SMS action is unavailable in this distribution because SMS and phone-state permissions are omitted for Play policy compliance.")
+        }
 
     private fun elevatedUnsupported(actionId: String, reason: String): ActionCapability =
         ActionCapability(

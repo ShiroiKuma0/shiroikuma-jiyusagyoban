@@ -55,6 +55,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.opentasker.app.BuildConfig
 import com.opentasker.core.location.LocationPolicyDisclosures
 import com.opentasker.core.permissions.UsageAccess
 import com.opentasker.core.power.ShizukuPowerBackend
@@ -383,7 +384,7 @@ private fun PermissionRequirement(label: String) {
 private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
     val shizukuStatus = ShizukuPowerBackend.inspect(context)
     val termuxStatus = TermuxScriptBackend.inspect(context)
-    return listOf(
+    return listOfNotNull(
         PermissionSetupItem(
             title = "Notifications",
             body = "Required for foreground-service visibility and user-facing notification actions on Android 13 and newer.",
@@ -486,14 +487,14 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
             },
             requiredFor = "Bluetooth actions",
         ),
-        PermissionSetupItem(
+        if (BuildConfig.SMS_ACTION_AVAILABLE) PermissionSetupItem(
             title = "SMS send",
             body = "Needed before SMS actions can send messages. Keep SMS automations explicit and user-authored.",
             granted = hasPermission(context, Manifest.permission.SEND_SMS),
             actionLabel = "Request",
             action = PermissionAction.RuntimePermission(Manifest.permission.SEND_SMS),
             requiredFor = "SMS actions",
-        ),
+        ) else null,
         PermissionSetupItem(
             title = "Do Not Disturb access",
             body = "Needed before OpenTasker can change interruption filters or DND-related settings.",
