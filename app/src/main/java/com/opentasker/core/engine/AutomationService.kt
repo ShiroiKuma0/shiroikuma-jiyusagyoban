@@ -24,6 +24,8 @@ import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Task
+import com.opentasker.core.storage.RunLogRetentionSettings
+import com.opentasker.core.storage.minimumTimestamp
 import com.opentasker.core.storage.toEntity
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineStart
@@ -51,12 +53,14 @@ class AutomationService : Service() {
     private val timeEventScheduler by lazy { TimeEventScheduler(this) }
     private val wifiNetworkMonitor by lazy { WiFiNetworkMonitor(this) }
     private val appUsageMonitor by lazy { AppUsageMonitor(this) }
+    private val runLogRetentionSettings by lazy { RunLogRetentionSettings(this) }
     
     private val matchers = Collections.synchronizedMap(mutableMapOf<Long, ProfileMatcher>())
     private val profileCooldowns = Collections.synchronizedMap(mutableMapOf<Long, Long>()) // profileId -> cooldownUntilMs
     private val matcherJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>()) // Track jobs for cleanup
     private val profileTaskJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>())
     private val queuedProfileTasks = Collections.synchronizedMap(mutableMapOf<Long, ArrayDeque<Task>>())
+    private var lastRunLogPruneAt = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -66,6 +70,7 @@ class AutomationService : Service() {
         timeEventScheduler.scheduleNextMinute()
         wifiNetworkMonitor.start()
         appUsageMonitor.start(scope)
+        scope.launch { pruneRunLogs(force = true) }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -306,8 +311,31 @@ class AutomationService : Service() {
 
     private suspend fun insertRunLog(entry: RunLogEntry) {
         runCatching { db.runLogDao().insert(entry.toEntity()) }
+            .onSuccess { pruneRunLogs(force = false) }
             .onFailure { error ->
                 android.util.Log.e("OpenTasker", "Failed to write run log for task ${entry.taskId}", error)
+            }
+    }
+
+    private suspend fun pruneRunLogs(force: Boolean) {
+        val now = System.currentTimeMillis()
+        if (!force && now - lastRunLogPruneAt < RUN_LOG_PRUNE_INTERVAL_MS) return
+
+        val policy = runLogRetentionSettings.load()
+        runCatching {
+            db.runLogDao().pruneRetention(
+                maxEntries = policy.maxEntries,
+                minimumTimestamp = policy.minimumTimestamp(now),
+            )
+        }
+            .onSuccess { deleted ->
+                lastRunLogPruneAt = now
+                if (deleted > 0) {
+                    android.util.Log.i("OpenTasker", "Pruned $deleted old run log entries")
+                }
+            }
+            .onFailure { error ->
+                android.util.Log.e("OpenTasker", "Failed to prune run logs", error)
             }
     }
 
@@ -392,6 +420,7 @@ class AutomationService : Service() {
         const val ACTION_BOOT_COMPLETED_TRIGGER = "com.opentasker.action.BOOT_COMPLETED_TRIGGER"
         private const val CHANNEL = "opentasker.engine"
         private const val NOTIF_ID = 1001
+        private val RUN_LOG_PRUNE_INTERVAL_MS = TimeUnit.HOURS.toMillis(1)
     }
 }
 

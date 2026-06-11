@@ -102,6 +102,12 @@ import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.RunLogRetentionOptions
+import com.opentasker.core.storage.RunLogRetentionPolicy
+import com.opentasker.core.storage.RunLogRetentionSettings
+import com.opentasker.core.storage.displayLabel
+import com.opentasker.core.storage.minimumTimestamp
+import com.opentasker.core.storage.normalized
 import com.opentasker.core.storage.toEntity
 import com.opentasker.core.transfer.OpenTaskerBundleRepository
 import com.opentasker.core.transfer.TaskerImportPlanner
@@ -199,6 +205,7 @@ class ActiveAutomationViewModel(
 ) : ViewModel() {
     private val locationDwellStateStore = LocationDwellStateStore(appContext)
     private val bundleRepository = OpenTaskerBundleRepository(db)
+    private val runLogRetentionSettings = RunLogRetentionSettings(appContext)
 
     val profiles: StateFlow<List<Profile>> = db.profileDao()
         .getAllAsFlow()
@@ -223,11 +230,20 @@ class ActiveAutomationViewModel(
     private val events = Channel<String>(Channel.BUFFERED)
     val messages = events.receiveAsFlow()
 
+    var runLogRetentionPolicy by mutableStateOf(runLogRetentionSettings.load())
+        private set
+
     internal var taskerImportReview by mutableStateOf<TaskerImportReviewState?>(null)
         private set
 
     var taskerImportBusy by mutableStateOf(false)
         private set
+
+    init {
+        viewModelScope.launch {
+            runCatching { pruneRunLogs(runLogRetentionPolicy) }
+        }
+    }
 
     fun createTask(name: String, priority: Int) = launchWithMessage("Task created") {
         db.taskDao().insert(Task(name = name.trim(), priority = priority.coerceIn(0, 10)).toEntity())
@@ -355,6 +371,28 @@ class ActiveAutomationViewModel(
         }
     }
 
+    fun updateRunLogRetention(policy: RunLogRetentionPolicy) {
+        viewModelScope.launch {
+            val normalized = policy.normalized()
+            runCatching {
+                runLogRetentionSettings.save(normalized)
+                runLogRetentionPolicy = normalized
+                pruneRunLogs(normalized)
+            }
+                .onSuccess { deleted ->
+                    val suffix = if (deleted > 0) "; pruned $deleted old entry${plural(deleted)}" else ""
+                    events.send("Run log retention updated$suffix")
+                }
+                .onFailure { events.send("Error: ${it.message ?: "Run log retention update failed"}") }
+        }
+    }
+
+    private suspend fun pruneRunLogs(policy: RunLogRetentionPolicy): Int =
+        db.runLogDao().pruneRetention(
+            maxEntries = policy.maxEntries,
+            minimumTimestamp = policy.minimumTimestamp(System.currentTimeMillis()),
+        )
+
     private fun launchWithMessage(successMessage: String, block: suspend () -> Unit) {
         viewModelScope.launch {
             runCatching { block() }
@@ -389,6 +427,7 @@ fun ActiveAutomationUi(
     val tasks by viewModel.tasks.collectAsState()
     val scenes by viewModel.scenes.collectAsState()
     val runLogs by viewModel.runLogs.collectAsState()
+    val runLogRetentionPolicy = viewModel.runLogRetentionPolicy
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var screen by remember { mutableStateOf(OpenTaskerScreen.Profiles) }
@@ -629,7 +668,13 @@ fun ActiveAutomationUi(
 
             OpenTaskerScreen.Inspector -> ContextInspectorScreen(db = db, contentPadding = innerPadding)
 
-            OpenTaskerScreen.RunLog -> RunLogScreenContent(runLogs, tasks, innerPadding)
+            OpenTaskerScreen.RunLog -> RunLogScreenContent(
+                logs = runLogs,
+                tasks = tasks,
+                retentionPolicy = runLogRetentionPolicy,
+                onRetentionPolicyChange = viewModel::updateRunLogRetention,
+                contentPadding = innerPadding,
+            )
         }
     }
 
@@ -1381,17 +1426,13 @@ private fun ContextRow(
 }
 
 @Composable
-private fun RunLogScreenContent(logs: List<RunLogEntry>, tasks: List<Task>, contentPadding: PaddingValues) {
-    if (logs.isEmpty()) {
-        EmptyState(
-            title = "No execution history yet",
-            body = "Run log entries appear here when enabled profiles execute tasks.",
-            actionLabel = null,
-            onAction = null,
-            contentPadding = contentPadding,
-        )
-        return
-    }
+private fun RunLogScreenContent(
+    logs: List<RunLogEntry>,
+    tasks: List<Task>,
+    retentionPolicy: RunLogRetentionPolicy,
+    onRetentionPolicyChange: (RunLogRetentionPolicy) -> Unit,
+    contentPadding: PaddingValues,
+) {
     var statusFilter by remember { mutableStateOf(RunLogStatusFilter.All) }
     var taskIdFilter by remember { mutableStateOf<Long?>(null) }
     var query by remember { mutableStateOf("") }
@@ -1406,23 +1447,41 @@ private fun RunLogScreenContent(logs: List<RunLogEntry>, tasks: List<Task>, cont
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            RunLogSummaryCard(logs)
+        if (logs.isEmpty()) {
+            item {
+                InlineNotice(
+                    title = "No execution history yet",
+                    body = "Run log entries appear here when enabled profiles execute tasks. Current retention: ${retentionPolicy.displayLabel()}.",
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        } else {
+            item {
+                RunLogSummaryCard(logs)
+            }
         }
         item {
-            RunLogFilterCard(
-                totalCount = logs.size,
-                visibleCount = filteredLogs.size,
-                statusFilter = statusFilter,
-                onStatusFilterChange = { statusFilter = it },
-                taskOptions = taskOptions,
-                selectedTaskId = taskIdFilter,
-                onTaskFilterChange = { taskIdFilter = it },
-                query = query,
-                onQueryChange = { query = it },
+            RunLogRetentionCard(
+                policy = retentionPolicy,
+                onPolicyChange = onRetentionPolicyChange,
             )
         }
-        if (filteredLogs.isEmpty()) {
+        if (logs.isNotEmpty()) {
+            item {
+                RunLogFilterCard(
+                    totalCount = logs.size,
+                    visibleCount = filteredLogs.size,
+                    statusFilter = statusFilter,
+                    onStatusFilterChange = { statusFilter = it },
+                    taskOptions = taskOptions,
+                    selectedTaskId = taskIdFilter,
+                    onTaskFilterChange = { taskIdFilter = it },
+                    query = query,
+                    onQueryChange = { query = it },
+                )
+            }
+        }
+        if (logs.isNotEmpty() && filteredLogs.isEmpty()) {
             item {
                 InlineNotice(
                     title = "No matching runs",
@@ -1433,6 +1492,86 @@ private fun RunLogScreenContent(logs: List<RunLogEntry>, tasks: List<Task>, cont
         }
         items(filteredLogs, key = { it.id }) { entry ->
             RunLogCard(entry)
+        }
+    }
+}
+
+@Composable
+private fun RunLogRetentionCard(
+    policy: RunLogRetentionPolicy,
+    onPolicyChange: (RunLogRetentionPolicy) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Retention", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Stored run history is pruned in the background. The Log tab loads the newest 100 entries for fast review.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                items(RunLogRetentionOptions.all, key = { it.label }) { option ->
+                    val selected = option.policy == policy
+                    OutlinedButton(
+                        onClick = { onPolicyChange(option.policy) },
+                        modifier = Modifier
+                            .width(220.dp)
+                            .animateContentSize(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = if (selected) {
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
+                            } else {
+                                Color.Transparent
+                            },
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                        ),
+                        border = BorderStroke(
+                            1.dp,
+                            if (selected) {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.58f)
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)
+                            },
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                if (selected) {
+                                    Icon(
+                                        Icons.Filled.CheckCircle,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
+                                Text(option.label, style = MaterialTheme.typography.labelLarge)
+                            }
+                            Text(
+                                option.description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
