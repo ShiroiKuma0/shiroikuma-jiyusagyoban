@@ -6,8 +6,7 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.os.Build
 import android.util.Log
-import com.opentasker.automation.core.AutomationEngine
-import com.opentasker.automation.model.AutomationEvent
+import com.opentasker.core.contexts.ApplicationContextEvents
 import com.opentasker.core.permissions.UsageAccess
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,7 +17,6 @@ import kotlinx.coroutines.launch
 
 class AppUsageMonitor(
     context: Context,
-    private val automationEngine: AutomationEngine,
 ) {
     private val appContext = context.applicationContext
     private val usageStatsManager = appContext.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
@@ -58,10 +56,7 @@ class AppUsageMonitor(
 
         if (currentPackage == previousPackage) return
 
-        if (!previousPackage.isNullOrBlank()) {
-            automationEngine.onEvent(AutomationEvent.AppEvent(previousPackage, opened = false))
-        }
-        automationEngine.onEvent(AutomationEvent.AppEvent(currentPackage, opened = true))
+        ApplicationContextEvents.publishForeground(currentPackage)
         lastForegroundPackage = currentPackage
         Log.d(TAG, "Foreground app changed: $previousPackage -> $currentPackage")
     }
@@ -76,7 +71,7 @@ class AppUsageMonitor(
                 usageEvents.getNextEvent(event)
                 if (isForegroundEvent(event.eventType)) {
                     foregroundEvents += ForegroundUsageEvent(
-                        packageName = event.packageName?.toString().orEmpty(),
+                        packageName = event.packageName.orEmpty(),
                         timestamp = event.timeStamp,
                     )
                 }

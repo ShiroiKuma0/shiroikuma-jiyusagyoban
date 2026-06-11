@@ -9,13 +9,11 @@ import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.util.Log
-import com.opentasker.automation.core.AutomationEngine
-import com.opentasker.automation.model.AutomationEvent
+import com.opentasker.core.contexts.DeviceStateEvents
 import java.util.concurrent.atomic.AtomicBoolean
 
 class WiFiNetworkMonitor(
     context: Context,
-    private val automationEngine: AutomationEngine,
 ) {
     private val appContext = context.applicationContext
     private val connectivityManager = appContext.getSystemService(ConnectivityManager::class.java)
@@ -77,7 +75,7 @@ class WiFiNetworkMonitor(
         if (state == lastState) return
         lastState = state
         Log.d(TAG, "WiFi event: connected=${state.connected}, ssid=${state.ssid}")
-        automationEngine.onEvent(AutomationEvent.WiFiEvent(state.ssid, state.connected))
+        DeviceStateEvents.publishWifi(state.ssid, state.connected)
     }
 
     @Suppress("DEPRECATION")
