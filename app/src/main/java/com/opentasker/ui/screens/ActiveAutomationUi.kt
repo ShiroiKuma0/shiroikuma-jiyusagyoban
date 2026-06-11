@@ -110,6 +110,9 @@ import com.opentasker.core.storage.displayLabel
 import com.opentasker.core.storage.minimumTimestamp
 import com.opentasker.core.storage.normalized
 import com.opentasker.core.storage.toEntity
+import com.opentasker.core.transfer.BundleImportPlan
+import com.opentasker.core.transfer.OpenTaskerBundle
+import com.opentasker.core.transfer.OpenTaskerBundleCodec
 import com.opentasker.core.transfer.OpenTaskerBundleRepository
 import com.opentasker.core.transfer.TaskerImportPlanner
 import com.opentasker.core.transfer.TaskerImportPreview
@@ -133,7 +136,9 @@ import java.util.Date
 import java.util.Locale
 
 private const val TASKER_XML_IMPORT_MAX_BYTES = 4 * 1024 * 1024
+private const val OPEN_TASKER_BUNDLE_IMPORT_MAX_BYTES = 8 * 1024 * 1024
 private val TASKER_XML_MIME_TYPES = arrayOf("application/xml", "text/xml", "text/*", "*/*")
+private val OPEN_TASKER_BUNDLE_MIME_TYPES = arrayOf("application/json", "text/json", "text/*", "*/*")
 private val DATABASE_BACKUP_MIME_TYPES = arrayOf(
     "application/octet-stream",
     "application/x-sqlite3",
@@ -143,6 +148,9 @@ private val DATABASE_BACKUP_MIME_TYPES = arrayOf(
 
 private fun databaseBackupExportName(): String =
     "opentasker_backup_${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())}.db"
+
+private fun openTaskerBundleExportName(): String =
+    "opentasker_bundle_${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())}.json"
 
 private enum class OpenTaskerScreen(val label: String) {
     Profiles("Profiles"),
@@ -171,6 +179,11 @@ private data class ContextEditState(
 internal data class TaskerImportReviewState(
     val report: TaskerXmlImportReport,
     val preview: TaskerImportPreview,
+)
+
+internal data class OpenTaskerBundleReviewState(
+    val bundle: OpenTaskerBundle,
+    val plan: BundleImportPlan,
 )
 
 private sealed interface DeleteTarget {
@@ -251,6 +264,12 @@ class ActiveAutomationViewModel(
         private set
 
     var taskerImportBusy by mutableStateOf(false)
+        private set
+
+    internal var openTaskerBundleReview by mutableStateOf<OpenTaskerBundleReviewState?>(null)
+        private set
+
+    var openTaskerBundleBusy by mutableStateOf(false)
         private set
 
     init {
@@ -385,6 +404,84 @@ class ActiveAutomationViewModel(
         }
     }
 
+    fun exportOpenTaskerBundle(uri: Uri, appVersion: String) {
+        viewModelScope.launch {
+            if (openTaskerBundleBusy) return@launch
+            openTaskerBundleBusy = true
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val bundle = bundleRepository.exportBundle(
+                        appVersion = appVersion,
+                        name = "OpenTasker Workspace Export",
+                        description = "Profiles, tasks, variables, and scenes exported from OpenTasker.",
+                    )
+                    val encoded = OpenTaskerBundleCodec.encode(bundle)
+                    val stream = appContext.contentResolver.openOutputStream(uri)
+                        ?: error("Unable to open export destination")
+                    stream.bufferedWriter(Charsets.UTF_8).use { writer -> writer.write(encoded) }
+                    bundle
+                }
+            }
+                .onSuccess { bundle ->
+                    events.send(
+                        "Exported ${bundle.tasks.size} task${plural(bundle.tasks.size)}, " +
+                            "${bundle.profiles.size} profile${plural(bundle.profiles.size)}, " +
+                            "${bundle.scenes.size} scene${plural(bundle.scenes.size)}"
+                    )
+                }
+                .onFailure { events.send("Error: ${it.message ?: "OpenTasker bundle export failed"}") }
+            openTaskerBundleBusy = false
+        }
+    }
+
+    fun previewOpenTaskerBundle(uri: Uri) {
+        viewModelScope.launch {
+            if (openTaskerBundleBusy) return@launch
+            openTaskerBundleBusy = true
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val rawJson = readBoundedOpenTaskerBundle(appContext, uri)
+                    val bundle = OpenTaskerBundleCodec.decode(rawJson)
+                    OpenTaskerBundleReviewState(bundle = bundle, plan = OpenTaskerBundleCodec.validate(bundle))
+                }
+            }
+                .onSuccess {
+                    openTaskerBundleReview = it
+                    events.send("OpenTasker bundle ready for review")
+                }
+                .onFailure { events.send("Error: ${it.message ?: "OpenTasker bundle preview failed"}") }
+            openTaskerBundleBusy = false
+        }
+    }
+
+    fun clearOpenTaskerBundleReview() {
+        if (!openTaskerBundleBusy) {
+            openTaskerBundleReview = null
+        }
+    }
+
+    fun confirmOpenTaskerBundleImport(bundle: OpenTaskerBundle) {
+        viewModelScope.launch {
+            if (openTaskerBundleBusy) return@launch
+            openTaskerBundleBusy = true
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    bundleRepository.importBundle(bundle)
+                }
+            }
+                .onSuccess { importReport ->
+                    openTaskerBundleReview = null
+                    events.send(
+                        "Imported ${importReport.insertedTasks} task${plural(importReport.insertedTasks)}, " +
+                            "${importReport.insertedProfiles} disabled profile${plural(importReport.insertedProfiles)}, " +
+                            "${importReport.insertedScenes} scene${plural(importReport.insertedScenes)}"
+                    )
+                }
+                .onFailure { events.send("Error: ${it.message ?: "OpenTasker bundle import failed"}") }
+            openTaskerBundleBusy = false
+        }
+    }
+
     fun updateRunLogRetention(policy: RunLogRetentionPolicy) {
         viewModelScope.launch {
             val normalized = policy.normalized()
@@ -507,8 +604,18 @@ fun ActiveAutomationUi(
     var pendingDelete by remember { mutableStateOf<DeleteTarget?>(null) }
     val taskerImportReview = viewModel.taskerImportReview
     val taskerImportBusy = viewModel.taskerImportBusy
+    val openTaskerBundleReview = viewModel.openTaskerBundleReview
+    val openTaskerBundleBusy = viewModel.openTaskerBundleBusy
     val taskerXmlLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.previewTaskerXml(it, BuildConfig.VERSION_NAME) }
+    }
+    val openTaskerBundleExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        uri?.let { viewModel.exportOpenTaskerBundle(it, BuildConfig.VERSION_NAME) }
+    }
+    val openTaskerBundleImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { viewModel.previewOpenTaskerBundle(it) }
     }
     val databaseBackupExportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
@@ -660,6 +767,9 @@ fun ActiveAutomationUi(
                 },
                 onCreateProfile = { showCreateProfileDialog = true },
                 onBrowseTemplates = { showTemplateDialog = true },
+                onExportOpenTaskerBundle = { openTaskerBundleExportLauncher.launch(openTaskerBundleExportName()) },
+                onImportOpenTaskerBundle = { openTaskerBundleImportLauncher.launch(OPEN_TASKER_BUNDLE_MIME_TYPES) },
+                openTaskerBundleBusy = openTaskerBundleBusy,
                 onImportTaskerXml = { taskerXmlLauncher.launch(TASKER_XML_MIME_TYPES) },
                 taskerImportBusy = taskerImportBusy,
                 onEditProfile = { profileDialog = it },
@@ -782,6 +892,15 @@ fun ActiveAutomationUi(
             busy = taskerImportBusy,
             onDismiss = viewModel::clearTaskerImportReview,
             onConfirm = { viewModel.confirmTaskerImport(state.report) },
+        )
+    }
+
+    openTaskerBundleReview?.let { state ->
+        OpenTaskerBundleReviewDialog(
+            state = state,
+            busy = openTaskerBundleBusy,
+            onDismiss = viewModel::clearOpenTaskerBundleReview,
+            onConfirm = { viewModel.confirmOpenTaskerBundleImport(state.bundle) },
         )
     }
 
@@ -921,6 +1040,9 @@ private fun ProfilesScreen(
     onCreateTaskFirst: () -> Unit,
     onCreateProfile: () -> Unit,
     onBrowseTemplates: () -> Unit,
+    onExportOpenTaskerBundle: () -> Unit,
+    onImportOpenTaskerBundle: () -> Unit,
+    openTaskerBundleBusy: Boolean,
     onImportTaskerXml: () -> Unit,
     taskerImportBusy: Boolean,
     onEditProfile: (Profile) -> Unit,
@@ -934,14 +1056,17 @@ private fun ProfilesScreen(
     if (tasks.isEmpty()) {
         EmptyState(
             title = "Start with a template or task",
-            body = "Import an existing Tasker XML export, start from a guided template, or create a blank task if you want to build everything manually.",
-            actionLabel = if (taskerImportBusy) "Reading Tasker XML..." else "Import Tasker XML",
-            onAction = onImportTaskerXml,
-            actionEnabled = !taskerImportBusy,
+            body = "Import an OpenTasker JSON bundle, migrate an existing Tasker XML export, start from a guided template, or create a blank task manually.",
+            actionLabel = if (openTaskerBundleBusy) "Reading Bundle..." else "Import OpenTasker JSON",
+            onAction = onImportOpenTaskerBundle,
+            actionEnabled = !openTaskerBundleBusy,
             secondaryActionLabel = "Browse Templates",
             onSecondaryAction = onBrowseTemplates,
-            tertiaryActionLabel = "Create Blank Task",
-            onTertiaryAction = onCreateTaskFirst,
+            tertiaryActionLabel = if (taskerImportBusy) "Reading Tasker XML..." else "Import Tasker XML",
+            onTertiaryAction = onImportTaskerXml,
+            tertiaryActionEnabled = !taskerImportBusy,
+            quaternaryActionLabel = "Create Blank Task",
+            onQuaternaryAction = onCreateTaskFirst,
             contentPadding = contentPadding,
         )
         return
@@ -949,14 +1074,17 @@ private fun ProfilesScreen(
     if (profiles.isEmpty()) {
         EmptyState(
             title = "No profiles yet",
-            body = "Profiles connect contexts to tasks. Import Tasker XML, start from a curated template, or create a blank profile and attach contexts yourself.",
-            actionLabel = if (taskerImportBusy) "Reading Tasker XML..." else "Import Tasker XML",
-            onAction = onImportTaskerXml,
-            actionEnabled = !taskerImportBusy,
+            body = "Profiles connect contexts to tasks. Import an OpenTasker JSON bundle, migrate Tasker XML, start from a curated template, or create a blank profile.",
+            actionLabel = if (openTaskerBundleBusy) "Reading Bundle..." else "Import OpenTasker JSON",
+            onAction = onImportOpenTaskerBundle,
+            actionEnabled = !openTaskerBundleBusy,
             secondaryActionLabel = "Browse Templates",
             onSecondaryAction = onBrowseTemplates,
-            tertiaryActionLabel = "Create Blank Profile",
-            onTertiaryAction = onCreateProfile,
+            tertiaryActionLabel = if (taskerImportBusy) "Reading Tasker XML..." else "Import Tasker XML",
+            onTertiaryAction = onImportTaskerXml,
+            tertiaryActionEnabled = !taskerImportBusy,
+            quaternaryActionLabel = "Create Blank Profile",
+            onQuaternaryAction = onCreateProfile,
             contentPadding = contentPadding,
         )
         return
@@ -975,6 +1103,9 @@ private fun ProfilesScreen(
                 tasks = tasks,
                 runLogs = runLogs,
                 onBrowseTemplates = onBrowseTemplates,
+                onExportOpenTaskerBundle = onExportOpenTaskerBundle,
+                onImportOpenTaskerBundle = onImportOpenTaskerBundle,
+                openTaskerBundleBusy = openTaskerBundleBusy,
                 onImportTaskerXml = onImportTaskerXml,
                 taskerImportBusy = taskerImportBusy,
             )
@@ -999,8 +1130,26 @@ private fun ProfilesScreen(
 }
 
 private fun readBoundedTaskerXml(context: Context, uri: Uri): String {
+    return readBoundedDocumentText(
+        context = context,
+        uri = uri,
+        maxBytes = TASKER_XML_IMPORT_MAX_BYTES,
+        label = "Tasker XML file",
+    )
+}
+
+private fun readBoundedOpenTaskerBundle(context: Context, uri: Uri): String {
+    return readBoundedDocumentText(
+        context = context,
+        uri = uri,
+        maxBytes = OPEN_TASKER_BUNDLE_IMPORT_MAX_BYTES,
+        label = "OpenTasker bundle",
+    )
+}
+
+private fun readBoundedDocumentText(context: Context, uri: Uri, maxBytes: Int, label: String): String {
     val stream = context.contentResolver.openInputStream(uri)
-        ?: error("Unable to open selected Tasker XML file")
+        ?: error("Unable to open selected $label")
     ByteArrayOutputStream().use { output ->
         stream.use { input ->
             val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
@@ -1009,8 +1158,8 @@ private fun readBoundedTaskerXml(context: Context, uri: Uri): String {
                 val read = input.read(buffer)
                 if (read == -1) break
                 totalBytes += read
-                require(totalBytes <= TASKER_XML_IMPORT_MAX_BYTES) {
-                    "Tasker XML file is larger than ${TASKER_XML_IMPORT_MAX_BYTES / (1024 * 1024)} MB"
+                require(totalBytes <= maxBytes) {
+                    "$label is larger than ${maxBytes / (1024 * 1024)} MB"
                 }
                 output.write(buffer, 0, read)
             }
@@ -1025,6 +1174,9 @@ private fun WorkspaceSummaryCard(
     tasks: List<Task>,
     runLogs: List<RunLogEntry>,
     onBrowseTemplates: () -> Unit,
+    onExportOpenTaskerBundle: () -> Unit,
+    onImportOpenTaskerBundle: () -> Unit,
+    openTaskerBundleBusy: Boolean,
     onImportTaskerXml: () -> Unit,
     taskerImportBusy: Boolean,
 ) {
@@ -1079,6 +1231,22 @@ private fun WorkspaceSummaryCard(
                     modifier = Modifier.weight(1f),
                 ) {
                     Text(if (taskerImportBusy) "Reading XML" else "Import Tasker")
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = onExportOpenTaskerBundle,
+                    enabled = !openTaskerBundleBusy,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(if (openTaskerBundleBusy) "Working" else "Export JSON")
+                }
+                OutlinedButton(
+                    onClick = onImportOpenTaskerBundle,
+                    enabled = !openTaskerBundleBusy,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(if (openTaskerBundleBusy) "Reading JSON" else "Import JSON")
                 }
             }
         }
@@ -2008,6 +2176,9 @@ private fun EmptyState(
     tertiaryActionLabel: String? = null,
     onTertiaryAction: (() -> Unit)? = null,
     tertiaryActionEnabled: Boolean = true,
+    quaternaryActionLabel: String? = null,
+    onQuaternaryAction: (() -> Unit)? = null,
+    quaternaryActionEnabled: Boolean = true,
 ) {
     Column(
         modifier = Modifier
@@ -2066,6 +2237,16 @@ private fun EmptyState(
                 Text(tertiaryActionLabel)
             }
         }
+        if (quaternaryActionLabel != null && onQuaternaryAction != null) {
+            Spacer(Modifier.height(4.dp))
+            TextButton(
+                onClick = onQuaternaryAction,
+                enabled = quaternaryActionEnabled,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(quaternaryActionLabel)
+            }
+        }
     }
 }
 
@@ -2111,6 +2292,100 @@ private fun DeleteConfirmationDialog(
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun OpenTaskerBundleReviewDialog(
+    state: OpenTaskerBundleReviewState,
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val bundle = state.bundle
+    val plan = state.plan
+    val reviewWarnings = (bundle.metadata.warnings + plan.warnings + plan.lossyWarnings).distinct()
+    val capabilityRequirements = bundle.metadata.capabilityRequirements
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        title = { Text("Review OpenTasker bundle") },
+        text = {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                item {
+                    Text(
+                        "Imported profiles will be created disabled so contexts, actions, and permissions can be reviewed before use.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                item {
+                    InlineNotice(
+                        title = bundle.metadata.name.ifBlank { "OpenTasker bundle" },
+                        body = "Schema ${bundle.schemaVersion} - exported by app ${bundle.appVersion}",
+                        color = if (plan.canImport) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                    )
+                }
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        SummaryMetric("${bundle.tasks.size}", "Tasks", Modifier.weight(1f))
+                        SummaryMetric("${bundle.profiles.size}", "Profiles", Modifier.weight(1f))
+                        SummaryMetric("${bundle.variables.size}", "Variables", Modifier.weight(1f))
+                    }
+                }
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        SummaryMetric("${bundle.scenes.size}", "Scenes", Modifier.weight(1f))
+                        SummaryMetric("${capabilityRequirements.size}", "Setup notes", Modifier.weight(1f))
+                        SummaryMetric("${reviewWarnings.size}", "Warnings", Modifier.weight(1f))
+                    }
+                }
+                if (!plan.canImport) {
+                    item {
+                        TaskerImportListSection(
+                            title = "Cannot import",
+                            values = plan.warnings.ifEmpty { listOf("Bundle schema is not compatible with this build.") },
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+                if (capabilityRequirements.isNotEmpty()) {
+                    item {
+                        TaskerImportListSection(
+                            title = "Capability review",
+                            values = capabilityRequirements.map {
+                                "${it.actionId}: ${it.level.name.lowercase().replace('_', ' ')} - ${it.reason}"
+                            },
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+                if (reviewWarnings.isNotEmpty()) {
+                    item {
+                        TaskerImportListSection(
+                            title = "Import warnings",
+                            values = reviewWarnings,
+                            color = if (plan.canImport) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = plan.canImport && !busy,
+                onClick = onConfirm,
+            ) {
+                Text(if (busy) "Importing..." else "Import Disabled")
+            }
+        },
+        dismissButton = {
+            TextButton(enabled = !busy, onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
     )
 }
 
