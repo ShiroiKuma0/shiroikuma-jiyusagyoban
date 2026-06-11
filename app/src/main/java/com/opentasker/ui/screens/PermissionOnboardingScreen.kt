@@ -71,6 +71,12 @@ private data class PermissionSetupItem(
     val optional: Boolean = false,
 )
 
+data class BackupSetupState(
+    val busy: Boolean,
+    val latestBackupName: String?,
+    val pendingRestore: Boolean,
+)
+
 private sealed interface PermissionAction {
     data class RuntimePermission(val permission: String) : PermissionAction
     data class SettingsIntent(val intent: Intent) : PermissionAction
@@ -81,6 +87,10 @@ private sealed interface PermissionAction {
 fun PermissionOnboardingScreen(
     contentPadding: PaddingValues,
     onMessage: (String) -> Unit,
+    backupState: BackupSetupState,
+    onCreateBackup: () -> Unit,
+    onExportBackup: () -> Unit,
+    onImportBackup: () -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -158,6 +168,15 @@ fun PermissionOnboardingScreen(
             }
         }
 
+        item {
+            BackupSetupCard(
+                state = backupState,
+                onCreateBackup = onCreateBackup,
+                onExportBackup = onExportBackup,
+                onImportBackup = onImportBackup,
+            )
+        }
+
         items(orderedItems, key = { it.title }) { item ->
             PermissionSetupCard(
                 item = item,
@@ -169,6 +188,64 @@ fun PermissionOnboardingScreen(
                     }
                 },
             )
+        }
+    }
+}
+
+@Composable
+private fun BackupSetupCard(
+    state: BackupSetupState,
+    onCreateBackup: () -> Unit,
+    onExportBackup: () -> Unit,
+    onImportBackup: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Backup and restore", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Create an on-device SQLite backup, export a fresh copy with Android's file picker, or import a backup to apply on the next app restart.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                when {
+                    state.pendingRestore -> "Restore staged. Restart OpenTasker to apply it before the database opens."
+                    state.latestBackupName != null -> "Latest backup: ${state.latestBackupName}"
+                    else -> "No local backup has been created yet."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (state.pendingRestore) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = onCreateBackup,
+                    enabled = !state.busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(if (state.busy) "Working..." else "Create Backup")
+                }
+                OutlinedButton(
+                    onClick = onExportBackup,
+                    enabled = !state.busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Export Current Backup")
+                }
+                OutlinedButton(
+                    onClick = onImportBackup,
+                    enabled = !state.busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Import Backup")
+                }
+            }
         }
     }
 }

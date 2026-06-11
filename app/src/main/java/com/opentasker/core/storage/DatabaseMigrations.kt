@@ -34,7 +34,7 @@ object DatabaseMigrations {
  *   - tasks: id, name, priority, collisionMode, actionsJson
  *   - scenes: id, name, widthDp, heightDp, elementsJson
  *   - variables: name (pk), value, isGlobal
- *   - run_log: id, taskId, taskName, startedAt, durationMs, resultsJson, success
+ *   - run_logs: id, taskId, taskName, timestamp, durationMs, success, message
  * 
  * Version 2 (current):
  *   - profiles: adds automationMode (SINGLE, RESTART, QUEUED, PARALLEL)
