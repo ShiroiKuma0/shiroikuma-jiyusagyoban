@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -86,6 +87,7 @@ import com.opentasker.core.contexts.DaySchedule
 import com.opentasker.core.contexts.EventContextPreset
 import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.contexts.contextConfigSummary
+import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.engine.ActionTraceStatus
 import com.opentasker.core.engine.RunLogActionDiagnostic
 import com.opentasker.core.engine.RunLogOutcome
@@ -552,6 +554,19 @@ class ActiveAutomationViewModel(
             pendingRestore = databaseBackupManager.hasPendingRestore(),
         )
 
+    fun runTaskNow(task: Task) {
+        viewModelScope.launch {
+            val result = executeAndLogTask(
+                appContext = appContext,
+                db = db,
+                task = task,
+                source = "Manual run",
+            )
+            val status = if (result.report.success) "succeeded" else "failed"
+            events.send("${task.name} $status (${result.report.durationMs}ms)")
+        }
+    }
+
     private fun launchWithMessage(successMessage: String, block: suspend () -> Unit) {
         viewModelScope.launch {
             runCatching { block() }
@@ -794,6 +809,7 @@ fun ActiveAutomationUi(
                 onCreateTask = { showCreateTaskDialog = true },
                 onEditTask = { taskDialog = it },
                 onDeleteTask = { pendingDelete = DeleteTarget.TaskTarget(it) },
+                onRunTask = { viewModel.runTaskNow(it) },
                 onAddAction = { actionPickerTask = it },
                 onEditAction = { task, index, action ->
                     ActionMetadataRegistry.get(action.type)?.let { metadata ->
@@ -1468,6 +1484,7 @@ private fun TasksScreen(
     onCreateTask: () -> Unit,
     onEditTask: (Task) -> Unit,
     onDeleteTask: (Task) -> Unit,
+    onRunTask: (Task) -> Unit,
     onAddAction: (Task) -> Unit,
     onEditAction: (Task, Int, ActionSpec) -> Unit,
     onDeleteAction: (Task, Int) -> Unit,
@@ -1498,6 +1515,7 @@ private fun TasksScreen(
                 task = task,
                 onEdit = { onEditTask(task) },
                 onDelete = { onDeleteTask(task) },
+                onRun = { onRunTask(task) },
                 onAddAction = { onAddAction(task) },
                 onEditAction = { index, action -> onEditAction(task, index, action) },
                 onDeleteAction = { index -> onDeleteAction(task, index) },
@@ -1511,6 +1529,7 @@ private fun TaskCard(
     task: Task,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onRun: () -> Unit,
     onAddAction: () -> Unit,
     onEditAction: (Int, ActionSpec) -> Unit,
     onDeleteAction: (Int) -> Unit,
@@ -1569,7 +1588,12 @@ private fun TaskCard(
                     Text("Add Action")
                 }
             }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                OutlinedButton(onClick = onRun) {
+                    Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Run")
+                }
                 TextButton(onClick = onDelete) {
                     Icon(Icons.Filled.Delete, contentDescription = null)
                     Spacer(Modifier.width(6.dp))

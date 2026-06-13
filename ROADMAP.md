@@ -106,19 +106,6 @@ Key local constraints:
 **Novelty:** Parity with Tasker; leapfrog vs Easer.
 **Tier reason:** High value-to-effort ratio; the only Now-tier non-platform-compliance item that ships measurable user value in days.
 
-### N4 (2026.05.06) - Predictive back gesture support
-
-**Status:** Not started. Activity does not opt in to `enableOnBackInvokedCallback`; Compose navigation paths use legacy back behavior.
-**Description:** Opt the activity into the predictive back callback in `AndroidManifest.xml`, audit Compose `BackHandler`/`OnBackPressedCallback` callsites for forward-compat behavior, ensure editor/picker dialogs and the Setup checklist all handle predicted back without losing in-progress edits, and add a regression smoke for the gesture on API 36.
-**Sources:** Predictive back for Compose [S44], Android 15 platform changes [S36].
-**Category:** UX, accessibility, platform/OS.
-**Impact:** 3 — visible polish; without it the app feels behind on flagship devices.
-**Effort:** 2.
-**Risk:** Low — the manifest opt-in is the largest single change.
-**Dependencies:** None.
-**Novelty:** Parity.
-**Tier reason:** Cheap polish that closes a visible gap before beta.
-
 ### N5 (2026.05.06) - Macrobenchmark + Baseline Profile for cold start
 
 **Status:** Not started. No benchmark module, no baseline profile shipped.
@@ -821,32 +808,6 @@ Items below were identified by the 2026-06-09 exhaustive research pass covering 
 **Novelty:** Leapfrog -- no FOSS competitor surfaces OEM-specific guidance. Automation2 acknowledges fragmentation but doesn't help users fix it.
 **Tier:** Now -- directly addresses the biggest reliability gap.
 
-### RD2 - Shared task-execution/logging helper extraction (Now)
-
-**Status:** Not started. `AutomationService` and `AutomationTargetReceiver` both hand-roll task-run and run-log-write paths with different source strings and error handling.
-**Description:** Extract a shared `TaskExecutionHelper` that accepts source metadata (profile, external intent, future tile, etc.), trigger metadata, event variables, and returns structured run-log entries. `AutomationService`, `AutomationTargetReceiver`, and the future `TileService` should all use it. This is a prerequisite for N3 (Quick Settings), RD5 (typed run-log source), and any future trigger surface.
-**Sources:** Local repo audit (AutomationService.kt, AutomationTargetReceiver.kt run paths); N3 tile run-log acceptance criteria.
-**Category:** architecture, reliability, dev-experience.
-**Impact:** 4 -- eliminates a known drift bug class across task-execution paths.
-**Effort:** S -- pure refactoring of existing code.
-**Risk:** Low -- behavior should be identical; existing tests cover task execution.
-**Dependencies:** None.
-**Novelty:** Maintenance prerequisite.
-**Tier:** Now -- blocks N3 Quick Settings from adding a third divergent execution path.
-
-### RD3 - Normal CI lint gate (Now)
-
-**Status:** Not started. The normal build workflow (`build.yml`) runs unit tests, debug/release assembly, F-Droid readiness, and metadata checks, but not lint. Only the release workflow runs lint.
-**Description:** Add `./gradlew :app:lintDebug` (or `lintRelease`) to the normal CI workflow. The existing `lint { abortOnError = false }` and baseline file will prevent immediate breakage, but lint issues will be visible in CI artifacts. Improvement Plan P7 cannot be marked done until normal CI has a lint gate.
-**Sources:** Local repo audit (`.github/workflows/build.yml`, `app/build.gradle.kts` lint config).
-**Category:** testing, dev-experience.
-**Impact:** 3 -- catches lint regressions before they accumulate.
-**Effort:** S -- one line in a workflow file plus artifact upload.
-**Risk:** Low.
-**Dependencies:** None.
-**Novelty:** Maintenance.
-**Tier:** Now -- trivial effort, high signal.
-
 ### RD4 - Compose BOM 2026.05.00 evaluation gate (Next)
 
 **Status:** Not started. Current BOM is 2026.04.01; 2026.05.00 is available.
@@ -1075,28 +1036,13 @@ New items from a code-level engine audit plus external platform/policy verificat
 
 ### P1 — trust, data safety, distribution
 
-- [ ] P1 — RD18: Manual "Run now" task test button
-  Why: There is no way to test a task from the UI — every competitor ships this (Tasker play button, MacroDroid "test macro") and it is the single fastest debuggability win for new users building their first automation.
-  Evidence: no run-now/test affordance in `ActiveAutomationUi.kt` (grep for run-now/PlayArrow empty); MacroDroid/Tasker parity docs.
-  Touches: Tasks screen row action in `ActiveAutomationUi.kt`, RD2 shared task-execution/logging helper (source `manual_run`), Run Log display.
-  Acceptance: tapping Run on a task executes it immediately with full action traces, logged with a Manual run source; capability-gated actions still fail honestly; works without any profile attached.
-  Complexity: S (after RD2)
-
-- [ ] P1 — RD19: TaskRunner watchdog timeouts and Wait cap
-  Why: `TaskRunner` has no per-action or per-task timeout and `flow.wait` accepts unbounded `millis`, so one hung or absurdly long action stalls a task forever — in `queued` automation mode this silently blocks all subsequent triggers for that profile.
-  Evidence: `app/src/main/java/com/opentasker/core/engine/TaskRunner.kt` (no `withTimeout` anywhere); `core/actions/BuiltInActions.kt` lines 108-119 (`WaitAction` unbounded `delay(ms)`).
-  Touches: `TaskRunner.kt` (per-action `withTimeout` with per-category defaults and a documented max), `WaitAction` (cap, e.g. 30 min, with failure above), run-log trace status `TIMEOUT`, tests.
-  Acceptance: an action exceeding its budget records a timeout failure and the task continues/aborts per `continueOnError`; queued mode drains after a timed-out run; Wait above the cap fails with a clear message.
-  Complexity: M
-
 ### P2 — hardening and table-stakes surface
 
-- [ ] P2 — RD20: HTTP action response/download size caps and LAN-HTTP policy decision
-  Why: `http.get`/`http.post` read the entire response into a variable with no byte cap and `download` streams without a size limit (memory/storage abuse via a single action); separately, the HTTPS-only rule silently blocks the most common home-automation use (local Home Assistant/Node-RED endpoints are plain HTTP on RFC1918 addresses) and deserves an explicit, documented opt-in decision rather than an implicit gap.
-  Evidence: `app/src/main/java/com/opentasker/core/actions/NetworkActions.kt` (lines 37, 82, 156 unbounded reads; lines 29/69/146 https-only).
-  Touches: `NetworkActions.kt` (bounded readers, e.g. 1 MB variable cap and configurable download cap), action metadata/help text, and either a per-action `allow_private_http` opt-in restricted to private-range hosts with a warning, or a documented rejection of LAN HTTP in `docs/`.
-  Acceptance: oversized responses fail with a size-limit message instead of OOM-risking reads; the LAN-HTTP stance is decided, implemented or documented, and reflected in the action editor copy; tests cover the caps and (if adopted) the private-range gate.
-  Complexity: M
+- [ ] P2 — RD20: LAN-HTTP policy decision
+  Why: The HTTPS-only rule silently blocks the most common home-automation use (local Home Assistant/Node-RED endpoints are plain HTTP on RFC1918 addresses) and deserves an explicit, documented opt-in decision rather than an implicit gap. HTTP response/download size caps are already implemented (1 MB response, 50 MB download).
+  Touches: `NetworkActions.kt` (either a per-action `allow_private_http` opt-in restricted to private-range hosts with a warning, or a documented rejection of LAN HTTP in `docs/`), action metadata/help text.
+  Acceptance: the LAN-HTTP stance is decided, implemented or documented, and reflected in the action editor copy; tests cover the private-range gate if adopted.
+  Complexity: S
 
 - [ ] P2 — RD21: Home-screen widget and pinned-shortcut task triggers
   Why: Widget buttons and launcher shortcuts are table-stakes trigger surfaces in MacroDroid (Widget Button, Shortcut Launched triggers) and Tasker, complement N3 Quick Settings, and need no special permissions — high value for one-tap task running.
@@ -1142,13 +1088,6 @@ New items from a code-level engine audit plus external platform/policy verificat
 New items from a trigger/action coverage audit, manifest privacy review, and external parity/integration research. Checked against N1-N10, X1-X9, RD1-RD25, Under Consideration, and Rejected tiers — no duplicates. Evidence details in RESEARCH.md (2026-06-10).
 
 ### P1 — trust, privacy, table-stakes actions
-
-- [ ] P1 — RD27: Explicit Android Auto Backup policy (`dataExtractionRules` / `allowBackup`)
-  Why: The manifest declares neither `allowBackup` nor `dataExtractionRules`, so Auto Backup defaults on and the Room databases — location coordinates, notification filter terms, run logs containing expanded action arguments — are uploaded to Google cloud backup by default, contradicting the privacy-first positioning; Android's own guidance says sensitive data should be excluded explicitly.
-  Evidence: `app/src/main/AndroidManifest.xml` application element (no backup attributes); Android backup security guidance (https://developer.android.com/privacy-and-security/risks/backup-best-practices, https://developer.android.com/identity/data/autobackup).
-  Touches: `AndroidManifest.xml` (`android:dataExtractionRules` + `android:fullBackupContent` for API <31), new `res/xml/backup_rules.xml` / `data_extraction_rules.xml` (exclude run-log DB and variable store at minimum, or disable backup entirely now that RD15 ships user-controlled backup), docs privacy note.
-  Acceptance: a lint `DataExtractionRules` check passes; `adb backup`/Auto Backup of a test device excludes the excluded files; the chosen policy (exclude vs. disable) is documented in README privacy notes and consistent with RD15's user-controlled backup story.
-  Complexity: S
 
 - [ ] P1 — RD28: Sound-profile action and trigger family: DND, ringer mode, torch
   Why: Quiet-hours is the canonical first automation and every competitor ships it (MacroDroid has Torch On/Off action, Priority Mode/DND trigger, Silent Mode trigger; Tasker equivalents) — OpenTasker has no `dnd.set`, no ringer action, no torch action, and no DND/ringer state triggers, even though DND policy access is already onboarded in the Setup checklist and currently consumed by nothing.
@@ -1227,4 +1166,31 @@ New items from an action truthfulness, notification lifecycle, plugin interopera
   Touches: package event source owned by `AutomationService`, `ContextMatchEvaluator` event filters, context editor hints, Inspector recent events, package visibility docs, tests.
   Acceptance: Profiles can match `event=package_added`, `event=package_removed`, and `event=package_replaced` with package allowlists and replacement metadata; implementation avoids broad installed-app inventory scans and does not require `QUERY_ALL_PACKAGES`; service lifecycle and Android broadcast restrictions are documented; Inspector shows recent package events; tests cover add/remove/reinstall intent data, allowlist matching, and ignored unrelated packages.
   Complexity: S/M
+
+## Research-Driven Additions (2026-06-12 exhaustive research pass)
+
+New items from an exhaustive research pass covering 5 parallel research agents (OSS competitors, Android platform, commercial competitors, community signals, dependency/security), full repo code review, and 50+ external sources. Each item was checked against every existing N, X, RD, Under Consideration, and Rejected tier — no duplicates. Evidence details in RESEARCH.md (2026-06-12).
+
+### P2 — hardening and hygiene
+
+- [ ] P2 — RD44: OR logic in context matching
+  Why: OpenTasker contexts within a profile are AND-only — all must match for the profile to activate. OR conditions (e.g., "WiFi=home OR WiFi=office") require creating duplicate profiles, which is the #1 most-voted Tasker feature request (170 supporters on tasker.helprace.com). Every commercial competitor except Samsung Routines supports OR in some form.
+  Evidence: `ProfileMatcherImpl.kt` evaluates all context specs with AND semantics; `ContextMatchEvaluator.kt` has no OR combinator; https://tasker.helprace.com/s1-general/ideas/top/c0-all/10 (#1 voted idea).
+  Touches: `ContextSpec` model (add an optional `group` or `orGroup` field), `ProfileMatcherImpl.kt` / `ContextMatchEvaluator.kt` (group specs by OR-group before AND-reducing), context editor UI (OR toggle or group picker), export/import schema (backward-compatible nullable field), tests.
+  Acceptance: A profile with two WiFi contexts in the same OR group activates when either matches; contexts without OR groups retain AND behavior; the JSON bundle schema handles the new field with backward-compatible null defaults; tests cover AND-only, OR-only, mixed AND/OR, and empty-group behavior.
+  Complexity: M
+
+- [ ] P2 — RD45: Android 17 `ACCESS_LOCAL_NETWORK` permission planning
+  Why: Android 17 (API 37) makes `ACCESS_LOCAL_NETWORK` a mandatory runtime permission (group: `NEARBY_DEVICES`) for any LAN device communication. This directly affects RD20's LAN-HTTP policy decision (Home Assistant/Node-RED endpoints are plain HTTP on RFC1918 addresses), RD34's MQTT publish action, and any future webhook/discovery work. The permission must be planned before targeting API 37.
+  Evidence: https://developer.android.com/about/versions/17/behavior-changes-17 (ACCESS_LOCAL_NETWORK enforcement); RD20 (LAN-HTTP policy); RD34 (MQTT action).
+  Touches: `AndroidManifest.xml` (declare `ACCESS_LOCAL_NETWORK` when target SDK rises to 37), `PermissionOnboardingScreen.kt` (new Setup row for LAN access), `NetworkActions.kt` (check permission before private-range HTTP if RD20 lands), action metadata copy, docs.
+  Acceptance: On an Android 17 device/emulator, HTTP GET to a private-range address works when the permission is granted and fails with a clear setup message when denied; the Setup screen shows the LAN access permission status; the manifest declaration is gated behind target SDK 37.
+  Complexity: S (planning and manifest); M (if bundled with RD20 LAN-HTTP implementation)
+
+- [ ] P3 — RD47: Automation edit undo / snapshot history
+  Why: There is no way to undo a profile or task edit, and no edit history. A misedited automation is silently lost. The Tasker community requests undo (tasker.helprace.com, 6 supporters), and users of other automation apps report "rules were deleted by the app" with no recovery. Database backup exists but is too coarse for single-edit undo.
+  Evidence: No undo/snapshot mechanism in `ActiveAutomationUi.kt` or Room DAOs; https://tasker.helprace.com/s1-general/ideas/top/c0-all/10 (undo request); community reports of lost automations.
+  Touches: Room (add a lightweight `edit_history` table with entity type, entity ID, serialized previous state, and timestamp; bounded to N entries per entity), DAO helpers for snapshot-before-save and restore, UI undo affordance (snackbar with "Undo" action after save), cleanup of old history entries.
+  Acceptance: After editing a profile or task, a snackbar offers undo for 10 seconds; tapping undo restores the previous state; edit history is bounded (e.g., 5 snapshots per entity) and pruned with run-log retention; the Room migration is tested.
+  Complexity: M
 
