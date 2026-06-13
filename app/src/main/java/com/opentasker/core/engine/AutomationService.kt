@@ -22,11 +22,9 @@ import com.opentasker.automation.scheduler.TimeEventScheduler
 import com.opentasker.core.contexts.BootContextEvents
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.Profile
-import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.minimumTimestamp
-import com.opentasker.core.storage.toEntity
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
@@ -168,7 +166,7 @@ class AutomationService : Service() {
             AutomationMode.SINGLE -> {
                 if (profileTaskJobs[profile.id]?.isActive == true) {
                     android.util.Log.i("OpenTasker", "Profile ${profile.id} already running; SINGLE mode skipped retrigger")
-                    logSkippedRun(profile, task, "Profile is already running in SINGLE mode.")
+                    logProfileSkippedRun(profile, task, "Profile is already running in SINGLE mode.")
                     return
                 }
                 val reservation = reserveCooldown(profile.id, profile.cooldownSec)
@@ -258,63 +256,33 @@ class AutomationService : Service() {
         task: Task,
         profile: Profile,
     ) {
-        val variables = VariableStore()
-        val ctx = ActionContext(this, variables) { msg ->
-            android.util.Log.i("OpenTasker", msg)
+        val result = executeAndLogTask(
+            appContext = this,
+            db = db,
+            task = task,
+            source = "Profile: ${profile.name}",
+            metadata = profileRunMetadata(profile),
+        )
+        if (result.logInserted) {
+            pruneRunLogs(force = false)
         }
-        val runner = TaskRunner(ctx)
-        val report = runner.run(task)
-        
-        // Write to run log
-        val logEntry = RunLogEntry(
-            taskId = task.id,
-            taskName = task.name,
-            timestamp = report.startedAt,
-            durationMs = report.durationMs,
-            success = report.success,
-            message = runLogMessage(
-                source = "Profile: ${profile.name}",
-                metadata = profileRunMetadata(profile),
-                traces = report.traces,
-            ),
-        )
-        insertRunLog(logEntry)
-        
-        android.util.Log.i(
-            "OpenTasker",
-            "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)"
-        )
-        
     }
 
     private fun logCooldownSkip(profile: Profile, task: Task, remainingMs: Long) {
-        logSkippedRun(profile, task, "Cooldown active for ${formatRemainingCooldown(remainingMs)}.")
+        logProfileSkippedRun(profile, task, "Cooldown active for ${formatRemainingCooldown(remainingMs)}.")
     }
 
-    private fun logSkippedRun(profile: Profile, task: Task, reason: String) {
+    private fun logProfileSkippedRun(profile: Profile, task: Task, reason: String) {
         scope.launch {
-            insertRunLog(
-                RunLogEntry(
-                    taskId = task.id,
-                    taskName = task.name,
-                    durationMs = 0,
-                    success = false,
-                    message = skippedRunLogMessage(
-                        source = "Profile: ${profile.name}",
-                        reason = reason,
-                        metadata = profileRunMetadata(profile),
-                    ),
-                )
+            val inserted = logSkippedRun(
+                db = db,
+                task = task,
+                source = "Profile: ${profile.name}",
+                reason = reason,
+                metadata = profileRunMetadata(profile),
             )
+            if (inserted) pruneRunLogs(force = false)
         }
-    }
-
-    private suspend fun insertRunLog(entry: RunLogEntry) {
-        runCatching { db.runLogDao().insert(entry.toEntity()) }
-            .onSuccess { pruneRunLogs(force = false) }
-            .onFailure { error ->
-                android.util.Log.e("OpenTasker", "Failed to write run log for task ${entry.taskId}", error)
-            }
     }
 
     private suspend fun pruneRunLogs(force: Boolean) {
