@@ -172,6 +172,14 @@
         </receiver>
 
         <receiver
+            android:name="com.opentasker.core.actions.NotificationActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.opentasker.action.NOTIFICATION_BUTTON" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
             android:name="com.opentasker.core.external.AutomationTargetReceiver"
             android:exported="true"
             android:permission="com.opentasker.permission.AUTOMATION">
