@@ -1058,12 +1058,6 @@ New items from a trigger/action coverage audit, manifest privacy review, and ext
 ### P2 — parity and hygiene
 
 
-- [ ] P2 — RD31: State family completion: initial-state seeding plus unlock/power-save/airplane keys
-  Why: The sticky store preserves partial broadcasts, but the state family is still blind at startup (screen/headphone state unknown until the first broadcast — a `screen=on` profile cannot activate until the screen toggles) and lacks common keys every competitor exposes: device unlocked (`ACTION_USER_PRESENT`), battery saver (`ACTION_POWER_SAVE_MODE_CHANGED`), airplane mode (`ACTION_AIRPLANE_MODE_CHANGED`).
-  Evidence: `StateContextSourceImpl.kt` (no initial seed; repo-wide grep for `USER_PRESENT`/`POWER_SAVE`/`AIRPLANE_MODE_CHANGED` is empty); MacroDroid Screen On/Off + Power Save triggers.
-  Touches: `StateContextSourceImpl.kt` (seed via `DisplayManager`/`PowerManager.isInteractive`, `AudioManager` wired/BT headset query, `PowerManager.isPowerSaveMode`, `Settings.Global.AIRPLANE_MODE_ON`; add the three broadcast keys), `ContextMatchEvaluator`/editor hints, Inspector copy, JVM tests.
-  Acceptance: a `screen=on` profile activates immediately after service start when the screen is already on; `unlocked`, `power_save`, and `airplane` predicates match documented values; seeding is covered by tests with fake providers.
-  Complexity: M
 
 ### P3 — integration bets
 

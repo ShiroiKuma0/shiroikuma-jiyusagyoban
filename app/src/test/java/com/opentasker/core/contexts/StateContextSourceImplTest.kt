@@ -65,4 +65,67 @@ class StateContextSourceImplTest {
         assertTrue(stateMatches("wifi=disconnected", state))
         assertFalse(stateMatches("wifi=OfficeWiFi", state))
     }
+
+    @Test
+    fun unlockedPredicateMatchesTrueFalse() {
+        val state = mapOf("unlocked" to "true")
+        assertTrue(stateMatches("unlocked=true", state))
+        assertTrue(stateMatches("unlocked=unlocked", state))
+        assertFalse(stateMatches("unlocked=locked", state))
+        assertFalse(stateMatches("unlocked=false", state))
+    }
+
+    @Test
+    fun powerSavePredicateMatchesWithAliases() {
+        val on = mapOf("power_save" to "true")
+        assertTrue(stateMatches("power_save=true", on))
+        assertTrue(stateMatches("power_save=on", on))
+        assertTrue(stateMatches("power_save=enabled", on))
+        assertTrue(stateMatches("battery_saver=true", on))
+        assertFalse(stateMatches("power_save=off", on))
+
+        val off = mapOf("power_save" to "false")
+        assertTrue(stateMatches("power_save=false", off))
+        assertTrue(stateMatches("power_save=disabled", off))
+        assertFalse(stateMatches("power_save=true", off))
+    }
+
+    @Test
+    fun airplanePredicateMatchesWithAliases() {
+        val on = mapOf("airplane" to "true")
+        assertTrue(stateMatches("airplane=true", on))
+        assertTrue(stateMatches("airplane=on", on))
+        assertTrue(stateMatches("airplane_mode=enabled", on))
+        assertTrue(stateMatches("flight_mode=true", on))
+        assertFalse(stateMatches("airplane=off", on))
+
+        val off = mapOf("airplane" to "false")
+        assertTrue(stateMatches("airplane=false", off))
+        assertTrue(stateMatches("airplane=disabled", off))
+        assertFalse(stateMatches("airplane=true", off))
+    }
+
+    @Test
+    fun normalizeStateKeyMapsNewAliases() {
+        assertEquals("power_save", normalizeStateKey("battery_saver"))
+        assertEquals("power_save", normalizeStateKey("powersave"))
+        assertEquals("power_save", normalizeStateKey("power_saver"))
+        assertEquals("airplane", normalizeStateKey("airplane_mode"))
+        assertEquals("airplane", normalizeStateKey("flight_mode"))
+        assertEquals("unlocked", normalizeStateKey("device_unlocked"))
+    }
+
+    @Test
+    fun connectivityPatchSupportsInternetAndVpnPredicates() {
+        val state = DeviceStateEvents.connectivityPatch(
+            internet = true,
+            networkType = "wifi",
+            vpn = false,
+        )
+
+        assertTrue(stateMatches("internet=true", state))
+        assertTrue(stateMatches("network_type=wifi", state))
+        assertTrue(stateMatches("vpn=false", state))
+        assertFalse(stateMatches("internet=false", state))
+    }
 }
