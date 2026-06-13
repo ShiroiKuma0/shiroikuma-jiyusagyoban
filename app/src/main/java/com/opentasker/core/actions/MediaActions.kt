@@ -2,7 +2,10 @@ package com.opentasker.core.actions
 
 import android.content.Context
 import android.media.AudioManager
+import android.media.MediaPlayer
+import android.net.Uri
 import android.view.KeyEvent
+import kotlinx.coroutines.suspendCancellableCoroutine
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
@@ -21,8 +24,34 @@ class PlaySoundAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
+        val volume = args["volume"]?.toFloatOrNull()?.let { (it / 100f).coerceIn(0f, 1f) }
+
+        val player = try {
+            val uri = if (path.contains("://")) Uri.parse(path) else Uri.parse("file://$path")
+            MediaPlayer.create(ctx.app, uri)
+                ?: return ActionResult.Failure("could not create player for: $path")
+        } catch (ex: Exception) {
+            return ActionResult.Failure("failed to open: ${ex.message}", ex)
+        }
+
+        if (volume != null) {
+            player.setVolume(volume, volume)
+        }
+
         ctx.logger("Play: $path")
-        return ActionResult.Failure("Direct media playback is not implemented yet")
+        return suspendCancellableCoroutine { cont ->
+            player.setOnCompletionListener {
+                player.release()
+                cont.resumeWith(Result.success(ActionResult.Success))
+            }
+            player.setOnErrorListener { _, what, extra ->
+                player.release()
+                cont.resumeWith(Result.success(ActionResult.Failure("playback error: what=$what extra=$extra")))
+                true
+            }
+            cont.invokeOnCancellation { player.release() }
+            player.start()
+        }
     }
 }
 
