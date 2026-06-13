@@ -4,10 +4,12 @@ import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Entity
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Update
 import com.opentasker.core.model.Variable
+import kotlinx.coroutines.flow.Flow
 
 @Entity("variables")
 data class VariableEntity(
@@ -22,10 +24,11 @@ fun Variable.toEntity() = VariableEntity(name, value, isGlobal)
 
 @Dao
 interface VariableDao {
-    @Insert suspend fun insert(v: VariableEntity)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insert(v: VariableEntity)
     @Update suspend fun update(v: VariableEntity)
     @Delete suspend fun delete(v: VariableEntity)
     @Query("SELECT * FROM variables WHERE name = :name") suspend fun get(name: String): VariableEntity?
     @Query("SELECT * FROM variables") suspend fun getAll(): List<VariableEntity>
     @Query("SELECT * FROM variables WHERE isGlobal = 1") suspend fun getAllGlobal(): List<VariableEntity>
+    @Query("SELECT * FROM variables WHERE isGlobal = 1 ORDER BY name") fun getAllGlobalAsFlow(): Flow<List<VariableEntity>>
 }
