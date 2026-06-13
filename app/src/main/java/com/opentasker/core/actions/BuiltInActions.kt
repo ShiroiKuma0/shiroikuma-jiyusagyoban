@@ -9,6 +9,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.suspendCancellableCoroutine
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
@@ -96,9 +97,41 @@ class SayAction : Action {
     override val category = ActionCategory.NOTIFICATION
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val text = args["text"] ?: ""
-        ctx.logger("TTS: $text")
-        return ActionResult.Failure("Text-to-speech action is not implemented yet")
+        val text = args["text"]?.takeIf { it.isNotBlank() }
+            ?: return ActionResult.Failure("missing text argument")
+        if (text.length > MAX_TTS_CHARS) {
+            return ActionResult.Failure("text exceeds $MAX_TTS_CHARS character limit (${text.length})")
+        }
+        return suspendCancellableCoroutine { cont ->
+            var tts: android.speech.tts.TextToSpeech? = null
+            tts = android.speech.tts.TextToSpeech(ctx.app) { status ->
+                if (status != android.speech.tts.TextToSpeech.SUCCESS) {
+                    tts?.shutdown()
+                    cont.resumeWith(Result.success(ActionResult.Failure("TTS engine initialization failed (status=$status)")))
+                    return@TextToSpeech
+                }
+                val engine = tts ?: return@TextToSpeech
+                engine.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {}
+                    override fun onDone(utteranceId: String?) {
+                        engine.shutdown()
+                        cont.resumeWith(Result.success(ActionResult.Success))
+                    }
+                    @Deprecated("Deprecated in API 21+")
+                    override fun onError(utteranceId: String?) {
+                        engine.shutdown()
+                        cont.resumeWith(Result.success(ActionResult.Failure("TTS utterance failed")))
+                    }
+                })
+                ctx.logger("TTS: ${text.take(80)}${if (text.length > 80) "..." else ""}")
+                engine.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "opentasker_say")
+            }
+            cont.invokeOnCancellation { tts.shutdown() }
+        }
+    }
+
+    companion object {
+        private const val MAX_TTS_CHARS = 4000
     }
 }
 
