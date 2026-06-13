@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -88,6 +89,7 @@ import com.opentasker.core.contexts.EventContextPreset
 import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.contexts.contextConfigSummary
 import com.opentasker.core.engine.executeAndLogTask
+import com.opentasker.widget.TaskShortcutHelper
 import com.opentasker.core.engine.ActionTraceStatus
 import com.opentasker.core.engine.RunLogActionDiagnostic
 import com.opentasker.core.engine.RunLogOutcome
@@ -567,6 +569,21 @@ class ActiveAutomationViewModel(
         }
     }
 
+    fun pinTaskShortcut(task: Task) {
+        viewModelScope.launch {
+            if (!TaskShortcutHelper.canPinShortcut(appContext)) {
+                events.send("Launcher does not support pinned shortcuts")
+                return@launch
+            }
+            val requested = TaskShortcutHelper.requestPinShortcut(appContext, task)
+            if (requested) {
+                events.send("Pinning \"${task.name}\" to home screen")
+            } else {
+                events.send("Failed to pin shortcut")
+            }
+        }
+    }
+
     private fun launchWithMessage(successMessage: String, block: suspend () -> Unit) {
         viewModelScope.launch {
             runCatching { block() }
@@ -810,6 +827,7 @@ fun ActiveAutomationUi(
                 onEditTask = { taskDialog = it },
                 onDeleteTask = { pendingDelete = DeleteTarget.TaskTarget(it) },
                 onRunTask = { viewModel.runTaskNow(it) },
+                onPinTask = { viewModel.pinTaskShortcut(it) },
                 onAddAction = { actionPickerTask = it },
                 onEditAction = { task, index, action ->
                     ActionMetadataRegistry.get(action.type)?.let { metadata ->
@@ -1485,6 +1503,7 @@ private fun TasksScreen(
     onEditTask: (Task) -> Unit,
     onDeleteTask: (Task) -> Unit,
     onRunTask: (Task) -> Unit,
+    onPinTask: (Task) -> Unit,
     onAddAction: (Task) -> Unit,
     onEditAction: (Task, Int, ActionSpec) -> Unit,
     onDeleteAction: (Task, Int) -> Unit,
@@ -1516,6 +1535,7 @@ private fun TasksScreen(
                 onEdit = { onEditTask(task) },
                 onDelete = { onDeleteTask(task) },
                 onRun = { onRunTask(task) },
+                onPin = { onPinTask(task) },
                 onAddAction = { onAddAction(task) },
                 onEditAction = { index, action -> onEditAction(task, index, action) },
                 onDeleteAction = { index -> onDeleteAction(task, index) },
@@ -1530,6 +1550,7 @@ private fun TaskCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onRun: () -> Unit,
+    onPin: () -> Unit,
     onAddAction: () -> Unit,
     onEditAction: (Int, ActionSpec) -> Unit,
     onDeleteAction: (Int) -> Unit,
@@ -1589,10 +1610,17 @@ private fun TaskCard(
                 }
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                OutlinedButton(onClick = onRun) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Run")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onRun) {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Run")
+                    }
+                    OutlinedButton(onClick = onPin) {
+                        Icon(Icons.Filled.PushPin, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Pin")
+                    }
                 }
                 TextButton(onClick = onDelete) {
                     Icon(Icons.Filled.Delete, contentDescription = null)

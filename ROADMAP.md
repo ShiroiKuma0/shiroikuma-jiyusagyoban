@@ -1024,13 +1024,6 @@ New items from a code-level engine audit plus external platform/policy verificat
 
 ### P2 — hardening and table-stakes surface
 
-- [ ] P2 — RD21: Home-screen widget and pinned-shortcut task triggers
-  Why: Widget buttons and launcher shortcuts are table-stakes trigger surfaces in MacroDroid (Widget Button, Shortcut Launched triggers) and Tasker, complement N3 Quick Settings, and need no special permissions — high value for one-tap task running.
-  Evidence: MacroDroid wiki Widget Button / Shortcut Launched trigger pages; Jetpack Glance (stable 1.1.x) for Compose-style widgets; absence of any appwidget/ShortcutManager code in the repo (grep empty).
-  Touches: new `GlanceAppWidget` + receiver (manifest), `ShortcutManagerCompat` pinned/dynamic shortcuts on the Tasks screen, RD2 shared execution helper (sources `widget`, `shortcut`), Setup copy.
-  Acceptance: user can pin a widget or shortcut bound to a task, tap it to run with run-log evidence, and rename/remove it without orphaning profiles; widget label/icon configurable; works on API 26+ with graceful pre-pin fallback.
-  Complexity: M (after RD2)
-
 - [ ] P2 — RD22: Android 17 readiness audit (background audio, memory limits, large-screen opt-out removal)
   Why: Android 17 (major SDK landing Q2 2026) enforces restrictions on background audio playback/focus/volume-change APIs — directly hitting OpenTasker's 6 Media actions and volume Settings actions when run from the background service — plus RAM-based app memory limits and removal of the large-screen orientation/resizability opt-out; this is the next platform wave after N1/N10's Android 16 scope.
   Evidence: https://developer.android.com/about/versions/17/behavior-changes-all (background audio, cross-profile loopback, memory limits); Android 17 beta blog posts (Feb/Apr 2026).

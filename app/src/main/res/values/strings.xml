@@ -5,4 +5,5 @@
     <string name="permission_automation_description">Allows same-signer integrations to run OpenTasker tasks, toggle profiles, and query automation status through documented intents.</string>
     <string name="error_prefix">Error: %1$s</string>
     <string name="success_prefix">Success: %1$s</string>
+    <string name="widget_task_description">Run an OpenTasker task with one tap</string>
 </resources>
