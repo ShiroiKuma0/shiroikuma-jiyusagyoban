@@ -92,20 +92,6 @@ Key local constraints:
 **Novelty:** Leapfrog — OSS competitors do not publish this evidence at all.
 **Tier reason:** The product positions itself as a privacy-first FOSS automation engine; without device-verified geofence reliability the headline claim is hollow.
 
-### N3 (2026.05.06) - Quick Settings Tile trigger and tile action
-
-**Status:** Not started. No `TileService` is registered.
-**Description:** Add (a) a `TileService` that publishes a user-configurable Quick Settings tile per profile (label, icon, on/off semantics), bound to the existing intent API as a same-signature trigger; (b) a built-in `tile.set` action that updates a tile's label/icon/state from a task; and (c) onboarding copy explaining the manual "Edit tiles" gesture Android requires. Register only when the user opts in.
-**2026-06-06 detailed requirements:** Limit the first release to a small, explicit tile slot set rather than unbounded per-profile tiles because Android's own guidance recommends no more than two high-value tiles per app. Use active TileService mode when the app owns state updates, expose label, state, subtitle on Android 10+, and monochrome icon choices, and persist tile-slot ownership separately from profile enablement. Support tap as "run task/profile" and optional toggle semantics; defer long-press until lock-screen and secure-device behavior are tested. Acceptance criteria: a user can configure a tile slot, add it manually through Android's Quick Settings editor, tap it to run a disabled-for-review test task safely, see tile state update from a `tile.set` action, remove the tile without breaking profiles, and inspect tile events in Run Log.
-**Sources:** Android `TileService` API [S46], Android Quick Settings tile UX guidance [S54], Tasker Quick Settings setup action [S55], MacroDroid tile trigger/state model [S56], Automate tile block behavior [S57], Home Assistant Android Quick Settings integration [S61], Quick Settings state-drift/community issue refresh [S62][S63][S64][S65][S66].
-**Category:** platform/OS, UX, integrations.
-**Impact:** 4 — Quick Settings is a high-frequency, low-friction trigger surface absent from current OSS alternatives.
-**Effort:** 2 — single service + action + small UI.
-**Risk:** Low — well-documented stable API since API 24.
-**Dependencies:** Capability registry; intent API.
-**Novelty:** Parity with Tasker; leapfrog vs Easer.
-**Tier reason:** High value-to-effort ratio; the only Now-tier non-platform-compliance item that ships measurable user value in days.
-
 ### N5 (2026.05.06) - Macrobenchmark + Baseline Profile for cold start
 
 **Status:** Not started. No benchmark module, no baseline profile shipped.
