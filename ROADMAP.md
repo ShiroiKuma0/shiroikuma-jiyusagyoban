@@ -1089,13 +1089,6 @@ New items from a trigger/action coverage audit, manifest privacy review, and ext
 
 ### P1 — trust, privacy, table-stakes actions
 
-- [ ] P1 — RD28: Sound-profile action and trigger family: DND, ringer mode, torch
-  Why: Quiet-hours is the canonical first automation and every competitor ships it (MacroDroid has Torch On/Off action, Priority Mode/DND trigger, Silent Mode trigger; Tasker equivalents) — OpenTasker has no `dnd.set`, no ringer action, no torch action, and no DND/ringer state triggers, even though DND policy access is already onboarded in the Setup checklist and currently consumed by nothing.
-  Evidence: action registry `core/actions/ActionMetadata.kt` (43 IDs, none for DND/ringer/torch; repo-wide grep for `setInterruptionFilter`/`RINGER_MODE`/`setTorchMode` is empty); Setup DND row in `PermissionOnboardingScreen.kt`; MacroDroid wiki Action: Torch On/Off, Trigger: Priority Mode/Do Not Disturb, Trigger: Silent Mode Enabled/Disabled.
-  Touches: new actions in `core/actions/SettingsActions.kt` or a new `SoundActions.kt` (`dnd.set` via `NotificationManager.setInterruptionFilter` behind `isNotificationPolicyAccessGranted`, `ringer.set` via `AudioManager.ringerMode` with DND-interaction handling, `torch.toggle` via `CameraManager.setTorchMode`), `ActionCapabilities.kt` gating, `RuntimeRegistries.kt`, `StateContextSourceImpl.kt` keys `dnd`/`ringer` from `ACTION_INTERRUPTION_FILTER_CHANGED`/`RINGER_MODE_CHANGED` broadcasts, action editor metadata, tests.
-  Acceptance: a profile can set DND priority-only at a scheduled time and restore it later; torch toggles on a permissionless device; missing DND access fails honestly with the Setup deep link; `state=dnd`/`ringer` predicates match and survive unrelated broadcasts (RD11 regression).
-  Complexity: M
-
 ### P2 — parity and hygiene
 
 - [ ] P2 — RD29: Data/internet connectivity context (any-network, cellular, VPN)

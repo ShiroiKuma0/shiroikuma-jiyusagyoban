@@ -1,10 +1,12 @@
 package com.opentasker.core.actions
 
 import android.Manifest
+import android.app.NotificationManager
 import android.bluetooth.BluetoothManager
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
+import android.hardware.camera2.CameraAccessException
+import android.hardware.camera2.CameraManager
 import android.media.AudioManager
 import android.net.wifi.WifiManager
 import android.os.Build
@@ -178,6 +180,90 @@ class MobileDataAction : Action {
         val state = args["state"] ?: "toggle"
         ctx.logger("Mobile data: $state")
         return ActionResult.Failure("Mobile data changes are restricted to carrier, system, or device-owner apps")
+    }
+}
+
+class DoNotDisturbAction : Action {
+    override val id = "dnd.set"
+    override val category = ActionCategory.SETTINGS
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val nm = ctx.app.getSystemService(NotificationManager::class.java)
+            ?: return ActionResult.Failure("notification service not available")
+        if (!nm.isNotificationPolicyAccessGranted) {
+            return ActionResult.Failure("Do Not Disturb access is not granted; enable it in Setup")
+        }
+        val mode = args["mode"] ?: "total_silence"
+        val filter = when (mode.lowercase()) {
+            "off", "all" -> NotificationManager.INTERRUPTION_FILTER_ALL
+            "priority", "priority_only" -> NotificationManager.INTERRUPTION_FILTER_PRIORITY
+            "alarms", "alarms_only" -> NotificationManager.INTERRUPTION_FILTER_ALARMS
+            "total_silence", "none" -> NotificationManager.INTERRUPTION_FILTER_NONE
+            else -> return ActionResult.Failure("invalid DND mode: $mode (use off/priority/alarms/total_silence)")
+        }
+        return try {
+            nm.setInterruptionFilter(filter)
+            ctx.logger("DND: $mode")
+            ActionResult.Success
+        } catch (ex: SecurityException) {
+            ActionResult.Failure("DND change blocked: ${ex.message}", ex)
+        }
+    }
+}
+
+class RingerModeAction : Action {
+    override val id = "ringer.set"
+    override val category = ActionCategory.SETTINGS
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val am = ctx.app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            ?: return ActionResult.Failure("audio service not available")
+        val mode = args["mode"] ?: return ActionResult.Failure("missing mode argument")
+        val ringerMode = when (mode.lowercase()) {
+            "normal", "ring" -> AudioManager.RINGER_MODE_NORMAL
+            "vibrate" -> AudioManager.RINGER_MODE_VIBRATE
+            "silent" -> AudioManager.RINGER_MODE_SILENT
+            else -> return ActionResult.Failure("invalid ringer mode: $mode (use normal/vibrate/silent)")
+        }
+        return try {
+            am.ringerMode = ringerMode
+            ctx.logger("Ringer: $mode")
+            ActionResult.Success
+        } catch (ex: SecurityException) {
+            ActionResult.Failure("ringer change blocked by DND policy: ${ex.message}", ex)
+        }
+    }
+}
+
+class TorchAction : Action {
+    override val id = "torch.set"
+    override val category = ActionCategory.SETTINGS
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val state = args["state"] ?: "toggle"
+        val cm = ctx.app.getSystemService(CameraManager::class.java)
+            ?: return ActionResult.Failure("camera service not available")
+        val cameraId = try {
+            cm.cameraIdList.firstOrNull()
+        } catch (_: CameraAccessException) { null }
+            ?: return ActionResult.Failure("no camera with flash found")
+
+        return try {
+            when (state.lowercase()) {
+                "on" -> cm.setTorchMode(cameraId, true)
+                "off" -> cm.setTorchMode(cameraId, false)
+                "toggle" -> {
+                    cm.setTorchMode(cameraId, true)
+                    ctx.logger("Torch: on (toggle always turns on; use explicit on/off for reliable state)")
+                    return ActionResult.Success
+                }
+                else -> return ActionResult.Failure("invalid state: $state (use on/off/toggle)")
+            }
+            ctx.logger("Torch: $state")
+            ActionResult.Success
+        } catch (ex: CameraAccessException) {
+            ActionResult.Failure("torch failed: ${ex.message}", ex)
+        }
     }
 }
 
