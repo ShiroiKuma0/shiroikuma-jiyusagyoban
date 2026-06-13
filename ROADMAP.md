@@ -1108,12 +1108,6 @@ New items from an exhaustive research pass covering 5 parallel research agents (
 ### P2 — hardening and hygiene
 
 
-- [ ] P2 — RD45: Android 17 `ACCESS_LOCAL_NETWORK` permission planning
-  Why: Android 17 (API 37) makes `ACCESS_LOCAL_NETWORK` a mandatory runtime permission (group: `NEARBY_DEVICES`) for any LAN device communication. This directly affects RD20's LAN-HTTP policy decision (Home Assistant/Node-RED endpoints are plain HTTP on RFC1918 addresses), RD34's MQTT publish action, and any future webhook/discovery work. The permission must be planned before targeting API 37.
-  Evidence: https://developer.android.com/about/versions/17/behavior-changes-17 (ACCESS_LOCAL_NETWORK enforcement); RD20 (LAN-HTTP policy); RD34 (MQTT action).
-  Touches: `AndroidManifest.xml` (declare `ACCESS_LOCAL_NETWORK` when target SDK rises to 37), `PermissionOnboardingScreen.kt` (new Setup row for LAN access), `NetworkActions.kt` (check permission before private-range HTTP if RD20 lands), action metadata copy, docs.
-  Acceptance: On an Android 17 device/emulator, HTTP GET to a private-range address works when the permission is granted and fails with a clear setup message when denied; the Setup screen shows the LAN access permission status; the manifest declaration is gated behind target SDK 37.
-  Complexity: S (planning and manifest); M (if bundled with RD20 LAN-HTTP implementation)
 
 - [ ] P3 — RD47: Automation edit undo / snapshot history
   Why: There is no way to undo a profile or task edit, and no edit history. A misedited automation is silently lost. The Tasker community requests undo (tasker.helprace.com, 6 supporters), and users of other automation apps report "rules were deleted by the app" with no recovery. Database backup exists but is too coarse for single-edit undo.
