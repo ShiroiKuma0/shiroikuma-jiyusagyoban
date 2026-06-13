@@ -2090,6 +2090,7 @@ private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
     val color = when (trace.status) {
         ActionTraceStatus.SUCCESS -> MaterialTheme.colorScheme.primary
         ActionTraceStatus.FAILURE -> MaterialTheme.colorScheme.error
+        ActionTraceStatus.TIMEOUT -> MaterialTheme.colorScheme.error
         ActionTraceStatus.SKIPPED -> MaterialTheme.colorScheme.secondary
     }
     Row(

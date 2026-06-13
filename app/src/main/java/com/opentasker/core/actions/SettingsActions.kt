@@ -1,12 +1,12 @@
 package com.opentasker.core.actions
 
 import android.Manifest
+import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.net.wifi.WifiManager
-import android.bluetooth.BluetoothAdapter
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.ContextCompat
@@ -63,8 +63,13 @@ class BluetoothToggleAction : Action {
         ) {
             return ActionResult.Failure("Bluetooth permission is not granted")
         }
-        val adapter = BluetoothAdapter.getDefaultAdapter()
+        val bm = ctx.app.getSystemService(BluetoothManager::class.java)
+        val adapter = bm?.adapter
             ?: return ActionResult.Failure("Bluetooth not available")
+
+        if (Build.VERSION.SDK_INT >= 33) {
+            return ActionResult.Failure("Android 13+ blocks direct Bluetooth enable/disable; use system Bluetooth settings instead")
+        }
 
         when (state.lowercase()) {
             "toggle" -> if (adapter.isEnabled) adapter.disable() else adapter.enable()
@@ -202,7 +207,7 @@ class ScreenTimeoutAction : Action {
             return ActionResult.Failure("Write system settings permission is not granted")
         }
         return try {
-            Settings.System.putInt(ctx.app.contentResolver, Settings.System.SCREEN_OFF_TIMEOUT, (ms / 1000).toInt())
+            Settings.System.putInt(ctx.app.contentResolver, Settings.System.SCREEN_OFF_TIMEOUT, ms.toInt())
             ctx.logger("Screen timeout: ${ms / 1000}s")
             ActionResult.Success
         } catch (e: Exception) {

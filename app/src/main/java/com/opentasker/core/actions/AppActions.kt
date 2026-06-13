@@ -84,14 +84,23 @@ class OpenUrlAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val url = args["url"] ?: return ActionResult.Failure("missing url")
+        val uri = Uri.parse(url)
+        val scheme = uri.scheme?.lowercase()
+        if (scheme != null && scheme !in ALLOWED_SCHEMES) {
+            return ActionResult.Failure("blocked URI scheme: $scheme (allowed: ${ALLOWED_SCHEMES.joinToString()})")
+        }
         return try {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             ctx.app.startActivity(intent)
             ctx.logger("Open URL: $url")
             ActionResult.Success
         } catch (e: Exception) {
             ActionResult.Failure("open failed: ${e.message}")
         }
+    }
+
+    companion object {
+        private val ALLOWED_SCHEMES = setOf("https", "http", "tel", "mailto", "geo")
     }
 }
 
@@ -117,8 +126,13 @@ class SendSmsAction : Action {
         }
         if (message.isBlank()) return ActionResult.Failure("missing message")
         return try {
-            @Suppress("DEPRECATION")
-            SmsManager.getDefault().sendTextMessage(number, null, message, null, null)
+            val smsManager = if (android.os.Build.VERSION.SDK_INT >= 31) {
+                ctx.app.getSystemService(SmsManager::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                SmsManager.getDefault()
+            } ?: return ActionResult.Failure("SMS service not available")
+            smsManager.sendTextMessage(number, null, message, null, null)
             ctx.logger("SMS sent to $number")
             ActionResult.Success
         } catch (ex: Exception) {
