@@ -17,6 +17,12 @@ object DeviceStateEvents {
         connected: Boolean,
     ): Boolean = statePatches.tryEmit(wifiPatch(ssid, connected))
 
+    fun publishConnectivity(
+        internet: Boolean,
+        networkType: String,
+        vpn: Boolean,
+    ): Boolean = statePatches.tryEmit(connectivityPatch(internet, networkType, vpn))
+
     internal fun wifiPatch(
         ssid: String,
         connected: Boolean,
@@ -28,4 +34,14 @@ object DeviceStateEvents {
             "wifi_connected" to connected.toString(),
         )
     }
+
+    internal fun connectivityPatch(
+        internet: Boolean,
+        networkType: String,
+        vpn: Boolean,
+    ): Map<String, String> = mapOf(
+        "internet" to internet.toString(),
+        "network_type" to networkType,
+        "vpn" to vpn.toString(),
+    )
 }
