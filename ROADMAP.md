@@ -1026,13 +1026,6 @@ New items from a code-level engine audit plus external platform/policy verificat
 
 ### P3 — parity and power-user polish
 
-- [ ] P3 — RD25: Shake/sensor trigger family
-  Why: Shake-to-trigger is a popular, permissionless MacroDroid trigger (Sensors > Shake Device with sensitivity setting) that gives OpenTasker a hardware-event family without any new privacy surface; foreground-service-owned accelerometer listening fits the existing source model.
-  Evidence: MacroDroid shake trigger docs/forum sensitivity guidance; no sensor source exists in `core/contexts` (only app/time/state/event/location families).
-  Touches: new `SensorContextSourceImpl` (accelerometer shake detection with debounce + sensitivity config, registered only while ≥1 enabled profile uses it), `ContextMatchEvaluator` event mapping, context editor row, battery-impact disclosure in Setup.
-  Acceptance: a shake profile triggers reliably at the chosen sensitivity, does not register listeners when unused, and shows up in Inspector source health; battery note documented.
-  Complexity: M
-
 ---
 
 ## Research-Driven Additions (2026-06-10 trigger/action coverage and privacy pass)
