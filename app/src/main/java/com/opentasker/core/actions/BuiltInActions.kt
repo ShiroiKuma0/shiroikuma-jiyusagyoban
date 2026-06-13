@@ -3,6 +3,7 @@ package com.opentasker.core.actions
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -54,14 +55,33 @@ class NotifyAction : Action {
         val tag = args["tag"]
         val notifId = args["id"]?.toIntOrNull() ?: nextNotificationId.getAndIncrement()
 
-        val notification = NotificationCompat.Builder(ctx.app, channelDef.id)
+        val builder = NotificationCompat.Builder(ctx.app, channelDef.id)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setAutoCancel(!persistent)
             .setOngoing(persistent)
-            .build()
+
+        for (i in 1..3) {
+            val taskName = args["button${i}_task"] ?: continue
+            val label = args["button${i}_label"] ?: taskName
+            val buttonIntent = Intent(ctx.app, NotificationActionReceiver::class.java).apply {
+                action = NotificationActionReceiver.ACTION_NOTIFICATION_BUTTON
+                putExtra(NotificationActionReceiver.EXTRA_TASK_NAME, taskName)
+                putExtra(NotificationActionReceiver.EXTRA_BUTTON_LABEL, label)
+                putExtra("_req", notifId * 10 + i)
+            }
+            val pi = PendingIntent.getBroadcast(
+                ctx.app,
+                notifId * 10 + i,
+                buttonIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            builder.addAction(0, label, pi)
+        }
+
+        val notification = builder.build()
 
         return try {
             NotificationManagerCompat.from(ctx.app).notify(tag, notifId, notification)

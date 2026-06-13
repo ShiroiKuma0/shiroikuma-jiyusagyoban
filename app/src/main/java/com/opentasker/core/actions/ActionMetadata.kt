@@ -63,6 +63,12 @@ fun registerActionMetadata() {
                 ActionField("persistent", "Persistent", FieldType.CHECKBOX, hint = "Keep until cancelled"),
                 ActionField("tag", "Tag", hint = "Replacement tag (same tag replaces)"),
                 ActionField("id", "ID", FieldType.NUMBER, hint = "Notification ID (same ID replaces)"),
+                ActionField("button1_label", "Button 1 label", hint = "Action button label"),
+                ActionField("button1_task", "Button 1 task", hint = "Task name to run on tap"),
+                ActionField("button2_label", "Button 2 label", hint = "Second button label"),
+                ActionField("button2_task", "Button 2 task", hint = "Task name to run on tap"),
+                ActionField("button3_label", "Button 3 label", hint = "Third button label"),
+                ActionField("button3_task", "Button 3 task", hint = "Task name to run on tap"),
             )
         )
     )

@@ -44,4 +44,5 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE id = :id") suspend fun getById(id: Long): TaskEntity?
     @Query("SELECT * FROM tasks") suspend fun getAll(): List<TaskEntity>
     @Query("SELECT * FROM tasks") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<TaskEntity>>
+    @Query("SELECT * FROM tasks WHERE name = :name LIMIT 1") suspend fun getByName(name: String): TaskEntity?
 }

@@ -1026,13 +1026,6 @@ New items from a code-level engine audit plus external platform/policy verificat
 
 ### P3 — parity and power-user polish
 
-- [ ] P3 — RD24: Interactive notification action buttons
-  Why: Tasker 6.6's headline notification work (action buttons, Live Updates) shows notifications as a two-way automation surface; OpenTasker's `notify` action is display-only, so flows cannot ask the user anything (confirm/cancel/snooze patterns).
-  Evidence: Tasker 6.6 release notes (https://joaoapps.com/tasker-6-6-live-update-notifications-sunset-sunrise-java-code-shizuku-and-more/); current notification action in `core/actions` (display-only args).
-  Touches: notify action args (up to 3 buttons → task bindings), a `PendingIntent` receiver routing through the RD2 shared execution helper (source `notification_action`), notification-trampoline-safe implementation (no activity trampoline), run-log evidence.
-  Acceptance: a notification posted by a task can carry buttons that run bound tasks when tapped, logged with their own source; buttons respect capability gating; works on API 26-36 without trampoline lint violations.
-  Complexity: M (after RD2)
-
 - [ ] P3 — RD25: Shake/sensor trigger family
   Why: Shake-to-trigger is a popular, permissionless MacroDroid trigger (Sensors > Shake Device with sensitivity setting) that gives OpenTasker a hardware-event family without any new privacy surface; foreground-service-owned accelerometer listening fits the existing source model.
   Evidence: MacroDroid shake trigger docs/forum sensitivity guidance; no sensor source exists in `core/contexts` (only app/time/state/event/location families).
