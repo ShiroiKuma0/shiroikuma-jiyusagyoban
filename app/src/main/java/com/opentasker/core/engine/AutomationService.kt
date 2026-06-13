@@ -57,6 +57,7 @@ class AutomationService : Service() {
     private val shakeDetector by lazy { ShakeDetector(this) }
     private val runLogRetentionSettings by lazy { RunLogRetentionSettings(this) }
     
+    private val cooldownStore by lazy { CooldownStore(this) }
     private val matchers = Collections.synchronizedMap(mutableMapOf<Long, ProfileMatcher>())
     private val profileCooldowns = Collections.synchronizedMap(mutableMapOf<Long, Long>()) // profileId -> cooldownUntilMs
     private val matcherJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>()) // Track jobs for cleanup
@@ -74,6 +75,7 @@ class AutomationService : Service() {
         connectivityMonitor.start()
         appUsageMonitor.start(scope)
         shakeDetector.start()
+        profileCooldowns.putAll(cooldownStore.loadAll())
         scope.launch { pruneRunLogs(force = true) }
     }
 
@@ -113,6 +115,7 @@ class AutomationService : Service() {
         matchers.clear()
         
         val profiles = db.profileDao().getAllEnabled()
+        cooldownStore.pruneDeleted(profiles.map { it.id }.toSet())
         for (profile in profiles) {
             val domain = profile.toDomain()
             val matcher = ProfileMatcher(this, domain)
@@ -324,7 +327,9 @@ class AutomationService : Service() {
                 return CooldownReservation(accepted = false, remainingMs = cooldownUntil - now)
             }
             if (cooldownSec > 0) {
-                profileCooldowns[profileId] = now + (cooldownSec * 1000L)
+                val deadline = now + (cooldownSec * 1000L)
+                profileCooldowns[profileId] = deadline
+                cooldownStore.set(profileId, deadline)
             }
             return CooldownReservation(accepted = true)
         }
