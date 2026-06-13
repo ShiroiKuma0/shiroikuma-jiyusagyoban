@@ -39,6 +39,7 @@ import com.opentasker.core.actions.SetVariableAction
 import com.opentasker.core.actions.StopSoundAction
 import com.opentasker.core.actions.TaskerUnsupportedAction
 import com.opentasker.core.actions.TermuxScriptAction
+import com.opentasker.core.actions.TileStateAction
 import com.opentasker.core.actions.TorchAction
 import com.opentasker.core.actions.VibrateAction
 import com.opentasker.core.actions.VolumeAction
@@ -76,6 +77,7 @@ private fun registerBuiltInActions() {
         DoNotDisturbAction(),
         RingerModeAction(),
         TorchAction(),
+        TileStateAction(),
         LaunchAppAction(),
         LocalePluginSettingAction(),
         LocalePluginConditionQueryAction(),
