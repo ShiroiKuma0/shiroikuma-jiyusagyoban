@@ -262,6 +262,42 @@ fun registerActionMetadata() {
         )
     )
 
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "dnd.set",
+            name = "Set Do Not Disturb",
+            description = "Set DND interruption filter mode",
+            category = "Settings",
+            fields = listOf(
+                ActionField("mode", "Mode", FieldType.DROPDOWN, required = true, hint = "off/priority/alarms/total_silence"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "ringer.set",
+            name = "Set Ringer Mode",
+            description = "Set device ringer mode",
+            category = "Settings",
+            fields = listOf(
+                ActionField("mode", "Mode", FieldType.DROPDOWN, required = true, hint = "normal/vibrate/silent"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "torch.set",
+            name = "Toggle Torch",
+            description = "Turn camera flashlight on or off",
+            category = "Settings",
+            fields = listOf(
+                ActionField("state", "State", FieldType.DROPDOWN, required = true, hint = "on/off/toggle"),
+            )
+        )
+    )
+
     // App actions
     ActionMetadataRegistry.register(
         ActionMetadata(
