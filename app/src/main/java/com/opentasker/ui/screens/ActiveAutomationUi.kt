@@ -3342,7 +3342,7 @@ private fun contextFields(type: ContextType): List<ActionField> = when (type) {
         ActionField("value", "Expected value", required = true, hint = "true/false, connected/disconnected, on/off, 80"),
     )
     ContextType.EVENT -> listOf(
-        ActionField("event", "Event type", required = true, hint = "boot_completed, notification, nfc, calendar, sunrise, sunset, shake"),
+        ActionField("event", "Event type", required = true, hint = "boot_completed, notification, nfc, calendar, sunrise, sunset, shake, package_added, package_removed, package_replaced"),
         ActionField("state", "Event state", hint = "during, upcoming"),
         ActionField("calendar", "Calendar name", hint = "Work"),
         ActionField("beforeMinutes", "Before minutes", FieldType.NUMBER, hint = "15"),
