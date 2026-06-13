@@ -4,7 +4,12 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.hardware.display.DisplayManager
+import android.media.AudioManager
 import android.os.BatteryManager
+import android.os.PowerManager
+import android.provider.Settings
+import android.view.Display
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -34,6 +39,8 @@ class StateContextSourceImpl : ContextSource {
             }
         }
 
+        publishPatch(seedInitialState(app))
+
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent == null) return
@@ -55,6 +62,14 @@ class StateContextSourceImpl : ContextSource {
                     }
                     Intent.ACTION_SCREEN_ON -> statePatch["screen"] = "on"
                     Intent.ACTION_SCREEN_OFF -> statePatch["screen"] = "off"
+                    Intent.ACTION_USER_PRESENT -> statePatch["unlocked"] = "true"
+                    PowerManager.ACTION_POWER_SAVE_MODE_CHANGED -> {
+                        val pm = app.getSystemService(PowerManager::class.java)
+                        statePatch["power_save"] = (pm?.isPowerSaveMode == true).toString()
+                    }
+                    Intent.ACTION_AIRPLANE_MODE_CHANGED -> {
+                        statePatch["airplane"] = isAirplaneModeOn(app).toString()
+                    }
                 }
 
                 publishPatch(statePatch)
@@ -66,6 +81,9 @@ class StateContextSourceImpl : ContextSource {
             addAction(Intent.ACTION_HEADSET_PLUG)
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_USER_PRESENT)
+            addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
+            addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)
         }
 
         ContextCompat.registerReceiver(app, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
@@ -125,6 +143,34 @@ fun stateMatches(predicate: String, state: Map<String, String>): Boolean {
     }
 }
 
+internal fun seedInitialState(app: Context): Map<String, String> {
+    val seed = mutableMapOf<String, String>()
+
+    val dm = app.getSystemService(DisplayManager::class.java)
+    val screenOn = dm?.getDisplay(Display.DEFAULT_DISPLAY)
+        ?.state == Display.STATE_ON
+    seed["screen"] = if (screenOn) "on" else "off"
+
+    val pm = app.getSystemService(PowerManager::class.java)
+    if (pm != null) {
+        seed["unlocked"] = pm.isInteractive.toString()
+        seed["power_save"] = pm.isPowerSaveMode.toString()
+    }
+
+    val am = app.getSystemService(AudioManager::class.java)
+    if (am != null) {
+        seed["headphones"] = am.isWiredHeadsetOn.toString()
+    }
+
+    seed["airplane"] = isAirplaneModeOn(app).toString()
+
+    return seed
+}
+
+@Suppress("DEPRECATION")
+private fun isAirplaneModeOn(context: Context): Boolean =
+    Settings.Global.getInt(context.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) != 0
+
 internal fun mergeStatePatch(
     currentState: Map<String, String>,
     patch: Map<String, String>,
@@ -137,6 +183,9 @@ internal fun normalizeStateKey(key: String): String = when (key.trim().lowercase
     "battery" -> "battery_level"
     "headset" -> "headphones"
     "ssid", "wifi_ssid" -> "wifi"
+    "battery_saver", "powersave", "power_saver" -> "power_save"
+    "airplane_mode", "flight_mode" -> "airplane"
+    "device_unlocked" -> "unlocked"
     else -> key.trim().lowercase()
 }
 
@@ -155,6 +204,21 @@ private fun normalizeStateExpectedValue(key: String, value: String): String? {
         }
         "screen" -> when (normalized) {
             "on", "off" -> normalized
+            else -> null
+        }
+        "unlocked" -> when (normalized) {
+            "unlocked", "on", "true", "yes" -> "true"
+            "locked", "off", "false", "no" -> "false"
+            else -> null
+        }
+        "power_save" -> when (normalized) {
+            "on", "enabled", "true", "yes" -> "true"
+            "off", "disabled", "false", "no" -> "false"
+            else -> null
+        }
+        "airplane" -> when (normalized) {
+            "on", "enabled", "true", "yes" -> "true"
+            "off", "disabled", "false", "no" -> "false"
             else -> null
         }
         else -> value.trim()
