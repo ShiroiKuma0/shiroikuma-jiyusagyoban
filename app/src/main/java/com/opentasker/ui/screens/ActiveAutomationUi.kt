@@ -109,6 +109,8 @@ import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseBackupManager
+import com.opentasker.core.storage.EditHistoryDao
+import com.opentasker.core.storage.EditHistoryEntity
 import com.opentasker.core.storage.RunLogRetentionOptions
 import com.opentasker.core.storage.VariableEntity
 import com.opentasker.core.storage.RunLogRetentionPolicy
@@ -296,6 +298,17 @@ class ActiveAutomationViewModel(
     }
 
     fun updateTask(task: Task, message: String = "Task updated") = launchWithMessage(message) {
+        val previous = db.taskDao().getById(task.id)
+        if (previous != null) {
+            db.editHistoryDao().insert(
+                EditHistoryEntity(
+                    entityType = EditHistoryDao.TYPE_TASK,
+                    entityId = task.id,
+                    previousJson = previous.actionsJson,
+                ),
+            )
+            db.editHistoryDao().pruneOld(EditHistoryDao.TYPE_TASK, task.id)
+        }
         db.taskDao().update(task.toEntity())
     }
 
@@ -348,8 +361,19 @@ class ActiveAutomationViewModel(
 
     fun updateProfile(profile: Profile, message: String = "Profile updated") =
         launchWithMessage(message) {
-            val previous = profile.id.takeIf { it > 0L }
-                ?.let { db.profileDao().getById(it)?.toDomain() }
+            val previousEntity = profile.id.takeIf { it > 0L }
+                ?.let { db.profileDao().getById(it) }
+            val previous = previousEntity?.toDomain()
+            if (previousEntity != null) {
+                db.editHistoryDao().insert(
+                    EditHistoryEntity(
+                        entityType = EditHistoryDao.TYPE_PROFILE,
+                        entityId = profile.id,
+                        previousJson = previousEntity.contextsJson,
+                    ),
+                )
+                db.editHistoryDao().pruneOld(EditHistoryDao.TYPE_PROFILE, profile.id)
+            }
             if (previous != null && previous.contexts != profile.contexts) {
                 locationDwellStateStore.clearProfile(profile.id)
             }
@@ -591,6 +615,26 @@ class ActiveAutomationViewModel(
                 events.send("Failed to pin shortcut")
             }
         }
+    }
+
+    fun undoLastTaskEdit(taskId: Long) = launchWithMessage("Edit undone") {
+        val snapshot = db.editHistoryDao().getLatest(EditHistoryDao.TYPE_TASK, taskId) ?: run {
+            events.send("No edit history available")
+            return@launchWithMessage
+        }
+        val current = db.taskDao().getById(taskId) ?: return@launchWithMessage
+        db.taskDao().update(current.copy(actionsJson = snapshot.previousJson))
+        db.editHistoryDao().deleteFor(EditHistoryDao.TYPE_TASK, taskId)
+    }
+
+    fun undoLastProfileEdit(profileId: Long) = launchWithMessage("Edit undone") {
+        val snapshot = db.editHistoryDao().getLatest(EditHistoryDao.TYPE_PROFILE, profileId) ?: run {
+            events.send("No edit history available")
+            return@launchWithMessage
+        }
+        val current = db.profileDao().getById(profileId) ?: return@launchWithMessage
+        db.profileDao().update(current.copy(contextsJson = snapshot.previousJson))
+        db.editHistoryDao().deleteFor(EditHistoryDao.TYPE_PROFILE, profileId)
     }
 
     fun updateVariable(name: String, value: String) {
