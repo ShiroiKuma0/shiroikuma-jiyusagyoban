@@ -17,6 +17,7 @@ import androidx.core.content.ContextCompat
 import com.opentasker.app.MainActivity
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.automation.app.AppUsageMonitor
+import com.opentasker.automation.network.ConnectivityMonitor
 import com.opentasker.automation.network.WiFiNetworkMonitor
 import com.opentasker.automation.scheduler.TimeEventScheduler
 import com.opentasker.core.contexts.BootContextEvents
@@ -50,6 +51,7 @@ class AutomationService : Service() {
     private val db by lazy { OpenTaskerApp_NoHilt.db }
     private val timeEventScheduler by lazy { TimeEventScheduler(this) }
     private val wifiNetworkMonitor by lazy { WiFiNetworkMonitor(this) }
+    private val connectivityMonitor by lazy { ConnectivityMonitor(this) }
     private val appUsageMonitor by lazy { AppUsageMonitor(this) }
     private val runLogRetentionSettings by lazy { RunLogRetentionSettings(this) }
     
@@ -67,6 +69,7 @@ class AutomationService : Service() {
         startForegroundCompat()
         timeEventScheduler.scheduleNextMinute()
         wifiNetworkMonitor.start()
+        connectivityMonitor.start()
         appUsageMonitor.start(scope)
         scope.launch { pruneRunLogs(force = true) }
     }
@@ -93,6 +96,7 @@ class AutomationService : Service() {
         queuedProfileTasks.clear()
         timeEventScheduler.cancel()
         wifiNetworkMonitor.stop()
+        connectivityMonitor.stop()
         appUsageMonitor.stop()
         job.cancel()
         super.onDestroy()
