@@ -1047,13 +1047,6 @@ New items from a trigger/action coverage audit, manifest privacy review, and ext
   Acceptance: with a distributor installed and a topic configured, an external `curl` to the distributor triggers a profile within seconds with run-log evidence; without opt-in, no connector registration occurs; payload appears redacted per existing sensitive-argument rules.
   Complexity: M (after RD2/shared execution helper; pulse semantics are fixed)
 
-- [ ] P3 — RD33: Persist profile cooldown deadlines across service restarts
-  Why: Cooldowns live in an in-memory map, so any service restart, crash, or reboot resets them — a "max once per day" profile can double-fire after a reboot, undermining the cooldown contract users rely on for noisy triggers.
-  Evidence: `app/src/main/java/com/opentasker/core/engine/AutomationService.kt` (line 55 `profileCooldowns`, lines 309-318 `reserveCooldown`).
-  Touches: `AutomationService.kt`/`reserveCooldown` (back the map with DataStore or a small Room table keyed by profile id; prune entries for deleted profiles like the dwell-state cleanup pattern), tests for restart survival and expiry.
-  Acceptance: a triggered profile with a 1-hour cooldown stays on cooldown across a service restart and a reboot; expired entries are cleaned up; behavior covered by a JVM test with injected clock.
-  Complexity: S
-
 - [ ] P3 — RD34: Native MQTT publish action (subscribe trigger as a follow-up spike)
   Why: Home Assistant community demand for Android-side MQTT is real and currently met only by Tasker's third-party MQTT plugin; an outbound-only `mqtt.publish` action bridges OpenTasker to HA/Node-RED without RD10's inbound listening socket, and a later subscribe trigger could supersede RD10 entirely.
   Evidence: https://community.home-assistant.io/t/setting-up-taskers-mqtt-client-plugin/321777; https://community.home-assistant.io/t/presence-detection-via-tasker-and-mqtt-android-only/21643; no MQTT code in repo.
