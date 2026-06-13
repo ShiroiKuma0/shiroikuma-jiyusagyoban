@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Settings
@@ -105,9 +106,11 @@ import com.opentasker.core.model.Profile
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
+import com.opentasker.core.model.Variable
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.RunLogRetentionOptions
+import com.opentasker.core.storage.VariableEntity
 import com.opentasker.core.storage.RunLogRetentionPolicy
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.displayLabel
@@ -159,6 +162,7 @@ private fun openTaskerBundleExportName(): String =
 private enum class OpenTaskerScreen(val label: String) {
     Profiles("Profiles"),
     Tasks("Tasks"),
+    Vars("Vars"),
     Flow("Flow"),
     Scenes("Scenes"),
     Inspector("Inspect"),
@@ -252,6 +256,11 @@ class ActiveAutomationViewModel(
 
     val runLogs: StateFlow<List<RunLogEntry>> = db.runLogDao()
         .getRecentFlow()
+        .map { entities -> entities.map { it.toDomain() } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val globalVariables: StateFlow<List<Variable>> = db.variableDao()
+        .getAllGlobalAsFlow()
         .map { entities -> entities.map { it.toDomain() } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -584,6 +593,18 @@ class ActiveAutomationViewModel(
         }
     }
 
+    fun updateVariable(name: String, value: String) {
+        viewModelScope.launch {
+            db.variableDao().insert(VariableEntity(name, value, isGlobal = true))
+        }
+    }
+
+    fun deleteVariable(name: String) {
+        viewModelScope.launch {
+            db.variableDao().delete(VariableEntity(name, "", isGlobal = true))
+        }
+    }
+
     private fun launchWithMessage(successMessage: String, block: suspend () -> Unit) {
         viewModelScope.launch {
             runCatching { block() }
@@ -618,6 +639,7 @@ fun ActiveAutomationUi(
     val tasks by viewModel.tasks.collectAsState()
     val scenes by viewModel.scenes.collectAsState()
     val runLogs by viewModel.runLogs.collectAsState()
+    val globalVariables by viewModel.globalVariables.collectAsState()
     val runLogRetentionPolicy = viewModel.runLogRetentionPolicy
     val backupSetupState = viewModel.backupSetupState
     val snackbarHostState = remember { SnackbarHostState() }
@@ -709,6 +731,7 @@ fun ActiveAutomationUi(
     val headerDetail = when (screen) {
         OpenTaskerScreen.Profiles -> "${profiles.count { it.enabled }} enabled - ${profiles.size} total"
         OpenTaskerScreen.Tasks -> "${tasks.sumOf { it.actions.size }} actions - ${tasks.size} tasks"
+        OpenTaskerScreen.Vars -> "${globalVariables.size} global variables"
         OpenTaskerScreen.Flow -> "${profiles.size} profiles - ${tasks.size} tasks"
         OpenTaskerScreen.Scenes -> "${scenes.sumOf { it.elements.size }} elements - ${scenes.size} scenes"
         OpenTaskerScreen.Inspector -> "Live context health"
@@ -756,6 +779,7 @@ fun ActiveAutomationUi(
                     Icon(Icons.Filled.Add, contentDescription = "Create task")
                 }
 
+                OpenTaskerScreen.Vars,
                 OpenTaskerScreen.Flow,
                 OpenTaskerScreen.Scenes,
                 OpenTaskerScreen.Inspector,
@@ -773,6 +797,7 @@ fun ActiveAutomationUi(
                             val icon = when (destination) {
                                 OpenTaskerScreen.Profiles -> Icons.Filled.CheckCircle
                                 OpenTaskerScreen.Tasks -> Icons.Filled.Edit
+                                OpenTaskerScreen.Vars -> Icons.Filled.Menu
                                 OpenTaskerScreen.Flow -> Icons.Filled.Info
                                 OpenTaskerScreen.Scenes -> Icons.Filled.Edit
                                 OpenTaskerScreen.Inspector -> Icons.Filled.Info
@@ -865,6 +890,14 @@ fun ActiveAutomationUi(
                         scope.launch { snackbarHostState.showSnackbar("Flow target no longer exists") }
                     }
                 },
+            )
+
+            OpenTaskerScreen.Vars -> VariablesScreen(
+                variables = globalVariables,
+                contentPadding = innerPadding,
+                onUpdate = viewModel::updateVariable,
+                onDelete = viewModel::deleteVariable,
+                onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
             )
 
             OpenTaskerScreen.Scenes -> SceneLibraryScreen(
