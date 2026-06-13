@@ -1024,12 +1024,6 @@ New items from a code-level engine audit plus external platform/policy verificat
 
 ### P2 — hardening and table-stakes surface
 
-- [ ] P2 — RD20: LAN-HTTP policy decision
-  Why: The HTTPS-only rule silently blocks the most common home-automation use (local Home Assistant/Node-RED endpoints are plain HTTP on RFC1918 addresses) and deserves an explicit, documented opt-in decision rather than an implicit gap. HTTP response/download size caps are already implemented (1 MB response, 50 MB download).
-  Touches: `NetworkActions.kt` (either a per-action `allow_private_http` opt-in restricted to private-range hosts with a warning, or a documented rejection of LAN HTTP in `docs/`), action metadata/help text.
-  Acceptance: the LAN-HTTP stance is decided, implemented or documented, and reflected in the action editor copy; tests cover the private-range gate if adopted.
-  Complexity: S
-
 - [ ] P2 — RD21: Home-screen widget and pinned-shortcut task triggers
   Why: Widget buttons and launcher shortcuts are table-stakes trigger surfaces in MacroDroid (Widget Button, Shortcut Launched triggers) and Tasker, complement N3 Quick Settings, and need no special permissions — high value for one-tap task running.
   Evidence: MacroDroid wiki Widget Button / Shortcut Launched trigger pages; Jetpack Glance (stable 1.1.x) for Compose-style widgets; absence of any appwidget/ShortcutManager code in the repo (grep empty).

@@ -458,6 +458,7 @@ fun registerActionMetadata() {
             fields = listOf(
                 ActionField("url", "URL", required = true),
                 ActionField("variable", "Store response in", hint = "%var"),
+                ActionField("allow_http", "Allow HTTP", FieldType.CHECKBOX, hint = "Allow plain HTTP for LAN/private-network hosts only"),
             )
         )
     )
@@ -472,6 +473,7 @@ fun registerActionMetadata() {
                 ActionField("url", "URL", required = true),
                 ActionField("body", "Request body", FieldType.MULTILINE),
                 ActionField("variable", "Store response in", hint = "%var"),
+                ActionField("allow_http", "Allow HTTP", FieldType.CHECKBOX, hint = "Allow plain HTTP for LAN/private-network hosts only"),
             )
         )
     )
@@ -497,6 +499,7 @@ fun registerActionMetadata() {
             fields = listOf(
                 ActionField("url", "URL", required = true),
                 ActionField("path", "Save to path", required = true),
+                ActionField("allow_http", "Allow HTTP", FieldType.CHECKBOX, hint = "Allow plain HTTP for LAN/private-network hosts only"),
             )
         )
     )
