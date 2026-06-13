@@ -298,6 +298,19 @@ fun registerActionMetadata() {
         )
     )
 
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "tile.set",
+            name = "Set Tile State",
+            description = "Update Quick Settings tile state",
+            category = "Settings",
+            fields = listOf(
+                ActionField("state", "State", FieldType.DROPDOWN, required = true, hint = "active/inactive"),
+                ActionField("label", "Label", required = false, hint = "Tile label text"),
+            )
+        )
+    )
+
     // App actions
     ActionMetadataRegistry.register(
         ActionMetadata(

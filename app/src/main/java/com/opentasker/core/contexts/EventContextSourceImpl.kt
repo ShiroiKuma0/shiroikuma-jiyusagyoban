@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.merge
  *   - "nfc": NFC tag scan
  *   - "locale_request_query": Locale condition plugin requested a host query
  *   - "boot_completed": manifest boot receiver restarted the engine
+ *   - "tile_clicked": Quick Settings tile toggled
  */
 class EventContextSourceImpl : ContextSource {
     override val type = "event"
@@ -25,5 +26,6 @@ class EventContextSourceImpl : ContextSource {
         BootContextEvents.events,
         CalendarSunContextEvents.events(app),
         LocalePluginRequestQueryEvents.events(app),
+        QuickSettingsTileContextEvents.events,
     )
 }

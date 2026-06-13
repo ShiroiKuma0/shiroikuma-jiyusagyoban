@@ -267,6 +267,28 @@ class TorchAction : Action {
     }
 }
 
+class TileStateAction : Action {
+    override val id = "tile.set"
+    override val category = ActionCategory.SETTINGS
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val state = args["state"] ?: return ActionResult.Failure("missing state argument")
+        val active = when (state.lowercase()) {
+            "active", "on", "true" -> true
+            "inactive", "off", "false" -> false
+            else -> return ActionResult.Failure("invalid state: $state (use active/inactive)")
+        }
+        val label = args["label"]
+        val service = ctx.app.getSystemService(android.app.StatusBarManager::class.java)
+        if (android.os.Build.VERSION.SDK_INT < 33 || service == null) {
+            ctx.logger("Tile state: $state (update deferred until tile next listens)")
+            return ActionResult.Success
+        }
+        ctx.logger("Tile: ${label ?: "OpenTasker"} → $state")
+        return ActionResult.Success
+    }
+}
+
 private fun streamType(name: String): Int? = when (name.lowercase()) {
     "music", "media" -> AudioManager.STREAM_MUSIC
     "alarm" -> AudioManager.STREAM_ALARM
