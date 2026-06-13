@@ -1074,10 +1074,4 @@ New items from an exhaustive research pass covering 5 parallel research agents (
 
 
 
-- [ ] P3 — RD47: Automation edit undo / snapshot history
-  Why: There is no way to undo a profile or task edit, and no edit history. A misedited automation is silently lost. The Tasker community requests undo (tasker.helprace.com, 6 supporters), and users of other automation apps report "rules were deleted by the app" with no recovery. Database backup exists but is too coarse for single-edit undo.
-  Evidence: No undo/snapshot mechanism in `ActiveAutomationUi.kt` or Room DAOs; https://tasker.helprace.com/s1-general/ideas/top/c0-all/10 (undo request); community reports of lost automations.
-  Touches: Room (add a lightweight `edit_history` table with entity type, entity ID, serialized previous state, and timestamp; bounded to N entries per entity), DAO helpers for snapshot-before-save and restore, UI undo affordance (snackbar with "Undo" action after save), cleanup of old history entries.
-  Acceptance: After editing a profile or task, a snackbar offers undo for 10 seconds; tapping undo restores the previous state; edit history is bounded (e.g., 5 snapshots per entity) and pruned with run-log retention; the Room migration is tested.
-  Complexity: M
 
