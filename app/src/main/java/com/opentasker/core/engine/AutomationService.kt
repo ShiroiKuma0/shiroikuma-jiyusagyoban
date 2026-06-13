@@ -19,6 +19,7 @@ import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.automation.app.AppUsageMonitor
 import com.opentasker.automation.network.ConnectivityMonitor
 import com.opentasker.automation.network.WiFiNetworkMonitor
+import com.opentasker.automation.sensor.ShakeDetector
 import com.opentasker.automation.scheduler.TimeEventScheduler
 import com.opentasker.core.contexts.BootContextEvents
 import com.opentasker.core.model.AutomationMode
@@ -53,6 +54,7 @@ class AutomationService : Service() {
     private val wifiNetworkMonitor by lazy { WiFiNetworkMonitor(this) }
     private val connectivityMonitor by lazy { ConnectivityMonitor(this) }
     private val appUsageMonitor by lazy { AppUsageMonitor(this) }
+    private val shakeDetector by lazy { ShakeDetector(this) }
     private val runLogRetentionSettings by lazy { RunLogRetentionSettings(this) }
     
     private val matchers = Collections.synchronizedMap(mutableMapOf<Long, ProfileMatcher>())
@@ -71,6 +73,7 @@ class AutomationService : Service() {
         wifiNetworkMonitor.start()
         connectivityMonitor.start()
         appUsageMonitor.start(scope)
+        shakeDetector.start()
         scope.launch { pruneRunLogs(force = true) }
     }
 
@@ -98,6 +101,7 @@ class AutomationService : Service() {
         wifiNetworkMonitor.stop()
         connectivityMonitor.stop()
         appUsageMonitor.stop()
+        shakeDetector.stop()
         job.cancel()
         super.onDestroy()
     }

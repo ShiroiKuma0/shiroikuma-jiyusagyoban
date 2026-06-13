@@ -27,5 +27,6 @@ class EventContextSourceImpl : ContextSource {
         CalendarSunContextEvents.events(app),
         LocalePluginRequestQueryEvents.events(app),
         QuickSettingsTileContextEvents.events,
+        ShakeContextEvents.events,
     )
 }
