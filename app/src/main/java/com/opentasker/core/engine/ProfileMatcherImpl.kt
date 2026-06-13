@@ -5,6 +5,7 @@ import com.opentasker.core.contexts.ContextMatchEvaluator
 import com.opentasker.core.contexts.ContextSourceRegistry
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.logging.AppLogger
+import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import kotlinx.coroutines.flow.Flow
@@ -88,13 +89,12 @@ class ProfileMatcher(
         contextMatches: Array<ContextMatchUpdate>,
     ): ProfileMatchSnapshot {
         val startTime = System.currentTimeMillis()
-        val allMatched = contextMatches.all { it.matched }
+        val allMatched = evaluateWithOrGroups(contextMatches, profile.contexts)
         val pulseSequence = contextMatches
             .filter { it.pulseContext }
             .sumOf { it.pulseSequence }
         val duration = System.currentTimeMillis() - startTime
 
-        // Log performance if threshold exceeded
         if (duration > performanceThresholdMs) {
             AppLogger.warn(tag, "Slow profile evaluation: ${duration}ms (threshold: ${performanceThresholdMs}ms)")
         }
@@ -107,7 +107,7 @@ class ProfileMatcher(
 
 }
 
-private data class ContextMatchUpdate(
+internal data class ContextMatchUpdate(
     val matched: Boolean,
     val pulseContext: Boolean,
     val pulseSequence: Long,
@@ -158,6 +158,25 @@ internal fun profileStateChangesFromSnapshots(
                 change?.also(onChange)
             }
     }
+
+internal fun evaluateWithOrGroups(
+    contextMatches: Array<ContextMatchUpdate>,
+    specs: List<ContextSpec>,
+): Boolean {
+    if (contextMatches.isEmpty()) return false
+    val andTerms = mutableListOf<Boolean>()
+    val orGroups = mutableMapOf<String, Boolean>()
+
+    for (i in contextMatches.indices) {
+        val group = specs.getOrNull(i)?.orGroup
+        if (group != null) {
+            orGroups[group] = orGroups.getOrDefault(group, false) || contextMatches[i].matched
+        } else {
+            andTerms.add(contextMatches[i].matched)
+        }
+    }
+    return andTerms.all { it } && orGroups.values.all { it }
+}
 
 sealed class ProfileStateChange {
     data object Activated : ProfileStateChange()

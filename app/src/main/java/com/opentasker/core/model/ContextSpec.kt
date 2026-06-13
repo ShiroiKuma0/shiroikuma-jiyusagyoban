@@ -11,6 +11,7 @@ data class ContextSpec(
     val type: ContextType,
     val config: Map<String, String> = emptyMap(),
     val invert: Boolean = false,
+    val orGroup: String? = null,
 )
 
 @Serializable

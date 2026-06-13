@@ -1107,12 +1107,6 @@ New items from an exhaustive research pass covering 5 parallel research agents (
 
 ### P2 — hardening and hygiene
 
-- [ ] P2 — RD44: OR logic in context matching
-  Why: OpenTasker contexts within a profile are AND-only — all must match for the profile to activate. OR conditions (e.g., "WiFi=home OR WiFi=office") require creating duplicate profiles, which is the #1 most-voted Tasker feature request (170 supporters on tasker.helprace.com). Every commercial competitor except Samsung Routines supports OR in some form.
-  Evidence: `ProfileMatcherImpl.kt` evaluates all context specs with AND semantics; `ContextMatchEvaluator.kt` has no OR combinator; https://tasker.helprace.com/s1-general/ideas/top/c0-all/10 (#1 voted idea).
-  Touches: `ContextSpec` model (add an optional `group` or `orGroup` field), `ProfileMatcherImpl.kt` / `ContextMatchEvaluator.kt` (group specs by OR-group before AND-reducing), context editor UI (OR toggle or group picker), export/import schema (backward-compatible nullable field), tests.
-  Acceptance: A profile with two WiFi contexts in the same OR group activates when either matches; contexts without OR groups retain AND behavior; the JSON bundle schema handles the new field with backward-compatible null defaults; tests cover AND-only, OR-only, mixed AND/OR, and empty-group behavior.
-  Complexity: M
 
 - [ ] P2 — RD45: Android 17 `ACCESS_LOCAL_NETWORK` permission planning
   Why: Android 17 (API 37) makes `ACCESS_LOCAL_NETWORK` a mandatory runtime permission (group: `NEARBY_DEVICES`) for any LAN device communication. This directly affects RD20's LAN-HTTP policy decision (Home Assistant/Node-RED endpoints are plain HTTP on RFC1918 addresses), RD34's MQTT publish action, and any future webhook/discovery work. The permission must be planned before targeting API 37.
