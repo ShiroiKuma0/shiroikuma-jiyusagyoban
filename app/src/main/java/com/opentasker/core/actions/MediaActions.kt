@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
+import android.os.Build
 import android.view.KeyEvent
 import kotlinx.coroutines.suspendCancellableCoroutine
 import com.opentasker.core.engine.Action
@@ -118,6 +119,12 @@ class MuteAction : Action {
     override val category = ActionCategory.MEDIA
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        if (Build.VERSION.SDK_INT >= ANDROID_17_API) {
+            return ActionResult.Failure(
+                "Android 17+ restricts background volume changes; " +
+                    "mute may not work from a background service"
+            )
+        }
         val stream = args["stream"] ?: "music"
         val am = ctx.app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
             ?: return ActionResult.Failure("audio service not available")
@@ -133,6 +140,12 @@ class MuteAction : Action {
 }
 
 private fun dispatchMediaKey(ctx: ActionContext, keyCode: Int): ActionResult {
+    if (Build.VERSION.SDK_INT >= ANDROID_17_API) {
+        return ActionResult.Failure(
+            "Android 17+ restricts background audio control; " +
+                "media key dispatch may not reach the active player from a background service"
+        )
+    }
     val audioManager = ctx.app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         ?: return ActionResult.Failure("audio service not available")
 
@@ -144,6 +157,8 @@ private fun dispatchMediaKey(ctx: ActionContext, keyCode: Int): ActionResult {
         ActionResult.Failure("media key dispatch failed: ${ex.message}", ex)
     }
 }
+
+private const val ANDROID_17_API = 37
 
 private fun streamType(name: String): Int? = when (name.lowercase()) {
     "music", "media" -> AudioManager.STREAM_MUSIC

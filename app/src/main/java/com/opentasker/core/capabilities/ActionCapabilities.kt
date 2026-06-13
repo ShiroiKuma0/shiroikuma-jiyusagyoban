@@ -4,6 +4,8 @@ import com.opentasker.app.BuildConfig
 import com.opentasker.core.power.ShizukuPowerBackend
 import com.opentasker.core.scripting.TermuxScriptBackend
 
+private const val ANDROID_17_API = 37
+
 enum class CapabilityLevel {
     Supported,
     RequiresSetup,
@@ -28,7 +30,7 @@ object ActionCapabilityRegistry {
         "wifi.toggle" to ActionCapability(CapabilityLevel.Unsupported, "Android 10+ blocks direct WiFi toggles for normal apps."),
         "bluetooth.toggle" to bluetoothCapability(),
         "brightness.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access."),
-        "volume.set" to ActionCapability(CapabilityLevel.RequiresSetup, "May be blocked by Do Not Disturb policy access."),
+        "volume.set" to volumeCapability("May be blocked by Do Not Disturb policy access."),
         "dnd.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Do Not Disturb access."),
         "ringer.set" to ActionCapability(CapabilityLevel.RequiresSetup, "May require Do Not Disturb access on some devices when switching to silent mode."),
         "torch.set" to ActionCapability(CapabilityLevel.Supported, "Uses camera flashlight."),
@@ -37,7 +39,11 @@ object ActionCapabilityRegistry {
         "sms.send" to smsCapability(),
         "screenshot.take" to elevatedUnsupported("screenshot.take", "Screenshots require MediaProjection consent or privileged shell access."),
         "sound.play" to ActionCapability(CapabilityLevel.Supported, "Plays audio from a file path or content URI."),
-        "media.mute" to ActionCapability(CapabilityLevel.RequiresSetup, "May be blocked by Do Not Disturb policy access."),
+        "sound.stop" to mediaKeyCapability("Stop playback via media key dispatch."),
+        "sound.pause" to mediaKeyCapability("Pause playback via media key dispatch."),
+        "track.next" to mediaKeyCapability("Next track via media key dispatch."),
+        "track.previous" to mediaKeyCapability("Previous track via media key dispatch."),
+        "media.mute" to volumeCapability("Mutes a stream. May be blocked by Do Not Disturb policy."),
         "tts.speak" to ActionCapability(CapabilityLevel.Supported, "Uses Android TTS engine to speak text aloud."),
         "reboot" to elevatedUnsupported("reboot", "Reboot requires privileged device-owner or system app access."),
         "lock" to ActionCapability(CapabilityLevel.Unsupported, "Device lock requires configured device-admin support."),
@@ -65,6 +71,20 @@ object ActionCapabilityRegistry {
             ActionCapability(CapabilityLevel.RequiresSetup, "Requires SMS permission; Play builds omit SMS actions for policy compliance.")
         } else {
             ActionCapability(CapabilityLevel.Unsupported, "SMS action is unavailable in this distribution because SMS and phone-state permissions are omitted for Play policy compliance.")
+        }
+
+    private fun mediaKeyCapability(reason: String): ActionCapability =
+        if (android.os.Build.VERSION.SDK_INT >= ANDROID_17_API) {
+            ActionCapability(CapabilityLevel.Unsupported, "Android 17+ restricts background media key dispatch. $reason")
+        } else {
+            ActionCapability(CapabilityLevel.Supported, reason)
+        }
+
+    private fun volumeCapability(reason: String): ActionCapability =
+        if (android.os.Build.VERSION.SDK_INT >= ANDROID_17_API) {
+            ActionCapability(CapabilityLevel.Unsupported, "Android 17+ restricts background volume changes. $reason")
+        } else {
+            ActionCapability(CapabilityLevel.RequiresSetup, reason)
         }
 
     private fun elevatedUnsupported(actionId: String, reason: String): ActionCapability =
