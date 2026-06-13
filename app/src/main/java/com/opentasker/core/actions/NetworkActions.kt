@@ -7,6 +7,7 @@ import com.opentasker.core.engine.ActionResult
 import java.io.File
 import java.io.InputStream
 import java.net.HttpURLConnection
+import java.net.InetAddress
 import java.net.URL
 
 /**
@@ -27,7 +28,7 @@ class HttpGetAction : Action {
         val timeout = (args["timeout_sec"]?.toIntOrNull() ?: 10).coerceIn(1, 60) * 1000
         return try {
             val parsedUrl = URL(url)
-            if (parsedUrl.protocol != "https") return ActionResult.Failure("only https URLs are allowed")
+            enforceHttpPolicy(parsedUrl, args)?.let { return it }
             val connection = parsedUrl.openConnection() as HttpURLConnection
             try {
                 val response = connection.apply {
@@ -67,7 +68,7 @@ class HttpPostAction : Action {
         val timeout = (args["timeout_sec"]?.toIntOrNull() ?: 10).coerceIn(1, 60) * 1000
         return try {
             val parsedUrl = URL(url)
-            if (parsedUrl.protocol != "https") return ActionResult.Failure("only https URLs are allowed")
+            enforceHttpPolicy(parsedUrl, args)?.let { return it }
             val connection = parsedUrl.openConnection() as HttpURLConnection
             try {
                 val response = connection.apply {
@@ -144,7 +145,7 @@ class DownloadAction : Action {
         val timeout = (args["timeout_sec"]?.toIntOrNull() ?: 30).coerceIn(1, 300) * 1000
         return try {
             val parsedUrl = URL(url)
-            if (parsedUrl.protocol != "https") return ActionResult.Failure("only https URLs are allowed")
+            enforceHttpPolicy(parsedUrl, args)?.let { return it }
             val destination = safeDownloadFile(ctx, path)
                 ?: return ActionResult.Failure("path is outside OpenTasker downloads")
             destination.parentFile?.mkdirs()
@@ -203,6 +204,25 @@ private fun InputStream.copyBounded(out: java.io.OutputStream, maxBytes: Long): 
         out.write(buffer, 0, n)
     }
     return total
+}
+
+private fun enforceHttpPolicy(url: URL, args: Map<String, String>): ActionResult? {
+    if (url.protocol == "https") return null
+    if (url.protocol != "http") return ActionResult.Failure("unsupported protocol: ${url.protocol}")
+    val allowHttp = args["allow_http"]?.lowercase() == "true"
+    if (!allowHttp) {
+        return ActionResult.Failure(
+            "only https URLs are allowed; set allow_http=true for LAN/private-network hosts"
+        )
+    }
+    val addr = runCatching { InetAddress.getByName(url.host) }.getOrNull()
+        ?: return ActionResult.Failure("cannot resolve host: ${url.host}")
+    if (!addr.isSiteLocalAddress && !addr.isLoopbackAddress && !addr.isLinkLocalAddress) {
+        return ActionResult.Failure(
+            "HTTP is only allowed for private/LAN addresses (${url.host} resolved to a public address)"
+        )
+    }
+    return null
 }
 
 private fun safeDownloadFile(ctx: ActionContext, path: String): File? {
