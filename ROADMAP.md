@@ -1026,13 +1026,6 @@ New items from a code-level engine audit plus external platform/policy verificat
 
 ### P3 — parity and power-user polish
 
-- [ ] P3 — RD23: Global variables inspector/editor tab
-  Why: Users cannot see or edit global/task variables anywhere in the UI, making template-expression automations hard to debug; Tasker's VARS tab is the parity reference, and CLAUDE.md has carried "Variable inspector" as an idea since v0.3.0-dev. Distinct from X6's run-log expression debugger (post-hoc traces) — this is live state.
-  Evidence: `core/storage/VariableDao.kt` exists with no UI consumer (grep across `ui/screens` empty); CLAUDE.md "Later roadmap ideas #1"; Tasker VARS tab.
-  Touches: new `VariablesScreen.kt` (list/search/edit/delete global variables, read-only view of recent event scopes), navigation registration, `VariableStore` exposure.
-  Acceptance: a variable set by a task appears live in the tab; editing a value affects the next expansion; sensitive-name redaction matches run-log rules; covered by a ViewModel/JVM test.
-  Complexity: M
-
 - [ ] P3 — RD24: Interactive notification action buttons
   Why: Tasker 6.6's headline notification work (action buttons, Live Updates) shows notifications as a two-way automation surface; OpenTasker's `notify` action is display-only, so flows cannot ask the user anything (confirm/cancel/snooze patterns).
   Evidence: Tasker 6.6 release notes (https://joaoapps.com/tasker-6-6-live-update-notifications-sunset-sunrise-java-code-shizuku-and-more/); current notification action in `core/actions` (display-only args).
