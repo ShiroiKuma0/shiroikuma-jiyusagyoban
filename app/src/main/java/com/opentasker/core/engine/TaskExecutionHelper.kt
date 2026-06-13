@@ -1,0 +1,72 @@
+package com.opentasker.core.engine
+
+import android.content.Context
+import android.util.Log
+import com.opentasker.core.model.RunLogEntry
+import com.opentasker.core.model.Task
+import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.toEntity
+
+data class TaskExecutionResult(
+    val report: TaskRunReport,
+    val logInserted: Boolean,
+)
+
+suspend fun executeAndLogTask(
+    appContext: Context,
+    db: AppDatabase,
+    task: Task,
+    source: String,
+    metadata: List<String> = emptyList(),
+    initialVariables: Map<String, String> = emptyMap(),
+    logTag: String = TAG,
+): TaskExecutionResult {
+    val variables = VariableStore()
+    initialVariables.forEach { (name, value) -> variables.set(name, value) }
+    val ctx = ActionContext(appContext, variables) { msg -> Log.i(logTag, msg) }
+    val runner = TaskRunner(ctx)
+    val report = runner.run(task)
+    Log.i(logTag, "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)")
+    val logEntry = RunLogEntry(
+        taskId = task.id,
+        taskName = task.name,
+        timestamp = report.startedAt,
+        durationMs = report.durationMs,
+        success = report.success,
+        message = runLogMessage(
+            source = source,
+            metadata = metadata,
+            traces = report.traces,
+        ),
+    )
+    val inserted = insertRunLog(db, logEntry)
+    return TaskExecutionResult(report, inserted)
+}
+
+suspend fun logSkippedRun(
+    db: AppDatabase,
+    task: Task,
+    source: String,
+    reason: String,
+    metadata: List<String> = emptyList(),
+): Boolean = insertRunLog(
+    db,
+    RunLogEntry(
+        taskId = task.id,
+        taskName = task.name,
+        durationMs = 0,
+        success = false,
+        message = skippedRunLogMessage(
+            source = source,
+            reason = reason,
+            metadata = metadata,
+        ),
+    ),
+)
+
+suspend fun insertRunLog(db: AppDatabase, entry: RunLogEntry): Boolean =
+    runCatching { db.runLogDao().insert(entry.toEntity()) }
+        .onFailure { e -> Log.e(TAG, "Failed to write run log for task ${entry.taskId}", e) }
+        .isSuccess
+
+private const val TAG = "OpenTasker"

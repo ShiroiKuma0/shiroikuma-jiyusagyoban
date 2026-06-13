@@ -7,11 +7,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import com.opentasker.app.OpenTaskerApp_NoHilt
-import com.opentasker.core.engine.ActionContext
-import com.opentasker.core.engine.TaskRunner
-import com.opentasker.core.engine.VariableStore
-import com.opentasker.core.engine.runLogMessage
-import com.opentasker.core.model.RunLogEntry
+import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.storage.toEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -74,35 +70,22 @@ class AutomationTargetReceiver : BroadcastReceiver() {
         val task = resolveTask(intent)
             ?: return failure("Task not found. Provide ${AutomationTargetContract.EXTRA_TASK_ID} or ${AutomationTargetContract.EXTRA_TASK_NAME}.")
 
-        val variables = VariableStore()
         val suppliedVariables = extractVariables(intent.extras)
-        suppliedVariables.forEach { (name, value) -> variables.set(name, value) }
-        val runner = TaskRunner(
-            ActionContext(appContext, variables) { message ->
-                Log.i(TAG, "External task ${task.id}: $message")
-            }
-        )
-        val report = runner.run(task)
-        db.runLogDao().insert(
-            RunLogEntry(
-                taskId = task.id,
-                taskName = task.name,
-                timestamp = report.startedAt,
-                durationMs = report.durationMs,
-                success = report.success,
-                message = runLogMessage(
-                    source = "External intent",
-                    metadata = listOf("Variables: ${suppliedVariables.size} provided"),
-                    traces = report.traces,
-                ),
-            ).toEntity()
+        val result = executeAndLogTask(
+            appContext = appContext,
+            db = db,
+            task = task,
+            source = "External intent",
+            metadata = listOf("Variables: ${suppliedVariables.size} provided"),
+            initialVariables = suppliedVariables,
+            logTag = TAG,
         )
 
         return TargetResponse(
-            if (report.success) Activity.RESULT_OK else Activity.RESULT_CANCELED,
+            if (result.report.success) Activity.RESULT_OK else Activity.RESULT_CANCELED,
             Bundle().apply {
-                putBoolean(AutomationTargetContract.EXTRA_TASK_SUCCESS, report.success)
-                putLong(AutomationTargetContract.EXTRA_TASK_DURATION_MS, report.durationMs)
+                putBoolean(AutomationTargetContract.EXTRA_TASK_SUCCESS, result.report.success)
+                putLong(AutomationTargetContract.EXTRA_TASK_DURATION_MS, result.report.durationMs)
             },
         )
     }
