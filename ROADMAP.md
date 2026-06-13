@@ -1024,13 +1024,6 @@ New items from a code-level engine audit plus external platform/policy verificat
 
 ### P2 — hardening and table-stakes surface
 
-- [ ] P2 — RD22: Android 17 readiness audit (background audio, memory limits, large-screen opt-out removal)
-  Why: Android 17 (major SDK landing Q2 2026) enforces restrictions on background audio playback/focus/volume-change APIs — directly hitting OpenTasker's 6 Media actions and volume Settings actions when run from the background service — plus RAM-based app memory limits and removal of the large-screen orientation/resizability opt-out; this is the next platform wave after N1/N10's Android 16 scope.
-  Evidence: https://developer.android.com/about/versions/17/behavior-changes-all (background audio, cross-profile loopback, memory limits); Android 17 beta blog posts (Feb/Apr 2026).
-  Touches: `MediaActions.kt`, volume paths in `SettingsActions.kt`, `ActionCapabilities.kt` (Android-17-aware gating + honest failure copy), `AutomationService` audio-interaction paths, docs/N10 evidence matrix extension.
-  Acceptance: on an Android 17 device/emulator each media/volume action either works or fails with an explicit platform-restriction message (no silent no-ops); capability registry reflects API-level gates; findings recorded alongside the N10 evidence matrix.
-  Complexity: M
-
 ### P3 — parity and power-user polish
 
 - [ ] P3 — RD23: Global variables inspector/editor tab

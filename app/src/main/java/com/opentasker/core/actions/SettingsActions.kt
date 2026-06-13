@@ -125,6 +125,12 @@ class VolumeAction : Action {
     override val category = ActionCategory.SETTINGS
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        if (Build.VERSION.SDK_INT >= ANDROID_17_API) {
+            return ActionResult.Failure(
+                "Android 17+ restricts background volume changes; " +
+                    "volume control may not work from a background service"
+            )
+        }
         val levelArg = args["level"] ?: return ActionResult.Failure("missing level")
         val audioManager = ctx.app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
             ?: return ActionResult.Failure("audio service not available")
@@ -288,6 +294,8 @@ class TileStateAction : Action {
         return ActionResult.Success
     }
 }
+
+private const val ANDROID_17_API = 37
 
 private fun streamType(name: String): Int? = when (name.lowercase()) {
     "music", "media" -> AudioManager.STREAM_MUSIC
