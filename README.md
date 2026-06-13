@@ -15,7 +15,7 @@
 
 ✅ **Core engine operational** — profiles → contexts → tasks → actions pipeline  
 ✅ **43 registered action definitions** — supported actions run, restricted/script/import-placeholder actions are gated or fail explicitly
-✅ **Reactive context sources** — app foreground, time, day schedules, state, event, WiFi, app-open monitoring, notifications, NFC tag scans/write helper, calendar windows, sunrise/sunset matching, and platform location fixes are wired; broader device-verified background geofencing remains planned runtime work
+✅ **Reactive context sources** — app foreground, time, day schedules, state, event, WiFi, app-open monitoring, notifications, NFC tag scans/write helper, calendar windows, sunrise/sunset matching, and platform location fixes are wired; broader device-verified background location event-delivery remains planned runtime work
 ✅ **Template expression runtime** — action arguments and conditions support bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math functions, traces, and warnings
 ✅ **FOSS geofence source/evaluator** — Location context matching supports platform GPS/network fixes, balanced provider cadence, policy disclosures, radius, accuracy, persisted dwell checks, stale-key cleanup, inspector dwell detail, a Location evidence template, adb run-log/logcat evidence collection, provider-cadence/unplugged-sample/post-reconnect history gates, and API 36 background event-delivery smoke evidence without Play Services
 ✅ **AMOLED-first** — Catppuccin Mocha palette, light theme toggle  

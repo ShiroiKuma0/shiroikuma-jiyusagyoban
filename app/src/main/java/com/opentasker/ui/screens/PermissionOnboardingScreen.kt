@@ -473,7 +473,7 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
             granted = Build.VERSION.SDK_INT < 29 || hasPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION),
             actionLabel = "Open app settings",
             action = PermissionAction.SettingsIntent(appDetailsIntent(context)),
-            requiredFor = "Background geofences",
+            requiredFor = "Background location radius evaluation",
         ),
         PermissionSetupItem(
             title = "Bluetooth connect",
