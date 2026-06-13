@@ -1057,12 +1057,6 @@ New items from a trigger/action coverage audit, manifest privacy review, and ext
 
 ### P2 — parity and hygiene
 
-- [ ] P2 — RD29: Data/internet connectivity context (any-network, cellular, VPN)
-  Why: Only WiFi connectivity is monitored (`WiFiNetworkMonitor` requests `TRANSPORT_WIFI` only); "internet available/lost" and "mobile data in use" are table-stakes triggers (MacroDroid Data Connectivity Change) used for sync-on-connect and data-saver automations, and the pattern already exists in the codebase.
-  Evidence: `app/src/main/java/com/opentasker/automation/network/WiFiNetworkMonitor.kt` (lines 43, 71 — WiFi transport only); MacroDroid wiki Trigger: Data Connectivity Change.
-  Touches: new `ConnectivityContextSource` (default `NetworkCallback` with `NET_CAPABILITY_INTERNET`/`NET_CAPABILITY_VALIDATED`, transports cellular/WiFi/ethernet/VPN), `state=internet`/`network_type`/`vpn` keys merged through the sticky state store, context editor row, Inspector source health, tests.
-  Acceptance: profiles can match `internet=true/false`, `network_type=cellular|wifi`, `vpn=true`; transitions are debounced against flapping; works without any new permissions (ACCESS_NETWORK_STATE already declared).
-  Complexity: S
 
 - [ ] P2 — RD31: State family completion: initial-state seeding plus unlock/power-save/airplane keys
   Why: The sticky store preserves partial broadcasts, but the state family is still blind at startup (screen/headphone state unknown until the first broadcast — a `screen=on` profile cannot activate until the screen toggles) and lacks common keys every competitor exposes: device unlocked (`ACTION_USER_PRESENT`), battery saver (`ACTION_POWER_SAVE_MODE_CHANGED`), airplane mode (`ACTION_AIRPLANE_MODE_CHANGED`).
