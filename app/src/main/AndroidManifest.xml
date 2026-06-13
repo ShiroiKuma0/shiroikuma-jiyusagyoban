@@ -76,6 +76,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/Theme.OpenTasker"
         android:supportsRtl="true"
+        android:enableOnBackInvokedCallback="true"
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules"
         tools:targetApi="s">
