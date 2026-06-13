@@ -28,5 +28,6 @@ class EventContextSourceImpl : ContextSource {
         LocalePluginRequestQueryEvents.events(app),
         QuickSettingsTileContextEvents.events,
         ShakeContextEvents.events,
+        PackageContextEvents.events,
     )
 }

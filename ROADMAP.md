@@ -1066,13 +1066,6 @@ New items from an action truthfulness, notification lifecycle, plugin interopera
   Acceptance: Tasker/MacroDroid can add an "OpenTasker: Run task/profile" plugin action through the Locale edit flow; fired plugin actions run only user-approved task/profile IDs with bounded extras and consent revocation; all invocations record source, caller, target, and result in Run Log; denied or stale plugin payloads fail closed; tests cover edit flow serialization, fire flow execution, revoked consent, malformed extras, and package/caller attribution.
   Complexity: L
 
-- [ ] P3 - RD38: Package lifecycle event trigger family
-  Why: Tasker exposes package removed and package updated events, and package lifecycle triggers support practical update, reinstall, and app-management automations. OpenTasker has event profiles but no package-added, package-removed, or package-replaced event family, and Android package visibility policy makes a narrow event-driven implementation preferable to broad installed-app inventory access.
-  Evidence: `ActiveAutomationUi.kt` event hints omit package lifecycle events; repository search finds no `ACTION_PACKAGE_ADDED`, `ACTION_PACKAGE_REMOVED`, or `ACTION_PACKAGE_REPLACED` handling; Tasker Event A-Z lists package lifecycle events; Android package visibility and broadcast guidance constrain implementation.
-  Touches: package event source owned by `AutomationService`, `ContextMatchEvaluator` event filters, context editor hints, Inspector recent events, package visibility docs, tests.
-  Acceptance: Profiles can match `event=package_added`, `event=package_removed`, and `event=package_replaced` with package allowlists and replacement metadata; implementation avoids broad installed-app inventory scans and does not require `QUERY_ALL_PACKAGES`; service lifecycle and Android broadcast restrictions are documented; Inspector shows recent package events; tests cover add/remove/reinstall intent data, allowlist matching, and ignored unrelated packages.
-  Complexity: S/M
-
 ## Research-Driven Additions (2026-06-12 exhaustive research pass)
 
 New items from an exhaustive research pass covering 5 parallel research agents (OSS competitors, Android platform, commercial competitors, community signals, dependency/security), full repo code review, and 50+ external sources. Each item was checked against every existing N, X, RD, Under Consideration, and Rejected tier — no duplicates. Evidence details in RESEARCH.md (2026-06-12).
