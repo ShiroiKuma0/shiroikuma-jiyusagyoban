@@ -1086,12 +1086,6 @@ New items from a trigger/action coverage audit, manifest privacy review, and ext
 
 New items from an action truthfulness, notification lifecycle, plugin interoperability, and package-event research pass. Checked against existing N, X, RD, Under Consideration, and Rejected tiers; no duplicates. Evidence details in RESEARCH.md (2026-06-12).
 
-- [ ] P2 - RD36: Notification channel/category and lifecycle controls
-  Why: `notify.show` currently posts through one default channel and auto-cancels by default. Android notification channels are user-controlled and immutable after creation, while Tasker exposes notification category, persistence, click behavior, and action surfaces. OpenTasker needs a truthful notification model before notification actions become a reliable automation primitive.
-  Evidence: `BuiltInActions.kt` `NotifyAction` creates one `"OpenTasker actions"` channel and posts auto-cancel notifications; Android notification channel docs; Android notification creation docs; Tasker Notify docs.
-  Touches: `NotifyAction`, notification channel/category registry, action metadata fields, setup/inspector channel-state UI, notification cancel/update action surface, notification tests.
-  Acceptance: Users can create/select quiet/default/urgent notification categories before posting, see when a selected channel is muted or blocked, open system channel settings, post persistent and replaceable notifications, cancel notifications by tag/id, and configure a safe tap target after the external execution boundary is in place; runtime code never attempts to mutate existing channel importance and tests cover channel creation, blocked-channel reporting, replacement, cancellation, and tap metadata persistence.
-  Complexity: M
 
 - [ ] P3 - RD37: OpenTasker Locale/Tasker plugin target bridge
   Why: OpenTasker can host Locale-compatible plugins, but Tasker/MacroDroid-style ecosystems also expect automation apps to expose plugin targets that other tools can discover and invoke. A guarded plugin target bridge would let users call approved OpenTasker tasks from Tasker, MacroDroid, and other Locale-compatible hosts without weakening the existing signature-only external intent boundary.

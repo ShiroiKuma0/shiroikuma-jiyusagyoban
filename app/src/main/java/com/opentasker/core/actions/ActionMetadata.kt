@@ -54,12 +54,27 @@ fun registerActionMetadata() {
         ActionMetadata(
             id = "notify.show",
             name = "Show Notification",
-            description = "Display a toast or heads-up notification",
+            description = "Post a notification with channel, persistence, and replacement controls",
             category = "Notification",
             fields = listOf(
                 ActionField("title", "Title", required = true, hint = "Notification title"),
                 ActionField("text", "Message", FieldType.MULTILINE, hint = "Notification body"),
-                ActionField("duration", "Duration", FieldType.DROPDOWN, hint = "Toast duration"),
+                ActionField("channel", "Channel", FieldType.DROPDOWN, hint = "quiet / default / urgent"),
+                ActionField("persistent", "Persistent", FieldType.CHECKBOX, hint = "Keep until cancelled"),
+                ActionField("tag", "Tag", hint = "Replacement tag (same tag replaces)"),
+                ActionField("id", "ID", FieldType.NUMBER, hint = "Notification ID (same ID replaces)"),
+            )
+        )
+    )
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "notify.cancel",
+            name = "Cancel Notification",
+            description = "Cancel a notification by tag and/or ID",
+            category = "Notification",
+            fields = listOf(
+                ActionField("tag", "Tag", hint = "Notification tag to cancel"),
+                ActionField("id", "ID", FieldType.NUMBER, hint = "Notification ID to cancel"),
             )
         )
     )

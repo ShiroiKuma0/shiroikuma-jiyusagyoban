@@ -37,23 +37,35 @@ class NotifyAction : Action {
             return ActionResult.Failure("Notification permission is not granted")
         }
 
-        val notificationManager = ctx.app.getSystemService(NotificationManager::class.java)
-        notificationManager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "OpenTasker actions", NotificationManager.IMPORTANCE_DEFAULT),
+        val nm = ctx.app.getSystemService(NotificationManager::class.java)
+        val channelKey = args["channel"] ?: "default"
+        val channelDef = NotificationChannels.resolve(channelKey)
+        nm.createNotificationChannel(
+            NotificationChannel(channelDef.id, channelDef.name, channelDef.importance),
         )
 
-        val notification = NotificationCompat.Builder(ctx.app, CHANNEL_ID)
+        val channel = nm.getNotificationChannel(channelDef.id)
+        if (channel != null && channel.importance == NotificationManager.IMPORTANCE_NONE) {
+            ctx.logger("Warning: channel '${channelDef.name}' is blocked by the user")
+            return ActionResult.Failure("Notification channel '${channelDef.name}' is blocked by the user; open system settings to unblock")
+        }
+
+        val persistent = args["persistent"]?.toBooleanStrictOrNull() ?: false
+        val tag = args["tag"]
+        val notifId = args["id"]?.toIntOrNull() ?: nextNotificationId.getAndIncrement()
+
+        val notification = NotificationCompat.Builder(ctx.app, channelDef.id)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-            .setAutoCancel(true)
+            .setAutoCancel(!persistent)
+            .setOngoing(persistent)
             .build()
 
         return try {
-            val notifId = nextNotificationId.getAndIncrement()
-            NotificationManagerCompat.from(ctx.app).notify(notifId, notification)
-            ctx.logger("Notify: $title | $text")
+            NotificationManagerCompat.from(ctx.app).notify(tag, notifId, notification)
+            ctx.logger("Notify: $title | $text (channel=${channelDef.name}, id=$notifId${if (tag != null) ", tag=$tag" else ""})")
             ActionResult.Success
         } catch (ex: SecurityException) {
             ActionResult.Failure("notification failed: ${ex.message}", ex)
@@ -61,9 +73,59 @@ class NotifyAction : Action {
     }
 
     companion object {
-        private const val CHANNEL_ID = "opentasker.actions"
         private val nextNotificationId = AtomicInteger(10_000)
     }
+}
+
+class NotifyCancelAction : Action {
+    override val id = "notify.cancel"
+    override val category = ActionCategory.NOTIFICATION
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val tag = args["tag"]
+        val notifId = args["id"]?.toIntOrNull()
+        val nm = NotificationManagerCompat.from(ctx.app)
+
+        return when {
+            tag != null && notifId != null -> {
+                nm.cancel(tag, notifId)
+                ctx.logger("Cancel notification: tag=$tag, id=$notifId")
+                ActionResult.Success
+            }
+            notifId != null -> {
+                nm.cancel(notifId)
+                ctx.logger("Cancel notification: id=$notifId")
+                ActionResult.Success
+            }
+            tag != null -> {
+                val mgr = ctx.app.getSystemService(NotificationManager::class.java)
+                val cancelled = mgr.activeNotifications.filter { it.tag == tag }
+                cancelled.forEach { nm.cancel(it.tag, it.id) }
+                ctx.logger("Cancel notification: tag=$tag (${cancelled.size} cancelled)")
+                ActionResult.Success
+            }
+            else -> ActionResult.Failure("Specify at least one of 'tag' or 'id' to cancel")
+        }
+    }
+}
+
+internal object NotificationChannels {
+    data class ChannelDef(
+        val id: String,
+        val name: String,
+        val importance: Int,
+    )
+
+    private val channels = mapOf(
+        "quiet" to ChannelDef("opentasker.quiet", "OpenTasker quiet", NotificationManager.IMPORTANCE_LOW),
+        "default" to ChannelDef("opentasker.actions", "OpenTasker actions", NotificationManager.IMPORTANCE_DEFAULT),
+        "urgent" to ChannelDef("opentasker.urgent", "OpenTasker urgent", NotificationManager.IMPORTANCE_HIGH),
+    )
+
+    fun resolve(key: String): ChannelDef =
+        channels[key.trim().lowercase()] ?: channels.getValue("default")
+
+    fun allKeys(): Set<String> = channels.keys
 }
 
 /**
