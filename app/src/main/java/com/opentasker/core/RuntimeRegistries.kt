@@ -22,6 +22,7 @@ import com.opentasker.core.actions.MobileDataAction
 import com.opentasker.core.actions.MuteAction
 import com.opentasker.core.actions.NextTrackAction
 import com.opentasker.core.actions.NotifyAction
+import com.opentasker.core.actions.NotifyCancelAction
 import com.opentasker.core.actions.OpenUrlAction
 import com.opentasker.core.actions.PauseSoundAction
 import com.opentasker.core.actions.PingAction
@@ -63,6 +64,7 @@ fun registerCoreRuntime() {
 private fun registerBuiltInActions() {
     listOf(
         NotifyAction(),
+        NotifyCancelAction(),
         SetVariableAction(),
         SayAction(),
         WaitAction(),
