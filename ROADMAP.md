@@ -1132,13 +1132,6 @@ New items from a trigger/action coverage audit, manifest privacy review, and ext
 
 New items from an action truthfulness, notification lifecycle, plugin interoperability, and package-event research pass. Checked against existing N, X, RD, Under Consideration, and Rejected tiers; no duplicates. Evidence details in RESEARCH.md (2026-06-12).
 
-- [ ] P1 - RD35: TTS and sound playback action truthfulness
-  Why: `tts.speak` and `sound.play` are visible action families, but their runtime implementations currently return unsupported failures. Tasker and MacroDroid treat speech and local media playback as core automation primitives, and Android 17 background audio hardening means OpenTasker must either perform these actions with the correct lifecycle or fail loudly with accurate diagnostics.
-  Evidence: `BuiltInActions.kt` `SayAction` returns "Text-to-speech action is not implemented yet."; `MediaActions.kt` `PlaySoundAction` returns "Direct media playback is not implemented yet."; `ActionCapabilities.kt` marks both action families unsupported; Tasker Say/Music Play docs; MacroDroid action coverage; Android 17 background audio guidance.
-  Touches: `BuiltInActions.kt`, `MediaActions.kt`, `ActionCapabilities.kt`, action metadata/editor UI, audio lifecycle/media-session decision, Run Log redaction, JVM/instrumentation tests.
-  Acceptance: `tts.speak` performs real text-to-speech with bounded text length, locale/voice fallback, rate/pitch options, queue/wait behavior, and redacted run-log output; `sound.play` plays app-private or content URI media with bounded loop/start/stop behavior; invalid background-audio cases on Android 17+ are recorded as explicit failures instead of silent success; `ActionCapabilities` and setup UI report the real support state; tests cover success, cancellation, unsupported engine/media, and policy-blocked execution.
-  Complexity: M
-
 - [ ] P2 - RD36: Notification channel/category and lifecycle controls
   Why: `notify.show` currently posts through one default channel and auto-cancels by default. Android notification channels are user-controlled and immutable after creation, while Tasker exposes notification category, persistence, click behavior, and action surfaces. OpenTasker needs a truthful notification model before notification actions become a reliable automation primitive.
   Evidence: `BuiltInActions.kt` `NotifyAction` creates one `"OpenTasker actions"` channel and posts auto-cancel notifications; Android notification channel docs; Android notification creation docs; Tasker Notify docs.
