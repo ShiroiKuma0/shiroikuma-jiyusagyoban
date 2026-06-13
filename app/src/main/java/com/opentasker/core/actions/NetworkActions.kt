@@ -5,6 +5,7 @@ import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import java.io.File
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -34,7 +35,7 @@ class HttpGetAction : Action {
                     readTimeout = timeout
                     requestMethod = "GET"
                     instanceFollowRedirects = false
-                }.getInputStream().bufferedReader().use { it.readText() }
+                }.getInputStream().readBounded(MAX_RESPONSE_BYTES)
                 ctx.variables.set(varName, response)
                 ctx.logger("HTTP GET ${parsedUrl.host} to \$$varName")
                 ActionResult.Success
@@ -79,7 +80,7 @@ class HttpPostAction : Action {
                 }.run {
                     outputStream.use { it.write(data.toByteArray(Charsets.UTF_8)) }
                     val stream = if (responseCode in 200..299) inputStream else errorStream
-                    stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                    stream?.readBounded(MAX_RESPONSE_BYTES).orEmpty()
                 }
                 ctx.variables.set(varName, response)
                 ctx.logger("HTTP POST ${parsedUrl.host} to \$$varName")
@@ -153,8 +154,15 @@ class DownloadAction : Action {
                 connection.connectTimeout = timeout
                 connection.readTimeout = timeout
                 connection.instanceFollowRedirects = false
+                val maxDownload = args["max_bytes"]?.toLongOrNull() ?: MAX_DOWNLOAD_BYTES
                 connection.inputStream.use { input ->
-                    destination.outputStream().use { output -> input.copyTo(output) }
+                    destination.outputStream().use { output ->
+                        val copied = input.copyBounded(output, maxDownload.coerceAtMost(MAX_DOWNLOAD_BYTES))
+                        if (copied < 0) {
+                            destination.delete()
+                            return ActionResult.Failure("download exceeds ${maxDownload / 1024 / 1024} MB limit")
+                        }
+                    }
                 }
                 ctx.logger("Downloaded ${parsedUrl.host} to ${destination.name}")
                 ActionResult.Success
@@ -165,6 +173,36 @@ class DownloadAction : Action {
             ActionResult.Failure("download failed: ${e.message}")
         }
     }
+}
+
+private const val MAX_RESPONSE_BYTES = 1_048_576L // 1 MB for in-memory response variables
+private const val MAX_DOWNLOAD_BYTES = 52_428_800L // 50 MB for file downloads
+
+private fun InputStream.readBounded(maxBytes: Long): String {
+    val buffer = ByteArray(8192)
+    val result = StringBuilder()
+    var total = 0L
+    while (true) {
+        val n = read(buffer)
+        if (n < 0) break
+        total += n
+        if (total > maxBytes) throw IllegalStateException("response exceeds ${maxBytes / 1024 / 1024} MB limit")
+        result.append(String(buffer, 0, n, Charsets.UTF_8))
+    }
+    return result.toString()
+}
+
+private fun InputStream.copyBounded(out: java.io.OutputStream, maxBytes: Long): Long {
+    val buffer = ByteArray(8192)
+    var total = 0L
+    while (true) {
+        val n = read(buffer)
+        if (n < 0) break
+        total += n
+        if (total > maxBytes) return -1
+        out.write(buffer, 0, n)
+    }
+    return total
 }
 
 private fun safeDownloadFile(ctx: ActionContext, path: String): File? {

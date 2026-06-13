@@ -13,6 +13,7 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Notification action — display a toast or heads-up notification.
@@ -49,7 +50,8 @@ class NotifyAction : Action {
             .build()
 
         return try {
-            NotificationManagerCompat.from(ctx.app).notify(System.currentTimeMillis().toInt(), notification)
+            val notifId = nextNotificationId.getAndIncrement()
+            NotificationManagerCompat.from(ctx.app).notify(notifId, notification)
             ctx.logger("Notify: $title | $text")
             ActionResult.Success
         } catch (ex: SecurityException) {
@@ -59,6 +61,7 @@ class NotifyAction : Action {
 
     companion object {
         private const val CHANNEL_ID = "opentasker.actions"
+        private val nextNotificationId = AtomicInteger(10_000)
     }
 }
 
@@ -111,11 +114,18 @@ class WaitAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val ms = args["millis"]?.toLongOrNull() ?: 0L
+        if (ms > MAX_WAIT_MS) {
+            return ActionResult.Failure("wait duration ${ms}ms exceeds maximum of ${MAX_WAIT_MS / 60_000} minutes")
+        }
         if (ms > 0) {
             ctx.logger("Wait ${ms}ms")
             kotlinx.coroutines.delay(ms)
         }
         return ActionResult.Success
+    }
+
+    companion object {
+        private const val MAX_WAIT_MS = 1_800_000L // 30 minutes
     }
 }
 

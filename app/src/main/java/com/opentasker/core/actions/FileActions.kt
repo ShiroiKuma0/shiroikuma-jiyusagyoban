@@ -22,6 +22,9 @@ class ReadFileAction : Action {
         val varName = args["var"] ?: "result"
         return try {
             val file = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside OpenTasker files")
+            if (file.length() > MAX_READ_BYTES) {
+                return ActionResult.Failure("file exceeds ${MAX_READ_BYTES / 1024 / 1024} MB read limit (${file.length()} bytes)")
+            }
             val content = file.readText()
             ctx.variables.set(varName, content)
             ctx.logger("Read ${file.name} to \$$varName")
@@ -29,6 +32,10 @@ class ReadFileAction : Action {
         } catch (e: Exception) {
             ActionResult.Failure("read failed: ${e.message}")
         }
+    }
+
+    companion object {
+        private const val MAX_READ_BYTES = 1_048_576L // 1 MB
     }
 }
 

@@ -26,7 +26,7 @@ object ActionCapabilityRegistry {
         "plugin.locale.fire" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires an installed Locale-compatible plugin; requests are dispatched only to an explicit package."),
         "plugin.locale.query" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires an installed Locale-compatible condition plugin; queries are explicit ordered broadcasts with timeout handling."),
         "wifi.toggle" to ActionCapability(CapabilityLevel.Unsupported, "Android 10+ blocks direct WiFi toggles for normal apps."),
-        "bluetooth.toggle" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Bluetooth permission and may be limited on newer Android versions."),
+        "bluetooth.toggle" to bluetoothCapability(),
         "brightness.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access."),
         "volume.set" to ActionCapability(CapabilityLevel.RequiresSetup, "May be blocked by Do Not Disturb policy access."),
         "airplane.toggle" to elevatedUnsupported("airplane.toggle", "Airplane mode changes require system or device-owner privileges."),
@@ -49,6 +49,13 @@ object ActionCapabilityRegistry {
     )
 
     fun get(actionId: String): ActionCapability = capabilities[actionId] ?: supported
+
+    private fun bluetoothCapability(): ActionCapability =
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            ActionCapability(CapabilityLevel.Unsupported, "Android 13+ blocks direct Bluetooth enable/disable for normal apps.")
+        } else {
+            ActionCapability(CapabilityLevel.RequiresSetup, "Requires Bluetooth permission.")
+        }
 
     private fun smsCapability(): ActionCapability =
         if (BuildConfig.SMS_ACTION_AVAILABLE) {

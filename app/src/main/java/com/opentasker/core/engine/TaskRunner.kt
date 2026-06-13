@@ -5,6 +5,8 @@ import com.opentasker.core.expressions.TemplateExpressionEngine
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 
 /**
  * Executes a Task's action list with flow control and variable expansion.
@@ -54,8 +56,13 @@ class TaskRunner(
                 return result to traceFor(index, spec, started, result, ActionArgumentExpansionReport.Empty)
             }
         val expansionReport = expandArgs(spec.args)
+        val timeoutMs = actionTimeoutMs(spec.type)
         val result = try {
-            action.run(ctx, expansionReport.args)
+            withTimeout(timeoutMs) {
+                action.run(ctx, expansionReport.args)
+            }
+        } catch (e: TimeoutCancellationException) {
+            ActionResult.Failure("timed out after ${timeoutMs / 1000}s")
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -87,7 +94,7 @@ class TaskRunner(
         durationMs = System.currentTimeMillis() - started,
         status = when (result) {
             is ActionResult.Success -> ActionTraceStatus.SUCCESS
-            is ActionResult.Failure -> ActionTraceStatus.FAILURE
+            is ActionResult.Failure -> if (result.message.startsWith("timed out")) ActionTraceStatus.TIMEOUT else ActionTraceStatus.FAILURE
             is ActionResult.Skip -> ActionTraceStatus.SKIPPED
         },
         message = when (result) {
@@ -139,8 +146,18 @@ data class TaskRunReport(
 enum class ActionTraceStatus {
     SUCCESS,
     FAILURE,
+    TIMEOUT,
     SKIPPED,
 }
+
+private fun actionTimeoutMs(actionType: String): Long = when {
+    actionType == "flow.wait" -> MAX_WAIT_TIMEOUT_MS
+    actionType.startsWith("http.") || actionType == "download" || actionType == "ping" -> 120_000L
+    else -> DEFAULT_ACTION_TIMEOUT_MS
+}
+
+private const val DEFAULT_ACTION_TIMEOUT_MS = 60_000L
+private const val MAX_WAIT_TIMEOUT_MS = 1_800_000L // 30 minutes
 
 data class ActionExecutionTrace(
     val index: Int,
