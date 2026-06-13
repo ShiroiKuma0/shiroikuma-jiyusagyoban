@@ -487,6 +487,14 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
             },
             requiredFor = "Bluetooth actions",
         ),
+        if (Build.VERSION.SDK_INT >= ANDROID_17_API) PermissionSetupItem(
+            title = "Local network access",
+            body = "Android 17+ requires this permission for any LAN device communication (HTTP, MQTT, mDNS). Without it, HTTP actions to private-range addresses will fail.",
+            granted = hasPermission(context, "android.permission.ACCESS_LOCAL_NETWORK"),
+            actionLabel = "Request",
+            action = PermissionAction.RuntimePermission("android.permission.ACCESS_LOCAL_NETWORK"),
+            requiredFor = "LAN HTTP/MQTT actions",
+        ) else null,
         if (BuildConfig.SMS_ACTION_AVAILABLE) PermissionSetupItem(
             title = "SMS send",
             body = "Needed before SMS actions can send messages. Keep SMS automations explicit and user-authored.",
@@ -543,6 +551,8 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
     )
 }
+
+private const val ANDROID_17_API = 37
 
 private fun hasPermission(context: Context, permission: String): Boolean =
     ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED

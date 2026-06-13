@@ -1,5 +1,9 @@
 package com.opentasker.core.actions
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.content.ContextCompat
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
@@ -29,6 +33,7 @@ class HttpGetAction : Action {
         return try {
             val parsedUrl = URL(url)
             enforceHttpPolicy(parsedUrl, args)?.let { return it }
+            if (parsedUrl.protocol == "http") checkLocalNetworkPermission(ctx)?.let { return it }
             val connection = parsedUrl.openConnection() as HttpURLConnection
             try {
                 val response = connection.apply {
@@ -69,6 +74,7 @@ class HttpPostAction : Action {
         return try {
             val parsedUrl = URL(url)
             enforceHttpPolicy(parsedUrl, args)?.let { return it }
+            if (parsedUrl.protocol == "http") checkLocalNetworkPermission(ctx)?.let { return it }
             val connection = parsedUrl.openConnection() as HttpURLConnection
             try {
                 val response = connection.apply {
@@ -146,6 +152,7 @@ class DownloadAction : Action {
         return try {
             val parsedUrl = URL(url)
             enforceHttpPolicy(parsedUrl, args)?.let { return it }
+            if (parsedUrl.protocol == "http") checkLocalNetworkPermission(ctx)?.let { return it }
             val destination = safeDownloadFile(ctx, path)
                 ?: return ActionResult.Failure("path is outside OpenTasker downloads")
             destination.parentFile?.mkdirs()
@@ -206,6 +213,8 @@ private fun InputStream.copyBounded(out: java.io.OutputStream, maxBytes: Long): 
     return total
 }
 
+private const val ANDROID_17_API = 37
+
 private fun enforceHttpPolicy(url: URL, args: Map<String, String>): ActionResult? {
     if (url.protocol == "https") return null
     if (url.protocol != "http") return ActionResult.Failure("unsupported protocol: ${url.protocol}")
@@ -220,6 +229,18 @@ private fun enforceHttpPolicy(url: URL, args: Map<String, String>): ActionResult
     if (!addr.isSiteLocalAddress && !addr.isLoopbackAddress && !addr.isLinkLocalAddress) {
         return ActionResult.Failure(
             "HTTP is only allowed for private/LAN addresses (${url.host} resolved to a public address)"
+        )
+    }
+    return null
+}
+
+internal fun checkLocalNetworkPermission(ctx: ActionContext): ActionResult? {
+    if (Build.VERSION.SDK_INT < ANDROID_17_API) return null
+    if (ContextCompat.checkSelfPermission(ctx.app, "android.permission.ACCESS_LOCAL_NETWORK")
+        != PackageManager.PERMISSION_GRANTED
+    ) {
+        return ActionResult.Failure(
+            "Android 17+ requires ACCESS_LOCAL_NETWORK permission for LAN communication; grant it in Setup"
         )
     }
     return null
