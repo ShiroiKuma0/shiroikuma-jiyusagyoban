@@ -243,19 +243,30 @@ private fun ContextSpec.toNode(id: String, profileId: Long, index: Int): Automat
         target = AutomationFlowTarget.Context(profileId, index),
     )
 
-private fun ActionSpec.toNode(id: String, taskId: Long, index: Int): AutomationFlowNode =
-    AutomationFlowNode(
+private fun ActionSpec.toNode(id: String, taskId: Long, index: Int): AutomationFlowNode {
+    val subTaskRef = if (type == "task.run") {
+        listOf("task", "name", "id").firstNotNullOfOrNull { args[it]?.trim()?.takeUnless(String::isBlank) }
+    } else {
+        null
+    }
+    val title = when {
+        !label.isNullOrBlank() -> label
+        subTaskRef != null -> "Step ${index + 1}: run sub-task \"$subTaskRef\""
+        else -> "Step ${index + 1}: $type"
+    }
+    return AutomationFlowNode(
         id = id,
         kind = AutomationFlowNodeKind.ACTION,
-        title = label?.takeUnless { it.isBlank() } ?: "Step ${index + 1}: $type",
+        title = title,
         detail = listOfNotNull(
-            type,
+            if (subTaskRef != null) "sub-task -> $subTaskRef" else type,
             args.summaryOrNull(),
             if (continueOnError) "continues after error" else null,
         ).joinToString(" - "),
         target = AutomationFlowTarget.Action(taskId, index),
         condition = condition?.trim()?.takeUnless { it.isBlank() },
     )
+}
 
 private fun ActionSpec.edgeLabel(index: Int): String {
     val trimmedCondition = condition?.trim()?.takeUnless { it.isBlank() }
