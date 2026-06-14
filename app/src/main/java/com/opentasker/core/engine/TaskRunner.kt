@@ -24,15 +24,65 @@ class TaskRunner(
     private val resolveTask: SubTaskResolver? = null,
     private val depth: Int = 0,
 ) {
+    /** A live `flow.foreach` iteration in progress. */
+    private class LoopFrame(
+        val foreachIndex: Int,
+        val items: List<String>,
+        val itemVar: String,
+        var index: Int,
+    )
+
     suspend fun run(task: Task): TaskRunReport {
         ctx.variables.pushScope()
         val started = System.currentTimeMillis()
         val results = mutableListOf<ActionResult>()
         val traces = mutableListOf<ActionExecutionTrace>()
+
+        val structure = FlowStructure.analyze(task.actions)
+        if (structure.error != null) {
+            ctx.variables.popScope()
+            val failure = ActionResult.Failure("flow control error: ${structure.error}")
+            return TaskRunReport(
+                taskId = task.id,
+                taskName = task.name,
+                startedAt = started,
+                durationMs = System.currentTimeMillis() - started,
+                results = listOf(failure),
+                traces = listOf(
+                    ActionExecutionTrace(
+                        index = 0,
+                        actionType = "flow",
+                        label = "flow control",
+                        durationMs = 0,
+                        status = ActionTraceStatus.FAILURE,
+                        message = failure.message,
+                    ),
+                ),
+                success = false,
+            )
+        }
+
+        val loopStack = ArrayDeque<LoopFrame>()
         try {
             var pc = 0
+            var steps = 0
             while (pc in task.actions.indices) {
+                if (++steps > MAX_FLOW_STEPS) {
+                    val failure = ActionResult.Failure("flow step budget ($MAX_FLOW_STEPS) exceeded")
+                    results += failure
+                    traces += markerTrace(pc, task.actions[pc], failure, ActionTraceStatus.FAILURE)
+                    break
+                }
                 val spec = task.actions[pc]
+                if (FlowControl.isControl(spec.type)) {
+                    val outcome = stepControl(pc, spec, structure, loopStack)
+                    results += outcome.result
+                    traces += outcome.trace
+                    if (outcome.halt) break
+                    pc = outcome.nextPc
+                    continue
+                }
+
                 val (result, trace) = runOne(pc, spec)
                 results += result
                 traces += trace
@@ -52,6 +102,96 @@ class TaskRunner(
             success = results.all { it is ActionResult.Success || it is ActionResult.Skip }
         )
     }
+
+    private class ControlOutcome(
+        val result: ActionResult,
+        val trace: ActionExecutionTrace,
+        val nextPc: Int,
+        val halt: Boolean = false,
+    )
+
+    private fun stepControl(
+        pc: Int,
+        spec: ActionSpec,
+        structure: FlowStructure,
+        loopStack: ArrayDeque<LoopFrame>,
+    ): ControlOutcome {
+        fun outcome(message: String, nextPc: Int, halt: Boolean = false) = ControlOutcome(
+            result = ActionResult.Success,
+            trace = markerTrace(pc, spec, ActionResult.Success, ActionTraceStatus.SUCCESS, message),
+            nextPc = nextPc,
+            halt = halt,
+        )
+
+        return when (spec.type) {
+            FlowControl.IF -> {
+                val condition = spec.args["condition"]?.trim()?.takeIf { it.isNotBlank() }
+                    ?: spec.condition?.trim()?.takeIf { it.isNotBlank() }
+                    ?: "true"
+                val matched = evaluateConditionString(condition)
+                if (matched) {
+                    outcome("if ($condition) -> true", pc + 1)
+                } else {
+                    val target = structure.ifToElse[pc]?.plus(1)
+                        ?: structure.ifToEndif.getValue(pc) + 1
+                    outcome("if ($condition) -> false", target)
+                }
+            }
+            FlowControl.ELSE -> outcome("else", structure.elseToEndif.getValue(pc) + 1)
+            FlowControl.ENDIF -> outcome("endif", pc + 1)
+            FlowControl.FOREACH -> {
+                val listName = listOf("list", "in", "array", "items")
+                    .firstNotNullOfOrNull { spec.args[it]?.trim()?.takeIf(String::isNotBlank) }
+                val itemVar = spec.args["var"]?.trim()?.takeIf { it.isNotBlank() } ?: "item"
+                val items = listName?.let { ctx.variables.getArrayItems(it) }.orEmpty()
+                val endfor = structure.foreachToEndfor.getValue(pc)
+                if (items.isEmpty()) {
+                    outcome("foreach $listName -> 0 items", endfor + 1)
+                } else {
+                    loopStack.addLast(LoopFrame(pc, items, itemVar, 0))
+                    ctx.variables.set(itemVar, items[0])
+                    outcome("foreach $listName -> ${items.size} items (1/${items.size})", pc + 1)
+                }
+            }
+            FlowControl.ENDFOR -> {
+                val frame = loopStack.lastOrNull()
+                if (frame == null || frame.foreachIndex != structure.endforToForeach[pc]) {
+                    ControlOutcome(
+                        result = ActionResult.Failure("flow.endfor without an active loop"),
+                        trace = markerTrace(pc, spec, ActionResult.Failure("flow.endfor without an active loop"), ActionTraceStatus.FAILURE),
+                        nextPc = pc + 1,
+                        halt = true,
+                    )
+                } else {
+                    frame.index++
+                    if (frame.index < frame.items.size) {
+                        ctx.variables.set(frame.itemVar, frame.items[frame.index])
+                        outcome("loop ${frame.index + 1}/${frame.items.size}", frame.foreachIndex + 1)
+                    } else {
+                        loopStack.removeLast()
+                        outcome("endfor", pc + 1)
+                    }
+                }
+            }
+            FlowControl.STOP -> outcome("stop", pc + 1, halt = true)
+            else -> outcome(spec.type, pc + 1)
+        }
+    }
+
+    private fun markerTrace(
+        index: Int,
+        spec: ActionSpec,
+        result: ActionResult,
+        status: ActionTraceStatus,
+        message: String = spec.type,
+    ): ActionExecutionTrace = ActionExecutionTrace(
+        index = index,
+        actionType = spec.type,
+        label = spec.label ?: spec.type,
+        durationMs = 0,
+        status = status,
+        message = message,
+    )
 
     private suspend fun runOne(index: Int, spec: ActionSpec): Pair<ActionResult, ActionExecutionTrace> {
         val started = System.currentTimeMillis()
@@ -123,6 +263,11 @@ class TaskRunner(
 
     private fun shouldRun(spec: ActionSpec): Boolean {
         val condition = spec.condition?.trim()?.takeIf { it.isNotBlank() } ?: return true
+        return evaluateConditionString(condition)
+    }
+
+    /** Evaluates a condition string with legacy `%var` then bounded `{{ ... }}` expansion. */
+    private fun evaluateConditionString(condition: String): Boolean {
         val legacyExpanded = ctx.variables.expand(condition)
         if (!legacyExpanded.contains("{{")) return ctx.variables.evaluateCondition(legacyExpanded)
 
@@ -212,6 +357,9 @@ private const val MAX_WAIT_TIMEOUT_MS = 1_800_000L // 30 minutes
 const val SUB_TASK_ACTION_ID = "task.run"
 const val MAX_SUBTASK_DEPTH = 8
 private val SUB_TASK_REF_KEYS = listOf("task", "name", "id")
+
+/** Safety cap on total interpreted steps to bound pathological flow.foreach loops. */
+private const val MAX_FLOW_STEPS = 100_000
 
 data class ActionExecutionTrace(
     val index: Int,

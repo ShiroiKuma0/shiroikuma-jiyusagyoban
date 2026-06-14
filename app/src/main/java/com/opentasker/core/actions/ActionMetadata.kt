@@ -136,6 +136,67 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "flow.if",
+            name = "If",
+            description = "Run the following actions only when the condition is true (close with End If)",
+            category = "Flow",
+            fields = listOf(
+                ActionField("condition", "Condition", required = true, hint = "%battery < 20"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "flow.else",
+            name = "Else",
+            description = "Alternate branch executed when the matching If was false",
+            category = "Flow",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "flow.endif",
+            name = "End If",
+            description = "Closes the matching If/Else block",
+            category = "Flow",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "flow.foreach",
+            name = "For Each",
+            description = "Iterate the following actions over an array variable (close with End For)",
+            category = "Flow",
+            fields = listOf(
+                ActionField("list", "Array variable name", required = true, hint = "myList"),
+                ActionField("var", "Item variable name", hint = "item"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "flow.endfor",
+            name = "End For",
+            description = "Closes the matching For Each loop",
+            category = "Flow",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "flow.stop",
+            name = "Stop",
+            description = "Halt the rest of the task immediately",
+            category = "Flow",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "intent.launch",
             name = "Launch Intent",
             description = "Launch an activity or service via intent",
