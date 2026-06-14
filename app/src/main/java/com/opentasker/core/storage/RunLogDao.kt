@@ -17,8 +17,10 @@ data class RunLogEntity(
     val durationMs: Long,
     val success: Boolean,
     val message: String,
+    val source: String? = null,
+    val sourceLabel: String? = null,
 ) {
-    fun toDomain() = RunLogEntry(id, taskId, taskName, timestamp, durationMs, success, message)
+    fun toDomain() = RunLogEntry(id, taskId, taskName, timestamp, durationMs, success, message, source, sourceLabel)
 }
 
 fun RunLogEntry.toEntity() = RunLogEntity(
@@ -28,7 +30,9 @@ fun RunLogEntry.toEntity() = RunLogEntity(
     timestamp = timestamp,
     durationMs = durationMs,
     success = success,
-    message = message
+    message = message,
+    source = source,
+    sourceLabel = sourceLabel,
 )
 
 @Dao
