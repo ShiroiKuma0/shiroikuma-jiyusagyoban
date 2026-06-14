@@ -27,6 +27,7 @@ suspend fun executeAndLogTask(
     val runner = TaskRunner(ctx, resolveTask = dbSubTaskResolver(db))
     val report = runner.run(task)
     Log.i(logTag, "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)")
+    val classified = RunLogSource.classify(source)
     val logEntry = RunLogEntry(
         taskId = task.id,
         taskName = task.name,
@@ -38,6 +39,8 @@ suspend fun executeAndLogTask(
             metadata = metadata,
             traces = report.traces,
         ),
+        source = classified.key,
+        sourceLabel = classified.label,
     )
     val inserted = insertRunLog(db, logEntry)
     return TaskExecutionResult(report, inserted)
@@ -49,20 +52,25 @@ suspend fun logSkippedRun(
     source: String,
     reason: String,
     metadata: List<String> = emptyList(),
-): Boolean = insertRunLog(
-    db,
-    RunLogEntry(
-        taskId = task.id,
-        taskName = task.name,
-        durationMs = 0,
-        success = false,
-        message = skippedRunLogMessage(
-            source = source,
-            reason = reason,
-            metadata = metadata,
+): Boolean {
+    val classified = RunLogSource.classify(source)
+    return insertRunLog(
+        db,
+        RunLogEntry(
+            taskId = task.id,
+            taskName = task.name,
+            durationMs = 0,
+            success = false,
+            message = skippedRunLogMessage(
+                source = source,
+                reason = reason,
+                metadata = metadata,
+            ),
+            source = classified.key,
+            sourceLabel = classified.label,
         ),
-    ),
-)
+    )
+}
 
 /**
  * Resolves a sub-task by numeric id first, then by exact name (case-insensitive), for `task.run`.
