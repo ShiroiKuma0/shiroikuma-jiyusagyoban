@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.merge
  *   - "calendar": local CalendarProvider event windows (requires READ_CALENDAR)
  *   - "sun_tick": local minute tick used by sunrise/sunset event filters
  *   - "nfc": NFC tag scan
+ *   - "bluetooth": Bluetooth device connected/disconnected
  *   - "locale_request_query": Locale condition plugin requested a host query
  *   - "boot_completed": manifest boot receiver restarted the engine
  *   - "tile_clicked": Quick Settings tile toggled
@@ -29,5 +30,6 @@ class EventContextSourceImpl : ContextSource {
         QuickSettingsTileContextEvents.events,
         ShakeContextEvents.events,
         PackageContextEvents.events,
+        BluetoothContextEvents.events,
     )
 }

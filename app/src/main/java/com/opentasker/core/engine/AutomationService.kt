@@ -21,6 +21,7 @@ import com.opentasker.automation.network.ConnectivityMonitor
 import com.opentasker.automation.network.WiFiNetworkMonitor
 import com.opentasker.automation.sensor.ShakeDetector
 import com.opentasker.automation.scheduler.TimeEventScheduler
+import com.opentasker.core.contexts.BluetoothContextEvents
 import com.opentasker.core.contexts.BootContextEvents
 import com.opentasker.core.contexts.PackageContextEvents
 import com.opentasker.core.model.AutomationMode
@@ -77,6 +78,7 @@ class AutomationService : Service() {
         appUsageMonitor.start(scope)
         shakeDetector.start()
         registerReceiver(PackageContextEvents.receiver, PackageContextEvents.intentFilter(), RECEIVER_NOT_EXPORTED)
+        registerReceiver(BluetoothContextEvents.receiver, BluetoothContextEvents.intentFilter(), RECEIVER_NOT_EXPORTED)
         profileCooldowns.putAll(cooldownStore.loadAll())
         scope.launch { pruneRunLogs(force = true) }
     }
@@ -107,6 +109,7 @@ class AutomationService : Service() {
         appUsageMonitor.stop()
         shakeDetector.stop()
         runCatching { unregisterReceiver(PackageContextEvents.receiver) }
+        runCatching { unregisterReceiver(BluetoothContextEvents.receiver) }
         job.cancel()
         super.onDestroy()
     }
