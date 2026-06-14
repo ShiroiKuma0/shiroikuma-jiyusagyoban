@@ -95,6 +95,7 @@ import com.opentasker.core.engine.ActionTraceStatus
 import com.opentasker.core.engine.RunLogActionDiagnostic
 import com.opentasker.core.engine.RunLogOutcome
 import com.opentasker.core.engine.outcome
+import com.opentasker.core.engine.RunLogSource
 import com.opentasker.core.engine.toRunLogDiagnostics
 import com.opentasker.core.flow.AutomationFlowTarget
 import com.opentasker.core.location.LocationDwellStateStore
@@ -2164,7 +2165,12 @@ private fun RunLogCard(entry: RunLogEntry) {
             Column(Modifier.weight(1f)) {
                 Text(entry.taskName, style = MaterialTheme.typography.titleMedium)
                 Text(time, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                diagnostics.source?.let { source ->
+                // Prefer the typed source column (no regex); fall back to the parsed message for legacy rows.
+                val sourceText = entry.source?.let { key ->
+                    val name = RunLogSource.displayName(key)
+                    entry.sourceLabel?.let { "$name: $it" } ?: name
+                } ?: diagnostics.source
+                sourceText?.let { source ->
                     Text(
                         "Source: $source",
                         style = MaterialTheme.typography.labelMedium,

@@ -32,10 +32,19 @@ object DatabaseMigrations {
         }
     }
 
+    val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Typed run-log trigger source columns (nullable; legacy rows keep NULL).
+            db.execSQL("ALTER TABLE run_logs ADD COLUMN source TEXT")
+            db.execSQL("ALTER TABLE run_logs ADD COLUMN sourceLabel TEXT")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
+            MIGRATION_3_4,
         )
     }
 }
@@ -53,9 +62,12 @@ object DatabaseMigrations {
  * Version 2:
  *   - profiles: adds automationMode (SINGLE, RESTART, QUEUED, PARALLEL)
  *
- * Version 3 (current):
+ * Version 3:
  *   - edit_history: id, entityType, entityId, previousJson, timestamp
- * 
+ *
+ * Version 4 (current):
+ *   - run_logs: adds nullable source (typed trigger key) and sourceLabel (human label)
+ *
  * To add a migration:
  * 1. Increment database version in @Database annotation
  * 2. Add new MIGRATION_X_Y class here

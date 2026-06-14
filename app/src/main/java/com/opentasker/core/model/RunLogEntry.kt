@@ -12,4 +12,8 @@ data class RunLogEntry(
     val durationMs: Long,
     val success: Boolean,
     val message: String = "",
+    /** Stable typed trigger key (see [com.opentasker.core.engine.RunLogSource]); null for legacy rows. */
+    val source: String? = null,
+    /** Human-readable trigger identifier (e.g. profile name or tile slot); null when not applicable. */
+    val sourceLabel: String? = null,
 )

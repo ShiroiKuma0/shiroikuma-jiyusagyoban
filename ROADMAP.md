@@ -781,19 +781,6 @@ Items below were identified by the 2026-06-09 exhaustive research pass covering 
 **Novelty:** Maintenance.
 **Tier:** Next.
 
-### RD5 - Typed run-log source field (Next)
-
-**Status:** Not started. Run-log source (profile name, external intent, etc.) is encoded in the free-form `message` field and parsed by `RunLogDiagnostics`.
-**Description:** Add a nullable `source` column to `RunLogEntry` (Room migration required) with an enum-like string value (`profile`, `external_intent`, `quick_settings_tile`, `manual_run`, etc.) and a separate `sourceLabel` column for the human-readable identifier (profile name, tile slot label, etc.). Migrate the existing free-form source parsing to populate these columns. This enables typed filtering in the Run Log UI without regex-based parsing.
-**Sources:** Local repo audit (RunLogEntry.kt, RunLogDao.kt, RunLogDiagnostics.kt); N3 tile run-log acceptance criteria.
-**Category:** architecture, observability.
-**Impact:** 4 -- unblocks structured filtering for Quick Settings, future trigger surfaces, and analytics.
-**Effort:** M -- Room migration + DAO changes + UI filter update.
-**Risk:** Medium -- Room migration must be tested; existing run logs need backfill or null handling.
-**Dependencies:** RD2 (shared execution helper).
-**Novelty:** Maintenance prerequisite for scale.
-**Tier:** Next -- required before Quick Settings run-log filtering is clean, but not a beta gate.
-
 ### RD7 - Encrypted database backup/restore (Later)
 
 **Status:** `DatabaseBackupManager.kt` exists but the research did not verify encryption support.
