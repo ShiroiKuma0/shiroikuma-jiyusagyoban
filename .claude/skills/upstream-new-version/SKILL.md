@@ -3,7 +3,7 @@ name: upstream-new-version
 description: Rebase this fork onto a new upstream release of SysAdminDoc/OpenTasker. Use when 白い熊 says a new upstream version is out, asks to update/sync to upstream, bump to the new OpenTasker release, or rebase custom onto the latest upstream — then build the new +1.
 ---
 
-# Sync shiroikuma-sagyoban onto a new upstream OpenTasker release
+# Sync shiroikuma-jiyusagyoban onto a new upstream OpenTasker release
 
 This fork tracks [SysAdminDoc/OpenTasker](https://github.com/SysAdminDoc/OpenTasker). `master` mirrors
 upstream (fast-forward only); `custom` carries our patches and is rebased onto each new upstream tip.
@@ -15,7 +15,7 @@ upstream (fast-forward only); `custom` carries our patches and is rebased onto e
 | `master` | Mirrors `upstream/master`. No fork work here. | fast-forward only |
 | `custom` | Our patches; the working/dev branch. | rebased onto `master` each sync |
 
-`origin` = `git@github.com:ShiroiKuma0/shiroikuma-sagyoban` (push). `upstream` =
+`origin` = `git@github.com:ShiroiKuma0/shiroikuma-jiyusagyoban` (push). `upstream` =
 `https://github.com/SysAdminDoc/OpenTasker` (fetch only).
 
 ## Steps
@@ -44,12 +44,12 @@ upstream (fast-forward only); `custom` carries our patches and is rebased onto e
 
    | What | Expected | Where |
    | --- | --- | --- |
-   | Installed app id | `shiroikuma.sagyoban` | `app/build.gradle.kts` → `defaultConfig.applicationId` |
+   | Installed app id | `shiroikuma.jiyusagyoban` | `app/build.gradle.kts` → `defaultConfig.applicationId` |
    | Code namespace | `com.opentasker.app` (unchanged from upstream) | `app/build.gradle.kts` → `namespace` |
-   | App label | `白い熊 作業盤` | `app_name` in `app/src/main/res/values/strings.xml` |
+   | App label | `白い熊 自由作業盤` | `app_name` in `app/src/main/res/values/strings.xml` |
    | Fork version | `versionCode = forkVersionCode`, `versionName = forkVersionName` + the fork blocks | `app/build.gradle.kts` |
    | Signing | `keystore.properties` block + `useKeystoreProperties` | `app/build.gradle.kts` |
-   | Archive name + task | `archivesName = "shiroikuma-sagyoban_…"` + `buildFork` task | `app/build.gradle.kts` |
+   | Archive name + task | `archivesName = "shiroikuma-jiyusagyoban_…"` + `buildFork` task | `app/build.gradle.kts` |
    | Build tail | `BUILD_NUMBER=1` | `gradle.properties` |
    | Committed agent files | `CLAUDE.md`, `.claude/` un-ignored; only `.claude/settings.local.json` out | `.gitignore` |
    | Black-yellow icon | yellow foreground + black `ic_launcher_background` | `app/src/main/res/mipmap/…` + `values/colors.xml` |

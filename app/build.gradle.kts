@@ -53,7 +53,7 @@ android {
     buildToolsVersion = "36.0.0"
 
     defaultConfig {
-        applicationId = "shiroikuma.sagyoban"
+        applicationId = "shiroikuma.jiyusagyoban"
         minSdk = 26
         targetSdk = 36
         versionCode = forkVersionCode
@@ -303,7 +303,7 @@ tasks.register("verifyPlayManifestPolicy") {
 
 // --- shiroikuma fork: archive naming + one-shot build task ---
 base {
-    archivesName = "shiroikuma-sagyoban_${forkVersionName}_arm64-v8a"
+    archivesName = "shiroikuma-jiyusagyoban_${forkVersionName}_arm64-v8a"
 }
 
 tasks.register("buildFork") {
@@ -311,7 +311,7 @@ tasks.register("buildFork") {
     description = "Build the signed release APK, copy it to ~/tmp, and bump BUILD_NUMBER for next time."
     dependsOn("assembleRelease")
     doLast {
-        val apkName = "shiroikuma-sagyoban_${forkVersionName}_arm64-v8a.apk"
+        val apkName = "shiroikuma-jiyusagyoban_${forkVersionName}_arm64-v8a.apk"
         val outputDir = layout.buildDirectory.dir("outputs/apk/release").get().asFile
         val targetDir = File(System.getProperty("user.home"), "tmp").apply { mkdirs() }
         val apk = outputDir.listFiles { _, name -> name.endsWith(".apk") }?.firstOrNull()

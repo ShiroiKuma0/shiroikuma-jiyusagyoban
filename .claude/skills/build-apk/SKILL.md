@@ -5,8 +5,8 @@ description: Build the signed release APK with the buildFork Gradle task, then a
 
 # Build the release APK and optionally send to the phone
 
-This is **shiroikuma-sagyoban** — 白い熊's fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker),
-renamed to `shiroikuma.sagyoban` ("白い熊 作業盤") so it installs side-by-side with upstream. Pure
+This is **shiroikuma-jiyusagyoban** — 白い熊's fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker),
+renamed to `shiroikuma.jiyusagyoban` ("白い熊 自由作業盤") so it installs side-by-side with upstream. Pure
 Kotlin/Compose, no native code, no Fossify Commons.
 
 > **Never ask whether to build — just build.** When this skill applies (白い熊 asked to build, or
@@ -21,7 +21,7 @@ Kotlin/Compose, no native code, no Fossify Commons.
 1. **Note the output filename.** Read the current version + build number:
    - `grep -nE 'appVersionName|appVersionCode' app/build.gradle.kts` (the upstream base, e.g. `0.2.60` / `62`)
    - `grep -E '^BUILD_NUMBER' gradle.properties` (the `N` used for THIS build, **before** the task bumps it)
-   - APK will be `shiroikuma-sagyoban_<appVersionName>+<BUILD_NUMBER>_arm64-v8a.apk`.
+   - APK will be `shiroikuma-jiyusagyoban_<appVersionName>+<BUILD_NUMBER>_arm64-v8a.apk`.
    - versionCode for this build = `appVersionCode * 10000 + BUILD_NUMBER`.
 
 2. **Build** (needs JDK 21 — the default `java` on this host is JDK 11, and Gradle 9.x aborts on it):
@@ -32,7 +32,9 @@ Kotlin/Compose, no native code, no Fossify Commons.
    - It prints `>>> <path>` and `>>> versionCode <n>`. Confirm `BUILD SUCCESSFUL` and use those for the
      exact filename/code.
    - If it fails to resolve a signing key, check that `keystore.properties` exists at the repo root
-     (gitignored; points at `~/.android-keystores/shiroikuma-sagyoban.jks`, alias `sagyoban`).
+     (gitignored; points at `~/.android-keystores/shiroikuma-jiyusagyoban.jks`, alias `sagyoban`).
+   - If it fails with **`SDK location not found`**, create the gitignored `local.properties` at the repo
+     root with `sdk.dir=/home/shiroikuma/android-sdk` (a background shell doesn't inherit `ANDROID_HOME`).
 
 3. **At the end of every successful build, ALWAYS ask** via `AskUserQuestion` how to transfer the APK —
    no exceptions, no assuming. Options, in this order: **"Scp to skhw"** (FIRST) / **"adb push"** /
