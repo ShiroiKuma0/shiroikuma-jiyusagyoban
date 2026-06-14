@@ -14,7 +14,9 @@ Kotlin/Compose, no native code, no Fossify Commons.
 > The **only** question in this whole flow is the `AskUserQuestion` about transferring the APK, asked
 > **after** a successful build.
 
-> **The push destination is ALWAYS `/sdcard/tmp/`.** Never `adb install` — 白い熊 installs manually.
+> **Every `adb push` goes ONLY to `/sdcard/tmp/`.** This holds for the APK *and any other
+> file* (import bundles, configs, logs, screenshots) — never `/sdcard/Download/` or anywhere
+> else. Never `adb install` — 白い熊 installs manually.
 
 ## Steps
 
