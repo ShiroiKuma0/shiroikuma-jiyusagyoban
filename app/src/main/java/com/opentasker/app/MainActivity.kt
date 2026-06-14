@@ -8,6 +8,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.material3.MaterialTheme
 import androidx.core.content.ContextCompat
@@ -16,6 +18,7 @@ import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.engine.AutomationService
 import com.opentasker.ui.screens.ActiveAutomationUi
 import com.opentasker.ui.theme.OpenTaskerTheme
+import com.opentasker.ui.theme.ThemeStore
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -24,7 +27,8 @@ class MainActivity : ComponentActivity() {
         Log.d("MainActivity", "Initializing OpenTasker")
         
         setContent {
-            OpenTaskerTheme {
+            val themePrefs by ThemeStore.state.collectAsState()
+            OpenTaskerTheme(prefs = themePrefs) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

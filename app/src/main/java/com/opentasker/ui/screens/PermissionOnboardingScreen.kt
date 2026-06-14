@@ -28,9 +28,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -94,6 +94,7 @@ private sealed interface PermissionAction {
 fun PermissionOnboardingScreen(
     contentPadding: PaddingValues,
     onMessage: (String) -> Unit,
+    onOpenUiCustomization: () -> Unit,
     backupState: BackupSetupState,
     onCreateBackup: () -> Unit,
     onExportBackup: () -> Unit,
@@ -132,6 +133,32 @@ fun PermissionOnboardingScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        item {
+            Card(
+                onClick = onOpenUiCustomization,
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.66f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+                shape = RoundedCornerShape(18.dp),
+            ) {
+                Row(
+                    Modifier.padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("白い熊 自由作業盤 UI", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Colors, borders, and fonts. Long-press the Setup tab to jump here anytime.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -232,7 +259,7 @@ private fun BackupSetupCard(
                 color = if (state.pendingRestore) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                Button(
+                OutlinedButton(
                     onClick = onCreateBackup,
                     enabled = !state.busy,
                     modifier = Modifier.fillMaxWidth(),
@@ -329,7 +356,7 @@ private fun PermissionSetupCard(
             Text(item.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             PermissionRequirement(label = if (item.optional) "Optional: ${item.requiredFor}" else item.requiredFor)
             if (!item.granted) {
-                Button(onClick = onRunAction, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = onRunAction, modifier = Modifier.fillMaxWidth()) {
                     Text(item.actionLabel)
                 }
             } else if (item.action is PermissionAction.SettingsIntent && item.title == "App visibility") {

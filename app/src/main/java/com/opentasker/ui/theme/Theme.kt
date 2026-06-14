@@ -1,150 +1,35 @@
 package com.opentasker.ui.theme
 
 import android.app.Activity
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 
-// AMOLED-black palette with Catppuccin Mocha accents.
-// Optimized for premium dark theme with excellent contrast and visual hierarchy.
-private val Mauve = Color(0xFFCBA6F7)          // Primary - vibrant purple
-private val Sapphire = Color(0xFF74C7EC)       // Secondary - cool blue
-private val Green = Color(0xFFA6E3A1)          // Tertiary - fresh green
-private val Red = Color(0xFFF38BA8)            // Error - warm red
-private val Peach = Color(0xFFFFB4A2)          // Warning accent
-private val Text = Color(0xFFCDD6F4)           // Primary text - light lavender
-private val TextSecondary = Color(0xFFA6ADC8)  // Secondary text - muted lavender
-private val Surface0 = Color(0xFF11111B)       // Primary surface
-private val Surface1 = Color(0xFF1E1E2E)       // Elevated surface
-private val Overlay0 = Color(0xFF45475A)       // Subtle overlay
-
-private val Amoled = darkColorScheme(
-    primary = Mauve,                           // Primary actions, active states
-    onPrimary = Color.Black,                   // Text on primary
-    primaryContainer = Mauve.copy(alpha = 0.12f), // Subtle primary background
-    onPrimaryContainer = Mauve,
-    secondary = Sapphire,                      // Secondary actions
-    onSecondary = Color.Black,
-    secondaryContainer = Sapphire.copy(alpha = 0.12f),
-    onSecondaryContainer = Sapphire,
-    tertiary = Green,                          // Tertiary actions, success states
-    onTertiary = Color.Black,
-    tertiaryContainer = Green.copy(alpha = 0.12f),
-    onTertiaryContainer = Green,
-    error = Red,                               // Error states
-    onError = Color.Black,
-    errorContainer = Red.copy(alpha = 0.12f),
-    onErrorContainer = Red,
-    background = Color.Black,                  // True AMOLED black for status bar
-    onBackground = Text,
-    surface = Surface0,                        // Main surface color
-    onSurface = Text,
-    surfaceVariant = Surface1,                 // Elevated surfaces
-    onSurfaceVariant = TextSecondary,
-    outline = Overlay0,                        // Borders and dividers
-    outlineVariant = Overlay0.copy(alpha = 0.5f),
-)
-
-// Catppuccin Latte palette for the light theme. Mirrors the dark scheme's structure so every
-// semantic token (including the *Container and outlineVariant slots the UI relies on) is defined
-// and coherent in both modes, rather than falling back to mismatched Material defaults.
-private val LatteMauve = Color(0xFF8839EF)        // Primary
-private val LatteSapphire = Color(0xFF209FB5)     // Secondary
-private val LatteGreen = Color(0xFF40A02B)        // Tertiary / success
-private val LatteRed = Color(0xFFD20F39)          // Error
-private val LatteText = Color(0xFF4C4F69)         // Primary text
-private val LatteSubtext = Color(0xFF6C6F85)      // Secondary text
-private val LatteBase = Color(0xFFEFF1F5)         // App background
-private val LatteSurface = Color(0xFFFFFFFF)      // Card/sheet surface
-private val LatteElevated = Color(0xFFE6E9EF)     // Elevated surface (mantle)
-private val LatteOverlay = Color(0xFF9CA0B0)      // Borders and dividers
-
-private val Light = lightColorScheme(
-    primary = LatteMauve,
-    onPrimary = Color.White,
-    primaryContainer = LatteMauve.copy(alpha = 0.12f),
-    onPrimaryContainer = LatteMauve,
-    secondary = LatteSapphire,
-    onSecondary = Color.White,
-    secondaryContainer = LatteSapphire.copy(alpha = 0.12f),
-    onSecondaryContainer = LatteSapphire,
-    tertiary = LatteGreen,
-    onTertiary = Color.White,
-    tertiaryContainer = LatteGreen.copy(alpha = 0.12f),
-    onTertiaryContainer = LatteGreen,
-    error = LatteRed,
-    onError = Color.White,
-    errorContainer = LatteRed.copy(alpha = 0.12f),
-    onErrorContainer = LatteRed,
-    background = LatteBase,
-    onBackground = LatteText,
-    surface = LatteSurface,
-    onSurface = LatteText,
-    surfaceVariant = LatteElevated,
-    onSurfaceVariant = LatteSubtext,
-    outline = LatteOverlay,
-    outlineVariant = LatteOverlay.copy(alpha = 0.5f),
-)
-
-private val OpenTaskerTypography = Typography(
-    headlineSmall = TextStyle(
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 24.sp,
-        lineHeight = 30.sp,
-    ),
-    titleLarge = TextStyle(
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 20.sp,
-        lineHeight = 26.sp,
-    ),
-    titleMedium = TextStyle(
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 16.sp,
-        lineHeight = 22.sp,
-    ),
-    titleSmall = TextStyle(
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
-    ),
-    bodyMedium = TextStyle(
-        fontWeight = FontWeight.Normal,
-        fontSize = 14.sp,
-        lineHeight = 21.sp,
-    ),
-    bodySmall = TextStyle(
-        fontWeight = FontWeight.Normal,
-        fontSize = 12.sp,
-        lineHeight = 18.sp,
-    ),
-    labelLarge = TextStyle(
-        fontWeight = FontWeight.Medium,
-        fontSize = 14.sp,
-        lineHeight = 18.sp,
-    ),
-    labelMedium = TextStyle(
-        fontWeight = FontWeight.Medium,
-        fontSize = 12.sp,
-        lineHeight = 16.sp,
-    ),
-    labelSmall = TextStyle(
-        fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
-        lineHeight = 14.sp,
-    ),
+// Base text styles (weights/sizes only); colour and font family/scale come from ThemePrefs.
+private val BaseTypography = Typography(
+    headlineSmall = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 30.sp),
+    titleLarge = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp),
+    titleMedium = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 22.sp),
+    titleSmall = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 20.sp),
+    bodyMedium = TextStyle(fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 21.sp),
+    bodySmall = TextStyle(fontWeight = FontWeight.Normal, fontSize = 12.sp, lineHeight = 18.sp),
+    labelLarge = TextStyle(fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 18.sp),
+    labelMedium = TextStyle(fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp),
+    labelSmall = TextStyle(fontWeight = FontWeight.Medium, fontSize = 11.sp, lineHeight = 14.sp),
 )
 
 private val OpenTaskerShapes = Shapes(
@@ -153,24 +38,122 @@ private val OpenTaskerShapes = Shapes(
     large = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
 )
 
+/**
+ * Black-yellow-by-default scheme assembled from the user's [ThemePrefs].
+ *
+ * Two things keep it clean: every *Container role is a flat dark surface (not a low-alpha accent,
+ * which composites to olive over black), and [ColorScheme.surfaceTint] is transparent so Material's
+ * tonal-elevation overlay never tints surfaces. The result is true black with pure-yellow content.
+ */
+fun colorSchemeFrom(prefs: ThemePrefs): ColorScheme {
+    val background = Color(prefs.background)
+    val surface = Color(prefs.surface)
+    val text = Color(prefs.text)
+    val textSecondary = Color(prefs.textSecondary)
+    val accent = Color(prefs.accent)
+    val onAccent = accent.contrastingOnColor()
+    val border = Color(prefs.border)
+    val error = Color(0xFFFF6B6B)
+
+    return darkColorScheme(
+        primary = accent,
+        onPrimary = onAccent,
+        primaryContainer = surface,
+        onPrimaryContainer = accent,
+        secondary = accent,
+        onSecondary = onAccent,
+        secondaryContainer = surface,
+        onSecondaryContainer = accent,
+        tertiary = accent,
+        onTertiary = onAccent,
+        tertiaryContainer = surface,
+        onTertiaryContainer = accent,
+        error = error,
+        onError = Color.Black,
+        errorContainer = surface,
+        onErrorContainer = error,
+        background = background,
+        onBackground = text,
+        surface = surface,
+        onSurface = text,
+        surfaceVariant = surface,
+        onSurfaceVariant = textSecondary,
+        surfaceContainerLowest = background,
+        surfaceContainerLow = surface,
+        surfaceContainer = surface,
+        surfaceContainerHigh = surface,
+        surfaceContainerHighest = surface,
+        surfaceTint = Color.Transparent,
+        inverseSurface = text,
+        inverseOnSurface = background,
+        outline = border,
+        outlineVariant = border.copy(alpha = 0.6f),
+        scrim = Color.Black,
+    )
+}
+
+/** Applies the chosen font family, optional uniform weight, and size scale to every text style. */
+fun typographyFrom(prefs: ThemePrefs, fontFamily: FontFamily?): Typography {
+    val scale = prefs.fontScalePct / 100f
+    val weight = if (prefs.fontWeight in 100..900) FontWeight(prefs.fontWeight) else null
+
+    fun TextStyle.themed(): TextStyle = copy(
+        fontFamily = fontFamily ?: this.fontFamily,
+        fontWeight = weight ?: this.fontWeight,
+        fontSize = if (fontSize.isSp) (fontSize.value * scale).sp else fontSize,
+        lineHeight = if (lineHeight.isSp) (lineHeight.value * scale).sp else lineHeight,
+    )
+
+    val b = BaseTypography
+    return Typography(
+        displayLarge = b.displayLarge.themed(),
+        displayMedium = b.displayMedium.themed(),
+        displaySmall = b.displaySmall.themed(),
+        headlineLarge = b.headlineLarge.themed(),
+        headlineMedium = b.headlineMedium.themed(),
+        headlineSmall = b.headlineSmall.themed(),
+        titleLarge = b.titleLarge.themed(),
+        titleMedium = b.titleMedium.themed(),
+        titleSmall = b.titleSmall.themed(),
+        bodyLarge = b.bodyLarge.themed(),
+        bodyMedium = b.bodyMedium.themed(),
+        bodySmall = b.bodySmall.themed(),
+        labelLarge = b.labelLarge.themed(),
+        labelMedium = b.labelMedium.themed(),
+        labelSmall = b.labelSmall.themed(),
+    )
+}
+
 @Composable
 fun OpenTaskerTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    prefs: ThemePrefs = ThemePrefs.DEFAULT,
     content: @Composable () -> Unit,
 ) {
-    val colors = if (darkTheme) Amoled else Light
+    val colors = remember(prefs) { colorSchemeFrom(prefs) }
+    val fontFamily = remember(prefs.fontFileName) { ThemeStore.fontFamily(prefs.fontFileName) }
+    val typography = remember(prefs, fontFamily) { typographyFrom(prefs, fontFamily) }
+
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
             window.statusBarColor = colors.background.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            // Background is user-chosen and usually dark; keep light status-bar icons unless the
+            // chosen background is itself light.
+            val lightBg = colors.background.luminance() > 0.5f
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = lightBg
         }
     }
     MaterialTheme(
         colorScheme = colors,
-        typography = OpenTaskerTypography,
+        typography = typography,
         shapes = OpenTaskerShapes,
         content = content,
     )
 }
+
+// ---- colour helpers ----
+
+private fun Color.luminance(): Float = 0.299f * red + 0.587f * green + 0.114f * blue
+
+private fun Color.contrastingOnColor(): Color = if (luminance() > 0.5f) Color.Black else Color.White

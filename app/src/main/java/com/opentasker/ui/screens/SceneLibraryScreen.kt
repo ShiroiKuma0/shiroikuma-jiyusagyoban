@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -197,7 +196,7 @@ private fun SceneEmptyState(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Button(onClick = onCreateScene) {
+            OutlinedButton(onClick = onCreateScene) {
                 Icon(Icons.Filled.Add, contentDescription = null)
                 Text("Create Scene")
             }
@@ -244,7 +243,7 @@ private fun SceneOverviewCard(
                 SceneMetric("${scenes.sumOf { it.elements.size }}", "Elements", Modifier.weight(1f))
                 SceneMetric("$errorCount", "Errors", Modifier.weight(1f))
             }
-            Button(onClick = onCreateScene, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = onCreateScene, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.Add, contentDescription = null)
                 Text("Create Scene")
             }
@@ -513,7 +512,7 @@ private fun SceneElementDeleteDialog(
             )
         },
         confirmButton = {
-            Button(onClick = onConfirm) { Text("Remove") }
+            OutlinedButton(onClick = onConfirm) { Text("Remove") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
@@ -666,7 +665,7 @@ private fun SceneElementEditorDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 enabled = canSave,
                 onClick = {
                     onSave(
@@ -864,7 +863,7 @@ private fun SceneEditorDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 enabled = canSave,
                 onClick = { onSave(name.trim(), parsedWidth ?: 320, parsedHeight ?: 240) },
             ) {

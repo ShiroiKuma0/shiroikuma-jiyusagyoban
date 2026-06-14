@@ -6,7 +6,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -34,7 +36,6 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -45,6 +46,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -68,6 +70,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -690,6 +693,7 @@ fun ActiveAutomationUi(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var screen by remember { mutableStateOf(OpenTaskerScreen.Profiles) }
+    var showUiCustomization by remember { mutableStateOf(false) }
     var taskDialog by remember { mutableStateOf<Task?>(null) }
     var showCreateTaskDialog by remember { mutableStateOf(false) }
     var profileDialog by remember { mutableStateOf<Profile?>(null) }
@@ -784,6 +788,11 @@ fun ActiveAutomationUi(
         OpenTaskerScreen.RunLog -> "${runLogs.size} recent entries"
     }
 
+    if (showUiCustomization) {
+        UiCustomizationScreen(onBack = { showUiCustomization = false })
+        return
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -802,7 +811,8 @@ fun ActiveAutomationUi(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
+                    containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.background,
                 ),
             )
         },
@@ -816,11 +826,21 @@ fun ActiveAutomationUi(
                             showCreateProfileDialog = true
                         }
                     },
+                    containerColor = MaterialTheme.colorScheme.background,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)),
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = if (tasks.isEmpty()) "Create task first" else "Create profile")
                 }
 
-                OpenTaskerScreen.Tasks -> FloatingActionButton(onClick = { showCreateTaskDialog = true }) {
+                OpenTaskerScreen.Tasks -> FloatingActionButton(
+                    onClick = { showCreateTaskDialog = true },
+                    containerColor = MaterialTheme.colorScheme.background,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)),
+                ) {
                     Icon(Icons.Filled.Add, contentDescription = "Create task")
                 }
 
@@ -833,12 +853,25 @@ fun ActiveAutomationUi(
             }
         },
         bottomBar = {
-            NavigationBar {
-                OpenTaskerScreen.entries.forEach { destination ->
-                    NavigationBarItem(
-                        selected = screen == destination,
-                        onClick = { screen = destination },
-                        icon = {
+            Column {
+                HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.primary)
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    tonalElevation = 0.dp,
+                ) {
+                    val navItemColors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        unselectedIconColor = MaterialTheme.colorScheme.primary,
+                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                        unselectedTextColor = MaterialTheme.colorScheme.primary,
+                        indicatorColor = Color.Transparent,
+                    )
+                    OpenTaskerScreen.entries.forEach { destination ->
+                        NavigationBarItem(
+                            selected = screen == destination,
+                            onClick = { screen = destination },
+                            colors = navItemColors,
+                            icon = {
                             val icon = when (destination) {
                                 OpenTaskerScreen.Profiles -> Icons.Filled.CheckCircle
                                 OpenTaskerScreen.Tasks -> Icons.Filled.Edit
@@ -849,11 +882,27 @@ fun ActiveAutomationUi(
                                 OpenTaskerScreen.Setup -> Icons.Filled.Settings
                                 OpenTaskerScreen.RunLog -> Icons.Filled.Info
                             }
-                            Icon(icon, contentDescription = null)
+                            if (destination == OpenTaskerScreen.Setup) {
+                                // Long-press the Setup cog jumps straight to the 白い熊 自由作業盤 UI page;
+                                // a normal tap still selects the Setup tab.
+                                Box(
+                                    modifier = Modifier.pointerInput(Unit) {
+                                        detectTapGestures(
+                                            onTap = { screen = OpenTaskerScreen.Setup },
+                                            onLongPress = { showUiCustomization = true },
+                                        )
+                                    },
+                                ) {
+                                    Icon(icon, contentDescription = null)
+                                }
+                            } else {
+                                Icon(icon, contentDescription = null)
+                            }
                         },
                         label = { Text(destination.label) },
                         alwaysShowLabel = true,
                     )
+                }
                 }
             }
         },
@@ -957,6 +1006,7 @@ fun ActiveAutomationUi(
             OpenTaskerScreen.Setup -> PermissionOnboardingScreen(
                 contentPadding = innerPadding,
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
+                onOpenUiCustomization = { showUiCustomization = true },
                 backupState = backupSetupState,
                 onCreateBackup = viewModel::createDatabaseBackup,
                 onExportBackup = { databaseBackupExportLauncher.launch(databaseBackupExportName()) },
@@ -1386,7 +1436,7 @@ private fun TaskLibrarySummaryCard(tasks: List<Task>, onCreateTask: () -> Unit) 
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Button(onClick = onCreateTask) {
+                OutlinedButton(onClick = onCreateTask) {
                     Icon(Icons.Filled.Add, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Task")
@@ -2349,7 +2399,7 @@ private fun EmptyState(
         )
         if (actionLabel != null && onAction != null) {
             Spacer(Modifier.height(24.dp))
-            Button(onClick = onAction, enabled = actionEnabled, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = onAction, enabled = actionEnabled, modifier = Modifier.fillMaxWidth()) {
                 Text(actionLabel)
             }
         }
@@ -2420,9 +2470,10 @@ private fun DeleteConfirmationDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
             ) {
                 Text(target.confirmLabel)
             }
@@ -2510,7 +2561,7 @@ private fun OpenTaskerBundleReviewDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 enabled = plan.canImport && !busy,
                 onClick = onConfirm,
             ) {
@@ -2612,7 +2663,7 @@ private fun TaskerImportReviewDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 enabled = preview.canImport && !busy,
                 onClick = onConfirm,
             ) {
@@ -2746,7 +2797,7 @@ private fun TemplateSlotDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 enabled = !missingRequired && template.installable,
                 onClick = { onInstall(values) },
             ) {
@@ -2794,7 +2845,7 @@ private fun TaskEditorDialog(
             }
         },
         confirmButton = {
-            Button(enabled = canSave, onClick = { onSave(name, parsedPriority ?: 5) }) {
+            OutlinedButton(enabled = canSave, onClick = { onSave(name, parsedPriority ?: 5) }) {
                 Text("Save")
             }
         },
@@ -2883,7 +2934,7 @@ private fun ProfileEditorDialog(
             }
         },
         confirmButton = {
-            Button(enabled = canSave, onClick = { onSave(name, enabled, enterTaskId, parsedCooldown ?: 0, automationMode) }) {
+            OutlinedButton(enabled = canSave, onClick = { onSave(name, enabled, enterTaskId, parsedCooldown ?: 0, automationMode) }) {
                 Text("Save")
             }
         },
@@ -3064,7 +3115,7 @@ private fun ActionConfigDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 enabled = !missingRequired && capability.canAdd,
                 onClick = {
                     onSave(
@@ -3361,7 +3412,7 @@ private fun ContextConfigDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 enabled = !missingRequired,
                 onClick = { onSave(ContextSpec(state.type, saveConfig, invert)) },
             ) {
