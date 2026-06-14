@@ -34,7 +34,7 @@
 ✅ **OEM reliability guidance** — detects Samsung/Xiaomi/OnePlus/Oppo/Realme/Vivo/Huawei/etc. and surfaces per-vendor battery-killer remediation with deep-links and dontkillmyapp.com references
 ✅ **Template expression runtime** — action arguments and conditions support bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math functions, traces, and warnings
 ✅ **FOSS geofence source/evaluator** — Location context matching supports platform GPS/network fixes, balanced provider cadence, policy disclosures, radius, accuracy, persisted dwell checks, stale-key cleanup, inspector dwell detail, a Location evidence template, adb run-log/logcat evidence collection, provider-cadence/unplugged-sample/post-reconnect history gates, and API 36 background event-delivery smoke evidence without Play Services
-✅ **AMOLED-first** — Catppuccin Mocha palette, light theme toggle  
+✅ **AMOLED-first** — Catppuccin Mocha (dark) and Latte (light) palettes, following the system theme  
 ✅ **Compose UI reintegration started** — active navigation now manages profiles, tasks, actions, contexts, and run logs from Room  
 ✅ **Profile templates** — guided starter profiles with variable slots, safety notes, disabled-by-default installation, and a setup-required Location evidence template
 ✅ **Scene element editor** — Room-backed scene list/create/delete plus button, text, slider, and image element editing with tap/long-press task bindings, scaled canvas previews, and drag-to-move layout edits

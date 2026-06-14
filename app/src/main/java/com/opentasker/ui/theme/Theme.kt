@@ -58,24 +58,45 @@ private val Amoled = darkColorScheme(
     outlineVariant = Overlay0.copy(alpha = 0.5f),
 )
 
+// Catppuccin Latte palette for the light theme. Mirrors the dark scheme's structure so every
+// semantic token (including the *Container and outlineVariant slots the UI relies on) is defined
+// and coherent in both modes, rather than falling back to mismatched Material defaults.
+private val LatteMauve = Color(0xFF8839EF)        // Primary
+private val LatteSapphire = Color(0xFF209FB5)     // Secondary
+private val LatteGreen = Color(0xFF40A02B)        // Tertiary / success
+private val LatteRed = Color(0xFFD20F39)          // Error
+private val LatteText = Color(0xFF4C4F69)         // Primary text
+private val LatteSubtext = Color(0xFF6C6F85)      // Secondary text
+private val LatteBase = Color(0xFFEFF1F5)         // App background
+private val LatteSurface = Color(0xFFFFFFFF)      // Card/sheet surface
+private val LatteElevated = Color(0xFFE6E9EF)     // Elevated surface (mantle)
+private val LatteOverlay = Color(0xFF9CA0B0)      // Borders and dividers
+
 private val Light = lightColorScheme(
-    primary = Color(0xFF8839EF),
+    primary = LatteMauve,
     onPrimary = Color.White,
-    secondary = Color(0xFF209FB5),
+    primaryContainer = LatteMauve.copy(alpha = 0.12f),
+    onPrimaryContainer = LatteMauve,
+    secondary = LatteSapphire,
     onSecondary = Color.White,
-    tertiary = Color(0xFF40A02B),
+    secondaryContainer = LatteSapphire.copy(alpha = 0.12f),
+    onSecondaryContainer = LatteSapphire,
+    tertiary = LatteGreen,
     onTertiary = Color.White,
-    error = Color(0xFFB00020),
+    tertiaryContainer = LatteGreen.copy(alpha = 0.12f),
+    onTertiaryContainer = LatteGreen,
+    error = LatteRed,
     onError = Color.White,
-    errorContainer = Color(0xFFF9DEDC),
-    onErrorContainer = Color(0xFF410E0B),
-    background = Color(0xFFFAFAFA),
-    onBackground = Color(0xFF1E1E2E),
-    surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF1E1E2E),
-    surfaceVariant = Color(0xFFE7E0EC),
-    onSurfaceVariant = Color(0xFF49454F),
-    outline = Color(0xFF79747E),
+    errorContainer = LatteRed.copy(alpha = 0.12f),
+    onErrorContainer = LatteRed,
+    background = LatteBase,
+    onBackground = LatteText,
+    surface = LatteSurface,
+    onSurface = LatteText,
+    surfaceVariant = LatteElevated,
+    onSurfaceVariant = LatteSubtext,
+    outline = LatteOverlay,
+    outlineVariant = LatteOverlay.copy(alpha = 0.5f),
 )
 
 private val OpenTaskerTypography = Typography(
