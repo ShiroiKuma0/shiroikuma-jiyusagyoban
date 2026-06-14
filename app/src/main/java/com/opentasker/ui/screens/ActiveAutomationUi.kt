@@ -3386,8 +3386,8 @@ private fun contextFields(type: ContextType): List<ActionField> = when (type) {
         ActionField("value", "Expected value", required = true, hint = "true/false, connected/disconnected, on/off, 80"),
     )
     ContextType.EVENT -> listOf(
-        ActionField("event", "Event type", required = true, hint = "boot_completed, notification, nfc, calendar, sunrise, sunset, shake, package_added, package_removed, package_replaced"),
-        ActionField("state", "Event state", hint = "during, upcoming"),
+        ActionField("event", "Event type", required = true, hint = "boot_completed, notification, nfc, bluetooth, calendar, sunrise, sunset, shake, package_added, package_removed, package_replaced"),
+        ActionField("state", "Event state", hint = "during, upcoming, connected, disconnected"),
         ActionField("calendar", "Calendar name", hint = "Work"),
         ActionField("beforeMinutes", "Before minutes", FieldType.NUMBER, hint = "15"),
         ActionField("package", "Package allowlist", hint = "com.example.app, com.chat.app"),
@@ -3494,7 +3494,7 @@ private fun contextDescription(type: ContextType): String = when (type) {
     ContextType.DAY -> "Matches on selected days, presets, or weekday/weekend ranges."
     ContextType.LOCATION -> "Matches near a latitude/longitude radius with optional accuracy and dwell checks."
     ContextType.STATE -> "Matches a device state such as battery level, charging, headphones, or screen."
-    ContextType.EVENT -> "Matches a one-shot event such as boot, notification, NFC, calendar, sun, shake, or Locale plugin queries."
+    ContextType.EVENT -> "Matches a one-shot event such as boot, notification, NFC, Bluetooth connect/disconnect, calendar, sun, shake, or Locale plugin queries."
 }
 
 private fun runLogTaskOptions(logs: List<RunLogEntry>, tasks: List<Task>): List<Pair<Long, String>> {
