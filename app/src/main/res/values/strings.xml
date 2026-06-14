@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">OpenTasker</string>
+    <string name="app_name">白い熊 作業盤</string>
     <string name="permission_automation_label">Control OpenTasker automations</string>
     <string name="permission_automation_description">Allows same-signer integrations to run OpenTasker tasks, toggle profiles, and query automation status through documented intents.</string>
     <string name="error_prefix">Error: %1$s</string>
