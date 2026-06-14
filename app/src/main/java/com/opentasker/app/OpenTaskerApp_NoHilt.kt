@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.room.Room
 import com.opentasker.core.registerCoreRuntime
 import com.opentasker.core.actions.registerActionMetadata
+import com.opentasker.ui.theme.ThemeStore
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.DatabaseMigrations
@@ -29,6 +30,8 @@ class OpenTaskerApp_NoHilt : Application() {
     override fun onCreate() {
         super.onCreate()
         CrashLogHandler.install(this)
+        // Seed the black-yellow appearance defaults before any Compose code reads the theme.
+        ThemeStore.init(this)
         registerActionMetadata()
         registerCoreRuntime()
          

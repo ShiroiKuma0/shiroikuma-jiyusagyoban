@@ -32,8 +32,6 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -271,8 +269,8 @@ private fun SceneEmptyState(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Button(onClick = onCreateScene) {
-                Icon(Icons.Filled.Add, contentDescription = "Create scene")
+            OutlinedButton(onClick = onCreateScene) {
+                Icon(Icons.Filled.Add, contentDescription = null)
                 Text("Create Scene")
             }
         }
@@ -318,8 +316,8 @@ private fun SceneOverviewCard(
                 SceneMetric("${scenes.sumOf { it.elements.size }}", "Elements", Modifier.weight(1f))
                 SceneMetric("$errorCount", "Errors", Modifier.weight(1f))
             }
-            Button(onClick = onCreateScene, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Add, contentDescription = "Add scene")
+            OutlinedButton(onClick = onCreateScene, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.Add, contentDescription = null)
                 Text("Create Scene")
             }
         }
@@ -646,15 +644,7 @@ private fun SceneElementDeleteDialog(
             )
         },
         confirmButton = {
-            Button(
-                onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    contentColor = MaterialTheme.colorScheme.onError,
-                ),
-            ) {
-                Text("Remove Element")
-            }
+            OutlinedButton(onClick = onConfirm) { Text("Remove") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
@@ -809,7 +799,7 @@ private fun SceneElementEditorDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 enabled = canSave,
                 onClick = {
                     onSave(
@@ -1012,7 +1002,7 @@ private fun SceneEditorDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 enabled = canSave,
                 onClick = { onSave(name.trim(), parsedWidth ?: 320, parsedHeight ?: 240) },
             ) {

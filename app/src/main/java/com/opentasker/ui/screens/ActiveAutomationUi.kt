@@ -6,9 +6,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,20 +17,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -41,18 +36,17 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -68,25 +62,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -149,10 +136,8 @@ import com.opentasker.core.templates.ProfileTemplateCatalog
 import com.opentasker.core.templates.TemplateAvailability
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -173,13 +158,6 @@ private val DATABASE_BACKUP_MIME_TYPES = arrayOf(
     "application/vnd.sqlite3",
     "*/*",
 )
-private const val NO_DIALOG_ENTITY_ID = 0L
-private const val NO_DIALOG_INDEX = -1
-private const val DELETE_TARGET_PROFILE = "profile"
-private const val DELETE_TARGET_TASK = "task"
-private const val DELETE_TARGET_SCENE = "scene"
-private const val DELETE_TARGET_ACTION = "action"
-private const val DELETE_TARGET_CONTEXT = "context"
 
 private fun databaseBackupExportName(): String =
     "opentasker_backup_${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())}.db"
@@ -196,26 +174,6 @@ private enum class OpenTaskerScreen(val label: String) {
     Inspector("Inspect"),
     Setup("Setup"),
     RunLog("Log"),
-}
-
-private val primaryNavigationScreens = listOf(
-    OpenTaskerScreen.Profiles,
-    OpenTaskerScreen.Tasks,
-    OpenTaskerScreen.Vars,
-    OpenTaskerScreen.Setup,
-)
-
-private val secondaryNavigationScreens = OpenTaskerScreen.entries.filterNot { it in primaryNavigationScreens }
-
-private fun OpenTaskerScreen.icon(): ImageVector = when (this) {
-    OpenTaskerScreen.Profiles -> Icons.Filled.CheckCircle
-    OpenTaskerScreen.Tasks -> Icons.Filled.Edit
-    OpenTaskerScreen.Vars -> Icons.Filled.Menu
-    OpenTaskerScreen.Flow -> Icons.Filled.Info
-    OpenTaskerScreen.Scenes -> Icons.Filled.Edit
-    OpenTaskerScreen.Inspector -> Icons.Filled.Info
-    OpenTaskerScreen.Setup -> Icons.Filled.Settings
-    OpenTaskerScreen.RunLog -> Icons.Filled.Info
 }
 
 private data class ActionEditState(
@@ -315,27 +273,27 @@ class ActiveAutomationViewModel(
     private val events = Channel<String>(Channel.BUFFERED)
     val messages = events.receiveAsFlow()
 
-    private val _runLogRetentionPolicy = MutableStateFlow(runLogRetentionSettings.load())
-    val runLogRetentionPolicy: StateFlow<RunLogRetentionPolicy> = _runLogRetentionPolicy.asStateFlow()
+    var runLogRetentionPolicy by mutableStateOf(runLogRetentionSettings.load())
+        private set
 
-    private val _backupSetupState = MutableStateFlow(loadBackupSetupState(busy = false))
-    val backupSetupState: StateFlow<BackupSetupState> = _backupSetupState.asStateFlow()
+    var backupSetupState by mutableStateOf(loadBackupSetupState(busy = false))
+        private set
 
-    private val _taskerImportReview = MutableStateFlow<TaskerImportReviewState?>(null)
-    internal val taskerImportReview: StateFlow<TaskerImportReviewState?> = _taskerImportReview.asStateFlow()
+    internal var taskerImportReview by mutableStateOf<TaskerImportReviewState?>(null)
+        private set
 
-    private val _taskerImportBusy = MutableStateFlow(false)
-    val taskerImportBusy: StateFlow<Boolean> = _taskerImportBusy.asStateFlow()
+    var taskerImportBusy by mutableStateOf(false)
+        private set
 
-    private val _openTaskerBundleReview = MutableStateFlow<OpenTaskerBundleReviewState?>(null)
-    internal val openTaskerBundleReview: StateFlow<OpenTaskerBundleReviewState?> = _openTaskerBundleReview.asStateFlow()
+    internal var openTaskerBundleReview by mutableStateOf<OpenTaskerBundleReviewState?>(null)
+        private set
 
-    private val _openTaskerBundleBusy = MutableStateFlow(false)
-    val openTaskerBundleBusy: StateFlow<Boolean> = _openTaskerBundleBusy.asStateFlow()
+    var openTaskerBundleBusy by mutableStateOf(false)
+        private set
 
     init {
         viewModelScope.launch {
-            runCatching { pruneRunLogs(_runLogRetentionPolicy.value) }
+            runCatching { pruneRunLogs(runLogRetentionPolicy) }
         }
     }
 
@@ -442,8 +400,8 @@ class ActiveAutomationViewModel(
 
     fun previewTaskerXml(uri: Uri, appVersion: String) {
         viewModelScope.launch {
-            if (_taskerImportBusy.value) return@launch
-            _taskerImportBusy.value = true
+            if (taskerImportBusy) return@launch
+            taskerImportBusy = true
             runCatching {
                 withContext(Dispatchers.IO) {
                     val rawXml = readBoundedTaskerXml(appContext, uri)
@@ -452,45 +410,45 @@ class ActiveAutomationViewModel(
                 }
             }
                 .onSuccess {
-                    _taskerImportReview.value = it
+                    taskerImportReview = it
                     events.send("Tasker XML ready for review")
                 }
                 .onFailure { events.send("Error: ${it.message ?: "Tasker XML import preview failed"}") }
-            _taskerImportBusy.value = false
+            taskerImportBusy = false
         }
     }
 
     fun clearTaskerImportReview() {
-        if (!_taskerImportBusy.value) {
-            _taskerImportReview.value = null
+        if (!taskerImportBusy) {
+            taskerImportReview = null
         }
     }
 
     fun confirmTaskerImport(report: TaskerXmlImportReport) {
         viewModelScope.launch {
-            if (_taskerImportBusy.value) return@launch
-            _taskerImportBusy.value = true
+            if (taskerImportBusy) return@launch
+            taskerImportBusy = true
             runCatching {
                 withContext(Dispatchers.IO) {
                     bundleRepository.importBundle(TaskerImportPlanner.confirmedBundle(report))
                 }
             }
                 .onSuccess { importReport ->
-                    _taskerImportReview.value = null
+                    taskerImportReview = null
                     events.send(
                         "Imported ${importReport.insertedTasks} task${plural(importReport.insertedTasks)}, " +
                             "${importReport.insertedProfiles} disabled profile${plural(importReport.insertedProfiles)}"
                     )
                 }
                 .onFailure { events.send("Error: ${it.message ?: "Tasker XML import failed"}") }
-            _taskerImportBusy.value = false
+            taskerImportBusy = false
         }
     }
 
     fun exportOpenTaskerBundle(uri: Uri, appVersion: String) {
         viewModelScope.launch {
-            if (_openTaskerBundleBusy.value) return@launch
-            _openTaskerBundleBusy.value = true
+            if (openTaskerBundleBusy) return@launch
+            openTaskerBundleBusy = true
             runCatching {
                 withContext(Dispatchers.IO) {
                     val bundle = bundleRepository.exportBundle(
@@ -513,14 +471,14 @@ class ActiveAutomationViewModel(
                     )
                 }
                 .onFailure { events.send("Error: ${it.message ?: "OpenTasker bundle export failed"}") }
-            _openTaskerBundleBusy.value = false
+            openTaskerBundleBusy = false
         }
     }
 
     fun previewOpenTaskerBundle(uri: Uri) {
         viewModelScope.launch {
-            if (_openTaskerBundleBusy.value) return@launch
-            _openTaskerBundleBusy.value = true
+            if (openTaskerBundleBusy) return@launch
+            openTaskerBundleBusy = true
             runCatching {
                 withContext(Dispatchers.IO) {
                     val rawJson = readBoundedOpenTaskerBundle(appContext, uri)
@@ -529,31 +487,31 @@ class ActiveAutomationViewModel(
                 }
             }
                 .onSuccess {
-                    _openTaskerBundleReview.value = it
+                    openTaskerBundleReview = it
                     events.send("OpenTasker bundle ready for review")
                 }
                 .onFailure { events.send("Error: ${it.message ?: "OpenTasker bundle preview failed"}") }
-            _openTaskerBundleBusy.value = false
+            openTaskerBundleBusy = false
         }
     }
 
     fun clearOpenTaskerBundleReview() {
-        if (!_openTaskerBundleBusy.value) {
-            _openTaskerBundleReview.value = null
+        if (!openTaskerBundleBusy) {
+            openTaskerBundleReview = null
         }
     }
 
     fun confirmOpenTaskerBundleImport(bundle: OpenTaskerBundle) {
         viewModelScope.launch {
-            if (_openTaskerBundleBusy.value) return@launch
-            _openTaskerBundleBusy.value = true
+            if (openTaskerBundleBusy) return@launch
+            openTaskerBundleBusy = true
             runCatching {
                 withContext(Dispatchers.IO) {
                     bundleRepository.importBundle(bundle)
                 }
             }
                 .onSuccess { importReport ->
-                    _openTaskerBundleReview.value = null
+                    openTaskerBundleReview = null
                     events.send(
                         "Imported ${importReport.insertedTasks} task${plural(importReport.insertedTasks)}, " +
                             "${importReport.insertedProfiles} disabled profile${plural(importReport.insertedProfiles)}, " +
@@ -561,7 +519,7 @@ class ActiveAutomationViewModel(
                     )
                 }
                 .onFailure { events.send("Error: ${it.message ?: "OpenTasker bundle import failed"}") }
-            _openTaskerBundleBusy.value = false
+            openTaskerBundleBusy = false
         }
     }
 
@@ -570,7 +528,7 @@ class ActiveAutomationViewModel(
             val normalized = policy.normalized()
             runCatching {
                 runLogRetentionSettings.save(normalized)
-                _runLogRetentionPolicy.value = normalized
+                runLogRetentionPolicy = normalized
                 pruneRunLogs(normalized)
             }
                 .onSuccess { deleted ->
@@ -625,7 +583,7 @@ class ActiveAutomationViewModel(
     }
 
     private fun setBackupBusy(busy: Boolean) {
-        _backupSetupState.value = loadBackupSetupState(busy)
+        backupSetupState = loadBackupSetupState(busy)
     }
 
     private fun loadBackupSetupState(busy: Boolean): BackupSetupState =
@@ -730,33 +688,27 @@ fun ActiveAutomationUi(
     val scenes by viewModel.scenes.collectAsState()
     val runLogs by viewModel.runLogs.collectAsState()
     val globalVariables by viewModel.globalVariables.collectAsState()
-    val runLogRetentionPolicy by viewModel.runLogRetentionPolicy.collectAsState()
-    val backupSetupState by viewModel.backupSetupState.collectAsState()
+    val runLogRetentionPolicy = viewModel.runLogRetentionPolicy
+    val backupSetupState = viewModel.backupSetupState
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    var screenOrdinal by rememberSaveable { mutableIntStateOf(0) }
-    val screen = OpenTaskerScreen.entries.getOrElse(screenOrdinal) { OpenTaskerScreen.Profiles }
-    var taskDialogId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
-    var showCreateTaskDialog by rememberSaveable { mutableStateOf(false) }
-    var profileDialogId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
-    var showCreateProfileDialog by rememberSaveable { mutableStateOf(false) }
-    var showTemplateDialog by rememberSaveable { mutableStateOf(false) }
-    var selectedTemplateId by rememberSaveable { mutableStateOf<String?>(null) }
-    var actionPickerTaskId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
-    var actionEditTaskId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
-    var actionEditActionId by rememberSaveable { mutableStateOf<String?>(null) }
-    var actionEditIndex by rememberSaveable { mutableIntStateOf(NO_DIALOG_INDEX) }
-    var contextPickerProfileId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
-    var contextEditProfileId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
-    var contextEditTypeName by rememberSaveable { mutableStateOf<String?>(null) }
-    var contextEditIndex by rememberSaveable { mutableIntStateOf(NO_DIALOG_INDEX) }
-    var pendingDeleteKind by rememberSaveable { mutableStateOf<String?>(null) }
-    var pendingDeleteOwnerId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
-    var pendingDeleteIndex by rememberSaveable { mutableIntStateOf(NO_DIALOG_INDEX) }
-    val taskerImportReview by viewModel.taskerImportReview.collectAsState()
-    val taskerImportBusy by viewModel.taskerImportBusy.collectAsState()
-    val openTaskerBundleReview by viewModel.openTaskerBundleReview.collectAsState()
-    val openTaskerBundleBusy by viewModel.openTaskerBundleBusy.collectAsState()
+    var screen by remember { mutableStateOf(OpenTaskerScreen.Profiles) }
+    var showUiCustomization by remember { mutableStateOf(false) }
+    var taskDialog by remember { mutableStateOf<Task?>(null) }
+    var showCreateTaskDialog by remember { mutableStateOf(false) }
+    var profileDialog by remember { mutableStateOf<Profile?>(null) }
+    var showCreateProfileDialog by remember { mutableStateOf(false) }
+    var showTemplateDialog by remember { mutableStateOf(false) }
+    var selectedTemplate by remember { mutableStateOf<ProfileTemplate?>(null) }
+    var actionPickerTask by remember { mutableStateOf<Task?>(null) }
+    var actionEdit by remember { mutableStateOf<ActionEditState?>(null) }
+    var contextPickerProfile by remember { mutableStateOf<Profile?>(null) }
+    var contextEdit by remember { mutableStateOf<ContextEditState?>(null) }
+    var pendingDelete by remember { mutableStateOf<DeleteTarget?>(null) }
+    val taskerImportReview = viewModel.taskerImportReview
+    val taskerImportBusy = viewModel.taskerImportBusy
+    val openTaskerBundleReview = viewModel.openTaskerBundleReview
+    val openTaskerBundleBusy = viewModel.openTaskerBundleBusy
     val taskerXmlLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.previewTaskerXml(it, BuildConfig.VERSION_NAME) }
     }
@@ -776,135 +728,13 @@ fun ActiveAutomationUi(
     val databaseBackupImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.importDatabaseBackup(it) }
     }
-    val taskDialog = taskDialogId.takeIf { it != NO_DIALOG_ENTITY_ID }
-        ?.let { taskId -> tasks.firstOrNull { it.id == taskId } }
-    val profileDialog = profileDialogId.takeIf { it != NO_DIALOG_ENTITY_ID }
-        ?.let { profileId -> profiles.firstOrNull { it.id == profileId } }
-    val selectedTemplate = selectedTemplateId
-        ?.let { templateId -> ProfileTemplateCatalog.all.firstOrNull { it.id == templateId } }
-    val actionPickerTask = actionPickerTaskId.takeIf { it != NO_DIALOG_ENTITY_ID }
-        ?.let { taskId -> tasks.firstOrNull { it.id == taskId } }
-    val actionEdit = actionEditTaskId.takeIf { it != NO_DIALOG_ENTITY_ID }?.let { taskId ->
-        val task = tasks.firstOrNull { it.id == taskId } ?: return@let null
-        val actionId = actionEditActionId ?: return@let null
-        val metadata = ActionMetadataRegistry.get(actionId) ?: return@let null
-        val index = actionEditIndex.takeIf { it != NO_DIALOG_INDEX }
-        val existing = index?.let { task.actions.getOrNull(it) }?.takeIf { it.type == actionId }
-        if (index != null && existing == null) {
-            null
-        } else {
-            ActionEditState(task = task, metadata = metadata, index = index, existing = existing)
-        }
-    }
-    val contextPickerProfile = contextPickerProfileId.takeIf { it != NO_DIALOG_ENTITY_ID }
-        ?.let { profileId -> profiles.firstOrNull { it.id == profileId } }
-    val contextEdit = contextEditProfileId.takeIf { it != NO_DIALOG_ENTITY_ID }?.let { profileId ->
-        val profile = profiles.firstOrNull { it.id == profileId } ?: return@let null
-        val type = contextEditTypeName
-            ?.let { typeName -> runCatching { ContextType.valueOf(typeName) }.getOrNull() }
-            ?: return@let null
-        val index = contextEditIndex.takeIf { it != NO_DIALOG_INDEX }
-        val existing = index?.let { profile.contexts.getOrNull(it) }?.takeIf { it.type == type }
-        if (index != null && existing == null) {
-            null
-        } else {
-            ContextEditState(profile = profile, type = type, index = index, existing = existing)
-        }
-    }
-    val pendingDelete = when (pendingDeleteKind) {
-        DELETE_TARGET_PROFILE -> profiles.firstOrNull { it.id == pendingDeleteOwnerId }
-            ?.let { DeleteTarget.ProfileTarget(it) }
-        DELETE_TARGET_TASK -> tasks.firstOrNull { it.id == pendingDeleteOwnerId }
-            ?.let { DeleteTarget.TaskTarget(it) }
-        DELETE_TARGET_SCENE -> scenes.firstOrNull { it.id == pendingDeleteOwnerId }
-            ?.let { DeleteTarget.SceneTarget(it) }
-        DELETE_TARGET_ACTION -> tasks.firstOrNull { it.id == pendingDeleteOwnerId }
-            ?.let { task -> task.actions.getOrNull(pendingDeleteIndex)?.let { DeleteTarget.ActionTarget(task, pendingDeleteIndex, it) } }
-        DELETE_TARGET_CONTEXT -> profiles.firstOrNull { it.id == pendingDeleteOwnerId }
-            ?.let { profile -> profile.contexts.getOrNull(pendingDeleteIndex)?.let { DeleteTarget.ContextTarget(profile, pendingDeleteIndex, it) } }
-        else -> null
-    }
-    fun clearPendingDelete() {
-        pendingDeleteKind = null
-        pendingDeleteOwnerId = NO_DIALOG_ENTITY_ID
-        pendingDeleteIndex = NO_DIALOG_INDEX
-    }
-    fun openTaskDialog(task: Task) {
-        taskDialogId = task.id
-    }
-    fun clearTaskDialog() {
-        taskDialogId = NO_DIALOG_ENTITY_ID
-    }
-    fun openProfileDialog(profile: Profile) {
-        profileDialogId = profile.id
-    }
-    fun clearProfileDialog() {
-        profileDialogId = NO_DIALOG_ENTITY_ID
-    }
-    fun openActionPicker(task: Task) {
-        actionPickerTaskId = task.id
-    }
-    fun clearActionPicker() {
-        actionPickerTaskId = NO_DIALOG_ENTITY_ID
-    }
-    fun openActionEdit(task: Task, metadata: ActionMetadata, index: Int? = null) {
-        actionEditTaskId = task.id
-        actionEditActionId = metadata.id
-        actionEditIndex = index ?: NO_DIALOG_INDEX
-    }
-    fun clearActionEdit() {
-        actionEditTaskId = NO_DIALOG_ENTITY_ID
-        actionEditActionId = null
-        actionEditIndex = NO_DIALOG_INDEX
-    }
-    fun openContextPicker(profile: Profile) {
-        contextPickerProfileId = profile.id
-    }
-    fun clearContextPicker() {
-        contextPickerProfileId = NO_DIALOG_ENTITY_ID
-    }
-    fun openContextEdit(profile: Profile, type: ContextType, index: Int? = null) {
-        contextEditProfileId = profile.id
-        contextEditTypeName = type.name
-        contextEditIndex = index ?: NO_DIALOG_INDEX
-    }
-    fun clearContextEdit() {
-        contextEditProfileId = NO_DIALOG_ENTITY_ID
-        contextEditTypeName = null
-        contextEditIndex = NO_DIALOG_INDEX
-    }
-    fun openDeleteProfile(profile: Profile) {
-        pendingDeleteKind = DELETE_TARGET_PROFILE
-        pendingDeleteOwnerId = profile.id
-        pendingDeleteIndex = NO_DIALOG_INDEX
-    }
-    fun openDeleteTask(task: Task) {
-        pendingDeleteKind = DELETE_TARGET_TASK
-        pendingDeleteOwnerId = task.id
-        pendingDeleteIndex = NO_DIALOG_INDEX
-    }
-    fun openDeleteScene(scene: Scene) {
-        pendingDeleteKind = DELETE_TARGET_SCENE
-        pendingDeleteOwnerId = scene.id
-        pendingDeleteIndex = NO_DIALOG_INDEX
-    }
-    fun openDeleteAction(task: Task, index: Int) {
-        pendingDeleteKind = DELETE_TARGET_ACTION
-        pendingDeleteOwnerId = task.id
-        pendingDeleteIndex = index
-    }
-    fun openDeleteContext(profile: Profile, index: Int) {
-        pendingDeleteKind = DELETE_TARGET_CONTEXT
-        pendingDeleteOwnerId = profile.id
-        pendingDeleteIndex = index
-    }
     val openFlowTarget: (AutomationFlowTarget) -> Unit = { target ->
         var opened = true
         when (target) {
             is AutomationFlowTarget.Profile -> {
                 profiles.firstOrNull { it.id == target.profileId }?.let { profile ->
-                    screenOrdinal = OpenTaskerScreen.Profiles.ordinal
-                    openProfileDialog(profile)
+                    screen = OpenTaskerScreen.Profiles
+                    profileDialog = profile
                 } ?: run { opened = false }
             }
 
@@ -912,8 +742,8 @@ fun ActiveAutomationUi(
                 val profile = profiles.firstOrNull { it.id == target.profileId }
                 val contextSpec = profile?.contexts?.getOrNull(target.index)
                 if (profile != null && contextSpec != null) {
-                    screenOrdinal = OpenTaskerScreen.Profiles.ordinal
-                    openContextEdit(profile, contextSpec.type, target.index)
+                    screen = OpenTaskerScreen.Profiles
+                    contextEdit = ContextEditState(profile, contextSpec.type, target.index, contextSpec)
                 } else {
                     opened = false
                 }
@@ -921,8 +751,8 @@ fun ActiveAutomationUi(
 
             is AutomationFlowTarget.Task -> {
                 tasks.firstOrNull { it.id == target.taskId }?.let { task ->
-                    screenOrdinal = OpenTaskerScreen.Tasks.ordinal
-                    openTaskDialog(task)
+                    screen = OpenTaskerScreen.Tasks
+                    taskDialog = task
                 } ?: run { opened = false }
             }
 
@@ -931,8 +761,8 @@ fun ActiveAutomationUi(
                 val action = task?.actions?.getOrNull(target.index)
                 val metadata = action?.let { ActionMetadataRegistry.get(it.type) }
                 if (task != null && action != null && metadata != null) {
-                    screenOrdinal = OpenTaskerScreen.Tasks.ordinal
-                    openActionEdit(task, metadata, target.index)
+                    screen = OpenTaskerScreen.Tasks
+                    actionEdit = ActionEditState(task, metadata, target.index, action)
                 } else {
                     opened = false
                 }
@@ -947,7 +777,6 @@ fun ActiveAutomationUi(
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
 
-    var showMoreDestinations by rememberSaveable { mutableStateOf(false) }
     val headerDetail = when (screen) {
         OpenTaskerScreen.Profiles -> "${profiles.count { it.enabled }} enabled - ${profiles.size} total"
         OpenTaskerScreen.Tasks -> "${tasks.sumOf { it.actions.size }} actions - ${tasks.size} tasks"
@@ -959,10 +788,13 @@ fun ActiveAutomationUi(
         OpenTaskerScreen.RunLog -> "${runLogs.size} recent entries"
     }
 
+    if (showUiCustomization) {
+        UiCustomizationScreen(onBack = { showUiCustomization = false })
+        return
+    }
+
     Scaffold(
-        modifier = modifier
-            .fillMaxSize()
-            .imePadding(),
+        modifier = modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
@@ -979,7 +811,8 @@ fun ActiveAutomationUi(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
+                    containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.background,
                 ),
             )
         },
@@ -993,14 +826,20 @@ fun ActiveAutomationUi(
                             showCreateProfileDialog = true
                         }
                     },
-                    shape = RoundedCornerShape(12.dp),
+                    containerColor = MaterialTheme.colorScheme.background,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)),
                 ) {
-                    Icon(Icons.Filled.Add, contentDescription = if (tasks.isEmpty()) "Create task" else "Create profile")
+                    Icon(Icons.Filled.Add, contentDescription = if (tasks.isEmpty()) "Create task first" else "Create profile")
                 }
 
                 OpenTaskerScreen.Tasks -> FloatingActionButton(
                     onClick = { showCreateTaskDialog = true },
-                    shape = RoundedCornerShape(12.dp),
+                    containerColor = MaterialTheme.colorScheme.background,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)),
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = "Create task")
                 }
@@ -1014,43 +853,56 @@ fun ActiveAutomationUi(
             }
         },
         bottomBar = {
-            NavigationBar {
-                primaryNavigationScreens.forEach { destination ->
-                    OpenTaskerNavigationItem(
-                        selected = screen == destination,
-                        onClick = {
-                            screenOrdinal = destination.ordinal
-                            showMoreDestinations = false
+            Column {
+                HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.primary)
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    tonalElevation = 0.dp,
+                ) {
+                    val navItemColors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        unselectedIconColor = MaterialTheme.colorScheme.primary,
+                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                        unselectedTextColor = MaterialTheme.colorScheme.primary,
+                        indicatorColor = Color.Transparent,
+                    )
+                    OpenTaskerScreen.entries.forEach { destination ->
+                        NavigationBarItem(
+                            selected = screen == destination,
+                            onClick = { screen = destination },
+                            colors = navItemColors,
+                            icon = {
+                            val icon = when (destination) {
+                                OpenTaskerScreen.Profiles -> Icons.Filled.CheckCircle
+                                OpenTaskerScreen.Tasks -> Icons.Filled.Edit
+                                OpenTaskerScreen.Vars -> Icons.Filled.Menu
+                                OpenTaskerScreen.Flow -> Icons.Filled.Info
+                                OpenTaskerScreen.Scenes -> Icons.Filled.Edit
+                                OpenTaskerScreen.Inspector -> Icons.Filled.Info
+                                OpenTaskerScreen.Setup -> Icons.Filled.Settings
+                                OpenTaskerScreen.RunLog -> Icons.Filled.Info
+                            }
+                            if (destination == OpenTaskerScreen.Setup) {
+                                // Long-press the Setup cog jumps straight to the 白い熊 自由作業盤 UI page;
+                                // a normal tap still selects the Setup tab.
+                                Box(
+                                    modifier = Modifier.pointerInput(Unit) {
+                                        detectTapGestures(
+                                            onTap = { screen = OpenTaskerScreen.Setup },
+                                            onLongPress = { showUiCustomization = true },
+                                        )
+                                    },
+                                ) {
+                                    Icon(icon, contentDescription = null)
+                                }
+                            } else {
+                                Icon(icon, contentDescription = null)
+                            }
                         },
-                        icon = destination.icon(),
-                        label = destination.label,
-                        modifier = Modifier.weight(1f),
+                        label = { Text(destination.label) },
+                        alwaysShowLabel = true,
                     )
                 }
-                Box(Modifier.weight(1f)) {
-                    OpenTaskerNavigationItem(
-                        selected = screen in secondaryNavigationScreens,
-                        onClick = { showMoreDestinations = true },
-                        icon = Icons.Filled.Menu,
-                        label = "More",
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    DropdownMenu(
-                        expanded = showMoreDestinations,
-                        onDismissRequest = { showMoreDestinations = false },
-                        modifier = Modifier.align(Alignment.TopEnd),
-                    ) {
-                        secondaryNavigationScreens.forEach { destination ->
-                            DropdownMenuItem(
-                                text = { Text(destination.label) },
-                                leadingIcon = { Icon(destination.icon(), contentDescription = null) },
-                                onClick = {
-                                    screenOrdinal = destination.ordinal
-                                    showMoreDestinations = false
-                                },
-                            )
-                        }
-                    }
                 }
             }
         },
@@ -1061,7 +913,7 @@ fun ActiveAutomationUi(
                 tasks = tasks,
                 runLogs = runLogs,
                 onCreateTaskFirst = {
-                    screenOrdinal = OpenTaskerScreen.Tasks.ordinal
+                    screen = OpenTaskerScreen.Tasks
                     showCreateTaskDialog = true
                 },
                 onCreateProfile = { showCreateProfileDialog = true },
@@ -1071,17 +923,19 @@ fun ActiveAutomationUi(
                 openTaskerBundleBusy = openTaskerBundleBusy,
                 onImportTaskerXml = { taskerXmlLauncher.launch(TASKER_XML_MIME_TYPES) },
                 taskerImportBusy = taskerImportBusy,
-                onEditProfile = { openProfileDialog(it) },
-                onDeleteProfile = { openDeleteProfile(it) },
+                onEditProfile = { profileDialog = it },
+                onDeleteProfile = { pendingDelete = DeleteTarget.ProfileTarget(it) },
                 onToggleProfile = { profile, enabled ->
                     viewModel.updateProfile(profile.copy(enabled = enabled), "Profile ${if (enabled) "enabled" else "disabled"}")
                 },
-                onAddContext = { openContextPicker(it) },
+                onAddContext = { contextPickerProfile = it },
                 onEditContext = { profile, index, context ->
-                    openContextEdit(profile, context.type, index)
+                    contextEdit = ContextEditState(profile, context.type, index, context)
                 },
                 onDeleteContext = { profile, index ->
-                    if (profile.contexts.getOrNull(index) != null) openDeleteContext(profile, index)
+                    profile.contexts.getOrNull(index)?.let { context ->
+                        pendingDelete = DeleteTarget.ContextTarget(profile, index, context)
+                    }
                 },
                 contentPadding = innerPadding,
             )
@@ -1089,18 +943,20 @@ fun ActiveAutomationUi(
             OpenTaskerScreen.Tasks -> TasksScreen(
                 tasks = tasks,
                 onCreateTask = { showCreateTaskDialog = true },
-                onEditTask = { openTaskDialog(it) },
-                onDeleteTask = { openDeleteTask(it) },
+                onEditTask = { taskDialog = it },
+                onDeleteTask = { pendingDelete = DeleteTarget.TaskTarget(it) },
                 onRunTask = { viewModel.runTaskNow(it) },
                 onPinTask = { viewModel.pinTaskShortcut(it) },
-                onAddAction = { openActionPicker(it) },
+                onAddAction = { actionPickerTask = it },
                 onEditAction = { task, index, action ->
                     ActionMetadataRegistry.get(action.type)?.let { metadata ->
-                        openActionEdit(task, metadata, index)
+                        actionEdit = ActionEditState(task, metadata, index, action)
                     }
                 },
                 onDeleteAction = { task, index ->
-                    if (task.actions.getOrNull(index) != null) openDeleteAction(task, index)
+                    task.actions.getOrNull(index)?.let { action ->
+                        pendingDelete = DeleteTarget.ActionTarget(task, index, action)
+                    }
                 },
                 contentPadding = innerPadding,
             )
@@ -1113,8 +969,8 @@ fun ActiveAutomationUi(
                 onAddContext = { profileId ->
                     val profile = profiles.firstOrNull { it.id == profileId }
                     if (profile != null) {
-                        screenOrdinal = OpenTaskerScreen.Profiles.ordinal
-                        openContextPicker(profile)
+                        screen = OpenTaskerScreen.Profiles
+                        contextPickerProfile = profile
                     } else {
                         scope.launch { snackbarHostState.showSnackbar("Flow target no longer exists") }
                     }
@@ -1122,8 +978,8 @@ fun ActiveAutomationUi(
                 onAddAction = { taskId ->
                     val task = tasks.firstOrNull { it.id == taskId }
                     if (task != null) {
-                        screenOrdinal = OpenTaskerScreen.Tasks.ordinal
-                        openActionPicker(task)
+                        screen = OpenTaskerScreen.Tasks
+                        actionPickerTask = task
                     } else {
                         scope.launch { snackbarHostState.showSnackbar("Flow target no longer exists") }
                     }
@@ -1143,13 +999,14 @@ fun ActiveAutomationUi(
                 tasks = tasks,
                 onCreateScene = viewModel::createScene,
                 onUpdateScene = viewModel::updateScene,
-                onDeleteScene = { openDeleteScene(it) },
+                onDeleteScene = { pendingDelete = DeleteTarget.SceneTarget(it) },
                 contentPadding = innerPadding,
             )
 
             OpenTaskerScreen.Setup -> PermissionOnboardingScreen(
                 contentPadding = innerPadding,
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
+                onOpenUiCustomization = { showUiCustomization = true },
                 backupState = backupSetupState,
                 onCreateBackup = viewModel::createDatabaseBackup,
                 onExportBackup = { databaseBackupExportLauncher.launch(databaseBackupExportName()) },
@@ -1171,7 +1028,7 @@ fun ActiveAutomationUi(
     pendingDelete?.let { target ->
         DeleteConfirmationDialog(
             target = target,
-            onDismiss = { clearPendingDelete() },
+            onDismiss = { pendingDelete = null },
             onConfirm = {
                 when (target) {
                     is DeleteTarget.ProfileTarget -> viewModel.deleteProfile(target.profile)
@@ -1186,7 +1043,7 @@ fun ActiveAutomationUi(
                         "Context removed",
                     )
                 }
-                clearPendingDelete()
+                pendingDelete = null
             },
         )
     }
@@ -1223,10 +1080,10 @@ fun ActiveAutomationUi(
     taskDialog?.let { task ->
         TaskEditorDialog(
             task = task,
-            onDismiss = { clearTaskDialog() },
+            onDismiss = { taskDialog = null },
             onSave = { name, priority ->
                 viewModel.updateTask(task.copy(name = name.trim(), priority = priority.coerceIn(0, 10)))
-                clearTaskDialog()
+                taskDialog = null
             },
         )
     }
@@ -1248,7 +1105,7 @@ fun ActiveAutomationUi(
             onDismiss = { showTemplateDialog = false },
             onSelect = { template ->
                 showTemplateDialog = false
-                selectedTemplateId = template.id
+                selectedTemplate = template
             },
         )
     }
@@ -1256,11 +1113,11 @@ fun ActiveAutomationUi(
     selectedTemplate?.let { template ->
         TemplateSlotDialog(
             template = template,
-            onDismiss = { selectedTemplateId = null },
+            onDismiss = { selectedTemplate = null },
             onInstall = { values ->
                 viewModel.installProfileTemplate(template, values)
-                selectedTemplateId = null
-                screenOrdinal = OpenTaskerScreen.Profiles.ordinal
+                selectedTemplate = null
+                screen = OpenTaskerScreen.Profiles
             },
         )
     }
@@ -1269,7 +1126,7 @@ fun ActiveAutomationUi(
         ProfileEditorDialog(
             profile = profile,
             tasks = tasks,
-            onDismiss = { clearProfileDialog() },
+            onDismiss = { profileDialog = null },
             onSave = { name, enabled, enterTaskId, cooldown, automationMode ->
                 viewModel.updateProfile(
                     profile.copy(
@@ -1280,17 +1137,17 @@ fun ActiveAutomationUi(
                         automationMode = automationMode,
                     )
                 )
-                clearProfileDialog()
+                profileDialog = null
             },
         )
     }
 
     actionPickerTask?.let { task ->
         ActionPickerDialog(
-            onDismiss = { clearActionPicker() },
+            onDismiss = { actionPickerTask = null },
             onSelect = { metadata ->
-                clearActionPicker()
-                openActionEdit(task, metadata)
+                actionPickerTask = null
+                actionEdit = ActionEditState(task, metadata)
             },
         )
     }
@@ -1298,23 +1155,23 @@ fun ActiveAutomationUi(
     actionEdit?.let { state ->
         ActionConfigDialog(
             state = state,
-            onDismiss = { clearActionEdit() },
+            onDismiss = { actionEdit = null },
             onSave = { action ->
                 val updatedActions = state.index?.let { index ->
                     state.task.actions.mapIndexed { i, existing -> if (i == index) action else existing }
                 } ?: (state.task.actions + action)
                 viewModel.updateTask(state.task.copy(actions = updatedActions), if (state.index == null) "Action added" else "Action updated")
-                clearActionEdit()
+                actionEdit = null
             },
         )
     }
 
     contextPickerProfile?.let { profile ->
         ContextTypePickerDialog(
-            onDismiss = { clearContextPicker() },
+            onDismiss = { contextPickerProfile = null },
             onSelect = { type ->
-                clearContextPicker()
-                openContextEdit(profile, type)
+                contextPickerProfile = null
+                contextEdit = ContextEditState(profile, type)
             },
         )
     }
@@ -1322,7 +1179,7 @@ fun ActiveAutomationUi(
     contextEdit?.let { state ->
         ContextConfigDialog(
             state = state,
-            onDismiss = { clearContextEdit() },
+            onDismiss = { contextEdit = null },
             onSave = { context ->
                 val updatedContexts = state.index?.let { index ->
                     state.profile.contexts.mapIndexed { i, existing -> if (i == index) context else existing }
@@ -1331,55 +1188,8 @@ fun ActiveAutomationUi(
                     state.profile.copy(contexts = updatedContexts),
                     if (state.index == null) "Context added" else "Context updated",
                 )
-                clearContextEdit()
+                contextEdit = null
             },
-        )
-    }
-}
-
-@Composable
-private fun OpenTaskerNavigationItem(
-    selected: Boolean,
-    onClick: () -> Unit,
-    icon: ImageVector,
-    label: String,
-    modifier: Modifier = Modifier,
-) {
-    val contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-    Column(
-        modifier = modifier
-            .heightIn(min = 72.dp)
-            .clickable(role = Role.Tab, onClick = onClick)
-            .semantics(mergeDescendants = true) {
-                this.selected = selected
-                stateDescription = if (selected) "Selected" else "Not selected"
-            }
-            .padding(horizontal = 4.dp, vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Surface(
-            color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f) else Color.Transparent,
-            shape = RoundedCornerShape(8.dp),
-            border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)) else null,
-        ) {
-            Icon(
-                icon,
-                contentDescription = label,
-                tint = contentColor,
-                modifier = Modifier
-                    .padding(horizontal = 16.dp, vertical = 5.dp)
-                    .size(24.dp),
-            )
-        }
-        Spacer(Modifier.height(2.dp))
-        Text(
-            label,
-            style = MaterialTheme.typography.labelMedium,
-            color = contentColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
         )
     }
 }
@@ -1442,10 +1252,6 @@ private fun ProfilesScreen(
         return
     }
 
-    var profileSearchQuery by rememberSaveable { mutableStateOf("") }
-    val filteredProfiles = if (profileSearchQuery.isBlank()) profiles
-        else profiles.filter { it.name.contains(profileSearchQuery, ignoreCase = true) }
-
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1469,21 +1275,7 @@ private fun ProfilesScreen(
         item {
             TemplatePromptCard(onBrowseTemplates)
         }
-        item {
-            OutlinedTextField(
-                value = profileSearchQuery,
-                onValueChange = { profileSearchQuery = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Search profiles...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
-                trailingIcon = if (profileSearchQuery.isNotEmpty()) {
-                    { IconButton(onClick = { profileSearchQuery = "" }) { Icon(Icons.Default.Clear, contentDescription = "Clear search") } }
-                } else null,
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-            )
-        }
-        items(filteredProfiles, key = { it.id }) { profile ->
+        items(profiles, key = { it.id }) { profile ->
             val enterTaskName = tasks.firstOrNull { it.id == profile.enterTaskId }?.name ?: "Missing task #${profile.enterTaskId}"
             ProfileCard(
                 profile = profile,
@@ -1559,7 +1351,7 @@ private fun WorkspaceSummaryCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f)),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
-        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+        shape = RoundedCornerShape(18.dp),
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -1632,7 +1424,7 @@ private fun TaskLibrarySummaryCard(tasks: List<Task>, onCreateTask: () -> Unit) 
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
-        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+        shape = RoundedCornerShape(18.dp),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1644,8 +1436,8 @@ private fun TaskLibrarySummaryCard(tasks: List<Task>, onCreateTask: () -> Unit) 
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Button(onClick = onCreateTask) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add task")
+                OutlinedButton(onClick = onCreateTask) {
+                    Icon(Icons.Filled.Add, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Task")
                 }
@@ -1686,7 +1478,7 @@ private fun StatusPill(
     Surface(
         modifier = modifier,
         color = color.copy(alpha = 0.14f),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(999.dp),
         border = BorderStroke(1.dp, color.copy(alpha = 0.34f)),
     ) {
         Text(
@@ -1713,7 +1505,7 @@ private fun InlineNotice(title: String, body: String, color: Color) {
         ) {
             Icon(
                 if (color == MaterialTheme.colorScheme.error) Icons.Filled.Error else Icons.Filled.Info,
-                contentDescription = if (color == MaterialTheme.colorScheme.error) "Error" else "Info",
+                contentDescription = null,
                 tint = color,
                 modifier = Modifier.size(20.dp),
             )
@@ -1811,19 +1603,19 @@ private fun ProfileCard(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Edit profile")
+                    Icon(Icons.Filled.Edit, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Edit")
                 }
                 OutlinedButton(onClick = onAddContext, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add context")
+                    Icon(Icons.Filled.Add, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Add Context")
                 }
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete profile")
+                    Icon(Icons.Filled.Delete, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Delete Profile")
                 }
@@ -1855,10 +1647,6 @@ private fun TasksScreen(
         )
         return
     }
-    var taskSearchQuery by rememberSaveable { mutableStateOf("") }
-    val filteredTasks = if (taskSearchQuery.isBlank()) tasks
-        else tasks.filter { it.name.contains(taskSearchQuery, ignoreCase = true) }
-
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1869,21 +1657,7 @@ private fun TasksScreen(
         item {
             TaskLibrarySummaryCard(tasks = tasks, onCreateTask = onCreateTask)
         }
-        item {
-            OutlinedTextField(
-                value = taskSearchQuery,
-                onValueChange = { taskSearchQuery = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Search tasks...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
-                trailingIcon = if (taskSearchQuery.isNotEmpty()) {
-                    { IconButton(onClick = { taskSearchQuery = "" }) { Icon(Icons.Default.Clear, contentDescription = "Clear search") } }
-                } else null,
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-            )
-        }
-        items(filteredTasks, key = { it.id }) { task ->
+        items(tasks, key = { it.id }) { task ->
             TaskCard(
                 task = task,
                 onEdit = { onEditTask(task) },
@@ -1953,12 +1727,12 @@ private fun TaskCard(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Edit task")
+                    Icon(Icons.Filled.Edit, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Edit")
                 }
                 OutlinedButton(onClick = onAddAction, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add action")
+                    Icon(Icons.Filled.Add, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Add Action")
                 }
@@ -1966,18 +1740,18 @@ private fun TaskCard(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onRun) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = "Run task")
+                        Icon(Icons.Filled.PlayArrow, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
                         Text("Run")
                     }
                     OutlinedButton(onClick = onPin) {
-                        Icon(Icons.Filled.PushPin, contentDescription = "Pin task")
+                        Icon(Icons.Filled.PushPin, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
                         Text("Pin")
                     }
                 }
                 TextButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete task")
+                    Icon(Icons.Filled.Delete, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Delete Task")
                 }
@@ -2082,10 +1856,9 @@ private fun RunLogScreenContent(
     onRetentionPolicyChange: (RunLogRetentionPolicy) -> Unit,
     contentPadding: PaddingValues,
 ) {
-    var statusFilterOrdinal by rememberSaveable { mutableIntStateOf(0) }
-    val statusFilter = RunLogStatusFilter.entries.getOrElse(statusFilterOrdinal) { RunLogStatusFilter.All }
-    var taskIdFilter by rememberSaveable { mutableStateOf<Long?>(null) }
-    var query by rememberSaveable { mutableStateOf("") }
+    var statusFilter by remember { mutableStateOf(RunLogStatusFilter.All) }
+    var taskIdFilter by remember { mutableStateOf<Long?>(null) }
+    var query by remember { mutableStateOf("") }
     val taskOptions = remember(logs, tasks) { runLogTaskOptions(logs, tasks) }
     val filteredLogs = remember(logs, statusFilter, taskIdFilter, query) {
         filterRunLogs(logs, RunLogFilterState(status = statusFilter, taskId = taskIdFilter, query = query))
@@ -2122,7 +1895,7 @@ private fun RunLogScreenContent(
                     totalCount = logs.size,
                     visibleCount = filteredLogs.size,
                     statusFilter = statusFilter,
-                    onStatusFilterChange = { statusFilterOrdinal = it.ordinal },
+                    onStatusFilterChange = { statusFilter = it },
                     taskOptions = taskOptions,
                     selectedTaskId = taskIdFilter,
                     onTaskFilterChange = { taskIdFilter = it },
@@ -2205,7 +1978,7 @@ private fun RunLogRetentionCard(
                                 if (selected) {
                                     Icon(
                                         Icons.Filled.CheckCircle,
-                                        contentDescription = "Selected",
+                                        contentDescription = null,
                                         modifier = Modifier.size(16.dp),
                                     )
                                 }
@@ -2351,7 +2124,7 @@ private fun RunLogSummaryCard(logs: List<RunLogEntry>) {
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
-        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+        shape = RoundedCornerShape(18.dp),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -2436,11 +2209,7 @@ private fun RunLogCard(entry: RunLogEntry) {
                     RunLogOutcome.Failed -> Icons.Filled.Error
                     RunLogOutcome.Skipped -> Icons.Filled.Info
                 },
-                contentDescription = when (outcome) {
-                    RunLogOutcome.Succeeded -> "Succeeded"
-                    RunLogOutcome.Failed -> "Failed"
-                    RunLogOutcome.Skipped -> "Skipped"
-                },
+                contentDescription = null,
                 tint = accent,
             )
             Column(Modifier.weight(1f)) {
@@ -2607,13 +2376,13 @@ private fun EmptyState(
     ) {
         Surface(
             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
-            shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+            shape = RoundedCornerShape(18.dp),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)),
         ) {
             Box(modifier = Modifier.padding(14.dp), contentAlignment = Alignment.Center) {
                 Icon(
                     Icons.Filled.Info,
-                    contentDescription = "Info",
+                    contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(30.dp),
                 )
@@ -2630,15 +2399,8 @@ private fun EmptyState(
         )
         if (actionLabel != null && onAction != null) {
             Spacer(Modifier.height(24.dp))
-            Button(
-                onClick = onAction,
-                enabled = actionEnabled,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp),
-                shape = RoundedCornerShape(12.dp),
-            ) {
-                Text(actionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+            OutlinedButton(onClick = onAction, enabled = actionEnabled, modifier = Modifier.fillMaxWidth()) {
+                Text(actionLabel)
             }
         }
         if (secondaryActionLabel != null && onSecondaryAction != null) {
@@ -2646,12 +2408,9 @@ private fun EmptyState(
             OutlinedButton(
                 onClick = onSecondaryAction,
                 enabled = secondaryActionEnabled,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp),
-                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(secondaryActionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                Text(secondaryActionLabel)
             }
         }
         if (tertiaryActionLabel != null && onTertiaryAction != null) {
@@ -2659,11 +2418,9 @@ private fun EmptyState(
             TextButton(
                 onClick = onTertiaryAction,
                 enabled = tertiaryActionEnabled,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp),
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(tertiaryActionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                Text(tertiaryActionLabel)
             }
         }
         if (quaternaryActionLabel != null && onQuaternaryAction != null) {
@@ -2671,11 +2428,9 @@ private fun EmptyState(
             TextButton(
                 onClick = onQuaternaryAction,
                 enabled = quaternaryActionEnabled,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp),
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(quaternaryActionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                Text(quaternaryActionLabel)
             }
         }
     }
@@ -2692,7 +2447,7 @@ private fun DeleteConfirmationDialog(
         icon = {
             Icon(
                 Icons.Filled.Delete,
-                contentDescription = "Delete",
+                contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
             )
         },
@@ -2715,9 +2470,10 @@ private fun DeleteConfirmationDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
             ) {
                 Text(target.confirmLabel)
             }
@@ -2805,7 +2561,7 @@ private fun OpenTaskerBundleReviewDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 enabled = plan.canImport && !busy,
                 onClick = onConfirm,
             ) {
@@ -2907,7 +2663,7 @@ private fun TaskerImportReviewDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 enabled = preview.canImport && !busy,
                 onClick = onConfirm,
             ) {
@@ -2945,7 +2701,7 @@ private fun TemplatePickerDialog(
         title = { Text("Starter templates") },
         text = {
             LazyColumn(
-                modifier = Modifier.heightIn(max = 460.dp),
+                modifier = Modifier.height(460.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 items(ProfileTemplateCatalog.all, key = { it.id }) { template ->
@@ -3003,7 +2759,7 @@ private fun TemplateSlotDialog(
     onDismiss: () -> Unit,
     onInstall: (Map<String, String>) -> Unit,
 ) {
-    var values by rememberSaveable(template.id) { mutableStateOf(template.defaults()) }
+    var values by remember(template.id) { mutableStateOf(template.defaults()) }
     val missingRequired = template.slots.any { it.required && values[it.key].isNullOrBlank() }
 
     AlertDialog(
@@ -3011,7 +2767,7 @@ private fun TemplateSlotDialog(
         title = { Text(template.title) },
         text = {
             LazyColumn(
-                modifier = Modifier.heightIn(max = 420.dp),
+                modifier = Modifier.height(420.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
@@ -3041,7 +2797,7 @@ private fun TemplateSlotDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 enabled = !missingRequired && template.installable,
                 onClick = { onInstall(values) },
             ) {
@@ -3058,8 +2814,8 @@ private fun TaskEditorDialog(
     onDismiss: () -> Unit,
     onSave: (String, Int) -> Unit,
 ) {
-    var name by rememberSaveable(task?.id) { mutableStateOf(task?.name.orEmpty()) }
-    var priority by rememberSaveable(task?.id) { mutableStateOf((task?.priority ?: 5).toString()) }
+    var name by remember(task?.id) { mutableStateOf(task?.name.orEmpty()) }
+    var priority by remember(task?.id) { mutableStateOf((task?.priority ?: 5).toString()) }
     val parsedPriority = priority.toIntOrNull()
     val canSave = name.isNotBlank() && parsedPriority != null && parsedPriority in 0..10
 
@@ -3083,14 +2839,13 @@ private fun TaskEditorDialog(
                     label = { Text("Priority") },
                     supportingText = { Text(if (parsedPriority == null || parsedPriority !in 0..10) "Enter a value from 0 to 10." else "Higher priority tasks run first when queues compete.") },
                     isError = parsedPriority == null || parsedPriority !in 0..10,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
         confirmButton = {
-            Button(enabled = canSave, onClick = { onSave(name, parsedPriority ?: 5) }) {
+            OutlinedButton(enabled = canSave, onClick = { onSave(name, parsedPriority ?: 5) }) {
                 Text("Save")
             }
         },
@@ -3106,11 +2861,11 @@ private fun ProfileEditorDialog(
     onSave: (String, Boolean, Long, Int, AutomationMode) -> Unit,
 ) {
     val initialTaskId = profile?.enterTaskId ?: tasks.firstOrNull()?.id ?: 0L
-    var name by rememberSaveable(profile?.id) { mutableStateOf(profile?.name.orEmpty()) }
-    var enabled by rememberSaveable(profile?.id) { mutableStateOf(profile?.enabled ?: true) }
-    var enterTaskId by rememberSaveable(profile?.id, tasks) { mutableLongStateOf(initialTaskId) }
-    var cooldown by rememberSaveable(profile?.id) { mutableStateOf((profile?.cooldownSec ?: 0).toString()) }
-    var automationMode by rememberSaveable(profile?.id) { mutableStateOf(profile?.automationMode ?: AutomationMode.SINGLE) }
+    var name by remember(profile?.id) { mutableStateOf(profile?.name.orEmpty()) }
+    var enabled by remember(profile?.id) { mutableStateOf(profile?.enabled ?: true) }
+    var enterTaskId by remember(profile?.id, tasks) { mutableLongStateOf(initialTaskId) }
+    var cooldown by remember(profile?.id) { mutableStateOf((profile?.cooldownSec ?: 0).toString()) }
+    var automationMode by remember(profile?.id) { mutableStateOf(profile?.automationMode ?: AutomationMode.SINGLE) }
     val parsedCooldown = cooldown.toIntOrNull()
     val canSave = name.isNotBlank() && enterTaskId > 0 && (cooldown.isBlank() || parsedCooldown != null)
 
@@ -3132,16 +2887,6 @@ private fun ProfileEditorDialog(
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f),
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .toggleable(
-                            value = enabled,
-                            role = Role.Switch,
-                            onValueChange = { enabled = it },
-                        )
-                        .semantics {
-                            stateDescription = if (enabled) "On" else "Off"
-                        },
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -3155,7 +2900,7 @@ private fun ProfileEditorDialog(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        Switch(checked = enabled, onCheckedChange = null)
+                        Switch(checked = enabled, onCheckedChange = { enabled = it })
                     }
                 }
                 Text("Enter task", style = MaterialTheme.typography.labelLarge)
@@ -3173,7 +2918,6 @@ private fun ProfileEditorDialog(
                     label = { Text("Cooldown seconds") },
                     supportingText = { Text(if (cooldown.isNotBlank() && parsedCooldown == null) "Enter seconds as a whole number." else "Prevents rapid re-triggering after a match.") },
                     isError = cooldown.isNotBlank() && parsedCooldown == null,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -3190,7 +2934,7 @@ private fun ProfileEditorDialog(
             }
         },
         confirmButton = {
-            Button(enabled = canSave, onClick = { onSave(name, enabled, enterTaskId, parsedCooldown ?: 0, automationMode) }) {
+            OutlinedButton(enabled = canSave, onClick = { onSave(name, enabled, enterTaskId, parsedCooldown ?: 0, automationMode) }) {
                 Text("Save")
             }
         },
@@ -3251,7 +2995,7 @@ private fun ActionPickerDialog(
         title = { Text("Add action") },
         text = {
             LazyColumn(
-                modifier = Modifier.heightIn(max = 420.dp),
+                modifier = Modifier.height(420.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 actionGroups.forEach { (category, actions) ->
@@ -3308,42 +3052,17 @@ private fun ActionPickerDialog(
     )
 }
 
-private fun existingActionArgValue(
-    actionId: String,
-    key: String,
-    args: Map<String, String>,
-): String = args[key] ?: when (actionId to key) {
-    "brightness.set" to "brightness" -> args["level"]
-    "screenshot.take" to "path" -> args["filename"]
-    "file.read" to "var" -> args["variable"]
-    "file.write" to "text" -> args["content"]
-    "file.append" to "text" -> args["content"]
-    "file.list" to "var" -> args["variable"]
-    "http.get" to "var" -> args["variable"]
-    "http.post" to "data" -> args["body"]
-    "http.post" to "var" -> args["variable"]
-    else -> null
-}.orEmpty()
-
 @Composable
 private fun ActionConfigDialog(
     state: ActionEditState,
     onDismiss: () -> Unit,
     onSave: (ActionSpec) -> Unit,
 ) {
-    var label by rememberSaveable(state.existing?.id, state.metadata.id) {
+    var label by remember(state.existing?.id, state.metadata.id) {
         mutableStateOf(state.existing?.label ?: state.metadata.name)
     }
-    var values by rememberSaveable(state.existing?.id, state.metadata.id) {
-        mutableStateOf(
-            state.metadata.fields.associate { field ->
-                field.key to existingActionArgValue(
-                    actionId = state.metadata.id,
-                    key = field.key,
-                    args = state.existing?.args.orEmpty(),
-                )
-            }
-        )
+    var values by remember(state.existing?.id, state.metadata.id) {
+        mutableStateOf(state.metadata.fields.associate { field -> field.key to state.existing?.args?.get(field.key).orEmpty() })
     }
     val capability = remember(state.metadata.id) { ActionCapabilityRegistry.get(state.metadata.id) }
     val missingRequired = state.metadata.fields.any { it.required && values[it.key].isNullOrBlank() }
@@ -3353,7 +3072,7 @@ private fun ActionConfigDialog(
         title = { Text(state.metadata.name) },
         text = {
             LazyColumn(
-                modifier = Modifier.heightIn(max = 420.dp),
+                modifier = Modifier.height(420.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
@@ -3396,7 +3115,7 @@ private fun ActionConfigDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 enabled = !missingRequired && capability.canAdd,
                 onClick = {
                     onSave(
@@ -3422,23 +3141,11 @@ private fun ActionConfigDialog(
 private fun ActionFieldInput(field: ActionField, value: String, onChange: (String) -> Unit) {
     val label = field.label + if (field.required) " *" else ""
     when (field.fieldType) {
-        FieldType.CHECKBOX -> {
-            val checked = value.toBoolean()
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .toggleable(
-                        value = checked,
-                        role = Role.Switch,
-                        onValueChange = { onChange(it.toString()) },
-                    )
-                    .semantics {
-                        stateDescription = if (checked) "On" else "Off"
-                    },
-            ) {
+        FieldType.CHECKBOX -> Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
+        ) {
             Row(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -3449,9 +3156,8 @@ private fun ActionFieldInput(field: ActionField, value: String, onChange: (Strin
                         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                Switch(checked = checked, onCheckedChange = null)
+                Switch(checked = value.toBoolean(), onCheckedChange = { onChange(it.toString()) })
             }
-        }
         }
 
         FieldType.MULTILINE -> OutlinedTextField(
@@ -3470,7 +3176,6 @@ private fun ActionFieldInput(field: ActionField, value: String, onChange: (Strin
             label = { Text(label) },
             placeholder = field.hint?.let { { Text(it) } },
             supportingText = if (field.required) {{ Text("Required") }} else null,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -3564,7 +3269,7 @@ private fun DayPresetButton(
 ) {
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier.heightIn(min = 48.dp),
+        modifier = modifier,
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f) else Color.Transparent,
             contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
@@ -3613,11 +3318,11 @@ private fun ContextConfigDialog(
     onDismiss: () -> Unit,
     onSave: (ContextSpec) -> Unit,
 ) {
-    var invert by rememberSaveable(state.profile.id, state.index, state.type) { mutableStateOf(state.existing?.invert ?: false) }
-    var config by rememberSaveable(state.profile.id, state.index, state.type) {
+    var invert by remember(state.existing, state.type) { mutableStateOf(state.existing?.invert ?: false) }
+    var config by remember(state.existing, state.type) {
         mutableStateOf(defaultContextConfig(state.type) + (state.existing?.config ?: emptyMap()))
     }
-    var nfcWriteMessage by rememberSaveable(state.profile.id, state.index, state.type) { mutableStateOf<String?>(null) }
+    var nfcWriteMessage by remember { mutableStateOf<String?>(null) }
     val fields = contextFields(state.type)
     val saveConfig = contextConfigForSave(state.type, config)
     val missingRequired = fields.any { it.required && config[it.key].isNullOrBlank() } ||
@@ -3634,7 +3339,7 @@ private fun ContextConfigDialog(
         title = { Text(state.type.name.lowercase().replaceFirstChar { it.uppercase() }) },
         text = {
             LazyColumn(
-                modifier = Modifier.heightIn(max = 420.dp),
+                modifier = Modifier.height(420.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
@@ -3644,16 +3349,6 @@ private fun ContextConfigDialog(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
                         shape = RoundedCornerShape(12.dp),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .toggleable(
-                                value = invert,
-                                role = Role.Switch,
-                                onValueChange = { invert = it },
-                            )
-                            .semantics {
-                                stateDescription = if (invert) "On" else "Off"
-                            },
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -3667,7 +3362,7 @@ private fun ContextConfigDialog(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            Switch(checked = invert, onCheckedChange = null)
+                            Switch(checked = invert, onCheckedChange = { invert = it })
                         }
                     }
                     HorizontalDivider()
@@ -3717,7 +3412,7 @@ private fun ContextConfigDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 enabled = !missingRequired,
                 onClick = { onSave(ContextSpec(state.type, saveConfig, invert)) },
             ) {
@@ -3806,7 +3501,7 @@ private fun NfcWriteHelperCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.secondary)
+                Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text("NFC write helper", style = MaterialTheme.typography.labelLarge)
                     Text(
