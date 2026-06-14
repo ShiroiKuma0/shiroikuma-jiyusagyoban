@@ -35,6 +35,7 @@ import com.opentasker.core.actions.SayAction
 import com.opentasker.core.actions.ScreenOffAction
 import com.opentasker.core.actions.ScreenTimeoutAction
 import com.opentasker.core.actions.ScreenshotAction
+import com.opentasker.core.actions.SendIntentAction
 import com.opentasker.core.actions.SendSmsAction
 import com.opentasker.core.actions.SetVariableAction
 import com.opentasker.core.actions.StopSoundAction
@@ -69,6 +70,7 @@ private fun registerBuiltInActions() {
         SayAction(),
         WaitAction(),
         LaunchIntentAction(),
+        SendIntentAction(),
         WiFiToggleAction(),
         BluetoothToggleAction(),
         BrightnessAction(),

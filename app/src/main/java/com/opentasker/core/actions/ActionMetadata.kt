@@ -211,6 +211,36 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "intent.send",
+            name = "Send Intent",
+            description = "Fire an arbitrary Android intent (action, component, data URI, MIME, string extras) as an activity, service, or broadcast — e.g. the 白い熊 GNU Jami automation intents",
+            category = "App",
+            fields = listOf(
+                ActionField("action", "Intent action", hint = "shiroikuma.jami.action.SEND_MESSAGE or android.intent.action.VIEW"),
+                ActionField("package", "Target package", hint = "shiroikuma.jami"),
+                ActionField("class", "Component class (fully-qualified)", hint = "cx.ring.automation.AutomationActivity"),
+                ActionField("data", "Data URI", hint = "jami-cmd://send/default/<hex>?text=hi&token=…"),
+                ActionField("mime", "MIME type", hint = "text/plain (optional)"),
+                ActionField("target", "Dispatch target", FieldType.DROPDOWN, hint = "activity / foreground-service / service / broadcast"),
+                ActionField("extra1_key", "Extra 1 key", hint = "account"),
+                ActionField("extra1_value", "Extra 1 value", hint = "default"),
+                ActionField("extra2_key", "Extra 2 key", hint = "peer"),
+                ActionField("extra2_value", "Extra 2 value", hint = "jami:<40-hex>"),
+                ActionField("extra3_key", "Extra 3 key", hint = "text"),
+                ActionField("extra3_value", "Extra 3 value", hint = "Hello from a task"),
+                ActionField("extra4_key", "Extra 4 key", hint = "token"),
+                ActionField("extra4_value", "Extra 4 value", hint = "automation token"),
+                ActionField("extra5_key", "Extra 5 key"),
+                ActionField("extra5_value", "Extra 5 value"),
+                ActionField("extra6_key", "Extra 6 key"),
+                ActionField("extra6_value", "Extra 6 value"),
+                ActionField("flags", "Intent flags", hint = "optional; decimal or 0x-hex, OR'd in"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "plugin.locale.fire",
             name = "Locale Plugin Setting",
             description = "Dispatch an explicit Locale/Tasker-compatible setting plugin request",
