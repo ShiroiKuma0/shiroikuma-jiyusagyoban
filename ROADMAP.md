@@ -994,6 +994,28 @@ New items from an exhaustive research pass covering 5 parallel research agents (
 
 ### P2 — hardening and hygiene
 
+## Audit follow-ups (engineering/UX/theming pass)
 
+Items found during a deep audit that need human decision, on-device verification, or implementation work beyond an audit pass.
+
+- [ ] P2 — On-device verification of the completed light (Catppuccin Latte) theme
+  Why: The light scheme was completed with full container/outline tokens, but this environment has no emulator. Verify contrast and surface layering across every mode and nested surface (modals, popovers, dropdowns, run-log/scene/flow cards, toasts) on a device before claiming theme parity.
+  Where: app/src/main/java/com/opentasker/ui/theme/Theme.kt, all ui/screens/*
+
+- [ ] P2 — Manual theme toggle + persistence + high-contrast mode
+  Why: The app follows the system theme only (OpenTaskerTheme reads isSystemInDarkTheme with no override); there is no user-selectable light/dark/high-contrast preference or persistence. A persisted DataStore-backed theme setting plus a high-contrast scheme is premium-table-stakes.
+  Where: app/src/main/java/com/opentasker/ui/theme/Theme.kt, Setup screen
+
+- [ ] P3 — Adopt DesignSystem spacing/radius/elevation tokens across screens
+  Why: DesignSystem defines Spacing/Radii/Elevation/ComponentSize scales but the UI hardcodes dp values throughout, so the design system is decorative and spacing/radius drift is unguarded.
+  Where: app/src/main/java/com/opentasker/ui/theme/DesignSystem.kt, all ui/screens/*
+
+- [ ] P3 — Declare android:allowBackup explicitly and confirm backup privacy posture
+  Why: allowBackup is implicit (defaults true); backup rules correctly exclude the DB + shared prefs, but user_files/ and downloads/ written by file actions are still eligible for backup/transfer. Decide the privacy posture for a privacy-first app and declare the flag explicitly.
+  Where: app/src/main/AndroidManifest.xml, app/src/main/res/xml/backup_rules.xml, data_extraction_rules.xml
+
+- [ ] P3 — Add a match-timeout to user-authored regex template/variable ops
+  Why: regex/replace ops bound pattern and input length but a crafted user pattern (e.g. nested quantifiers) can still backtrack on the bounded input. A wall-clock match timeout would fully neutralize ReDoS from self-authored automations.
+  Where: app/src/main/java/com/opentasker/core/engine/variables/VariableExpander.kt
 
 
