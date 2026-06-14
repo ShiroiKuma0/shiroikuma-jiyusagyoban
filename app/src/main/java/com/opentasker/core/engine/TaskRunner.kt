@@ -8,12 +8,21 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 
+/** Resolves a sub-task by id or name for the `task.run` action. */
+typealias SubTaskResolver = suspend (ref: String) -> Task?
+
 /**
  * Executes a Task's action list with flow control and variable expansion.
+ *
+ * When a [resolveTask] resolver is supplied, the `task.run` action can execute another task as a
+ * reusable sub-task, sharing this task's variable store so inputs flow in and global outputs flow
+ * out. Recursion is bounded by [MAX_SUBTASK_DEPTH] to prevent infinite call chains.
  */
 class TaskRunner(
     private val ctx: ActionContext,
     private val templateExpressionEngine: TemplateExpressionEngine = TemplateExpressionEngine(),
+    private val resolveTask: SubTaskResolver? = null,
+    private val depth: Int = 0,
 ) {
     suspend fun run(task: Task): TaskRunReport {
         ctx.variables.pushScope()
@@ -51,6 +60,10 @@ class TaskRunner(
             return result to traceFor(index, spec, started, result, ActionArgumentExpansionReport.Empty)
         }
 
+        if (spec.type == SUB_TASK_ACTION_ID) {
+            return runSubTask(index, spec, started)
+        }
+
         val action = ActionRegistry.get(spec.type)
             ?: ActionResult.Failure("unknown action: ${spec.type}").let { result ->
                 return result to traceFor(index, spec, started, result, ActionArgumentExpansionReport.Empty)
@@ -67,6 +80,43 @@ class TaskRunner(
             throw e
         } catch (e: Exception) {
             ActionResult.Failure("threw: ${e.message}", e)
+        }
+        return result to traceFor(index, spec, started, result, expansionReport)
+    }
+
+    private suspend fun runSubTask(
+        index: Int,
+        spec: ActionSpec,
+        started: Long,
+    ): Pair<ActionResult, ActionExecutionTrace> {
+        val expansionReport = expandArgs(spec.args)
+        val args = expansionReport.args
+
+        fun fail(message: String): Pair<ActionResult, ActionExecutionTrace> {
+            val result = ActionResult.Failure(message)
+            return result to traceFor(index, spec, started, result, expansionReport)
+        }
+
+        val resolver = resolveTask ?: return fail("sub-tasks are not available in this context")
+        if (depth >= MAX_SUBTASK_DEPTH) {
+            return fail("sub-task depth limit ($MAX_SUBTASK_DEPTH) exceeded; possible recursion")
+        }
+
+        val ref = SUB_TASK_REF_KEYS.firstNotNullOfOrNull { args[it]?.trim()?.takeIf(String::isNotBlank) }
+            ?: return fail("task.run requires a 'task' (id or name)")
+        val target = resolver(ref) ?: return fail("sub-task not found: $ref")
+
+        // Pass any extra args as input variables; the shared store lets global outputs flow back.
+        args.forEach { (key, value) ->
+            if (key !in SUB_TASK_REF_KEYS) ctx.variables.set(key, value)
+        }
+
+        val child = TaskRunner(ctx, templateExpressionEngine, resolveTask, depth + 1)
+        val report = child.run(target)
+        val result = if (report.success) {
+            ActionResult.Success
+        } else {
+            ActionResult.Failure("sub-task '${target.name}' failed")
         }
         return result to traceFor(index, spec, started, result, expansionReport)
     }
@@ -158,6 +208,10 @@ private fun actionTimeoutMs(actionType: String): Long = when {
 
 private const val DEFAULT_ACTION_TIMEOUT_MS = 60_000L
 private const val MAX_WAIT_TIMEOUT_MS = 1_800_000L // 30 minutes
+
+const val SUB_TASK_ACTION_ID = "task.run"
+const val MAX_SUBTASK_DEPTH = 8
+private val SUB_TASK_REF_KEYS = listOf("task", "name", "id")
 
 data class ActionExecutionTrace(
     val index: Int,

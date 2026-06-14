@@ -124,6 +124,18 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "task.run",
+            name = "Run Task",
+            description = "Run another task as a reusable sub-task (shares variables; max 8 levels deep)",
+            category = "Flow",
+            fields = listOf(
+                ActionField("task", "Task id or name", required = true, hint = "Toggle WiFi"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "intent.launch",
             name = "Launch Intent",
             description = "Launch an activity or service via intent",
