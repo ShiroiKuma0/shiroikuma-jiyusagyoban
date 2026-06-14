@@ -29,6 +29,7 @@
 ✅ **Core engine operational** — profiles → contexts → tasks → actions pipeline  
 ✅ **48 registered action definitions** — supported actions run, restricted/script/import-placeholder actions are gated or fail explicitly
 ✅ **Reusable sub-tasks** — the `task.run` action calls another task by id/name (shared variables, depth-bounded to 8 levels)
+✅ **Flow control** — `if`/`else`/`end if` branching, `for each`/`end for` loops over array variables, and `stop`, interpreted with balanced-block validation
 ✅ **Reactive context sources** — app foreground, time, day schedules, state, WiFi, data/internet connectivity, notifications, NFC tag scans/write helper, calendar windows, sunrise/sunset matching, shake, Bluetooth connect/disconnect, package lifecycle, Quick Settings tile, home-screen widget/shortcut, boot, and platform location fixes are wired; broader device-verified background location event-delivery remains planned runtime work
 ✅ **OEM reliability guidance** — detects Samsung/Xiaomi/OnePlus/Oppo/Realme/Vivo/Huawei/etc. and surfaces per-vendor battery-killer remediation with deep-links and dontkillmyapp.com references
 ✅ **Template expression runtime** — action arguments and conditions support bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math functions, traces, and warnings
@@ -92,7 +93,7 @@ Room DB (persistent storage)
 - **Runtime-wired now:** Application foreground detection, time ticks, day schedules with presets/ranges, device state broadcasts, event broadcasts, WiFi network changes, app-open monitoring, notification listener events, NFC tag events, calendar windows, sunrise/sunset event filters, and platform location fixes.
 - **Configured in UI but still being hardened:** Location/geofence contexts. Location matching now receives FOSS platform GPS/network events and supports radius, accuracy, persisted dwell evaluation, a focused API 36 background event-delivery smoke test, and harness gates for provider cadence plus unplugged battery samples or post-reconnect battery history; broader multi-device reliability evidence remains planned runtime work.
 
-### Actions (48 registered definitions)
+### Actions (48 registered + 7 engine-handled Flow controls)
 | Category | Count | Examples |
 |----------|-------|----------|
 | Settings | 11 | WiFi, Bluetooth, brightness, volume, airplane, mobile data, screen timeout, DND, ringer mode, torch, Quick Settings tile state |
@@ -103,12 +104,12 @@ Room DB (persistent storage)
 | System | 6 | vibrate, reboot, lock, screen off/wake, log |
 | Notification | 3 | notification/toast, cancel, TTS speak |
 | Variable | 1 | set variable |
-| Flow | 2 | wait, run sub-task (`task.run`) |
+| Flow | 1 + 7* | wait; *engine-handled: run sub-task (`task.run`), if/else/end if, for each/end for, stop |
 | Plugin | 2 | Locale setting dispatch, Locale condition query |
 | Script | 1 | gated Termux script run |
 | Import | 1 | unsupported Tasker action placeholder |
 
-The `task.run` Flow action is handled by the engine (TaskRunner) rather than the action registry, so the registry holds 48 implementations while the editor exposes 49 metadata entries.
+Flow-control actions (`task.run`, `flow.if`/`flow.else`/`flow.endif`, `flow.foreach`/`flow.endfor`, `flow.stop`) are interpreted directly by the engine (TaskRunner) rather than the action registry, so the registry holds 48 implementations while the editor exposes those 7 extra control entries.
 
 Some actions are intentionally disabled or marked setup-required because Android restricts normal apps from changing airplane mode, mobile data, screenshots, reboot, screen-off, and similar privileged operations. SMS send remains available in standard/F-Droid builds; Play builds omit SMS and phone-state permissions and mark the SMS action unsupported. Shizuku manager detection and Termux script bridge detection are available only as readiness signals; OpenTasker does not request Shizuku permission, request Termux `RUN_COMMAND`, execute elevated commands, or run scripts yet.
 

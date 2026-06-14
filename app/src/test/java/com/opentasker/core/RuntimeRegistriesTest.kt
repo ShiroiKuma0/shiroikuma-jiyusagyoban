@@ -4,13 +4,14 @@ import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.actions.registerActionMetadata
 import com.opentasker.core.contexts.ContextSourceRegistry
 import com.opentasker.core.engine.ActionRegistry
+import com.opentasker.core.engine.FlowControl
 import com.opentasker.core.engine.SUB_TASK_ACTION_ID
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RuntimeRegistriesTest {
     // Actions handled directly by the TaskRunner (not via ActionRegistry).
-    private val engineHandledActions = setOf(SUB_TASK_ACTION_ID)
+    private val engineHandledActions = setOf(SUB_TASK_ACTION_ID) + FlowControl.ALL
 
     @Test
     fun everyUiMetadataActionHasRuntimeImplementation() {

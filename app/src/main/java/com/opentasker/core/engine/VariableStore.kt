@@ -59,6 +59,13 @@ class VariableStore {
         arrayStore.put(name, values)
     }
 
+    /**
+     * Returns the elements of a stored array by name, or null if no array with that name exists.
+     * Used by the `flow.foreach` control action to iterate over array variables.
+     */
+    fun getArrayItems(name: String): List<String>? =
+        arrayStore.snapshot()[name]
+
     /** Expand all variable references in [s] using the current scope chain. */
     fun expand(s: String): String {
         return expander.expand(s, this, arrayStore)

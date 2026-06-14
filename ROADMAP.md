@@ -794,19 +794,6 @@ Items below were identified by the 2026-06-09 exhaustive research pass covering 
 **Novelty:** Leapfrog -- no FOSS competitor offers encrypted backup.
 **Tier:** Later.
 
-### RD9 - Conditional flow control actions: If/Else/End If, For Each, Stop (Later)
-
-**Status:** Not started. Action conditions exist (template expansion) but there are no explicit flow-control action types.
-**Description:** Add `flow.if` / `flow.else` / `flow.endif` (condition-block structure), `flow.foreach` (iterate over array variable), and `flow.stop` (halt task execution) action types. These enable branching logic within tasks without requiring the visual flow editor. Render these in the Flow graph as branch/loop nodes. This is a prerequisite for X2 (visual flow editor authoring) and a common request from Tasker users.
-**Sources:** Tasker If/End If actions, Automate flowchart branching, MacroDroid conditional actions.
-**Category:** engine, UX.
-**Impact:** 4 -- unlocks conditional logic that is table-stakes for non-trivial automations.
-**Effort:** L -- TaskRunner needs a stack-based execution model; parser, validator, and Flow graph renderer changes.
-**Risk:** Medium -- stack-based execution is a significant TaskRunner redesign.
-**Dependencies:** Template expression engine (done v0.2.35).
-**Novelty:** Parity with all commercial competitors.
-**Tier:** Later -- significant effort but high value; blocks X2 visual flow authoring.
-
 ### RD10 - HTTP webhook receiver trigger (Under Consideration)
 
 **Status:** Not started. Already in existing "Under Consideration" table. This entry deepens the requirements.
