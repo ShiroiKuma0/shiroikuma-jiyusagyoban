@@ -60,6 +60,7 @@ import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.location.LocationPolicyDisclosures
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.permissions.OemBatteryGuidance
 import com.opentasker.core.permissions.UsageAccess
 import com.opentasker.core.scheduling.ExactAlarmSupport
 import com.opentasker.core.storage.AppDatabase
@@ -179,6 +180,8 @@ fun ContextInspectorScreen(
         return
     }
 
+    val oem = remember { OemBatteryGuidance.forDevice(Build.MANUFACTURER, Build.BRAND) }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -188,6 +191,11 @@ fun ContextInspectorScreen(
     ) {
         item {
             ContextInspectorSummaryCard(snapshot = snapshot, onRefresh = viewModel::refresh)
+        }
+        if (oem.needsExtraSteps) {
+            item {
+                OemRiskNotice(oem)
+            }
         }
         item {
             Text(
@@ -478,6 +486,36 @@ private fun InspectorStatusPill(label: String, color: Color) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+@Composable
+private fun OemRiskNotice(oem: OemBatteryGuidance.Guidance) {
+    val color = when (oem.riskLevel) {
+        OemBatteryGuidance.RiskLevel.SEVERE, OemBatteryGuidance.RiskLevel.HIGH -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.primary
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = color.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.26f)),
+    ) {
+        Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(Icons.Filled.Error, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    "${oem.oemName} background risk: ${oem.riskLevel.name.lowercase(Locale.US)}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    "${oem.summary} Open the Setup tab for OEM-specific steps.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
