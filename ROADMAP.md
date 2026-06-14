@@ -794,19 +794,6 @@ Items below were identified by the 2026-06-09 exhaustive research pass covering 
 **Novelty:** Maintenance prerequisite for scale.
 **Tier:** Next -- required before Quick Settings run-log filtering is clean, but not a beta gate.
 
-### RD6 - Bluetooth trigger context (Next)
-
-**Status:** Not started. Bluetooth connect permission is in the Setup checklist but no Bluetooth context source or trigger exists.
-**Description:** Add a `BluetoothContextSource` that monitors `BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED` and `BluetoothDevice.ACTION_ACL_CONNECTED`/`ACTION_ACL_DISCONNECTED` broadcasts. Emit `state=bluetooth` context events with device name, MAC (redacted in logs), and connection state. This is a common trigger in Tasker, MacroDroid, Automate, and Automation2. Android 16 adds Bluetooth bond-loss event handling that should be considered.
-**Sources:** Automation2 trigger list (Bluetooth connection trigger), MacroDroid Bluetooth trigger docs, Android 16 Bluetooth bond-loss behavior.
-**Category:** platform/OS, integrations.
-**Impact:** 3 -- Bluetooth triggers are table-stakes for car/headset/speaker automations.
-**Effort:** M -- similar pattern to WiFi NetworkCallback but uses broadcast receivers.
-**Risk:** Low -- well-understood Android APIs since API 18.
-**Dependencies:** Setup checklist Bluetooth row (done).
-**Novelty:** Parity.
-**Tier:** Next.
-
 ### RD7 - Encrypted database backup/restore (Later)
 
 **Status:** `DatabaseBackupManager.kt` exists but the research did not verify encryption support.
