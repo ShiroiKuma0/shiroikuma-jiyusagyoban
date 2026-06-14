@@ -1018,4 +1018,83 @@ Items found during a deep audit that need human decision, on-device verification
   Why: regex/replace ops bound pattern and input length but a crafted user pattern (e.g. nested quantifiers) can still backtrack on the bounded input. A wall-clock match timeout would fully neutralize ReDoS from self-authored automations.
   Where: app/src/main/java/com/opentasker/core/engine/variables/VariableExpander.kt
 
+## Research-Driven Additions (2026-06-14 exhaustive research pass)
+
+Items below come from a fresh code audit (all prior P0/P1 bugs verified fixed) plus external platform/competitor/community research. Each was checked against every existing N, X, RD, P, Under Consideration, and Rejected tier — no duplicates. Strategic gaps already tiered elsewhere (AI authoring → Under Consideration; UnifiedPush → RD32; Shizuku → X3; large-screen → N10) are discussed in RESEARCH.md, not duplicated here. Evidence details in RESEARCH.md (2026-06-14).
+
+### P1 — platform deadlines and trust
+
+- [ ] P1 — Gate background TTS/sound actions behind a while-in-use FGS path (Android 17)
+  Why: Android 17 makes background audio fail *silently* unless the foreground service holds a while-in-use capability; `AutomationService` declares `specialUse|location`, whose WIU is granted only while location is actively in use — so newly-shipped TTS/sound actions can no-op when fired from a non-location profile.
+  Evidence: https://developer.android.com/about/versions/17/changes/bg-audio ; tts/sound impls in app/src/main/java/com/opentasker/core/actions/MediaActions.kt and BuiltInActions.kt ; foregroundServiceType="specialUse|location" in app/src/main/AndroidManifest.xml:102.
+  Touches: AndroidManifest.xml (FGS type / optional mediaPlayback path), AutomationService.kt, MediaActions.kt, BuiltInActions.kt, ActionCapabilities.kt (honest-failure when WIU unavailable), Android 17 device evidence harness.
+  Acceptance: on an Android 17 device, a background-triggered Speak/Play-Sound action either produces audio or records an explicit honest failure in the Run Log (never a silent no-op); capability gating reflects the WIU state; tests cover the gated path.
+  Complexity: M
+
+- [ ] P1 — Commit targetSdk 35 → 36 (Play deadline Aug 31, 2026)
+  Why: Google Play requires all app updates to target API 36 by Aug 31, 2026; the app compiles SDK 36 but still targets 35. N1/N10 scope the rehearsal — this item is the commitment to actually raise `targetSdk`, ship the edge-to-edge/predictive-back/intent-redirection fallout, and re-verify the F-Droid/Play submission.
+  Evidence: https://developer.android.com/google/play/requirements/target-sdk ; https://support.google.com/googleplay/android-developer/answer/11926878 ; targetSdk = 35 in app/build.gradle.kts ; predictive back already shipped (commit 9b7021c).
+  Touches: app/build.gradle.kts (targetSdk), AndroidManifest.xml, edge-to-edge insets in ui/screens/*, intent-redirection hardening, fdroid/metadata, CI release gates.
+  Acceptance: app targets SDK 36, builds debug+release, passes JVM tests + F-Droid readiness, runs on SM-S938B with correct insets and predictive-back in gesture + 3-button modes; fdroid metadata and version strings updated.
+  Complexity: M (depends on N1/N10 rehearsal)
+
+### P2 — accessibility, testing, and state hardening
+
+- [ ] P2 — Screen-reader / TalkBack accessibility pass
+  Why: ~16 icon-only IconButtons pass `contentDescription = null` and there is no `Role`/`stateDescription` outside PremiumComponents.kt, so TalkBack users cannot identify or operate action/context row controls — a table-stakes trust gap the engine work skipped.
+  Evidence: contentDescription=null at app/src/main/java/com/opentasker/ui/screens/ActiveAutomationUi.kt:1556,1561,1568,1680,1685,1693,1698,1704 (and add/nav icons); semantics only in app/src/main/java/com/opentasker/ui/components/PremiumComponents.kt.
+  Touches: ui/screens/ActiveAutomationUi.kt, ui/screens/*, ui/components/*, strings.xml (label resources, dovetails with X9 i18n).
+  Acceptance: every interactive icon-only control has a meaningful contentDescription; toggles expose Role.Switch + stateDescription; a manual TalkBack sweep of Profiles/Tasks/Actions/Contexts/RunLog reaches and announces every control; an accessibility-checks instrumentation test passes on core screens.
+  Complexity: M
+
+- [ ] P2 — Unit tests for action implementations
+  Why: every package except the action layer has JVM tests; NetworkActions/FileActions/SettingsActions/MediaActions/SystemActions/AppActions/BuiltInActions hold the security guards (byte caps, scheme allowlist, timeouts) yet have zero coverage, so regressions in those guards are invisible.
+  Evidence: no app/src/test/java/com/opentasker/core/actions/ directory exists; guards live at FileActions.kt:25, NetworkActions.kt:44/168, AppActions.kt:85, BuiltInActions.kt:232.
+  Touches: new app/src/test/java/com/opentasker/core/actions/* with a fake ActionContext (Robolectric or pure where possible).
+  Acceptance: tests cover the file-read cap, HTTP-response/download byte bounds, OpenUrl scheme allowlist (including blocked schemes), flow.wait cap, and notification-id allocation; CI runs them in :app:testDebugUnitTest.
+  Complexity: M
+
+- [ ] P2 — Config-change and process-death state retention (rememberSaveable)
+  Why: 0 `rememberSaveable` vs 98 `remember` across ui/ means editor drafts, dialog state, and filter selections are lost on rotation, multi-window resize, or background process death — increasingly visible as target SDK 36 brings edge-to-edge/large-screen behavior.
+  Evidence: grep across app/src/main/java/com/opentasker/ui/ shows zero rememberSaveable; concrete loss sites are the action/context editor dialogs and Run Log filters in ActiveAutomationUi.kt.
+  Touches: ui/screens/ActiveAutomationUi.kt and any dialog/editor state holders; add Saver implementations for non-primitive draft state.
+  Acceptance: rotating or resizing the action editor, context editor, and Run Log filter preserves in-progress input and selection; a process-death simulation (developer-options "don't keep activities") retains editor drafts.
+  Complexity: M
+
+### P3 — parity quick wins and hygiene
+
+- [ ] P3 — Wake-on-LAN action
+  Why: a magic-packet `wol` action is a repeatedly-requested, low-effort automation primitive (Tasker feature-request board) that fits the existing network-action pattern and the home-automation persona, and no live FOSS competitor ships it cleanly.
+  Evidence: https://tasker.helprace.com/s1-general/ideas/accepted (Wake-on-LAN, 8 votes); no WoL/magic-packet code in repo.
+  Touches: app/src/main/java/com/opentasker/core/actions/NetworkActions.kt (UDP broadcast magic packet), ActionMetadata.kt, ActionCapabilities.kt, tests.
+  Acceptance: a task with a configured MAC (and optional broadcast IP/port) sends a valid magic packet, logs success/failure, and is covered by a packet-construction unit test.
+  Complexity: S
+
+- [ ] P3 — Date/time format template function (getDateFormatted parity)
+  Why: the template engine has no date/time formatting function, a concrete Tasker-import parity gap and a top migrant request (`getDateFormatted`) that causes imported-task failures when date logic is involved.
+  Evidence: applyFunction dispatcher at app/src/main/java/com/opentasker/core/expressions/TemplateExpressionEngine.kt:373 has no date function; https://tasker.helprace.com/s1-general/ideas/accepted (getDateFormatted, 10 votes).
+  Touches: TemplateExpressionEngine.kt (new bounded `date`/`format` function with explicit pattern allowlist), docs, tests; map the Tasker function during XML import in core/transfer/.
+  Acceptance: `{{ now | date:'yyyy-MM-dd HH:mm' }}` (or equivalent) expands deterministically with a bounded pattern set; invalid patterns fail closed with a warning; tests cover format, default, and rejection cases.
+  Complexity: S
+
+- [ ] P3 — Passive (battery-friendly) location listener mode
+  Why: the FOSS location source uses active GPS/network provider updates; a passive-provider listener that piggybacks on other apps' fixes is an explicit top community request for geofencing without constant GPS drain, and complements N2 durability work.
+  Evidence: https://tasker.helprace.com/s1-general/ideas/accepted (passive location listeners, 8 votes); active-provider cadence in app/src/main/java/com/opentasker/core/contexts/LocationContextSourceImpl.kt.
+  Touches: LocationContextSourceImpl.kt (PASSIVE_PROVIDER registration + opt-in toggle), Location context editor, Context Inspector cadence copy, docs.
+  Acceptance: a Location context can opt into passive mode; with another app requesting fixes, the profile still matches from passive updates; setup/inspector copy explains the battery/latency tradeoff; behavior is covered by a source-contract test.
+  Complexity: S/M
+
+- [ ] P3 — Camera-in-use / microphone-recording trigger and constraint
+  Why: privacy-automation primitives (auto-DND while recording, log camera use) that MacroDroid paywalls; Android's `AppOpsManager` active-op watcher (OP_CAMERA / OP_RECORD_AUDIO) provides them with no cloud and no accessibility dependency — a FOSS-aligned differentiator.
+  Evidence: MacroDroid 2026 Camera-In-Use trigger + Microphone-Recording constraint (competitor research); AppOpsManager.startWatchingActive (platform API); no camera/mic-use code in repo.
+  Touches: a new event bridge following core/contexts/NotificationContextEvents.kt pattern emitting `event=camera`/`event=mic`, opt-in Setup row, ProfileMatcher wiring, capability gating, docs, tests.
+  Acceptance: with the watcher enabled, starting/stopping camera or mic in any app fires the context within seconds and is observable in the Context Inspector; without opt-in no watcher registers; run-log evidence present.
+  Complexity: M
+
+- [ ] P3 — Scope LAN cleartext via Network Security Config (Android 17 usesCleartextTraffic deprecation)
+  Why: the manifest declares neither `usesCleartextTraffic` nor `networkSecurityConfig` while a LAN/private-host HTTP opt-in exists; Android 17 deprecates `usesCleartextTraffic`, so a scoped Network Security Config is the forward-compatible way to permit LAN cleartext without exposing all hosts.
+  Evidence: https://developer.android.com/about/versions/17/behavior-changes-17 (usesCleartextTraffic deprecation); no networkSecurityConfig in app/src/main/AndroidManifest.xml; LAN HTTP opt-in in core/actions/NetworkActions.kt (commit e693037).
+  Touches: app/src/main/res/xml/network_security_config.xml (new), AndroidManifest.xml, NetworkActions.kt comments, docs.
+  Acceptance: cleartext is permitted only to private/LAN address ranges via Network Security Config; public-host cleartext stays blocked; the LAN opt-in behavior is unchanged and documented.
+  Complexity: S
 
