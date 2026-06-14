@@ -807,19 +807,6 @@ Items below were identified by the 2026-06-09 exhaustive research pass covering 
 **Novelty:** Leapfrog -- no FOSS competitor offers encrypted backup.
 **Tier:** Later.
 
-### RD8 - Sub-task / reusable task reference (Later)
-
-**Status:** Not started. Tasks are flat action lists; no task-call or sub-task mechanism exists.
-**Description:** Add a `task.run` action that executes another task by ID/name, passing variables and receiving output variables. This enables reusable task building blocks (e.g., a "toggle WiFi" sub-task called from multiple profiles). Limit nesting depth (e.g., 8 levels) to prevent infinite recursion. Render sub-task calls in the Flow graph as nested nodes.
-**Sources:** Node-RED sub-workflows, n8n reusable sub-workflows, Tasker "Perform Task" action, Home Assistant scripts-as-services.
-**Category:** architecture, UX.
-**Impact:** 3 -- reduces duplication in complex automation setups; parity with Tasker's "Perform Task".
-**Effort:** M -- TaskRunner recursion with depth limit, variable passing, run-log nesting.
-**Risk:** Medium -- infinite recursion must be caught; run-log display of nested calls needs design.
-**Dependencies:** Run-log step traces (done v0.2.9).
-**Novelty:** Parity.
-**Tier:** Later.
-
 ### RD9 - Conditional flow control actions: If/Else/End If, For Each, Stop (Later)
 
 **Status:** Not started. Action conditions exist (template expansion) but there are no explicit flow-control action types.

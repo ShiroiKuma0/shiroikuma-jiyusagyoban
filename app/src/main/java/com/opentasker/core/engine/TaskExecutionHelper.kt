@@ -24,7 +24,7 @@ suspend fun executeAndLogTask(
     val variables = VariableStore()
     initialVariables.forEach { (name, value) -> variables.set(name, value) }
     val ctx = ActionContext(appContext, variables) { msg -> Log.i(logTag, msg) }
-    val runner = TaskRunner(ctx)
+    val runner = TaskRunner(ctx, resolveTask = dbSubTaskResolver(db))
     val report = runner.run(task)
     Log.i(logTag, "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)")
     val logEntry = RunLogEntry(
@@ -63,6 +63,17 @@ suspend fun logSkippedRun(
         ),
     ),
 )
+
+/**
+ * Resolves a sub-task by numeric id first, then by exact name (case-insensitive), for `task.run`.
+ */
+fun dbSubTaskResolver(db: AppDatabase): SubTaskResolver = resolver@{ ref ->
+    val byId = ref.toLongOrNull()?.let { db.taskDao().getById(it) }
+    if (byId != null) return@resolver byId.toDomain()
+    val exact = db.taskDao().getByName(ref)
+    if (exact != null) return@resolver exact.toDomain()
+    db.taskDao().getAll().firstOrNull { it.name.equals(ref, ignoreCase = true) }?.toDomain()
+}
 
 suspend fun insertRunLog(db: AppDatabase, entry: RunLogEntry): Boolean =
     runCatching { db.runLogDao().insert(entry.toEntity()) }
