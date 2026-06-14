@@ -1,13 +1,13 @@
 # CLAUDE.md — guide for Claude Code in this repo
 
-**shiroikuma-sagyoban** — 白い熊's fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker), a
+**shiroikuma-jiyusagyoban** — 白い熊's fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker), a
 FOSS, Tasker-style Android automation app (native Kotlin + Jetpack Compose, Room, WorkManager; no native
 code). Renamed to install side-by-side with upstream. The fork's reason for existing: add a **generic
 "Send Intent" action** so OpenTasker tasks can fire arbitrary Android intents — specifically the
 token-gated automation intents exposed by the sister apps (e.g. `白い熊 GNU Jami` /
 `shiroikuma.jami`'s send-message / place-call / open-conversation intents).
 
-This repo (`ShiroiKuma0/shiroikuma-sagyoban`) is a fork. We track upstream
+This repo (`ShiroiKuma0/shiroikuma-jiyusagyoban`) is a fork. We track upstream
 (`SysAdminDoc/OpenTasker`) on `master` and layer our customizations on `custom`.
 
 ## Read this first
@@ -18,7 +18,7 @@ Before any work, read **`.claude/skills/build-apk/SKILL.md`** (canonical build +
 ## Fork workflow — READ THIS FIRST
 
 ### Git remotes & branches
-- `origin` → `git@github.com:ShiroiKuma0/shiroikuma-sagyoban` (push here).
+- `origin` → `git@github.com:ShiroiKuma0/shiroikuma-jiyusagyoban` (push here).
 - `upstream` → `https://github.com/SysAdminDoc/OpenTasker` (fetch only).
 - `master` — mirrors upstream, **fast-forward only**, no fork work.
 - `custom` — all our work; rebased onto `master` on each upstream sync.
@@ -26,12 +26,12 @@ Before any work, read **`.claude/skills/build-apk/SKILL.md`** (canonical build +
 ### Our customizations (install identity + build)
 | What | Value | Where |
 | --- | --- | --- |
-| applicationId | `shiroikuma.sagyoban` | `app/build.gradle.kts` → `defaultConfig` |
+| applicationId | `shiroikuma.jiyusagyoban` | `app/build.gradle.kts` → `defaultConfig` |
 | namespace (R/BuildConfig pkg) | `com.opentasker.app` (**unchanged** from upstream) | `app/build.gradle.kts` |
-| App label | `白い熊 作業盤` | `app_name` in `app/src/main/res/values/strings.xml` |
+| App label | `白い熊 自由作業盤` | `app_name` in `app/src/main/res/values/strings.xml` |
 | App icon | black-yellow (yellow foreground + black background) | `app/src/main/res/mipmap/*`, `values/colors.xml` |
 | Version tail | `versionName = "<base>+N"`, `versionCode = <base>*10000+N` | `app/build.gradle.kts` fork blocks |
-| Signing | gitignored `keystore.properties` → `~/.android-keystores/shiroikuma-sagyoban.jks` (alias `sagyoban`) | `app/build.gradle.kts` |
+| Signing | gitignored `keystore.properties` → `~/.android-keystores/shiroikuma-jiyusagyoban.jks` (alias `sagyoban`) | `app/build.gradle.kts` |
 
 ### Versioning & APK naming
 - Upstream base lives in `app/build.gradle.kts` as `appVersionName` (e.g. `0.2.60`) / `appVersionCode`
@@ -39,7 +39,7 @@ Before any work, read **`.claude/skills/build-apk/SKILL.md`** (canonical build +
 - `BUILD_NUMBER` (in `gradle.properties`) is our per-build `N`: `versionName = "<base>+N"`,
   `versionCode = <base>*10000 + N`. The `buildFork` task bumps it after every successful build; the
   upstream-sync skill resets it to `1`.
-- APK: `shiroikuma-sagyoban_<versionName>_arm64-v8a.apk`, copied to `~/tmp/`.
+- APK: `shiroikuma-jiyusagyoban_<versionName>_arm64-v8a.apk`, copied to `~/tmp/`.
 
 ### Build commands
 ```bash
