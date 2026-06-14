@@ -768,19 +768,6 @@ Continue with AC-2026-06-06-8: doc-truth and release-pipeline patch plan. Start 
 
 Items below were identified by the 2026-06-09 exhaustive research pass covering 34+ external sources, full repo walk, commit history, and competitive analysis. Each item was checked against existing Now/Next/Later/Under Consideration tiers to avoid duplicates. Only genuinely new or materially deepened items appear here.
 
-### RD1 - OEM battery-killer detection and setup guidance (Now)
-
-**Status:** Not started. Setup checklist has a generic battery-optimization row but no OEM-specific detection or guidance.
-**Description:** Add OEM detection (Samsung OneUI, Xiaomi MIUI/HyperOS, OnePlus OxygenOS/ColorOS, Oppo, Realme, Huawei EMUI) to the Setup screen. For detected OEMs, show specific guidance: Samsung "Put unused apps to sleep" exclusion, Xiaomi "Background autostart" permission, and deep-link to the relevant OEM settings where possible. Link to dontkillmyapp.com per-OEM pages. Add an OEM risk level to the Context Inspector's source health model so users understand why their automations may not fire reliably on certain devices.
-**Sources:** dontkillmyapp.com OEM database, Samsung OneUI battery docs, Xiaomi MIUI/HyperOS background autostart docs.
-**Category:** reliability, UX, platform/OS.
-**Impact:** 5 -- OEM battery killing is the #1 reported cause of broken automations across all Android automation apps.
-**Effort:** M -- OEM detection is straightforward (`Build.MANUFACTURER`/`Build.BRAND`); guidance copy and deep-links need per-OEM research.
-**Risk:** Low -- purely additive; worst case is an unrecognized OEM falls back to generic guidance.
-**Dependencies:** N1 platform readiness pass.
-**Novelty:** Leapfrog -- no FOSS competitor surfaces OEM-specific guidance. Automation2 acknowledges fragmentation but doesn't help users fix it.
-**Tier:** Now -- directly addresses the biggest reliability gap.
-
 ### RD4 - Compose BOM 2026.05.00 evaluation gate (Next)
 
 **Status:** Not started. Current BOM is 2026.04.01; 2026.05.00 is available.

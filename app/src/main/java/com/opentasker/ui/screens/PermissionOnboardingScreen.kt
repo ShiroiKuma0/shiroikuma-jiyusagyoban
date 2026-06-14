@@ -57,6 +57,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.opentasker.app.BuildConfig
 import com.opentasker.core.location.LocationPolicyDisclosures
+import com.opentasker.core.permissions.OemBatteryGuidance
 import com.opentasker.core.permissions.UsageAccess
 import com.opentasker.core.power.ShizukuPowerBackend
 import com.opentasker.core.scheduling.ExactAlarmSupport
@@ -81,6 +82,11 @@ data class BackupSetupState(
 private sealed interface PermissionAction {
     data class RuntimePermission(val permission: String) : PermissionAction
     data class SettingsIntent(val intent: Intent) : PermissionAction
+    /** Try each OEM settings component in order, falling back to a web guide URL. */
+    data class OemSettings(
+        val targets: List<OemBatteryGuidance.SettingsTarget>,
+        val fallbackUrl: String,
+    ) : PermissionAction
     data object None : PermissionAction
 }
 
@@ -186,6 +192,7 @@ fun PermissionOnboardingScreen(
                         PermissionAction.None -> onMessage("${item.title} is already ready.")
                         is PermissionAction.RuntimePermission -> permissionLauncher.launch(action.permission)
                         is PermissionAction.SettingsIntent -> openSettingsIntent(context, action.intent, onMessage)
+                        is PermissionAction.OemSettings -> openOemSettings(context, action, onMessage)
                     }
                 },
             )
@@ -384,6 +391,7 @@ private fun PermissionRequirement(label: String) {
 private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
     val shizukuStatus = ShizukuPowerBackend.inspect(context)
     val termuxStatus = TermuxScriptBackend.inspect(context)
+    val oem = OemBatteryGuidance.forDevice(Build.MANUFACTURER, Build.BRAND)
     return listOfNotNull(
         PermissionSetupItem(
             title = "Notifications",
@@ -407,12 +415,27 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
         PermissionSetupItem(
             title = "Battery optimization",
-            body = "OEM and Android battery managers can stop background automation. Exempting OpenTasker improves reliability.",
+            body = "OEM and Android battery managers can stop background automation. Exempting OpenTasker improves reliability. " +
+                oem.summary,
             granted = ignoresBatteryOptimizations(context),
             actionLabel = "Open settings",
             action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)),
             requiredFor = "Long-running automation service",
         ),
+        if (oem.needsExtraSteps) PermissionSetupItem(
+            title = "${oem.oemName} background guidance",
+            body = buildString {
+                append("Detected ${oem.oemName} (reliability risk: ${oem.riskLevel.label()}). ")
+                append("Battery-optimization exemption alone is often not enough on this OEM.\n\n")
+                oem.steps.forEachIndexed { index, step -> append("${index + 1}. $step\n") }
+                append("\nIf the button cannot open the right screen, see ${oem.dontKillMyAppUrl}")
+            }.trim(),
+            granted = false,
+            actionLabel = if (oem.settingsTargets.isNotEmpty()) "Open ${oem.oemName} settings" else "Open dontkillmyapp.com",
+            action = PermissionAction.OemSettings(oem.settingsTargets, oem.dontKillMyAppUrl),
+            requiredFor = "Reliable background automation on ${oem.oemName}",
+            optional = true,
+        ) else null,
         PermissionSetupItem(
             title = "Usage access",
             body = "Needed to detect foreground apps without an accessibility service.",
@@ -589,5 +612,43 @@ private fun openSettingsIntent(context: Context, intent: Intent, onMessage: (Str
         onMessage("Settings screen is unavailable on this device: ${ex.message ?: "no handler"}")
     } catch (ex: SecurityException) {
         onMessage("Settings screen could not be opened: ${ex.message ?: "permission denied"}")
+    }
+}
+
+private fun OemBatteryGuidance.RiskLevel.label(): String = when (this) {
+    OemBatteryGuidance.RiskLevel.LOW -> "low"
+    OemBatteryGuidance.RiskLevel.MEDIUM -> "medium"
+    OemBatteryGuidance.RiskLevel.HIGH -> "high"
+    OemBatteryGuidance.RiskLevel.SEVERE -> "severe"
+}
+
+/**
+ * Try each OEM autostart/background settings component in order. OEM component names are fragile and
+ * vary across versions, so every failure falls through to the next candidate and finally to the
+ * device's dontkillmyapp.com page in a browser.
+ */
+private fun openOemSettings(context: Context, action: PermissionAction.OemSettings, onMessage: (String) -> Unit) {
+    for (target in action.targets) {
+        val intent = Intent().apply {
+            setClassName(target.packageName, target.className)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            context.startActivity(intent)
+            return
+        } catch (_: ActivityNotFoundException) {
+            // Component not present on this build; try the next candidate.
+        } catch (_: SecurityException) {
+            // Some OEM screens are not exported; try the next candidate.
+        }
+    }
+    val fallback = Intent(Intent.ACTION_VIEW, Uri.parse(action.fallbackUrl)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    try {
+        context.startActivity(fallback)
+        if (action.targets.isNotEmpty()) {
+            onMessage("Could not open the OEM settings screen directly; opened the online guide instead.")
+        }
+    } catch (ex: ActivityNotFoundException) {
+        onMessage("No app can open the guidance page: ${ex.message ?: "no handler"}")
     }
 }
