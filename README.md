@@ -3,19 +3,34 @@
 [![Version](https://img.shields.io/badge/version-0.2.59-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
-[![Kotlin](https://img.shields.io/badge/kotlin-2.0-7f52ff.svg)](https://kotlinlang.org)
+[![Kotlin](https://img.shields.io/badge/kotlin-2.3.21-7f52ff.svg)](https://kotlinlang.org)
 
-**OpenTasker v0.2.59** — a fully open-source, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. Profiles, contexts, tasks, actions, day schedule presets/ranges, runtime template argument and condition expansion, per-expression template diagnostics, explicit regex template policy, FOSS geofence evaluation with a live platform location source, a disabled Location evidence template, app-launch service startup, adb-backed location/calendar/sun evidence collection, provider-cadence, unplugged-sample, and post-reconnect unplugged-history gates, background Location event-delivery smoke evidence, balanced provider cadence, policy-aware location setup copy, persisted dwell state, inspector dwell details, and stale-key cleanup, scene library management with text/button/slider/image element editing, task binding pickers, scaled canvas previews, and drag-to-move canvas editing, flow graphs with node deep links, conditional action labels, scrollable lane overviews, screen-reader summaries, and picker-backed Add Context/Add Step shortcuts, JSON bundle export/import UI, profile sharing manifests, Tasker XML import UI, F-Droid and Play distribution checks, dependency version governance, optional Shizuku readiness, optional Termux script readiness, external automation intents, context inspection, notification listener triggers, NFC tag triggers and write helper, calendar/sun triggers with editor presets, and conservative Locale setting/condition plugin host actions with an adb validation harness are active now; broad device-verified background geofence reliability, elevated backends, script execution, and broader plugin UX are planned.
+**OpenTasker** is a fully open-source, on-device, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. No cloud, no accounts, no telemetry — automations run entirely on your device.
 
-> **Status:** v0.2.59 adds Flow graph deep links, conditional edge labels, lane overviews, accessibility summaries, mutation shortcuts, Scene element editing, scaled previews, drag-to-move layout editing, shorter bottom navigation labels, and the API 36 dependency/toolchain follow-up. v0.2.58 adds a Tasker XML document-picker import flow with bounded preview, migration/capability warnings, confirmed Room import, and disabled-by-default imported profiles. v0.2.57 adds a calendar/sun adb evidence harness and verified the debug app on API 36 device `SM-S938B`; evidence `build/device-evidence/calendar-sun/20260505-152622` shows Calendar access granted, CalendarProvider calendar/instance queries succeeding, and `AutomationService` foreground after launch. v0.2.48 evidence `build/device-evidence/location/20260505-143254` shows a 615.055-second recent unplugged interval that satisfied the 600-second post-reconnect history gate with GPS/network provider cadence evidence present. These remain single-device data points, not broad background geofence reliability claims.
+**What it does today:**
+
+- **Profiles → contexts → tasks → actions** — a complete Room-backed automation pipeline with a Compose UI
+- **Triggers (contexts):** time/day schedules, device state, app foreground, WiFi, data/internet connectivity, notifications, NFC tags, calendar windows, sunrise/sunset, shake, Bluetooth connect/disconnect, package install/remove/replace, Quick Settings tile, home-screen widget/shortcut, boot, and FOSS platform location/geofence
+- **48 built-in actions** plus a `task.run` sub-task action for reusable building blocks; unsupported privileged actions fail honestly with backend hints
+- **Template expressions** — bounded `{{ ... }}` expansion in arguments and conditions with scopes, arrays, JSON paths, string/math functions, traces, and a strict regex policy
+- **Reliability tooling** — OEM battery-killer detection with per-vendor setup guidance, a setup checklist, context inspector with live source health, and step-level run logs with retention
+- **Interop** — Locale/Tasker plugin host (setting + condition), signature-scoped external automation intents, OpenTasker JSON bundle import/export, Tasker XML import, and offline profile-share manifests
+- **Distribution** — F-Droid and Play readiness profiles, dependency version governance, and SQLite backup/restore
+- **Power-user readiness (detection only):** Shizuku and Termux status surfaces; elevated/script execution is not wired yet
+
+**Planned:** broad device-verified background geofence reliability, elevated (Shizuku) execution, Termux script dispatch, a visual flow authoring editor, and richer plugin UX. See [ROADMAP.md](ROADMAP.md).
+
+> **Status:** the current source version is `0.2.59` (version/F-Droid metadata bumps at release time only). Device-evidence claims (location/calendar/sun) are single-device API 36 data points on `SM-S938B`, not broad background-geofence reliability guarantees.
 
 ---
 
 ## Highlights
 
 ✅ **Core engine operational** — profiles → contexts → tasks → actions pipeline  
-✅ **43 registered action definitions** — supported actions run, restricted/script/import-placeholder actions are gated or fail explicitly
-✅ **Reactive context sources** — app foreground, time, day schedules, state, event, WiFi, app-open monitoring, notifications, NFC tag scans/write helper, calendar windows, sunrise/sunset matching, and platform location fixes are wired; broader device-verified background location event-delivery remains planned runtime work
+✅ **48 registered action definitions** — supported actions run, restricted/script/import-placeholder actions are gated or fail explicitly
+✅ **Reusable sub-tasks** — the `task.run` action calls another task by id/name (shared variables, depth-bounded to 8 levels)
+✅ **Reactive context sources** — app foreground, time, day schedules, state, WiFi, data/internet connectivity, notifications, NFC tag scans/write helper, calendar windows, sunrise/sunset matching, shake, Bluetooth connect/disconnect, package lifecycle, Quick Settings tile, home-screen widget/shortcut, boot, and platform location fixes are wired; broader device-verified background location event-delivery remains planned runtime work
+✅ **OEM reliability guidance** — detects Samsung/Xiaomi/OnePlus/Oppo/Realme/Vivo/Huawei/etc. and surfaces per-vendor battery-killer remediation with deep-links and dontkillmyapp.com references
 ✅ **Template expression runtime** — action arguments and conditions support bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math functions, traces, and warnings
 ✅ **FOSS geofence source/evaluator** — Location context matching supports platform GPS/network fixes, balanced provider cadence, policy disclosures, radius, accuracy, persisted dwell checks, stale-key cleanup, inspector dwell detail, a Location evidence template, adb run-log/logcat evidence collection, provider-cadence/unplugged-sample/post-reconnect history gates, and API 36 background event-delivery smoke evidence without Play Services
 ✅ **AMOLED-first** — Catppuccin Mocha palette, light theme toggle  
@@ -48,7 +63,7 @@
 ✅ **Calendar and sun events** — Calendar access feeds redacted `event=calendar` windows; coordinate-based `sunrise`/`sunset` filters support offsets and editor presets; adb smoke evidence covers permission/provider/service readiness<br>
 ✅ **Regression coverage** — cron parsing, variable scoping, and template expression edge cases are test-covered
 ✅ **Database persistence** — Room DAOs with StateFlow live updates  
-✅ **Action metadata system** — dynamic form generation for all 43 registered action definitions
+✅ **Action metadata system** — dynamic form generation for all registered action definitions
 ✅ **Context configuration UI** — editor supports all 6 context families while runtime support continues to harden by family  
 ✅ **100% Kotlin** — modern, type-safe, coroutine-friendly  
 ✅ **Profile execution** — AutomationService wired to TaskRunner for context triggers  
@@ -77,21 +92,23 @@ Room DB (persistent storage)
 - **Runtime-wired now:** Application foreground detection, time ticks, day schedules with presets/ranges, device state broadcasts, event broadcasts, WiFi network changes, app-open monitoring, notification listener events, NFC tag events, calendar windows, sunrise/sunset event filters, and platform location fixes.
 - **Configured in UI but still being hardened:** Location/geofence contexts. Location matching now receives FOSS platform GPS/network events and supports radius, accuracy, persisted dwell evaluation, a focused API 36 background event-delivery smoke test, and harness gates for provider cadence plus unplugged battery samples or post-reconnect battery history; broader multi-device reliability evidence remains planned runtime work.
 
-### Actions (43 registered definitions)
+### Actions (48 registered definitions)
 | Category | Count | Examples |
 |----------|-------|----------|
-| Settings | 7 | WiFi, Bluetooth, brightness, volume, airplane, mobile data, screen timeout |
+| Settings | 11 | WiFi, Bluetooth, brightness, volume, airplane, mobile data, screen timeout, DND, ringer mode, torch, Quick Settings tile state |
 | App | 7 | launch intent, launch app, kill, go home, open URL, SMS, screenshot |
 | File | 5 | read, write, append, delete, list |
 | Network | 4 | HTTP GET/POST, ping, download |
 | Media | 6 | play, stop, pause, next, previous, mute |
 | System | 6 | vibrate, reboot, lock, screen off/wake, log |
-| Notification | 2 | notification/toast, TTS speak |
+| Notification | 3 | notification/toast, cancel, TTS speak |
 | Variable | 1 | set variable |
-| Flow | 1 | wait |
+| Flow | 2 | wait, run sub-task (`task.run`) |
 | Plugin | 2 | Locale setting dispatch, Locale condition query |
 | Script | 1 | gated Termux script run |
 | Import | 1 | unsupported Tasker action placeholder |
+
+The `task.run` Flow action is handled by the engine (TaskRunner) rather than the action registry, so the registry holds 48 implementations while the editor exposes 49 metadata entries.
 
 Some actions are intentionally disabled or marked setup-required because Android restricts normal apps from changing airplane mode, mobile data, screenshots, reboot, screen-off, and similar privileged operations. SMS send remains available in standard/F-Droid builds; Play builds omit SMS and phone-state permissions and mark the SMS action unsupported. Shizuku manager detection and Termux script bridge detection are available only as readiness signals; OpenTasker does not request Shizuku permission, request Termux `RUN_COMMAND`, execute elevated commands, or run scripts yet.
 
@@ -134,11 +151,11 @@ Release APKs are unsigned unless `OPEN_TASKER_RELEASE_KEYSTORE`, `OPEN_TASKER_RE
 
 ## Development
 
-- **IDE:** Android Studio Koala+ (Kotlin 2.0)
+- **Toolchain:** Kotlin 2.3.21, Gradle 9.4.1, AGP 9.2.1, KSP 2.3.7, Build Tools 36.0.0, JDK 17/21
 - **Min SDK:** 26 (Android 8.0)
-- **Target SDK:** 35
+- **Compile SDK:** 36 · **Target SDK:** 35
 - **Permissions:** foreground service, PACKAGE_USAGE_STATS, system alert window (optional for scenes)
-- **Architecture:** MVVM with Compose + Room + coroutines
+- **Architecture:** MVVM with Compose + Room + coroutines (manual DI via `OpenTaskerApp_NoHilt`; no Hilt)
 
 ---
 
