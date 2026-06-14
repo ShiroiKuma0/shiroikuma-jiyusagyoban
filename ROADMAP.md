@@ -131,19 +131,6 @@ Key local constraints:
 **Novelty:** Parity.
 **Tier reason:** Closes the asymmetry between setting plugins (usable) and condition plugins (engine-only).
 
-### N8 (2026.05.06) - Resolve AGP 9 opt-out flags and Hilt-vs-non-Hilt drift
-
-**Status:** AGP 9 migrated to built-in Kotlin/new DSL in v0.2.59 with opt-out flags removed. The `OpenTaskerApp_NoHilt` runtime path remains the active app entry. RD13 removed the legacy `AutomationModule` provider surface, but Gradle still applies Hilt and keeps Hilt/Dagger dependencies without an active `@HiltAndroidApp` path. Improvement plan P10 still flagged "not started".
-**Description:** Make a deliberate decision: either complete the Hilt migration (delete `OpenTaskerApp_NoHilt`, route all wiring through `@HiltAndroidApp`, run the existing instrumentation suite) or remove the remaining Hilt Gradle plugin/dependencies and hilt-navigation dependency until needed. Document the decision and fix any leftover Dagger graph that won't compile under the chosen path.
-**Sources:** Improvement plan P10 [L7], Dagger releases [S39], local DI inventory [L1].
-**Category:** architecture, dev-experience, testing.
-**Impact:** 3 — eliminates a known drift bug class and unblocks future module splits.
-**Effort:** 4.
-**Risk:** Medium — Hilt-only migration is touch-everything; delete is faster but loses optionality.
-**Dependencies:** Dependency modernization (done v0.2.59).
-**Novelty:** Maintenance.
-**Tier reason:** Drift is cheaper to resolve before Room 3 / Compose Material 3 expressive land.
-
 ### N9 (2026.05.06) - Documentation truth pass post-v0.2.59
 
 **Status:** Stale older snapshots removed in v0.2.11; current README still has a single 1700-character status sentence that is hard to skim. AC-2026-06-06-7 also found stale README Kotlin/Android Studio wording, CLAUDE.md v0.2.58/Gradle/workflow references, and F-Droid readiness evidence still describing v0.2.58/code 60 and Build Tools 35.0.0 while the app is v0.2.59/code 61 on Build Tools 36.0.0. [L14]

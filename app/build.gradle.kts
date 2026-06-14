@@ -4,7 +4,6 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlin.parcelize)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.hilt.android)
 }
 
 val releaseKeystorePath = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE")
@@ -136,10 +135,6 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
-
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)
-    implementation(libs.androidx.hilt.navigation.compose)
 
     implementation(libs.gson)
 
