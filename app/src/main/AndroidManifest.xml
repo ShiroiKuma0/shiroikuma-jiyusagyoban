@@ -50,6 +50,20 @@
         android:protectionLevel="signature" />
 
     <queries>
+        <!-- Sister app: token-gated automation intents driven by the Send Intent action. -->
+        <package android:name="shiroikuma.jami" />
+        <!--
+          Broad visibility for the generic Send Intent action. Package visibility is
+          all-or-nothing per package, so matching any launchable app's MAIN/LAUNCHER
+          entry exposes every component of that package — letting Send Intent dispatch
+          to any normal app's activities/services/receivers on Android 11+. Targets
+          with no launcher entry, or reachable only by a custom action string, still
+          need their own <package> pin (e.g. shiroikuma.jami above).
+        -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
         <package android:name="com.termux" />
         <package android:name="com.termux.tasker" />
         <package android:name="moe.shizuku.privileged.api" />
