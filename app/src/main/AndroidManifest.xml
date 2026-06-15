@@ -206,6 +206,14 @@
             </intent-filter>
         </receiver>
 
+        <activity
+            android:name="com.opentasker.core.dialog.DialogActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

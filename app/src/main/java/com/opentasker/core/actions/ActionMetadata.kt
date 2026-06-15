@@ -547,6 +547,57 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "dialog.input",
+            name = "Input Dialog",
+            description = "Prompt for text and store the result in a variable",
+            category = "Alert",
+            fields = listOf(
+                ActionField("title", "Title"),
+                ActionField("text", "Prompt", FieldType.MULTILINE),
+                ActionField("default", "Default value"),
+                ActionField("input_type", "Input type", FieldType.DROPDOWN, hint = "text / number / password / email"),
+                ActionField("store", "Store in", hint = "variable name (default: input)"),
+                ActionField("timeout", "Close after (s)", FieldType.NUMBER, hint = "0 = wait indefinitely"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "dialog.list",
+            name = "List Dialog",
+            description = "Show a list to pick from; store the chosen item and index",
+            category = "Alert",
+            fields = listOf(
+                ActionField("title", "Title"),
+                ActionField("items", "Items", FieldType.MULTILINE, required = true, hint = "separated list (default separator: ,)"),
+                ActionField("separator", "Separator", hint = "default ,"),
+                ActionField("store", "Store selection in", hint = "variable name (default: selected)"),
+                ActionField("store_index", "Store index in", hint = "variable for the picked index (optional)"),
+                ActionField("timeout", "Close after (s)", FieldType.NUMBER, hint = "0 = wait indefinitely"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "dialog.text",
+            name = "Text Dialog",
+            description = "Show text with OK/Cancel; store which button was pressed",
+            category = "Alert",
+            fields = listOf(
+                ActionField("title", "Title"),
+                ActionField("text", "Text", FieldType.MULTILINE),
+                ActionField("ok", "OK label", hint = "default: OK"),
+                ActionField("cancel", "Cancel label", hint = "default: Cancel"),
+                ActionField("store", "Store OK in", hint = "variable set to true/false (optional)"),
+                ActionField("timeout", "Close after (s)", FieldType.NUMBER, hint = "0 = wait indefinitely"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "tts.speak",
             name = "Say (Text-to-Speech)",
             description = "Speak text aloud using the device speaker",

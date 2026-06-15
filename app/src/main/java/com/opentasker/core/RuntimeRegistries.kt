@@ -87,6 +87,9 @@ import com.opentasker.core.actions.OpenFileAction
 import com.opentasker.core.actions.ToggleProfileAction
 import com.opentasker.core.actions.GetSettingAction
 import com.opentasker.core.actions.PutSettingAction
+import com.opentasker.core.actions.InputDialogAction
+import com.opentasker.core.actions.ListDialogAction
+import com.opentasker.core.actions.TextDialogAction
 import com.opentasker.core.contexts.ApplicationContextSourceImpl
 import com.opentasker.core.contexts.ContextSourceRegistry
 import com.opentasker.core.contexts.EventContextSourceImpl
@@ -187,6 +190,9 @@ private fun registerBuiltInActions() {
         ToggleProfileAction(),
         GetSettingAction(),
         PutSettingAction(),
+        InputDialogAction(),
+        ListDialogAction(),
+        TextDialogAction(),
         TermuxScriptAction(),
         TaskerUnsupportedAction(),
     ).forEach(ActionRegistry::register)

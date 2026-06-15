@@ -66,6 +66,9 @@ object ActionCapabilityRegistry {
         "call.place" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs the Phone (CALL_PHONE) permission to dial directly; otherwise opens the dialer."),
         "brightness.auto" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access."),
         "setting.put" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access; only the System namespace is writable without Shizuku."),
+        "dialog.input" to dialogCapability(),
+        "dialog.list" to dialogCapability(),
+        "dialog.text" to dialogCapability(),
         "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported 白い熊 自由作業盤 action."),
     )
 
@@ -87,6 +90,9 @@ object ActionCapabilityRegistry {
 
     private fun accessibilityCapability(): ActionCapability =
         ActionCapability(CapabilityLevel.RequiresSetup, "Enable the 白い熊 自由作業盤 accessibility service in Android settings.")
+
+    private fun dialogCapability(): ActionCapability =
+        ActionCapability(CapabilityLevel.RequiresSetup, "Shows over other apps; from a background trigger it needs the \"display over other apps\" permission. Always works when run from the app.")
 
     private fun mediaKeyCapability(reason: String): ActionCapability =
         if (android.os.Build.VERSION.SDK_INT >= ANDROID_17_API) {
