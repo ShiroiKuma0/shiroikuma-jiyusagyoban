@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">白い熊 自由作業盤</string>
-    <string name="permission_automation_label">Control OpenTasker automations</string>
-    <string name="permission_automation_description">Allows same-signer integrations to run OpenTasker tasks, toggle profiles, and query automation status through documented intents.</string>
+    <string name="permission_automation_label">Control 白い熊 自由作業盤 automations</string>
+    <string name="permission_automation_description">Allows same-signer integrations to run 白い熊 自由作業盤 tasks, toggle profiles, and query automation status through documented intents.</string>
     <string name="error_prefix">Error: %1$s</string>
     <string name="success_prefix">Success: %1$s</string>
-    <string name="widget_task_description">Run an OpenTasker task with one tap</string>
+    <string name="widget_task_description">Run an 白い熊 自由作業盤 task with one tap</string>
 </resources>

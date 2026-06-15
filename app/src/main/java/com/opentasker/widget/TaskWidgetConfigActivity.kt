@@ -96,7 +96,7 @@ private fun ConfigScreen(tasks: List<Task>, onTaskSelected: (Task) -> Unit) {
                 color = MaterialTheme.colorScheme.background,
             ) {
                 Text(
-                    "No tasks yet. Create a task in OpenTasker first.",
+                    "No tasks yet. Create a task in 白い熊 自由作業盤 first.",
                     modifier = Modifier.padding(24.dp),
                     style = MaterialTheme.typography.bodyLarge,
                 )

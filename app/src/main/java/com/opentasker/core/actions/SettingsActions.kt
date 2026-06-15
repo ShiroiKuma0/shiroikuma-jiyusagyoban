@@ -290,7 +290,7 @@ class TileStateAction : Action {
             ctx.logger("Tile state: $state (update deferred until tile next listens)")
             return ActionResult.Success
         }
-        ctx.logger("Tile: ${label ?: "OpenTasker"} → $state")
+        ctx.logger("Tile: ${label ?: "白い熊 自由作業盤"} → $state")
         return ActionResult.Success
     }
 }

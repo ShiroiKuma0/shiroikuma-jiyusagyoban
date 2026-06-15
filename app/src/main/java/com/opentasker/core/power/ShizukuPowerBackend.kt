@@ -24,7 +24,7 @@ object ShizukuPowerBackend {
         if (managerInstalled) {
             ShizukuPowerStatus(
                 state = ShizukuPowerState.ManagerInstalled,
-                summary = "Shizuku manager is installed. OpenTasker has not linked the Shizuku API yet.",
+                summary = "Shizuku manager is installed. 白い熊 自由作業盤 has not linked the Shizuku API yet.",
             )
         } else {
             ShizukuPowerStatus(

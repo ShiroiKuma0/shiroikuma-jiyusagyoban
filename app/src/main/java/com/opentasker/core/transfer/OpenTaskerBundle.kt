@@ -36,7 +36,7 @@ data class OpenTaskerBundle(
 
 @Serializable
 data class BundleMetadata(
-    val name: String = "OpenTasker Export",
+    val name: String = "白い熊 自由作業盤 Export",
     val description: String = "",
     val capabilityRequirements: List<CapabilityRequirement> = emptyList(),
     val warnings: List<String> = emptyList(),
@@ -91,7 +91,7 @@ object OpenTaskerBundleCodec {
         variables: List<Variable> = emptyList(),
         scenes: List<Scene> = emptyList(),
         projects: List<Project> = emptyList(),
-        name: String = "OpenTasker Export",
+        name: String = "白い熊 自由作業盤 Export",
         description: String = "",
     ): OpenTaskerBundle {
         val sortedTasks = tasks.sortedWith(compareBy<Task> { it.name.lowercase() }.thenBy { it.id })
@@ -194,7 +194,7 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
     suspend fun exportBundle(
         appVersion: String,
         exportedAtEpochMs: Long = System.currentTimeMillis(),
-        name: String = "OpenTasker Export",
+        name: String = "白い熊 自由作業盤 Export",
         description: String = "",
     ): OpenTaskerBundle {
         val tasks = db.taskDao().getAll().map { it.toDomain() }

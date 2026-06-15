@@ -55,7 +55,7 @@ object ActionCapabilityRegistry {
             TermuxScriptBackend.hintForAction(TermuxScriptBackend.ACTION_ID)?.message
                 ?: "Termux script backend is not active.",
         ),
-        "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported OpenTasker action."),
+        "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported 白い熊 自由作業盤 action."),
     )
 
     fun get(actionId: String): ActionCapability = capabilities[actionId] ?: supported

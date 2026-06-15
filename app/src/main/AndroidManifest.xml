@@ -116,7 +116,7 @@
             android:foregroundServiceType="specialUse|location">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="OpenTasker automation engine — runs user-defined profiles when their contexts match" />
+                android:value="白い熊 自由作業盤 automation engine — runs user-defined profiles when their contexts match" />
         </service>
 
         <service

@@ -137,9 +137,9 @@ internal object NotificationChannels {
     )
 
     private val channels = mapOf(
-        "quiet" to ChannelDef("opentasker.quiet", "OpenTasker quiet", NotificationManager.IMPORTANCE_LOW),
-        "default" to ChannelDef("opentasker.actions", "OpenTasker actions", NotificationManager.IMPORTANCE_DEFAULT),
-        "urgent" to ChannelDef("opentasker.urgent", "OpenTasker urgent", NotificationManager.IMPORTANCE_HIGH),
+        "quiet" to ChannelDef("opentasker.quiet", "白い熊 自由作業盤 quiet", NotificationManager.IMPORTANCE_LOW),
+        "default" to ChannelDef("opentasker.actions", "白い熊 自由作業盤 actions", NotificationManager.IMPORTANCE_DEFAULT),
+        "urgent" to ChannelDef("opentasker.urgent", "白い熊 自由作業盤 urgent", NotificationManager.IMPORTANCE_HIGH),
     )
 
     fun resolve(key: String): ChannelDef =
