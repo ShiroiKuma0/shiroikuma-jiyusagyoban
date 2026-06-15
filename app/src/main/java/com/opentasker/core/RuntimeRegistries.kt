@@ -94,6 +94,7 @@ import com.opentasker.core.actions.TextDialogAction
 import com.opentasker.core.actions.ShellRunAction
 import com.opentasker.core.actions.LocationModeAction
 import com.opentasker.core.actions.SetImeAction
+import com.opentasker.core.actions.RefreshWidgetsAction
 import com.opentasker.core.actions.SetWidgetAction
 import com.opentasker.core.contexts.ApplicationContextSourceImpl
 import com.opentasker.core.contexts.ContextSourceRegistry
@@ -203,6 +204,7 @@ private fun registerBuiltInActions() {
         LocationModeAction(),
         SetImeAction(),
         SetWidgetAction(),
+        RefreshWidgetsAction(),
         TermuxScriptAction(),
         TaskerUnsupportedAction(),
     ).forEach(ActionRegistry::register)

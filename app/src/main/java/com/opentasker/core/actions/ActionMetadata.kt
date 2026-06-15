@@ -662,6 +662,16 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "widget.refresh",
+            name = "Refresh Widgets",
+            description = "Re-render every placed styled widget. Template-bound widgets pull their template and re-expand %vars (the pull model) — run this once per minute instead of a Set Widget per location.",
+            category = "System",
+            fields = emptyList(),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "tts.speak",
             name = "Say (Text-to-Speech)",
             description = "Speak text aloud using the device speaker",

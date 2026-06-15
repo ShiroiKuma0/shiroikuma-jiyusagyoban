@@ -37,3 +37,19 @@ class SetWidgetAction : Action {
         return ActionResult.Success
     }
 }
+
+/**
+ * `Refresh Widgets` — the pull model. Re-renders every placed styled widget; template-bound widgets
+ * pull their template and re-expand `%vars` (e.g. the clock's `%DT_*`) against the current globals.
+ * A per-minute tick just runs this once, with no per-widget wiring.
+ */
+class RefreshWidgetsAction : Action {
+    override val id = "widget.refresh"
+    override val category = ActionCategory.SYSTEM
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val n = StyledWidgetProvider.refreshAll(ctx.app)
+        ctx.logger("Refreshed $n widget(s)")
+        return ActionResult.Success
+    }
+}

@@ -9,6 +9,10 @@ import android.os.Bundle
 import android.util.TypedValue
 import android.widget.RemoteViews
 import com.opentasker.app.R
+import com.opentasker.core.engine.VariableStore
+import com.opentasker.core.engine.variables.InMemoryGlobalScope
+import com.opentasker.core.engine.variables.PersistentGlobalScope
+import com.opentasker.core.storage.SUPER_GLOBAL_PROJECT_ID
 import com.opentasker.core.widget.WidgetLayoutCodec
 import com.opentasker.core.widget.WidgetRenderer
 import com.opentasker.ui.theme.ThemeStore
@@ -43,8 +47,15 @@ class StyledWidgetProvider : AppWidgetProvider() {
             val wPx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, wDp.toFloat(), dm).toInt().coerceIn(1, MAX_PX)
             val hPx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, hDp.toFloat(), dm).toInt().coerceIn(1, MAX_PX)
 
-            val node = StyledWidgetStore.getLayout(context, id)?.let { WidgetLayoutCodec.decode(it) }
-                ?: WidgetLayoutCodec.PLACEHOLDER
+            // Pull model: a template-bound slot renders its template, expanded against the current
+            // persisted globals (`%DT_*` etc.) right here — no task run needed. Otherwise the static layout.
+            val templateName = StyledWidgetStore.getTemplate(context, id)
+            val layoutJson = if (templateName != null) {
+                TemplateStore.get(templateName)?.let { expandGlobals(it) }
+            } else {
+                StyledWidgetStore.getLayout(context, id)
+            }
+            val node = layoutJson?.let { WidgetLayoutCodec.decode(it) } ?: WidgetLayoutCodec.PLACEHOLDER
             val renderer = WidgetRenderer(dm.density) { ThemeStore.typeface(it) }
             val bitmap = runCatching { renderer.render(node, wPx, hPx) }.getOrNull()
 
@@ -75,6 +86,21 @@ class StyledWidgetProvider : AppWidgetProvider() {
                 renderWidget(context, manager, it)
             }
             return ids.size
+        }
+
+        /** Pull model: re-render every placed styled widget (template-bound ones pull fresh `%var` values). */
+        fun refreshAll(context: Context): Int {
+            val manager = AppWidgetManager.getInstance(context)
+            val ids = StyledWidgetStore.allIds(context)
+            ids.forEach { renderWidget(context, manager, it) }
+            return ids.size
+        }
+
+        /** Expand `%vars` in a template against all persisted globals (super + every project), merged. */
+        private fun expandGlobals(raw: String): String {
+            val scope = InMemoryGlobalScope()
+            PersistentGlobalScope.snapshotAll().forEach { (k, v) -> scope.set(SUPER_GLOBAL_PROJECT_ID, k, v) }
+            return runCatching { VariableStore(scope, SUPER_GLOBAL_PROJECT_ID).expand(raw) }.getOrDefault(raw)
         }
     }
 }

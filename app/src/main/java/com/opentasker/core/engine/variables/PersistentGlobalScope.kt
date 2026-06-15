@@ -61,4 +61,13 @@ object PersistentGlobalScope : GlobalVariableScope {
         if (projectId != SUPER_GLOBAL_PROJECT_ID) buckets[projectId]?.let(out::putAll)
         return out
     }
+
+    /** Every persisted global merged (super-globals first, then each project) — for rendering a widget
+     *  outside any task run, where the owning project isn't known. */
+    fun snapshotAll(): Map<String, String> {
+        val out = LinkedHashMap<String, String>()
+        buckets[SUPER_GLOBAL_PROJECT_ID]?.let(out::putAll)
+        buckets.forEach { (pid, m) -> if (pid != SUPER_GLOBAL_PROJECT_ID) out.putAll(m) }
+        return out
+    }
 }

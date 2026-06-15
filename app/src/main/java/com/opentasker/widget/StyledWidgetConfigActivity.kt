@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +15,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -58,6 +61,11 @@ class StyledWidgetConfigActivity : ComponentActivity() {
                     var layout by remember {
                         mutableStateOf(StyledWidgetStore.getLayout(this@StyledWidgetConfigActivity, widgetId) ?: DEFAULT_LAYOUT)
                     }
+                    var template by remember {
+                        mutableStateOf(StyledWidgetStore.getTemplate(this@StyledWidgetConfigActivity, widgetId) ?: "")
+                    }
+                    var templateMenu by remember { mutableStateOf(false) }
+                    val templateNames = remember { TemplateStore.names() }
                     var editing by remember { mutableStateOf(false) }
                     // On reconfigure, pre-fill the tap-task name from the stored id.
                     LaunchedEffect(Unit) {
@@ -91,16 +99,35 @@ class StyledWidgetConfigActivity : ComponentActivity() {
                             supportingText = { Text("Exact task name to run when the widget is tapped.") },
                             singleLine = true, modifier = Modifier.fillMaxWidth(),
                         )
-                        OutlinedButton(onClick = { editing = true }, modifier = Modifier.fillMaxWidth()) {
-                            Text("Edit layout visually")
+                        Box(Modifier.fillMaxWidth()) {
+                            OutlinedButton(onClick = { templateMenu = true }, modifier = Modifier.fillMaxWidth()) {
+                                Text(if (template.isBlank()) "Content: Custom layout" else "Content: template \"$template\"")
+                            }
+                            DropdownMenu(expanded = templateMenu, onDismissRequest = { templateMenu = false }) {
+                                DropdownMenuItem(text = { Text("Custom layout (edit below)") }, onClick = { template = ""; templateMenu = false })
+                                templateNames.forEach { n ->
+                                    DropdownMenuItem(text = { Text(n) }, onClick = { template = n; templateMenu = false })
+                                }
+                            }
                         }
-                        OutlinedTextField(
-                            value = layout, onValueChange = { layout = it },
-                            label = { Text("Layout (JSON, advanced)") },
-                            minLines = 4, modifier = Modifier.fillMaxWidth(),
-                        )
+                        if (template.isBlank()) {
+                            OutlinedButton(onClick = { editing = true }, modifier = Modifier.fillMaxWidth()) {
+                                Text("Edit layout visually")
+                            }
+                            OutlinedTextField(
+                                value = layout, onValueChange = { layout = it },
+                                label = { Text("Layout (JSON, advanced)") },
+                                minLines = 4, modifier = Modifier.fillMaxWidth(),
+                            )
+                        } else {
+                            Text(
+                                "This widget renders the \"$template\" template, re-expanded by the Refresh Widgets action (e.g. the per-minute clock tick).",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { save(name, tapTask, layout) }, modifier = Modifier.fillMaxWidth(0.6f)) {
+                            OutlinedButton(onClick = { save(name, template, tapTask, layout) }, modifier = Modifier.fillMaxWidth(0.6f)) {
                                 Text("Add widget")
                             }
                             TextButton(onClick = { finish() }) { Text("Cancel") }
@@ -111,9 +138,11 @@ class StyledWidgetConfigActivity : ComponentActivity() {
         }
     }
 
-    private fun save(name: String, tapTaskName: String, layout: String) {
+    private fun save(name: String, template: String, tapTaskName: String, layout: String) {
         val ctx = applicationContext
         StyledWidgetStore.setName(ctx, widgetId, name.trim())
+        // A non-blank template binds the slot to the pull model; a blank one falls back to the static layout.
+        StyledWidgetStore.setTemplate(ctx, widgetId, template.trim())
         // Keep the layout if it parses; otherwise fall back to the placeholder so the widget still renders.
         val json = if (WidgetLayoutCodec.decode(layout) != null) layout else WidgetLayoutCodec.encode(WidgetLayoutCodec.PLACEHOLDER)
         StyledWidgetStore.setLayout(ctx, widgetId, json)
