@@ -1,0 +1,202 @@
+package com.opentasker.scenes
+
+import android.graphics.BitmapFactory
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.core.engine.executeAndLogTask
+import com.opentasker.core.engine.variables.expandAgainstGlobals
+import com.opentasker.core.model.Scene
+import com.opentasker.core.model.SceneElement
+import com.opentasker.core.model.SceneElementType
+import com.opentasker.ui.theme.OpenTaskerTheme
+import com.opentasker.ui.theme.ThemeStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.lang.ref.WeakReference
+
+/**
+ * Runtime display of a [Scene]: a modal overlay (scrim + the scene laid out by its elements'
+ * dp positions, scaled to fit). Element `%vars` are expanded against the persisted globals, and
+ * tap / long-press run the element's tasks. Shown by the `scene.show` action; dismissed by tapping
+ * the scrim, back, or the `scene.hide` action.
+ */
+class SceneActivity : ComponentActivity() {
+
+    private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        open.add(WeakReference(this))
+        val sceneId = intent.getLongExtra(EXTRA_SCENE_ID, -1L)
+
+        setContent {
+            val prefs by ThemeStore.state.collectAsState()
+            OpenTaskerTheme(prefs) {
+                var scene by remember { mutableStateOf<Scene?>(null) }
+                LaunchedEffect(sceneId) {
+                    scene = withContext(Dispatchers.IO) {
+                        OpenTaskerApp_NoHilt.db.sceneDao().getById(sceneId)?.toDomain()
+                    }
+                }
+                SceneOverlay(scene, onDismiss = { finish() }, onRunTask = ::runTask)
+            }
+        }
+    }
+
+    private fun runTask(taskId: Long) {
+        io.launch {
+            val db = OpenTaskerApp_NoHilt.db
+            val task = db.taskDao().getById(taskId)?.toDomain() ?: return@launch
+            executeAndLogTask(applicationContext, db, task, source = "Scene")
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        open.removeAll { it.get() == null || it.get() === this }
+    }
+
+    companion object {
+        const val EXTRA_SCENE_ID = "com.opentasker.scenes.SCENE_ID"
+        private val open = mutableListOf<WeakReference<SceneActivity>>()
+
+        /** Dismiss every open scene (the `scene.hide` action). Returns how many were closed. */
+        fun dismissAll(): Int {
+            val activities = open.mapNotNull { it.get() }
+            activities.forEach { it.runOnUiThread { it.finish() } }
+            open.clear()
+            return activities.size
+        }
+    }
+}
+
+@Composable
+private fun SceneOverlay(scene: Scene?, onDismiss: () -> Unit, onRunTask: (Long) -> Unit) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.55f))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (scene == null) return@Box
+        BoxWithConstraints {
+            val availW = maxWidth.value
+            val availH = maxHeight.value
+            val sw = scene.widthDp.coerceAtLeast(1)
+            val sh = scene.heightDp.coerceAtLeast(1)
+            val scale = minOf(1f, (availW * 0.94f) / sw, (availH * 0.94f) / sh)
+            Box(
+                Modifier
+                    .size((sw * scale).dp, (sh * scale).dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    // Absorb taps so tapping the scene (not the scrim) doesn't dismiss.
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
+            ) {
+                scene.elements.forEach { element ->
+                    Box(
+                        Modifier
+                            .offset((element.xDp * scale).dp, (element.yDp * scale).dp)
+                            .size((element.widthDp * scale).dp, (element.heightDp * scale).dp),
+                    ) {
+                        SceneElementView(element, onRunTask)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SceneElementView(element: SceneElement, onRunTask: (Long) -> Unit) {
+    val cfg = element.config
+    fun v(key: String, fallback: String = "") = expandAgainstGlobals(cfg[key] ?: fallback)
+    when (element.type) {
+        SceneElementType.TEXT -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
+            Text(v("text"), color = MaterialTheme.colorScheme.onSurface)
+        }
+
+        SceneElementType.BUTTON -> Box(
+            Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.primary)
+                .pointerInput(element.id) {
+                    detectTapGestures(
+                        onTap = { element.tapTaskId?.let(onRunTask) },
+                        onLongPress = { element.longPressTaskId?.let(onRunTask) },
+                    )
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(v("label", "Button"), color = MaterialTheme.colorScheme.onPrimary, textAlign = TextAlign.Center)
+        }
+
+        SceneElementType.SLIDER -> {
+            val min = cfg["min"]?.toFloatOrNull() ?: 0f
+            val max = (cfg["max"]?.toFloatOrNull() ?: 100f).coerceAtLeast(min + 1f)
+            var value by remember(element.id) { mutableStateOf((cfg["value"]?.toFloatOrNull() ?: min).coerceIn(min, max)) }
+            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
+                Text(v("label", "Slider"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+                Slider(value = value, onValueChange = { value = it }, valueRange = min..max, modifier = Modifier.fillMaxWidth())
+            }
+        }
+
+        SceneElementType.IMAGE -> {
+            val source = v("source")
+            val bmp = remember(source) {
+                runCatching { File(source).takeIf { it.exists() }?.let { BitmapFactory.decodeFile(it.path) } }.getOrNull()
+            }
+            if (bmp != null) {
+                Image(bmp.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize())
+            } else {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(source.ifBlank { "Image" }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(element.type.name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}

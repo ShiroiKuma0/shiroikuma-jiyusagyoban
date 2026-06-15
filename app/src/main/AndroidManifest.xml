@@ -171,6 +171,13 @@
             android:taskAffinity="" />
 
         <activity
+            android:name="com.opentasker.scenes.SceneActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:taskAffinity="" />
+
+        <activity
             android:name="com.opentasker.widget.TaskWidgetConfigActivity"
             android:exported="true"
             android:theme="@style/Theme.OpenTasker">

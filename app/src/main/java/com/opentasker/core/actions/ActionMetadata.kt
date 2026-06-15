@@ -672,6 +672,28 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "scene.show",
+            name = "Show Scene",
+            description = "Display a scene (from the Scenes tab) as a modal overlay. Its elements run tasks on tap; %vars in text are expanded.",
+            category = "System",
+            fields = listOf(
+                ActionField("scene", "Scene name", required = true, hint = "the scene's name (or id)"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "scene.hide",
+            name = "Hide Scene",
+            description = "Dismiss any scene currently shown.",
+            category = "System",
+            fields = emptyList(),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "tts.speak",
             name = "Say (Text-to-Speech)",
             description = "Speak text aloud using the device speaker",
