@@ -353,7 +353,11 @@ private fun PermissionSetupCard(
                                 item.optional -> Icons.Filled.Info
                                 else -> Icons.Filled.Error
                             },
-                            contentDescription = null,
+                            contentDescription = when {
+                                item.granted -> "Granted"
+                                item.optional -> "Optional"
+                                else -> "Required"
+                            },
                             tint = stateColor,
                             modifier = Modifier.size(22.dp),
                         )

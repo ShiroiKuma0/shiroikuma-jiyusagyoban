@@ -240,7 +240,7 @@ private fun FlowInlineCommand(
     onClick: () -> Unit,
 ) {
     OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        Icon(Icons.Filled.Add, contentDescription = null)
+        Icon(Icons.Filled.Add, contentDescription = "Add")
         Spacer(Modifier.width(6.dp))
         Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }

@@ -272,7 +272,7 @@ private fun ContextInspectorSummaryCard(
                 InspectorMetric("$enabledProfiles", "Enabled", Modifier.weight(1f))
             }
             OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Filled.Refresh, contentDescription = "Refresh", modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text("Refresh Status")
             }
@@ -299,7 +299,7 @@ private fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(sourceStatusIcon(source.status), contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
+                Icon(sourceStatusIcon(source.status), contentDescription = source.status.label, tint = color, modifier = Modifier.size(22.dp))
                 Column(Modifier.weight(1f)) {
                     Text(source.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
@@ -346,7 +346,7 @@ private fun ProfileInspectorCard(profile: ProfileInspection, nowMs: Long) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Icon(
                     if (profile.matching) Icons.Filled.CheckCircle else Icons.Filled.Info,
-                    contentDescription = null,
+                    contentDescription = if (profile.matching) "Matching" else "Not matching",
                     tint = color,
                     modifier = Modifier.size(22.dp),
                 )
@@ -502,7 +502,7 @@ private fun OemRiskNotice(oem: OemBatteryGuidance.Guidance) {
         border = BorderStroke(1.dp, color.copy(alpha = 0.26f)),
     ) {
         Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Icon(Icons.Filled.Error, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
+            Icon(Icons.Filled.Error, contentDescription = "Warning", tint = color, modifier = Modifier.size(20.dp))
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     "${oem.oemName} background risk: ${oem.riskLevel.name.lowercase(Locale.US)}",
@@ -544,7 +544,7 @@ private fun InspectorEmptyState(contentPadding: PaddingValues) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(Icons.Filled.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
+        Icon(Icons.Filled.Info, contentDescription = "Info", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
         Spacer(Modifier.height(12.dp))
         Text("Context inspector unavailable", style = MaterialTheme.typography.titleLarge)
         Text(
