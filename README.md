@@ -20,7 +20,7 @@
 
 **Planned:** broad device-verified background geofence reliability, elevated (Shizuku) execution, Termux script dispatch, a visual flow authoring editor, and richer plugin UX. See [ROADMAP.md](ROADMAP.md).
 
-> **Status:** the current source version is `0.2.63`. Device-evidence claims (location/calendar/sun) are single-device API 36 data points on `SM-S938B`, not broad background-geofence reliability guarantees. The latest polish pass improves IME handling, small-screen bottom navigation, variable deletion safety, saveable editor state, and accessibility roles for widget/flow targets.
+> **Status:** the current source version is `0.2.63`. Device-evidence claims (location/calendar/sun) are single-device API 36 data points on `SM-S938B`, not broad background-geofence reliability guarantees. The latest polish pass improves IME handling, compact small-screen bottom navigation with a More menu, variable deletion safety, saveable editor state, and accessibility roles for widget/flow targets.
 
 ---
 

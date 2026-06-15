@@ -133,7 +133,7 @@ Key local constraints:
 
 ### N9 (2026.05.06) - Documentation truth pass post-v0.2.59
 
-**Status:** Partially refreshed through v0.2.63: README, ROADMAP.md, RESEARCH.md, Gradle version values, and F-Droid metadata gates now reflect the target-SDK-36/action-metadata and stricter UI polish passes. Older architecture and readiness docs still need a current-version truth pass before this item closes. [L14]
+**Status:** Partially refreshed through v0.2.63: README, ROADMAP.md, RESEARCH.md, Gradle version values, F-Droid metadata gates, and compact More-menu phone navigation now reflect the target-SDK-36/action-metadata and stricter UI polish passes. Older architecture and readiness docs still need a current-version truth pass before this item closes. [L14]
 **Description:** Refresh README, CLAUDE.md, ARCHITECTURE.md, IMPROVEMENT_PLAN.md, and FDROID_READINESS.md to reflect the current release. Restructure long status copy into skimmable feature lists where needed. Sync version strings, toolchain versions, workflow filenames, fdroid metadata, Gradle properties, ROADMAP, and CHANGELOG.
 **Sources:** Local repo state [L1][L5], existing improvement plan [L7], dependency/release audit [L14].
 **Category:** docs, dev-experience.
