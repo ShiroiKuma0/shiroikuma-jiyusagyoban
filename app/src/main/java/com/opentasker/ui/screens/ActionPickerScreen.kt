@@ -21,13 +21,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,6 +61,19 @@ fun AdvancedActionPickerScreen(
     }
     val expandedCategories = remember { mutableStateMapOf<String, Boolean>() }
     val expandedActions = remember { mutableStateMapOf<String, Boolean>() }
+    var query by remember { mutableStateOf("") }
+    val filteredGroups = if (query.isBlank()) {
+        actionGroups
+    } else {
+        actionGroups.mapNotNull { (category, actions) ->
+            val matches = actions.filter {
+                it.name.contains(query, ignoreCase = true) ||
+                    category.contains(query, ignoreCase = true) ||
+                    it.description.contains(query, ignoreCase = true)
+            }
+            if (matches.isEmpty()) null else category to matches
+        }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -79,8 +96,18 @@ fun AdvancedActionPickerScreen(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            actionGroups.forEach { (category, actions) ->
-                val categoryExpanded = expandedCategories[category] == true
+            item(key = "search") {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = { Text("Search actions") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+            filteredGroups.forEach { (category, actions) ->
+                // While searching, force categories open so matches are visible.
+                val categoryExpanded = query.isNotBlank() || expandedCategories[category] == true
                 item(key = "cat-$category") {
                     CategoryHeaderRow(category, actions.size, categoryExpanded) {
                         expandedCategories[category] = !categoryExpanded
@@ -121,7 +148,7 @@ private fun CategoryHeaderRow(category: String, count: Int, expanded: Boolean, o
             Text(category, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
             Text("$count", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
@@ -187,6 +214,6 @@ private fun ActionAccordionItem(
                 }
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }

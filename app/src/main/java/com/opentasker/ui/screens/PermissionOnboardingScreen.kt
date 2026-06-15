@@ -138,7 +138,7 @@ fun PermissionOnboardingScreen(
                 onClick = onOpenUiCustomization,
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.66f)),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 shape = RoundedCornerShape(18.dp),
             ) {
                 Row(
@@ -163,7 +163,7 @@ fun PermissionOnboardingScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.66f)),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 shape = RoundedCornerShape(18.dp),
             ) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -171,7 +171,7 @@ fun PermissionOnboardingScreen(
                         Column(Modifier.weight(1f)) {
                             Text("Setup checklist", style = MaterialTheme.typography.headlineSmall)
                             Text(
-                                "OpenTasker can run with missing access, but affected automations stay gated until setup is complete.",
+                                "白い熊 自由作業盤 can run with missing access, but affected automations stay gated until setup is complete.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -237,7 +237,7 @@ private fun BackupSetupCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         shape = RoundedCornerShape(16.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -251,7 +251,7 @@ private fun BackupSetupCard(
             }
             Text(
                 when {
-                    state.pendingRestore -> "Restore staged. Restart OpenTasker to apply it before the database opens."
+                    state.pendingRestore -> "Restore staged. Restart 白い熊 自由作業盤 to apply it before the database opens."
                     state.latestBackupName != null -> "Latest backup: ${state.latestBackupName}"
                     else -> "No local backup has been created yet."
                 },
@@ -313,7 +313,7 @@ private fun PermissionSetupCard(
         ),
         border = BorderStroke(
             1.dp,
-            if (item.granted || item.optional) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f) else MaterialTheme.colorScheme.error.copy(alpha = 0.26f),
+            if (item.granted || item.optional) MaterialTheme.colorScheme.outlineVariant else MaterialTheme.colorScheme.error.copy(alpha = 0.26f),
         ),
         shape = RoundedCornerShape(16.dp),
     ) {
@@ -374,7 +374,7 @@ private fun PermissionMetric(value: String, label: String, modifier: Modifier = 
         modifier = modifier,
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(value, style = MaterialTheme.typography.titleMedium)
@@ -404,7 +404,7 @@ private fun PermissionRequirement(label: String) {
     Surface(
         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f),
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
     ) {
         Text(
             label,
@@ -434,7 +434,7 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
         PermissionSetupItem(
             title = "Exact alarms",
-            body = "Allows precise scheduled automations. If denied, OpenTasker falls back to inexact delivery windows.",
+            body = "Allows precise scheduled automations. If denied, 白い熊 自由作業盤 falls back to inexact delivery windows.",
             granted = ExactAlarmSupport.canScheduleExactAlarms(context),
             actionLabel = "Open settings",
             action = PermissionAction.SettingsIntent(ExactAlarmSupport.settingsIntent(context)),
@@ -442,7 +442,7 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
         PermissionSetupItem(
             title = "Battery optimization",
-            body = "OEM and Android battery managers can stop background automation. Exempting OpenTasker improves reliability. " +
+            body = "OEM and Android battery managers can stop background automation. Exempting 白い熊 自由作業盤 improves reliability. " +
                 oem.summary,
             granted = ignoresBatteryOptimizations(context),
             actionLabel = "Open settings",
@@ -481,7 +481,7 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
         PermissionSetupItem(
             title = "Calendar access",
-            body = "Needed for local calendar-window triggers. OpenTasker only emits redacted calendar metadata to matching.",
+            body = "Needed for local calendar-window triggers. 白い熊 自由作業盤 only emits redacted calendar metadata to matching.",
             granted = hasPermission(context, Manifest.permission.READ_CALENDAR),
             actionLabel = "Request",
             action = PermissionAction.RuntimePermission(Manifest.permission.READ_CALENDAR),
@@ -555,7 +555,7 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ) else null,
         PermissionSetupItem(
             title = "Do Not Disturb access",
-            body = "Needed before OpenTasker can change interruption filters or DND-related settings.",
+            body = "Needed before 白い熊 自由作業盤 can change interruption filters or DND-related settings.",
             granted = hasNotificationPolicyAccess(context),
             actionLabel = "Open settings",
             action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)),

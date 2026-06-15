@@ -27,7 +27,10 @@ private val BaseTypography = Typography(
     titleSmall = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 20.sp),
     bodyMedium = TextStyle(fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 21.sp),
     bodySmall = TextStyle(fontWeight = FontWeight.Normal, fontSize = 12.sp, lineHeight = 18.sp),
-    labelLarge = TextStyle(fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 18.sp),
+    // Button text uses labelLarge. Pure #FFFF00 at the old Medium weight read as a dim/"alpha" yellow
+    // against black at small sizes; SemiBold makes it render as saturated, full-strength yellow like the
+    // headings. Lower-priority affordances are plain TextButtons (no border), which carry the hierarchy.
+    labelLarge = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 18.sp),
     labelMedium = TextStyle(fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp),
     labelSmall = TextStyle(fontWeight = FontWeight.Medium, fontSize = 11.sp, lineHeight = 14.sp),
 )
@@ -77,7 +80,11 @@ fun colorSchemeFrom(prefs: ThemePrefs): ColorScheme {
         surface = surface,
         onSurface = text,
         surfaceVariant = surface,
-        onSurfaceVariant = textSecondary,
+        // Material3 1.4 ("expressive") routes Outlined/Text button LABEL + ICON colour to
+        // onSurfaceVariant (not primary as older versions did). Mapping it to the dim textSecondary
+        // made every button's text render as a muted/olive yellow while its border stayed bright.
+        // Point it at the full-strength text colour so button labels are pure #FFFF00 like the headings.
+        onSurfaceVariant = text,
         surfaceContainerLowest = background,
         surfaceContainerLow = surface,
         surfaceContainer = surface,
@@ -87,7 +94,7 @@ fun colorSchemeFrom(prefs: ThemePrefs): ColorScheme {
         inverseSurface = text,
         inverseOnSurface = background,
         outline = border,
-        outlineVariant = border.copy(alpha = 0.6f),
+        outlineVariant = border,
         scrim = Color.Black,
     )
 }
