@@ -126,10 +126,32 @@ fun registerActionMetadata() {
         ActionMetadata(
             id = "task.run",
             name = "Run Task",
-            description = "Run another task as a reusable sub-task (shares variables; max 8 levels deep)",
+            description = "Run another task as a sub-task with named parameters (it reads them as {{ param.name }}). Capture its named results and ok/error status into variables under a prefix. Globals are shared; locals are isolated; max 8 levels deep.",
             category = "Flow",
             fields = listOf(
                 ActionField("task", "Task id or name", required = true, hint = "Toggle WiFi"),
+                ActionField("results_prefix", "Store results into (prefix)", hint = "e.g. r_  →  %r_<name>, %r_ok, %r_error"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "task.return",
+            name = "Return Values",
+            description = "Return named values to the task that called this one (via its Run Task results prefix). Values may reference this task's variables and {{ param.* }}.",
+            category = "Flow",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "flow.fail",
+            name = "Fail",
+            description = "Stop the task with an error message. Surfaced to a caller's Run Task as %<prefix>error / %<prefix>ok=false.",
+            category = "Flow",
+            fields = listOf(
+                ActionField("message", "Error message", FieldType.MULTILINE, hint = "Why the task failed"),
             )
         )
     )
