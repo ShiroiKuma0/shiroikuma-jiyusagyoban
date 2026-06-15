@@ -26,7 +26,7 @@ class VariableStore {
     private val expander = VariableExpander()
     private val arrayStore = ArrayStore()
 
-    fun pushScope() { localStack.add(mutableMapOf()) }
+    fun pushScope() { localStack.add(java.util.concurrent.ConcurrentHashMap()) }
     fun popScope() { 
         synchronized(localStack) {
             if (localStack.isNotEmpty()) localStack.removeAt(localStack.size - 1)

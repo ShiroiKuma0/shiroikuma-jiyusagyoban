@@ -18,7 +18,7 @@ class WiFiNetworkMonitor(
     private val appContext = context.applicationContext
     private val connectivityManager = appContext.getSystemService(ConnectivityManager::class.java)
     private val started = AtomicBoolean(false)
-    private var lastState: WiFiState? = null
+    @Volatile private var lastState: WiFiState? = null
 
     private val callback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {

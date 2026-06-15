@@ -14,7 +14,7 @@ class ConnectivityMonitor(context: Context) {
     private val appContext = context.applicationContext
     private val cm = appContext.getSystemService(ConnectivityManager::class.java)
     private val started = AtomicBoolean(false)
-    private var lastState: ConnState? = null
+    @Volatile private var lastState: ConnState? = null
 
     private val callback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {

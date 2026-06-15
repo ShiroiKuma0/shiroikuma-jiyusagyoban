@@ -252,16 +252,16 @@ private const val MAX_DOWNLOAD_BYTES = 52_428_800L // 50 MB for file downloads
 
 private fun InputStream.readBounded(maxBytes: Long): String {
     val buffer = ByteArray(8192)
-    val result = StringBuilder()
+    val result = java.io.ByteArrayOutputStream()
     var total = 0L
     while (true) {
         val n = read(buffer)
         if (n < 0) break
         total += n
         if (total > maxBytes) throw IllegalStateException("response exceeds ${maxBytes / 1024 / 1024} MB limit")
-        result.append(String(buffer, 0, n, Charsets.UTF_8))
+        result.write(buffer, 0, n)
     }
-    return result.toString()
+    return result.toByteArray().toString(Charsets.UTF_8)
 }
 
 private fun InputStream.copyBounded(out: java.io.OutputStream, maxBytes: Long): Long {

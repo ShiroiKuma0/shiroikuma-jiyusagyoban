@@ -21,7 +21,7 @@ class VibrateAction : Action {
     override val category = ActionCategory.NOTIFICATION
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val millis = args["millis"]?.toLongOrNull() ?: 100L
+        val millis = (args["millis"]?.toLongOrNull() ?: 100L).coerceIn(1L, 10_000L)
         return try {
             val vibrator = if (Build.VERSION.SDK_INT >= 31) {
                 ctx.app.getSystemService(Context.VIBRATOR_MANAGER_SERVICE)?.let {
