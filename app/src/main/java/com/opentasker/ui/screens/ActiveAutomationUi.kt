@@ -15,12 +15,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -73,6 +75,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -1451,7 +1456,7 @@ private fun StatusPill(
     Surface(
         modifier = modifier,
         color = color.copy(alpha = 0.14f),
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, color.copy(alpha = 0.34f)),
     ) {
         Text(
@@ -2696,7 +2701,7 @@ private fun TemplatePickerDialog(
         title = { Text("Starter templates") },
         text = {
             LazyColumn(
-                modifier = Modifier.height(460.dp),
+                modifier = Modifier.heightIn(max = 460.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 items(ProfileTemplateCatalog.all, key = { it.id }) { template ->
@@ -2762,7 +2767,7 @@ private fun TemplateSlotDialog(
         title = { Text(template.title) },
         text = {
             LazyColumn(
-                modifier = Modifier.height(420.dp),
+                modifier = Modifier.heightIn(max = 420.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
@@ -2990,7 +2995,7 @@ private fun ActionPickerDialog(
         title = { Text("Add action") },
         text = {
             LazyColumn(
-                modifier = Modifier.height(420.dp),
+                modifier = Modifier.heightIn(max = 420.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 actionGroups.forEach { (category, actions) ->
@@ -3047,6 +3052,23 @@ private fun ActionPickerDialog(
     )
 }
 
+private fun existingActionArgValue(
+    actionId: String,
+    key: String,
+    args: Map<String, String>,
+): String = args[key] ?: when (actionId to key) {
+    "brightness.set" to "brightness" -> args["level"]
+    "screenshot.take" to "path" -> args["filename"]
+    "file.read" to "var" -> args["variable"]
+    "file.write" to "text" -> args["content"]
+    "file.append" to "text" -> args["content"]
+    "file.list" to "var" -> args["variable"]
+    "http.get" to "var" -> args["variable"]
+    "http.post" to "data" -> args["body"]
+    "http.post" to "var" -> args["variable"]
+    else -> null
+}.orEmpty()
+
 @Composable
 private fun ActionConfigDialog(
     state: ActionEditState,
@@ -3057,7 +3079,15 @@ private fun ActionConfigDialog(
         mutableStateOf(state.existing?.label ?: state.metadata.name)
     }
     var values by remember(state.existing?.id, state.metadata.id) {
-        mutableStateOf(state.metadata.fields.associate { field -> field.key to state.existing?.args?.get(field.key).orEmpty() })
+        mutableStateOf(
+            state.metadata.fields.associate { field ->
+                field.key to existingActionArgValue(
+                    actionId = state.metadata.id,
+                    key = field.key,
+                    args = state.existing?.args.orEmpty(),
+                )
+            }
+        )
     }
     val capability = remember(state.metadata.id) { ActionCapabilityRegistry.get(state.metadata.id) }
     val missingRequired = state.metadata.fields.any { it.required && values[it.key].isNullOrBlank() }
@@ -3067,7 +3097,7 @@ private fun ActionConfigDialog(
         title = { Text(state.metadata.name) },
         text = {
             LazyColumn(
-                modifier = Modifier.height(420.dp),
+                modifier = Modifier.heightIn(max = 420.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
@@ -3136,11 +3166,23 @@ private fun ActionConfigDialog(
 private fun ActionFieldInput(field: ActionField, value: String, onChange: (String) -> Unit) {
     val label = field.label + if (field.required) " *" else ""
     when (field.fieldType) {
-        FieldType.CHECKBOX -> Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
-        ) {
+        FieldType.CHECKBOX -> {
+            val checked = value.toBoolean()
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = checked,
+                        role = Role.Switch,
+                        onValueChange = { onChange(it.toString()) },
+                    )
+                    .semantics {
+                        stateDescription = if (checked) "On" else "Off"
+                    },
+            ) {
             Row(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -3151,8 +3193,9 @@ private fun ActionFieldInput(field: ActionField, value: String, onChange: (Strin
                         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                Switch(checked = value.toBoolean(), onCheckedChange = { onChange(it.toString()) })
+                Switch(checked = checked, onCheckedChange = null)
             }
+        }
         }
 
         FieldType.MULTILINE -> OutlinedTextField(
@@ -3334,7 +3377,7 @@ private fun ContextConfigDialog(
         title = { Text(state.type.name.lowercase().replaceFirstChar { it.uppercase() }) },
         text = {
             LazyColumn(
-                modifier = Modifier.height(420.dp),
+                modifier = Modifier.heightIn(max = 420.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {

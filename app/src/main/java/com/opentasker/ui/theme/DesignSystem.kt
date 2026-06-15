@@ -34,7 +34,6 @@ object DesignSystem {
         val md = 8.dp      // Medium radius (cards, standard buttons)
         val lg = 12.dp     // Large radius (dialogs, large cards)
         val xl = 16.dp     // Extra large radius (bottom sheets, premium cards)
-        val pill = 50.dp   // Full round (chips, avatar circles)
     }
 
     // ========== Elevation/Shadow Scale ==========

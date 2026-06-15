@@ -447,7 +447,7 @@ private fun FlowEdgeLabel(label: String) {
     ) {
         Surface(
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.56f),
-            shape = RoundedCornerShape(999.dp),
+            shape = RoundedCornerShape(8.dp),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)),
         ) {
             Text(
@@ -489,7 +489,7 @@ private fun FlowStatusPill(
     Surface(
         modifier = modifier,
         color = color.copy(alpha = 0.14f),
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, color.copy(alpha = 0.34f)),
     ) {
         Text(
