@@ -182,9 +182,13 @@ class LocationContextSourceImpl(
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
-    private fun enabledLocationProviders(locationManager: LocationManager): List<String> =
-        listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+    private fun enabledLocationProviders(locationManager: LocationManager): List<String> {
+        val active = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
             .filter { provider -> runCatching { locationManager.isProviderEnabled(provider) }.getOrDefault(false) }
+        val passive = if (runCatching { locationManager.isProviderEnabled(LocationManager.PASSIVE_PROVIDER) }.getOrDefault(false))
+            listOf(LocationManager.PASSIVE_PROVIDER) else emptyList()
+        return active + passive
+    }
 
     companion object {
         private const val DEFAULT_SETUP_RECHECK_MS = 60_000L
@@ -207,12 +211,14 @@ data class LocationProviderCadence(
 data class LocationProviderRequestPolicy(
     private val gps: LocationProviderCadence,
     private val network: LocationProviderCadence,
+    private val passive: LocationProviderCadence,
     private val fallback: LocationProviderCadence,
 ) {
     fun cadenceFor(provider: String): LocationProviderCadence =
         when (provider) {
             LocationManager.GPS_PROVIDER -> gps
             LocationManager.NETWORK_PROVIDER -> network
+            LocationManager.PASSIVE_PROVIDER -> passive
             else -> fallback
         }
 
@@ -221,6 +227,7 @@ data class LocationProviderRequestPolicy(
             LocationProviderRequestPolicy(
                 gps = LocationProviderCadence(minTimeMs = 180_000L, minDistanceMeters = 100f),
                 network = LocationProviderCadence(minTimeMs = 90_000L, minDistanceMeters = 150f),
+                passive = LocationProviderCadence(minTimeMs = 1L, minDistanceMeters = 0f),
                 fallback = LocationProviderCadence(minTimeMs = 180_000L, minDistanceMeters = 150f),
             )
     }
