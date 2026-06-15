@@ -23,6 +23,7 @@ import com.opentasker.automation.sensor.ShakeDetector
 import com.opentasker.automation.scheduler.TimeEventScheduler
 import com.opentasker.core.contexts.BluetoothContextEvents
 import com.opentasker.core.contexts.BootContextEvents
+import com.opentasker.core.contexts.CameraMicContextEvents
 import com.opentasker.core.contexts.PackageContextEvents
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.Profile
@@ -79,6 +80,7 @@ class AutomationService : Service() {
         shakeDetector.start()
         registerReceiver(PackageContextEvents.receiver, PackageContextEvents.intentFilter(), RECEIVER_NOT_EXPORTED)
         registerReceiver(BluetoothContextEvents.receiver, BluetoothContextEvents.intentFilter(), RECEIVER_NOT_EXPORTED)
+        CameraMicContextEvents.start(this)
         profileCooldowns.putAll(cooldownStore.loadAll())
         scope.launch { pruneRunLogs(force = true) }
     }
