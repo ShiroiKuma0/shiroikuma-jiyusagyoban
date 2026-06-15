@@ -129,8 +129,8 @@ private fun FlowOverviewCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
-        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(18.dp),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -171,8 +171,8 @@ private fun FlowGraphCard(
             .fillMaxWidth()
             .semantics { contentDescription = graph.accessibilitySummary() },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)),
-        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(18.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -221,7 +221,7 @@ private fun FlowGraphCard(
             }
 
             if (graph.warnings.isNotEmpty()) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     graph.warnings.forEach { warning ->
                         Text(
@@ -449,8 +449,8 @@ private fun FlowEdgeLabel(label: String) {
     ) {
         Surface(
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.56f),
-            shape = RoundedCornerShape(8.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)),
+            shape = RoundedCornerShape(999.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
             Text(
                 label,
@@ -470,7 +470,7 @@ private fun FlowMetric(value: String, label: String, modifier: Modifier = Modifi
         modifier = modifier,
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),

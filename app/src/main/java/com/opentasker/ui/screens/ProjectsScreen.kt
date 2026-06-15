@@ -286,6 +286,7 @@ private fun ProjectEditDialog(
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var color by remember { mutableStateOf(initial?.color) }
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text(if (initial == null) "New project" else "Edit project") },
         text = {
@@ -324,6 +325,7 @@ private fun DeleteProjectDialog(
     onDeleteItems: () -> Unit,
 ) {
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text("Delete \"${project.name}\"?") },
         text = {
@@ -363,6 +365,7 @@ fun ProjectPickerDialog(
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {

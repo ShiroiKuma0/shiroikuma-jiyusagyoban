@@ -33,6 +33,14 @@ data class ThemePrefs(
     val fontWeight: Int = 0,        // 0 = leave each text style's own weight; else 100..900
     val fontScalePct: Int = 100,    // 100 = 1.0x; clamped to [SCALE_MIN, SCALE_MAX]
     val advancedActionPicker: Boolean = false,  // full-screen, category-foldable action picker
+    // ---- Flash / toast (the transient snackbar that reports task results) -----------------------
+    val flashBackground: Int = BLACK,            // opaque so content never shows through
+    val flashText: Int = YELLOW,
+    val flashBorder: Int = YELLOW,
+    val flashBorderWidthDp: Int = 1,             // [0, FLASH_BORDER_WIDTH_MAX]
+    val flashCornerRadiusDp: Int = 12,           // [0, FLASH_CORNER_MAX]
+    val flashTextSizeSp: Int = 16,               // [FLASH_TEXT_MIN, FLASH_TEXT_MAX]
+    val flashFontWeight: Int = 700,              // 100..900 (Bold by default — bigger & heavier)
 ) {
     companion object {
         const val BLACK = 0xFF000000.toInt()
@@ -42,6 +50,13 @@ data class ThemePrefs(
         const val SCALE_MIN = 80
         const val SCALE_MAX = 160
         const val BORDER_WIDTH_MAX = 8
+
+        const val FLASH_BORDER_WIDTH_MAX = 8
+        const val FLASH_CORNER_MAX = 28
+        const val FLASH_TEXT_MIN = 12
+        const val FLASH_TEXT_MAX = 30
+        const val FONT_WEIGHT_MIN = 100
+        const val FONT_WEIGHT_MAX = 900
 
         val DEFAULT = ThemePrefs()
     }
@@ -71,6 +86,13 @@ object ThemeStore {
     private const val K_FONT_WEIGHT = "font_weight"
     private const val K_FONT_SCALE = "font_scale"
     private const val K_ADVANCED_ACTION_PICKER = "advanced_action_picker"
+    private const val K_FLASH_BACKGROUND = "flash_background"
+    private const val K_FLASH_TEXT = "flash_text"
+    private const val K_FLASH_BORDER = "flash_border"
+    private const val K_FLASH_BORDER_WIDTH = "flash_border_width"
+    private const val K_FLASH_CORNER = "flash_corner"
+    private const val K_FLASH_TEXT_SIZE = "flash_text_size"
+    private const val K_FLASH_FONT_WEIGHT = "flash_font_weight"
 
     private lateinit var appContext: Context
     private lateinit var prefs: SharedPreferences
@@ -102,6 +124,10 @@ object ThemeStore {
     private fun ThemePrefs.normalized(): ThemePrefs = copy(
         borderWidthDp = borderWidthDp.coerceIn(0, ThemePrefs.BORDER_WIDTH_MAX),
         fontScalePct = fontScalePct.coerceIn(ThemePrefs.SCALE_MIN, ThemePrefs.SCALE_MAX),
+        flashBorderWidthDp = flashBorderWidthDp.coerceIn(0, ThemePrefs.FLASH_BORDER_WIDTH_MAX),
+        flashCornerRadiusDp = flashCornerRadiusDp.coerceIn(0, ThemePrefs.FLASH_CORNER_MAX),
+        flashTextSizeSp = flashTextSizeSp.coerceIn(ThemePrefs.FLASH_TEXT_MIN, ThemePrefs.FLASH_TEXT_MAX),
+        flashFontWeight = flashFontWeight.coerceIn(ThemePrefs.FONT_WEIGHT_MIN, ThemePrefs.FONT_WEIGHT_MAX),
     )
 
     private fun load(): ThemePrefs {
@@ -118,6 +144,13 @@ object ThemeStore {
             fontWeight = prefs.getInt(K_FONT_WEIGHT, d.fontWeight),
             fontScalePct = prefs.getInt(K_FONT_SCALE, d.fontScalePct),
             advancedActionPicker = prefs.getBoolean(K_ADVANCED_ACTION_PICKER, d.advancedActionPicker),
+            flashBackground = prefs.getInt(K_FLASH_BACKGROUND, d.flashBackground),
+            flashText = prefs.getInt(K_FLASH_TEXT, d.flashText),
+            flashBorder = prefs.getInt(K_FLASH_BORDER, d.flashBorder),
+            flashBorderWidthDp = prefs.getInt(K_FLASH_BORDER_WIDTH, d.flashBorderWidthDp),
+            flashCornerRadiusDp = prefs.getInt(K_FLASH_CORNER, d.flashCornerRadiusDp),
+            flashTextSizeSp = prefs.getInt(K_FLASH_TEXT_SIZE, d.flashTextSizeSp),
+            flashFontWeight = prefs.getInt(K_FLASH_FONT_WEIGHT, d.flashFontWeight),
         ).normalized()
     }
 
@@ -134,6 +167,13 @@ object ThemeStore {
             putInt(K_FONT_WEIGHT, p.fontWeight)
             putInt(K_FONT_SCALE, p.fontScalePct)
             putBoolean(K_ADVANCED_ACTION_PICKER, p.advancedActionPicker)
+            putInt(K_FLASH_BACKGROUND, p.flashBackground)
+            putInt(K_FLASH_TEXT, p.flashText)
+            putInt(K_FLASH_BORDER, p.flashBorder)
+            putInt(K_FLASH_BORDER_WIDTH, p.flashBorderWidthDp)
+            putInt(K_FLASH_CORNER, p.flashCornerRadiusDp)
+            putInt(K_FLASH_TEXT_SIZE, p.flashTextSizeSp)
+            putInt(K_FLASH_FONT_WEIGHT, p.flashFontWeight)
         }
     }
 

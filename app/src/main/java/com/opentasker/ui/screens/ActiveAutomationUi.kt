@@ -9,7 +9,10 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -18,6 +21,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -33,6 +37,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Upload
@@ -69,19 +74,27 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -89,9 +102,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.withTransaction
 import com.opentasker.app.BuildConfig
 import com.opentasker.ui.theme.ThemeStore
+import kotlin.math.roundToInt
 import com.opentasker.core.actions.ActionField
 import com.opentasker.core.actions.ActionMetadata
 import com.opentasker.core.actions.ActionMetadataRegistry
+import com.opentasker.core.actions.RETURN_VALUES_ACTION_ID
+import com.opentasker.core.actions.RETURN_VALUE_PREFIX
+import com.opentasker.core.engine.SUB_TASK_ACTION_ID
+import com.opentasker.core.engine.SUB_TASK_PARAM_PREFIX
 import com.opentasker.core.actions.FieldType
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
@@ -573,8 +591,8 @@ class ActiveAutomationViewModel(
                 withContext(Dispatchers.IO) {
                     val bundle = bundleRepository.exportBundle(
                         appVersion = appVersion,
-                        name = "OpenTasker Workspace Export",
-                        description = "Profiles, tasks, variables, and scenes exported from OpenTasker.",
+                        name = "白い熊 自由作業盤 Workspace Export",
+                        description = "Profiles, tasks, variables, and scenes exported from 白い熊 自由作業盤.",
                     )
                     val encoded = OpenTaskerBundleCodec.encode(bundle)
                     val stream = appContext.contentResolver.openOutputStream(uri)
@@ -590,7 +608,7 @@ class ActiveAutomationViewModel(
                             "${bundle.scenes.size} scene${plural(bundle.scenes.size)}"
                     )
                 }
-                .onFailure { events.send("Error: ${it.message ?: "OpenTasker bundle export failed"}") }
+                .onFailure { events.send("Error: ${it.message ?: "白い熊 自由作業盤 bundle export failed"}") }
             openTaskerBundleBusy = false
         }
     }
@@ -651,9 +669,9 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess {
                     openTaskerBundleReview = it
-                    events.send("OpenTasker bundle ready for review")
+                    events.send("白い熊 自由作業盤 bundle ready for review")
                 }
-                .onFailure { events.send("Error: ${it.message ?: "OpenTasker bundle preview failed"}") }
+                .onFailure { events.send("Error: ${it.message ?: "白い熊 自由作業盤 bundle preview failed"}") }
             openTaskerBundleBusy = false
         }
     }
@@ -685,7 +703,7 @@ class ActiveAutomationViewModel(
                             if (importReport.insertedProjects > 0) ", ${importReport.insertedProjects} project${plural(importReport.insertedProjects)}" else ""
                     )
                 }
-                .onFailure { events.send("Error: ${it.message ?: "OpenTasker bundle import failed"}") }
+                .onFailure { events.send("Error: ${it.message ?: "白い熊 自由作業盤 bundle import failed"}") }
             openTaskerBundleBusy = false
         }
     }
@@ -743,7 +761,7 @@ class ActiveAutomationViewModel(
         viewModelScope.launch {
             setBackupBusy(true)
             databaseBackupManager.stageRestore(uri)
-                .onSuccess { events.send("Backup imported. Restart OpenTasker to apply the restore.") }
+                .onSuccess { events.send("Backup imported. Restart 白い熊 自由作業盤 to apply the restore.") }
                 .onFailure { events.send("Error: ${it.message ?: "Database backup import failed"}") }
             setBackupBusy(false)
         }
@@ -881,10 +899,14 @@ fun ActiveAutomationUi(
     var screen by remember { mutableStateOf(OpenTaskerScreen.Profiles) }
     var showUiCustomization by remember { mutableStateOf(false) }
     var showProjectManagement by remember { mutableStateOf(false) }
+    var showTaskLibrary by remember { mutableStateOf(false) }
     var moveTarget by remember { mutableStateOf<MoveTarget?>(null) }
     var exportRequest by remember { mutableStateOf<ExportRequest?>(null) }
     var pendingExportWrite by remember { mutableStateOf<ExportRequest?>(null) }
     var importConflict by remember { mutableStateOf<OpenTaskerBundle?>(null) }
+    // Fold state hoisted to the root so it survives full-screen overlays (e.g. the action picker).
+    val expandedTasks = remember { mutableStateMapOf<Long, Boolean>() }
+    val expandedActions = remember { mutableStateMapOf<String, Boolean>() }
     var taskDialog by remember { mutableStateOf<Task?>(null) }
     var showCreateTaskDialog by remember { mutableStateOf(false) }
     var profileDialog by remember { mutableStateOf<Profile?>(null) }
@@ -1043,12 +1065,40 @@ fun ActiveAutomationUi(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                // Fully custom flash: fill + border live on the SAME Surface node so the box is
+                // opaque (the default Snackbar overload inserts padding between the border and the
+                // fill, leaving a see-through ring). All attributes are theme-configurable.
+                val flashShape = RoundedCornerShape(themePrefs.flashCornerRadiusDp.dp)
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Surface(
+                        shape = flashShape,
+                        color = Color(themePrefs.flashBackground),
+                        contentColor = Color(themePrefs.flashText),
+                        border = if (themePrefs.flashBorderWidthDp > 0) {
+                            BorderStroke(themePrefs.flashBorderWidthDp.dp, Color(themePrefs.flashBorder))
+                        } else null,
+                    ) {
+                        Text(
+                            text = data.visuals.message,
+                            color = Color(themePrefs.flashText),
+                            fontSize = themePrefs.flashTextSizeSp.sp,
+                            fontWeight = FontWeight(themePrefs.flashFontWeight),
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                        )
+                    }
+                }
+            }
+        },
         topBar = {
             TopAppBar(
                 title = {
                     Column {
-                        Text("OpenTasker", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("白い熊 自由作業盤", maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
                             "${screen.label} - $headerDetail",
                             style = MaterialTheme.typography.labelMedium,
@@ -1059,6 +1109,11 @@ fun ActiveAutomationUi(
                     }
                 },
                 actions = {
+                    if (screen == OpenTaskerScreen.Tasks) {
+                        IconButton(onClick = { showTaskLibrary = true }) {
+                            Icon(Icons.Filled.Info, contentDescription = "Task library")
+                        }
+                    }
                     if (screen == OpenTaskerScreen.Profiles ||
                         screen == OpenTaskerScreen.Tasks ||
                         screen == OpenTaskerScreen.Scenes
@@ -1205,6 +1260,8 @@ fun ActiveAutomationUi(
 
             OpenTaskerScreen.Tasks -> TasksScreen(
                 tasks = visibleTasks,
+                expandedTasks = expandedTasks,
+                expandedActions = expandedActions,
                 onCreateTask = { showCreateTaskDialog = true },
                 onEditTask = { taskDialog = it },
                 onDeleteTask = { pendingDelete = DeleteTarget.TaskTarget(it) },
@@ -1223,6 +1280,7 @@ fun ActiveAutomationUi(
                 },
                 onMoveTask = { moveTarget = MoveTarget.TaskMove(it) },
                 onExportTask = { exportRequest = ExportRequest(name = "Task: ${it.name}", fileName = exportFileName(it.name), taskIds = setOf(it.id)) },
+                onReorderAction = { task, newOrder -> viewModel.updateTask(task.copy(actions = newOrder), "Actions reordered") },
                 contentPadding = innerPadding,
             )
 
@@ -1402,6 +1460,10 @@ fun ActiveAutomationUi(
         )
     }
 
+    if (showTaskLibrary) {
+        TaskLibraryDialog(tasks = tasks, onDismiss = { showTaskLibrary = false })
+    }
+
     taskDialog?.let { task ->
         TaskEditorDialog(
             task = task,
@@ -1480,6 +1542,9 @@ fun ActiveAutomationUi(
     actionEdit?.let { state ->
         ActionConfigDialog(
             state = state,
+            allTasks = tasks,
+            projects = projects,
+            currentProjectId = currentProjectId,
             onDismiss = { actionEdit = null },
             onSave = { action ->
                 val updatedActions = state.index?.let { index ->
@@ -1545,8 +1610,8 @@ private fun ProfilesScreen(
     if (tasks.isEmpty()) {
         EmptyState(
             title = "Start with a template or task",
-            body = "Import an OpenTasker JSON bundle, migrate an existing Tasker XML export, start from a guided template, or create a blank task manually.",
-            actionLabel = if (openTaskerBundleBusy) "Reading Bundle..." else "Import OpenTasker JSON",
+            body = "Import a 白い熊 自由作業盤 JSON bundle, migrate an existing Tasker XML export, start from a guided template, or create a blank task manually.",
+            actionLabel = if (openTaskerBundleBusy) "Reading Bundle..." else "Import 白い熊 自由作業盤 JSON",
             onAction = onImportOpenTaskerBundle,
             actionEnabled = !openTaskerBundleBusy,
             secondaryActionLabel = "Browse Templates",
@@ -1563,8 +1628,8 @@ private fun ProfilesScreen(
     if (profiles.isEmpty()) {
         EmptyState(
             title = "No profiles yet",
-            body = "Profiles connect contexts to tasks. Import an OpenTasker JSON bundle, migrate Tasker XML, start from a curated template, or create a blank profile.",
-            actionLabel = if (openTaskerBundleBusy) "Reading Bundle..." else "Import OpenTasker JSON",
+            body = "Profiles connect contexts to tasks. Import a 白い熊 自由作業盤 JSON bundle, migrate Tasker XML, start from a curated template, or create a blank profile.",
+            actionLabel = if (openTaskerBundleBusy) "Reading Bundle..." else "Import 白い熊 自由作業盤 JSON",
             onAction = onImportOpenTaskerBundle,
             actionEnabled = !openTaskerBundleBusy,
             secondaryActionLabel = "Browse Templates",
@@ -1634,7 +1699,7 @@ private fun readBoundedOpenTaskerBundle(context: Context, uri: Uri): String {
         context = context,
         uri = uri,
         maxBytes = OPEN_TASKER_BUNDLE_IMPORT_MAX_BYTES,
-        label = "OpenTasker bundle",
+        label = "白い熊 自由作業盤 bundle",
     )
 }
 
@@ -1679,7 +1744,7 @@ private fun WorkspaceSummaryCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         shape = RoundedCornerShape(18.dp),
     ) {
         Column(
@@ -1744,40 +1809,31 @@ private fun WorkspaceSummaryCard(
     }
 }
 
+/** The Task-library summary — description + counts — surfaced from the Tasks top-bar ⓘ, off the list. */
 @Composable
-private fun TaskLibrarySummaryCard(tasks: List<Task>, onCreateTask: () -> Unit) {
+private fun TaskLibraryDialog(tasks: List<Task>, onDismiss: () -> Unit) {
     val totalActions = tasks.sumOf { it.actions.size }
     val emptyTasks = tasks.count { it.actions.isEmpty() }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
-        shape = RoundedCornerShape(18.dp),
-    ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(Modifier.weight(1f)) {
-                    Text("Task library", style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        "Build reusable action sequences, then attach them to profiles when the order and permissions are ready.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                OutlinedButton(onClick = onCreateTask) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Task")
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = onDismiss,
+        title = { Text("Task library") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text(
+                    "Build reusable action sequences, then attach them to profiles when the order and permissions are ready.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    SummaryMetric("${tasks.size}", "Tasks", Modifier.weight(1f))
+                    SummaryMetric("$totalActions", "Actions", Modifier.weight(1f))
+                    SummaryMetric("$emptyTasks", "Need actions", Modifier.weight(1f))
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                SummaryMetric("${tasks.size}", "Tasks", Modifier.weight(1f))
-                SummaryMetric("$totalActions", "Actions", Modifier.weight(1f))
-                SummaryMetric("$emptyTasks", "Need actions", Modifier.weight(1f))
-            }
-        }
-    }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+    )
 }
 
 @Composable
@@ -1786,7 +1842,7 @@ private fun SummaryMetric(value: String, label: String, modifier: Modifier = Mod
         modifier = modifier,
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -1806,9 +1862,9 @@ private fun StatusPill(
 ) {
     Surface(
         modifier = modifier,
-        color = color.copy(alpha = 0.14f),
+        color = Color.Transparent,
         shape = RoundedCornerShape(999.dp),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.34f)),
+        border = BorderStroke(1.dp, color),
     ) {
         Text(
             text = label,
@@ -1851,7 +1907,7 @@ private fun TemplatePromptCard(onBrowseTemplates: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
         shape = RoundedCornerShape(16.dp),
     ) {
         Row(
@@ -1896,7 +1952,7 @@ private fun ProfileCard(
         ),
         border = BorderStroke(
             1.dp,
-            if (profile.enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.24f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f),
+            if (profile.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
         ),
         shape = RoundedCornerShape(16.dp),
     ) {
@@ -1966,6 +2022,8 @@ private fun ProfileCard(
 @Composable
 private fun TasksScreen(
     tasks: List<Task>,
+    expandedTasks: SnapshotStateMap<Long, Boolean>,
+    expandedActions: SnapshotStateMap<String, Boolean>,
     onCreateTask: () -> Unit,
     onEditTask: (Task) -> Unit,
     onDeleteTask: (Task) -> Unit,
@@ -1976,6 +2034,7 @@ private fun TasksScreen(
     onDeleteAction: (Task, Int) -> Unit,
     onMoveTask: (Task) -> Unit,
     onExportTask: (Task) -> Unit,
+    onReorderAction: (Task, List<ActionSpec>) -> Unit,
     contentPadding: PaddingValues,
 ) {
     if (tasks.isEmpty()) {
@@ -1988,7 +2047,6 @@ private fun TasksScreen(
         )
         return
     }
-    val expandedTasks = remember { mutableStateMapOf<Long, Boolean>() }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1996,14 +2054,16 @@ private fun TasksScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            TaskLibrarySummaryCard(tasks = tasks, onCreateTask = onCreateTask)
-        }
         items(tasks, key = { it.id }) { task ->
             TaskCard(
                 task = task,
                 expanded = expandedTasks[task.id] == true,
                 onToggleExpanded = { expandedTasks[task.id] = expandedTasks[task.id] != true },
+                isActionExpanded = { index -> expandedActions["${task.id}:$index"] == true },
+                onToggleAction = { index ->
+                    val key = "${task.id}:$index"
+                    expandedActions[key] = expandedActions[key] != true
+                },
                 onEdit = { onEditTask(task) },
                 onDelete = { onDeleteTask(task) },
                 onRun = { onRunTask(task) },
@@ -2013,6 +2073,7 @@ private fun TasksScreen(
                 onDeleteAction = { index -> onDeleteAction(task, index) },
                 onMove = { onMoveTask(task) },
                 onExport = { onExportTask(task) },
+                onReorderActions = { newOrder -> onReorderAction(task, newOrder) },
             )
         }
     }
@@ -2023,6 +2084,8 @@ private fun TaskCard(
     task: Task,
     expanded: Boolean,
     onToggleExpanded: () -> Unit,
+    isActionExpanded: (Int) -> Boolean,
+    onToggleAction: (Int) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onRun: () -> Unit,
@@ -2032,14 +2095,17 @@ private fun TaskCard(
     onDeleteAction: (Int) -> Unit,
     onMove: () -> Unit,
     onExport: () -> Unit,
+    onReorderActions: (List<ActionSpec>) -> Unit,
 ) {
-    val expandedActions = remember(task.id) { mutableStateMapOf<Int, Boolean>() }
+    var draggingIndex by remember(task.id) { mutableStateOf<Int?>(null) }
+    var dragOffsetY by remember(task.id) { mutableFloatStateOf(0f) }
+    var actionRowHeightPx by remember(task.id) { mutableIntStateOf(0) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         shape = RoundedCornerShape(16.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -2084,13 +2150,42 @@ private fun TaskCard(
                     )
                 } else {
                     task.actions.forEachIndexed { index, action ->
+                        val dragging = draggingIndex == index
                         ActionRow(
                             index = index,
                             action = action,
-                            expanded = expandedActions[index] == true,
-                            onToggle = { expandedActions[index] = expandedActions[index] != true },
+                            expanded = isActionExpanded(index),
+                            onToggle = { onToggleAction(index) },
                             onEdit = { onEditAction(index, action) },
                             onDelete = { onDeleteAction(index) },
+                            modifier = Modifier
+                                .zIndex(if (dragging) 1f else 0f)
+                                .graphicsLayer { translationY = if (dragging) dragOffsetY else 0f }
+                                .onSizeChanged { if (actionRowHeightPx == 0 && it.height > 0) actionRowHeightPx = it.height },
+                            dragHandleModifier = Modifier.pointerInput(index, task.id) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { draggingIndex = index; dragOffsetY = 0f },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        dragOffsetY += dragAmount.y
+                                    },
+                                    onDragEnd = {
+                                        val from = index
+                                        val shift = if (actionRowHeightPx > 0) (dragOffsetY / actionRowHeightPx).roundToInt() else 0
+                                        val to = (from + shift).coerceIn(0, task.actions.lastIndex)
+                                        if (to != from) {
+                                            val reordered = task.actions.toMutableList().apply { add(to, removeAt(from)) }
+                                            onReorderActions(reordered)
+                                        }
+                                        draggingIndex = null
+                                        dragOffsetY = 0f
+                                    },
+                                    onDragCancel = {
+                                        draggingIndex = null
+                                        dragOffsetY = 0f
+                                    },
+                                )
+                            },
                         )
                     }
                 }
@@ -2143,14 +2238,16 @@ private fun ActionRow(
     onToggle: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+    dragHandleModifier: Modifier = Modifier,
 ) {
     val metadata = ActionMetadataRegistry.get(action.type)
     val capability = ActionCapabilityRegistry.get(action.type)
     Surface(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
         shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.fillMaxWidth().animateContentSize(),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
+        modifier = modifier.fillMaxWidth().animateContentSize(),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(Modifier.fillMaxWidth()) {
             Row(
@@ -2158,6 +2255,12 @@ private fun ActionRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                Icon(
+                    Icons.Filled.DragIndicator,
+                    contentDescription = "Drag to reorder",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = dragHandleModifier,
+                )
                 StatusPill("#${index + 1}", MaterialTheme.colorScheme.secondary)
                 Text(
                     action.label ?: metadata?.name ?: action.type,
@@ -2230,7 +2333,7 @@ private fun ContextRow(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -2339,7 +2442,7 @@ private fun RunLogRetentionCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         shape = RoundedCornerShape(16.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -2371,9 +2474,9 @@ private fun RunLogRetentionCard(
                         border = BorderStroke(
                             1.dp,
                             if (selected) {
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.58f)
+                                MaterialTheme.colorScheme.primary
                             } else {
-                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)
+                                MaterialTheme.colorScheme.outlineVariant
                             },
                         ),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
@@ -2426,7 +2529,7 @@ private fun RunLogFilterCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         shape = RoundedCornerShape(16.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -2514,9 +2617,9 @@ private fun RunLogFilterChip(
         border = BorderStroke(
             1.dp,
             if (selected) {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.58f)
+                MaterialTheme.colorScheme.primary
             } else {
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)
+                MaterialTheme.colorScheme.outlineVariant
             },
         ),
         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 9.dp),
@@ -2535,7 +2638,7 @@ private fun RunLogSummaryCard(logs: List<RunLogEntry>) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         shape = RoundedCornerShape(18.dp),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -2603,9 +2706,9 @@ private fun RunLogCard(entry: RunLogEntry) {
         border = BorderStroke(
             1.dp,
             when (outcome) {
-                RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)
+                RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.outlineVariant
                 RunLogOutcome.Failed -> MaterialTheme.colorScheme.error.copy(alpha = 0.30f)
-                RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.34f)
+                RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondary
             },
         ),
         shape = RoundedCornerShape(16.dp),
@@ -2789,7 +2892,7 @@ private fun EmptyState(
         Surface(
             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
             shape = RoundedCornerShape(18.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
         ) {
             Box(modifier = Modifier.padding(14.dp), contentAlignment = Alignment.Center) {
                 Icon(
@@ -2856,6 +2959,7 @@ private fun ExportOptionsDialog(
 ) {
     var includeVariables by remember { mutableStateOf(false) }
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text("Export") },
         text = {
@@ -2880,6 +2984,7 @@ private fun ImportProjectConflictDialog(
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text("Project already exists") },
         text = {
@@ -2908,6 +3013,7 @@ private fun DeleteConfirmationDialog(
     onConfirm: () -> Unit,
 ) {
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         icon = {
             Icon(
@@ -2959,8 +3065,9 @@ private fun OpenTaskerBundleReviewDialog(
     val reviewWarnings = (bundle.metadata.warnings + plan.warnings + plan.lossyWarnings).distinct()
     val capabilityRequirements = bundle.metadata.capabilityRequirements
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text("Review OpenTasker bundle") },
+        title = { Text("Review 白い熊 自由作業盤 bundle") },
         text = {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -2975,7 +3082,7 @@ private fun OpenTaskerBundleReviewDialog(
                 }
                 item {
                     InlineNotice(
-                        title = bundle.metadata.name.ifBlank { "OpenTasker bundle" },
+                        title = bundle.metadata.name.ifBlank { "白い熊 自由作業盤 bundle" },
                         body = "Schema ${bundle.schemaVersion} - exported by app ${bundle.appVersion}",
                         color = if (plan.canImport) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
                     )
@@ -3051,6 +3158,7 @@ private fun TaskerImportReviewDialog(
     val preview = state.preview
     val migrationWarnings = (preview.warnings + preview.lossyWarnings).distinct()
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = { if (!busy) onDismiss() },
         title = { Text("Review Tasker import") },
         text = {
@@ -3162,6 +3270,7 @@ private fun TemplatePickerDialog(
     onSelect: (ProfileTemplate) -> Unit,
 ) {
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text("Starter templates") },
         text = {
@@ -3186,7 +3295,7 @@ private fun TemplatePickerDialog(
                                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f)
                             },
                         ),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         shape = RoundedCornerShape(14.dp),
                     ) {
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -3228,6 +3337,7 @@ private fun TemplateSlotDialog(
     val missingRequired = template.slots.any { it.required && values[it.key].isNullOrBlank() }
 
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text(template.title) },
         text = {
@@ -3285,6 +3395,7 @@ private fun TaskEditorDialog(
     val canSave = name.isNotBlank() && parsedPriority != null && parsedPriority in 0..10
 
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text(if (task == null) "Create Task" else "Edit Task") },
         text = {
@@ -3335,6 +3446,7 @@ private fun ProfileEditorDialog(
     val canSave = name.isNotBlank() && enterTaskId > 0 && (cooldown.isBlank() || parsedCooldown != null)
 
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text(if (profile == null) "Create Profile" else "Edit Profile") },
         text = {
@@ -3351,7 +3463,7 @@ private fun ProfileEditorDialog(
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f),
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -3424,7 +3536,7 @@ private fun SelectableOption(
         ),
         border = BorderStroke(
             1.dp,
-            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.55f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.60f),
+            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
         ),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
     ) {
@@ -3455,15 +3567,40 @@ private fun ActionPickerDialog(
             .toSortedMap()
             .map { (category, actions) -> category to actions.sortedBy { it.name } }
     }
+    var query by remember { mutableStateOf("") }
+    val filteredGroups = remember(query) {
+        if (query.isBlank()) {
+            actionGroups
+        } else {
+            actionGroups.mapNotNull { (category, actions) ->
+                val matches = actions.filter {
+                    it.name.contains(query, ignoreCase = true) ||
+                        category.contains(query, ignoreCase = true) ||
+                        it.description.contains(query, ignoreCase = true)
+                }
+                if (matches.isEmpty()) null else category to matches
+            }
+        }
+    }
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text("Add action") },
         text = {
-            LazyColumn(
-                modifier = Modifier.height(420.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                actionGroups.forEach { (category, actions) ->
+            Column {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = { Text("Search actions") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                LazyColumn(
+                    modifier = Modifier.height(380.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    filteredGroups.forEach { (category, actions) ->
                     item(key = "category-$category") {
                         Text(
                             category,
@@ -3485,7 +3622,7 @@ private fun ActionPickerDialog(
                                     MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
                                 },
                             ),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             shape = RoundedCornerShape(14.dp),
                         ) {
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -3510,6 +3647,7 @@ private fun ActionPickerDialog(
                         }
                     }
                 }
+                }
             }
         },
         confirmButton = {},
@@ -3520,19 +3658,41 @@ private fun ActionPickerDialog(
 @Composable
 private fun ActionConfigDialog(
     state: ActionEditState,
+    allTasks: List<Task>,
+    projects: List<Project>,
+    currentProjectId: Long?,
     onDismiss: () -> Unit,
     onSave: (ActionSpec) -> Unit,
 ) {
+    var showTaskPicker by remember { mutableStateOf(false) }
     var label by remember(state.existing?.id, state.metadata.id) {
         mutableStateOf(state.existing?.label ?: state.metadata.name)
     }
     var values by remember(state.existing?.id, state.metadata.id) {
         mutableStateOf(state.metadata.fields.associate { field -> field.key to state.existing?.args?.get(field.key).orEmpty() })
     }
+    // Run Task takes named parameters (param:<name>); Return Values takes named results (ret:<name>).
+    val dynamicPrefix = when (state.metadata.id) {
+        SUB_TASK_ACTION_ID -> SUB_TASK_PARAM_PREFIX
+        RETURN_VALUES_ACTION_ID -> RETURN_VALUE_PREFIX
+        else -> null
+    }
+    var dynamicPairs by remember(state.existing?.id, state.metadata.id) {
+        val initial: List<Pair<String, String>> = dynamicPrefix?.let { prefix ->
+            state.existing?.args.orEmpty()
+                .filterKeys { it.startsWith(prefix) }
+                .map { (key, value) -> key.removePrefix(prefix) to value }
+        }.orEmpty()
+        mutableStateOf(initial)
+    }
+    var continueOnError by remember(state.existing?.id, state.metadata.id) {
+        mutableStateOf(state.existing?.continueOnError ?: false)
+    }
     val capability = remember(state.metadata.id) { ActionCapabilityRegistry.get(state.metadata.id) }
     val missingRequired = state.metadata.fields.any { it.required && values[it.key].isNullOrBlank() }
 
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text(state.metadata.name) },
         text = {
@@ -3571,11 +3731,59 @@ private fun ActionConfigDialog(
                     )
                 }
                 items(state.metadata.fields, key = { it.key }) { field ->
-                    ActionFieldInput(
-                        field = field,
-                        value = values[field.key].orEmpty(),
-                        onChange = { newValue -> values = values + (field.key to newValue) },
-                    )
+                    if (state.metadata.id == SUB_TASK_ACTION_ID && field.key == "task") {
+                        OutlinedTextField(
+                            value = values[field.key].orEmpty(),
+                            onValueChange = { newValue -> values = values + (field.key to newValue) },
+                            label = { Text(field.label + if (field.required) " *" else "") },
+                            placeholder = field.hint?.let { { Text(it) } },
+                            singleLine = true,
+                            trailingIcon = {
+                                IconButton(onClick = { showTaskPicker = true }) {
+                                    Icon(Icons.Filled.Menu, contentDescription = "Pick task")
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    } else {
+                        ActionFieldInput(
+                            field = field,
+                            value = values[field.key].orEmpty(),
+                            onChange = { newValue -> values = values + (field.key to newValue) },
+                        )
+                    }
+                }
+                if (dynamicPrefix != null) {
+                    item {
+                        DynamicArgsEditor(
+                            title = if (state.metadata.id == RETURN_VALUES_ACTION_ID) "Return values" else "Parameters",
+                            addLabel = if (state.metadata.id == RETURN_VALUES_ACTION_ID) "Add return value" else "Add parameter",
+                            pairs = dynamicPairs,
+                            onChange = { dynamicPairs = it },
+                        )
+                    }
+                }
+                item {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Continue on error", style = MaterialTheme.typography.labelLarge)
+                                Text(
+                                    "If this action fails, run the rest of the task anyway (e.g. to branch on a Run Task's %ok/%error).",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Switch(checked = continueOnError, onCheckedChange = { continueOnError = it })
+                        }
+                    }
                 }
             }
         },
@@ -3583,13 +3791,20 @@ private fun ActionConfigDialog(
             OutlinedButton(
                 enabled = !missingRequired && capability.canAdd,
                 onClick = {
+                    val dynamicArgs = if (dynamicPrefix != null) {
+                        dynamicPairs
+                            .filter { it.first.isNotBlank() }
+                            .associate { (name, value) -> "$dynamicPrefix${name.trim()}" to value }
+                    } else {
+                        emptyMap()
+                    }
                     onSave(
                         ActionSpec(
                             id = state.existing?.id ?: 0,
                             type = state.metadata.id,
                             label = label.trim().ifBlank { state.metadata.name },
-                            args = values.filterValues { it.isNotBlank() },
-                            continueOnError = state.existing?.continueOnError ?: false,
+                            args = values.filterValues { it.isNotBlank() } + dynamicArgs,
+                            continueOnError = continueOnError,
                             condition = state.existing?.condition,
                         )
                     )
@@ -3600,6 +3815,132 @@ private fun ActionConfigDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
+
+    if (showTaskPicker) {
+        TaskPickerDialog(
+            allTasks = allTasks,
+            projects = projects,
+            currentProjectId = currentProjectId,
+            onPick = { task ->
+                values = values + ("task" to task.name)
+                showTaskPicker = false
+            },
+            onDismiss = { showTaskPicker = false },
+        )
+    }
+}
+
+@Composable
+private fun TaskPickerDialog(
+    allTasks: List<Task>,
+    projects: List<Project>,
+    currentProjectId: Long?,
+    onPick: (Task) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val tasksByProject = remember(allTasks) { allTasks.groupBy { it.projectId } }
+    val expandedProjects = remember { mutableStateMapOf<Long, Boolean>() }
+    var unfiledExpanded by remember { mutableStateOf(currentProjectId == null) }
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = onDismiss,
+        title = { Text("Pick a task") },
+        text = {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                projects.forEach { project ->
+                    val tasksHere = tasksByProject[project.id].orEmpty().sortedBy { it.name.lowercase() }
+                    val expanded = expandedProjects[project.id] ?: (project.id == currentProjectId)
+                    TaskPickerGroupHeader(project.name, tasksHere.size, expanded) {
+                        expandedProjects[project.id] = !expanded
+                    }
+                    if (expanded) tasksHere.forEach { task -> TaskPickerRow(task.name) { onPick(task) } }
+                }
+                val unfiled = tasksByProject[null].orEmpty().sortedBy { it.name.lowercase() }
+                if (unfiled.isNotEmpty() || projects.isEmpty()) {
+                    TaskPickerGroupHeader("Unfiled", unfiled.size, unfiledExpanded) { unfiledExpanded = !unfiledExpanded }
+                    if (unfiledExpanded) unfiled.forEach { task -> TaskPickerRow(task.name) { onPick(task) } }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+    )
+}
+
+@Composable
+private fun TaskPickerGroupHeader(name: String, count: Int, expanded: Boolean, onToggle: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        Text(name, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+        Text("$count", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun TaskPickerRow(name: String, onClick: () -> Unit) {
+    Text(
+        name,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(start = 32.dp, top = 10.dp, bottom = 10.dp, end = 8.dp),
+        style = MaterialTheme.typography.bodyLarge,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Composable
+private fun DynamicArgsEditor(
+    title: String,
+    addLabel: String,
+    pairs: List<Pair<String, String>>,
+    onChange: (List<Pair<String, String>>) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        pairs.forEachIndexed { index, (name, value) ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { newName -> onChange(pairs.mapIndexed { i, p -> if (i == index) newName to p.second else p }) },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { newValue -> onChange(pairs.mapIndexed { i, p -> if (i == index) p.first to newValue else p }) },
+                    label = { Text("Value") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1.3f),
+                )
+                IconButton(onClick = { onChange(pairs.filterIndexed { i, _ -> i != index }) }) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Remove")
+                }
+            }
+        }
+        OutlinedButton(onClick = { onChange(pairs + ("" to "")) }) {
+            Icon(Icons.Filled.Add, contentDescription = null)
+            Spacer(Modifier.width(6.dp))
+            Text(addLabel)
+        }
+    }
 }
 
 @Composable
@@ -3609,7 +3950,7 @@ private fun ActionFieldInput(field: ActionField, value: String, onChange: (Strin
         FieldType.CHECKBOX -> Surface(
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
             shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -3741,7 +4082,7 @@ private fun DayPresetButton(
         ),
         border = BorderStroke(
             1.dp,
-            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.62f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f),
+            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
         ),
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
     ) {
@@ -3752,6 +4093,7 @@ private fun DayPresetButton(
 @Composable
 private fun ContextTypePickerDialog(onDismiss: () -> Unit, onSelect: (ContextType) -> Unit) {
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text("Add context") },
         text = {
@@ -3761,7 +4103,7 @@ private fun ContextTypePickerDialog(onDismiss: () -> Unit, onSelect: (ContextTyp
                         onClick = { onSelect(type) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         shape = RoundedCornerShape(14.dp),
                     ) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -3800,6 +4142,7 @@ private fun ContextConfigDialog(
     }
 
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text(state.type.name.lowercase().replaceFirstChar { it.uppercase() }) },
         text = {
@@ -3813,7 +4156,7 @@ private fun ContextConfigDialog(
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -3950,15 +4293,15 @@ private fun NfcWriteHelperCard(
     onArm: (String) -> Unit,
 ) {
     val label = if (tagId.isBlank()) {
-        "OpenTasker NFC trigger"
+        "白い熊 自由作業盤 NFC trigger"
     } else {
-        "OpenTasker NFC trigger $tagId"
+        "白い熊 自由作業盤 NFC trigger $tagId"
     }
 
     Surface(
         color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.32f),
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(

@@ -3,6 +3,7 @@ package com.opentasker.ui.screens
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -41,6 +42,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -60,8 +62,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.opentasker.ui.theme.FontOption
 import com.opentasker.ui.theme.ThemePrefs
 import com.opentasker.ui.theme.ThemeStore
@@ -183,6 +187,47 @@ fun UiCustomizationScreen(
             }
             item { SampleRow(level = 1) }
 
+            item { SectionHeader("Flash / toast") }
+            item { FlashPreview(level = 1, prefs = prefs) }
+            item { ColorRow(1, "Background", prefs.flashBackground, ColorTarget.FlashBackground) { colorTarget = it } }
+            item { ColorRow(1, "Text", prefs.flashText, ColorTarget.FlashText) { colorTarget = it } }
+            item { ColorRow(1, "Border color", prefs.flashBorder, ColorTarget.FlashBorder) { colorTarget = it } }
+            item {
+                StepperRow(
+                    level = 1,
+                    label = "Border width",
+                    value = "${prefs.flashBorderWidthDp} dp",
+                    onDecrement = { ThemeStore.update { it.copy(flashBorderWidthDp = it.flashBorderWidthDp - 1) } },
+                    onIncrement = { ThemeStore.update { it.copy(flashBorderWidthDp = it.flashBorderWidthDp + 1) } },
+                )
+            }
+            item {
+                StepperRow(
+                    level = 1,
+                    label = "Corner radius",
+                    value = "${prefs.flashCornerRadiusDp} dp",
+                    onDecrement = { ThemeStore.update { it.copy(flashCornerRadiusDp = it.flashCornerRadiusDp - 2) } },
+                    onIncrement = { ThemeStore.update { it.copy(flashCornerRadiusDp = it.flashCornerRadiusDp + 2) } },
+                )
+            }
+            item {
+                StepperRow(
+                    level = 1,
+                    label = "Text size",
+                    value = "${prefs.flashTextSizeSp} sp",
+                    onDecrement = { ThemeStore.update { it.copy(flashTextSizeSp = it.flashTextSizeSp - 1) } },
+                    onIncrement = { ThemeStore.update { it.copy(flashTextSizeSp = it.flashTextSizeSp + 1) } },
+                )
+            }
+            item {
+                WeightRow(
+                    level = 1,
+                    weight = prefs.flashFontWeight,
+                    // Flash weight must stay 100..900 (FontWeight(0) is invalid); map "Default" to Bold.
+                    onPick = { w -> ThemeStore.update { it.copy(flashFontWeight = if (w == 0) 700 else w) } },
+                )
+            }
+
             item { SectionHeader("Editor") }
             item {
                 SwitchRow(
@@ -236,7 +281,7 @@ private fun SectionHeader(title: String) {
         HorizontalDivider(
             modifier = Modifier.padding(top = 6.dp),
             thickness = 1.dp,
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+            color = MaterialTheme.colorScheme.outline,
         )
     }
 }
@@ -353,6 +398,36 @@ private fun SampleRow(level: Int) {
     }
 }
 
+/** Renders a sample flash exactly as the real one, so changes are visible without running a task. */
+@Composable
+private fun FlashPreview(level: Int, prefs: ThemePrefs) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = rowStartPadding(level), end = 16.dp, top = 8.dp, bottom = 8.dp),
+    ) {
+        Text("Live preview", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
+            Surface(
+                shape = RoundedCornerShape(prefs.flashCornerRadiusDp.dp),
+                color = Color(prefs.flashBackground),
+                contentColor = Color(prefs.flashText),
+                border = if (prefs.flashBorderWidthDp > 0) {
+                    BorderStroke(prefs.flashBorderWidthDp.dp, Color(prefs.flashBorder))
+                } else null,
+            ) {
+                Text(
+                    text = "Main succeeded (8 ms)",
+                    color = Color(prefs.flashText),
+                    fontSize = prefs.flashTextSizeSp.sp,
+                    fontWeight = FontWeight(prefs.flashFontWeight),
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun ActionRow(level: Int, label: String, description: String, actionLabel: String, onAction: () -> Unit) {
     RowScaffold(level) {
@@ -387,6 +462,7 @@ private fun ColorPickerDialog(title: String, initial: Int, onDismiss: () -> Unit
     fun syncHex() { hexText = hex6((r shl 16) or (g shl 8) or b) }
 
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
@@ -448,6 +524,7 @@ private fun FontPickerDialog(
     onAddFont: () -> Unit,
 ) {
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text("Font") },
         text = {
@@ -481,7 +558,7 @@ private fun FontPickerDialog(
                         }
                     }
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -507,7 +584,10 @@ private enum class ColorTarget(val label: String, val default: Int) {
     TextSecondary("Secondary text", ThemePrefs.DEFAULT.textSecondary),
     Accent("Accent", ThemePrefs.DEFAULT.accent),
     Surface("Surface", ThemePrefs.DEFAULT.surface),
-    Border("Border", ThemePrefs.DEFAULT.border);
+    Border("Border", ThemePrefs.DEFAULT.border),
+    FlashBackground("Flash background", ThemePrefs.DEFAULT.flashBackground),
+    FlashText("Flash text", ThemePrefs.DEFAULT.flashText),
+    FlashBorder("Flash border", ThemePrefs.DEFAULT.flashBorder);
 
     fun get(p: ThemePrefs): Int = when (this) {
         Background -> p.background
@@ -516,6 +596,9 @@ private enum class ColorTarget(val label: String, val default: Int) {
         Accent -> p.accent
         Surface -> p.surface
         Border -> p.border
+        FlashBackground -> p.flashBackground
+        FlashText -> p.flashText
+        FlashBorder -> p.flashBorder
     }
 
     fun set(p: ThemePrefs, value: Int): ThemePrefs = when (this) {
@@ -525,6 +608,9 @@ private enum class ColorTarget(val label: String, val default: Int) {
         Accent -> p.copy(accent = value)
         Surface -> p.copy(surface = value)
         Border -> p.copy(border = value)
+        FlashBackground -> p.copy(flashBackground = value)
+        FlashText -> p.copy(flashText = value)
+        FlashBorder -> p.copy(flashBorder = value)
     }
 }
 

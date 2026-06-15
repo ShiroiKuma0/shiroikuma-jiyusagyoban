@@ -1,6 +1,8 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -187,6 +189,7 @@ private fun EditVariableDialog(
     var value by rememberSaveable(variable.name) { mutableStateOf(variable.value) }
 
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text("%${variable.name}") },
         text = {
