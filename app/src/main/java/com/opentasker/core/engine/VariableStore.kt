@@ -61,6 +61,13 @@ class VariableStore private constructor(
         return globals[name]
     }
 
+    /** Unset a variable across all scopes and drop any array of the same name (Variable Clear). */
+    fun unset(name: String) {
+        globals.remove(name)
+        synchronized(localStack) { localStack.forEach { it.remove(name) } }
+        arrayStore.remove(name)
+    }
+
     /**
      * Store an array in the array storage.
      * Arrays can be accessed via %arrayName(#) for length, %arrayName(0) for index, etc.
