@@ -24,6 +24,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -1205,6 +1207,10 @@ private fun ProfilesScreen(
         return
     }
 
+    var profileSearchQuery by rememberSaveable { mutableStateOf("") }
+    val filteredProfiles = if (profileSearchQuery.isBlank()) profiles
+        else profiles.filter { it.name.contains(profileSearchQuery, ignoreCase = true) }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1228,7 +1234,21 @@ private fun ProfilesScreen(
         item {
             TemplatePromptCard(onBrowseTemplates)
         }
-        items(profiles, key = { it.id }) { profile ->
+        item {
+            OutlinedTextField(
+                value = profileSearchQuery,
+                onValueChange = { profileSearchQuery = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Search profiles...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+                trailingIcon = if (profileSearchQuery.isNotEmpty()) {
+                    { IconButton(onClick = { profileSearchQuery = "" }) { Icon(Icons.Default.Clear, contentDescription = "Clear search") } }
+                } else null,
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+            )
+        }
+        items(filteredProfiles, key = { it.id }) { profile ->
             val enterTaskName = tasks.firstOrNull { it.id == profile.enterTaskId }?.name ?: "Missing task #${profile.enterTaskId}"
             ProfileCard(
                 profile = profile,
@@ -1600,6 +1620,10 @@ private fun TasksScreen(
         )
         return
     }
+    var taskSearchQuery by rememberSaveable { mutableStateOf("") }
+    val filteredTasks = if (taskSearchQuery.isBlank()) tasks
+        else tasks.filter { it.name.contains(taskSearchQuery, ignoreCase = true) }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1610,7 +1634,21 @@ private fun TasksScreen(
         item {
             TaskLibrarySummaryCard(tasks = tasks, onCreateTask = onCreateTask)
         }
-        items(tasks, key = { it.id }) { task ->
+        item {
+            OutlinedTextField(
+                value = taskSearchQuery,
+                onValueChange = { taskSearchQuery = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Search tasks...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+                trailingIcon = if (taskSearchQuery.isNotEmpty()) {
+                    { IconButton(onClick = { taskSearchQuery = "" }) { Icon(Icons.Default.Clear, contentDescription = "Clear search") } }
+                } else null,
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+            )
+        }
+        items(filteredTasks, key = { it.id }) { task ->
             TaskCard(
                 task = task,
                 onEdit = { onEditTask(task) },
