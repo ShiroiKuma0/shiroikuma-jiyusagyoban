@@ -296,7 +296,7 @@ private fun SceneOverviewCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -343,7 +343,7 @@ private fun SceneCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -921,7 +921,11 @@ private fun NumberField(
 private fun SceneIssueText(issue: SceneIssue) {
     val color = when (issue.severity) {
         SceneIssueSeverity.ERROR -> MaterialTheme.colorScheme.error
-        SceneIssueSeverity.WARNING -> MaterialTheme.colorScheme.tertiary
+        SceneIssueSeverity.WARNING -> if (androidx.compose.foundation.isSystemInDarkTheme()) {
+            com.opentasker.ui.theme.DesignSystem.SemanticColor.warningDark
+        } else {
+            com.opentasker.ui.theme.DesignSystem.SemanticColor.warningLight
+        }
     }
     Text(issue.message, style = MaterialTheme.typography.bodySmall, color = color)
 }

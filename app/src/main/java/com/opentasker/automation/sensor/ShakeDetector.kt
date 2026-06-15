@@ -11,7 +11,7 @@ import kotlin.math.sqrt
 
 class ShakeDetector(context: Context) {
 
-    private val sensorManager = context.getSystemService(SensorManager::class.java)
+    private val sensorManager = context.applicationContext.getSystemService(SensorManager::class.java)
     private val accelerometer = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
     private var lastShakeTime = 0L

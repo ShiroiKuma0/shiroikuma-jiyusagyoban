@@ -1,6 +1,6 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.66-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.67-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.3.21-7f52ff.svg)](https://kotlinlang.org)
@@ -20,7 +20,7 @@
 
 **Planned:** broad device-verified background geofence reliability, elevated (Shizuku) execution, Termux script dispatch, a visual flow authoring editor, and richer plugin UX. See [ROADMAP.md](ROADMAP.md).
 
-> **Status:** the current source version is `0.2.66`. Device-evidence claims (location/calendar/sun) are single-device API 36 data points on `SM-S938B`, not broad background-geofence reliability guarantees. The latest polish pass improves IME handling, compact small-screen bottom navigation with a More menu, squared-off navigation/FAB affordances, variable and scene-element deletion safety, saveable editor/context/template/scene-element state, scene-element nudge controls for non-drag movement, numeric form keyboards, larger day-token touch targets, and accessibility roles for widget/flow/form switch targets.
+> **Status:** the current source version is `0.2.67`. Device-evidence claims (location/calendar/sun) are single-device API 36 data points on `SM-S938B`, not broad background-geofence reliability guarantees. The latest polish pass improves IME handling, compact small-screen bottom navigation with a More menu, squared-off navigation/FAB affordances, variable and scene-element deletion safety, saveable editor/context/template/scene-element state, scene-element nudge controls for non-drag movement, numeric form keyboards, larger day-token touch targets, and accessibility roles for widget/flow/form switch targets.
 
 ---
 

@@ -32,7 +32,7 @@ class DatabaseBackupManager(
                 throw IOException("Database file does not exist")
             }
 
-            db.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)").use { }
+            db.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { }
             val backupFile = File(backupDir, "${databaseName.removeSuffix(".db")}_backup_${timestamp()}.db")
             sourceFile.inputStream().use { input ->
                 FileOutputStream(backupFile).use { output ->

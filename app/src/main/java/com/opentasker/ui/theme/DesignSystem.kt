@@ -34,6 +34,7 @@ object DesignSystem {
         val md = 8.dp      // Medium radius (cards, standard buttons)
         val lg = 12.dp     // Large radius (dialogs, large cards)
         val xl = 16.dp     // Extra large radius (bottom sheets, premium cards)
+        val xxl = 18.dp    // Card radius (premium summary cards)
     }
 
     // ========== Elevation/Shadow Scale ==========
@@ -71,6 +72,12 @@ object DesignSystem {
         
         // Status indicator size
         val statusIndicator = 12.dp
+    }
+
+    // ========== Semantic Colors ==========
+    object SemanticColor {
+        val warningDark = androidx.compose.ui.graphics.Color(0xFFFFB4A2) // Peach — warm amber for warnings in dark theme
+        val warningLight = androidx.compose.ui.graphics.Color(0xFFDF8E1D) // Latte Yellow — warm amber for warnings in light theme
     }
 
     // ========== Opacity Scale ==========

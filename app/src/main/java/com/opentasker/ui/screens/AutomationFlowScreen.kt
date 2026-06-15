@@ -130,7 +130,7 @@ private fun FlowOverviewCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -163,7 +163,8 @@ private fun FlowGraphCard(
     onAddContext: (Long) -> Unit,
     onAddAction: (Long) -> Unit,
 ) {
-    val profileNode = graph.nodes.first { it.kind == AutomationFlowNodeKind.PROFILE }
+    val profileNode = graph.nodes.firstOrNull { it.kind == AutomationFlowNodeKind.PROFILE }
+        ?: return
 
     Card(
         modifier = Modifier
@@ -171,7 +172,7 @@ private fun FlowGraphCard(
             .semantics { contentDescription = graph.accessibilitySummary() },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

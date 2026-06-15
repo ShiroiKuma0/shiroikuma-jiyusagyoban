@@ -1232,7 +1232,7 @@ private fun OpenTaskerNavigationItem(
         ) {
             Icon(
                 icon,
-                contentDescription = null,
+                contentDescription = label,
                 tint = contentColor,
                 modifier = Modifier
                     .padding(horizontal = 16.dp, vertical = 5.dp)
@@ -1426,7 +1426,7 @@ private fun WorkspaceSummaryCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f)),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -1499,7 +1499,7 @@ private fun TaskLibrarySummaryCard(tasks: List<Task>, onCreateTask: () -> Unit) 
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -2218,7 +2218,7 @@ private fun RunLogSummaryCard(logs: List<RunLogEntry>) {
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -2474,7 +2474,7 @@ private fun EmptyState(
     ) {
         Surface(
             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
-            shape = RoundedCornerShape(18.dp),
+            shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)),
         ) {
             Box(modifier = Modifier.padding(14.dp), contentAlignment = Alignment.Center) {

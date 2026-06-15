@@ -52,7 +52,9 @@ object SunEventCalculator {
         } / 15.0
         val localMeanTime = hourAngle + rightAscension - 0.06571 * approximateTime - 6.622
         val utcHour = normalizeHours(localMeanTime - lngHour)
-        val offsetHours = ZonedDateTime.of(date, LocalTime.NOON, zone).offset.totalSeconds / 3600.0
+        val approxLocalHour = normalizeHours(utcHour + ZonedDateTime.of(date, LocalTime.NOON, zone).offset.totalSeconds / 3600.0)
+        val approxTime = LocalTime.of(approxLocalHour.toInt().coerceIn(0, 23), 0)
+        val offsetHours = ZonedDateTime.of(date, approxTime, zone).offset.totalSeconds / 3600.0
         val localHour = normalizeHours(utcHour + offsetHours)
         return Math.floorMod((localHour * MINUTES_PER_HOUR).roundToInt(), MINUTES_PER_DAY)
     }
