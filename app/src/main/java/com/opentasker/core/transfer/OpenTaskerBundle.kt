@@ -10,6 +10,9 @@ import com.opentasker.core.model.SceneElement
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.ListSortStore
+import com.opentasker.core.storage.SortMethod
+import com.opentasker.core.storage.SortPrefs
 import com.opentasker.core.storage.toEntity
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -17,9 +20,10 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-// v2 adds the `projects` array and a projectId on profiles/tasks/scenes. v1 bundles still import
-// (their missing fields default), so the version is a floor on what THIS build can read, not a gate.
-const val OPEN_TASKER_BUNDLE_SCHEMA_VERSION = 2
+// v3 adds a per-item `position` and a per-category `sort` method. v2 added the `projects` array and a
+// projectId on profiles/tasks/scenes. Older bundles still import (their missing fields default), so
+// the version is a floor on what THIS build can read, not a gate.
+const val OPEN_TASKER_BUNDLE_SCHEMA_VERSION = 3
 
 @Serializable
 data class OpenTaskerBundle(
@@ -32,7 +36,22 @@ data class OpenTaskerBundle(
     val profiles: List<Profile> = emptyList(),
     val variables: List<Variable> = emptyList(),
     val scenes: List<Scene> = emptyList(),
+    val sort: BundleSortConfig = BundleSortConfig(),
 )
+
+/** Per-category sort method carried in the bundle, so a tab's Alphabetical/Manual choice round-trips. */
+@Serializable
+data class BundleSortConfig(
+    val profiles: SortMethod = SortMethod.ALPHABETICAL,
+    val tasks: SortMethod = SortMethod.ALPHABETICAL,
+    val scenes: SortMethod = SortMethod.ALPHABETICAL,
+) {
+    fun toPrefs(): SortPrefs = SortPrefs(profiles = profiles, tasks = tasks, scenes = scenes)
+
+    companion object {
+        fun from(prefs: SortPrefs) = BundleSortConfig(prefs.profiles, prefs.tasks, prefs.scenes)
+    }
+}
 
 @Serializable
 data class BundleMetadata(
@@ -91,13 +110,16 @@ object OpenTaskerBundleCodec {
         variables: List<Variable> = emptyList(),
         scenes: List<Scene> = emptyList(),
         projects: List<Project> = emptyList(),
+        sort: BundleSortConfig = BundleSortConfig(),
         name: String = "白い熊 自由作業盤 Export",
         description: String = "",
     ): OpenTaskerBundle {
-        val sortedTasks = tasks.sortedWith(compareBy<Task> { it.name.lowercase() }.thenBy { it.id })
-        val sortedProfiles = profiles.sortedWith(compareBy<Profile> { it.name.lowercase() }.thenBy { it.id })
+        // Order the arrays by manual position (then name) so the JSON reflects manual order; each
+        // item also carries its own `position`, which is what import restores.
+        val sortedTasks = tasks.sortedWith(compareBy<Task> { it.position }.thenBy { it.name.lowercase() }.thenBy { it.id })
+        val sortedProfiles = profiles.sortedWith(compareBy<Profile> { it.position }.thenBy { it.name.lowercase() }.thenBy { it.id })
         val sortedVariables = variables.sortedWith(compareBy<Variable> { it.name.lowercase() }.thenBy { it.name })
-        val sortedScenes = scenes.sortedWith(compareBy<Scene> { it.name.lowercase() }.thenBy { it.id })
+        val sortedScenes = scenes.sortedWith(compareBy<Scene> { it.position }.thenBy { it.name.lowercase() }.thenBy { it.id })
         val sortedProjects = projects.sortedWith(compareBy<Project> { it.sortOrder }.thenBy { it.name.lowercase() })
         val base = OpenTaskerBundle(
             appVersion = appVersion,
@@ -108,6 +130,7 @@ object OpenTaskerBundleCodec {
             profiles = sortedProfiles,
             variables = sortedVariables,
             scenes = sortedScenes,
+            sort = sort,
         )
         val plan = validate(base)
         return base.copy(
@@ -211,6 +234,7 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             variables = variables,
             scenes = scenes,
             projects = projects,
+            sort = BundleSortConfig.from(ListSortStore.state.value),
             name = name,
             description = description,
         )
@@ -248,6 +272,7 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             variables = variables,
             scenes = scenes,
             projects = projects,
+            sort = BundleSortConfig.from(ListSortStore.state.value),
             name = name,
             description = description,
         )
@@ -341,6 +366,10 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
                 insertedScenes++
             }
         }
+
+        // Restore the per-category sort method the bundle was exported with (v3+; older bundles
+        // default to Alphabetical).
+        ListSortStore.setAll(bundle.sort.toPrefs())
 
         return BundleImportReport(
             insertedTasks = insertedTasks,

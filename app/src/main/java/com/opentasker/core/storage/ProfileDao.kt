@@ -24,6 +24,7 @@ data class ProfileEntity(
     val contextsJson: String,
     val automationMode: String = AutomationMode.SINGLE.name,
     val projectId: Long? = null,
+    val position: Int = 0,
 ) {
     fun toDomain() = try {
         Profile(
@@ -36,16 +37,17 @@ data class ProfileEntity(
             cooldownSec,
             runCatching { AutomationMode.valueOf(automationMode) }.getOrDefault(AutomationMode.SINGLE),
             projectId,
+            position,
         )
     } catch (e: Exception) {
         android.util.Log.e("ProfileDao", "Failed to deserialize profile $id: ${e.message}", e)
         // Return profile with empty contexts as fallback
-        Profile(id, name, enabled, emptyList(), enterTaskId, exitTaskId, cooldownSec, AutomationMode.SINGLE, projectId)
+        Profile(id, name, enabled, emptyList(), enterTaskId, exitTaskId, cooldownSec, AutomationMode.SINGLE, projectId, position)
     }
 }
 
 fun Profile.toEntity() = ProfileEntity(
-    id, name, enabled, enterTaskId, exitTaskId, cooldownSec, Json.encodeToString(contexts), automationMode.name, projectId
+    id, name, enabled, enterTaskId, exitTaskId, cooldownSec, Json.encodeToString(contexts), automationMode.name, projectId, position
 )
 
 @Dao
@@ -54,7 +56,9 @@ interface ProfileDao {
     @Update suspend fun update(p: ProfileEntity)
     @Delete suspend fun delete(p: ProfileEntity)
     @Query("SELECT * FROM profiles WHERE id = :id") suspend fun getById(id: Long): ProfileEntity?
-    @Query("SELECT * FROM profiles") suspend fun getAll(): List<ProfileEntity>
+    @Query("SELECT * FROM profiles ORDER BY position, id") suspend fun getAll(): List<ProfileEntity>
     @Query("SELECT * FROM profiles WHERE enabled = 1") suspend fun getAllEnabled(): List<ProfileEntity>
-    @Query("SELECT * FROM profiles") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<ProfileEntity>>
+    @Query("SELECT * FROM profiles ORDER BY position, id") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<ProfileEntity>>
+    @Query("UPDATE profiles SET position = :position WHERE id = :id") suspend fun setPosition(id: Long, position: Int)
+    @Query("SELECT COALESCE(MAX(position), -1) + 1 FROM profiles") suspend fun nextPosition(): Int
 }

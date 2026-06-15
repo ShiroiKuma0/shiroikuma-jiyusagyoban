@@ -32,6 +32,7 @@ class OpenTaskerApp_NoHilt : Application() {
         CrashLogHandler.install(this)
         // Seed the black-yellow appearance defaults before any Compose code reads the theme.
         ThemeStore.init(this)
+        com.opentasker.core.storage.ListSortStore.init(this)
         registerActionMetadata()
         registerCoreRuntime()
          

@@ -17,6 +17,7 @@ data class Task(
     val collisionMode: CollisionMode = CollisionMode.ABORT_NEW,
     val actions: List<ActionSpec> = emptyList(),
     val projectId: Long? = null,            // null = Unfiled
+    val position: Int = 0,                  // manual sort order within its tab
 )
 
 @Serializable

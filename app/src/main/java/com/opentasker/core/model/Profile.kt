@@ -18,6 +18,7 @@ data class Profile(
     val cooldownSec: Int = 0,
     val automationMode: AutomationMode = AutomationMode.SINGLE,
     val projectId: Long? = null,            // null = Unfiled
+    val position: Int = 0,                  // manual sort order within its tab
 )
 
 @Serializable
