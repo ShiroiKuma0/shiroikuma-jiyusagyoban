@@ -1,6 +1,6 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.60-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.61-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.3.21-7f52ff.svg)](https://kotlinlang.org)
@@ -11,7 +11,7 @@
 
 - **Profiles → contexts → tasks → actions** — a complete Room-backed automation pipeline with a Compose UI
 - **Triggers (contexts):** time/day schedules, device state, app foreground, WiFi, data/internet connectivity, notifications, NFC tags, calendar windows, sunrise/sunset, shake, Bluetooth connect/disconnect, package install/remove/replace, Quick Settings tile, home-screen widget/shortcut, boot, and FOSS platform location/geofence
-- **48 built-in actions** plus a `task.run` sub-task action for reusable building blocks; unsupported privileged actions fail honestly with backend hints
+- **49 built-in actions** plus a `task.run` sub-task action for reusable building blocks; unsupported privileged actions fail honestly with backend hints
 - **Template expressions** — bounded `{{ ... }}` expansion in arguments and conditions with scopes, arrays, JSON paths, string/math functions, traces, and a strict regex policy
 - **Reliability tooling** — OEM battery-killer detection with per-vendor setup guidance, a setup checklist, context inspector with live source health, and step-level run logs with retention
 - **Interop** — Locale/Tasker plugin host (setting + condition), signature-scoped external automation intents, OpenTasker JSON bundle import/export, Tasker XML import, and offline profile-share manifests
@@ -20,7 +20,7 @@
 
 **Planned:** broad device-verified background geofence reliability, elevated (Shizuku) execution, Termux script dispatch, a visual flow authoring editor, and richer plugin UX. See [ROADMAP.md](ROADMAP.md).
 
-> **Status:** the current source version is `0.2.60`. Device-evidence claims (location/calendar/sun) are single-device API 36 data points on `SM-S938B`, not broad background-geofence reliability guarantees.
+> **Status:** the current source version is `0.2.61`. Device-evidence claims (location/calendar/sun) are single-device API 36 data points on `SM-S938B`, not broad background-geofence reliability guarantees.
 
 ---
 
