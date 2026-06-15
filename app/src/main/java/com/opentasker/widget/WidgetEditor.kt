@@ -335,9 +335,10 @@ private fun DropdownField(label: String, value: String, options: List<String>, o
         OutlinedTextField(
             value = value, onValueChange = {}, readOnly = true,
             label = { Text(label) },
-            modifier = Modifier.fillMaxWidth().clickable { expanded = true },
-            enabled = false,
+            modifier = Modifier.fillMaxWidth(),
         )
+        // Transparent overlay catches taps (a readOnly field won't open the menu on its own),
+        // while the field keeps normal — not disabled/dimmed — colours.
         Box(Modifier.matchParentSize().clickable { expanded = true })
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEach { opt ->
