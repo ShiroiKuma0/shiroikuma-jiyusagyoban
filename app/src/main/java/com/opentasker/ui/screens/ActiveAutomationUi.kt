@@ -28,6 +28,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import com.opentasker.ui.components.ReorderableRow
+import com.opentasker.ui.components.rememberListReorderState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -1303,6 +1306,8 @@ fun ActiveAutomationUi(
                 },
                 onMoveProfile = { moveTarget = MoveTarget.ProfileMove(it) },
                 onExportProfile = { exportRequest = ExportRequest(name = "Profile: ${it.name}", fileName = exportFileName(it.name), profileIds = setOf(it.id)) },
+                manualSort = sortPrefs.profiles == SortMethod.MANUAL,
+                onReorder = { viewModel.reorderProfiles(it) },
                 contentPadding = innerPadding,
             )
 
@@ -1329,6 +1334,8 @@ fun ActiveAutomationUi(
                 onMoveTask = { moveTarget = MoveTarget.TaskMove(it) },
                 onExportTask = { exportRequest = ExportRequest(name = "Task: ${it.name}", fileName = exportFileName(it.name), taskIds = setOf(it.id)) },
                 onReorderAction = { task, newOrder -> viewModel.updateTask(task.copy(actions = newOrder), "Actions reordered") },
+                manualSort = sortPrefs.tasks == SortMethod.MANUAL,
+                onReorder = { viewModel.reorderTasks(it) },
                 contentPadding = innerPadding,
             )
 
@@ -1373,6 +1380,8 @@ fun ActiveAutomationUi(
                 onDeleteScene = { pendingDelete = DeleteTarget.SceneTarget(it) },
                 onMoveScene = { moveTarget = MoveTarget.SceneMove(it) },
                 onExportScene = { exportRequest = ExportRequest(name = "Scene: ${it.name}", fileName = exportFileName(it.name), sceneIds = setOf(it.id)) },
+                manualSort = sortPrefs.scenes == SortMethod.MANUAL,
+                onReorder = { viewModel.reorderScenes(it) },
                 contentPadding = innerPadding,
             )
 
@@ -1653,6 +1662,8 @@ private fun ProfilesScreen(
     onDeleteContext: (Profile, Int) -> Unit,
     onMoveProfile: (Profile) -> Unit,
     onExportProfile: (Profile) -> Unit,
+    manualSort: Boolean,
+    onReorder: (List<Profile>) -> Unit,
     contentPadding: PaddingValues,
 ) {
     if (tasks.isEmpty()) {
@@ -1692,7 +1703,10 @@ private fun ProfilesScreen(
         return
     }
 
+    val listState = rememberLazyListState()
+    val reorder = rememberListReorderState()
     LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding),
@@ -1716,19 +1730,21 @@ private fun ProfilesScreen(
             TemplatePromptCard(onBrowseTemplates)
         }
         items(profiles, key = { it.id }) { profile ->
-            val enterTaskName = tasks.firstOrNull { it.id == profile.enterTaskId }?.name ?: "Missing task #${profile.enterTaskId}"
-            ProfileCard(
-                profile = profile,
-                enterTaskName = enterTaskName,
-                onEdit = { onEditProfile(profile) },
-                onDelete = { onDeleteProfile(profile) },
-                onToggle = { onToggleProfile(profile, it) },
-                onAddContext = { onAddContext(profile) },
-                onEditContext = { index, context -> onEditContext(profile, index, context) },
-                onDeleteContext = { index -> onDeleteContext(profile, index) },
-                onMove = { onMoveProfile(profile) },
-                onExport = { onExportProfile(profile) },
-            )
+            ReorderableRow(reorder, listState, profiles, profile, { it.id }, manualSort, onReorder) {
+                val enterTaskName = tasks.firstOrNull { it.id == profile.enterTaskId }?.name ?: "Missing task #${profile.enterTaskId}"
+                ProfileCard(
+                    profile = profile,
+                    enterTaskName = enterTaskName,
+                    onEdit = { onEditProfile(profile) },
+                    onDelete = { onDeleteProfile(profile) },
+                    onToggle = { onToggleProfile(profile, it) },
+                    onAddContext = { onAddContext(profile) },
+                    onEditContext = { index, context -> onEditContext(profile, index, context) },
+                    onDeleteContext = { index -> onDeleteContext(profile, index) },
+                    onMove = { onMoveProfile(profile) },
+                    onExport = { onExportProfile(profile) },
+                )
+            }
         }
     }
 }
@@ -2083,6 +2099,8 @@ private fun TasksScreen(
     onMoveTask: (Task) -> Unit,
     onExportTask: (Task) -> Unit,
     onReorderAction: (Task, List<ActionSpec>) -> Unit,
+    manualSort: Boolean,
+    onReorder: (List<Task>) -> Unit,
     contentPadding: PaddingValues,
 ) {
     if (tasks.isEmpty()) {
@@ -2095,7 +2113,10 @@ private fun TasksScreen(
         )
         return
     }
+    val listState = rememberLazyListState()
+    val reorder = rememberListReorderState()
     LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding),
@@ -2103,26 +2124,28 @@ private fun TasksScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         items(tasks, key = { it.id }) { task ->
-            TaskCard(
-                task = task,
-                expanded = expandedTasks[task.id] == true,
-                onToggleExpanded = { expandedTasks[task.id] = expandedTasks[task.id] != true },
-                isActionExpanded = { index -> expandedActions["${task.id}:$index"] == true },
-                onToggleAction = { index ->
-                    val key = "${task.id}:$index"
-                    expandedActions[key] = expandedActions[key] != true
-                },
-                onEdit = { onEditTask(task) },
-                onDelete = { onDeleteTask(task) },
-                onRun = { onRunTask(task) },
-                onPin = { onPinTask(task) },
-                onAddAction = { onAddAction(task) },
-                onEditAction = { index, action -> onEditAction(task, index, action) },
-                onDeleteAction = { index -> onDeleteAction(task, index) },
-                onMove = { onMoveTask(task) },
-                onExport = { onExportTask(task) },
-                onReorderActions = { newOrder -> onReorderAction(task, newOrder) },
-            )
+            ReorderableRow(reorder, listState, tasks, task, { it.id }, manualSort, onReorder) {
+                TaskCard(
+                    task = task,
+                    expanded = expandedTasks[task.id] == true,
+                    onToggleExpanded = { expandedTasks[task.id] = expandedTasks[task.id] != true },
+                    isActionExpanded = { index -> expandedActions["${task.id}:$index"] == true },
+                    onToggleAction = { index ->
+                        val key = "${task.id}:$index"
+                        expandedActions[key] = expandedActions[key] != true
+                    },
+                    onEdit = { onEditTask(task) },
+                    onDelete = { onDeleteTask(task) },
+                    onRun = { onRunTask(task) },
+                    onPin = { onPinTask(task) },
+                    onAddAction = { onAddAction(task) },
+                    onEditAction = { index, action -> onEditAction(task, index, action) },
+                    onDeleteAction = { index -> onDeleteAction(task, index) },
+                    onMove = { onMoveTask(task) },
+                    onExport = { onExportTask(task) },
+                    onReorderActions = { newOrder -> onReorderAction(task, newOrder) },
+                )
+            }
         }
     }
 }
