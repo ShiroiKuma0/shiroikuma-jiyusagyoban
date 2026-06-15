@@ -11,6 +11,9 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.shizuku.ShizukuShell
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Launch an application.
@@ -152,10 +155,17 @@ class ScreenshotAction : Action {
     override val category = ActionCategory.APP
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val path = args["path"]
-            ?: ctx.app.getExternalFilesDir(null)?.resolve("screenshot.png")?.absolutePath
-            ?: "app-specific external storage/screenshot.png"
+        val path = args["path"]?.takeIf { it.isNotBlank() }
+            ?: ctx.app.getExternalFilesDir(null)?.resolve("screenshot_${System.currentTimeMillis()}.png")?.absolutePath
+            ?: return ActionResult.Failure("no writable path for the screenshot")
+        requireShizuku("Screenshot")?.let { return it }
+        val result = runCatching { withContext(Dispatchers.IO) { ShizukuShell.exec("screencap -p '$path'") } }
+            .getOrElse { return ActionResult.Failure("Shizuku exec failed: ${it.message}") }
+        if (result.exitCode != 0) {
+            return ActionResult.Failure("screencap failed: ${result.stderr.trim().take(160).ifBlank { "exit ${result.exitCode}" }}")
+        }
+        ctx.variables.set(args["store"]?.trim()?.takeIf { it.isNotEmpty() } ?: "screenshot_path", path)
         ctx.logger("Screenshot: $path")
-        return ActionResult.Failure("Screenshot capture requires MediaProjection consent or privileged shell access")
+        return ActionResult.Success
     }
 }
