@@ -1,6 +1,6 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.61-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.62-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.3.21-7f52ff.svg)](https://kotlinlang.org)
@@ -20,7 +20,7 @@
 
 **Planned:** broad device-verified background geofence reliability, elevated (Shizuku) execution, Termux script dispatch, a visual flow authoring editor, and richer plugin UX. See [ROADMAP.md](ROADMAP.md).
 
-> **Status:** the current source version is `0.2.61`. Device-evidence claims (location/calendar/sun) are single-device API 36 data points on `SM-S938B`, not broad background-geofence reliability guarantees.
+> **Status:** the current source version is `0.2.62`. Device-evidence claims (location/calendar/sun) are single-device API 36 data points on `SM-S938B`, not broad background-geofence reliability guarantees.
 
 ---
 
@@ -93,13 +93,13 @@ Room DB (persistent storage)
 - **Runtime-wired now:** Application foreground detection, time ticks, day schedules with presets/ranges, device state broadcasts, event broadcasts, WiFi network changes, app-open monitoring, notification listener events, NFC tag events, calendar windows, sunrise/sunset event filters, and platform location fixes.
 - **Configured in UI but still being hardened:** Location/geofence contexts. Location matching now receives FOSS platform GPS/network events and supports radius, accuracy, persisted dwell evaluation, a focused API 36 background event-delivery smoke test, and harness gates for provider cadence plus unplugged battery samples or post-reconnect battery history; broader multi-device reliability evidence remains planned runtime work.
 
-### Actions (48 registered + 7 engine-handled Flow controls)
+### Actions (49 registered + 7 engine-handled Flow controls)
 | Category | Count | Examples |
 |----------|-------|----------|
 | Settings | 11 | WiFi, Bluetooth, brightness, volume, airplane, mobile data, screen timeout, DND, ringer mode, torch, Quick Settings tile state |
 | App | 7 | launch intent, launch app, kill, go home, open URL, SMS, screenshot |
 | File | 5 | read, write, append, delete, list |
-| Network | 4 | HTTP GET/POST, ping, download |
+| Network | 5 | HTTP GET/POST, ping, download, Wake-on-LAN |
 | Media | 6 | play, stop, pause, next, previous, mute |
 | System | 6 | vibrate, reboot, lock, screen off/wake, log |
 | Notification | 3 | notification/toast, cancel, TTS speak |
@@ -109,7 +109,7 @@ Room DB (persistent storage)
 | Script | 1 | gated Termux script run |
 | Import | 1 | unsupported Tasker action placeholder |
 
-Flow-control actions (`task.run`, `flow.if`/`flow.else`/`flow.endif`, `flow.foreach`/`flow.endfor`, `flow.stop`) are interpreted directly by the engine (TaskRunner) rather than the action registry, so the registry holds 48 implementations while the editor exposes those 7 extra control entries.
+Flow-control actions (`task.run`, `flow.if`/`flow.else`/`flow.endif`, `flow.foreach`/`flow.endfor`, `flow.stop`) are interpreted directly by the engine (TaskRunner) rather than the action registry, so the registry holds 49 implementations while the editor exposes those 7 extra control entries.
 
 Some actions are intentionally disabled or marked setup-required because Android restricts normal apps from changing airplane mode, mobile data, screenshots, reboot, screen-off, and similar privileged operations. SMS send remains available in standard/F-Droid builds; Play builds omit SMS and phone-state permissions and mark the SMS action unsupported. Shizuku manager detection and Termux script bridge detection are available only as readiness signals; OpenTasker does not request Shizuku permission, request Termux `RUN_COMMAND`, execute elevated commands, or run scripts yet.
 
@@ -154,7 +154,7 @@ Release APKs are unsigned unless `OPEN_TASKER_RELEASE_KEYSTORE`, `OPEN_TASKER_RE
 
 - **Toolchain:** Kotlin 2.3.21, Gradle 9.4.1, AGP 9.2.1, KSP 2.3.7, Build Tools 36.0.0, JDK 17/21
 - **Min SDK:** 26 (Android 8.0)
-- **Compile SDK:** 36 · **Target SDK:** 35
+- **Compile SDK:** 36 - **Target SDK:** 36
 - **Permissions:** foreground service, PACKAGE_USAGE_STATS, system alert window (optional for scenes)
 - **Architecture:** MVVM with Compose + Room + coroutines (manual DI via `OpenTaskerApp_NoHilt`; no Hilt)
 

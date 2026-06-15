@@ -26,6 +26,18 @@ class ActionGuardsTest {
     }
 
     @Test
+    fun httpPostRejectsOversizedLegacyBodyKey() = runBlocking {
+        val action = HttpPostAction()
+        val bigBody = "x".repeat(1_048_577)
+        val result = action.run(ctx(), mapOf("url" to "https://example.com", "body" to bigBody))
+        assertTrue("oversized legacy POST body should fail", result is ActionResult.Failure)
+        assertTrue(
+            "failure message mentions limit",
+            (result as ActionResult.Failure).message.contains("KB limit")
+        )
+    }
+
+    @Test
     fun httpPostAcceptsBodyAtLimit() = runBlocking {
         val action = HttpPostAction()
         val bodyAtLimit = "x".repeat(1_048_576)

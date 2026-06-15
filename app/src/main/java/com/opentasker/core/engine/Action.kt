@@ -23,7 +23,7 @@ sealed class ActionResult {
 
 /**
  * Atomic unit of automation work. Implementations live in [com.opentasker.core.actions]
- * for built-ins; plugins implement the same interface via the AIDL bridge.
+ * for built-ins; Locale-compatible plugins are invoked by host actions in that package.
  */
 interface Action {
     val id: String                 // stable, e.g. "wifi.toggle"

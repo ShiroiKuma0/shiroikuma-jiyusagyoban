@@ -19,7 +19,7 @@ class ReadFileAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
-        val varName = args["var"] ?: "result"
+        val varName = args["var"] ?: args["variable"] ?: "result"
         return try {
             val file = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside OpenTasker files")
             if (file.length() > MAX_READ_BYTES) {
@@ -52,7 +52,7 @@ class WriteFileAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
-        val text = args["text"] ?: ""
+        val text = args["text"] ?: args["content"] ?: ""
         return try {
             val file = safeUserFile(ctx, path) ?: return ActionResult.Failure("path is outside OpenTasker files")
             file.parentFile?.mkdirs()
@@ -78,7 +78,7 @@ class AppendFileAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
-        val text = args["text"] ?: ""
+        val text = args["text"] ?: args["content"] ?: ""
         return try {
             val file = safeUserFile(ctx, path) ?: return ActionResult.Failure("path is outside OpenTasker files")
             file.parentFile?.mkdirs()
@@ -132,7 +132,7 @@ class ListFilesAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
-        val varName = args["var"] ?: "result"
+        val varName = args["var"] ?: args["variable"] ?: "result"
         return try {
             val dir = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside OpenTasker files")
             if (!dir.isDirectory) return ActionResult.Failure("path is not a directory")

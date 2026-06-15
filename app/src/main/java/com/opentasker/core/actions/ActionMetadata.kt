@@ -302,7 +302,7 @@ fun registerActionMetadata() {
             description = "Set screen brightness level",
             category = "Settings",
             fields = listOf(
-                ActionField("level", "Brightness (0-255)", FieldType.NUMBER, required = true),
+                ActionField("brightness", "Brightness (0-255)", FieldType.NUMBER, required = true),
             )
         )
     )
@@ -472,7 +472,7 @@ fun registerActionMetadata() {
             description = "Capture device screenshot",
             category = "App",
             fields = listOf(
-                ActionField("filename", "Filename", hint = "optional output path"),
+                ActionField("path", "Output path", hint = "optional output path"),
             )
         )
     )
@@ -486,7 +486,7 @@ fun registerActionMetadata() {
             category = "File",
             fields = listOf(
                 ActionField("path", "File path", required = true),
-                ActionField("variable", "Store in variable", required = true, hint = "%var"),
+                ActionField("var", "Store in variable", required = true, hint = "%var"),
             )
         )
     )
@@ -499,7 +499,7 @@ fun registerActionMetadata() {
             category = "File",
             fields = listOf(
                 ActionField("path", "File path", required = true),
-                ActionField("content", "Content", FieldType.MULTILINE, required = true),
+                ActionField("text", "Content", FieldType.MULTILINE, required = true),
             )
         )
     )
@@ -512,7 +512,7 @@ fun registerActionMetadata() {
             category = "File",
             fields = listOf(
                 ActionField("path", "File path", required = true),
-                ActionField("content", "Content", FieldType.MULTILINE, required = true),
+                ActionField("text", "Content", FieldType.MULTILINE, required = true),
             )
         )
     )
@@ -537,7 +537,7 @@ fun registerActionMetadata() {
             category = "File",
             fields = listOf(
                 ActionField("path", "Directory path", required = true),
-                ActionField("variable", "Store in variable", required = true, hint = "%var"),
+                ActionField("var", "Store in variable", required = true, hint = "%var"),
             )
         )
     )
@@ -551,7 +551,7 @@ fun registerActionMetadata() {
             category = "Network",
             fields = listOf(
                 ActionField("url", "URL", required = true),
-                ActionField("variable", "Store response in", hint = "%var"),
+                ActionField("var", "Store response in", hint = "%var"),
                 ActionField("allow_http", "Allow HTTP", FieldType.CHECKBOX, hint = "Allow plain HTTP for LAN/private-network hosts only"),
             )
         )
@@ -565,8 +565,8 @@ fun registerActionMetadata() {
             category = "Network",
             fields = listOf(
                 ActionField("url", "URL", required = true),
-                ActionField("body", "Request body", FieldType.MULTILINE),
-                ActionField("variable", "Store response in", hint = "%var"),
+                ActionField("data", "Request body", FieldType.MULTILINE),
+                ActionField("var", "Store response in", hint = "%var"),
                 ActionField("allow_http", "Allow HTTP", FieldType.CHECKBOX, hint = "Allow plain HTTP for LAN/private-network hosts only"),
             )
         )

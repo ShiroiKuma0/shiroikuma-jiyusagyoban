@@ -30,7 +30,7 @@ class HttpGetAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val url = args["url"] ?: return ActionResult.Failure("missing url")
-        val varName = args["var"] ?: "result"
+        val varName = args["var"] ?: args["variable"] ?: "result"
         val timeout = (args["timeout_sec"]?.toIntOrNull() ?: 10).coerceIn(1, 60) * 1000
         return try {
             val parsedUrl = URL(url)
@@ -70,8 +70,8 @@ class HttpPostAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val url = args["url"] ?: return ActionResult.Failure("missing url")
-        val data = args["data"] ?: ""
-        val varName = args["var"] ?: "result"
+        val data = args["data"] ?: args["body"] ?: ""
+        val varName = args["var"] ?: args["variable"] ?: "result"
         val timeout = (args["timeout_sec"]?.toIntOrNull() ?: 10).coerceIn(1, 60) * 1000
         return try {
             val parsedUrl = URL(url)

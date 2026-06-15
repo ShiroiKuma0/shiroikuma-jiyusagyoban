@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.59 → v0.3.x. Reconciles current repo state with competitive research across Android automation apps, adjacent workflow engines, platform constraints (API 35–36), distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.62 → v0.3.x. Reconciles current repo state with competitive research across Android automation apps, adjacent workflow engines, platform constraints (API 35–36), distribution policy, and dependency changelogs.
 
-**Last updated:** 2026-06-06
-**Roadmap version:** 2026.06.06 autonomous continuation pass (post-v0.2.59 platform and UX reconciliation)
-**Current app version:** 0.2.59
+**Last updated:** 2026-06-15
+**Roadmap version:** 2026.06.15 implementation/audit pass (post-v0.2.62 action editor and UI reconciliation)
+**Current app version:** 0.2.62
 **Planning rule:** items marked "Now" must ship before the v0.3.0 public beta claim. Items already completed in 0.2.x are retained in the **Completed Backlog** appendix for traceability and explicitly removed from active tiers.
 
 ## Reconciliation note (2026-05-06 pass)
@@ -19,9 +19,9 @@ The June continuation pass verified the current repo after commit `c2412ad` and 
 
 ## State of the Repo
 
-OpenTasker is an Android/Kotlin automation app targeting API 35 with Jetpack Compose, Material 3, Room, Coroutines, WorkManager, DataStore, Gson, and Hilt dependencies. The project goal is a privacy-first, fully on-device, open-source Tasker/MacroDroid/Automate alternative.
+OpenTasker is an Android/Kotlin automation app targeting API 36 with Jetpack Compose, Material 3, Room, Coroutines, WorkManager, DataStore, Kotlinx Serialization, and manual dependency wiring. The project goal is a privacy-first, fully on-device, open-source Tasker/MacroDroid/Automate alternative.
 
-The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, scenes with text/button/slider/image element editing, scaled canvas previews, drag-to-move layout edits, and tap/long-press task binding pickers, run logs, setup/onboarding status, flow graphs with node deep links into existing editors, conditional action labels, scrollable lane overviews, screen-reader summaries, and picker-backed Add Context/Add Step shortcuts, live context inspection with geofence dwell detail, notification listener event triggers, NFC tag event triggers and a write helper, calendar/sun event triggers with editor presets and adb smoke evidence, day schedule aliases/ranges/presets, a foreground automation service that starts from app launch and boot, a FOSS platform location source with balanced provider cadence and policy-aware setup copy, FOSS geofence radius/accuracy/dwell evaluation with persisted inside-since state and stale dwell-key cleanup, an installable disabled Location evidence template, an adb-backed Location/geofence evidence harness with Room/run-log/logcat assertions plus provider-cadence, unplugged-sample, and post-reconnect unplugged-history gates, API 36 smoke evidence for background Location event delivery, bounded runtime template argument and condition expansion, per-expression template run-log diagnostics, explicit regex template policy, a Tasker XML-to-OpenTasker-bundle migration parser, Locale setting dispatch and condition query actions with explicit receiver targeting, best-effort last-known unknown-state handling, guarded configuration result parsing, request-query event handling, and an adb plugin validation harness, OpenTasker bundle share manifests, a F-Droid readiness build profile with metadata/version gates, historical fdroidserver lint/build evidence that now needs a v0.2.59 refresh, APK payload comparison tooling, centralized Gradle dependency version governance, optional Shizuku readiness status for elevated-action planning, and optional Termux script readiness status for future scripting. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
+The active APK now has a Room-backed Compose management UI for profiles, tasks, action lists, context lists, scenes with text/button/slider/image element editing, scaled canvas previews, drag-to-move layout edits, and tap/long-press task binding pickers, run logs, setup/onboarding status, flow graphs with node deep links into existing editors, conditional action labels, scrollable lane overviews, screen-reader summaries, and picker-backed Add Context/Add Step shortcuts, live context inspection with geofence dwell detail, notification listener event triggers, NFC tag event triggers and a write helper, calendar/sun event triggers with editor presets and adb smoke evidence, day schedule aliases/ranges/presets, a foreground automation service that starts from app launch and boot, a FOSS platform location source with balanced provider cadence and policy-aware setup copy, FOSS geofence radius/accuracy/dwell evaluation with persisted inside-since state and stale dwell-key cleanup, an installable disabled Location evidence template, an adb-backed Location/geofence evidence harness with Room/run-log/logcat assertions plus provider-cadence, unplugged-sample, and post-reconnect unplugged-history gates, API 36 smoke evidence for background Location event delivery, bounded runtime template argument and condition expansion, per-expression template run-log diagnostics, explicit regex template policy, a Tasker XML-to-OpenTasker-bundle migration parser, Locale setting dispatch and condition query actions with explicit receiver targeting, best-effort last-known unknown-state handling, guarded configuration result parsing, request-query event handling, and an adb plugin validation harness, OpenTasker bundle share manifests, a F-Droid readiness build profile with metadata/version gates, historical fdroidserver lint/build evidence that now needs a current-version refresh, APK payload comparison tooling, centralized Gradle dependency version governance, optional Shizuku readiness status for elevated-action planning, and optional Termux script readiness status for future scripting. Older `.kt.bak` editor snapshots are still not compiled, and advanced capability gating remains required before public beta claims.
 
 Key local constraints:
 
@@ -46,7 +46,7 @@ Key local constraints:
 5. Plugin compatibility is table stakes. Locale/Tasker-compatible plugins are the de facto Android automation extension protocol; OpenTasker should become both a host and a target. [S7][S8][S16]
 6. F-Droid is strategically aligned with OpenTasker's privacy/on-device positioning, but Google Play Services geofencing and non-reproducible signing/build-tool choices would block inclusion. [S31][S32]
 7. Quick Settings should be treated as a first-class trigger/action surface, not a minor shortcut. Android recommends tiles only for frequent, fast-access actions and warns that users must manually add them; Tasker, MacroDroid, Automate, and Home Assistant all expose tile configuration, state, labels, icons, subtitles, and/or long-press behavior, which sets user expectations for OpenTasker. [S54][S55][S56][S57][S61]
-8. The current platform compliance risk is broader than Android 15 foreground-service timeouts: Android 16 target behavior affects large-screen resizability, predictive back in 3-button navigation, intent redirection hardening, granular health permissions, and fixed-rate scheduling behavior. OpenTasker already compiles SDK 36 but still targets SDK 35, so target-SDK-36 rehearsal should be explicit before any beta claim. [L8][S52][S53]
+8. The current platform compliance risk is broader than Android 15 foreground-service timeouts: Android 16 target behavior affects large-screen resizability, predictive back in 3-button navigation, intent redirection hardening, granular health permissions, and fixed-rate scheduling behavior. OpenTasker now compiles and targets SDK 36, so target-SDK-36 rehearsal evidence should be explicit before any beta claim. [L8][S52][S53]
 9. Health Connect is now more plausible than the May roadmap implied, but it must be designed as an opt-in polling/sync integration with granular permissions, background-read permission handling, history limits, source attribution, and a settings toggle. It should not be described as a real-time trigger unless Android adds an event delivery contract. [S58][S59]
 10. UI maintainability is now a product risk, not just code hygiene: `ActiveAutomationUi.kt` is 2,891 lines, `SceneLibraryScreen.kt` is 927 lines, and `strings.xml` still contains only five strings while most Compose UI copy remains inline. This supports keeping P2/P12/N9 active and adding testable split/i18n acceptance criteria. [L9]
 
@@ -68,7 +68,7 @@ Key local constraints:
 
 ### N1 (2026.06.06) - Target SDK 36 / foreground-service and platform readiness pass
 
-**Status:** 2026-06-06 correction. Compile SDK is already 36 and API-36 smoke evidence exists, but the app still targets SDK 35. The active manifest declares `FOREGROUND_SERVICE_SPECIAL_USE`, `FOREGROUND_SERVICE_LOCATION`, and `android:foregroundServiceType="specialUse|location"` for `AutomationService`; it does not currently declare `dataSync` or `mediaProcessing`. Android's current six-hour timeout documentation applies to `dataSync` and `mediaProcessing`, not to `specialUse`; `specialUse` remains a Play Console declaration/review risk and a boot/background-start behavior risk. [L8][S49][S50][S51]
+**Status:** 2026-06-15 correction. Compile SDK and target SDK are now 36 and API-36 smoke evidence exists, but the explicit foreground-service behavior matrix, Play `specialUse` declaration evidence, background-start denial evidence, and large-screen/predictive-back/intent-hardening rehearsal remain incomplete. The active manifest declares `FOREGROUND_SERVICE_SPECIAL_USE`, `FOREGROUND_SERVICE_LOCATION`, and `android:foregroundServiceType="specialUse|location"` for `AutomationService`; it does not currently declare `dataSync` or `mediaProcessing`. Android's current six-hour timeout documentation applies to `dataSync` and `mediaProcessing`, not to `specialUse`; `specialUse` remains a Play Console declaration/review risk and a boot/background-start behavior risk. [L8][S49][S50][S51]
 **Description:** Add a target-SDK-36 readiness pass that (a) audits all FGS callsites from `MainActivity` and `BootReceiver`, (b) documents why the automation engine needs `specialUse|location` and prepares Play declaration/demo evidence, (c) adds regression evidence for boot-start, app-launch start, background-start denial behavior, notification visibility, and location-prerequisite handling, (d) adds `Service.onTimeout()` handling and adb timeout tests only if a future slice introduces `dataSync` or `mediaProcessing`, (e) rehearses Android 16 target behavior around adaptive large-screen layouts, predictive back in 3-button navigation, intent redirection hardening, fixed-rate scheduling, and health permissions, and (f) updates the Setup/Inspector UI so users can see when platform constraints block a profile family.
 **Sources:** foreground-service timeout docs [S49], Android 15 FGS type changes [S50], Play FGS declaration requirements [S51], Android 16 target behavior [S52], Android 16 all-app behavior [S53], local FGS startup audit [L8][L12], existing Location evidence harness [L6].
 **Category:** platform/OS, reliability, distribution, observability.
@@ -133,8 +133,8 @@ Key local constraints:
 
 ### N9 (2026.05.06) - Documentation truth pass post-v0.2.59
 
-**Status:** Stale older snapshots removed in v0.2.11; current README still has a single 1700-character status sentence that is hard to skim. AC-2026-06-06-7 also found stale README Kotlin/Android Studio wording, CLAUDE.md v0.2.58/Gradle/workflow references, and F-Droid readiness evidence still describing v0.2.58/code 60 and Build Tools 35.0.0 while the app is v0.2.59/code 61 on Build Tools 36.0.0. [L14]
-**Description:** Refresh README, CLAUDE.md, ARCHITECTURE.md, IMPROVEMENT_PLAN.md, and FDROID_READINESS.md to reflect v0.2.59. Restructure the README opening from one mega-sentence into a scannable feature list. Sync version strings, toolchain versions, workflow filenames, fdroid metadata, Gradle properties, ROADMAP, and CHANGELOG.
+**Status:** Partially refreshed in v0.2.62: README, CLAUDE.md, ROADMAP.md, RESEARCH.md, CHANGELOG.md, Gradle version values, and F-Droid metadata gates now reflect the target-SDK-36/action-metadata pass. Older architecture and readiness docs still need a current-version truth pass before this item closes. [L14]
+**Description:** Refresh README, CLAUDE.md, ARCHITECTURE.md, IMPROVEMENT_PLAN.md, and FDROID_READINESS.md to reflect the current release. Restructure long status copy into skimmable feature lists where needed. Sync version strings, toolchain versions, workflow filenames, fdroid metadata, Gradle properties, ROADMAP, and CHANGELOG.
 **Sources:** Local repo state [L1][L5], existing improvement plan [L7], dependency/release audit [L14].
 **Category:** docs, dev-experience.
 **Impact:** 3.
@@ -146,8 +146,8 @@ Key local constraints:
 
 ### N10 (2026.06.06) - Target-SDK-36 adaptive layout, predictive back, and intent hardening rehearsal
 
-**Status:** Not started as a named gate. The app compiles SDK 36 and includes a monochrome launcher icon layer, but target SDK remains 35; no explicit large-screen/adaptive-layout test matrix, target-36 compat-flag run, or intent-redirection audit is tracked. [L8]
-**Description:** Before raising `targetSdk` to 36, run an Android 16 rehearsal that covers (a) large screens and desktop/windowing where orientation and aspect-ratio restrictions are ignored at `sw600dp`, (b) predictive back behavior in gesture and 3-button modes, (c) intent-redirection hardening for imported Tasker/Locale/external intents and any nested intents, (d) fixed-rate scheduling semantics for any polling loops, (e) Bluetooth bond-loss event handling if Bluetooth context work expands, and (f) Health Connect granular permission implications if X5 moves forward. Record screenshots/evidence for phone, foldable/tablet-width emulator, and desktop/freeform if available.
+**Status:** Partially started. The app compiles and targets SDK 36 and includes a monochrome launcher icon layer, but no explicit large-screen/adaptive-layout test matrix, target-36 compat-flag run, predictive-back run, or intent-redirection audit is tracked. [L8]
+**Description:** With `targetSdk` at 36, run an Android 16 rehearsal that covers (a) large screens and desktop/windowing where orientation and aspect-ratio restrictions are ignored at `sw600dp`, (b) predictive back behavior in gesture and 3-button modes, (c) intent-redirection hardening for imported Tasker/Locale/external intents and any nested intents, (d) fixed-rate scheduling semantics for any polling loops, (e) Bluetooth bond-loss event handling if Bluetooth context work expands, and (f) Health Connect granular permission implications if X5 moves forward. Record screenshots/evidence for phone, foldable/tablet-width emulator, and desktop/freeform if available.
 **Sources:** Android 16 target behavior changes [S52], Android 16 all-app behavior and predictive-back 3-button support [S53], current manifest/build config [L8], incoming-intent audit [L12], UI line-count and inline-copy audit [L9].
 **Category:** platform/OS, UX, accessibility, security, testing.
 **Impact:** 4 - prevents target-SDK upgrade regressions in navigation, layouts, and intent safety.
@@ -499,8 +499,8 @@ This matrix captures the research harvest and deduped backlog. "Prevalence" is b
 **Key findings:**
 
 - `ActiveAutomationUi.kt` still combines `ActiveAutomationViewModel`, factory, top-level router, profile/task/run-log screens, Tasker import review, template picker/slot dialogs, task/profile dialogs, action picker/config dialogs, context picker/config dialogs, field renderers, rows, cards, and helpers. That makes P2 more urgent before Quick Settings, Health Connect, or more plugin UX adds another editor family.
-- Screen selection and draft dialog state are held in plain `remember` variables, so rotation, freeform resize, foldable posture changes, or Android 16 large-screen recreation can drop the selected tab or unsaved dialog inputs.
-- `TemplatePickerDialog`, `TemplateSlotDialog`, `ActionPickerDialog`, `ActionConfigDialog`, and `ContextConfigDialog` use fixed 420-460 dp content heights. These are likely acceptable on phones but need a bounded adaptive max-height strategy for landscape, split-screen, and `sw600dp` modes.
+- Screen selection, profile/task search, and run-log filters now use `rememberSaveable`, but draft dialog/editor state is still mostly plain `remember`, so rotation, freeform resize, foldable posture changes, or Android 16 large-screen recreation can still drop unsaved dialog inputs.
+- `TemplatePickerDialog`, `TemplateSlotDialog`, `ActionPickerDialog`, `ActionConfigDialog`, and `ContextConfigDialog` now use bounded `heightIn` list containers instead of fixed 420-460 dp heights. They still need screenshot/device QA in landscape, split-screen, and `sw600dp` modes to decide whether window-relative constraints are necessary.
 - `AutomationFlowScreen` uses a horizontally scrolling lane view with fixed 68 dp lane labels and node widths. It now has accessibility summaries, but target-SDK-36 large-screen QA should verify keyboard/rotary navigation, scroll affordance visibility, and whether condition labels need more than the current short "if" marker.
 - `SceneLibraryScreen` uses `BoxWithConstraints` and `SceneCanvasProjector`, but preview height is capped at 280 dp and movement is drag-only on the canvas. The numeric editor gives a fallback, yet N10 should still validate tall/wide scenes, resize handles, alignment guides, keyboard/screen-reader movement controls, and screenshot evidence on tablet/freeform widths.
 - `strings.xml` contains only app name, external automation permission copy, and generic success/error prefixes. P12 should move stable labels/errors/empty states by workflow as part of screen extraction, not as a broad one-shot string migration.
@@ -588,8 +588,8 @@ This matrix captures the research harvest and deduped backlog. "Prevalence" is b
 
 #### Addendum: N10 large-screen and state-retention QA
 
-- [ ] Replace plain `remember` with `rememberSaveable` or ViewModel-backed state for selected screen, open dialog identity, picker filters, run-log filter/search state, and simple editor drafts that must survive rotation/freeform resize.
-- [ ] Convert fixed 420-460 dp dialog lists to adaptive `heightIn`/window-relative constraints so small landscape windows and large desktop windows both remain usable.
+- [ ] Continue replacing plain `remember` with `rememberSaveable` or ViewModel-backed state for open dialog identity, picker state, and simple editor drafts that must survive rotation/freeform resize.
+- [ ] Validate the new `heightIn`-bounded picker/editor lists in small landscape, split-screen, and `sw600dp` windows; add window-relative constraints only where screenshots show clipping or wasted space.
 - [ ] Test Flow canvas on phone portrait, phone landscape, `sw600dp` tablet, split-screen, and freeform widths; record whether horizontal scroll, node selection, and lane labels remain discoverable.
 - [ ] Test Scene preview with tall, wide, and dense scenes; add fit/actual-size/zoom or pan follow-up if the 280 dp cap hides important layout relationships.
 - [ ] Verify drag actions have equivalent numeric, keyboard, or button-based controls for accessibility before scene overlay launch ships.
@@ -936,29 +936,9 @@ Items below were identified by the 2026-06-09 exhaustive research pass covering 
 
 ---
 
-## Research-Driven Additions (2026-06-09 engine-correctness and gap-closure pass)
-
-New items from a code-level engine audit plus external platform/policy verification. Checked against N1-N10, X1-X9, RD1-RD10, Under Consideration, and Rejected tiers — no duplicates. Evidence details live in RESEARCH.md (same date).
-
-### P0 — root-cause correctness
-
-### P1 — trust, data safety, distribution
-
-### P2 — hardening and table-stakes surface
-
-### P3 — parity and power-user polish
-
----
-
 ## Research-Driven Additions (2026-06-10 trigger/action coverage and privacy pass)
 
 New items from a trigger/action coverage audit, manifest privacy review, and external parity/integration research. Checked against N1-N10, X1-X9, RD1-RD25, Under Consideration, and Rejected tiers — no duplicates. Evidence details in RESEARCH.md (2026-06-10).
-
-### P1 — trust, privacy, table-stakes actions
-
-### P2 — parity and hygiene
-
-
 
 ### P3 — integration bets
 
@@ -991,8 +971,6 @@ New items from an action truthfulness, notification lifecycle, plugin interopera
 ## Research-Driven Additions (2026-06-12 exhaustive research pass)
 
 New items from an exhaustive research pass covering 5 parallel research agents (OSS competitors, Android platform, commercial competitors, community signals, dependency/security), full repo code review, and 50+ external sources. Each item was checked against every existing N, X, RD, Under Consideration, and Rejected tier — no duplicates. Evidence details in RESEARCH.md (2026-06-12).
-
-### P2 — hardening and hygiene
 
 ## Audit follow-ups (engineering/UX/theming pass)
 
@@ -1031,44 +1009,30 @@ Items below come from a fresh code audit (all prior P0/P1 bugs verified fixed) p
   Acceptance: on an Android 17 device, a background-triggered Speak/Play-Sound action either produces audio or records an explicit honest failure in the Run Log (never a silent no-op); capability gating reflects the WIU state; tests cover the gated path.
   Complexity: M
 
-- [ ] P1 — Commit targetSdk 35 → 36 (Play deadline Aug 31, 2026)
-  Why: Google Play requires all app updates to target API 36 by Aug 31, 2026; the app compiles SDK 36 but still targets 35. N1/N10 scope the rehearsal — this item is the commitment to actually raise `targetSdk`, ship the edge-to-edge/predictive-back/intent-redirection fallout, and re-verify the F-Droid/Play submission.
-  Evidence: https://developer.android.com/google/play/requirements/target-sdk ; https://support.google.com/googleplay/android-developer/answer/11926878 ; targetSdk = 35 in app/build.gradle.kts ; predictive back already shipped (commit 9b7021c).
-  Touches: app/build.gradle.kts (targetSdk), AndroidManifest.xml, edge-to-edge insets in ui/screens/*, intent-redirection hardening, fdroid/metadata, CI release gates.
-  Acceptance: app targets SDK 36, builds debug+release, passes JVM tests + F-Droid readiness, runs on SM-S938B with correct insets and predictive-back in gesture + 3-button modes; fdroid metadata and version strings updated.
-  Complexity: M (depends on N1/N10 rehearsal)
-
 ### P2 — accessibility, testing, and state hardening
 
 - [ ] P2 — Screen-reader / TalkBack accessibility pass
-  Why: ~16 icon-only IconButtons pass `contentDescription = null` and there is no `Role`/`stateDescription` outside PremiumComponents.kt, so TalkBack users cannot identify or operate action/context row controls — a table-stakes trust gap the engine work skipped.
-  Evidence: contentDescription=null at app/src/main/java/com/opentasker/ui/screens/ActiveAutomationUi.kt:1556,1561,1568,1680,1685,1693,1698,1704 (and add/nav icons); semantics only in app/src/main/java/com/opentasker/ui/components/PremiumComponents.kt.
+  Why: v0.2.62 removed the audited icon-only `contentDescription = null` cases and gave action checkbox rows `Role.Switch` plus `stateDescription`, but there is still no full TalkBack sweep or accessibility-checks instrumentation gate across the main editor, setup, inspector, scene, and flow screens.
+  Evidence: static search no longer finds `contentDescription = null` in app source; `ActiveAutomationUi.kt` action checkbox fields expose switch semantics; remaining risk is manual/instrumented coverage across icon buttons, drag-only controls, tabs, filters, and dynamic row summaries.
   Touches: ui/screens/ActiveAutomationUi.kt, ui/screens/*, ui/components/*, strings.xml (label resources, dovetails with X9 i18n).
   Acceptance: every interactive icon-only control has a meaningful contentDescription; toggles expose Role.Switch + stateDescription; a manual TalkBack sweep of Profiles/Tasks/Actions/Contexts/RunLog reaches and announces every control; an accessibility-checks instrumentation test passes on core screens.
   Complexity: M
 
-- [ ] P2 — Unit tests for action implementations
-  Why: every package except the action layer has JVM tests; NetworkActions/FileActions/SettingsActions/MediaActions/SystemActions/AppActions/BuiltInActions hold the security guards (byte caps, scheme allowlist, timeouts) yet have zero coverage, so regressions in those guards are invisible.
-  Evidence: no app/src/test/java/com/opentasker/core/actions/ directory exists; guards live at FileActions.kt:25, NetworkActions.kt:44/168, AppActions.kt:85, BuiltInActions.kt:232.
-  Touches: new app/src/test/java/com/opentasker/core/actions/* with a fake ActionContext (Robolectric or pure where possible).
-  Acceptance: tests cover the file-read cap, HTTP-response/download byte bounds, OpenUrl scheme allowlist (including blocked schemes), flow.wait cap, and notification-id allocation; CI runs them in :app:testDebugUnitTest.
+- [ ] P2 — Broaden unit tests for action implementations
+  Why: v0.2.62 added a dedicated action guard test package covering HTTP POST body caps, legacy `body` compatibility, URL scheme allowlist, flow wait caps, missing network args, ping host validation, and Wake-on-LAN packet guards. File, media, settings, system, app, notification, and download edge cases still need focused coverage.
+  Evidence: app/src/test/java/com/opentasker/core/actions/ActionGuardsTest.kt exists; uncovered guards remain in FileActions.kt, NetworkActions.kt download paths, AppActions.kt, SettingsActions.kt, MediaActions.kt, SystemActions.kt, and BuiltInActions.kt.
+  Touches: expand app/src/test/java/com/opentasker/core/actions/* with fake ActionContext/Robolectric coverage where Android framework APIs are required.
+  Acceptance: tests cover the file-read cap, HTTP-response/download byte bounds, OpenUrl scheme allowlist (including blocked schemes), flow.wait cap, notification-id allocation, settings/media/app honest-failure paths, and CI runs them in :app:testDebugUnitTest.
   Complexity: M
 
 - [ ] P2 — Config-change and process-death state retention (rememberSaveable)
-  Why: 0 `rememberSaveable` vs 98 `remember` across ui/ means editor drafts, dialog state, and filter selections are lost on rotation, multi-window resize, or background process death — increasingly visible as target SDK 36 brings edge-to-edge/large-screen behavior.
-  Evidence: grep across app/src/main/java/com/opentasker/ui/ shows zero rememberSaveable; concrete loss sites are the action/context editor dialogs and Run Log filters in ActiveAutomationUi.kt.
+  Why: selected screen, profile/task search, and run-log filters now use `rememberSaveable`, but editor drafts, dialog identity, picker state, and several screen-local controls still use plain `remember`, so rotation, multi-window resize, or process death can lose in-progress input.
+  Evidence: `rememberSaveable` is present in ActiveAutomationUi.kt for screen/search/filter state; concrete remaining loss sites are the action/context editor dialogs, template picker state, scene/editor drafts, and other dialog-local `remember` state.
   Touches: ui/screens/ActiveAutomationUi.kt and any dialog/editor state holders; add Saver implementations for non-primitive draft state.
   Acceptance: rotating or resizing the action editor, context editor, and Run Log filter preserves in-progress input and selection; a process-death simulation (developer-options "don't keep activities") retains editor drafts.
   Complexity: M
 
 ### P3 — parity quick wins and hygiene
-
-- [ ] P3 — Wake-on-LAN action
-  Why: a magic-packet `wol` action is a repeatedly-requested, low-effort automation primitive (Tasker feature-request board) that fits the existing network-action pattern and the home-automation persona, and no live FOSS competitor ships it cleanly.
-  Evidence: https://tasker.helprace.com/s1-general/ideas/accepted (Wake-on-LAN, 8 votes); no WoL/magic-packet code in repo.
-  Touches: app/src/main/java/com/opentasker/core/actions/NetworkActions.kt (UDP broadcast magic packet), ActionMetadata.kt, ActionCapabilities.kt, tests.
-  Acceptance: a task with a configured MAC (and optional broadcast IP/port) sends a valid magic packet, logs success/failure, and is covered by a packet-construction unit test.
-  Complexity: S
 
 - [ ] P3 — Date/time format template function (getDateFormatted parity)
   Why: the template engine has no date/time formatting function, a concrete Tasker-import parity gap and a top migrant request (`getDateFormatted`) that causes imported-task failures when date logic is involved.
@@ -1077,24 +1041,78 @@ Items below come from a fresh code audit (all prior P0/P1 bugs verified fixed) p
   Acceptance: `{{ now | date:'yyyy-MM-dd HH:mm' }}` (or equivalent) expands deterministically with a bounded pattern set; invalid patterns fail closed with a warning; tests cover format, default, and rejection cases.
   Complexity: S
 
-- [ ] P3 — Passive (battery-friendly) location listener mode
-  Why: the FOSS location source uses active GPS/network provider updates; a passive-provider listener that piggybacks on other apps' fixes is an explicit top community request for geofencing without constant GPS drain, and complements N2 durability work.
-  Evidence: https://tasker.helprace.com/s1-general/ideas/accepted (passive location listeners, 8 votes); active-provider cadence in app/src/main/java/com/opentasker/core/contexts/LocationContextSourceImpl.kt.
-  Touches: LocationContextSourceImpl.kt (PASSIVE_PROVIDER registration + opt-in toggle), Location context editor, Context Inspector cadence copy, docs.
-  Acceptance: a Location context can opt into passive mode; with another app requesting fixes, the profile still matches from passive updates; setup/inspector copy explains the battery/latency tradeoff; behavior is covered by a source-contract test.
-  Complexity: S/M
+## Research-Driven Additions (2026-06-14 code-audit deep pass)
 
-- [ ] P3 — Camera-in-use / microphone-recording trigger and constraint
-  Why: privacy-automation primitives (auto-DND while recording, log camera use) that MacroDroid paywalls; Android's `AppOpsManager` active-op watcher (OP_CAMERA / OP_RECORD_AUDIO) provides them with no cloud and no accessibility dependency — a FOSS-aligned differentiator.
-  Evidence: MacroDroid 2026 Camera-In-Use trigger + Microphone-Recording constraint (competitor research); AppOpsManager.startWatchingActive (platform API); no camera/mic-use code in repo.
-  Touches: a new event bridge following core/contexts/NotificationContextEvents.kt pattern emitting `event=camera`/`event=mic`, opt-in Setup row, ProfileMatcher wiring, capability gating, docs, tests.
-  Acceptance: with the watcher enabled, starting/stopping camera or mic in any app fires the context within seconds and is observable in the Context Inspector; without opt-in no watcher registers; run-log evidence present.
+Second 2026-06-14 pass: a full source audit (engine verified clean — 0 TODO/FIXME, all prior bugs still fixed, deps CVE-clean) surfaced product-scaling and interop gaps that earlier passes missed. Each item below was checked against every existing N/X/RD/P tier, Under Consideration, Rejected, and the same-day platform/a11y additions — no duplicates. Strategic gaps already elsewhere (AI authoring → Under Consideration; UI split → P2 split plan; camera/mic + date-format + network-security-config + WoL → 2026-06-14 P3) are not repeated. Evidence in RESEARCH.md (2026-06-14 code-audit pass).
+
+### P2 — product scaling and resilience
+
+- [ ] P2 — Project/folder/tag organization for profile and task lists
+  Why: profile/task search bars now exist, but the lists are still flat and have no grouping — `Profile` has no tag/folder/project/group field and task organization is still name-only. Every major competitor (Tasker "Projects" tabs + in-app search, vFlow's searchable workflow picker) solves this; organization becomes the dominant usability gap once a user has more than about 20 profiles.
+  Evidence: model/Profile.kt has no organization field; ActiveAutomationUi.kt has profile/task search but no group/project model or filter; https://tasker.joaoapps.com/userguide/en/activity_main.html (Projects tabs); https://notenoughtech.com/tasker/tasker-tips-organise/ ; vFlow 2026 searchable workflow picker (https://github.com/ChaoMixian/vFlow/releases).
+  Touches: model/Profile.kt (+ nullable group/tag fields), Room migration, DAO query/filter, ui/screens/ActiveAutomationUi.kt (group/tab UI integrated with existing search), OpenTaskerBundle.kt (carry group on export/import).
+  Acceptance: profiles can be assigned to a group/folder (or tags) and filtered to one group; existing profile/task search works inside the selected organization scope; the assignment survives export/import and a Room migration; empty-search and missing-group states render cleanly.
+  Complexity: M/L
+
+- [ ] P2 — Complete WorkManager retention coverage and service re-arm
+  Why: `RunLogPruneWorker` is now enqueued from `OpenTaskerApp_NoHilt`, so WorkManager is no longer dead weight. The remaining resilience gap is evidence/test coverage for retention after service death plus a deliberate decision on whether WorkManager should also re-arm the foreground automation service.
+  Evidence: app/src/main/java/com/opentasker/core/engine/RunLogPruneWorker.kt uses `PeriodicWorkRequestBuilder`; OpenTaskerApp_NoHilt.kt enqueues it on app start; re-arm is still primarily AlarmManager + BootReceiver and lacks worker-level tests.
+  Touches: core/engine/RunLogPruneWorker.kt, OpenTaskerApp_NoHilt.kt, AutomationService.kt, optional service-watchdog periodic re-arm, tests.
+  Acceptance: run-log retention prunes on schedule even after the foreground service is killed and not restarted; a deliberate service re-arm policy is documented or implemented; worker behavior is covered by a unit/integration test.
   Complexity: M
 
-- [ ] P3 — Scope LAN cleartext via Network Security Config (Android 17 usesCleartextTraffic deprecation)
-  Why: the manifest declares neither `usesCleartextTraffic` nor `networkSecurityConfig` while a LAN/private-host HTTP opt-in exists; Android 17 deprecates `usesCleartextTraffic`, so a scoped Network Security Config is the forward-compatible way to permit LAN cleartext without exposing all hosts.
-  Evidence: https://developer.android.com/about/versions/17/behavior-changes-17 (usesCleartextTraffic deprecation); no networkSecurityConfig in app/src/main/AndroidManifest.xml; LAN HTTP opt-in in core/actions/NetworkActions.kt (commit e693037).
-  Touches: app/src/main/res/xml/network_security_config.xml (new), AndroidManifest.xml, NetworkActions.kt comments, docs.
-  Acceptance: cleartext is permitted only to private/LAN address ranges via Network Security Config; public-host cleartext stays blocked; the LAN opt-in behavior is unchanged and documented.
-  Complexity: S
+### P3 — interop, support, and hygiene
 
+- [ ] P3 — Tasker XML export (round-trip back to Tasker)
+  Why: Tasker interop is import-only (TaskerXmlImport.kt parses XML → bundle; no writer), and the only export is OpenTasker's own JSON — partial lock-in that contradicts the FOSS/no-lock-in positioning and blocks users who want to move automations back to Tasker.
+  Evidence: app/src/main/java/com/opentasker/core/transfer/TaskerXmlImport.kt is parse-only; no `<TaskerData>` emitter anywhere in core/transfer/; JSON export at OpenTaskerBundleRepository.exportBundle.
+  Touches: new core/transfer/TaskerXmlExport.kt (bundle → Tasker .prj.xml/.tsk.xml for the mappable action subset), unmappable-action report mirroring the import planner, export UI entry in ActiveAutomationUi.kt, docs, tests.
+  Acceptance: a profile/task with mappable actions exports to valid Tasker XML that Tasker imports; unmappable actions are reported (not silently dropped); a round-trip (import → export) test preserves the mappable subset.
+  Complexity: M
+
+- [ ] P3 — Diagnostic / run-log export-to-share UX and redaction tests
+  Why: local crash capture and diagnostic report generation now exist, but users still need a clear Run Log/Setup entry point to create/share the redacted bundle, and the redaction rules need regression tests before support workflows rely on them.
+  Evidence: CrashLogHandler.install is called from OpenTaskerApp_NoHilt.kt; DiagnosticExport.kt builds app/device/permission/run-log reports; no Run Log or Setup share action calls DiagnosticExport, and redactSensitive has no direct test.
+  Touches: DiagnosticExport.kt, CrashLogHandler.kt, ActiveAutomationUi.kt Run Log UI, PermissionOnboardingScreen.kt or Setup UI, ACTION_SEND/SAF share flow, docs, tests.
+  Acceptance: a user can export/share a redacted diagnostic bundle (run logs + app/permission state, no PHI/secrets) from the Run Log or Setup screen; an uncaught crash is written to a local rotating log; redaction is covered by a test.
+  Complexity: S/M
+
+- [ ] P3 — Consolidate dual JSON serializers (Gson + kotlinx-serialization)
+  Why: both Gson 2.14.0 and kotlinx-serialization 1.11.0 are bundled, adding redundant method count and APK size; the bundle/transfer layer should standardize on one (kotlinx-serialization is already pulled for Compose-era code and is the FOSS-idiomatic choice).
+  Evidence: gson at app/build.gradle.kts:139 and kotlin-serialization plugin at :135 / libs.versions.toml (both present).
+  Touches: core/transfer/* and any Gson call sites migrated to kotlinx-serialization (or vice versa), remove the unused dependency, regression tests on bundle import/export round-trip.
+  Acceptance: only one JSON library remains; bundle export/import and DB backup round-trips are unchanged and test-covered; APK method count drops.
+  Complexity: M
+
+- [ ] P3 — Mobile hotspot toggle action via the Shizuku elevated allowlist (X3-gated)
+  Why: a hotspot on/off action is a concrete competitor parity item (vFlow shipped a Hotspot Control module in 2026) and a common home/away automation, but tethering toggle is privileged on modern Android — it must ride the X3 Shizuku allowlist and fail honestly without elevation, not become a normal-app action.
+  Evidence: vFlow CoreHotspotModule 2026 (https://github.com/ChaoMixian/vFlow/releases); no hotspot/tether code in repo; Android tethering toggle requires privileged/reflection access (see Rejected note in RESEARCH.md).
+  Touches: X3 ShizukuShellRunner allowlist (hotspot enable/disable), ActionMetadata.kt + ActionCapabilities.kt (setup-required/elevated gate), honest-failure path when Shizuku absent, docs, tests.
+  Acceptance: with Shizuku active and opted-in, the action toggles the hotspot and logs success; without elevation it records an explicit honest failure (never a silent no-op); capability gating reflects Shizuku state. Depends on X3.
+  Complexity: M (depends on X3)
+
+## Research-Driven Additions (2026-06-14 delegated OpenTasker pass)
+
+Fresh delegated pass over current v0.2.62 source, live Google platform docs, competitor updates, and prior same-day research. Existing platform/audio/a11y/search/WorkManager/diagnostic/Tasker-export items were not duplicated.
+
+### P2 — profile-aware app automation
+
+- [ ] P2 — Work-profile and Private Space app/package automation audit
+  Why: app-open contexts, package lifecycle events, and app-launch actions are package-name/current-profile only; Android work profiles and Private Space use separate or hidden profiles, so OpenTasker can silently miss work/private apps or launch the wrong profile copy without telling the user.
+  Evidence: AppUsageMonitor.kt uses current-profile UsageStatsManager events; ApplicationContextEvents.kt carries only package name; PackageContextEvents.kt listens to current-profile package broadcasts; LaunchAppAction uses PackageManager.getLaunchIntentForPackage; Android work-profile docs warn intents/storage/profile boundaries can break normal assumptions; Android 15 Private Space docs require special launcher handling for hidden profiles; ActivityWatch issue #135 shows this exact usage-stats limitation in an adjacent app.
+  Touches: automation/app/AppUsageMonitor.kt, core/contexts/ApplicationContextEvents.kt, core/contexts/PackageContextEvents.kt, core/actions/AppActions.kt, ContextSpec/Profile config, Context Inspector, Setup copy, import/export schema if profile scope is persisted.
+  Acceptance: OpenTasker either supports explicit personal/work/private profile targeting through LauncherApps/UserHandle where permitted, or clearly marks app/package automations as profile-local; Inspector shows when selected packages are unavailable because of work/private profile boundaries; launching a work-profile app succeeds only through an explicit profile-aware path or fails honestly; tests cover package-name collision across profiles at the model layer.
+  Complexity: M/L
+
+## Research-Driven Additions
+
+Continuation pass on 2026-06-14: local source audit plus current Android, GitHub Actions, and Gradle documentation. Existing same-day target-SDK, Android 17 audio, work/private profile, accessibility, action-test, WorkManager, diagnostics, Tasker XML export, cleartext, search, BYO-key AI, and release-governance items were treated as already covered.
+
+### P2 - Evidence Quality and Observability
+
+- [ ] P2 -- Add CI and dependency supply-chain verification
+  Why: GitHub Actions workflows currently consume mutable tag-pinned actions and the build workflow has no explicit least-privilege permissions; Gradle dependencies are resolved without committed dependency-verification metadata. A compromised action or artifact could affect release evidence and APK builds.
+  Evidence: `.github/workflows/build.yml` uses `actions/checkout@v4`, `actions/setup-java@v4`, `gradle/actions/setup-gradle@v4`, and `actions/upload-artifact@v4` with no top-level `permissions`; `.github/workflows/release.yml` also uses tag-pinned actions; `gradle/verification-metadata.xml` and `.github/dependabot.yml` are absent; GitHub recommends full-length SHA pins and least-privilege `GITHUB_TOKEN`; Android/Gradle docs describe dependency verification through `gradle/verification-metadata.xml`.
+  Touches: `.github/workflows/build.yml`, `.github/workflows/release.yml`, `.github/dependabot.yml` or `renovate.json`, `gradle/verification-metadata.xml`, `gradle/verification-keyring.keys`, release checklist docs.
+  Acceptance: build workflow declares read-only permissions; release workflow scopes write access to the release job only; external actions are pinned to full commit SHAs or documented exceptions; Gradle dependency verification runs in CI; dependency/action update automation keeps pins maintainable; dependency-verification updates require review.
+  Complexity: M

@@ -475,7 +475,7 @@ private fun InspectorMetric(value: String, label: String, modifier: Modifier = M
 private fun InspectorStatusPill(label: String, color: Color) {
     Surface(
         color = color.copy(alpha = 0.14f),
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, color.copy(alpha = 0.32f)),
     ) {
         Text(
