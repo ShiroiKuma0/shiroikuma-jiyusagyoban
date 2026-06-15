@@ -112,6 +112,7 @@ class AutomationService : Service() {
         shakeDetector.stop()
         runCatching { unregisterReceiver(PackageContextEvents.receiver) }
         runCatching { unregisterReceiver(BluetoothContextEvents.receiver) }
+        CameraMicContextEvents.stop(this)
         job.cancel()
         super.onDestroy()
     }
@@ -214,7 +215,13 @@ class AutomationService : Service() {
                 }
                 if (profileTaskJobs[profile.id]?.isActive == true) {
                     synchronized(queuedProfileTasks) {
-                        queuedProfileTasks.getOrPut(profile.id) { ArrayDeque() }.add(task)
+                        val queue = queuedProfileTasks.getOrPut(profile.id) { ArrayDeque() }
+                        if (queue.size >= MAX_QUEUED_TASKS) {
+                            android.util.Log.w("OpenTasker", "Profile ${profile.id} queue full ($MAX_QUEUED_TASKS), dropping retrigger")
+                            logProfileSkippedRun(profile, task, "Task queue is full ($MAX_QUEUED_TASKS pending).")
+                            return
+                        }
+                        queue.add(task)
                     }
                     android.util.Log.i("OpenTasker", "Profile ${profile.id} queued retrigger")
                     return
@@ -409,6 +416,7 @@ class AutomationService : Service() {
         const val ACTION_BOOT_COMPLETED_TRIGGER = "com.opentasker.action.BOOT_COMPLETED_TRIGGER"
         private const val CHANNEL = "opentasker.engine"
         private const val NOTIF_ID = 1001
+        private const val MAX_QUEUED_TASKS = 50
         private val RUN_LOG_PRUNE_INTERVAL_MS = TimeUnit.HOURS.toMillis(1)
     }
 }

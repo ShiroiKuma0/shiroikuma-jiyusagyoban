@@ -310,7 +310,7 @@ class VariableExpander {
  * Arrays are accessed as %list(#) for count, %list(1) for index, %list() for join.
  */
 class ArrayStore {
-    private val arrays = mutableMapOf<String, List<String>>()
+    private val arrays = java.util.concurrent.ConcurrentHashMap<String, List<String>>()
 
     fun put(name: String, values: List<String>) {
         arrays[name] = values
@@ -337,5 +337,5 @@ class ArrayStore {
     }
 
     fun snapshot(): Map<String, List<String>> =
-        arrays.mapValues { (_, values) -> values.toList() }
+        HashMap(arrays).mapValues { (_, values) -> values.toList() }
 }

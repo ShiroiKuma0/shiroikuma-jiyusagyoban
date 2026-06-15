@@ -11,8 +11,8 @@ object CameraMicContextEvents {
     private val events = MutableSharedFlow<ContextEvent>(extraBufferCapacity = 16)
     val flow: SharedFlow<ContextEvent> = events.asSharedFlow()
 
-    private var cameraCallback: AppOpsManager.OnOpActiveChangedListener? = null
-    private var micCallback: AppOpsManager.OnOpActiveChangedListener? = null
+    @Volatile private var cameraCallback: AppOpsManager.OnOpActiveChangedListener? = null
+    @Volatile private var micCallback: AppOpsManager.OnOpActiveChangedListener? = null
 
     fun start(context: Context) {
         if (Build.VERSION.SDK_INT < 29) return

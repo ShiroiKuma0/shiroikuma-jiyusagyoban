@@ -159,10 +159,21 @@ internal fun seedInitialState(app: Context): Map<String, String> {
 
     val am = app.getSystemService(AudioManager::class.java)
     if (am != null) {
+        @Suppress("DEPRECATION")
         seed["headphones"] = am.isWiredHeadsetOn.toString()
     }
 
     seed["airplane"] = isAirplaneModeOn(app).toString()
+
+    val batteryIntent = app.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+    if (batteryIntent != null) {
+        val level = batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val isCharging = batteryIntent.getIntExtra(BatteryManager.EXTRA_STATUS, -1).let {
+            it == BatteryManager.BATTERY_STATUS_CHARGING || it == BatteryManager.BATTERY_STATUS_FULL
+        }
+        if (level >= 0) seed["battery_level"] = level.toString()
+        seed["charging"] = isCharging.toString()
+    }
 
     return seed
 }

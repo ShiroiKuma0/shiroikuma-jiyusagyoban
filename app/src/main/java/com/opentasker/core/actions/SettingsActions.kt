@@ -100,11 +100,14 @@ class BrightnessAction : Action {
             return ActionResult.Failure("Write system settings permission is not granted")
         }
         return try {
-            val value = when (brightness.lowercase()) {
-                "auto" -> -1
-                else -> brightness.toInt().coerceIn(0, 255)
+            val resolver = ctx.app.contentResolver
+            if (brightness.lowercase() == "auto") {
+                Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC)
+            } else {
+                val value = brightness.toInt().coerceIn(0, 255)
+                Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
+                Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS, value)
             }
-            Settings.System.putInt(ctx.app.contentResolver, Settings.System.SCREEN_BRIGHTNESS, value)
             ctx.logger("Brightness: $brightness")
             ActionResult.Success
         } catch (e: Exception) {
@@ -318,7 +321,7 @@ class ScreenTimeoutAction : Action {
     override val category = ActionCategory.SETTINGS
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val ms = args["millis"]?.toLongOrNull() ?: 30000L
+        val ms = (args["millis"]?.toLongOrNull() ?: 30000L).coerceIn(0L, MAX_SCREEN_TIMEOUT_MS)
         if (!Settings.System.canWrite(ctx.app)) {
             return ActionResult.Failure("Write system settings permission is not granted")
         }
@@ -329,5 +332,9 @@ class ScreenTimeoutAction : Action {
         } catch (e: Exception) {
             ActionResult.Failure("failed: ${e.message}")
         }
+    }
+
+    companion object {
+        private const val MAX_SCREEN_TIMEOUT_MS = 1_800_000L // 30 minutes
     }
 }

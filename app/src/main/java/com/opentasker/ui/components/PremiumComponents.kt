@@ -2,6 +2,7 @@ package com.opentasker.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -336,6 +337,6 @@ fun ErrorState(
  * Visual feedback for disabled UI elements.
  */
 fun Modifier.disabledAlpha(disabled: Boolean): Modifier =
-    if (disabled) this.then(Modifier.background(Color.Black.copy(alpha = DesignSystem.Opacity.disabled))) else this
+    if (disabled) this.then(Modifier.alpha(DesignSystem.Opacity.disabled)) else this
 
 
