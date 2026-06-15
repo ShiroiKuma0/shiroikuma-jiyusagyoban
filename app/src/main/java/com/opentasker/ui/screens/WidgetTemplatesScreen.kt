@@ -1,5 +1,8 @@
 package com.opentasker.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -43,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -80,9 +84,26 @@ fun WidgetTemplatesScreen(
     // The template currently open in the full-screen editor (null = none).
     var editing by remember { mutableStateOf<WidgetTemplate?>(null) }
     var showNameDialog by remember { mutableStateOf(false) }
-    var showImportDialog by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
     val selectionActive = selectedNames.isNotEmpty()
+
+    // File-based import/export (a {name: layoutJson} JSON file) — the same shape Export writes.
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val text = runCatching {
+            context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+        }.getOrNull()
+        if (text == null) { onMessage("Couldn’t read that file"); return@rememberLauncherForActivityResult }
+        val n = onImport(text)
+        onMessage(if (n >= 0) "Imported $n template(s)" else "Couldn’t parse that templates file")
+    }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        runCatching { context.contentResolver.openOutputStream(uri)?.use { it.write(onExportAll().toByteArray()) } }
+            .onSuccess { onMessage("Exported ${templates.size} template(s)") }
+            .onFailure { onMessage("Export failed: ${it.message}") }
+    }
 
     Column(Modifier.fillMaxSize().padding(contentPadding)) {
         if (selectionActive) {
@@ -103,13 +124,10 @@ fun WidgetTemplatesScreen(
                 Icon(Icons.Filled.Add, contentDescription = null)
                 Text("  New")
             }
-            OutlinedButton(onClick = { showImportDialog = true }) { Text("Import") }
+            OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/json", "text/*", "*/*")) }) { Text("Import") }
             OutlinedButton(
                 enabled = templates.isNotEmpty(),
-                onClick = {
-                    clipboard.setText(AnnotatedString(onExportAll()))
-                    onMessage("Copied ${templates.size} templates to clipboard")
-                },
+                onClick = { exportLauncher.launch("widget-templates.json") },
             ) { Text("Export") }
         }
 
@@ -135,17 +153,6 @@ fun WidgetTemplatesScreen(
                 )
             }
         }
-    }
-
-    if (showImportDialog) {
-        ImportTemplatesDialog(
-            onImport = { raw ->
-                val n = onImport(raw)
-                showImportDialog = false
-                onMessage(if (n >= 0) "Imported $n template(s)" else "Couldn’t parse that templates JSON")
-            },
-            onDismiss = { showImportDialog = false },
-        )
     }
 
     if (showNameDialog) {
@@ -264,30 +271,3 @@ private fun NameDialog(existing: List<String>, onConfirm: (String) -> Unit, onDi
     )
 }
 
-@Composable
-private fun ImportTemplatesDialog(onImport: (String) -> Unit, onDismiss: () -> Unit) {
-    var raw by remember { mutableStateOf("") }
-    AlertDialog(
-        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
-        onDismissRequest = onDismiss,
-        title = { Text("Import templates") },
-        text = {
-            Column {
-                Text(
-                    "Paste a templates JSON object — a {\"name\": \"<layout json>\", …} map, as produced by Export. Same-name templates are replaced.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                OutlinedTextField(
-                    value = raw,
-                    onValueChange = { raw = it },
-                    label = { Text("Templates JSON") },
-                    minLines = 6,
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                )
-            }
-        },
-        confirmButton = { TextButton(enabled = raw.isNotBlank(), onClick = { onImport(raw) }) { Text("Import") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
-}
