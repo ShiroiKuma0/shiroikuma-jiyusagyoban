@@ -19,6 +19,14 @@ class LocationProviderRequestPolicyTest {
         assertEquals("network:90000ms/150m", network.toMetadata(LocationManager.NETWORK_PROVIDER))
     }
 
+    @Test
+    fun balancedPolicyIncludesPassiveProvider() {
+        val policy = LocationProviderRequestPolicy.balanced()
+        val passive = policy.cadenceFor(LocationManager.PASSIVE_PROVIDER)
+        assertTrue(passive.minTimeMs > 0)
+        assertEquals(0f, passive.minDistanceMeters)
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun cadenceRejectsNonPositiveTime() {
         LocationProviderCadence(minTimeMs = 0L, minDistanceMeters = 100f)
