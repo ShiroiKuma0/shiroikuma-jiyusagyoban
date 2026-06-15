@@ -84,6 +84,9 @@ object ContextMatchEvaluator {
     private fun matchesEvent(spec: ContextSpec, event: ContextEvent): Boolean {
         val actualEvent = event.metadata["event"].orEmpty()
         val expectedEvent = spec.config["event"]?.trim().orEmpty()
+        if (expectedEvent.isMinuteTick()) {
+            return matchesMinuteTick(spec, event)
+        }
         if (expectedEvent.isSunEvent()) {
             return matchesSunEvent(spec, event, expectedEvent)
         }
@@ -154,6 +157,19 @@ object ContextMatchEvaluator {
         return event.metadata.values.any { textMatches(it, filter, regex) }
     }
 
+    /**
+     * A periodic clock tick. Rides the internal per-minute `sun_tick` pulse, so it fires once every
+     * minute (the natural cadence for a clock widget); an optional `everyMinutes`/`interval` config
+     * fires only every N minutes, aligned to the top of the hour.
+     */
+    private fun matchesMinuteTick(spec: ContextSpec, event: ContextEvent): Boolean {
+        if (!event.metadata["event"].orEmpty().equals("sun_tick", ignoreCase = true)) return false
+        val every = firstConfig(spec, "everyMinutes", "interval", "minutes").toIntOrNull()?.coerceAtLeast(1) ?: 1
+        if (every <= 1) return true
+        val minute = event.metadata["time"]?.let(::parseClockMinutes) ?: currentMinuteOfDay()
+        return minute % every == 0
+    }
+
     private fun matchesSunEvent(spec: ContextSpec, event: ContextEvent, expectedEvent: String): Boolean {
         if (!event.metadata["event"].orEmpty().equals("sun_tick", ignoreCase = true)) return false
         val latitude = firstConfig(spec, "latitude", "lat").toDoubleOrNull() ?: return false
@@ -212,3 +228,7 @@ object ContextMatchEvaluator {
 
 private fun String.isSunEvent(): Boolean =
     equals("sunrise", ignoreCase = true) || equals("sunset", ignoreCase = true)
+
+private fun String.isMinuteTick(): Boolean =
+    equals("minute", ignoreCase = true) || equals("clock", ignoreCase = true) ||
+        equals("clock_tick", ignoreCase = true) || equals("tick", ignoreCase = true)
