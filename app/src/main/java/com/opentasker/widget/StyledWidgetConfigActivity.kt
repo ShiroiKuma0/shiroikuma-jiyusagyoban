@@ -55,6 +55,15 @@ class StyledWidgetConfigActivity : ComponentActivity() {
                     var name by remember { mutableStateOf(StyledWidgetStore.getName(this@StyledWidgetConfigActivity, widgetId)) }
                     var tapTask by remember { mutableStateOf("") }
                     var layout by remember { mutableStateOf(DEFAULT_LAYOUT) }
+                    var editing by remember { mutableStateOf(false) }
+                    if (editing) {
+                        WidgetEditor(
+                            initialJson = layout,
+                            onDone = { layout = it; editing = false },
+                            onCancel = { editing = false },
+                        )
+                        return@Surface
+                    }
                     Column(
                         Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -72,10 +81,13 @@ class StyledWidgetConfigActivity : ComponentActivity() {
                             supportingText = { Text("Exact task name to run when the widget is tapped.") },
                             singleLine = true, modifier = Modifier.fillMaxWidth(),
                         )
+                        OutlinedButton(onClick = { editing = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Edit layout visually")
+                        }
                         OutlinedTextField(
                             value = layout, onValueChange = { layout = it },
-                            label = { Text("Layout (JSON)") },
-                            minLines = 6, modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Layout (JSON, advanced)") },
+                            minLines = 4, modifier = Modifier.fillMaxWidth(),
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(onClick = { save(name, tapTask, layout) }, modifier = Modifier.fillMaxWidth(0.6f)) {
