@@ -10,6 +10,8 @@ import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import java.io.File
 import java.io.InputStream
+import java.net.DatagramPacket
+import java.net.DatagramSocket
 import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.URL
@@ -186,6 +188,60 @@ class DownloadAction : Action {
             }
         } catch (e: Exception) {
             ActionResult.Failure("download failed: ${e.message}")
+        }
+    }
+}
+
+/**
+ * Wake-on-LAN magic packet.
+ *
+ * Args:
+ *   - "mac": target MAC address (e.g. "AA:BB:CC:DD:EE:FF")
+ *   - "broadcast": broadcast IP (default: "255.255.255.255")
+ *   - "port": UDP port (default: 9)
+ */
+class WakeOnLanAction : Action {
+    override val id = "wol"
+    override val category = ActionCategory.NET
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val macStr = args["mac"] ?: return ActionResult.Failure("missing mac")
+        val broadcast = args["broadcast"] ?: "255.255.255.255"
+        val port = (args["port"]?.toIntOrNull() ?: 9).coerceIn(1, 65535)
+
+        val macBytes = parseMac(macStr)
+            ?: return ActionResult.Failure("invalid MAC address: $macStr")
+
+        val packet = buildMagicPacket(macBytes)
+
+        return try {
+            val addr = InetAddress.getByName(broadcast)
+            DatagramSocket().use { socket ->
+                socket.broadcast = true
+                socket.send(DatagramPacket(packet, packet.size, addr, port))
+            }
+            ctx.logger("WoL sent to $macStr via $broadcast:$port")
+            ActionResult.Success
+        } catch (e: Exception) {
+            ActionResult.Failure("WoL failed: ${e.message}")
+        }
+    }
+
+    companion object {
+        private val MAC_PATTERN = Regex("^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$")
+
+        internal fun parseMac(mac: String): ByteArray? {
+            if (!MAC_PATTERN.matches(mac)) return null
+            return mac.split(':', '-').map { it.toInt(16).toByte() }.toByteArray()
+        }
+
+        internal fun buildMagicPacket(mac: ByteArray): ByteArray {
+            val packet = ByteArray(6 + 16 * 6)
+            for (i in 0..5) packet[i] = 0xFF.toByte()
+            for (i in 0..15) {
+                System.arraycopy(mac, 0, packet, 6 + i * 6, 6)
+            }
+            return packet
         }
     }
 }

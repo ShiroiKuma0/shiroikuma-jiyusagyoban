@@ -179,6 +179,12 @@ class SayAction : Action {
     override val category = ActionCategory.NOTIFICATION
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        if (android.os.Build.VERSION.SDK_INT >= ANDROID_17_API) {
+            return ActionResult.Failure(
+                "Android 17+ restricts background audio output; " +
+                    "TTS may produce no speech from a background service without a media foreground-service type"
+            )
+        }
         val text = args["text"]?.takeIf { it.isNotBlank() }
             ?: return ActionResult.Failure("missing text argument")
         if (text.length > MAX_TTS_CHARS) {
@@ -252,6 +258,8 @@ class WaitAction : Action {
  *   - "action": intent action (optional, defaults to MAIN)
  *   - "category": intent category (optional)
  */
+private const val ANDROID_17_API = 37
+
 class LaunchIntentAction : Action {
     override val id = "intent.launch"
     override val category = ActionCategory.APP

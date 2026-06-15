@@ -7,6 +7,9 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.floor
 import kotlin.math.roundToLong
 
@@ -62,7 +65,7 @@ enum class TemplateValueSource {
  * - `{{ payload.user.name }}` reads a dot path from a JSON object variable.
  * - `{{ items[0] }}` and `{{ items[#] }}` read arrays supplied by the caller.
  * - Pipe functions include `default`, `upper`, `lower`, `trim`, `add`, `sub`,
- *   `mul`, `div`, `round`, `floor`, `count`, and `join`.
+ *   `mul`, `div`, `round`, `floor`, `count`, `join`, and `date`.
  */
 class TemplateExpressionEngine(
     private val limits: TemplateExpressionLimits = TemplateExpressionLimits(),
@@ -421,6 +424,27 @@ class TemplateExpressionEngine(
                     FunctionApplication(current.copy(value = joined, missing = false))
                 }
             }
+            "date" -> {
+                val pattern = arg ?: "yyyy-MM-dd HH:mm:ss"
+                if (pattern.length > MAX_DATE_PATTERN_LENGTH) {
+                    FunctionApplication(current, warnings = listOf("date pattern exceeds $MAX_DATE_PATTERN_LENGTH characters."))
+                } else {
+                    try {
+                        val millis = if (current.missing || value.isEmpty()) {
+                            System.currentTimeMillis()
+                        } else {
+                            value.toLongOrNull() ?: return FunctionApplication(
+                                current,
+                                warnings = listOf("date requires a numeric epoch-millis value or empty input for current time."),
+                            )
+                        }
+                        val formatted = SimpleDateFormat(pattern, Locale.ROOT).format(Date(millis))
+                        FunctionApplication(current.copy(value = formatted, missing = false))
+                    } catch (_: IllegalArgumentException) {
+                        FunctionApplication(current, warnings = listOf("Invalid date pattern: $pattern"))
+                    }
+                }
+            }
             "match", "matches", "regex", "replace" -> FunctionApplication(
                 current,
                 preserveReason = "Regex template function '$name' is intentionally unsupported.",
@@ -641,6 +665,8 @@ class TemplateExpressionEngine(
         val warnings: List<String> = emptyList(),
         val preserveReason: String? = null,
     )
+
+    private val MAX_DATE_PATTERN_LENGTH = 64
 
     private data class TemplateFunction(
         val name: String,

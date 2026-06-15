@@ -46,6 +46,7 @@ import com.opentasker.core.actions.VibrateAction
 import com.opentasker.core.actions.VolumeAction
 import com.opentasker.core.actions.WaitAction
 import com.opentasker.core.actions.WakeAction
+import com.opentasker.core.actions.WakeOnLanAction
 import com.opentasker.core.actions.WiFiToggleAction
 import com.opentasker.core.actions.WriteFileAction
 import com.opentasker.core.contexts.ApplicationContextSourceImpl
@@ -97,6 +98,7 @@ private fun registerBuiltInActions() {
         HttpPostAction(),
         PingAction(),
         DownloadAction(),
+        WakeOnLanAction(),
         PlaySoundAction(),
         StopSoundAction(),
         PauseSoundAction(),
