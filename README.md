@@ -27,7 +27,7 @@
 ## Highlights
 
 ✅ **Core engine operational** — profiles → contexts → tasks → actions pipeline  
-✅ **48 registered action definitions** — supported actions run, restricted/script/import-placeholder actions are gated or fail explicitly
+✅ **49 registered action definitions** — supported actions run, restricted/script/import-placeholder actions are gated or fail explicitly
 ✅ **Reusable sub-tasks** — the `task.run` action calls another task by id/name (shared variables, depth-bounded to 8 levels)
 ✅ **Flow control** — `if`/`else`/`end if` branching, `for each`/`end for` loops over array variables, and `stop`, interpreted with balanced-block validation
 ✅ **Reactive context sources** — app foreground, time, day schedules, state, WiFi, data/internet connectivity, notifications, NFC tag scans/write helper, calendar windows, sunrise/sunset matching, shake, Bluetooth connect/disconnect, package lifecycle, Quick Settings tile, home-screen widget/shortcut, boot, and platform location fixes are wired; broader device-verified background location event-delivery remains planned runtime work
