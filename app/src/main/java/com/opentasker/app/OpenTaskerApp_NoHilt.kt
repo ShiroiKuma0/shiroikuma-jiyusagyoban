@@ -9,6 +9,7 @@ import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.DatabaseMigrations
 import com.opentasker.core.storage.PendingRestoreApplyResult
+import com.opentasker.core.diagnostics.CrashLogHandler
 import com.opentasker.core.engine.RunLogPruneWorker
 
 // Application singleton keeps startup deterministic while Hilt is not active.
@@ -27,6 +28,7 @@ class OpenTaskerApp_NoHilt : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        CrashLogHandler.install(this)
         registerActionMetadata()
         registerCoreRuntime()
          
