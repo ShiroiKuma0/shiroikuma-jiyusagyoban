@@ -43,6 +43,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -75,6 +77,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.stateDescription
@@ -181,6 +184,26 @@ private enum class OpenTaskerScreen(val label: String) {
     Inspector("Inspect"),
     Setup("Setup"),
     RunLog("Log"),
+}
+
+private val primaryNavigationScreens = listOf(
+    OpenTaskerScreen.Profiles,
+    OpenTaskerScreen.Tasks,
+    OpenTaskerScreen.Vars,
+    OpenTaskerScreen.Setup,
+)
+
+private val secondaryNavigationScreens = OpenTaskerScreen.entries.filterNot { it in primaryNavigationScreens }
+
+private fun OpenTaskerScreen.icon(): ImageVector = when (this) {
+    OpenTaskerScreen.Profiles -> Icons.Filled.CheckCircle
+    OpenTaskerScreen.Tasks -> Icons.Filled.Edit
+    OpenTaskerScreen.Vars -> Icons.Filled.Menu
+    OpenTaskerScreen.Flow -> Icons.Filled.Info
+    OpenTaskerScreen.Scenes -> Icons.Filled.Edit
+    OpenTaskerScreen.Inspector -> Icons.Filled.Info
+    OpenTaskerScreen.Setup -> Icons.Filled.Settings
+    OpenTaskerScreen.RunLog -> Icons.Filled.Info
 }
 
 private data class ActionEditState(
@@ -784,6 +807,7 @@ fun ActiveAutomationUi(
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
 
+    var showMoreDestinations by rememberSaveable { mutableStateOf(false) }
     val headerDetail = when (screen) {
         OpenTaskerScreen.Profiles -> "${profiles.count { it.enabled }} enabled - ${profiles.size} total"
         OpenTaskerScreen.Tasks -> "${tasks.sumOf { it.actions.size }} actions - ${tasks.size} tasks"
@@ -847,26 +871,46 @@ fun ActiveAutomationUi(
         },
         bottomBar = {
             NavigationBar {
-                OpenTaskerScreen.entries.forEach { destination ->
+                val navigationBarScope = this
+                primaryNavigationScreens.forEach { destination ->
                     NavigationBarItem(
                         selected = screen == destination,
-                        onClick = { screenOrdinal = destination.ordinal },
-                        icon = {
-                            val icon = when (destination) {
-                                OpenTaskerScreen.Profiles -> Icons.Filled.CheckCircle
-                                OpenTaskerScreen.Tasks -> Icons.Filled.Edit
-                                OpenTaskerScreen.Vars -> Icons.Filled.Menu
-                                OpenTaskerScreen.Flow -> Icons.Filled.Info
-                                OpenTaskerScreen.Scenes -> Icons.Filled.Edit
-                                OpenTaskerScreen.Inspector -> Icons.Filled.Info
-                                OpenTaskerScreen.Setup -> Icons.Filled.Settings
-                                OpenTaskerScreen.RunLog -> Icons.Filled.Info
-                            }
-                            Icon(icon, contentDescription = destination.label)
+                        onClick = {
+                            screenOrdinal = destination.ordinal
+                            showMoreDestinations = false
                         },
+                        icon = { Icon(destination.icon(), contentDescription = destination.label) },
                         label = { Text(destination.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        alwaysShowLabel = false,
+                        alwaysShowLabel = true,
                     )
+                }
+                Box(Modifier.weight(1f)) {
+                    with(navigationBarScope) {
+                        NavigationBarItem(
+                            selected = screen in secondaryNavigationScreens,
+                            onClick = { showMoreDestinations = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            icon = { Icon(Icons.Filled.Menu, contentDescription = "More screens") },
+                            label = { Text("More", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            alwaysShowLabel = true,
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = showMoreDestinations,
+                        onDismissRequest = { showMoreDestinations = false },
+                        modifier = Modifier.align(Alignment.TopEnd),
+                    ) {
+                        secondaryNavigationScreens.forEach { destination ->
+                            DropdownMenuItem(
+                                text = { Text(destination.label) },
+                                leadingIcon = { Icon(destination.icon(), contentDescription = null) },
+                                onClick = {
+                                    screenOrdinal = destination.ordinal
+                                    showMoreDestinations = false
+                                },
+                            )
+                        }
+                    }
                 }
             }
         },
@@ -2403,8 +2447,15 @@ private fun EmptyState(
         )
         if (actionLabel != null && onAction != null) {
             Spacer(Modifier.height(24.dp))
-            Button(onClick = onAction, enabled = actionEnabled, modifier = Modifier.fillMaxWidth()) {
-                Text(actionLabel)
+            Button(
+                onClick = onAction,
+                enabled = actionEnabled,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp),
+                shape = RoundedCornerShape(12.dp),
+            ) {
+                Text(actionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
             }
         }
         if (secondaryActionLabel != null && onSecondaryAction != null) {
@@ -2412,9 +2463,12 @@ private fun EmptyState(
             OutlinedButton(
                 onClick = onSecondaryAction,
                 enabled = secondaryActionEnabled,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp),
+                shape = RoundedCornerShape(12.dp),
             ) {
-                Text(secondaryActionLabel)
+                Text(secondaryActionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
             }
         }
         if (tertiaryActionLabel != null && onTertiaryAction != null) {
@@ -2422,9 +2476,11 @@ private fun EmptyState(
             TextButton(
                 onClick = onTertiaryAction,
                 enabled = tertiaryActionEnabled,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp),
             ) {
-                Text(tertiaryActionLabel)
+                Text(tertiaryActionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
             }
         }
         if (quaternaryActionLabel != null && onQuaternaryAction != null) {
@@ -2432,9 +2488,11 @@ private fun EmptyState(
             TextButton(
                 onClick = onQuaternaryAction,
                 enabled = quaternaryActionEnabled,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp),
             ) {
-                Text(quaternaryActionLabel)
+                Text(quaternaryActionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
             }
         }
     }
