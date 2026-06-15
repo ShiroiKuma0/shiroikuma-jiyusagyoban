@@ -2,8 +2,6 @@
 -keepclassmembers class **$$serializer { *; }
 -keepclasseswithmembers class * { @kotlinx.serialization.Serializable <fields>; }
 
-# Keep Application class and Hilt-generated classes
--keep class com.opentasker.app.OpenTaskerApp
--keep class com.opentasker.app.Hilt_OpenTaskerApp
+# Keep manifest-declared entry points
+-keep class com.opentasker.app.OpenTaskerApp_NoHilt
 -keep class com.opentasker.app.MainActivity
--keep class * implements dagger.hilt.android.HiltAndroidApp
