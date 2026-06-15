@@ -1008,6 +1008,8 @@ fun ActiveAutomationUi(
     var confirmDeleteSelectedScenes by remember { mutableStateOf(false) }
     var selectedTemplateNames by remember { mutableStateOf<Set<String>>(emptySet()) }
     var confirmDeleteSelectedTemplates by remember { mutableStateOf(false) }
+    var selectedVarKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var confirmDeleteSelectedVars by remember { mutableStateOf(false) }
     val taskerImportReview = viewModel.taskerImportReview
     val taskerImportBusy = viewModel.taskerImportBusy
     val openTaskerBundleReview = viewModel.openTaskerBundleReview
@@ -1102,6 +1104,7 @@ fun ActiveAutomationUi(
         selectedProfileIds = emptySet()
         selectedSceneIds = emptySet()
         selectedTemplateNames = emptySet()
+        selectedVarKeys = emptySet()
     }
 
     val headerDetail = when (screen) {
@@ -1449,6 +1452,12 @@ fun ActiveAutomationUi(
                 onUpdate = viewModel::updateVariable,
                 onDelete = viewModel::deleteVariable,
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
+                selectedKeys = selectedVarKeys,
+                onLongPressVar = { selectedVarKeys = selectedVarKeys + variableKey(it) },
+                onToggleSelectVar = { val k = variableKey(it); selectedVarKeys = if (k in selectedVarKeys) selectedVarKeys - k else selectedVarKeys + k },
+                onSelectAllVars = { selectedVarKeys = globalVariables.map { variableKey(it) }.toSet() },
+                onClearVarSelection = { selectedVarKeys = emptySet() },
+                onDeleteSelectedVars = { confirmDeleteSelectedVars = true },
             )
 
             OpenTaskerScreen.Scenes -> SceneLibraryScreen(
@@ -1586,6 +1595,17 @@ fun ActiveAutomationUi(
                 selectedTemplateNames = emptySet(); confirmDeleteSelectedTemplates = false
             },
             onDismiss = { confirmDeleteSelectedTemplates = false },
+        )
+    }
+
+    if (confirmDeleteSelectedVars) {
+        ConfirmDeleteSelected(
+            count = selectedVarKeys.size, noun = "variable",
+            onConfirm = {
+                globalVariables.filter { variableKey(it) in selectedVarKeys }.forEach { viewModel.deleteVariable(it.projectId, it.name) }
+                selectedVarKeys = emptySet(); confirmDeleteSelectedVars = false
+            },
+            onDismiss = { confirmDeleteSelectedVars = false },
         )
     }
 

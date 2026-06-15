@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -31,11 +33,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.model.Variable
+import com.opentasker.ui.components.SelectionBar
+import com.opentasker.ui.components.selectableItem
 
 private val SENSITIVE_NAMES = setOf("password", "token", "secret", "key", "credential", "auth")
 
 private fun isSensitive(name: String): Boolean =
     SENSITIVE_NAMES.any { name.lowercase().contains(it) }
+
+/** Stable selection key for a variable (name alone isn't unique across scopes). */
+fun variableKey(v: Variable): String = "${v.projectId}:${v.name}"
 
 @Composable
 fun VariablesScreen(
@@ -44,9 +51,16 @@ fun VariablesScreen(
     onUpdate: (projectId: Long, name: String, value: String) -> Unit,
     onDelete: (projectId: Long, name: String) -> Unit,
     onMessage: (String) -> Unit,
+    selectedKeys: Set<String>,
+    onLongPressVar: (Variable) -> Unit,
+    onToggleSelectVar: (Variable) -> Unit,
+    onSelectAllVars: () -> Unit,
+    onClearVarSelection: () -> Unit,
+    onDeleteSelectedVars: () -> Unit,
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var editTarget by remember { mutableStateOf<Variable?>(null) }
+    val selectionActive = selectedKeys.isNotEmpty()
 
     val filtered = remember(variables, searchQuery) {
         if (searchQuery.isBlank()) variables
@@ -57,6 +71,15 @@ fun VariablesScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
+        if (selectionActive) {
+            SelectionBar(
+                count = selectedKeys.size,
+                total = variables.size,
+                onSelectAll = onSelectAllVars,
+                onClear = onClearVarSelection,
+                onDelete = onDeleteSelectedVars,
+            )
+        }
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
@@ -74,9 +97,13 @@ fun VariablesScreen(
         }
 
         LazyColumn(modifier = Modifier.fillMaxSize()) {
-            items(filtered, key = { "${it.projectId}:${it.name}" }) { variable ->
+            items(filtered, key = { variableKey(it) }) { variable ->
                 VariableRow(
                     variable = variable,
+                    selectionActive = selectionActive,
+                    selected = variableKey(variable) in selectedKeys,
+                    onLongPress = { onLongPressVar(variable) },
+                    onToggleSelect = { onToggleSelectVar(variable) },
                     onEdit = { editTarget = variable },
                     onDelete = { onDelete(variable.projectId, variable.name) },
                 )
@@ -100,18 +127,30 @@ fun VariablesScreen(
 @Composable
 private fun VariableRow(
     variable: Variable,
+    selectionActive: Boolean,
+    selected: Boolean,
+    onLongPress: () -> Unit,
+    onToggleSelect: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Card(
-        onClick = onEdit,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).selectableItem(
+            selectionActive = selectionActive,
+            onLongPress = onLongPress,
+            onToggleSelect = onToggleSelect,
+            onTapNormal = onEdit,
+        ),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (selectionActive) {
+                Checkbox(checked = selected, onCheckedChange = { onToggleSelect() })
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "%${variable.name}",
