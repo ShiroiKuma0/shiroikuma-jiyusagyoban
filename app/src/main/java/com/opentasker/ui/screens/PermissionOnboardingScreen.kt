@@ -56,8 +56,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.opentasker.app.BuildConfig
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
 import com.opentasker.core.location.LocationPolicyDisclosures
 import com.opentasker.core.permissions.OemBatteryGuidance
+import com.opentasker.ui.theme.ThemeMode
+import com.opentasker.ui.theme.ThemePreference
+import kotlinx.coroutines.launch
 import com.opentasker.core.permissions.UsageAccess
 import com.opentasker.core.power.ShizukuPowerBackend
 import com.opentasker.core.scheduling.ExactAlarmSupport
@@ -175,6 +180,8 @@ fun PermissionOnboardingScreen(
             }
         }
 
+        item { ThemeSetupCard() }
+
         item {
             BackupSetupCard(
                 state = backupState,
@@ -196,6 +203,45 @@ fun PermissionOnboardingScreen(
                     }
                 },
             )
+        }
+    }
+}
+
+@Composable
+private fun ThemeSetupCard() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val currentMode by ThemePreference.observe(context).collectAsState(initial = ThemeMode.System)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Theme", style = MaterialTheme.typography.titleMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                ThemeMode.entries.forEach { mode ->
+                    val label = when (mode) {
+                        ThemeMode.System -> "System"
+                        ThemeMode.Dark -> "Dark"
+                        ThemeMode.Light -> "Light"
+                    }
+                    val selected = mode == currentMode
+                    if (selected) {
+                        Button(
+                            onClick = {},
+                            modifier = Modifier.weight(1f),
+                        ) { Text(label) }
+                    } else {
+                        OutlinedButton(
+                            onClick = { scope.launch { ThemePreference.set(context, mode) } },
+                            modifier = Modifier.weight(1f),
+                        ) { Text(label) }
+                    }
+                }
+            }
         }
     }
 }

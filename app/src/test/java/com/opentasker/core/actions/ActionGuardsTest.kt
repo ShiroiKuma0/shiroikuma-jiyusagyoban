@@ -137,6 +137,51 @@ class ActionGuardsTest {
     }
 
     @Test
+    fun wolParsesValidMac() {
+        val mac = WakeOnLanAction.parseMac("AA:BB:CC:DD:EE:FF")
+        assertTrue("valid MAC should parse", mac != null)
+        assertEquals(6, mac!!.size)
+    }
+
+    @Test
+    fun wolRejectsInvalidMac() {
+        assertTrue("short MAC should be rejected", WakeOnLanAction.parseMac("AA:BB") == null)
+        assertTrue("non-hex should be rejected", WakeOnLanAction.parseMac("GG:HH:II:JJ:KK:LL") == null)
+        assertTrue("empty should be rejected", WakeOnLanAction.parseMac("") == null)
+    }
+
+    @Test
+    fun wolBuildsMagicPacket() {
+        val mac = WakeOnLanAction.parseMac("AA:BB:CC:DD:EE:FF")!!
+        val packet = WakeOnLanAction.buildMagicPacket(mac)
+        assertEquals(102, packet.size)
+        // First 6 bytes are 0xFF
+        for (i in 0..5) assertEquals(0xFF.toByte(), packet[i])
+        // Next 16 repetitions of the MAC
+        for (rep in 0..15) {
+            for (b in 0..5) {
+                assertEquals(mac[b], packet[6 + rep * 6 + b])
+            }
+        }
+    }
+
+    @Test
+    fun wolMissingMacFails() = runBlocking {
+        val action = WakeOnLanAction()
+        val result = action.run(ctx(), emptyMap())
+        assertTrue("missing mac should fail", result is ActionResult.Failure)
+        assertEquals("missing mac", (result as ActionResult.Failure).message)
+    }
+
+    @Test
+    fun wolInvalidMacFails() = runBlocking {
+        val action = WakeOnLanAction()
+        val result = action.run(ctx(), mapOf("mac" to "not-a-mac"))
+        assertTrue("invalid mac should fail", result is ActionResult.Failure)
+        assertTrue((result as ActionResult.Failure).message.contains("invalid MAC"))
+    }
+
+    @Test
     fun httpPolicyBlocksPlaintextWithoutOptIn() = runBlocking {
         val action = HttpGetAction()
         val result = action.run(ctx(), mapOf("url" to "http://192.168.1.1/api"))

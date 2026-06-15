@@ -598,6 +598,20 @@ fun registerActionMetadata() {
         )
     )
 
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "wol",
+            name = "Wake-on-LAN",
+            description = "Send a magic packet to wake a device on the local network",
+            category = "Network",
+            fields = listOf(
+                ActionField("mac", "MAC Address", required = true, hint = "e.g. AA:BB:CC:DD:EE:FF"),
+                ActionField("broadcast", "Broadcast IP", hint = "Default: 255.255.255.255"),
+                ActionField("port", "Port", FieldType.NUMBER, hint = "Default: 9"),
+            )
+        )
+    )
+
     // Media actions
     ActionMetadataRegistry.register(
         ActionMetadata(
