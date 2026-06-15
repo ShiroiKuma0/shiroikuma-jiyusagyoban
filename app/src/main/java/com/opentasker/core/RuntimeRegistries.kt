@@ -90,6 +90,7 @@ import com.opentasker.core.actions.PutSettingAction
 import com.opentasker.core.actions.InputDialogAction
 import com.opentasker.core.actions.ListDialogAction
 import com.opentasker.core.actions.TextDialogAction
+import com.opentasker.core.actions.ShellRunAction
 import com.opentasker.core.contexts.ApplicationContextSourceImpl
 import com.opentasker.core.contexts.ContextSourceRegistry
 import com.opentasker.core.contexts.EventContextSourceImpl
@@ -193,6 +194,7 @@ private fun registerBuiltInActions() {
         InputDialogAction(),
         ListDialogAction(),
         TextDialogAction(),
+        ShellRunAction(),
         TermuxScriptAction(),
         TaskerUnsupportedAction(),
     ).forEach(ActionRegistry::register)
