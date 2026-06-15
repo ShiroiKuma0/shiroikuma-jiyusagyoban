@@ -75,6 +75,12 @@ class HttpPostAction : Action {
             val parsedUrl = URL(url)
             enforceHttpPolicy(parsedUrl, args)?.let { return it }
             if (parsedUrl.protocol == "http") checkLocalNetworkPermission(ctx)?.let { return it }
+            val payload = data.toByteArray(Charsets.UTF_8)
+            if (payload.size > MAX_REQUEST_BODY_BYTES) {
+                return ActionResult.Failure(
+                    "POST body exceeds ${MAX_REQUEST_BODY_BYTES / 1024} KB limit"
+                )
+            }
             val connection = parsedUrl.openConnection() as HttpURLConnection
             try {
                 val response = connection.apply {
@@ -83,9 +89,10 @@ class HttpPostAction : Action {
                     requestMethod = "POST"
                     instanceFollowRedirects = false
                     doOutput = true
+                    setFixedLengthStreamingMode(payload.size.toLong())
                     setRequestProperty("Content-Type", args["content_type"] ?: "text/plain; charset=utf-8")
                 }.run {
-                    outputStream.use { it.write(data.toByteArray(Charsets.UTF_8)) }
+                    outputStream.use { it.write(payload) }
                     val stream = if (responseCode in 200..299) inputStream else errorStream
                     stream?.readBounded(MAX_RESPONSE_BYTES).orEmpty()
                 }
@@ -183,6 +190,7 @@ class DownloadAction : Action {
     }
 }
 
+private const val MAX_REQUEST_BODY_BYTES = 1_048_576L // 1 MB for POST request bodies
 private const val MAX_RESPONSE_BYTES = 1_048_576L // 1 MB for in-memory response variables
 private const val MAX_DOWNLOAD_BYTES = 52_428_800L // 50 MB for file downloads
 

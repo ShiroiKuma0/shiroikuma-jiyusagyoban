@@ -101,6 +101,7 @@ class OpenUrlAction : Action {
 
     companion object {
         private val ALLOWED_SCHEMES = setOf("https", "http", "tel", "mailto", "geo")
+        fun allowedSchemes(): Set<String> = ALLOWED_SCHEMES
     }
 }
 
