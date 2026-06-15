@@ -6,4 +6,5 @@
     <string name="error_prefix">Error: %1$s</string>
     <string name="success_prefix">Success: %1$s</string>
     <string name="widget_task_description">Run an 白い熊 自由作業盤 task with one tap</string>
+    <string name="accessibility_service_description">Lets 白い熊 自由作業盤 actions perform system gestures — Back, Recents, the notification and quick-settings panels, the power dialog, and lock screen. No screen content is read.</string>
 </resources>

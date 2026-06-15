@@ -56,6 +56,14 @@ object ActionCapabilityRegistry {
         ),
         "clipboard.get" to ActionCapability(CapabilityLevel.RequiresSetup, "Android 10+ blocks clipboard reads unless the app is focused; may return empty from the background."),
         "apps.list" to ActionCapability(CapabilityLevel.RequiresSetup, "Android 11+ package visibility limits the result to apps this app can see."),
+        "nav.back" to accessibilityCapability(),
+        "nav.recents" to accessibilityCapability(),
+        "panel.notifications" to accessibilityCapability(),
+        "panel.quicksettings" to accessibilityCapability(),
+        "nav.power" to accessibilityCapability(),
+        "screen.lock" to accessibilityCapability(),
+        "call.place" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs the Phone (CALL_PHONE) permission to dial directly; otherwise opens the dialer."),
+        "brightness.auto" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access."),
         "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported 白い熊 自由作業盤 action."),
     )
 
@@ -81,6 +89,9 @@ object ActionCapabilityRegistry {
         } else {
             ActionCapability(CapabilityLevel.Supported, reason)
         }
+
+    private fun accessibilityCapability(): ActionCapability =
+        ActionCapability(CapabilityLevel.RequiresSetup, "Enable the 白い熊 自由作業盤 accessibility service in Android settings.")
 
     internal fun mediaKeyCapabilityForSdk(sdkInt: Int, reason: String): ActionCapability =
         if (AndroidAudioHardening.isRestricted(sdkInt)) {
