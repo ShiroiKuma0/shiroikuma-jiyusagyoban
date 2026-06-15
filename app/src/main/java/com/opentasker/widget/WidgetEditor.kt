@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -33,6 +34,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -51,6 +53,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import com.opentasker.core.widget.Background
 import com.opentasker.core.widget.Offset
 import com.opentasker.core.widget.WidgetLayoutCodec
@@ -224,26 +227,22 @@ private fun PropertyPanel(node: WidgetNode, isChild: Boolean, fonts: List<String
                 DropdownField("Shape", node.shape ?: "rect", SHAPES) { onChange(node.copy(shape = it)) }
                 ColorField("Fill", node.color) { onChange(node.copy(color = it)) }
                 ColorField("Stroke", node.stroke) { onChange(node.copy(stroke = it)) }
-                NumberField("Stroke width (dp)", node.strokeWidth) { onChange(node.copy(strokeWidth = it)) }
-                NumberField("Corner (dp)", node.corner) { onChange(node.copy(corner = it)) }
+                NumberField("Stroke width (dp)", node.strokeWidth, range = 0..40) { onChange(node.copy(strokeWidth = it)) }
+                NumberField("Corner (dp)", node.corner, range = 0..120) { onChange(node.copy(corner = it)) }
             }
             "column", "row" -> {
                 DropdownField("Arrange (main)", node.arrange ?: "start", ARRANGES) { onChange(node.copy(arrange = it)) }
                 DropdownField("Align (cross)", node.align ?: "start", listOf("start", "center", "end")) { onChange(node.copy(align = it)) }
-                NumberField("Gap (dp)", node.gap) { onChange(node.copy(gap = it)) }
+                NumberField("Gap (dp)", node.gap, range = 0..200) { onChange(node.copy(gap = it)) }
             }
         }
         // Placement of THIS node inside its parent (when it's a child).
         if (isChild) {
             DropdownField("Anchor (in box)", node.align ?: "center", ALIGNS) { onChange(node.copy(align = it)) }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.weight(1f)) { NumberField("Offset X (dp)", node.offset?.x) { onChange(node.copy(offset = Offset(it ?: 0, node.offset?.y ?: 0))) } }
-                Box(Modifier.weight(1f)) { NumberField("Offset Y (dp)", node.offset?.y) { onChange(node.copy(offset = Offset(node.offset?.x ?: 0, it ?: 0))) } }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.weight(1f)) { NumberField("Free X (dp)", node.x) { onChange(node.copy(x = it)) } }
-                Box(Modifier.weight(1f)) { NumberField("Free Y (dp)", node.y) { onChange(node.copy(y = it)) } }
-            }
+            NumberField("Offset X (dp)", node.offset?.x, range = -300..300) { onChange(node.copy(offset = Offset(it ?: 0, node.offset?.y ?: 0))) }
+            NumberField("Offset Y (dp)", node.offset?.y, range = -300..300) { onChange(node.copy(offset = Offset(node.offset?.x ?: 0, it ?: 0))) }
+            NumberField("Free X (dp)", node.x, range = 0..600) { onChange(node.copy(x = it)) }
+            NumberField("Free Y (dp)", node.y, range = 0..600) { onChange(node.copy(y = it)) }
         }
         // Common box: size + background.
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -253,7 +252,7 @@ private fun PropertyPanel(node: WidgetNode, isChild: Boolean, fonts: List<String
         ColorField("Background", node.background?.color) {
             onChange(node.copy(background = (node.background ?: Background()).copy(color = it)))
         }
-        NumberField("Background corner (dp)", node.background?.corner) {
+        NumberField("Background corner (dp)", node.background?.corner, range = 0..120) {
             onChange(node.copy(background = (node.background ?: Background()).copy(corner = it ?: 0)))
         }
     }
@@ -267,15 +266,23 @@ private fun TextField2(label: String, value: String, onChange: (String) -> Unit)
 }
 
 @Composable
-private fun NumberField(label: String, value: Int?, onChange: (Int?) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-        OutlinedTextField(
-            value = value?.toString().orEmpty(),
-            onValueChange = { s -> onChange(s.filter { it.isDigit() || it == '-' }.toIntOrNull()) },
-            label = { Text(label) }, singleLine = true, modifier = Modifier.weight(1f),
+private fun NumberField(label: String, value: Int?, range: IntRange = 0..300, onChange: (Int?) -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+            OutlinedTextField(
+                value = value?.toString().orEmpty(),
+                onValueChange = { s -> onChange(s.filter { it.isDigit() || it == '-' }.toIntOrNull()) },
+                singleLine = true, modifier = Modifier.width(92.dp),
+            )
+            IconButton(onClick = { onChange((value ?: range.first) - 1) }) { Icon(Icons.Filled.Remove, contentDescription = "Decrease $label") }
+            IconButton(onClick = { onChange((value ?: range.first) + 1) }) { Icon(Icons.Filled.Add, contentDescription = "Increase $label") }
+        }
+        Slider(
+            value = (value ?: range.first).coerceIn(range).toFloat(),
+            onValueChange = { onChange(it.roundToInt()) },
+            valueRange = range.first.toFloat()..range.last.toFloat(),
         )
-        IconButton(onClick = { onChange((value ?: 0) - 1) }) { Icon(Icons.Filled.Remove, contentDescription = "Decrease $label") }
-        IconButton(onClick = { onChange((value ?: 0) + 1) }) { Icon(Icons.Filled.Add, contentDescription = "Increase $label") }
     }
 }
 
