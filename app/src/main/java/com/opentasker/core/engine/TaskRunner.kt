@@ -246,17 +246,36 @@ class TaskRunner(
             ?: return fail("task.run requires a 'task' (id or name)")
         val target = resolver(ref) ?: return fail("sub-task not found: $ref")
 
-        // Pass any extra args as input variables; the shared store lets global outputs flow back.
-        args.forEach { (key, value) ->
-            if (key !in SUB_TASK_REF_KEYS) ctx.variables.set(key, value)
+        // Named parameters (param:<name>); values are already expanded in the caller's scope.
+        val parameters = buildMap {
+            args.forEach { (key, value) ->
+                if (key.startsWith(SUB_TASK_PARAM_PREFIX)) put(key.removePrefix(SUB_TASK_PARAM_PREFIX), value)
+            }
         }
+        val resultsPrefix = args[SUB_TASK_RESULTS_PREFIX_KEY]?.trim().orEmpty()
 
-        val child = TaskRunner(ctx, templateExpressionEngine, resolveTask, depth + 1)
+        // Isolated child: shares globals + arrays, fresh locals, read-only params, its own returns.
+        val childCtx = ActionContext(
+            app = ctx.app,
+            variables = ctx.variables.childScope(),
+            eventVariables = emptyMap(),
+            parameters = parameters,
+            returns = mutableMapOf(),
+            logger = ctx.logger,
+        )
+        val child = TaskRunner(childCtx, templateExpressionEngine, resolveTask, depth + 1)
         val report = child.run(target)
+
+        // Surface the sub-task's named results and status back to the caller as variables.
+        childCtx.returns.forEach { (name, value) -> ctx.variables.set("$resultsPrefix$name", value) }
+        ctx.variables.set("${resultsPrefix}ok", report.success.toString())
+        val errorMessage = report.results.firstNotNullOfOrNull { (it as? ActionResult.Failure)?.message } ?: ""
+        ctx.variables.set("${resultsPrefix}error", errorMessage)
+
         val result = if (report.success) {
             ActionResult.Success
         } else {
-            ActionResult.Failure("sub-task '${target.name}' failed")
+            ActionResult.Failure(errorMessage.ifBlank { "sub-task '${target.name}' failed" })
         }
         return result to traceFor(index, spec, started, result, expansionReport)
     }
@@ -268,10 +287,10 @@ class TaskRunner(
 
     /** Evaluates a condition string with legacy `%var` then bounded `{{ ... }}` expansion. */
     private fun evaluateConditionString(condition: String): Boolean {
-        val legacyExpanded = ctx.variables.expand(condition)
+        val legacyExpanded = ctx.variables.expand(rewriteParamSugar(condition))
         if (!legacyExpanded.contains("{{")) return ctx.variables.evaluateCondition(legacyExpanded)
 
-        val expanded = templateExpressionEngine.expand(legacyExpanded, ctx.variables.toTemplateScope(ctx.eventVariables))
+        val expanded = templateExpressionEngine.expand(legacyExpanded, ctx.variables.toTemplateScope(ctx.eventVariables, ctx.parameters))
         if (expanded.warnings.isNotEmpty()) return false
         return ctx.variables.evaluateCondition(expanded.value)
     }
@@ -305,10 +324,10 @@ class TaskRunner(
     private fun expandArgs(args: Map<String, String>): ActionArgumentExpansionReport {
         if (args.isEmpty()) return ActionArgumentExpansionReport.Empty
 
-        val templateScope = ctx.variables.toTemplateScope(ctx.eventVariables)
+        val templateScope = ctx.variables.toTemplateScope(ctx.eventVariables, ctx.parameters)
         val expansions = mutableListOf<ActionArgumentExpansionTrace>()
         val expandedArgs = args.mapValues { (name, rawValue) ->
-            val legacyExpanded = ctx.variables.expand(rawValue)
+            val legacyExpanded = ctx.variables.expand(rewriteParamSugar(rawValue))
             if (!legacyExpanded.contains("{{")) return@mapValues legacyExpanded
 
             val result = templateExpressionEngine.expand(legacyExpanded, templateScope)
@@ -357,6 +376,16 @@ private const val MAX_WAIT_TIMEOUT_MS = 1_800_000L // 30 minutes
 const val SUB_TASK_ACTION_ID = "task.run"
 const val MAX_SUBTASK_DEPTH = 8
 private val SUB_TASK_REF_KEYS = listOf("task", "name", "id")
+
+/** Run Task arg keys: each `param:<name>` is a named parameter; results land under this prefix. */
+const val SUB_TASK_PARAM_PREFIX = "param:"
+const val SUB_TASK_RESULTS_PREFIX_KEY = "results_prefix"
+
+private val PARAM_SUGAR_REGEX = Regex("%@([A-Za-z_][A-Za-z0-9_]*)")
+
+/** Rewrites the terse `%@name` parameter reference into the canonical `{{ param.name }}`. */
+private fun rewriteParamSugar(text: String): String =
+    if (text.contains("%@")) text.replace(PARAM_SUGAR_REGEX) { "{{ param.${it.groupValues[1]} }}" } else text
 
 /** Safety cap on total interpreted steps to bound pathological flow.foreach loops. */
 private const val MAX_FLOW_STEPS = 100_000

@@ -20,11 +20,21 @@ import java.util.concurrent.ConcurrentHashMap
  *   - Arrays: %list(#), %list(1), %list()
  *   - JSON: %json.path.to.field
  */
-class VariableStore {
-    private val globals = ConcurrentHashMap<String, String>()
+class VariableStore private constructor(
+    private val globals: ConcurrentHashMap<String, String>,
+    private val arrayStore: ArrayStore,
+) {
+    constructor() : this(ConcurrentHashMap(), ArrayStore())
+
     private val localStack = java.util.Collections.synchronizedList(mutableListOf<MutableMap<String, String>>())
     private val expander = VariableExpander()
-    private val arrayStore = ArrayStore()
+
+    /**
+     * A store for a called sub-task: shares globals (`%UPPERCASE`) and arrays so they persist and
+     * flow back, but starts with empty local scopes, so the child's `%lowercase` locals stay
+     * isolated and the caller's locals aren't visible to it.
+     */
+    fun childScope(): VariableStore = VariableStore(globals, arrayStore)
 
     fun pushScope() { localStack.add(mutableMapOf()) }
     fun popScope() { 
@@ -86,7 +96,10 @@ class VariableStore {
         return expander.evaluateCondition(expr, this, arrayStore)
     }
 
-    fun toTemplateScope(event: Map<String, String> = emptyMap()): TemplateScope {
+    fun toTemplateScope(
+        event: Map<String, String> = emptyMap(),
+        param: Map<String, String> = emptyMap(),
+    ): TemplateScope {
         val taskValues = mutableMapOf<String, String>()
         synchronized(localStack) {
             localStack.forEach { scope -> taskValues += scope }
@@ -95,6 +108,7 @@ class VariableStore {
             global = globals.toMap(),
             task = taskValues.toMap(),
             event = event.toMap(),
+            param = param.toMap(),
             arrays = arrayStore.snapshot(),
         )
     }
