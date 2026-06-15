@@ -62,20 +62,35 @@ fun WidgetTemplatesScreen(
     templates: List<WidgetTemplate>,
     onSave: (name: String, layout: String) -> Unit,
     onDelete: (name: String) -> Unit,
+    onImport: (String) -> Int,
+    onExportAll: () -> String,
+    onMessage: (String) -> Unit,
     contentPadding: PaddingValues,
 ) {
     // The template currently open in the full-screen editor (null = none).
     var editing by remember { mutableStateOf<WidgetTemplate?>(null) }
     var showNameDialog by remember { mutableStateOf(false) }
+    var showImportDialog by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
 
     Column(Modifier.fillMaxSize().padding(contentPadding)) {
-        OutlinedButton(
-            onClick = { showNameDialog = true },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Filled.Add, contentDescription = null)
-            Text("  New template")
+            OutlinedButton(onClick = { showNameDialog = true }, modifier = Modifier.weight(1f)) {
+                Icon(Icons.Filled.Add, contentDescription = null)
+                Text("  New")
+            }
+            OutlinedButton(onClick = { showImportDialog = true }) { Text("Import") }
+            OutlinedButton(
+                enabled = templates.isNotEmpty(),
+                onClick = {
+                    clipboard.setText(AnnotatedString(onExportAll()))
+                    onMessage("Copied ${templates.size} templates to clipboard")
+                },
+            ) { Text("Export") }
         }
 
         if (templates.isEmpty()) {
@@ -96,6 +111,17 @@ fun WidgetTemplatesScreen(
                 )
             }
         }
+    }
+
+    if (showImportDialog) {
+        ImportTemplatesDialog(
+            onImport = { raw ->
+                val n = onImport(raw)
+                showImportDialog = false
+                onMessage(if (n >= 0) "Imported $n template(s)" else "Couldn’t parse that templates JSON")
+            },
+            onDismiss = { showImportDialog = false },
+        )
     }
 
     if (showNameDialog) {
@@ -198,6 +224,34 @@ private fun NameDialog(existing: List<String>, onConfirm: (String) -> Unit, onDi
         confirmButton = {
             TextButton(enabled = trimmed.isNotEmpty() && !clash, onClick = { onConfirm(trimmed) }) { Text("Design") }
         },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun ImportTemplatesDialog(onImport: (String) -> Unit, onDismiss: () -> Unit) {
+    var raw by remember { mutableStateOf("") }
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = onDismiss,
+        title = { Text("Import templates") },
+        text = {
+            Column {
+                Text(
+                    "Paste a templates JSON object — a {\"name\": \"<layout json>\", …} map, as produced by Export. Same-name templates are replaced.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = raw,
+                    onValueChange = { raw = it },
+                    label = { Text("Templates JSON") },
+                    minLines = 6,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                )
+            }
+        },
+        confirmButton = { TextButton(enabled = raw.isNotBlank(), onClick = { onImport(raw) }) { Text("Import") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

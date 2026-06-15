@@ -65,4 +65,17 @@ object TemplateStore {
         persist(next)
         _state.value = next
     }
+
+    /** All templates as a JSON object `{name: layoutJson}` — the same shape [importJson] accepts. */
+    fun exportJson(): String = json.encodeToString(mapSerializer, _state.value.associate { it.name to it.layout })
+
+    /** Merge templates from a `{name: layoutJson}` JSON object (same-name replaces). Count, or -1 on parse error. */
+    fun importJson(raw: String): Int {
+        val map = runCatching { json.decodeFromString(mapSerializer, raw) }.getOrNull() ?: return -1
+        val merged = (_state.value.filterNot { it.name in map.keys } + map.map { WidgetTemplate(it.key, it.value) })
+            .sortedBy { it.name.lowercase() }
+        persist(merged)
+        _state.value = merged
+        return map.size
+    }
 }

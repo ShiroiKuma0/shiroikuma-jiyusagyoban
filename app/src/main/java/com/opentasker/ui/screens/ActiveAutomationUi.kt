@@ -1401,6 +1401,9 @@ fun ActiveAutomationUi(
                 templates = widgetTemplates,
                 onSave = { name, layout -> com.opentasker.widget.TemplateStore.put(name, layout) },
                 onDelete = { com.opentasker.widget.TemplateStore.delete(it) },
+                onImport = { raw -> com.opentasker.widget.TemplateStore.importJson(raw) },
+                onExportAll = { com.opentasker.widget.TemplateStore.exportJson() },
+                onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
                 contentPadding = innerPadding,
             )
 
