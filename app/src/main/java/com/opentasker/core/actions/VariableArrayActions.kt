@@ -19,7 +19,7 @@ import kotlin.math.floor
 // store via ctx.variables.get(name) / getArrayItems(name).
 // ---------------------------------------------------------------------------------------------
 
-private fun truthy(s: String?): Boolean = s?.trim()?.lowercase() in setOf("true", "1", "yes", "on")
+internal fun truthy(s: String?): Boolean = s?.trim()?.lowercase() in setOf("true", "1", "yes", "on")
 
 private fun formatNumber(d: Double): String =
     if (!d.isInfinite() && !d.isNaN() && d == floor(d)) d.toLong().toString() else d.toString()

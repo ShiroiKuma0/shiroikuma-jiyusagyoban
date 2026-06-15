@@ -55,6 +55,8 @@ object ActionCapabilityRegistry {
             TermuxScriptBackend.hintForAction(TermuxScriptBackend.ACTION_ID)?.message
                 ?: "Termux script backend is not active.",
         ),
+        "clipboard.get" to ActionCapability(CapabilityLevel.RequiresSetup, "Android 10+ blocks clipboard reads unless the app is focused; may return empty from the background."),
+        "apps.list" to ActionCapability(CapabilityLevel.RequiresSetup, "Android 11+ package visibility limits the result to apps this app can see."),
         "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported 白い熊 自由作業盤 action."),
     )
 
