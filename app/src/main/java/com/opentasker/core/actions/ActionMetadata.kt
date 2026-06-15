@@ -18,6 +18,7 @@ enum class FieldType {
     DROPDOWN,       // select from predefined values
     CHECKBOX,       // boolean toggle
     MULTILINE,      // multi-line text area
+    COLOR,          // #AARRGGBB via a 4-slider RGBA picker (blank = use default)
 }
 
 data class ActionMetadata(
@@ -314,9 +315,9 @@ fun registerActionMetadata() {
             fields = listOf(
                 ActionField("text", "Text", FieldType.MULTILINE, required = true, hint = "message; supports %expansion"),
                 ActionField("html", "Use HTML", FieldType.CHECKBOX, hint = "interpret HTML tags (<b>, <h1>, <font color>, …)"),
-                ActionField("text_color", "Text color", hint = "#RRGGBB — blank uses the UI default"),
-                ActionField("background_color", "Background color", hint = "#RRGGBB — blank uses the UI default"),
-                ActionField("border_color", "Border color", hint = "#RRGGBB — blank uses the UI default"),
+                ActionField("text_color", "Text color", FieldType.COLOR, hint = "blank uses the UI default"),
+                ActionField("background_color", "Background color", FieldType.COLOR, hint = "blank uses the UI default"),
+                ActionField("border_color", "Border color", FieldType.COLOR, hint = "blank uses the UI default"),
                 ActionField("position", "Position", FieldType.DROPDOWN,
                     hint = "top-left / top / top-right / left / center / right / bottom-left / bottom / bottom-right"),
                 ActionField("x", "X offset (dp)", FieldType.NUMBER, hint = "horizontal offset from the anchor"),
