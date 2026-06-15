@@ -7,6 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -30,6 +31,8 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Upload
@@ -66,6 +69,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -1984,6 +1988,7 @@ private fun TasksScreen(
         )
         return
     }
+    val expandedTasks = remember { mutableStateMapOf<Long, Boolean>() }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1997,6 +2002,8 @@ private fun TasksScreen(
         items(tasks, key = { it.id }) { task ->
             TaskCard(
                 task = task,
+                expanded = expandedTasks[task.id] == true,
+                onToggleExpanded = { expandedTasks[task.id] = expandedTasks[task.id] != true },
                 onEdit = { onEditTask(task) },
                 onDelete = { onDeleteTask(task) },
                 onRun = { onRunTask(task) },
@@ -2014,6 +2021,8 @@ private fun TasksScreen(
 @Composable
 private fun TaskCard(
     task: Task,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onRun: () -> Unit,
@@ -2024,6 +2033,7 @@ private fun TaskCard(
     onMove: () -> Unit,
     onExport: () -> Unit,
 ) {
+    val expandedActions = remember(task.id) { mutableStateMapOf<Int, Boolean>() }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -2033,76 +2043,92 @@ private fun TaskCard(
         shape = RoundedCornerShape(16.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable(onClick = onToggleExpanded),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Column(Modifier.weight(1f)) {
                     Text(task.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(
-                        "Priority ${task.priority} - ${task.collisionMode.name.lowercase().replace('_', ' ')}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    if (expanded) {
+                        Text(
+                            "Priority ${task.priority} - ${task.collisionMode.name.lowercase().replace('_', ' ')}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
-                IconButton(onClick = onExport) {
-                    Icon(Icons.Filled.Upload, contentDescription = "Export task")
+                if (expanded) {
+                    IconButton(onClick = onExport) {
+                        Icon(Icons.Filled.Upload, contentDescription = "Export task")
+                    }
                 }
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatusPill("${task.actions.size} action${plural(task.actions.size)}", MaterialTheme.colorScheme.primary)
-                    StatusPill("Priority ${task.priority}", MaterialTheme.colorScheme.secondary)
-                }
-                StatusPill(task.collisionMode.name.lowercase().replace('_', ' '), MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (task.actions.isEmpty()) {
-                InlineNotice(
-                    title = "Task has no actions",
-                    body = "Add at least one action before attaching this task to an enabled profile.",
-                    color = MaterialTheme.colorScheme.error,
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Collapse task" else "Expand task",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            } else {
-                task.actions.forEachIndexed { index, action ->
-                    ActionRow(
-                        index = index,
-                        action = action,
-                        onEdit = { onEditAction(index, action) },
-                        onDelete = { onDeleteAction(index) },
+            }
+            if (expanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        StatusPill("${task.actions.size} action${plural(task.actions.size)}", MaterialTheme.colorScheme.primary)
+                        StatusPill("Priority ${task.priority}", MaterialTheme.colorScheme.secondary)
+                    }
+                    StatusPill(task.collisionMode.name.lowercase().replace('_', ' '), MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (task.actions.isEmpty()) {
+                    InlineNotice(
+                        title = "Task has no actions",
+                        body = "Add at least one action before attaching this task to an enabled profile.",
+                        color = MaterialTheme.colorScheme.error,
                     )
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Edit, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Edit")
-                }
-                OutlinedButton(onClick = onAddAction, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Add Action")
-                }
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = onRun) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Run")
-                    }
-                    OutlinedButton(onClick = onPin) {
-                        Icon(Icons.Filled.PushPin, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Pin")
-                    }
-                    OutlinedButton(onClick = onMove) {
-                        Icon(Icons.Filled.Folder, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Move")
+                } else {
+                    task.actions.forEachIndexed { index, action ->
+                        ActionRow(
+                            index = index,
+                            action = action,
+                            expanded = expandedActions[index] == true,
+                            onToggle = { expandedActions[index] = expandedActions[index] != true },
+                            onEdit = { onEditAction(index, action) },
+                            onDelete = { onDeleteAction(index) },
+                        )
                     }
                 }
-                TextButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Delete Task")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Edit, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Edit")
+                    }
+                    OutlinedButton(onClick = onAddAction, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Add Action")
+                    }
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = onRun) {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Run")
+                        }
+                        OutlinedButton(onClick = onPin) {
+                            Icon(Icons.Filled.PushPin, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Pin")
+                        }
+                        OutlinedButton(onClick = onMove) {
+                            Icon(Icons.Filled.Folder, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Move")
+                        }
+                    }
+                    TextButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Delete, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Delete Task")
+                    }
                 }
             }
         }
@@ -2113,6 +2139,8 @@ private fun TaskCard(
 private fun ActionRow(
     index: Int,
     action: ActionSpec,
+    expanded: Boolean,
+    onToggle: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -2121,37 +2149,72 @@ private fun ActionRow(
     Surface(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
         shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            StatusPill("#${index + 1}", MaterialTheme.colorScheme.secondary)
-            Column(Modifier.weight(1f)) {
-                Text(action.label ?: metadata?.name ?: action.type, style = MaterialTheme.typography.titleSmall)
+        Column(Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                StatusPill("#${index + 1}", MaterialTheme.colorScheme.secondary)
                 Text(
-                    action.args.entries.joinToString { "${it.key}=${it.value}" }.ifBlank { metadata?.description ?: "No arguments" },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
+                    action.label ?: metadata?.name ?: action.type,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (capability.level != CapabilityLevel.Supported) {
-                    Spacer(Modifier.height(6.dp))
                     StatusPill(
                         if (capability.level == CapabilityLevel.Unsupported) "Unsupported" else "Needs setup",
                         if (capability.level == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                     )
                 }
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Collapse action" else "Expand action",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Filled.Edit, contentDescription = "Edit action")
-            }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete action", tint = MaterialTheme.colorScheme.error)
+            if (expanded) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    metadata?.description?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (action.args.isEmpty()) {
+                        Text("No arguments configured", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        action.args.forEach { (key, value) ->
+                            Text("$key = $value", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    action.condition?.takeIf { it.isNotBlank() }?.let {
+                        Text("Condition: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (action.continueOnError) {
+                        Text("Continues on error", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (capability.level != CapabilityLevel.Supported) {
+                        Text(capability.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = onEdit) {
+                            Icon(Icons.Filled.Edit, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Edit")
+                        }
+                        TextButton(onClick = onDelete) {
+                            Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Delete")
+                        }
+                    }
+                }
             }
         }
     }
