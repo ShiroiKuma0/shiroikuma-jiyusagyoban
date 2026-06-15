@@ -64,6 +64,7 @@ object ActionCapabilityRegistry {
         "screen.lock" to accessibilityCapability(),
         "call.place" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs the Phone (CALL_PHONE) permission to dial directly; otherwise opens the dialer."),
         "brightness.auto" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access."),
+        "setting.put" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access; only the System namespace is writable without Shizuku."),
         "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported 白い熊 自由作業盤 action."),
     )
 
