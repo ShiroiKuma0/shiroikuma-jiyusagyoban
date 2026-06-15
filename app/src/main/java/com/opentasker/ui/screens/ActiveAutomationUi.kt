@@ -3070,16 +3070,16 @@ private fun ImportProjectConflictDialog(
         text = {
             Text(
                 if (conflictingNames.size == 1) {
-                    "A project named \"${conflictingNames.first()}\" already exists. Overwrite it (file the imported items into it), or keep both (import as a new, renamed project)?"
+                    "A project named \"${conflictingNames.first()}\" already exists. Import into it (file the imported items under the existing project), or create a separate new (renamed) project?"
                 } else {
-                    "These projects already exist: ${conflictingNames.joinToString()}. Overwrite them, or keep both (import as new, renamed projects)?"
+                    "These projects already exist: ${conflictingNames.joinToString()}. Import into them, or create separate new (renamed) projects?"
                 },
             )
         },
-        confirmButton = { TextButton(onClick = onOverwrite) { Text("Overwrite") } },
+        confirmButton = { TextButton(onClick = onOverwrite) { Text("Import into") } },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(onClick = onKeepBoth) { Text("Keep both") }
+                TextButton(onClick = onKeepBoth) { Text("New project") }
                 TextButton(onClick = onDismiss) { Text("Cancel") }
             }
         },
