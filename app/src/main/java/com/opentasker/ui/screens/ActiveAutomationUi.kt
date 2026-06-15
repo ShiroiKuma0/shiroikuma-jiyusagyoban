@@ -428,6 +428,25 @@ class ActiveAutomationViewModel(
         }
     }
 
+    /** Delete several tasks at once, skipping any still referenced by a profile (same guard as [deleteTask]). */
+    fun deleteTasks(tasks: List<Task>) {
+        if (tasks.isEmpty()) return
+        viewModelScope.launch {
+            runCatching {
+                val usedIds = db.profileDao().getAll().map { it.toDomain() }
+                    .flatMap { listOfNotNull(it.enterTaskId, it.exitTaskId) }.toSet()
+                val (used, free) = tasks.partition { it.id in usedIds }
+                free.forEach { db.taskDao().delete(it.toEntity()) }
+                buildString {
+                    append("Deleted ${free.size} task(s)")
+                    if (used.isNotEmpty()) append("; skipped ${used.size} used by a profile")
+                }
+            }
+                .onSuccess { events.send(it) }
+                .onFailure { events.send("Error: ${it.message ?: "Delete failed"}") }
+        }
+    }
+
     fun createScene(name: String, widthDp: Int, heightDp: Int, projectId: Long? = null) = launchWithMessage("Scene created") {
         db.sceneDao().insert(
             Scene(
@@ -960,6 +979,9 @@ fun ActiveAutomationUi(
     var contextPickerProfile by remember { mutableStateOf<Profile?>(null) }
     var contextEdit by remember { mutableStateOf<ContextEditState?>(null) }
     var pendingDelete by remember { mutableStateOf<DeleteTarget?>(null) }
+    // Multi-select in the Tasks tab: long-press a task to start, tap others to add/remove.
+    var selectedTaskIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var confirmDeleteSelectedTasks by remember { mutableStateOf(false) }
     val taskerImportReview = viewModel.taskerImportReview
     val taskerImportBusy = viewModel.taskerImportBusy
     val openTaskerBundleReview = viewModel.openTaskerBundleReview
@@ -1048,6 +1070,8 @@ fun ActiveAutomationUi(
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
+    // Leaving the Tasks tab clears any in-progress multi-selection.
+    LaunchedEffect(screen) { if (screen != OpenTaskerScreen.Tasks) selectedTaskIds = emptySet() }
 
     val headerDetail = when (screen) {
         OpenTaskerScreen.Profiles -> "${profiles.count { it.enabled }} enabled - ${profiles.size} total"
@@ -1348,6 +1372,12 @@ fun ActiveAutomationUi(
                 onReorderAction = { task, newOrder -> viewModel.updateTask(task.copy(actions = newOrder), "Actions reordered") },
                 manualSort = sortPrefs.tasks == SortMethod.MANUAL,
                 onReorder = { viewModel.reorderTasks(it) },
+                selectedIds = selectedTaskIds,
+                onLongPressTask = { selectedTaskIds = selectedTaskIds + it.id },
+                onToggleSelectTask = { selectedTaskIds = if (it.id in selectedTaskIds) selectedTaskIds - it.id else selectedTaskIds + it.id },
+                onSelectAllTasks = { selectedTaskIds = visibleTasks.map { it.id }.toSet() },
+                onClearTaskSelection = { selectedTaskIds = emptySet() },
+                onDeleteSelectedTasks = { confirmDeleteSelectedTasks = true },
                 contentPadding = innerPadding,
             )
 
@@ -1456,6 +1486,24 @@ fun ActiveAutomationUi(
                 pendingExportWrite = resolved
                 selectiveExportLauncher.launch(resolved.fileName)
             },
+        )
+    }
+
+    if (confirmDeleteSelectedTasks) {
+        val count = selectedTaskIds.size
+        AlertDialog(
+            modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+            onDismissRequest = { confirmDeleteSelectedTasks = false },
+            title = { Text("Delete $count task${if (count == 1) "" else "s"}?") },
+            text = { Text("This permanently removes the selected tasks. Any still used by a profile are skipped.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteTasks(visibleTasks.filter { it.id in selectedTaskIds })
+                    selectedTaskIds = emptySet()
+                    confirmDeleteSelectedTasks = false
+                }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDeleteSelectedTasks = false }) { Text("Cancel") } },
         )
     }
 
@@ -2105,6 +2153,29 @@ private fun ProfileCard(
     }
 }
 
+/** Contextual bar shown while a multi-selection is active: count, select-all, delete, and clear. */
+@Composable
+private fun SelectionBar(
+    count: Int,
+    total: Int,
+    onSelectAll: () -> Unit,
+    onClear: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            IconButton(onClick = onClear) { Icon(Icons.Filled.Close, contentDescription = "Clear selection") }
+            Text("$count selected", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            TextButton(onClick = onSelectAll, enabled = count < total) { Text("Select all") }
+            IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = "Delete selected") }
+        }
+    }
+}
+
 @Composable
 private fun TasksScreen(
     tasks: List<Task>,
@@ -2123,6 +2194,12 @@ private fun TasksScreen(
     onReorderAction: (Task, List<ActionSpec>) -> Unit,
     manualSort: Boolean,
     onReorder: (List<Task>) -> Unit,
+    selectedIds: Set<Long>,
+    onLongPressTask: (Task) -> Unit,
+    onToggleSelectTask: (Task) -> Unit,
+    onSelectAllTasks: () -> Unit,
+    onClearTaskSelection: () -> Unit,
+    onDeleteSelectedTasks: () -> Unit,
     contentPadding: PaddingValues,
 ) {
     if (tasks.isEmpty()) {
@@ -2137,19 +2214,32 @@ private fun TasksScreen(
     }
     val listState = rememberLazyListState()
     val reorder = rememberListReorderState()
-    LazyColumn(
-        state = listState,
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(contentPadding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        items(tasks, key = { it.id }) { task ->
-            ReorderableRow(reorder, listState, tasks, task, { it.id }, manualSort, onReorder) {
-                TaskCard(
-                    task = task,
-                    expanded = expandedTasks[task.id] == true,
+    val selectionActive = selectedIds.isNotEmpty()
+    Column(Modifier.fillMaxSize().padding(contentPadding)) {
+        if (selectionActive) {
+            SelectionBar(
+                count = selectedIds.size,
+                total = tasks.size,
+                onSelectAll = onSelectAllTasks,
+                onClear = onClearTaskSelection,
+                onDelete = onDeleteSelectedTasks,
+            )
+        }
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().weight(1f),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(tasks, key = { it.id }) { task ->
+                ReorderableRow(reorder, listState, tasks, task, { it.id }, manualSort && !selectionActive, onReorder) {
+                    TaskCard(
+                        task = task,
+                        selectionActive = selectionActive,
+                        selected = task.id in selectedIds,
+                        onLongPress = { onLongPressTask(task) },
+                        onToggleSelect = { onToggleSelectTask(task) },
+                        expanded = expandedTasks[task.id] == true,
                     onToggleExpanded = { expandedTasks[task.id] = expandedTasks[task.id] != true },
                     isActionExpanded = { index -> expandedActions["${task.id}:$index"] == true },
                     onToggleAction = { index ->
@@ -2166,7 +2256,8 @@ private fun TasksScreen(
                     onMove = { onMoveTask(task) },
                     onExport = { onExportTask(task) },
                     onReorderActions = { newOrder -> onReorderAction(task, newOrder) },
-                )
+                    )
+                }
             }
         }
     }
@@ -2175,6 +2266,10 @@ private fun TasksScreen(
 @Composable
 private fun TaskCard(
     task: Task,
+    selectionActive: Boolean,
+    selected: Boolean,
+    onLongPress: () -> Unit,
+    onToggleSelect: () -> Unit,
     expanded: Boolean,
     onToggleExpanded: () -> Unit,
     isActionExpanded: (Int) -> Boolean,
@@ -2197,15 +2292,30 @@ private fun TaskCard(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+        ),
+        border = BorderStroke(
+            if (selected) 2.dp else 1.dp,
+            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        ),
         shape = RoundedCornerShape(16.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth().clickable(onClick = onToggleExpanded),
+                // Tap = expand (or toggle-select while selecting); long-press = start / extend selection.
+                modifier = Modifier.fillMaxWidth().pointerInput(selectionActive) {
+                    detectTapGestures(
+                        onTap = { if (selectionActive) onToggleSelect() else onToggleExpanded() },
+                        onLongPress = { onLongPress() },
+                    )
+                },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                if (selectionActive) {
+                    Checkbox(checked = selected, onCheckedChange = { onToggleSelect() })
+                }
                 Column(Modifier.weight(1f)) {
                     Text(task.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (expanded) {
