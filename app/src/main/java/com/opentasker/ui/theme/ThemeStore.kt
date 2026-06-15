@@ -200,6 +200,19 @@ object ThemeStore {
         else -> File(fileName).nameWithoutExtension
     }
 
+    private val typefaceCache = mutableMapOf<String, android.graphics.Typeface?>()
+
+    /** An android.graphics.Typeface for an imported font file (for Canvas drawing, e.g. widgets). */
+    fun typeface(fileName: String): android.graphics.Typeface? = when {
+        fileName.isEmpty() || fileName == MONOSPACE -> null
+        else -> typefaceCache.getOrPut(fileName) {
+            runCatching {
+                val file = File(fontsDir(), fileName)
+                if (file.exists()) android.graphics.Typeface.createFromFile(file) else null
+            }.getOrNull()
+        }
+    }
+
     /** The Compose FontFamily for a selection, or null for the platform default. Cached by name. */
     fun fontFamily(fileName: String): FontFamily? = when {
         fileName.isEmpty() -> null

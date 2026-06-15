@@ -647,6 +647,19 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "widget.set",
+            name = "Set Widget",
+            description = "Replace a styled home-screen widget's layout and re-render it",
+            category = "System",
+            fields = listOf(
+                ActionField("widget", "Widget name", required = true, hint = "the name set when the widget was placed"),
+                ActionField("layout", "Layout (JSON)", FieldType.MULTILINE, required = true, hint = "widget layout; %vars are expanded"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "tts.speak",
             name = "Say (Text-to-Speech)",
             description = "Speak text aloud using the device speaker",
