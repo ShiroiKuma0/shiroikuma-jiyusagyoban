@@ -24,9 +24,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -233,6 +237,15 @@ private fun sceneElementEditorState(
     }
 }
 
+private fun SceneElement.nudgedWithin(scene: Scene, deltaX: Int, deltaY: Int): SceneElement {
+    val maxX = (scene.widthDp - widthDp).coerceAtLeast(0)
+    val maxY = (scene.heightDp - heightDp).coerceAtLeast(0)
+    return copy(
+        xDp = (xDp + deltaX).coerceIn(0, maxX),
+        yDp = (yDp + deltaY).coerceIn(0, maxY),
+    )
+}
+
 private data class SceneElementEditorState(
     val scene: Scene,
     val index: Int? = null,
@@ -366,8 +379,12 @@ private fun SceneCard(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     scene.elements.forEachIndexed { index, element ->
                         SceneElementRow(
+                            scene = scene,
                             element = element,
                             taskNames = taskNames,
+                            onNudge = { deltaX, deltaY ->
+                                onMoveElement(index, element.nudgedWithin(scene, deltaX, deltaY))
+                            },
                             onEdit = { onEditElement(index, element) },
                             onDelete = { onDeleteElement(index, element) },
                         )
@@ -513,8 +530,10 @@ private fun SceneCanvasElement(
 
 @Composable
 private fun SceneElementRow(
+    scene: Scene,
     element: SceneElement,
     taskNames: Map<Long, String>,
+    onNudge: (Int, Int) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -523,36 +542,82 @@ private fun SceneElementRow(
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)),
     ) {
-        Row(
+        Column(
             Modifier.padding(12.dp),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(sceneElementTypeLabel(element.type), style = MaterialTheme.typography.labelLarge)
-                sceneElementSummary(element)?.let { summary ->
-                    Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+            Row(
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(sceneElementTypeLabel(element.type), style = MaterialTheme.typography.labelLarge)
+                    sceneElementSummary(element)?.let { summary ->
+                        Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    Text(
+                        "Bounds ${element.xDp},${element.yDp} ${element.widthDp}x${element.heightDp} dp",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    listOfNotNull(
+                        element.tapTaskId?.let { "Tap: ${taskNames[it] ?: "missing #$it"}" },
+                        element.longPressTaskId?.let { "Long press: ${taskNames[it] ?: "missing #$it"}" },
+                    ).forEach { binding ->
+                        Text(binding, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
-                Text(
-                    "Bounds ${element.xDp},${element.yDp} ${element.widthDp}x${element.heightDp} dp",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                listOfNotNull(
-                    element.tapTaskId?.let { "Tap: ${taskNames[it] ?: "missing #$it"}" },
-                    element.longPressTaskId?.let { "Long press: ${taskNames[it] ?: "missing #$it"}" },
-                ).forEach { binding ->
-                    Text(binding, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row {
+                    IconButton(onClick = onEdit) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Edit element")
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Delete element", tint = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
-            Row {
-                IconButton(onClick = onEdit) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Edit element")
-                }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete element", tint = MaterialTheme.colorScheme.error)
-                }
-            }
+            SceneElementNudgeControls(
+                scene = scene,
+                element = element,
+                onNudge = onNudge,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SceneElementNudgeControls(
+    scene: Scene,
+    element: SceneElement,
+    onNudge: (Int, Int) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        IconButton(
+            enabled = element.xDp > 0,
+            onClick = { onNudge(-1, 0) },
+        ) {
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Move element left 1 dp")
+        }
+        IconButton(
+            enabled = element.yDp > 0,
+            onClick = { onNudge(0, -1) },
+        ) {
+            Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move element up 1 dp")
+        }
+        IconButton(
+            enabled = element.yDp < (scene.heightDp - element.heightDp).coerceAtLeast(0),
+            onClick = { onNudge(0, 1) },
+        ) {
+            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move element down 1 dp")
+        }
+        IconButton(
+            enabled = element.xDp < (scene.widthDp - element.widthDp).coerceAtLeast(0),
+            onClick = { onNudge(1, 0) },
+        ) {
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Move element right 1 dp")
         }
     }
 }
