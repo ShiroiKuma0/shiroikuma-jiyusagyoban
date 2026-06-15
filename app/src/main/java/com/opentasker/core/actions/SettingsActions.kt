@@ -37,12 +37,18 @@ class WiFiToggleAction : Action {
     @Suppress("DEPRECATION")
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val state = args["state"] ?: "toggle"
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            return ActionResult.Failure("Android 10+ blocks direct WiFi toggles; open system WiFi settings instead")
-        }
         val wm = ctx.app.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-            ?: return ActionResult.Failure("WiFi not available")
-        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Direct toggles are blocked on Android 10+; drive `svc wifi` through Shizuku instead.
+            val target = when (state.lowercase()) {
+                "on" -> true
+                "off" -> false
+                "toggle" -> !(wm?.isWifiEnabled ?: false)
+                else -> return ActionResult.Failure("invalid state: $state")
+            }
+            return runElevated(ctx, "WiFi", "svc wifi ${if (target) "enable" else "disable"}")
+        }
+        wm ?: return ActionResult.Failure("WiFi not available")
         when (state.lowercase()) {
             "toggle" -> wm.isWifiEnabled = !wm.isWifiEnabled
             "on" -> wm.isWifiEnabled = true
@@ -174,8 +180,17 @@ class AirplaneModeAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val state = args["state"] ?: "toggle"
-        ctx.logger("Airplane mode: $state")
-        return ActionResult.Failure("Airplane mode changes are restricted to system or device-owner apps")
+        val target = when (state.lowercase()) {
+            "on", "enable", "true", "1" -> true
+            "off", "disable", "false", "0" -> false
+            "toggle" -> Settings.Global.getInt(ctx.app.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) == 0
+            else -> return ActionResult.Failure("invalid state: $state")
+        }
+        return runElevated(
+            ctx, "Airplane mode",
+            "settings put global airplane_mode_on ${if (target) 1 else 0} ; " +
+                "am broadcast -a android.intent.action.AIRPLANE_MODE --ez state $target",
+        )
     }
 }
 
@@ -191,8 +206,13 @@ class MobileDataAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val state = args["state"] ?: "toggle"
-        ctx.logger("Mobile data: $state")
-        return ActionResult.Failure("Mobile data changes are restricted to carrier, system, or device-owner apps")
+        val target = when (state.lowercase()) {
+            "on", "enable", "true", "1" -> true
+            "off", "disable", "false", "0" -> false
+            "toggle" -> Settings.Global.getInt(ctx.app.contentResolver, "mobile_data", 0) == 0
+            else -> return ActionResult.Failure("invalid state: $state")
+        }
+        return runElevated(ctx, "Mobile data", "svc data ${if (target) "enable" else "disable"}")
     }
 }
 

@@ -623,6 +623,30 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "location.mode",
+            name = "Location Mode",
+            description = "Turn location services on/off (via Shizuku)",
+            category = "Settings",
+            fields = listOf(
+                ActionField("state", "State", FieldType.DROPDOWN, hint = "on / off / toggle"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "ime.set",
+            name = "Set Keyboard",
+            description = "Switch the active input method / keyboard (via Shizuku)",
+            category = "System",
+            fields = listOf(
+                ActionField("ime", "IME id", required = true, hint = "e.g. com.pkg/.InputMethodService"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "tts.speak",
             name = "Say (Text-to-Speech)",
             description = "Speak text aloud using the device speaker",
@@ -1044,10 +1068,11 @@ fun registerActionMetadata() {
         ActionMetadata(
             id = "screenshot.take",
             name = "Take Screenshot",
-            description = "Capture device screenshot",
+            description = "Capture the screen to a file via Shizuku",
             category = "App",
             fields = listOf(
-                ActionField("path", "Output path", hint = "optional output path"),
+                ActionField("path", "Path", hint = "optional output path (default: app external files)"),
+                ActionField("store", "Store path in", hint = "variable for the saved path (default: screenshot_path)"),
             )
         )
     )

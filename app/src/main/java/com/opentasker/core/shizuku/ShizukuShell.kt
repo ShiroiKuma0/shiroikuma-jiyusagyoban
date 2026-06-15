@@ -19,6 +19,9 @@ object ShizukuShell {
     fun hasPermission(): Boolean =
         runCatching { Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED }.getOrDefault(false)
 
+    /** Shizuku is running and access is granted — i.e. elevated commands can run right now. */
+    fun available(): Boolean = isRunning() && hasPermission()
+
     /** Pop Shizuku's permission dialog (result is picked up on the next [hasPermission] check). */
     fun requestPermission() {
         runCatching { Shizuku.requestPermission(PERMISSION_REQUEST_CODE) }

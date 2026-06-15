@@ -6,6 +6,7 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.shizuku.ShizukuShell
 import com.opentasker.core.storage.toEntity
 
 // ---------------------------------------------------------------------------------------------
@@ -67,19 +68,25 @@ class PutSettingAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val key = args["name"]?.trim().orEmpty()
         if (key.isEmpty()) return ActionResult.Failure("missing setting name")
-        val namespace = args["namespace"]?.trim()?.lowercase() ?: "system"
-        if (namespace != "system") {
-            return ActionResult.Failure("only the System namespace is writable without elevated (Shizuku) access")
+        val namespace = args["namespace"]?.trim()?.lowercase()?.takeIf { it.isNotEmpty() } ?: "system"
+        val value = args["value"].orEmpty()
+        // Secure/Global require elevated access — drive `settings put` through Shizuku.
+        if (namespace == "secure" || namespace == "global") {
+            return runElevated(ctx, "Setting", "settings put $namespace '$key' '$value'")
         }
-        if (!Settings.System.canWrite(ctx.app)) {
-            return ActionResult.Failure("Write system settings permission is not granted")
+        // System: prefer the WRITE_SETTINGS path; fall back to Shizuku if it's available.
+        if (Settings.System.canWrite(ctx.app)) {
+            return try {
+                Settings.System.putString(ctx.app.contentResolver, key, value)
+                ctx.logger("Setting $key set")
+                ActionResult.Success
+            } catch (e: Exception) {
+                ActionResult.Failure("failed to write setting: ${e.message}")
+            }
         }
-        return try {
-            Settings.System.putString(ctx.app.contentResolver, key, args["value"].orEmpty())
-            ctx.logger("Setting $key set")
-            ActionResult.Success
-        } catch (e: Exception) {
-            ActionResult.Failure("failed to write setting: ${e.message}")
+        if (ShizukuShell.available()) {
+            return runElevated(ctx, "Setting", "settings put system '$key' '$value'")
         }
+        return ActionResult.Failure("Write system settings permission is not granted (grant it, or use Shizuku)")
     }
 }

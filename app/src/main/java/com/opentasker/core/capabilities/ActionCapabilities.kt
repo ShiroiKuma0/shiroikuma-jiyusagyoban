@@ -27,17 +27,19 @@ object ActionCapabilityRegistry {
         "notify.cancel" to ActionCapability(CapabilityLevel.RequiresSetup, "Cancels a posted notification by tag and/or ID. Requires notification permission on Android 13+."),
         "plugin.locale.fire" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires an installed Locale-compatible plugin; requests are dispatched only to an explicit package."),
         "plugin.locale.query" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires an installed Locale-compatible condition plugin; queries are explicit ordered broadcasts with timeout handling."),
-        "wifi.toggle" to ActionCapability(CapabilityLevel.Unsupported, "Android 10+ blocks direct WiFi toggles for normal apps."),
+        "wifi.toggle" to shizukuCapability("WiFi toggle on Android 10+"),
         "bluetooth.toggle" to bluetoothCapability(),
         "brightness.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access."),
         "volume.set" to volumeCapability("May be blocked by Do Not Disturb policy access."),
         "dnd.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Do Not Disturb access."),
         "ringer.set" to ActionCapability(CapabilityLevel.RequiresSetup, "May require Do Not Disturb access on some devices when switching to silent mode."),
         "torch.set" to ActionCapability(CapabilityLevel.Supported, "Uses camera flashlight."),
-        "airplane.toggle" to elevatedUnsupported("airplane.toggle", "Airplane mode changes require system or device-owner privileges."),
-        "mobile.toggle" to elevatedUnsupported("mobile.toggle", "Mobile data changes require carrier, system, or device-owner privileges."),
+        "airplane.toggle" to shizukuCapability("Airplane mode"),
+        "mobile.toggle" to shizukuCapability("Mobile data"),
         "sms.send" to smsCapability(),
-        "screenshot.take" to elevatedUnsupported("screenshot.take", "Screenshots require MediaProjection consent or privileged shell access."),
+        "screenshot.take" to shizukuCapability("Screenshot"),
+        "location.mode" to shizukuCapability("Location mode"),
+        "ime.set" to shizukuCapability("Set keyboard"),
         "sound.play" to audioOutputCapability("Plays audio from a file path or content URI."),
         "sound.stop" to mediaKeyCapability("Stop playback via media key dispatch."),
         "sound.pause" to mediaKeyCapability("Pause playback via media key dispatch."),
@@ -95,6 +97,9 @@ object ActionCapabilityRegistry {
         } else {
             ActionCapability(CapabilityLevel.Supported, reason)
         }
+
+    private fun shizukuCapability(feature: String): ActionCapability =
+        ActionCapability(CapabilityLevel.RequiresSetup, "$feature runs through Shizuku — install and start Shizuku, then grant this app access.")
 
     private fun dialogCapability(): ActionCapability =
         ActionCapability(CapabilityLevel.RequiresSetup, "Shows over other apps; from a background trigger it needs the \"display over other apps\" permission. Always works when run from the app.")
