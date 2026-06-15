@@ -19,6 +19,7 @@ enum class FieldType {
     CHECKBOX,       // boolean toggle
     MULTILINE,      // multi-line text area
     COLOR,          // #AARRGGBB via a 4-slider RGBA picker (blank = use default)
+    WIDGET_LAYOUT,  // widget layout JSON, edited with the full visual editor (+ Tasker import)
 }
 
 data class ActionMetadata(
@@ -653,7 +654,7 @@ fun registerActionMetadata() {
             category = "System",
             fields = listOf(
                 ActionField("widget", "Widget name", required = true, hint = "the name set when the widget was placed"),
-                ActionField("layout", "Layout (JSON)", FieldType.MULTILINE, required = true, hint = "widget layout; %vars are expanded"),
+                ActionField("layout", "Layout", FieldType.WIDGET_LAYOUT, required = true, hint = "widget layout; %vars are expanded"),
             )
         )
     )

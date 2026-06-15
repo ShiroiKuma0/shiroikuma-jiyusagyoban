@@ -133,6 +133,7 @@ import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.contexts.contextConfigSummary
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.widget.TaskShortcutHelper
+import com.opentasker.widget.WidgetEditor
 import com.opentasker.core.engine.ActionTraceStatus
 import com.opentasker.core.engine.RunLogActionDiagnostic
 import com.opentasker.core.engine.RunLogOutcome
@@ -4106,6 +4107,37 @@ private fun ActionFieldInput(field: ActionField, value: String, onChange: (Strin
                     onClear = { onChange(""); showPicker = false },
                     onDismiss = { showPicker = false },
                 )
+            }
+        }
+
+        FieldType.WIDGET_LAYOUT -> {
+            var editing by remember { mutableStateOf(false) }
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(label, style = MaterialTheme.typography.labelLarge)
+                OutlinedButton(onClick = { editing = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (value.isBlank()) "Design layout (visual editor)" else "Edit layout visually")
+                }
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = onChange,
+                    label = { Text("Layout JSON (advanced)") },
+                    placeholder = field.hint?.let { { Text(it) } },
+                    supportingText = if (field.required) {{ Text("Required") }} else null,
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (editing) {
+                Dialog(
+                    onDismissRequest = { editing = false },
+                    properties = DialogProperties(usePlatformDefaultWidth = false),
+                ) {
+                    WidgetEditor(
+                        initialJson = value,
+                        onDone = { onChange(it); editing = false },
+                        onCancel = { editing = false },
+                    )
+                }
             }
         }
 
