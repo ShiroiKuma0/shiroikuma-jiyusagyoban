@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -84,6 +85,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -2820,7 +2822,7 @@ private fun TemplateSlotDialog(
     onDismiss: () -> Unit,
     onInstall: (Map<String, String>) -> Unit,
 ) {
-    var values by remember(template.id) { mutableStateOf(template.defaults()) }
+    var values by rememberSaveable(template.id) { mutableStateOf(template.defaults()) }
     val missingRequired = template.slots.any { it.required && values[it.key].isNullOrBlank() }
 
     AlertDialog(
@@ -2900,6 +2902,7 @@ private fun TaskEditorDialog(
                     label = { Text("Priority") },
                     supportingText = { Text(if (parsedPriority == null || parsedPriority !in 0..10) "Enter a value from 0 to 10." else "Higher priority tasks run first when queues compete.") },
                     isError = parsedPriority == null || parsedPriority !in 0..10,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -2948,6 +2951,16 @@ private fun ProfileEditorDialog(
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f),
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .toggleable(
+                            value = enabled,
+                            role = Role.Switch,
+                            onValueChange = { enabled = it },
+                        )
+                        .semantics {
+                            stateDescription = if (enabled) "On" else "Off"
+                        },
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -2961,7 +2974,7 @@ private fun ProfileEditorDialog(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        Switch(checked = enabled, onCheckedChange = { enabled = it })
+                        Switch(checked = enabled, onCheckedChange = null)
                     }
                 }
                 Text("Enter task", style = MaterialTheme.typography.labelLarge)
@@ -2979,6 +2992,7 @@ private fun ProfileEditorDialog(
                     label = { Text("Cooldown seconds") },
                     supportingText = { Text(if (cooldown.isNotBlank() && parsedCooldown == null) "Enter seconds as a whole number." else "Prevents rapid re-triggering after a match.") },
                     isError = cooldown.isNotBlank() && parsedCooldown == null,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -3275,6 +3289,7 @@ private fun ActionFieldInput(field: ActionField, value: String, onChange: (Strin
             label = { Text(label) },
             placeholder = field.hint?.let { { Text(it) } },
             supportingText = if (field.required) {{ Text("Required") }} else null,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -3368,7 +3383,7 @@ private fun DayPresetButton(
 ) {
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.heightIn(min = 48.dp),
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f) else Color.Transparent,
             contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
@@ -3417,11 +3432,11 @@ private fun ContextConfigDialog(
     onDismiss: () -> Unit,
     onSave: (ContextSpec) -> Unit,
 ) {
-    var invert by remember(state.existing, state.type) { mutableStateOf(state.existing?.invert ?: false) }
-    var config by remember(state.existing, state.type) {
+    var invert by rememberSaveable(state.profile.id, state.index, state.type) { mutableStateOf(state.existing?.invert ?: false) }
+    var config by rememberSaveable(state.profile.id, state.index, state.type) {
         mutableStateOf(defaultContextConfig(state.type) + (state.existing?.config ?: emptyMap()))
     }
-    var nfcWriteMessage by remember { mutableStateOf<String?>(null) }
+    var nfcWriteMessage by rememberSaveable(state.profile.id, state.index, state.type) { mutableStateOf<String?>(null) }
     val fields = contextFields(state.type)
     val saveConfig = contextConfigForSave(state.type, config)
     val missingRequired = fields.any { it.required && config[it.key].isNullOrBlank() } ||
@@ -3448,6 +3463,16 @@ private fun ContextConfigDialog(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
                         shape = RoundedCornerShape(12.dp),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .toggleable(
+                                value = invert,
+                                role = Role.Switch,
+                                onValueChange = { invert = it },
+                            )
+                            .semantics {
+                                stateDescription = if (invert) "On" else "Off"
+                            },
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -3461,7 +3486,7 @@ private fun ContextConfigDialog(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            Switch(checked = invert, onCheckedChange = { invert = it })
+                            Switch(checked = invert, onCheckedChange = null)
                         }
                     }
                     HorizontalDivider()

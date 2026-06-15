@@ -2,6 +2,7 @@ package com.opentasker.ui.screens
 
 import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -45,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +56,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
@@ -74,7 +77,7 @@ fun SceneLibraryScreen(
     onDeleteScene: (Scene) -> Unit,
     contentPadding: PaddingValues,
 ) {
-    var showCreateDialog by remember { mutableStateOf(false) }
+    var showCreateDialog by rememberSaveable { mutableStateOf(false) }
     var elementEditor by remember { mutableStateOf<SceneElementEditorState?>(null) }
     var pendingElementDelete by remember { mutableStateOf<SceneElementEditorState?>(null) }
     val sortedScenes = remember(scenes) { scenes.sortedBy { it.name.lowercase() } }
@@ -698,7 +701,7 @@ private fun SceneElementTypeSelector(
     selected: SceneElementType,
     onSelect: (SceneElementType) -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    var expanded by rememberSaveable { mutableStateOf(false) }
     Box {
         OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
             Text(sceneElementTypeLabel(selected), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -724,7 +727,7 @@ private fun SceneTaskBindingSelector(
     selectedTaskId: Long?,
     onSelect: (Long?) -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    var expanded by rememberSaveable { mutableStateOf(false) }
     val taskNames = remember(tasks) { tasks.associate { it.id to it.name } }
     Box {
         OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
@@ -768,6 +771,7 @@ private fun NumberField(
         onValueChange = onValueChange,
         label = { Text(label) },
         isError = isError,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         singleLine = true,
         modifier = modifier,
     )
@@ -826,9 +830,9 @@ private fun SceneEditorDialog(
     onDismiss: () -> Unit,
     onSave: (String, Int, Int) -> Unit,
 ) {
-    var name by remember { mutableStateOf("") }
-    var width by remember { mutableStateOf("320") }
-    var height by remember { mutableStateOf("240") }
+    var name by rememberSaveable { mutableStateOf("") }
+    var width by rememberSaveable { mutableStateOf("320") }
+    var height by rememberSaveable { mutableStateOf("240") }
     val parsedWidth = width.toIntOrNull()
     val parsedHeight = height.toIntOrNull()
     val canSave = name.isNotBlank() && parsedWidth != null && parsedHeight != null && parsedWidth > 0 && parsedHeight > 0
