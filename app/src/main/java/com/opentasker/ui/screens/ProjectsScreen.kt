@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -141,6 +142,7 @@ fun ProjectsManagementScreen(
     onDelete: (Project, Boolean) -> Unit,
     onMoveUp: (Project) -> Unit,
     onMoveDown: (Project) -> Unit,
+    onExportProject: (Project) -> Unit,
 ) {
     var editing by remember { mutableStateOf<Project?>(null) }
     var creating by remember { mutableStateOf(false) }
@@ -195,6 +197,7 @@ fun ProjectsManagementScreen(
                         onMoveDown = { onMoveDown(project) },
                         onEdit = { editing = project },
                         onDelete = { deleting = project },
+                        onExport = { onExportProject(project) },
                     )
                 }
             }
@@ -239,6 +242,7 @@ private fun ProjectManagementRow(
     onMoveDown: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onExport: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -263,6 +267,7 @@ private fun ProjectManagementRow(
         IconButton(onClick = onMoveDown, enabled = !isLast) {
             Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down")
         }
+        IconButton(onClick = onExport) { Icon(Icons.Filled.Upload, contentDescription = "Export project") }
         IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = "Edit") }
         IconButton(onClick = onDelete) {
             Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)

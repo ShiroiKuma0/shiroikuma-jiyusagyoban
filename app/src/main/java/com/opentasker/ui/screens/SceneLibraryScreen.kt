@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -73,6 +74,7 @@ fun SceneLibraryScreen(
     onUpdateScene: (Scene, String) -> Unit,
     onDeleteScene: (Scene) -> Unit,
     onMoveScene: (Scene) -> Unit,
+    onExportScene: (Scene) -> Unit,
     contentPadding: PaddingValues,
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -169,6 +171,7 @@ fun SceneLibraryScreen(
                 },
                 onDelete = { onDeleteScene(scene) },
                 onMoveToProject = { onMoveScene(scene) },
+                onExportToBundle = { onExportScene(scene) },
             )
         }
     }
@@ -264,6 +267,7 @@ private fun SceneCard(
     onMoveElement: (Int, SceneElement) -> Unit,
     onDelete: () -> Unit,
     onMoveToProject: () -> Unit,
+    onExportToBundle: () -> Unit,
 ) {
     val taskNames = remember(tasks) { tasks.associate { it.id to it.name } }
     val issues = remember(scene, tasks) { SceneValidator.validate(scene, tasks) }
@@ -283,6 +287,9 @@ private fun SceneCard(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                IconButton(onClick = onExportToBundle) {
+                    Icon(Icons.Filled.Upload, contentDescription = "Export scene")
                 }
                 IconButton(onClick = onMoveToProject) {
                     Icon(Icons.Filled.Folder, contentDescription = "Move scene to project")
