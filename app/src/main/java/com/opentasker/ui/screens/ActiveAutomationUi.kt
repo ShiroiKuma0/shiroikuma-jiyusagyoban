@@ -1,9 +1,15 @@
 package com.opentasker.ui.screens
 
+import android.Manifest
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
@@ -2524,6 +2530,27 @@ private fun TaskCard(
     }
 }
 
+/** Open this app's system notification settings (its channels), falling back to app details. */
+private fun openNotificationSettings(context: Context) {
+    runCatching {
+        context.startActivity(
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }.onFailure { openAppDetailsSettings(context) }
+}
+
+/** Open this app's "App info" settings page (where every permission toggle lives). */
+private fun openAppDetailsSettings(context: Context) {
+    runCatching {
+        context.startActivity(
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+}
+
 @Composable
 private fun ActionRow(
     index: Int,
@@ -2537,6 +2564,12 @@ private fun ActionRow(
 ) {
     val metadata = ActionMetadataRegistry.get(action.type)
     val capability = ActionCapabilityRegistry.get(action.type)
+    val context = LocalContext.current
+    val isNotification = action.type.startsWith("notify.")
+    // Granting POST_NOTIFICATIONS from the card; if the system won't prompt (already denied), fall to settings.
+    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted) openNotificationSettings(context)
+    }
     Surface(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
         shape = RoundedCornerShape(12.dp),
@@ -2598,6 +2631,21 @@ private fun ActionRow(
                     }
                     if (capability.level != CapabilityLevel.Supported) {
                         Text(capability.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                        if (capability.level == CapabilityLevel.RequiresSetup) {
+                            TextButton(onClick = {
+                                when {
+                                    isNotification && Build.VERSION.SDK_INT >= 33 &&
+                                        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED ->
+                                        notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    isNotification -> openNotificationSettings(context)
+                                    else -> openAppDetailsSettings(context)
+                                }
+                            }) {
+                                Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(if (isNotification) "Grant notification access" else "Open app settings")
+                            }
+                        }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = onEdit) {
