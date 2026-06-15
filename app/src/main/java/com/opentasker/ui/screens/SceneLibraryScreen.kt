@@ -19,7 +19,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import com.opentasker.ui.components.ReorderableRow
+import com.opentasker.ui.components.rememberListReorderState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.verticalScroll
@@ -76,12 +79,15 @@ fun SceneLibraryScreen(
     onDeleteScene: (Scene) -> Unit,
     onMoveScene: (Scene) -> Unit,
     onExportScene: (Scene) -> Unit,
+    manualSort: Boolean,
+    onReorder: (List<Scene>) -> Unit,
     contentPadding: PaddingValues,
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
     var elementEditor by remember { mutableStateOf<SceneElementEditorState?>(null) }
     var pendingElementDelete by remember { mutableStateOf<SceneElementEditorState?>(null) }
-    val sortedScenes = remember(scenes) { scenes.sortedBy { it.name.lowercase() } }
+    // Order comes from the ViewModel (Alphabetical or Manual); don't re-sort here.
+    val sortedScenes = scenes
 
     if (showCreateDialog) {
         SceneEditorDialog(
@@ -139,7 +145,10 @@ fun SceneLibraryScreen(
         return
     }
 
+    val listState = rememberLazyListState()
+    val reorder = rememberListReorderState()
     LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding),
@@ -154,26 +163,28 @@ fun SceneLibraryScreen(
             )
         }
         items(sortedScenes, key = { it.id }) { scene ->
-            SceneCard(
-                scene = scene,
-                tasks = tasks,
-                onAddElement = { elementEditor = SceneElementEditorState(scene = scene) },
-                onEditElement = { index, element -> elementEditor = SceneElementEditorState(scene, index, element) },
-                onDeleteElement = { index, element -> pendingElementDelete = SceneElementEditorState(scene, index, element) },
-                onMoveElement = { index, element ->
-                    onUpdateScene(
-                        scene.copy(
-                            elements = scene.elements.mapIndexed { i, existing ->
-                                if (i == index) element else existing
-                            },
-                        ),
-                        "Element moved",
-                    )
-                },
-                onDelete = { onDeleteScene(scene) },
-                onMoveToProject = { onMoveScene(scene) },
-                onExportToBundle = { onExportScene(scene) },
-            )
+            ReorderableRow(reorder, listState, sortedScenes, scene, { it.id }, manualSort, onReorder) {
+                SceneCard(
+                    scene = scene,
+                    tasks = tasks,
+                    onAddElement = { elementEditor = SceneElementEditorState(scene = scene) },
+                    onEditElement = { index, element -> elementEditor = SceneElementEditorState(scene, index, element) },
+                    onDeleteElement = { index, element -> pendingElementDelete = SceneElementEditorState(scene, index, element) },
+                    onMoveElement = { index, element ->
+                        onUpdateScene(
+                            scene.copy(
+                                elements = scene.elements.mapIndexed { i, existing ->
+                                    if (i == index) element else existing
+                                },
+                            ),
+                            "Element moved",
+                        )
+                    },
+                    onDelete = { onDeleteScene(scene) },
+                    onMoveToProject = { onMoveScene(scene) },
+                    onExportToBundle = { onExportScene(scene) },
+                )
+            }
         }
     }
 }
