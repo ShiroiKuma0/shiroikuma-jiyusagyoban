@@ -190,7 +190,7 @@ fun LoadingButton(
         if (icon != null && !isLoading) {
             Icon(
                 icon,
-                contentDescription = null,
+                contentDescription = text,
                 modifier = Modifier.size(DesignSystem.ComponentSize.iconMedium)
             )
             Spacer(modifier = Modifier.width(DesignSystem.Spacing.sm))

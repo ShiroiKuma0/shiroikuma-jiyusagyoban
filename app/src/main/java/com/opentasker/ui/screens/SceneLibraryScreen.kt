@@ -198,7 +198,7 @@ private fun SceneEmptyState(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Button(onClick = onCreateScene) {
-                Icon(Icons.Filled.Add, contentDescription = null)
+                Icon(Icons.Filled.Add, contentDescription = "Create scene")
                 Text("Create Scene")
             }
         }
@@ -245,7 +245,7 @@ private fun SceneOverviewCard(
                 SceneMetric("$errorCount", "Errors", Modifier.weight(1f))
             }
             Button(onClick = onCreateScene, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Add, contentDescription = null)
+                Icon(Icons.Filled.Add, contentDescription = "Add scene")
                 Text("Create Scene")
             }
         }
@@ -296,7 +296,7 @@ private fun SceneCard(
             )
 
             OutlinedButton(onClick = onAddElement, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Add, contentDescription = null)
+                Icon(Icons.Filled.Add, contentDescription = "Add element")
                 Spacer(Modifier.width(6.dp))
                 Text("Add Element")
             }

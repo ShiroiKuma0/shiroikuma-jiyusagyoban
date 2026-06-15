@@ -849,7 +849,7 @@ fun ActiveAutomationUi(
                                 OpenTaskerScreen.Setup -> Icons.Filled.Settings
                                 OpenTaskerScreen.RunLog -> Icons.Filled.Info
                             }
-                            Icon(icon, contentDescription = null)
+                            Icon(icon, contentDescription = destination.label)
                         },
                         label = { Text(destination.label) },
                         alwaysShowLabel = true,
@@ -1387,7 +1387,7 @@ private fun TaskLibrarySummaryCard(tasks: List<Task>, onCreateTask: () -> Unit) 
                     )
                 }
                 Button(onClick = onCreateTask) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Icon(Icons.Filled.Add, contentDescription = "Add task")
                     Spacer(Modifier.width(6.dp))
                     Text("Task")
                 }
@@ -1455,7 +1455,7 @@ private fun InlineNotice(title: String, body: String, color: Color) {
         ) {
             Icon(
                 if (color == MaterialTheme.colorScheme.error) Icons.Filled.Error else Icons.Filled.Info,
-                contentDescription = null,
+                contentDescription = if (color == MaterialTheme.colorScheme.error) "Error" else "Info",
                 tint = color,
                 modifier = Modifier.size(20.dp),
             )
@@ -1553,19 +1553,19 @@ private fun ProfileCard(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Edit, contentDescription = null)
+                    Icon(Icons.Filled.Edit, contentDescription = "Edit profile")
                     Spacer(Modifier.width(6.dp))
                     Text("Edit")
                 }
                 OutlinedButton(onClick = onAddContext, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Icon(Icons.Filled.Add, contentDescription = "Add context")
                     Spacer(Modifier.width(6.dp))
                     Text("Add Context")
                 }
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = null)
+                    Icon(Icons.Filled.Delete, contentDescription = "Delete profile")
                     Spacer(Modifier.width(6.dp))
                     Text("Delete Profile")
                 }
@@ -1677,12 +1677,12 @@ private fun TaskCard(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Edit, contentDescription = null)
+                    Icon(Icons.Filled.Edit, contentDescription = "Edit task")
                     Spacer(Modifier.width(6.dp))
                     Text("Edit")
                 }
                 OutlinedButton(onClick = onAddAction, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Icon(Icons.Filled.Add, contentDescription = "Add action")
                     Spacer(Modifier.width(6.dp))
                     Text("Add Action")
                 }
@@ -1690,18 +1690,18 @@ private fun TaskCard(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onRun) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                        Icon(Icons.Filled.PlayArrow, contentDescription = "Run task")
                         Spacer(Modifier.width(6.dp))
                         Text("Run")
                     }
                     OutlinedButton(onClick = onPin) {
-                        Icon(Icons.Filled.PushPin, contentDescription = null)
+                        Icon(Icons.Filled.PushPin, contentDescription = "Pin task")
                         Spacer(Modifier.width(6.dp))
                         Text("Pin")
                     }
                 }
                 TextButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = null)
+                    Icon(Icons.Filled.Delete, contentDescription = "Delete task")
                     Spacer(Modifier.width(6.dp))
                     Text("Delete Task")
                 }
@@ -1928,7 +1928,7 @@ private fun RunLogRetentionCard(
                                 if (selected) {
                                     Icon(
                                         Icons.Filled.CheckCircle,
-                                        contentDescription = null,
+                                        contentDescription = "Selected",
                                         modifier = Modifier.size(16.dp),
                                     )
                                 }
@@ -2159,7 +2159,11 @@ private fun RunLogCard(entry: RunLogEntry) {
                     RunLogOutcome.Failed -> Icons.Filled.Error
                     RunLogOutcome.Skipped -> Icons.Filled.Info
                 },
-                contentDescription = null,
+                contentDescription = when (outcome) {
+                    RunLogOutcome.Succeeded -> "Succeeded"
+                    RunLogOutcome.Failed -> "Failed"
+                    RunLogOutcome.Skipped -> "Skipped"
+                },
                 tint = accent,
             )
             Column(Modifier.weight(1f)) {
@@ -2332,7 +2336,7 @@ private fun EmptyState(
             Box(modifier = Modifier.padding(14.dp), contentAlignment = Alignment.Center) {
                 Icon(
                     Icons.Filled.Info,
-                    contentDescription = null,
+                    contentDescription = "Info",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(30.dp),
                 )
@@ -2397,7 +2401,7 @@ private fun DeleteConfirmationDialog(
         icon = {
             Icon(
                 Icons.Filled.Delete,
-                contentDescription = null,
+                contentDescription = "Delete",
                 tint = MaterialTheme.colorScheme.error,
             )
         },
@@ -3450,7 +3454,7 @@ private fun NfcWriteHelperCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.secondary)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text("NFC write helper", style = MaterialTheme.typography.labelLarge)
                     Text(
