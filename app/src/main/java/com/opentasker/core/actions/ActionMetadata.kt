@@ -100,6 +100,188 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "var.clear",
+            name = "Variable Clear",
+            description = "Unset a variable (and any array of the same name)",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Variable name", required = true, hint = "bare name, no %"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "var.split",
+            name = "Variable Split",
+            description = "Split a variable's value into an array of the same name",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Variable name", required = true, hint = "bare name, no %"),
+                ActionField("splitter", "Splitter", hint = "delimiter; \\n \\t allowed; empty = per character"),
+                ActionField("delete_base", "Delete base", FieldType.CHECKBOX, hint = "Unset the scalar after splitting"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "var.join",
+            name = "Variable Join",
+            description = "Join the array of this name back into a single value",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Array name", required = true, hint = "bare name, no %"),
+                ActionField("joiner", "Joiner", hint = "delimiter; \\n \\t allowed"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "var.replace",
+            name = "Variable Search Replace",
+            description = "Regex search/replace within a variable; optionally store matches",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Variable name", required = true, hint = "bare name, no %"),
+                ActionField("search", "Search", required = true, hint = "regular expression"),
+                ActionField("replace", "Replace with", hint = "replacement (empty = remove matches)"),
+                ActionField("ignore_case", "Ignore case", FieldType.CHECKBOX),
+                ActionField("multiline", "Multi-line", FieldType.CHECKBOX, hint = "^ and $ match per line"),
+                ActionField("store_matches", "Store matches in", hint = "array variable for matches (optional)"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "var.convert",
+            name = "Variable Convert",
+            description = "Transform a variable's value (case, encoding, hash, …)",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Variable name", required = true, hint = "bare name, no %"),
+                ActionField("function", "Function", FieldType.DROPDOWN, required = true,
+                    hint = "upper / lower / trim / length / reverse / capitalize / urlencode / urldecode / base64encode / base64decode / md5 / sha1 / sha256"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "var.add",
+            name = "Variable Add",
+            description = "Add a number to a numeric variable, with optional wrap and round",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Variable name", required = true, hint = "bare name, no %"),
+                ActionField("value", "Amount", FieldType.NUMBER, required = true, hint = "number to add (may be negative)"),
+                ActionField("wrap", "Wrap around", FieldType.NUMBER, hint = "wrap result modulo this value (optional)"),
+                ActionField("round", "Round", FieldType.CHECKBOX, hint = "round result to a whole number"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "datetime",
+            name = "Parse/Format DateTime",
+            description = "Produce a formatted date/time string into a variable",
+            category = "Variable",
+            fields = listOf(
+                ActionField("store", "Store result in", required = true, hint = "bare variable name"),
+                ActionField("source", "Source", FieldType.DROPDOWN, hint = "now / seconds / millis / formatted"),
+                ActionField("input", "Input", hint = "epoch value, or a date string when source = formatted"),
+                ActionField("inputformat", "Input format", hint = "pattern when source = formatted (e.g. yyyy-MM-dd)"),
+                ActionField("format", "Output format", hint = "default yyyy-MM-dd HH:mm:ss"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "array.set",
+            name = "Array Set",
+            description = "Populate an array from a delimited string",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Array name", required = true, hint = "bare name, no %"),
+                ActionField("values", "Values", FieldType.MULTILINE, hint = "delimited string"),
+                ActionField("splitter", "Splitter", hint = "delimiter; default , ; \\n \\t allowed"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "array.push",
+            name = "Array Push",
+            description = "Insert a value into an array",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Array name", required = true, hint = "bare name, no %"),
+                ActionField("value", "Value", hint = "value to insert"),
+                ActionField("position", "Position", FieldType.NUMBER, hint = "1-based; empty = end"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "array.pop",
+            name = "Array Pop",
+            description = "Remove an element from an array into a variable",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Array name", required = true, hint = "bare name, no %"),
+                ActionField("position", "Position", FieldType.NUMBER, hint = "1-based; empty = last"),
+                ActionField("store", "Store removed in", hint = "variable for the popped value (optional)"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "array.clear",
+            name = "Array Clear",
+            description = "Empty an array",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Array name", required = true, hint = "bare name, no %"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "array.process",
+            name = "Array Process",
+            description = "Sort, reverse, shuffle, dedupe or squash an array",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Array name", required = true, hint = "bare name, no %"),
+                ActionField("type", "Type", FieldType.DROPDOWN, required = true,
+                    hint = "sort / sort-desc / numeric / reverse / shuffle / unique / squash"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "array.merge",
+            name = "Arrays Merge",
+            description = "Concatenate several arrays into one",
+            category = "Variable",
+            fields = listOf(
+                ActionField("arrays", "Source arrays", required = true, hint = "comma-separated array names"),
+                ActionField("into", "Result array", required = true, hint = "bare name for the merged array"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "tts.speak",
             name = "Say (Text-to-Speech)",
             description = "Speak text aloud using the device speaker",

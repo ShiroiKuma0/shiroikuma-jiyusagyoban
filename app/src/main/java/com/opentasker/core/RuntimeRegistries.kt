@@ -52,6 +52,19 @@ import com.opentasker.core.actions.WakeAction
 import com.opentasker.core.actions.WakeOnLanAction
 import com.opentasker.core.actions.WiFiToggleAction
 import com.opentasker.core.actions.WriteFileAction
+import com.opentasker.core.actions.ClearVariableAction
+import com.opentasker.core.actions.SplitVariableAction
+import com.opentasker.core.actions.JoinVariableAction
+import com.opentasker.core.actions.SearchReplaceVariableAction
+import com.opentasker.core.actions.ConvertVariableAction
+import com.opentasker.core.actions.AddVariableAction
+import com.opentasker.core.actions.DateTimeAction
+import com.opentasker.core.actions.ArraySetAction
+import com.opentasker.core.actions.ArrayPushAction
+import com.opentasker.core.actions.ArrayPopAction
+import com.opentasker.core.actions.ArrayClearAction
+import com.opentasker.core.actions.ArrayProcessAction
+import com.opentasker.core.actions.ArrayMergeAction
 import com.opentasker.core.contexts.ApplicationContextSourceImpl
 import com.opentasker.core.contexts.ContextSourceRegistry
 import com.opentasker.core.contexts.EventContextSourceImpl
@@ -117,6 +130,19 @@ private fun registerBuiltInActions() {
         ScreenOffAction(),
         WakeAction(),
         LogAction(),
+        ClearVariableAction(),
+        SplitVariableAction(),
+        JoinVariableAction(),
+        SearchReplaceVariableAction(),
+        ConvertVariableAction(),
+        AddVariableAction(),
+        DateTimeAction(),
+        ArraySetAction(),
+        ArrayPushAction(),
+        ArrayPopAction(),
+        ArrayClearAction(),
+        ArrayProcessAction(),
+        ArrayMergeAction(),
         TermuxScriptAction(),
         TaskerUnsupportedAction(),
     ).forEach(ActionRegistry::register)

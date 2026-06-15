@@ -418,6 +418,10 @@ class ArrayStore {
         arrays[name] = values
     }
 
+    fun remove(name: String) {
+        arrays.remove(name)
+    }
+
     fun get(name: String, index: Int): String {
         return arrays[name]?.getOrNull(index) ?: ""
     }
