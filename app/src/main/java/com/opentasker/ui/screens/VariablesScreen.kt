@@ -168,7 +168,11 @@ private fun VariableRow(
                 )
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete variable")
+                Icon(
+                    Icons.Filled.Delete,
+                    contentDescription = "Delete variable",
+                    tint = MaterialTheme.colorScheme.error,
+                )
             }
         }
     }
