@@ -4,14 +4,15 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -122,6 +123,10 @@ fun WidgetEditor(initialJson: String, onDone: (String) -> Unit, onCancel: () -> 
     val fonts = remember { ThemeStore.availableFonts().map { it.fileName }.filter { it.isNotEmpty() } }
     val clipboard = LocalClipboardManager.current
     var showImport by remember { mutableStateOf(false) }
+    // Preview canvas size in dp — the home-screen widget's size varies by placement, so the designer
+    // sets a representative size here; tall widgets stay fully viewable (the preview area scrolls).
+    var previewW by remember { mutableStateOf(220) }
+    var previewH by remember { mutableStateOf(220) }
 
     if (showImport) {
         TaskerImportDialog(
@@ -147,7 +152,8 @@ fun WidgetEditor(initialJson: String, onDone: (String) -> Unit, onCancel: () -> 
                 OutlinedButton(onClick = { onDone(WidgetLayoutCodec.encode(root)) }) { Text("Save") }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            WidgetPreview(root)
+            PreviewSizeControl(previewW, previewH, { previewW = it }, { previewH = it })
+            WidgetPreview(root, previewW, previewH)
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp)) {
                 root.flatten().forEach { flat ->
@@ -208,20 +214,52 @@ private fun TaskerImportDialog(onImport: (WidgetNode) -> Unit, onDismiss: () -> 
     )
 }
 
+/** Renders the layout at the chosen canvas size. The frame is height-bounded and scrolls, so a tall
+ *  (or wide) widget can be viewed in full — most fit at once; very large ones scroll. */
 @Composable
-private fun WidgetPreview(root: WidgetNode) {
+private fun WidgetPreview(root: WidgetNode, widthDp: Int, heightDp: Int) {
     val density = LocalDensity.current.density
-    BoxWithConstraints(
-        Modifier.fillMaxWidth().height(170.dp).padding(12.dp)
-            .background(Color(0xFF202020), RoundedCornerShape(8.dp)),
+    Box(
+        Modifier.fillMaxWidth().heightIn(min = 96.dp, max = 460.dp).padding(12.dp)
+            .background(Color(0xFF202020), RoundedCornerShape(8.dp))
+            .verticalScroll(rememberScrollState())
+            .horizontalScroll(rememberScrollState()),
     ) {
-        val wPx = with(LocalDensity.current) { maxWidth.toPx() }.toInt()
-        val hPx = with(LocalDensity.current) { maxHeight.toPx() }.toInt()
+        val wPx = with(LocalDensity.current) { widthDp.dp.toPx() }.toInt().coerceAtLeast(1)
+        val hPx = with(LocalDensity.current) { heightDp.dp.toPx() }.toInt().coerceAtLeast(1)
         val bitmap = remember(root, wPx, hPx) {
             runCatching { WidgetRenderer(density) { ThemeStore.typeface(it) }.render(root, wPx, hPx) }.getOrNull()
         }
-        if (bitmap != null) Image(bitmap.asImageBitmap(), contentDescription = "Preview", modifier = Modifier.fillMaxSize())
+        if (bitmap != null) {
+            Image(bitmap.asImageBitmap(), contentDescription = "Preview", modifier = Modifier.size(widthDp.dp, heightDp.dp))
+        }
     }
+}
+
+/** Compact width × height (dp) control for the preview canvas. */
+@Composable
+private fun PreviewSizeControl(width: Int, height: Int, onWidth: (Int) -> Unit, onHeight: (Int) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("Preview size", style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+        PreviewDimField("W", width, 40..600, onWidth)
+        Text("×", style = MaterialTheme.typography.labelMedium)
+        PreviewDimField("H", height, 40..1200, onHeight)
+    }
+}
+
+@Composable
+private fun PreviewDimField(label: String, value: Int, range: IntRange, onChange: (Int) -> Unit) {
+    OutlinedTextField(
+        value = value.toString(),
+        onValueChange = { s -> onChange((s.filter(Char::isDigit).toIntOrNull() ?: range.first).coerceIn(range)) },
+        label = { Text(label) },
+        singleLine = true,
+        modifier = Modifier.width(96.dp),
+    )
 }
 
 @Composable
