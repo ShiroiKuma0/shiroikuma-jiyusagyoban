@@ -214,6 +214,16 @@ object ThemeStore {
         }
     }
 
+    /** Delete an imported font file. If it was the selected font, fall back to the system default. */
+    fun deleteFont(fileName: String): Boolean {
+        if (fileName.isEmpty() || fileName == MONOSPACE) return false
+        val deleted = runCatching { File(fontsDir(), fileName).delete() }.getOrDefault(false)
+        typefaceCache.remove(fileName)
+        fontFamilyCache.remove(fileName)
+        if (_state.value.fontFileName == fileName) update { it.copy(fontFileName = "") }
+        return deleted
+    }
+
     /** The Compose FontFamily for a selection, or null for the platform default. Cached by name. */
     fun fontFamily(fileName: String): FontFamily? = when {
         fileName.isEmpty() -> null

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -264,6 +265,10 @@ fun UiCustomizationScreen(
                 showFontPicker = false
             },
             onAddFont = { fontImportLauncher.launch(arrayOf("*/*")) },
+            onDelete = { fileName ->
+                ThemeStore.deleteFont(fileName)
+                fontsRefresh++
+            },
         )
     }
 }
@@ -522,6 +527,7 @@ private fun FontPickerDialog(
     onDismiss: () -> Unit,
     onPick: (String) -> Unit,
     onAddFont: () -> Unit,
+    onDelete: (String) -> Unit,
 ) {
     AlertDialog(
         modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
@@ -555,6 +561,11 @@ private fun FontPickerDialog(
                         )
                         if (option.fileName == current) {
                             Icon(Icons.Filled.CheckCircle, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
+                        }
+                        if (option.fileName.isNotEmpty() && option.fileName != ThemeStore.MONOSPACE) {
+                            IconButton(onClick = { onDelete(option.fileName) }) {
+                                Icon(Icons.Filled.Delete, contentDescription = "Delete font", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 }
