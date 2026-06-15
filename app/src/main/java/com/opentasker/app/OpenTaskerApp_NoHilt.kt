@@ -9,6 +9,7 @@ import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.DatabaseMigrations
 import com.opentasker.core.storage.PendingRestoreApplyResult
+import com.opentasker.core.engine.RunLogPruneWorker
 
 // Application singleton keeps startup deterministic while Hilt is not active.
 class OpenTaskerApp_NoHilt : Application() {
@@ -48,5 +49,7 @@ class OpenTaskerApp_NoHilt : Application() {
                 .addMigrations(*DatabaseMigrations.getAllMigrations())
                 .build()
         }
+
+        RunLogPruneWorker.enqueue(this)
     }
 }
