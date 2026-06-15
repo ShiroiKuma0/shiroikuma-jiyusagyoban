@@ -65,6 +65,17 @@ import com.opentasker.core.actions.ArrayPopAction
 import com.opentasker.core.actions.ArrayClearAction
 import com.opentasker.core.actions.ArrayProcessAction
 import com.opentasker.core.actions.ArrayMergeAction
+import com.opentasker.core.actions.MoveFileAction
+import com.opentasker.core.actions.MakeDirectoryAction
+import com.opentasker.core.actions.FlashAction
+import com.opentasker.core.actions.CommentAction
+import com.opentasker.core.actions.SetClipboardAction
+import com.opentasker.core.actions.GetClipboardAction
+import com.opentasker.core.actions.ComposeEmailAction
+import com.opentasker.core.actions.SetWallpaperAction
+import com.opentasker.core.actions.WifiSettingsAction
+import com.opentasker.core.actions.ListAppsAction
+import com.opentasker.core.actions.ImePickerAction
 import com.opentasker.core.contexts.ApplicationContextSourceImpl
 import com.opentasker.core.contexts.ContextSourceRegistry
 import com.opentasker.core.contexts.EventContextSourceImpl
@@ -143,6 +154,17 @@ private fun registerBuiltInActions() {
         ArrayClearAction(),
         ArrayProcessAction(),
         ArrayMergeAction(),
+        MoveFileAction(),
+        MakeDirectoryAction(),
+        FlashAction(),
+        CommentAction(),
+        SetClipboardAction(),
+        GetClipboardAction(),
+        ComposeEmailAction(),
+        SetWallpaperAction(),
+        WifiSettingsAction(),
+        ListAppsAction(),
+        ImePickerAction(),
         TermuxScriptAction(),
         TaskerUnsupportedAction(),
     ).forEach(ActionRegistry::register)

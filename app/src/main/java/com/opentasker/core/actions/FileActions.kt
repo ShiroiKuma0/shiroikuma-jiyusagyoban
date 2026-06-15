@@ -146,7 +146,62 @@ class ListFilesAction : Action {
     }
 }
 
-private fun safeUserFile(ctx: ActionContext, path: String, mustExist: Boolean = false): File? {
+/**
+ * Move/rename a file within the sandbox.
+ *
+ * Args:
+ *   - "from": source path (must exist)
+ *   - "to": destination path
+ */
+class MoveFileAction : Action {
+    override val id = "file.move"
+    override val category = ActionCategory.FILE
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val fromArg = args["from"] ?: return ActionResult.Failure("missing from")
+        val toArg = args["to"] ?: return ActionResult.Failure("missing to")
+        val src = safeUserFile(ctx, fromArg, mustExist = true) ?: return ActionResult.Failure("source is outside 白い熊 自由作業盤 files")
+        val dest = safeUserFile(ctx, toArg) ?: return ActionResult.Failure("destination is outside 白い熊 自由作業盤 files")
+        return try {
+            dest.parentFile?.mkdirs()
+            val ok = src.renameTo(dest) || run {
+                src.copyTo(dest, overwrite = true); src.delete()
+            }
+            if (ok) {
+                ctx.logger("Moved ${src.name} → ${dest.name}")
+                ActionResult.Success
+            } else {
+                ActionResult.Failure("move failed")
+            }
+        } catch (e: Exception) {
+            ActionResult.Failure("move failed: ${e.message}")
+        }
+    }
+}
+
+/**
+ * Create a directory (and any missing parents) within the sandbox.
+ *
+ * Args:
+ *   - "path": directory path
+ */
+class MakeDirectoryAction : Action {
+    override val id = "file.mkdir"
+    override val category = ActionCategory.FILE
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val path = args["path"] ?: return ActionResult.Failure("missing path")
+        val dir = safeUserFile(ctx, path) ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
+        return if (dir.isDirectory || dir.mkdirs()) {
+            ctx.logger("Created directory ${dir.name}")
+            ActionResult.Success
+        } else {
+            ActionResult.Failure("could not create directory")
+        }
+    }
+}
+
+internal fun safeUserFile(ctx: ActionContext, path: String, mustExist: Boolean = false): File? {
     if (path.isBlank() || path.contains('\u0000')) return null
     val baseDir = File(ctx.app.filesDir, "user_files").canonicalFile
     val requested = File(baseDir, path.trimStart('/', '\\')).canonicalFile

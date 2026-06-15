@@ -282,6 +282,139 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "file.move",
+            name = "Move File",
+            description = "Move or rename a file within the app's files",
+            category = "File",
+            fields = listOf(
+                ActionField("from", "From", required = true, hint = "source path"),
+                ActionField("to", "To", required = true, hint = "destination path"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "file.mkdir",
+            name = "Create Directory",
+            description = "Create a directory (and parents) within the app's files",
+            category = "File",
+            fields = listOf(
+                ActionField("path", "Path", required = true, hint = "directory path"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "flash",
+            name = "Flash",
+            description = "Show a brief toast message",
+            category = "System",
+            fields = listOf(
+                ActionField("text", "Text", required = true, hint = "message; supports %expansion"),
+                ActionField("long", "Long", FieldType.CHECKBOX, hint = "longer display time"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "flow.comment",
+            name = "Comment",
+            description = "A no-op note for documenting a task",
+            category = "Flow",
+            fields = listOf(
+                ActionField("text", "Comment", FieldType.MULTILINE, hint = "note text"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "clipboard.set",
+            name = "Set Clipboard",
+            description = "Put text on the system clipboard",
+            category = "System",
+            fields = listOf(
+                ActionField("text", "Text", FieldType.MULTILINE, hint = "text to copy"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "clipboard.get",
+            name = "Get Clipboard",
+            description = "Read clipboard text into a variable",
+            category = "System",
+            fields = listOf(
+                ActionField("store", "Store in", required = true, hint = "variable name"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "email.compose",
+            name = "Compose Email",
+            description = "Open the email composer prefilled",
+            category = "App",
+            fields = listOf(
+                ActionField("to", "To", hint = "comma-separated addresses"),
+                ActionField("cc", "Cc", hint = "comma-separated addresses"),
+                ActionField("subject", "Subject"),
+                ActionField("body", "Body", FieldType.MULTILINE),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "wallpaper.set",
+            name = "Set Wallpaper",
+            description = "Set the wallpaper from an image in the app's files",
+            category = "System",
+            fields = listOf(
+                ActionField("path", "Image path", required = true, hint = "path to a .png/.jpg in app files"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "wifi.settings",
+            name = "WiFi Settings",
+            description = "Open the system Wi-Fi settings screen",
+            category = "Settings",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "apps.list",
+            name = "List Apps",
+            description = "List installed apps into array variable(s)",
+            category = "App",
+            fields = listOf(
+                ActionField("packages", "Packages array", required = true, hint = "array name for package names"),
+                ActionField("labels", "Labels array", hint = "array name for app labels (optional)"),
+                ActionField("include_system", "Include system apps", FieldType.CHECKBOX),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "ime.pick",
+            name = "Keyboard Picker",
+            description = "Show the input-method (keyboard) picker",
+            category = "System",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "tts.speak",
             name = "Say (Text-to-Speech)",
             description = "Speak text aloud using the device speaker",
@@ -548,8 +681,8 @@ fun registerActionMetadata() {
             description = "Adjust volume for a stream",
             category = "Settings",
             fields = listOf(
-                ActionField("stream", "Stream", FieldType.DROPDOWN, required = true, hint = "music, call, alarm"),
-                ActionField("level", "Level (0-100)", FieldType.NUMBER, required = true),
+                ActionField("stream", "Stream", FieldType.DROPDOWN, required = true, hint = "music / ring / alarm / notification / call / system"),
+                ActionField("level", "Level", FieldType.NUMBER, required = true, hint = "0..max for the stream, or mute / unmute"),
             )
         )
     )
