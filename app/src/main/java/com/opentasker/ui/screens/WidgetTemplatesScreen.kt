@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,6 +51,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.opentasker.core.widget.WidgetLayoutCodec
 import com.opentasker.core.widget.WidgetRenderer
+import com.opentasker.ui.components.SelectionBar
+import com.opentasker.ui.components.selectableItem
 import com.opentasker.ui.theme.ThemeStore
 import com.opentasker.widget.WidgetEditor
 import com.opentasker.widget.WidgetTemplate
@@ -65,6 +69,12 @@ fun WidgetTemplatesScreen(
     onImport: (String) -> Int,
     onExportAll: () -> String,
     onMessage: (String) -> Unit,
+    selectedNames: Set<String>,
+    onLongPressTemplate: (WidgetTemplate) -> Unit,
+    onToggleSelectTemplate: (WidgetTemplate) -> Unit,
+    onSelectAllTemplates: () -> Unit,
+    onClearTemplateSelection: () -> Unit,
+    onDeleteSelectedTemplates: () -> Unit,
     contentPadding: PaddingValues,
 ) {
     // The template currently open in the full-screen editor (null = none).
@@ -72,8 +82,18 @@ fun WidgetTemplatesScreen(
     var showNameDialog by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
+    val selectionActive = selectedNames.isNotEmpty()
 
     Column(Modifier.fillMaxSize().padding(contentPadding)) {
+        if (selectionActive) {
+            SelectionBar(
+                count = selectedNames.size,
+                total = templates.size,
+                onSelectAll = onSelectAllTemplates,
+                onClear = onClearTemplateSelection,
+                onDelete = onDeleteSelectedTemplates,
+            )
+        }
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -105,6 +125,10 @@ fun WidgetTemplatesScreen(
             items(templates, key = { it.name }) { template ->
                 TemplateRow(
                     template = template,
+                    selectionActive = selectionActive,
+                    selected = template.name in selectedNames,
+                    onLongPress = { onLongPressTemplate(template) },
+                    onToggleSelect = { onToggleSelectTemplate(template) },
                     onEdit = { editing = template },
                     onCopy = { clipboard.setText(AnnotatedString(template.layout)) },
                     onDelete = { onDelete(template.name) },
@@ -152,19 +176,31 @@ fun WidgetTemplatesScreen(
 @Composable
 private fun TemplateRow(
     template: WidgetTemplate,
+    selectionActive: Boolean,
+    selected: Boolean,
+    onLongPress: () -> Unit,
+    onToggleSelect: () -> Unit,
     onEdit: () -> Unit,
     onCopy: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Card(
-        onClick = onEdit,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).selectableItem(
+            selectionActive = selectionActive,
+            onLongPress = onLongPress,
+            onToggleSelect = onToggleSelect,
+            onTapNormal = onEdit,
+        ),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (selectionActive) {
+                Checkbox(checked = selected, onCheckedChange = { onToggleSelect() })
+            }
             TemplatePreview(template.layout)
             Text(template.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
             IconButton(onClick = onCopy) { Icon(Icons.Filled.ContentCopy, contentDescription = "Copy layout JSON") }

@@ -36,7 +36,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.opentasker.ui.components.ReorderableRow
+import com.opentasker.ui.components.ConfirmDeleteSelected
 import com.opentasker.ui.components.RgbaColorPickerDialog
+import com.opentasker.ui.components.SelectionBar
+import com.opentasker.ui.components.selectableItem
 import com.opentasker.ui.components.rememberListReorderState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -473,6 +476,10 @@ class ActiveAutomationViewModel(
         db.sceneDao().delete(scene.toEntity())
     }
 
+    fun deleteScenes(scenes: List<Scene>) = launchWithMessage("Deleted ${scenes.size} scene(s)") {
+        scenes.forEach { db.sceneDao().delete(it.toEntity()) }
+    }
+
     // ---- Projects (organizational; the engine ignores projectId) ----
 
     fun selectProject(filter: ProjectFilter) {
@@ -586,6 +593,13 @@ class ActiveAutomationViewModel(
     fun deleteProfile(profile: Profile) = launchWithMessage("Profile deleted") {
         db.profileDao().delete(profile.toEntity())
         locationDwellStateStore.clearProfile(profile.id)
+    }
+
+    fun deleteProfiles(profiles: List<Profile>) = launchWithMessage("Deleted ${profiles.size} profile(s)") {
+        profiles.forEach {
+            db.profileDao().delete(it.toEntity())
+            locationDwellStateStore.clearProfile(it.id)
+        }
     }
 
     fun installProfileTemplate(template: ProfileTemplate, slotValues: Map<String, String>) =
@@ -979,9 +993,15 @@ fun ActiveAutomationUi(
     var contextPickerProfile by remember { mutableStateOf<Profile?>(null) }
     var contextEdit by remember { mutableStateOf<ContextEditState?>(null) }
     var pendingDelete by remember { mutableStateOf<DeleteTarget?>(null) }
-    // Multi-select in the Tasks tab: long-press a task to start, tap others to add/remove.
+    // Multi-select per tab: long-press an item to start, tap others to add/remove, then delete.
     var selectedTaskIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var confirmDeleteSelectedTasks by remember { mutableStateOf(false) }
+    var selectedProfileIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var confirmDeleteSelectedProfiles by remember { mutableStateOf(false) }
+    var selectedSceneIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var confirmDeleteSelectedScenes by remember { mutableStateOf(false) }
+    var selectedTemplateNames by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var confirmDeleteSelectedTemplates by remember { mutableStateOf(false) }
     val taskerImportReview = viewModel.taskerImportReview
     val taskerImportBusy = viewModel.taskerImportBusy
     val openTaskerBundleReview = viewModel.openTaskerBundleReview
@@ -1070,8 +1090,13 @@ fun ActiveAutomationUi(
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
-    // Leaving the Tasks tab clears any in-progress multi-selection.
-    LaunchedEffect(screen) { if (screen != OpenTaskerScreen.Tasks) selectedTaskIds = emptySet() }
+    // Switching tabs clears any in-progress multi-selection.
+    LaunchedEffect(screen) {
+        selectedTaskIds = emptySet()
+        selectedProfileIds = emptySet()
+        selectedSceneIds = emptySet()
+        selectedTemplateNames = emptySet()
+    }
 
     val headerDetail = when (screen) {
         OpenTaskerScreen.Profiles -> "${profiles.count { it.enabled }} enabled - ${profiles.size} total"
@@ -1344,6 +1369,12 @@ fun ActiveAutomationUi(
                 onExportProfile = { exportRequest = ExportRequest(name = "Profile: ${it.name}", fileName = exportFileName(it.name), profileIds = setOf(it.id)) },
                 manualSort = sortPrefs.profiles == SortMethod.MANUAL,
                 onReorder = { viewModel.reorderProfiles(it) },
+                selectedIds = selectedProfileIds,
+                onLongPressProfile = { selectedProfileIds = selectedProfileIds + it.id },
+                onToggleSelectProfile = { selectedProfileIds = if (it.id in selectedProfileIds) selectedProfileIds - it.id else selectedProfileIds + it.id },
+                onSelectAllProfiles = { selectedProfileIds = visibleProfiles.map { it.id }.toSet() },
+                onClearProfileSelection = { selectedProfileIds = emptySet() },
+                onDeleteSelectedProfiles = { confirmDeleteSelectedProfiles = true },
                 contentPadding = innerPadding,
             )
 
@@ -1424,6 +1455,12 @@ fun ActiveAutomationUi(
                 onExportScene = { exportRequest = ExportRequest(name = "Scene: ${it.name}", fileName = exportFileName(it.name), sceneIds = setOf(it.id)) },
                 manualSort = sortPrefs.scenes == SortMethod.MANUAL,
                 onReorder = { viewModel.reorderScenes(it) },
+                selectedIds = selectedSceneIds,
+                onLongPressScene = { selectedSceneIds = selectedSceneIds + it.id },
+                onToggleSelectScene = { selectedSceneIds = if (it.id in selectedSceneIds) selectedSceneIds - it.id else selectedSceneIds + it.id },
+                onSelectAllScenes = { selectedSceneIds = visibleScenes.map { it.id }.toSet() },
+                onClearSceneSelection = { selectedSceneIds = emptySet() },
+                onDeleteSelectedScenes = { confirmDeleteSelectedScenes = true },
                 contentPadding = innerPadding,
             )
 
@@ -1434,6 +1471,12 @@ fun ActiveAutomationUi(
                 onImport = { raw -> com.opentasker.widget.TemplateStore.importJson(raw) },
                 onExportAll = { com.opentasker.widget.TemplateStore.exportJson() },
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
+                selectedNames = selectedTemplateNames,
+                onLongPressTemplate = { selectedTemplateNames = selectedTemplateNames + it.name },
+                onToggleSelectTemplate = { selectedTemplateNames = if (it.name in selectedTemplateNames) selectedTemplateNames - it.name else selectedTemplateNames + it.name },
+                onSelectAllTemplates = { selectedTemplateNames = widgetTemplates.map { it.name }.toSet() },
+                onClearTemplateSelection = { selectedTemplateNames = emptySet() },
+                onDeleteSelectedTemplates = { confirmDeleteSelectedTemplates = true },
                 contentPadding = innerPadding,
             )
 
@@ -1504,6 +1547,39 @@ fun ActiveAutomationUi(
                 }) { Text("Delete") }
             },
             dismissButton = { TextButton(onClick = { confirmDeleteSelectedTasks = false }) { Text("Cancel") } },
+        )
+    }
+
+    if (confirmDeleteSelectedProfiles) {
+        ConfirmDeleteSelected(
+            count = selectedProfileIds.size, noun = "profile",
+            onConfirm = {
+                viewModel.deleteProfiles(visibleProfiles.filter { it.id in selectedProfileIds })
+                selectedProfileIds = emptySet(); confirmDeleteSelectedProfiles = false
+            },
+            onDismiss = { confirmDeleteSelectedProfiles = false },
+        )
+    }
+
+    if (confirmDeleteSelectedScenes) {
+        ConfirmDeleteSelected(
+            count = selectedSceneIds.size, noun = "scene",
+            onConfirm = {
+                viewModel.deleteScenes(visibleScenes.filter { it.id in selectedSceneIds })
+                selectedSceneIds = emptySet(); confirmDeleteSelectedScenes = false
+            },
+            onDismiss = { confirmDeleteSelectedScenes = false },
+        )
+    }
+
+    if (confirmDeleteSelectedTemplates) {
+        ConfirmDeleteSelected(
+            count = selectedTemplateNames.size, noun = "template",
+            onConfirm = {
+                selectedTemplateNames.forEach { com.opentasker.widget.TemplateStore.delete(it) }
+                selectedTemplateNames = emptySet(); confirmDeleteSelectedTemplates = false
+            },
+            onDismiss = { confirmDeleteSelectedTemplates = false },
         )
     }
 
@@ -1734,6 +1810,12 @@ private fun ProfilesScreen(
     onExportProfile: (Profile) -> Unit,
     manualSort: Boolean,
     onReorder: (List<Profile>) -> Unit,
+    selectedIds: Set<Long>,
+    onLongPressProfile: (Profile) -> Unit,
+    onToggleSelectProfile: (Profile) -> Unit,
+    onSelectAllProfiles: () -> Unit,
+    onClearProfileSelection: () -> Unit,
+    onDeleteSelectedProfiles: () -> Unit,
     contentPadding: PaddingValues,
 ) {
     if (tasks.isEmpty()) {
@@ -1775,37 +1857,50 @@ private fun ProfilesScreen(
 
     val listState = rememberLazyListState()
     val reorder = rememberListReorderState()
-    LazyColumn(
-        state = listState,
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(contentPadding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            WorkspaceSummaryCard(
-                profiles = profiles,
-                tasks = tasks,
-                runLogs = runLogs,
-                onBrowseTemplates = onBrowseTemplates,
-                onExportOpenTaskerBundle = onExportOpenTaskerBundle,
-                onImportOpenTaskerBundle = onImportOpenTaskerBundle,
-                openTaskerBundleBusy = openTaskerBundleBusy,
-                onImportTaskerXml = onImportTaskerXml,
-                taskerImportBusy = taskerImportBusy,
+    val selectionActive = selectedIds.isNotEmpty()
+    Column(Modifier.fillMaxSize().padding(contentPadding)) {
+        if (selectionActive) {
+            SelectionBar(
+                count = selectedIds.size,
+                total = profiles.size,
+                onSelectAll = onSelectAllProfiles,
+                onClear = onClearProfileSelection,
+                onDelete = onDeleteSelectedProfiles,
             )
         }
-        item {
-            TemplatePromptCard(onBrowseTemplates)
-        }
-        items(profiles, key = { it.id }) { profile ->
-            ReorderableRow(reorder, listState, profiles, profile, { it.id }, manualSort, onReorder) {
-                val enterTaskName = tasks.firstOrNull { it.id == profile.enterTaskId }?.name ?: "Missing task #${profile.enterTaskId}"
-                ProfileCard(
-                    profile = profile,
-                    enterTaskName = enterTaskName,
-                    onEdit = { onEditProfile(profile) },
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().weight(1f),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item {
+                WorkspaceSummaryCard(
+                    profiles = profiles,
+                    tasks = tasks,
+                    runLogs = runLogs,
+                    onBrowseTemplates = onBrowseTemplates,
+                    onExportOpenTaskerBundle = onExportOpenTaskerBundle,
+                    onImportOpenTaskerBundle = onImportOpenTaskerBundle,
+                    openTaskerBundleBusy = openTaskerBundleBusy,
+                    onImportTaskerXml = onImportTaskerXml,
+                    taskerImportBusy = taskerImportBusy,
+                )
+            }
+            item {
+                TemplatePromptCard(onBrowseTemplates)
+            }
+            items(profiles, key = { it.id }) { profile ->
+                ReorderableRow(reorder, listState, profiles, profile, { it.id }, manualSort && !selectionActive, onReorder) {
+                    val enterTaskName = tasks.firstOrNull { it.id == profile.enterTaskId }?.name ?: "Missing task #${profile.enterTaskId}"
+                    ProfileCard(
+                        profile = profile,
+                        enterTaskName = enterTaskName,
+                        selectionActive = selectionActive,
+                        selected = profile.id in selectedIds,
+                        onLongPress = { onLongPressProfile(profile) },
+                        onToggleSelect = { onToggleSelectProfile(profile) },
+                        onEdit = { onEditProfile(profile) },
                     onDelete = { onDeleteProfile(profile) },
                     onToggle = { onToggleProfile(profile, it) },
                     onAddContext = { onAddContext(profile) },
@@ -1813,7 +1908,8 @@ private fun ProfilesScreen(
                     onDeleteContext = { index -> onDeleteContext(profile, index) },
                     onMove = { onMoveProfile(profile) },
                     onExport = { onExportProfile(profile) },
-                )
+                    )
+                }
             }
         }
     }
@@ -2068,6 +2164,10 @@ private fun TemplatePromptCard(onBrowseTemplates: () -> Unit) {
 private fun ProfileCard(
     profile: Profile,
     enterTaskName: String,
+    selectionActive: Boolean,
+    selected: Boolean,
+    onLongPress: () -> Unit,
+    onToggleSelect: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onToggle: (Boolean) -> Unit,
@@ -2082,16 +2182,31 @@ private fun ProfileCard(
             .fillMaxWidth()
             .animateContentSize(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (profile.enabled) 0.72f else 0.46f),
+            containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (profile.enabled) 0.72f else 0.46f),
         ),
         border = BorderStroke(
-            1.dp,
-            if (profile.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+            if (selected) 2.dp else 1.dp,
+            when {
+                selected -> MaterialTheme.colorScheme.primary
+                profile.enabled -> MaterialTheme.colorScheme.primary
+                else -> MaterialTheme.colorScheme.outlineVariant
+            },
         ),
         shape = RoundedCornerShape(16.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth().selectableItem(
+                    selectionActive = selectionActive,
+                    onLongPress = onLongPress,
+                    onToggleSelect = onToggleSelect,
+                ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (selectionActive) {
+                    Checkbox(checked = selected, onCheckedChange = { onToggleSelect() })
+                }
                 Column(Modifier.weight(1f)) {
                     Text(profile.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("Runs: $enterTaskName", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -2149,29 +2264,6 @@ private fun ProfileCard(
                     Text("Delete Profile")
                 }
             }
-        }
-    }
-}
-
-/** Contextual bar shown while a multi-selection is active: count, select-all, delete, and clear. */
-@Composable
-private fun SelectionBar(
-    count: Int,
-    total: Int,
-    onSelectAll: () -> Unit,
-    onClear: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            IconButton(onClick = onClear) { Icon(Icons.Filled.Close, contentDescription = "Clear selection") }
-            Text("$count selected", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            TextButton(onClick = onSelectAll, enabled = count < total) { Text("Select all") }
-            IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = "Delete selected") }
         }
     }
 }
@@ -2304,13 +2396,12 @@ private fun TaskCard(
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
-                // Tap = expand (or toggle-select while selecting); long-press = start / extend selection.
-                modifier = Modifier.fillMaxWidth().pointerInput(selectionActive) {
-                    detectTapGestures(
-                        onTap = { if (selectionActive) onToggleSelect() else onToggleExpanded() },
-                        onLongPress = { onLongPress() },
-                    )
-                },
+                modifier = Modifier.fillMaxWidth().selectableItem(
+                    selectionActive = selectionActive,
+                    onLongPress = onLongPress,
+                    onToggleSelect = onToggleSelect,
+                    onTapNormal = onToggleExpanded,
+                ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (selectionActive) {

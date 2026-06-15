@@ -21,8 +21,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.Checkbox
 import com.opentasker.ui.components.ReorderableRow
+import com.opentasker.ui.components.SelectionBar
 import com.opentasker.ui.components.rememberListReorderState
+import com.opentasker.ui.components.selectableItem
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.verticalScroll
@@ -81,6 +84,12 @@ fun SceneLibraryScreen(
     onExportScene: (Scene) -> Unit,
     manualSort: Boolean,
     onReorder: (List<Scene>) -> Unit,
+    selectedIds: Set<Long>,
+    onLongPressScene: (Scene) -> Unit,
+    onToggleSelectScene: (Scene) -> Unit,
+    onSelectAllScenes: () -> Unit,
+    onClearSceneSelection: () -> Unit,
+    onDeleteSelectedScenes: () -> Unit,
     contentPadding: PaddingValues,
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -147,26 +156,39 @@ fun SceneLibraryScreen(
 
     val listState = rememberLazyListState()
     val reorder = rememberListReorderState()
-    LazyColumn(
-        state = listState,
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(contentPadding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            SceneOverviewCard(
-                scenes = sortedScenes,
-                tasks = tasks,
-                onCreateScene = { showCreateDialog = true },
+    val selectionActive = selectedIds.isNotEmpty()
+    Column(Modifier.fillMaxSize().padding(contentPadding)) {
+        if (selectionActive) {
+            SelectionBar(
+                count = selectedIds.size,
+                total = sortedScenes.size,
+                onSelectAll = onSelectAllScenes,
+                onClear = onClearSceneSelection,
+                onDelete = onDeleteSelectedScenes,
             )
         }
-        items(sortedScenes, key = { it.id }) { scene ->
-            ReorderableRow(reorder, listState, sortedScenes, scene, { it.id }, manualSort, onReorder) {
-                SceneCard(
-                    scene = scene,
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().weight(1f),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item {
+                SceneOverviewCard(
+                    scenes = sortedScenes,
                     tasks = tasks,
+                    onCreateScene = { showCreateDialog = true },
+                )
+            }
+            items(sortedScenes, key = { it.id }) { scene ->
+                ReorderableRow(reorder, listState, sortedScenes, scene, { it.id }, manualSort && !selectionActive, onReorder) {
+                    SceneCard(
+                        scene = scene,
+                        tasks = tasks,
+                        selectionActive = selectionActive,
+                        selected = scene.id in selectedIds,
+                        onLongPress = { onLongPressScene(scene) },
+                        onToggleSelect = { onToggleSelectScene(scene) },
                     onAddElement = { elementEditor = SceneElementEditorState(scene = scene) },
                     onEditElement = { index, element -> elementEditor = SceneElementEditorState(scene, index, element) },
                     onDeleteElement = { index, element -> pendingElementDelete = SceneElementEditorState(scene, index, element) },
@@ -183,7 +205,8 @@ fun SceneLibraryScreen(
                     onDelete = { onDeleteScene(scene) },
                     onMoveToProject = { onMoveScene(scene) },
                     onExportToBundle = { onExportScene(scene) },
-                )
+                    )
+                }
             }
         }
     }
@@ -273,6 +296,10 @@ private fun SceneOverviewCard(
 private fun SceneCard(
     scene: Scene,
     tasks: List<Task>,
+    selectionActive: Boolean,
+    selected: Boolean,
+    onLongPress: () -> Unit,
+    onToggleSelect: () -> Unit,
     onAddElement: () -> Unit,
     onEditElement: (Int, SceneElement) -> Unit,
     onDeleteElement: (Int, SceneElement) -> Unit,
@@ -286,12 +313,29 @@ private fun SceneCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+            else MaterialTheme.colorScheme.surface,
+        ),
+        border = BorderStroke(
+            if (selected) 2.dp else 1.dp,
+            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        ),
         shape = RoundedCornerShape(18.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().selectableItem(
+                    selectionActive = selectionActive,
+                    onLongPress = onLongPress,
+                    onToggleSelect = onToggleSelect,
+                ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (selectionActive) {
+                    Checkbox(checked = selected, onCheckedChange = { onToggleSelect() })
+                }
                 Column(Modifier.weight(1f)) {
                     Text(scene.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
