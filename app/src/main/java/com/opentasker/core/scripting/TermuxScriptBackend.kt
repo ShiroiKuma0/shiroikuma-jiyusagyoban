@@ -27,7 +27,7 @@ object TermuxScriptBackend {
         val summary = when (state) {
             TermuxScriptState.TermuxMissing -> "Termux is not installed."
             TermuxScriptState.TaskerPluginMissing -> "Termux is installed, but Termux:Tasker is not installed."
-            TermuxScriptState.PluginInstalled -> "Termux and Termux:Tasker are installed. OpenTasker has not enabled script dispatch yet."
+            TermuxScriptState.PluginInstalled -> "Termux and Termux:Tasker are installed. 白い熊 自由作業盤 has not enabled script dispatch yet."
         }
         return TermuxScriptStatus(
             state = state,

@@ -130,7 +130,7 @@ class DatabaseBackupManager(
         validateDatabaseFile(temp)
         temp.copyTo(pending, overwrite = true)
         temp.delete()
-        AppLogger.warn(tag, "Restore staged at ${pending.absolutePath}; restart OpenTasker to apply it")
+        AppLogger.warn(tag, "Restore staged at ${pending.absolutePath}; restart 白い熊 自由作業盤 to apply it")
         return pending
     }
 
@@ -138,7 +138,7 @@ class DatabaseBackupManager(
         val canonicalBackupDir = backupDir.canonicalFile
         val canonicalBackup = backupFile.canonicalFile
         if (!canonicalBackup.path.startsWith(canonicalBackupDir.path + File.separator)) {
-            throw SecurityException("Backup file is outside the OpenTasker backup directory")
+            throw SecurityException("Backup file is outside the 白い熊 自由作業盤 backup directory")
         }
         if (!canonicalBackup.exists()) {
             throw IOException("Backup file not found: ${backupFile.absolutePath}")

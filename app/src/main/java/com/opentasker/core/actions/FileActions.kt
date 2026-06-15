@@ -21,7 +21,7 @@ class ReadFileAction : Action {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         val varName = args["var"] ?: args["variable"] ?: "result"
         return try {
-            val file = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside OpenTasker files")
+            val file = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
             if (file.length() > MAX_READ_BYTES) {
                 return ActionResult.Failure("file exceeds ${MAX_READ_BYTES / 1024 / 1024} MB read limit (${file.length()} bytes)")
             }
@@ -54,7 +54,7 @@ class WriteFileAction : Action {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         val text = args["text"] ?: args["content"] ?: ""
         return try {
-            val file = safeUserFile(ctx, path) ?: return ActionResult.Failure("path is outside OpenTasker files")
+            val file = safeUserFile(ctx, path) ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
             file.parentFile?.mkdirs()
             file.writeText(text)
             ctx.logger("Write ${file.name}")
@@ -80,7 +80,7 @@ class AppendFileAction : Action {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         val text = args["text"] ?: args["content"] ?: ""
         return try {
-            val file = safeUserFile(ctx, path) ?: return ActionResult.Failure("path is outside OpenTasker files")
+            val file = safeUserFile(ctx, path) ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
             file.parentFile?.mkdirs()
             file.appendText(text)
             ctx.logger("Append to ${file.name}")
@@ -104,7 +104,7 @@ class DeleteFileAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         return try {
-            val file = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside OpenTasker files")
+            val file = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
             if (!file.isFile) return ActionResult.Failure("delete only supports files")
             if (file.delete()) {
                 ctx.logger("Delete ${file.name}")
@@ -134,7 +134,7 @@ class ListFilesAction : Action {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         val varName = args["var"] ?: args["variable"] ?: "result"
         return try {
-            val dir = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside OpenTasker files")
+            val dir = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
             if (!dir.isDirectory) return ActionResult.Failure("path is not a directory")
             val files = dir.listFiles()?.joinToString("\n") { it.name } ?: ""
             ctx.variables.set(varName, files)
