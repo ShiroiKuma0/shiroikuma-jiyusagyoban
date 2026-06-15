@@ -23,10 +23,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.model.Variable
 
@@ -43,8 +45,9 @@ fun VariablesScreen(
     onDelete: (name: String) -> Unit,
     onMessage: (String) -> Unit,
 ) {
-    var searchQuery by remember { mutableStateOf("") }
-    var editTarget by remember { mutableStateOf<Variable?>(null) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var editTargetName by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingDeleteName by rememberSaveable { mutableStateOf<String?>(null) }
 
     val filtered = remember(variables, searchQuery) {
         if (searchQuery.isBlank()) variables
@@ -75,20 +78,59 @@ fun VariablesScreen(
             items(filtered, key = { it.name }) { variable ->
                 VariableRow(
                     variable = variable,
-                    onEdit = { editTarget = variable },
-                    onDelete = { onDelete(variable.name) },
+                    onEdit = { editTargetName = variable.name },
+                    onDelete = { pendingDeleteName = variable.name },
                 )
             }
         }
     }
 
+    val editTarget = remember(variables, editTargetName) {
+        editTargetName?.let { targetName -> variables.firstOrNull { it.name == targetName } }
+    }
+
+    pendingDeleteName?.let { name ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteName = null },
+            icon = {
+                Icon(
+                    Icons.Filled.Delete,
+                    contentDescription = "Delete variable",
+                    tint = MaterialTheme.colorScheme.error,
+                )
+            },
+            title = { Text("Delete %$name?") },
+            text = {
+                Text(
+                    "This removes the saved global variable value. Tasks that reference it may fall back to an empty value.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDelete(name)
+                        pendingDeleteName = null
+                        if (editTargetName == name) editTargetName = null
+                        onMessage("Deleted $name")
+                    },
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteName = null }) { Text("Cancel") }
+            },
+        )
+    }
+
     editTarget?.let { target ->
         EditVariableDialog(
             variable = target,
-            onDismiss = { editTarget = null },
+            onDismiss = { editTargetName = null },
             onSave = { newValue ->
                 onUpdate(target.name, newValue)
-                editTarget = null
+                editTargetName = null
                 onMessage("Updated ${target.name}")
             },
         )
@@ -115,11 +157,14 @@ private fun VariableRow(
                     text = "%${variable.name}",
                     style = MaterialTheme.typography.titleSmall,
                     fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = if (isSensitive(variable.name)) "***" else variable.value,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             IconButton(onClick = onDelete) {
@@ -135,7 +180,7 @@ private fun EditVariableDialog(
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,
 ) {
-    var value by remember { mutableStateOf(variable.value) }
+    var value by rememberSaveable(variable.name) { mutableStateOf(variable.value) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
