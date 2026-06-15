@@ -32,6 +32,7 @@ data class ThemePrefs(
     val fontFileName: String = "",
     val fontWeight: Int = 0,        // 0 = leave each text style's own weight; else 100..900
     val fontScalePct: Int = 100,    // 100 = 1.0x; clamped to [SCALE_MIN, SCALE_MAX]
+    val advancedActionPicker: Boolean = false,  // full-screen, category-foldable action picker
 ) {
     companion object {
         const val BLACK = 0xFF000000.toInt()
@@ -69,6 +70,7 @@ object ThemeStore {
     private const val K_FONT_FILE = "font_file"
     private const val K_FONT_WEIGHT = "font_weight"
     private const val K_FONT_SCALE = "font_scale"
+    private const val K_ADVANCED_ACTION_PICKER = "advanced_action_picker"
 
     private lateinit var appContext: Context
     private lateinit var prefs: SharedPreferences
@@ -115,6 +117,7 @@ object ThemeStore {
             fontFileName = prefs.getString(K_FONT_FILE, d.fontFileName) ?: d.fontFileName,
             fontWeight = prefs.getInt(K_FONT_WEIGHT, d.fontWeight),
             fontScalePct = prefs.getInt(K_FONT_SCALE, d.fontScalePct),
+            advancedActionPicker = prefs.getBoolean(K_ADVANCED_ACTION_PICKER, d.advancedActionPicker),
         ).normalized()
     }
 
@@ -130,6 +133,7 @@ object ThemeStore {
             putString(K_FONT_FILE, p.fontFileName)
             putInt(K_FONT_WEIGHT, p.fontWeight)
             putInt(K_FONT_SCALE, p.fontScalePct)
+            putBoolean(K_ADVANCED_ACTION_PICKER, p.advancedActionPicker)
         }
     }
 

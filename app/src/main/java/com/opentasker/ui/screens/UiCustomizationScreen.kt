@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -40,6 +41,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.Switch
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -81,6 +83,7 @@ private fun rowStartPadding(level: Int) = (16 + level * 28).dp
 fun UiCustomizationScreen(
     onBack: () -> Unit,
 ) {
+    BackHandler(onBack = onBack)
     val prefs by ThemeStore.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -179,6 +182,17 @@ fun UiCustomizationScreen(
                 )
             }
             item { SampleRow(level = 1) }
+
+            item { SectionHeader("Editor") }
+            item {
+                SwitchRow(
+                    level = 1,
+                    label = "Advanced action picker",
+                    description = "When adding an action, browse a full-screen list folded by category, each action expandable to its description and fields.",
+                    checked = prefs.advancedActionPicker,
+                    onCheckedChange = { ThemeStore.update { p -> p.copy(advancedActionPicker = it) } },
+                )
+            }
         }
     }
 
@@ -347,6 +361,17 @@ private fun ActionRow(level: Int, label: String, description: String, actionLabe
             Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         OutlinedButton(onClick = onAction) { Text(actionLabel) }
+    }
+}
+
+@Composable
+private fun SwitchRow(level: Int, label: String, description: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    RowScaffold(level, onClick = { onCheckedChange(!checked) }) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
