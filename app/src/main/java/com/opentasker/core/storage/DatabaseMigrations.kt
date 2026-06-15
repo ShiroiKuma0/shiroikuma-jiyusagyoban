@@ -40,11 +40,30 @@ object DatabaseMigrations {
         }
     }
 
+    val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Projects: a top-level grouping for profiles/tasks/scenes. New `projects` table plus a
+            // nullable `projectId` on each groupable table (legacy rows keep NULL = Unfiled).
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `projects` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`name` TEXT NOT NULL, " +
+                    "`color` INTEGER, " +
+                    "`sortOrder` INTEGER NOT NULL, " +
+                    "`description` TEXT NOT NULL)"
+            )
+            db.execSQL("ALTER TABLE profiles ADD COLUMN projectId INTEGER")
+            db.execSQL("ALTER TABLE tasks ADD COLUMN projectId INTEGER")
+            db.execSQL("ALTER TABLE scenes ADD COLUMN projectId INTEGER")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
             MIGRATION_3_4,
+            MIGRATION_4_5,
         )
     }
 }
@@ -65,8 +84,12 @@ object DatabaseMigrations {
  * Version 3:
  *   - edit_history: id, entityType, entityId, previousJson, timestamp
  *
- * Version 4 (current):
+ * Version 4:
  *   - run_logs: adds nullable source (typed trigger key) and sourceLabel (human label)
+ *
+ * Version 5 (current):
+ *   - projects: id, name, color (nullable), sortOrder, description
+ *   - profiles/tasks/scenes: add nullable projectId (NULL = Unfiled)
  *
  * To add a migration:
  * 1. Increment database version in @Database annotation

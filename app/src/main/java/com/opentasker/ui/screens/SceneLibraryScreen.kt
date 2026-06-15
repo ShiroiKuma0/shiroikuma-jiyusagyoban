@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -71,6 +72,7 @@ fun SceneLibraryScreen(
     onCreateScene: (String, Int, Int) -> Unit,
     onUpdateScene: (Scene, String) -> Unit,
     onDeleteScene: (Scene) -> Unit,
+    onMoveScene: (Scene) -> Unit,
     contentPadding: PaddingValues,
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -166,6 +168,7 @@ fun SceneLibraryScreen(
                     )
                 },
                 onDelete = { onDeleteScene(scene) },
+                onMoveToProject = { onMoveScene(scene) },
             )
         }
     }
@@ -260,6 +263,7 @@ private fun SceneCard(
     onDeleteElement: (Int, SceneElement) -> Unit,
     onMoveElement: (Int, SceneElement) -> Unit,
     onDelete: () -> Unit,
+    onMoveToProject: () -> Unit,
 ) {
     val taskNames = remember(tasks) { tasks.associate { it.id to it.name } }
     val issues = remember(scene, tasks) { SceneValidator.validate(scene, tasks) }
@@ -279,6 +283,9 @@ private fun SceneCard(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                IconButton(onClick = onMoveToProject) {
+                    Icon(Icons.Filled.Folder, contentDescription = "Move scene to project")
                 }
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Filled.Delete, contentDescription = "Delete scene", tint = MaterialTheme.colorScheme.error)

@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PlayArrow
@@ -107,6 +108,8 @@ import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.Project
+import com.opentasker.core.model.ProjectFilter
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
@@ -118,6 +121,7 @@ import com.opentasker.core.storage.EditHistoryEntity
 import com.opentasker.core.storage.RunLogRetentionOptions
 import com.opentasker.core.storage.VariableEntity
 import com.opentasker.core.storage.RunLogRetentionPolicy
+import com.opentasker.core.storage.ProjectSelectionStore
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.displayLabel
 import com.opentasker.core.storage.minimumTimestamp
@@ -200,6 +204,22 @@ internal data class OpenTaskerBundleReviewState(
     val plan: BundleImportPlan,
 )
 
+private sealed interface MoveTarget {
+    val currentProjectId: Long?
+
+    data class ProfileMove(val profile: Profile) : MoveTarget {
+        override val currentProjectId get() = profile.projectId
+    }
+
+    data class TaskMove(val task: Task) : MoveTarget {
+        override val currentProjectId get() = task.projectId
+    }
+
+    data class SceneMove(val scene: Scene) : MoveTarget {
+        override val currentProjectId get() = scene.projectId
+    }
+}
+
 private sealed interface DeleteTarget {
     val title: String
     val body: String
@@ -260,6 +280,15 @@ class ActiveAutomationViewModel(
         .map { entities -> entities.map { it.toDomain() }.sortedBy { it.name.lowercase() } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val projects: StateFlow<List<Project>> = db.projectDao()
+        .getAllAsFlow()
+        .map { entities -> entities.map { it.toDomain() } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val projectSelectionStore = ProjectSelectionStore(appContext)
+    var projectFilter by mutableStateOf<ProjectFilter>(projectSelectionStore.load())
+        private set
+
     val runLogs: StateFlow<List<RunLogEntry>> = db.runLogDao()
         .getRecentFlow()
         .map { entities -> entities.map { it.toDomain() } }
@@ -297,8 +326,8 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun createTask(name: String, priority: Int) = launchWithMessage("Task created") {
-        db.taskDao().insert(Task(name = name.trim(), priority = priority.coerceIn(0, 10)).toEntity())
+    fun createTask(name: String, priority: Int, projectId: Long? = null) = launchWithMessage("Task created") {
+        db.taskDao().insert(Task(name = name.trim(), priority = priority.coerceIn(0, 10), projectId = projectId).toEntity())
     }
 
     fun updateTask(task: Task, message: String = "Task updated") = launchWithMessage(message) {
@@ -332,12 +361,13 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun createScene(name: String, widthDp: Int, heightDp: Int) = launchWithMessage("Scene created") {
+    fun createScene(name: String, widthDp: Int, heightDp: Int, projectId: Long? = null) = launchWithMessage("Scene created") {
         db.sceneDao().insert(
             Scene(
                 name = name.trim(),
                 widthDp = widthDp.coerceIn(120, 1440),
                 heightDp = heightDp.coerceIn(80, 2560),
+                projectId = projectId,
             ).toEntity()
         )
     }
@@ -350,7 +380,75 @@ class ActiveAutomationViewModel(
         db.sceneDao().delete(scene.toEntity())
     }
 
-    fun createProfile(name: String, enabled: Boolean, enterTaskId: Long, cooldownSec: Int, automationMode: AutomationMode) =
+    // ---- Projects (organizational; the engine ignores projectId) ----
+
+    fun selectProject(filter: ProjectFilter) {
+        projectSelectionStore.save(filter)
+        projectFilter = filter
+    }
+
+    fun createProject(name: String, color: Int?) = launchWithMessage("Project created") {
+        val nextOrder = (db.projectDao().getAll().maxOfOrNull { it.sortOrder } ?: -1) + 1
+        db.projectDao().insert(Project(name = name.trim(), color = color, sortOrder = nextOrder).toEntity())
+    }
+
+    fun updateProject(project: Project) = launchWithMessage("Project updated") {
+        db.projectDao().update(project.toEntity())
+    }
+
+    fun deleteProject(project: Project, deleteItems: Boolean) = launchWithMessage(
+        if (deleteItems) "Project and its items deleted" else "Project deleted; items moved to Unfiled"
+    ) {
+        val pid = project.id
+        db.withTransaction {
+            val profileRows = db.profileDao().getAll().filter { it.projectId == pid }
+            val taskRows = db.taskDao().getAll().filter { it.projectId == pid }
+            val sceneRows = db.sceneDao().getAll().filter { it.projectId == pid }
+            if (deleteItems) {
+                profileRows.forEach { db.profileDao().delete(it) }
+                taskRows.forEach { db.taskDao().delete(it) }
+                sceneRows.forEach { db.sceneDao().delete(it) }
+            } else {
+                profileRows.forEach { db.profileDao().update(it.copy(projectId = null)) }
+                taskRows.forEach { db.taskDao().update(it.copy(projectId = null)) }
+                sceneRows.forEach { db.sceneDao().update(it.copy(projectId = null)) }
+            }
+            db.projectDao().delete(project.toEntity())
+        }
+        if ((projectFilter as? ProjectFilter.Of)?.projectId == pid) {
+            selectProject(ProjectFilter.All)
+        }
+    }
+
+    /** Reorder by reassigning contiguous sortOrder so the moved project shifts one slot. */
+    fun moveProject(project: Project, up: Boolean) = launchWithMessage("Project reordered") {
+        val ordered = db.projectDao().getAll()
+            .sortedWith(compareBy({ it.sortOrder }, { it.name.lowercase() }))
+            .toMutableList()
+        val index = ordered.indexOfFirst { it.id == project.id }
+        val target = if (up) index - 1 else index + 1
+        if (index < 0 || target !in ordered.indices) return@launchWithMessage
+        ordered.add(target, ordered.removeAt(index))
+        db.withTransaction {
+            ordered.forEachIndexed { position, row ->
+                if (row.sortOrder != position) db.projectDao().update(row.copy(sortOrder = position))
+            }
+        }
+    }
+
+    fun moveProfileToProject(profile: Profile, projectId: Long?) = launchWithMessage("Profile moved") {
+        db.profileDao().update(profile.copy(projectId = projectId).toEntity())
+    }
+
+    fun moveTaskToProject(task: Task, projectId: Long?) = launchWithMessage("Task moved") {
+        db.taskDao().update(task.copy(projectId = projectId).toEntity())
+    }
+
+    fun moveSceneToProject(scene: Scene, projectId: Long?) = launchWithMessage("Scene moved") {
+        db.sceneDao().update(scene.copy(projectId = projectId).toEntity())
+    }
+
+    fun createProfile(name: String, enabled: Boolean, enterTaskId: Long, cooldownSec: Int, automationMode: AutomationMode, projectId: Long? = null) =
         launchWithMessage("Profile created") {
             db.profileDao().insert(
                 Profile(
@@ -359,6 +457,7 @@ class ActiveAutomationViewModel(
                     enterTaskId = enterTaskId,
                     cooldownSec = cooldownSec.coerceAtLeast(0),
                     automationMode = automationMode,
+                    projectId = projectId,
                 ).toEntity()
             )
         }
@@ -686,6 +785,24 @@ fun ActiveAutomationUi(
     val profiles by viewModel.profiles.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
     val scenes by viewModel.scenes.collectAsState()
+    val projects by viewModel.projects.collectAsState()
+    val projectFilter = viewModel.projectFilter
+    val currentProjectId = (projectFilter as? ProjectFilter.Of)?.projectId
+    val visibleProfiles = when (projectFilter) {
+        ProjectFilter.All -> profiles
+        ProjectFilter.Unfiled -> profiles.filter { it.projectId == null }
+        is ProjectFilter.Of -> profiles.filter { it.projectId == projectFilter.projectId }
+    }
+    val visibleTasks = when (projectFilter) {
+        ProjectFilter.All -> tasks
+        ProjectFilter.Unfiled -> tasks.filter { it.projectId == null }
+        is ProjectFilter.Of -> tasks.filter { it.projectId == projectFilter.projectId }
+    }
+    val visibleScenes = when (projectFilter) {
+        ProjectFilter.All -> scenes
+        ProjectFilter.Unfiled -> scenes.filter { it.projectId == null }
+        is ProjectFilter.Of -> scenes.filter { it.projectId == projectFilter.projectId }
+    }
     val runLogs by viewModel.runLogs.collectAsState()
     val globalVariables by viewModel.globalVariables.collectAsState()
     val runLogRetentionPolicy = viewModel.runLogRetentionPolicy
@@ -694,6 +811,8 @@ fun ActiveAutomationUi(
     val scope = rememberCoroutineScope()
     var screen by remember { mutableStateOf(OpenTaskerScreen.Profiles) }
     var showUiCustomization by remember { mutableStateOf(false) }
+    var showProjectManagement by remember { mutableStateOf(false) }
+    var moveTarget by remember { mutableStateOf<MoveTarget?>(null) }
     var taskDialog by remember { mutableStateOf<Task?>(null) }
     var showCreateTaskDialog by remember { mutableStateOf(false) }
     var profileDialog by remember { mutableStateOf<Profile?>(null) }
@@ -793,6 +912,24 @@ fun ActiveAutomationUi(
         return
     }
 
+    if (showProjectManagement) {
+        ProjectsManagementScreen(
+            projects = projects,
+            memberCount = { pid ->
+                profiles.count { it.projectId == pid } +
+                    tasks.count { it.projectId == pid } +
+                    scenes.count { it.projectId == pid }
+            },
+            onBack = { showProjectManagement = false },
+            onCreate = { name, color -> viewModel.createProject(name, color) },
+            onUpdate = { viewModel.updateProject(it) },
+            onDelete = { project, deleteItems -> viewModel.deleteProject(project, deleteItems) },
+            onMoveUp = { viewModel.moveProject(it, up = true) },
+            onMoveDown = { viewModel.moveProject(it, up = false) },
+        )
+        return
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -807,6 +944,19 @@ fun ActiveAutomationUi(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                },
+                actions = {
+                    if (screen == OpenTaskerScreen.Profiles ||
+                        screen == OpenTaskerScreen.Tasks ||
+                        screen == OpenTaskerScreen.Scenes
+                    ) {
+                        ProjectSwitcher(
+                            filter = projectFilter,
+                            projects = projects,
+                            onSelect = { viewModel.selectProject(it) },
+                            onManage = { showProjectManagement = true },
                         )
                     }
                 },
@@ -909,7 +1059,7 @@ fun ActiveAutomationUi(
     ) { innerPadding ->
         when (screen) {
             OpenTaskerScreen.Profiles -> ProfilesScreen(
-                profiles = profiles,
+                profiles = visibleProfiles,
                 tasks = tasks,
                 runLogs = runLogs,
                 onCreateTaskFirst = {
@@ -937,11 +1087,12 @@ fun ActiveAutomationUi(
                         pendingDelete = DeleteTarget.ContextTarget(profile, index, context)
                     }
                 },
+                onMoveProfile = { moveTarget = MoveTarget.ProfileMove(it) },
                 contentPadding = innerPadding,
             )
 
             OpenTaskerScreen.Tasks -> TasksScreen(
-                tasks = tasks,
+                tasks = visibleTasks,
                 onCreateTask = { showCreateTaskDialog = true },
                 onEditTask = { taskDialog = it },
                 onDeleteTask = { pendingDelete = DeleteTarget.TaskTarget(it) },
@@ -958,6 +1109,7 @@ fun ActiveAutomationUi(
                         pendingDelete = DeleteTarget.ActionTarget(task, index, action)
                     }
                 },
+                onMoveTask = { moveTarget = MoveTarget.TaskMove(it) },
                 contentPadding = innerPadding,
             )
 
@@ -995,11 +1147,12 @@ fun ActiveAutomationUi(
             )
 
             OpenTaskerScreen.Scenes -> SceneLibraryScreen(
-                scenes = scenes,
+                scenes = visibleScenes,
                 tasks = tasks,
-                onCreateScene = viewModel::createScene,
+                onCreateScene = { name, widthDp, heightDp -> viewModel.createScene(name, widthDp, heightDp, currentProjectId) },
                 onUpdateScene = viewModel::updateScene,
                 onDeleteScene = { pendingDelete = DeleteTarget.SceneTarget(it) },
+                onMoveScene = { moveTarget = MoveTarget.SceneMove(it) },
                 contentPadding = innerPadding,
             )
 
@@ -1023,6 +1176,23 @@ fun ActiveAutomationUi(
                 contentPadding = innerPadding,
             )
         }
+    }
+
+    moveTarget?.let { target ->
+        ProjectPickerDialog(
+            title = "Move to project",
+            projects = projects,
+            currentProjectId = target.currentProjectId,
+            onPick = { projectId ->
+                when (target) {
+                    is MoveTarget.ProfileMove -> viewModel.moveProfileToProject(target.profile, projectId)
+                    is MoveTarget.TaskMove -> viewModel.moveTaskToProject(target.task, projectId)
+                    is MoveTarget.SceneMove -> viewModel.moveSceneToProject(target.scene, projectId)
+                }
+                moveTarget = null
+            },
+            onDismiss = { moveTarget = null },
+        )
     }
 
     pendingDelete?.let { target ->
@@ -1071,7 +1241,7 @@ fun ActiveAutomationUi(
             task = null,
             onDismiss = { showCreateTaskDialog = false },
             onSave = { name, priority ->
-                viewModel.createTask(name, priority)
+                viewModel.createTask(name, priority, currentProjectId)
                 showCreateTaskDialog = false
             },
         )
@@ -1094,7 +1264,7 @@ fun ActiveAutomationUi(
             tasks = tasks,
             onDismiss = { showCreateProfileDialog = false },
             onSave = { name, enabled, enterTaskId, cooldown, automationMode ->
-                viewModel.createProfile(name, enabled, enterTaskId, cooldown, automationMode)
+                viewModel.createProfile(name, enabled, enterTaskId, cooldown, automationMode, currentProjectId)
                 showCreateProfileDialog = false
             },
         )
@@ -1213,6 +1383,7 @@ private fun ProfilesScreen(
     onAddContext: (Profile) -> Unit,
     onEditContext: (Profile, Int, ContextSpec) -> Unit,
     onDeleteContext: (Profile, Int) -> Unit,
+    onMoveProfile: (Profile) -> Unit,
     contentPadding: PaddingValues,
 ) {
     if (tasks.isEmpty()) {
@@ -1286,6 +1457,7 @@ private fun ProfilesScreen(
                 onAddContext = { onAddContext(profile) },
                 onEditContext = { index, context -> onEditContext(profile, index, context) },
                 onDeleteContext = { index -> onDeleteContext(profile, index) },
+                onMove = { onMoveProfile(profile) },
             )
         }
     }
@@ -1555,6 +1727,7 @@ private fun ProfileCard(
     onAddContext: () -> Unit,
     onEditContext: (Int, ContextSpec) -> Unit,
     onDeleteContext: (Int) -> Unit,
+    onMove: () -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -1613,7 +1786,12 @@ private fun ProfileCard(
                     Text("Add Context")
                 }
             }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                TextButton(onClick = onMove) {
+                    Icon(Icons.Filled.Folder, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Move")
+                }
                 TextButton(onClick = onDelete) {
                     Icon(Icons.Filled.Delete, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
@@ -1635,6 +1813,7 @@ private fun TasksScreen(
     onAddAction: (Task) -> Unit,
     onEditAction: (Task, Int, ActionSpec) -> Unit,
     onDeleteAction: (Task, Int) -> Unit,
+    onMoveTask: (Task) -> Unit,
     contentPadding: PaddingValues,
 ) {
     if (tasks.isEmpty()) {
@@ -1667,6 +1846,7 @@ private fun TasksScreen(
                 onAddAction = { onAddAction(task) },
                 onEditAction = { index, action -> onEditAction(task, index, action) },
                 onDeleteAction = { index -> onDeleteAction(task, index) },
+                onMove = { onMoveTask(task) },
             )
         }
     }
@@ -1682,6 +1862,7 @@ private fun TaskCard(
     onAddAction: () -> Unit,
     onEditAction: (Int, ActionSpec) -> Unit,
     onDeleteAction: (Int) -> Unit,
+    onMove: () -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -1748,6 +1929,11 @@ private fun TaskCard(
                         Icon(Icons.Filled.PushPin, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
                         Text("Pin")
+                    }
+                    OutlinedButton(onClick = onMove) {
+                        Icon(Icons.Filled.Folder, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Move")
                     }
                 }
                 TextButton(onClick = onDelete) {

@@ -10,6 +10,7 @@ data class Scene(
     val widthDp: Int,
     val heightDp: Int,
     val elements: List<SceneElement> = emptyList(),
+    val projectId: Long? = null,            // null = Unfiled
 )
 
 @Serializable

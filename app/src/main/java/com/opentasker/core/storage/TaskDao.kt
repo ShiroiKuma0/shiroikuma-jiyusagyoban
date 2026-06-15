@@ -20,20 +20,21 @@ data class TaskEntity(
     val priority: Int,
     val collisionMode: String,
     val actionsJson: String,
+    val projectId: Long? = null,
 ) {
     fun toDomain() = try {
         Task(
-            id, name, priority, CollisionMode.valueOf(collisionMode), Json.decodeFromString(actionsJson)
+            id, name, priority, CollisionMode.valueOf(collisionMode), Json.decodeFromString(actionsJson), projectId
         )
     } catch (e: Exception) {
         android.util.Log.e("TaskDao", "Failed to deserialize task $id: ${e.message}", e)
         // Return task with empty actions as fallback
-        Task(id, name, priority, CollisionMode.ABORT_NEW, emptyList())
+        Task(id, name, priority, CollisionMode.ABORT_NEW, emptyList(), projectId)
     }
 }
 
 fun Task.toEntity() = TaskEntity(
-    id, name, priority, collisionMode.name, Json.encodeToString(actions)
+    id, name, priority, collisionMode.name, Json.encodeToString(actions), projectId
 )
 
 @Dao
