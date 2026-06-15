@@ -212,6 +212,16 @@
             </intent-filter>
         </activity>
 
+        <!-- External "name this widget" bridge for sister apps (e.g. the raikidoban launcher). Explicit
+             ordered broadcast, no permission: senders may use a different signing key. -->
+        <receiver
+            android:name="com.opentasker.widget.SetWidgetNameReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="shiroikuma.jiyusagyoban.action.SET_WIDGET_NAME" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name="com.opentasker.core.actions.NotificationActionReceiver"
             android:exported="false">
