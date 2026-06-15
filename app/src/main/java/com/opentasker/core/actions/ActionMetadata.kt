@@ -654,7 +654,8 @@ fun registerActionMetadata() {
             category = "System",
             fields = listOf(
                 ActionField("widget", "Widget name", required = true, hint = "the name set when the widget was placed"),
-                ActionField("layout", "Layout", FieldType.WIDGET_LAYOUT, required = true, hint = "widget layout; %vars are expanded"),
+                ActionField("template", "Template (optional)", hint = "a saved Widget Templates name; overrides the layout below"),
+                ActionField("layout", "Layout", FieldType.WIDGET_LAYOUT, hint = "inline layout (used when no template is set); %vars are expanded"),
             )
         )
     )

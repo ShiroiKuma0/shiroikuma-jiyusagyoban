@@ -219,6 +219,7 @@ private enum class OpenTaskerScreen(val label: String) {
     Vars("Vars"),
     Flow("Flow"),
     Scenes("Scenes"),
+    Widgets("Widgets"),
     Inspector("Inspect"),
     Setup("Setup"),
     RunLog("Log"),
@@ -930,6 +931,7 @@ fun ActiveAutomationUi(
     }
     val runLogs by viewModel.runLogs.collectAsState()
     val globalVariables by viewModel.globalVariables.collectAsState()
+    val widgetTemplates by com.opentasker.widget.TemplateStore.state.collectAsState()
     val runLogRetentionPolicy = viewModel.runLogRetentionPolicy
     val backupSetupState = viewModel.backupSetupState
     val themePrefs by ThemeStore.state.collectAsState()
@@ -1053,6 +1055,7 @@ fun ActiveAutomationUi(
         OpenTaskerScreen.Vars -> "${globalVariables.size} global variables"
         OpenTaskerScreen.Flow -> "${profiles.size} profiles - ${tasks.size} tasks"
         OpenTaskerScreen.Scenes -> "${scenes.sumOf { it.elements.size }} elements - ${scenes.size} scenes"
+        OpenTaskerScreen.Widgets -> "${widgetTemplates.size} widget templates"
         OpenTaskerScreen.Inspector -> "Live context health"
         OpenTaskerScreen.Setup -> "Permission and reliability checks"
         OpenTaskerScreen.RunLog -> "${runLogs.size} recent entries"
@@ -1221,6 +1224,7 @@ fun ActiveAutomationUi(
                 OpenTaskerScreen.Vars,
                 OpenTaskerScreen.Flow,
                 OpenTaskerScreen.Scenes,
+                OpenTaskerScreen.Widgets,
                 OpenTaskerScreen.Inspector,
                 OpenTaskerScreen.Setup,
                 OpenTaskerScreen.RunLog -> Unit
@@ -1252,6 +1256,7 @@ fun ActiveAutomationUi(
                                 OpenTaskerScreen.Vars -> Icons.Filled.Menu
                                 OpenTaskerScreen.Flow -> Icons.Filled.Info
                                 OpenTaskerScreen.Scenes -> Icons.Filled.Edit
+                                OpenTaskerScreen.Widgets -> Icons.Filled.Menu
                                 OpenTaskerScreen.Inspector -> Icons.Filled.Info
                                 OpenTaskerScreen.Setup -> Icons.Filled.Settings
                                 OpenTaskerScreen.RunLog -> Icons.Filled.Info
@@ -1389,6 +1394,13 @@ fun ActiveAutomationUi(
                 onExportScene = { exportRequest = ExportRequest(name = "Scene: ${it.name}", fileName = exportFileName(it.name), sceneIds = setOf(it.id)) },
                 manualSort = sortPrefs.scenes == SortMethod.MANUAL,
                 onReorder = { viewModel.reorderScenes(it) },
+                contentPadding = innerPadding,
+            )
+
+            OpenTaskerScreen.Widgets -> WidgetTemplatesScreen(
+                templates = widgetTemplates,
+                onSave = { name, layout -> com.opentasker.widget.TemplateStore.put(name, layout) },
+                onDelete = { com.opentasker.widget.TemplateStore.delete(it) },
                 contentPadding = innerPadding,
             )
 
