@@ -69,6 +69,7 @@ object ActionCapabilityRegistry {
         "dialog.input" to dialogCapability(),
         "dialog.list" to dialogCapability(),
         "dialog.text" to dialogCapability(),
+        "shell.run" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Shizuku installed, started, and access granted to this app."),
         "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported 白い熊 自由作業盤 action."),
     )
 

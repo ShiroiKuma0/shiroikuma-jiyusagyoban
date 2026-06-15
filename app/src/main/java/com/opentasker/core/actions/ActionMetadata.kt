@@ -607,6 +607,22 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "shell.run",
+            name = "Run Shell",
+            description = "Run a shell command with Shizuku (ADB/root) privileges",
+            category = "System",
+            fields = listOf(
+                ActionField("command", "Command", FieldType.MULTILINE, required = true, hint = "runs via sh -c"),
+                ActionField("store_stdout", "Store stdout in", hint = "variable (default: stdout)"),
+                ActionField("store_stderr", "Store stderr in", hint = "variable (default: stderr)"),
+                ActionField("store_exit", "Store exit code in", hint = "variable (default: exit)"),
+                ActionField("ignore_exit", "Ignore exit code", FieldType.CHECKBOX, hint = "succeed even if exit code is non-zero"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "tts.speak",
             name = "Say (Text-to-Speech)",
             description = "Speak text aloud using the device speaker",
