@@ -84,6 +84,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.withTransaction
 import com.opentasker.app.BuildConfig
+import com.opentasker.ui.theme.ThemeStore
 import com.opentasker.core.actions.ActionField
 import com.opentasker.core.actions.ActionMetadata
 import com.opentasker.core.actions.ActionMetadataRegistry
@@ -870,6 +871,7 @@ fun ActiveAutomationUi(
     val globalVariables by viewModel.globalVariables.collectAsState()
     val runLogRetentionPolicy = viewModel.runLogRetentionPolicy
     val backupSetupState = viewModel.backupSetupState
+    val themePrefs by ThemeStore.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var screen by remember { mutableStateOf(OpenTaskerScreen.Profiles) }
@@ -1018,6 +1020,18 @@ fun ActiveAutomationUi(
                     taskIds = tasks.filter { it.projectId == project.id }.map { it.id }.toSet(),
                     sceneIds = scenes.filter { it.projectId == project.id }.map { it.id }.toSet(),
                 )
+            },
+        )
+        return
+    }
+
+    val pickerTask = actionPickerTask
+    if (pickerTask != null && themePrefs.advancedActionPicker) {
+        AdvancedActionPickerScreen(
+            onDismiss = { actionPickerTask = null },
+            onSelect = { metadata ->
+                actionPickerTask = null
+                actionEdit = ActionEditState(pickerTask, metadata)
             },
         )
         return

@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -144,6 +145,7 @@ fun ProjectsManagementScreen(
     onMoveDown: (Project) -> Unit,
     onExportProject: (Project) -> Unit,
 ) {
+    BackHandler(onBack = onBack)
     var editing by remember { mutableStateOf<Project?>(null) }
     var creating by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<Project?>(null) }
