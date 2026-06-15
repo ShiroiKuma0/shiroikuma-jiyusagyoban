@@ -415,6 +415,84 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "nav.back",
+            name = "Back",
+            description = "Press Back (needs the accessibility service enabled)",
+            category = "Interface",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "nav.recents",
+            name = "Recents",
+            description = "Open the recent-apps overview (needs the accessibility service)",
+            category = "Interface",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "panel.notifications",
+            name = "Notifications Panel",
+            description = "Open the notification shade (needs the accessibility service)",
+            category = "Interface",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "panel.quicksettings",
+            name = "Quick Settings",
+            description = "Open the quick-settings panel (needs the accessibility service)",
+            category = "Interface",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "nav.power",
+            name = "Power Dialog",
+            description = "Show the power / long-press menu (needs the accessibility service)",
+            category = "Interface",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "screen.lock",
+            name = "Lock Screen",
+            description = "Lock the screen — Android 9+ (needs the accessibility service)",
+            category = "Interface",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "call.place",
+            name = "Call",
+            description = "Place a phone call (or open the dialer without CALL_PHONE)",
+            category = "App",
+            fields = listOf(
+                ActionField("number", "Number", required = true, hint = "phone number"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "brightness.auto",
+            name = "Auto Brightness",
+            description = "Turn automatic screen brightness on/off (Write Settings access)",
+            category = "Settings",
+            fields = listOf(
+                ActionField("state", "State", FieldType.DROPDOWN, hint = "on / off / toggle"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "tts.speak",
             name = "Say (Text-to-Speech)",
             description = "Speak text aloud using the device speaker",

@@ -75,6 +75,14 @@ import com.opentasker.core.actions.SetWallpaperAction
 import com.opentasker.core.actions.WifiSettingsAction
 import com.opentasker.core.actions.ListAppsAction
 import com.opentasker.core.actions.ImePickerAction
+import com.opentasker.core.actions.NavBackAction
+import com.opentasker.core.actions.NavRecentsAction
+import com.opentasker.core.actions.NotificationsPanelAction
+import com.opentasker.core.actions.QuickSettingsPanelAction
+import com.opentasker.core.actions.PowerDialogAction
+import com.opentasker.core.actions.LockScreenAction
+import com.opentasker.core.actions.PlaceCallAction
+import com.opentasker.core.actions.AutoBrightnessAction
 import com.opentasker.core.contexts.ApplicationContextSourceImpl
 import com.opentasker.core.contexts.ContextSourceRegistry
 import com.opentasker.core.contexts.EventContextSourceImpl
@@ -163,6 +171,14 @@ private fun registerBuiltInActions() {
         WifiSettingsAction(),
         ListAppsAction(),
         ImePickerAction(),
+        NavBackAction(),
+        NavRecentsAction(),
+        NotificationsPanelAction(),
+        QuickSettingsPanelAction(),
+        PowerDialogAction(),
+        LockScreenAction(),
+        PlaceCallAction(),
+        AutoBrightnessAction(),
         TermuxScriptAction(),
         TaskerUnsupportedAction(),
     ).forEach(ActionRegistry::register)
