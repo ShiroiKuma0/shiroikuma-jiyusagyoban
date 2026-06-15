@@ -60,10 +60,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -689,7 +691,8 @@ fun ActiveAutomationUi(
     val backupSetupState = viewModel.backupSetupState
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    var screen by remember { mutableStateOf(OpenTaskerScreen.Profiles) }
+    var screenOrdinal by rememberSaveable { mutableIntStateOf(0) }
+    val screen = OpenTaskerScreen.entries.getOrElse(screenOrdinal) { OpenTaskerScreen.Profiles }
     var taskDialog by remember { mutableStateOf<Task?>(null) }
     var showCreateTaskDialog by remember { mutableStateOf(false) }
     var profileDialog by remember { mutableStateOf<Profile?>(null) }
@@ -729,7 +732,7 @@ fun ActiveAutomationUi(
         when (target) {
             is AutomationFlowTarget.Profile -> {
                 profiles.firstOrNull { it.id == target.profileId }?.let { profile ->
-                    screen = OpenTaskerScreen.Profiles
+                    screenOrdinal = OpenTaskerScreen.Profiles.ordinal
                     profileDialog = profile
                 } ?: run { opened = false }
             }
@@ -738,7 +741,7 @@ fun ActiveAutomationUi(
                 val profile = profiles.firstOrNull { it.id == target.profileId }
                 val contextSpec = profile?.contexts?.getOrNull(target.index)
                 if (profile != null && contextSpec != null) {
-                    screen = OpenTaskerScreen.Profiles
+                    screenOrdinal = OpenTaskerScreen.Profiles.ordinal
                     contextEdit = ContextEditState(profile, contextSpec.type, target.index, contextSpec)
                 } else {
                     opened = false
@@ -747,7 +750,7 @@ fun ActiveAutomationUi(
 
             is AutomationFlowTarget.Task -> {
                 tasks.firstOrNull { it.id == target.taskId }?.let { task ->
-                    screen = OpenTaskerScreen.Tasks
+                    screenOrdinal = OpenTaskerScreen.Tasks.ordinal
                     taskDialog = task
                 } ?: run { opened = false }
             }
@@ -757,7 +760,7 @@ fun ActiveAutomationUi(
                 val action = task?.actions?.getOrNull(target.index)
                 val metadata = action?.let { ActionMetadataRegistry.get(it.type) }
                 if (task != null && action != null && metadata != null) {
-                    screen = OpenTaskerScreen.Tasks
+                    screenOrdinal = OpenTaskerScreen.Tasks.ordinal
                     actionEdit = ActionEditState(task, metadata, target.index, action)
                 } else {
                     opened = false
@@ -837,7 +840,7 @@ fun ActiveAutomationUi(
                 OpenTaskerScreen.entries.forEach { destination ->
                     NavigationBarItem(
                         selected = screen == destination,
-                        onClick = { screen = destination },
+                        onClick = { screenOrdinal = destination.ordinal },
                         icon = {
                             val icon = when (destination) {
                                 OpenTaskerScreen.Profiles -> Icons.Filled.CheckCircle
@@ -864,7 +867,7 @@ fun ActiveAutomationUi(
                 tasks = tasks,
                 runLogs = runLogs,
                 onCreateTaskFirst = {
-                    screen = OpenTaskerScreen.Tasks
+                    screenOrdinal = OpenTaskerScreen.Tasks.ordinal
                     showCreateTaskDialog = true
                 },
                 onCreateProfile = { showCreateProfileDialog = true },
@@ -920,7 +923,7 @@ fun ActiveAutomationUi(
                 onAddContext = { profileId ->
                     val profile = profiles.firstOrNull { it.id == profileId }
                     if (profile != null) {
-                        screen = OpenTaskerScreen.Profiles
+                        screenOrdinal = OpenTaskerScreen.Profiles.ordinal
                         contextPickerProfile = profile
                     } else {
                         scope.launch { snackbarHostState.showSnackbar("Flow target no longer exists") }
@@ -929,7 +932,7 @@ fun ActiveAutomationUi(
                 onAddAction = { taskId ->
                     val task = tasks.firstOrNull { it.id == taskId }
                     if (task != null) {
-                        screen = OpenTaskerScreen.Tasks
+                        screenOrdinal = OpenTaskerScreen.Tasks.ordinal
                         actionPickerTask = task
                     } else {
                         scope.launch { snackbarHostState.showSnackbar("Flow target no longer exists") }
@@ -1067,7 +1070,7 @@ fun ActiveAutomationUi(
             onInstall = { values ->
                 viewModel.installProfileTemplate(template, values)
                 selectedTemplate = null
-                screen = OpenTaskerScreen.Profiles
+                screenOrdinal = OpenTaskerScreen.Profiles.ordinal
             },
         )
     }
@@ -1806,9 +1809,10 @@ private fun RunLogScreenContent(
     onRetentionPolicyChange: (RunLogRetentionPolicy) -> Unit,
     contentPadding: PaddingValues,
 ) {
-    var statusFilter by remember { mutableStateOf(RunLogStatusFilter.All) }
-    var taskIdFilter by remember { mutableStateOf<Long?>(null) }
-    var query by remember { mutableStateOf("") }
+    var statusFilterOrdinal by rememberSaveable { mutableIntStateOf(0) }
+    val statusFilter = RunLogStatusFilter.entries.getOrElse(statusFilterOrdinal) { RunLogStatusFilter.All }
+    var taskIdFilter by rememberSaveable { mutableStateOf<Long?>(null) }
+    var query by rememberSaveable { mutableStateOf("") }
     val taskOptions = remember(logs, tasks) { runLogTaskOptions(logs, tasks) }
     val filteredLogs = remember(logs, statusFilter, taskIdFilter, query) {
         filterRunLogs(logs, RunLogFilterState(status = statusFilter, taskId = taskIdFilter, query = query))
@@ -1845,7 +1849,7 @@ private fun RunLogScreenContent(
                     totalCount = logs.size,
                     visibleCount = filteredLogs.size,
                     statusFilter = statusFilter,
-                    onStatusFilterChange = { statusFilter = it },
+                    onStatusFilterChange = { statusFilterOrdinal = it.ordinal },
                     taskOptions = taskOptions,
                     selectedTaskId = taskIdFilter,
                     onTaskFilterChange = { taskIdFilter = it },
