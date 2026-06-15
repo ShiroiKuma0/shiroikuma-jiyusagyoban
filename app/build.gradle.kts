@@ -10,8 +10,8 @@ val releaseKeystorePath = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE")
 val releaseKeystorePassword = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE_PASSWORD")
 val releaseKeyAlias = System.getenv("OPEN_TASKER_RELEASE_KEY_ALIAS")
 val releaseKeyPassword = System.getenv("OPEN_TASKER_RELEASE_KEY_PASSWORD")
-val appVersionCode = 65
-val appVersionName = "0.2.63"
+val appVersionCode = 66
+val appVersionName = "0.2.64"
 val allowedDistributions = setOf("standard", "fdroid", "play")
 val selectedDistribution = providers.gradleProperty("openTaskerDistribution")
     .orElse("standard")
@@ -211,7 +211,7 @@ tasks.register("verifyFdroidMetadata") {
         requireValue("versionCode", appVersionCode.toString())
         requireValue("CurrentVersion", appVersionName)
         requireValue("CurrentVersionCode", appVersionCode.toString())
-        requireValue("Changelog", "https://github.com/SysAdminDoc/OpenTasker/blob/HEAD/CHANGELOG.md")
+        requireValue("Changelog", "https://github.com/SysAdminDoc/OpenTasker/releases")
 
         val commits = valuesFor("commit")
         check(commits.size == 1) {
