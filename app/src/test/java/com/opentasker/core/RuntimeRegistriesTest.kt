@@ -26,6 +26,18 @@ class RuntimeRegistriesTest {
     }
 
     @Test
+    fun everyRuntimeActionHasUiMetadata() {
+        registerActionMetadata()
+        registerCoreRuntime()
+
+        val metadataIds = ActionMetadataRegistry.all().map { it.id }.toSet()
+        val runtimeIds = ActionRegistry.allIds()
+        val missing = runtimeIds.filter { it !in metadataIds }
+
+        assertTrue("Runtime actions missing metadata: $missing", missing.isEmpty())
+    }
+
+    @Test
     fun coreContextSourcesIncludeLiveLocationSource() {
         registerCoreRuntime()
 

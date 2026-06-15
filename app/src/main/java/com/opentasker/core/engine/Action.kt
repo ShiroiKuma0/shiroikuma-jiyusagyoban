@@ -41,5 +41,6 @@ object ActionRegistry {
 
     fun register(action: Action) { byId[action.id] = action }
     fun get(id: String): Action? = byId[id]
-    fun all(): Collection<Action> = byId.values.toList() // Return a copy to prevent external modification
+    fun all(): Collection<Action> = byId.values.toList()
+    fun allIds(): Set<String> = byId.keys.toSet()
 }
