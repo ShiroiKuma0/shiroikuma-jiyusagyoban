@@ -24,8 +24,10 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -38,6 +40,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import com.opentasker.core.widget.Background
 import com.opentasker.core.widget.Offset
+import com.opentasker.core.widget.TaskerWidgetImport
 import com.opentasker.core.widget.WidgetLayoutCodec
 import com.opentasker.core.widget.WidgetNode
 import com.opentasker.core.widget.WidgetRenderer
@@ -117,6 +121,14 @@ fun WidgetEditor(initialJson: String, onDone: (String) -> Unit, onCancel: () -> 
     var selected by remember { mutableStateOf<List<Int>>(emptyList()) }
     val fonts = remember { ThemeStore.availableFonts().map { it.fileName }.filter { it.isNotEmpty() } }
     val clipboard = LocalClipboardManager.current
+    var showImport by remember { mutableStateOf(false) }
+
+    if (showImport) {
+        TaskerImportDialog(
+            onImport = { root = it; selected = emptyList(); showImport = false },
+            onDismiss = { showImport = false },
+        )
+    }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize()) {
@@ -126,6 +138,9 @@ fun WidgetEditor(initialJson: String, onDone: (String) -> Unit, onCancel: () -> 
             ) {
                 IconButton(onClick = onCancel) { Icon(Icons.Filled.Close, contentDescription = "Cancel") }
                 Text("Widget layout", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).padding(start = 4.dp))
+                IconButton(onClick = { showImport = true }) {
+                    Icon(Icons.Filled.ContentPaste, contentDescription = "Import Tasker layout")
+                }
                 IconButton(onClick = { clipboard.setText(AnnotatedString(WidgetLayoutCodec.encode(root))) }) {
                     Icon(Icons.Filled.ContentCopy, contentDescription = "Copy JSON")
                 }
@@ -153,6 +168,44 @@ fun WidgetEditor(initialJson: String, onDone: (String) -> Unit, onCancel: () -> 
             }
         }
     }
+}
+
+/** Paste the `arg13` JSON of a Tasker Widget V2 action (code 461); convert it into our layout tree. */
+@Composable
+private fun TaskerImportDialog(onImport: (WidgetNode) -> Unit, onDismiss: () -> Unit) {
+    var pasted by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = onDismiss,
+        title = { Text("Import Tasker layout") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Paste the layout JSON from a Tasker “Widget” (V2) action — the value of its " +
+                        "Layout field (arg13). Containers, text, images, padding, colours and fonts are mapped " +
+                        "to this editor’s schema.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = pasted,
+                    onValueChange = { pasted = it; error = null },
+                    label = { Text("Tasker layout JSON") },
+                    minLines = 6,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val node = TaskerWidgetImport.convert(pasted)
+                if (node != null) onImport(node) else error = "Couldn’t parse that as a Tasker layout."
+            }) { Text("Convert") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable
