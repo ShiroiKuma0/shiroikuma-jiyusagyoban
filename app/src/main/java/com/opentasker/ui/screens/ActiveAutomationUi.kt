@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
@@ -40,6 +41,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -130,6 +132,7 @@ import com.opentasker.core.storage.toEntity
 import com.opentasker.core.transfer.BundleImportPlan
 import com.opentasker.core.transfer.OpenTaskerBundle
 import com.opentasker.core.transfer.OpenTaskerBundleCodec
+import com.opentasker.core.transfer.ProjectConflictStrategy
 import com.opentasker.core.transfer.OpenTaskerBundleRepository
 import com.opentasker.core.transfer.TaskerImportPlanner
 import com.opentasker.core.transfer.TaskerImportPreview
@@ -203,6 +206,19 @@ internal data class OpenTaskerBundleReviewState(
     val bundle: OpenTaskerBundle,
     val plan: BundleImportPlan,
 )
+
+/** A pending selective export: exactly these items, plus the include-variables choice. */
+private data class ExportRequest(
+    val name: String,
+    val fileName: String,
+    val profileIds: Set<Long> = emptySet(),
+    val taskIds: Set<Long> = emptySet(),
+    val sceneIds: Set<Long> = emptySet(),
+    val includeVariables: Boolean = false,
+)
+
+private fun exportFileName(label: String): String =
+    label.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_').ifEmpty { "export" } + ".json"
 
 private sealed interface MoveTarget {
     val currentProjectId: Long?
@@ -574,6 +590,49 @@ class ActiveAutomationViewModel(
         }
     }
 
+    fun exportSelectionBundle(
+        uri: Uri,
+        appVersion: String,
+        profileIds: Set<Long>,
+        taskIds: Set<Long>,
+        sceneIds: Set<Long>,
+        includeVariables: Boolean,
+        name: String,
+    ) {
+        viewModelScope.launch {
+            if (openTaskerBundleBusy) return@launch
+            openTaskerBundleBusy = true
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val bundle = bundleRepository.exportSelection(
+                        appVersion = appVersion,
+                        profileIds = profileIds,
+                        taskIds = taskIds,
+                        sceneIds = sceneIds,
+                        includeVariables = includeVariables,
+                        name = name,
+                    )
+                    val encoded = OpenTaskerBundleCodec.encode(bundle)
+                    val stream = appContext.contentResolver.openOutputStream(uri)
+                        ?: error("Unable to open export destination")
+                    stream.bufferedWriter(Charsets.UTF_8).use { writer -> writer.write(encoded) }
+                    bundle
+                }
+            }
+                .onSuccess { bundle ->
+                    val parts = buildList {
+                        if (bundle.profiles.isNotEmpty()) add("${bundle.profiles.size} profile${plural(bundle.profiles.size)}")
+                        if (bundle.tasks.isNotEmpty()) add("${bundle.tasks.size} task${plural(bundle.tasks.size)}")
+                        if (bundle.scenes.isNotEmpty()) add("${bundle.scenes.size} scene${plural(bundle.scenes.size)}")
+                        if (bundle.variables.isNotEmpty()) add("${bundle.variables.size} variable${plural(bundle.variables.size)}")
+                    }
+                    events.send("Exported ${parts.joinToString().ifEmpty { "nothing" }}")
+                }
+                .onFailure { events.send("Error: ${it.message ?: "Export failed"}") }
+            openTaskerBundleBusy = false
+        }
+    }
+
     fun previewOpenTaskerBundle(uri: Uri) {
         viewModelScope.launch {
             if (openTaskerBundleBusy) return@launch
@@ -600,13 +659,16 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun confirmOpenTaskerBundleImport(bundle: OpenTaskerBundle) {
+    fun confirmOpenTaskerBundleImport(
+        bundle: OpenTaskerBundle,
+        projectConflictStrategy: ProjectConflictStrategy = ProjectConflictStrategy.MERGE,
+    ) {
         viewModelScope.launch {
             if (openTaskerBundleBusy) return@launch
             openTaskerBundleBusy = true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    bundleRepository.importBundle(bundle)
+                    bundleRepository.importBundle(bundle, projectConflictStrategy)
                 }
             }
                 .onSuccess { importReport ->
@@ -614,7 +676,8 @@ class ActiveAutomationViewModel(
                     events.send(
                         "Imported ${importReport.insertedTasks} task${plural(importReport.insertedTasks)}, " +
                             "${importReport.insertedProfiles} disabled profile${plural(importReport.insertedProfiles)}, " +
-                            "${importReport.insertedScenes} scene${plural(importReport.insertedScenes)}"
+                            "${importReport.insertedScenes} scene${plural(importReport.insertedScenes)}" +
+                            if (importReport.insertedProjects > 0) ", ${importReport.insertedProjects} project${plural(importReport.insertedProjects)}" else ""
                     )
                 }
                 .onFailure { events.send("Error: ${it.message ?: "OpenTasker bundle import failed"}") }
@@ -813,6 +876,9 @@ fun ActiveAutomationUi(
     var showUiCustomization by remember { mutableStateOf(false) }
     var showProjectManagement by remember { mutableStateOf(false) }
     var moveTarget by remember { mutableStateOf<MoveTarget?>(null) }
+    var exportRequest by remember { mutableStateOf<ExportRequest?>(null) }
+    var pendingExportWrite by remember { mutableStateOf<ExportRequest?>(null) }
+    var importConflict by remember { mutableStateOf<OpenTaskerBundle?>(null) }
     var taskDialog by remember { mutableStateOf<Task?>(null) }
     var showCreateTaskDialog by remember { mutableStateOf(false) }
     var profileDialog by remember { mutableStateOf<Profile?>(null) }
@@ -838,6 +904,23 @@ fun ActiveAutomationUi(
     }
     val openTaskerBundleImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.previewOpenTaskerBundle(it) }
+    }
+    val selectiveExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        val req = pendingExportWrite
+        pendingExportWrite = null
+        if (uri != null && req != null) {
+            viewModel.exportSelectionBundle(
+                uri = uri,
+                appVersion = BuildConfig.VERSION_NAME,
+                profileIds = req.profileIds,
+                taskIds = req.taskIds,
+                sceneIds = req.sceneIds,
+                includeVariables = req.includeVariables,
+                name = req.name,
+            )
+        }
     }
     val databaseBackupExportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
@@ -926,6 +1009,16 @@ fun ActiveAutomationUi(
             onDelete = { project, deleteItems -> viewModel.deleteProject(project, deleteItems) },
             onMoveUp = { viewModel.moveProject(it, up = true) },
             onMoveDown = { viewModel.moveProject(it, up = false) },
+            onExportProject = { project ->
+                showProjectManagement = false
+                exportRequest = ExportRequest(
+                    name = "Project: ${project.name}",
+                    fileName = exportFileName(project.name),
+                    profileIds = profiles.filter { it.projectId == project.id }.map { it.id }.toSet(),
+                    taskIds = tasks.filter { it.projectId == project.id }.map { it.id }.toSet(),
+                    sceneIds = scenes.filter { it.projectId == project.id }.map { it.id }.toSet(),
+                )
+            },
         )
         return
     }
@@ -1088,6 +1181,7 @@ fun ActiveAutomationUi(
                     }
                 },
                 onMoveProfile = { moveTarget = MoveTarget.ProfileMove(it) },
+                onExportProfile = { exportRequest = ExportRequest(name = "Profile: ${it.name}", fileName = exportFileName(it.name), profileIds = setOf(it.id)) },
                 contentPadding = innerPadding,
             )
 
@@ -1110,6 +1204,7 @@ fun ActiveAutomationUi(
                     }
                 },
                 onMoveTask = { moveTarget = MoveTarget.TaskMove(it) },
+                onExportTask = { exportRequest = ExportRequest(name = "Task: ${it.name}", fileName = exportFileName(it.name), taskIds = setOf(it.id)) },
                 contentPadding = innerPadding,
             )
 
@@ -1153,6 +1248,7 @@ fun ActiveAutomationUi(
                 onUpdateScene = viewModel::updateScene,
                 onDeleteScene = { pendingDelete = DeleteTarget.SceneTarget(it) },
                 onMoveScene = { moveTarget = MoveTarget.SceneMove(it) },
+                onExportScene = { exportRequest = ExportRequest(name = "Scene: ${it.name}", fileName = exportFileName(it.name), sceneIds = setOf(it.id)) },
                 contentPadding = innerPadding,
             )
 
@@ -1195,6 +1291,19 @@ fun ActiveAutomationUi(
         )
     }
 
+    exportRequest?.let { req ->
+        ExportOptionsDialog(
+            request = req,
+            onDismiss = { exportRequest = null },
+            onExport = { includeVars ->
+                val resolved = req.copy(includeVariables = includeVars)
+                exportRequest = null
+                pendingExportWrite = resolved
+                selectiveExportLauncher.launch(resolved.fileName)
+            },
+        )
+    }
+
     pendingDelete?.let { target ->
         DeleteConfirmationDialog(
             target = target,
@@ -1232,7 +1341,35 @@ fun ActiveAutomationUi(
             state = state,
             busy = openTaskerBundleBusy,
             onDismiss = viewModel::clearOpenTaskerBundleReview,
-            onConfirm = { viewModel.confirmOpenTaskerBundleImport(state.bundle) },
+            onConfirm = {
+                val hasProjectCollision = state.bundle.projects.any { incoming ->
+                    projects.any { it.name.equals(incoming.name, ignoreCase = true) }
+                }
+                if (hasProjectCollision) {
+                    importConflict = state.bundle
+                    viewModel.clearOpenTaskerBundleReview()
+                } else {
+                    viewModel.confirmOpenTaskerBundleImport(state.bundle, ProjectConflictStrategy.RENAME)
+                }
+            },
+        )
+    }
+
+    importConflict?.let { bundle ->
+        val conflictingNames = bundle.projects
+            .filter { incoming -> projects.any { it.name.equals(incoming.name, ignoreCase = true) } }
+            .map { it.name }
+        ImportProjectConflictDialog(
+            conflictingNames = conflictingNames,
+            onOverwrite = {
+                viewModel.confirmOpenTaskerBundleImport(bundle, ProjectConflictStrategy.MERGE)
+                importConflict = null
+            },
+            onKeepBoth = {
+                viewModel.confirmOpenTaskerBundleImport(bundle, ProjectConflictStrategy.RENAME)
+                importConflict = null
+            },
+            onDismiss = { importConflict = null },
         )
     }
 
@@ -1384,6 +1521,7 @@ private fun ProfilesScreen(
     onEditContext: (Profile, Int, ContextSpec) -> Unit,
     onDeleteContext: (Profile, Int) -> Unit,
     onMoveProfile: (Profile) -> Unit,
+    onExportProfile: (Profile) -> Unit,
     contentPadding: PaddingValues,
 ) {
     if (tasks.isEmpty()) {
@@ -1458,6 +1596,7 @@ private fun ProfilesScreen(
                 onEditContext = { index, context -> onEditContext(profile, index, context) },
                 onDeleteContext = { index -> onDeleteContext(profile, index) },
                 onMove = { onMoveProfile(profile) },
+                onExport = { onExportProfile(profile) },
             )
         }
     }
@@ -1728,6 +1867,7 @@ private fun ProfileCard(
     onEditContext: (Int, ContextSpec) -> Unit,
     onDeleteContext: (Int) -> Unit,
     onMove: () -> Unit,
+    onExport: () -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -1747,6 +1887,9 @@ private fun ProfileCard(
                 Column(Modifier.weight(1f)) {
                     Text(profile.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("Runs: $enterTaskName", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                IconButton(onClick = onExport) {
+                    Icon(Icons.Filled.Upload, contentDescription = "Export profile")
                 }
                 Switch(checked = profile.enabled, onCheckedChange = onToggle)
             }
@@ -1814,6 +1957,7 @@ private fun TasksScreen(
     onEditAction: (Task, Int, ActionSpec) -> Unit,
     onDeleteAction: (Task, Int) -> Unit,
     onMoveTask: (Task) -> Unit,
+    onExportTask: (Task) -> Unit,
     contentPadding: PaddingValues,
 ) {
     if (tasks.isEmpty()) {
@@ -1847,6 +1991,7 @@ private fun TasksScreen(
                 onEditAction = { index, action -> onEditAction(task, index, action) },
                 onDeleteAction = { index -> onDeleteAction(task, index) },
                 onMove = { onMoveTask(task) },
+                onExport = { onExportTask(task) },
             )
         }
     }
@@ -1863,6 +2008,7 @@ private fun TaskCard(
     onEditAction: (Int, ActionSpec) -> Unit,
     onDeleteAction: (Int) -> Unit,
     onMove: () -> Unit,
+    onExport: () -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -1881,6 +2027,9 @@ private fun TaskCard(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                IconButton(onClick = onExport) {
+                    Icon(Icons.Filled.Upload, contentDescription = "Export task")
                 }
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -2623,6 +2772,59 @@ private fun EmptyState(
 }
 
 @Composable
+private fun ExportOptionsDialog(
+    request: ExportRequest,
+    onDismiss: () -> Unit,
+    onExport: (Boolean) -> Unit,
+) {
+    var includeVariables by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Export") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(request.name, style = MaterialTheme.typography.bodyMedium)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Checkbox(checked = includeVariables, onCheckedChange = { includeVariables = it })
+                    Text("Include global variables", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onExport(includeVariables) }) { Text("Export") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun ImportProjectConflictDialog(
+    conflictingNames: List<String>,
+    onOverwrite: () -> Unit,
+    onKeepBoth: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Project already exists") },
+        text = {
+            Text(
+                if (conflictingNames.size == 1) {
+                    "A project named \"${conflictingNames.first()}\" already exists. Overwrite it (file the imported items into it), or keep both (import as a new, renamed project)?"
+                } else {
+                    "These projects already exist: ${conflictingNames.joinToString()}. Overwrite them, or keep both (import as new, renamed projects)?"
+                },
+            )
+        },
+        confirmButton = { TextButton(onClick = onOverwrite) { Text("Overwrite") } },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = onKeepBoth) { Text("Keep both") }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        },
+    )
+}
+
+@Composable
 private fun DeleteConfirmationDialog(
     target: DeleteTarget,
     onDismiss: () -> Unit,
@@ -2751,7 +2953,7 @@ private fun OpenTaskerBundleReviewDialog(
                 enabled = plan.canImport && !busy,
                 onClick = onConfirm,
             ) {
-                Text(if (busy) "Importing..." else "Import Disabled")
+                Text(if (busy) "Importing..." else "Import")
             }
         },
         dismissButton = {

@@ -2,7 +2,6 @@ package com.opentasker.ui.screens
 
 import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -24,14 +23,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -47,11 +43,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,7 +55,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
@@ -81,33 +74,13 @@ fun SceneLibraryScreen(
     onUpdateScene: (Scene, String) -> Unit,
     onDeleteScene: (Scene) -> Unit,
     onMoveScene: (Scene) -> Unit,
+    onExportScene: (Scene) -> Unit,
     contentPadding: PaddingValues,
 ) {
-    var showCreateDialog by rememberSaveable { mutableStateOf(false) }
-    var elementEditorSceneId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var elementEditorIndex by rememberSaveable { mutableStateOf<Int?>(null) }
-    var pendingElementDeleteSceneId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var pendingElementDeleteIndex by rememberSaveable { mutableStateOf<Int?>(null) }
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var elementEditor by remember { mutableStateOf<SceneElementEditorState?>(null) }
+    var pendingElementDelete by remember { mutableStateOf<SceneElementEditorState?>(null) }
     val sortedScenes = remember(scenes) { scenes.sortedBy { it.name.lowercase() } }
-    val elementEditor = remember(scenes, elementEditorSceneId, elementEditorIndex) {
-        sceneElementEditorState(scenes, elementEditorSceneId, elementEditorIndex, allowNew = true)
-    }
-    val pendingElementDelete = remember(scenes, pendingElementDeleteSceneId, pendingElementDeleteIndex) {
-        sceneElementEditorState(scenes, pendingElementDeleteSceneId, pendingElementDeleteIndex, allowNew = false)
-    }
-
-    LaunchedEffect(elementEditorSceneId, elementEditor) {
-        if (elementEditorSceneId != null && elementEditor == null) {
-            elementEditorSceneId = null
-            elementEditorIndex = null
-        }
-    }
-    LaunchedEffect(pendingElementDeleteSceneId, pendingElementDelete) {
-        if (pendingElementDeleteSceneId != null && pendingElementDelete == null) {
-            pendingElementDeleteSceneId = null
-            pendingElementDeleteIndex = null
-        }
-    }
 
     if (showCreateDialog) {
         SceneEditorDialog(
@@ -123,10 +96,7 @@ fun SceneLibraryScreen(
         SceneElementEditorDialog(
             state = state,
             tasks = tasks,
-            onDismiss = {
-                elementEditorSceneId = null
-                elementEditorIndex = null
-            },
+            onDismiss = { elementEditor = null },
             onSave = { element ->
                 val updatedScene = if (state.index == null) {
                     state.scene.copy(elements = state.scene.elements + element)
@@ -138,8 +108,7 @@ fun SceneLibraryScreen(
                     )
                 }
                 onUpdateScene(updatedScene, if (state.index == null) "Element added" else "Element updated")
-                elementEditorSceneId = null
-                elementEditorIndex = null
+                elementEditor = null
             },
         )
     }
@@ -147,10 +116,7 @@ fun SceneLibraryScreen(
     pendingElementDelete?.let { state ->
         SceneElementDeleteDialog(
             state = state,
-            onDismiss = {
-                pendingElementDeleteSceneId = null
-                pendingElementDeleteIndex = null
-            },
+            onDismiss = { pendingElementDelete = null },
             onConfirm = {
                 val index = state.index
                 if (index != null) {
@@ -159,8 +125,7 @@ fun SceneLibraryScreen(
                         "Element removed",
                     )
                 }
-                pendingElementDeleteSceneId = null
-                pendingElementDeleteIndex = null
+                pendingElementDelete = null
             },
         )
     }
@@ -191,18 +156,9 @@ fun SceneLibraryScreen(
             SceneCard(
                 scene = scene,
                 tasks = tasks,
-                onAddElement = {
-                    elementEditorSceneId = scene.id
-                    elementEditorIndex = null
-                },
-                onEditElement = { index, _ ->
-                    elementEditorSceneId = scene.id
-                    elementEditorIndex = index
-                },
-                onDeleteElement = { index, _ ->
-                    pendingElementDeleteSceneId = scene.id
-                    pendingElementDeleteIndex = index
-                },
+                onAddElement = { elementEditor = SceneElementEditorState(scene = scene) },
+                onEditElement = { index, element -> elementEditor = SceneElementEditorState(scene, index, element) },
+                onDeleteElement = { index, element -> pendingElementDelete = SceneElementEditorState(scene, index, element) },
                 onMoveElement = { index, element ->
                     onUpdateScene(
                         scene.copy(
@@ -215,36 +171,10 @@ fun SceneLibraryScreen(
                 },
                 onDelete = { onDeleteScene(scene) },
                 onMoveToProject = { onMoveScene(scene) },
+                onExportToBundle = { onExportScene(scene) },
             )
         }
     }
-}
-
-private fun sceneElementEditorState(
-    scenes: List<Scene>,
-    sceneId: Long?,
-    index: Int?,
-    allowNew: Boolean,
-): SceneElementEditorState? {
-    val scene = scenes.firstOrNull { it.id == sceneId } ?: return null
-    return if (index == null) {
-        if (allowNew) SceneElementEditorState(scene = scene) else null
-    } else {
-        SceneElementEditorState(
-            scene = scene,
-            index = index,
-            element = scene.elements.getOrNull(index) ?: return null,
-        )
-    }
-}
-
-private fun SceneElement.nudgedWithin(scene: Scene, deltaX: Int, deltaY: Int): SceneElement {
-    val maxX = (scene.widthDp - widthDp).coerceAtLeast(0)
-    val maxY = (scene.heightDp - heightDp).coerceAtLeast(0)
-    return copy(
-        xDp = (xDp + deltaX).coerceIn(0, maxX),
-        yDp = (yDp + deltaY).coerceIn(0, maxY),
-    )
 }
 
 private data class SceneElementEditorState(
@@ -297,7 +227,7 @@ private fun SceneOverviewCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
-        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+        shape = RoundedCornerShape(18.dp),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -337,6 +267,7 @@ private fun SceneCard(
     onMoveElement: (Int, SceneElement) -> Unit,
     onDelete: () -> Unit,
     onMoveToProject: () -> Unit,
+    onExportToBundle: () -> Unit,
 ) {
     val taskNames = remember(tasks) { tasks.associate { it.id to it.name } }
     val issues = remember(scene, tasks) { SceneValidator.validate(scene, tasks) }
@@ -345,7 +276,7 @@ private fun SceneCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)),
-        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+        shape = RoundedCornerShape(18.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -356,6 +287,9 @@ private fun SceneCard(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                IconButton(onClick = onExportToBundle) {
+                    Icon(Icons.Filled.Upload, contentDescription = "Export scene")
                 }
                 IconButton(onClick = onMoveToProject) {
                     Icon(Icons.Filled.Folder, contentDescription = "Move scene to project")
@@ -375,7 +309,7 @@ private fun SceneCard(
             )
 
             OutlinedButton(onClick = onAddElement, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Add, contentDescription = "Add element")
+                Icon(Icons.Filled.Add, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
                 Text("Add Element")
             }
@@ -384,12 +318,8 @@ private fun SceneCard(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     scene.elements.forEachIndexed { index, element ->
                         SceneElementRow(
-                            scene = scene,
                             element = element,
                             taskNames = taskNames,
-                            onNudge = { deltaX, deltaY ->
-                                onMoveElement(index, element.nudgedWithin(scene, deltaX, deltaY))
-                            },
                             onEdit = { onEditElement(index, element) },
                             onDelete = { onDeleteElement(index, element) },
                         )
@@ -535,10 +465,8 @@ private fun SceneCanvasElement(
 
 @Composable
 private fun SceneElementRow(
-    scene: Scene,
     element: SceneElement,
     taskNames: Map<Long, String>,
-    onNudge: (Int, Int) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -547,82 +475,36 @@ private fun SceneElementRow(
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)),
     ) {
-        Column(
+        Row(
             Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(sceneElementTypeLabel(element.type), style = MaterialTheme.typography.labelLarge)
-                    sceneElementSummary(element)?.let { summary ->
-                        Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
-                    }
-                    Text(
-                        "Bounds ${element.xDp},${element.yDp} ${element.widthDp}x${element.heightDp} dp",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    listOfNotNull(
-                        element.tapTaskId?.let { "Tap: ${taskNames[it] ?: "missing #$it"}" },
-                        element.longPressTaskId?.let { "Long press: ${taskNames[it] ?: "missing #$it"}" },
-                    ).forEach { binding ->
-                        Text(binding, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(sceneElementTypeLabel(element.type), style = MaterialTheme.typography.labelLarge)
+                sceneElementSummary(element)?.let { summary ->
+                    Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
                 }
-                Row {
-                    IconButton(onClick = onEdit) {
-                        Icon(Icons.Filled.Edit, contentDescription = "Edit element")
-                    }
-                    IconButton(onClick = onDelete) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Delete element", tint = MaterialTheme.colorScheme.error)
-                    }
+                Text(
+                    "Bounds ${element.xDp},${element.yDp} ${element.widthDp}x${element.heightDp} dp",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                listOfNotNull(
+                    element.tapTaskId?.let { "Tap: ${taskNames[it] ?: "missing #$it"}" },
+                    element.longPressTaskId?.let { "Long press: ${taskNames[it] ?: "missing #$it"}" },
+                ).forEach { binding ->
+                    Text(binding, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            SceneElementNudgeControls(
-                scene = scene,
-                element = element,
-                onNudge = onNudge,
-            )
-        }
-    }
-}
-
-@Composable
-private fun SceneElementNudgeControls(
-    scene: Scene,
-    element: SceneElement,
-    onNudge: (Int, Int) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        IconButton(
-            enabled = element.xDp > 0,
-            onClick = { onNudge(-1, 0) },
-        ) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Move element left 1 dp")
-        }
-        IconButton(
-            enabled = element.yDp > 0,
-            onClick = { onNudge(0, -1) },
-        ) {
-            Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move element up 1 dp")
-        }
-        IconButton(
-            enabled = element.yDp < (scene.heightDp - element.heightDp).coerceAtLeast(0),
-            onClick = { onNudge(0, 1) },
-        ) {
-            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move element down 1 dp")
-        }
-        IconButton(
-            enabled = element.xDp < (scene.widthDp - element.widthDp).coerceAtLeast(0),
-            onClick = { onNudge(1, 0) },
-        ) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Move element right 1 dp")
+            Row {
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Filled.Edit, contentDescription = "Edit element")
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Delete element", tint = MaterialTheme.colorScheme.error)
+                }
+            }
         }
     }
 }
@@ -636,13 +518,6 @@ private fun SceneElementDeleteDialog(
     val element = state.element
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                Icons.Filled.Delete,
-                contentDescription = "Remove element",
-                tint = MaterialTheme.colorScheme.error,
-            )
-        },
         title = { Text("Remove element?") },
         text = {
             Text(
@@ -669,22 +544,20 @@ private fun SceneElementEditorDialog(
     val initial = remember(state) {
         state.element ?: SceneElementDrafts.defaultElement(state.scene, SceneElementType.BUTTON)
     }
-    var type by rememberSaveable(state.scene.id, state.index) {
-        mutableStateOf(initial.type.takeIf { it in SceneElementDrafts.editableTypes } ?: SceneElementType.BUTTON)
-    }
-    var x by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.xDp.toString()) }
-    var y by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.yDp.toString()) }
-    var width by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.widthDp.toString()) }
-    var height by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.heightDp.toString()) }
-    var label by rememberSaveable(state.scene.id, state.index) {
+    var type by remember(state) { mutableStateOf(initial.type.takeIf { it in SceneElementDrafts.editableTypes } ?: SceneElementType.BUTTON) }
+    var x by remember(state) { mutableStateOf(initial.xDp.toString()) }
+    var y by remember(state) { mutableStateOf(initial.yDp.toString()) }
+    var width by remember(state) { mutableStateOf(initial.widthDp.toString()) }
+    var height by remember(state) { mutableStateOf(initial.heightDp.toString()) }
+    var label by remember(state) {
         mutableStateOf(initial.config["label"] ?: initial.config["text"] ?: "")
     }
-    var sliderMin by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.config["min"] ?: "0") }
-    var sliderMax by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.config["max"] ?: "100") }
-    var sliderValue by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.config["value"] ?: "50") }
-    var imageSource by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.config["source"] ?: "") }
-    var tapTaskId by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.tapTaskId) }
-    var longPressTaskId by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.longPressTaskId) }
+    var sliderMin by remember(state) { mutableStateOf(initial.config["min"] ?: "0") }
+    var sliderMax by remember(state) { mutableStateOf(initial.config["max"] ?: "100") }
+    var sliderValue by remember(state) { mutableStateOf(initial.config["value"] ?: "50") }
+    var imageSource by remember(state) { mutableStateOf(initial.config["source"] ?: "") }
+    var tapTaskId by remember(state) { mutableStateOf(initial.tapTaskId) }
+    var longPressTaskId by remember(state) { mutableStateOf(initial.longPressTaskId) }
 
     val parsedX = x.toIntOrNull()
     val parsedY = y.toIntOrNull()
@@ -838,7 +711,7 @@ private fun SceneElementTypeSelector(
     selected: SceneElementType,
     onSelect: (SceneElementType) -> Unit,
 ) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
     Box {
         OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
             Text(sceneElementTypeLabel(selected), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -864,7 +737,7 @@ private fun SceneTaskBindingSelector(
     selectedTaskId: Long?,
     onSelect: (Long?) -> Unit,
 ) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
     val taskNames = remember(tasks) { tasks.associate { it.id to it.name } }
     Box {
         OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
@@ -908,7 +781,6 @@ private fun NumberField(
         onValueChange = onValueChange,
         label = { Text(label) },
         isError = isError,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         singleLine = true,
         modifier = modifier,
     )
@@ -918,11 +790,7 @@ private fun NumberField(
 private fun SceneIssueText(issue: SceneIssue) {
     val color = when (issue.severity) {
         SceneIssueSeverity.ERROR -> MaterialTheme.colorScheme.error
-        SceneIssueSeverity.WARNING -> if (androidx.compose.foundation.isSystemInDarkTheme()) {
-            com.opentasker.ui.theme.DesignSystem.SemanticColor.warningDark
-        } else {
-            com.opentasker.ui.theme.DesignSystem.SemanticColor.warningLight
-        }
+        SceneIssueSeverity.WARNING -> MaterialTheme.colorScheme.tertiary
     }
     Text(issue.message, style = MaterialTheme.typography.bodySmall, color = color)
 }
@@ -954,7 +822,7 @@ private fun SceneStatusPill(
     Surface(
         modifier = modifier,
         color = color.copy(alpha = 0.14f),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(999.dp),
         border = BorderStroke(1.dp, color.copy(alpha = 0.34f)),
     ) {
         Text(
@@ -971,9 +839,9 @@ private fun SceneEditorDialog(
     onDismiss: () -> Unit,
     onSave: (String, Int, Int) -> Unit,
 ) {
-    var name by rememberSaveable { mutableStateOf("") }
-    var width by rememberSaveable { mutableStateOf("320") }
-    var height by rememberSaveable { mutableStateOf("240") }
+    var name by remember { mutableStateOf("") }
+    var width by remember { mutableStateOf("320") }
+    var height by remember { mutableStateOf("240") }
     val parsedWidth = width.toIntOrNull()
     val parsedHeight = height.toIntOrNull()
     val canSave = name.isNotBlank() && parsedWidth != null && parsedHeight != null && parsedWidth > 0 && parsedHeight > 0
