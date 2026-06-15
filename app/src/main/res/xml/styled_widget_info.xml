@@ -9,4 +9,5 @@
     android:configure="com.opentasker.widget.StyledWidgetConfigActivity"
     android:initialLayout="@layout/styled_widget"
     android:previewImage="@mipmap/ic_launcher"
+    android:description="@string/widget_styled_description"
     android:updatePeriodMillis="0" />
