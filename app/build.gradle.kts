@@ -10,8 +10,8 @@ val releaseKeystorePath = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE")
 val releaseKeystorePassword = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE_PASSWORD")
 val releaseKeyAlias = System.getenv("OPEN_TASKER_RELEASE_KEY_ALIAS")
 val releaseKeyPassword = System.getenv("OPEN_TASKER_RELEASE_KEY_PASSWORD")
-val appVersionCode = 62
-val appVersionName = "0.2.60"
+val appVersionCode = 63
+val appVersionName = "0.2.61"
 val allowedDistributions = setOf("standard", "fdroid", "play")
 val selectedDistribution = providers.gradleProperty("openTaskerDistribution")
     .orElse("standard")
@@ -36,7 +36,7 @@ android {
     defaultConfig {
         applicationId = "com.opentasker.app"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
