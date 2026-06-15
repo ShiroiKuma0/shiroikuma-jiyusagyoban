@@ -21,7 +21,7 @@ suspend fun executeAndLogTask(
     initialVariables: Map<String, String> = emptyMap(),
     logTag: String = TAG,
 ): TaskExecutionResult {
-    val variables = VariableStore()
+    val variables = VariableStore(com.opentasker.core.engine.variables.PersistentGlobalScope, task.projectId)
     initialVariables.forEach { (name, value) -> variables.set(name, value) }
     val ctx = ActionContext(appContext, variables) { msg -> Log.i(logTag, msg) }
     val runner = TaskRunner(ctx, resolveTask = dbSubTaskResolver(db))

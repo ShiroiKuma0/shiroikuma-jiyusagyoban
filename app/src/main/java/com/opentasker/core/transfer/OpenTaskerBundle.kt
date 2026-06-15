@@ -13,6 +13,7 @@ import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.ListSortStore
 import com.opentasker.core.storage.SortMethod
 import com.opentasker.core.storage.SortPrefs
+import com.opentasker.core.storage.VariableEntity
 import com.opentasker.core.storage.toEntity
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -325,12 +326,10 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             }
 
             bundle.variables.sortedWith(compareBy<Variable> { it.name.lowercase() }.thenBy { it.name }).forEach { variable ->
-                val existing = db.variableDao().get(variable.name)
-                if (existing == null) {
-                    db.variableDao().insert(variable.toEntity())
-                } else {
-                    db.variableDao().update(variable.toEntity())
-                }
+                // Super-globals (projectId 0) stay super; project-globals remap to the resolved project
+                // (or fall back to super if the bundle didn't carry that project). insert REPLACEs.
+                val pid = if (variable.projectId == 0L) 0L else (projectIdMap[variable.projectId] ?: 0L)
+                db.variableDao().insert(VariableEntity(pid, variable.name, variable.value))
                 insertedVariables++
             }
 

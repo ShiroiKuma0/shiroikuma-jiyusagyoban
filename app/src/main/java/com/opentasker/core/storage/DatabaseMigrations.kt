@@ -69,6 +69,23 @@ object DatabaseMigrations {
         }
     }
 
+    val MIGRATION_6_7 = object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Project-scoped, persistent variables. Re-key the `variables` table from (name) to
+            // (projectId, name) and drop `isGlobal`. Existing rows become super-globals (projectId 0).
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `variables_new` (" +
+                    "`projectId` INTEGER NOT NULL, " +
+                    "`name` TEXT NOT NULL, " +
+                    "`value` TEXT NOT NULL, " +
+                    "PRIMARY KEY(`projectId`, `name`))"
+            )
+            db.execSQL("INSERT OR REPLACE INTO `variables_new` (`projectId`, `name`, `value`) SELECT 0, `name`, `value` FROM `variables`")
+            db.execSQL("DROP TABLE `variables`")
+            db.execSQL("ALTER TABLE `variables_new` RENAME TO `variables`")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -76,6 +93,7 @@ object DatabaseMigrations {
             MIGRATION_3_4,
             MIGRATION_4_5,
             MIGRATION_5_6,
+            MIGRATION_6_7,
         )
     }
 }

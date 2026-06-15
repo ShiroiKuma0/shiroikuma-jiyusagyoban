@@ -55,6 +55,8 @@ class OpenTaskerApp_NoHilt : Application() {
                 .addMigrations(*DatabaseMigrations.getAllMigrations())
                 .build()
         }
+        // Warm the persistent-variable cache (super- and project-globals) before any task runs.
+        com.opentasker.core.engine.variables.PersistentGlobalScope.init(requireNotNull(_db).variableDao())
 
         RunLogPruneWorker.enqueue(this)
     }

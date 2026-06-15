@@ -1,17 +1,22 @@
 package com.opentasker.core.engine
 
 import com.opentasker.core.engine.variables.ArrayStore
+import com.opentasker.core.engine.variables.GlobalVariableScope
+import com.opentasker.core.engine.variables.InMemoryGlobalScope
 import com.opentasker.core.engine.variables.VariableExpander
 import com.opentasker.core.expressions.TemplateScope
+import com.opentasker.core.storage.SUPER_GLOBAL_PROJECT_ID
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * In-memory variable store with a global scope and stack of local scopes.
- * Thread-safe for concurrent read/write access.
+ * Variable store for one task execution. Three scopes, chosen by the name's casing:
+ *   - `%ALLCAPS`   → **super-global**: persistent, app-wide ([GlobalVariableScope] bucket 0).
+ *   - `%MixedCase` → **project-global**: persistent, owned by the running task's [projectId]
+ *                    (an Unfiled task — projectId 0 — falls back to the super bucket, so nothing breaks).
+ *   - `%lowercase` → **task-local**: ephemeral, lives only for this execution (local stack / base scope).
  *
- * Naming convention (matches Tasker):
- *   - %UPPERCASE   → global, persistent
- *   - %lowercase   → local to current task invocation
+ * Persistent scopes are delegated to a shared [GlobalVariableScope] (the DB-backed singleton at runtime),
+ * so globals survive across runs; only the local scopes are per-store. Thread-safe.
  *
  * Enhanced with operator support:
  *   - Math: %VAR(+5), %VAR(*2), %VAR(//), %VAR(/round)
@@ -21,20 +26,29 @@ import java.util.concurrent.ConcurrentHashMap
  *   - JSON: %json.path.to.field
  */
 class VariableStore private constructor(
-    private val globals: ConcurrentHashMap<String, String>,
+    private val globalScope: GlobalVariableScope,
+    private val projectId: Long,            // 0 = Unfiled/super; >0 = the running task's project
     private val arrayStore: ArrayStore,
 ) {
-    constructor() : this(ConcurrentHashMap(), ArrayStore())
+    /** Standalone store with no persistence (ad-hoc / unit tests). */
+    constructor() : this(InMemoryGlobalScope(), SUPER_GLOBAL_PROJECT_ID, ArrayStore())
 
+    /** Store for a task run under [taskProjectId] (null = Unfiled → super scope), sharing [globalScope]. */
+    constructor(globalScope: GlobalVariableScope, taskProjectId: Long?) :
+        this(globalScope, taskProjectId ?: SUPER_GLOBAL_PROJECT_ID, ArrayStore())
+
+    // Bottom ephemeral scope: holds `%lowercase` vars set before any scope is pushed.
+    private val baseScope = ConcurrentHashMap<String, String>()
     private val localStack = java.util.Collections.synchronizedList(mutableListOf<MutableMap<String, String>>())
     private val expander = VariableExpander()
 
     /**
-     * A store for a called sub-task: shares globals (`%UPPERCASE`) and arrays so they persist and
-     * flow back, but starts with empty local scopes, so the child's `%lowercase` locals stay
-     * isolated and the caller's locals aren't visible to it.
+     * A store for a called sub-task: shares the persistent [globalScope] and the [arrayStore], but
+     * starts with fresh local scopes (so `%lowercase` locals stay isolated). [childProjectId] is the
+     * sub-task's own project, so its `%MixedCase` vars resolve to that project's bucket.
      */
-    fun childScope(): VariableStore = VariableStore(globals, arrayStore)
+    fun childScope(childProjectId: Long?): VariableStore =
+        VariableStore(globalScope, childProjectId ?: SUPER_GLOBAL_PROJECT_ID, arrayStore)
 
     fun pushScope() { localStack.add(java.util.concurrent.ConcurrentHashMap()) }
     fun popScope() { 
@@ -43,12 +57,19 @@ class VariableStore private constructor(
         }
     }
 
+    /** The persistent bucket for a name, or null if the name is task-local (`%lowercase`). */
+    private fun bucketOf(name: String): Long? {
+        if (name.isEmpty() || !name[0].isUpperCase()) return null            // local
+        val allCaps = name.none { it.isLetter() && it.isLowerCase() }
+        return if (allCaps) SUPER_GLOBAL_PROJECT_ID else projectId           // super vs project
+    }
+
     fun set(name: String, value: String) {
-        if (isGlobalName(name)) globals[name] = value
-        else {
-            synchronized(localStack) {
-                (localStack.lastOrNull() ?: globals)[name] = value
-            }
+        val bucket = bucketOf(name)
+        if (bucket == null) {
+            synchronized(localStack) { (localStack.lastOrNull() ?: baseScope)[name] = value }
+        } else {
+            globalScope.set(bucket, name, value)
         }
     }
 
@@ -58,13 +79,16 @@ class VariableStore private constructor(
                 localStack[i][name]?.let { return it }
             }
         }
-        return globals[name]
+        baseScope[name]?.let { return it }
+        val bucket = bucketOf(name) ?: return null
+        return globalScope.get(bucket, name)
     }
 
-    /** Unset a variable across all scopes and drop any array of the same name (Variable Clear). */
+    /** Unset a variable in whichever scope owns it and drop any array of the same name (Variable Clear). */
     fun unset(name: String) {
-        globals.remove(name)
+        baseScope.remove(name)
         synchronized(localStack) { localStack.forEach { it.remove(name) } }
+        bucketOf(name)?.let { globalScope.unset(it, name) }
         arrayStore.remove(name)
     }
 
@@ -107,19 +131,15 @@ class VariableStore private constructor(
         event: Map<String, String> = emptyMap(),
         param: Map<String, String> = emptyMap(),
     ): TemplateScope {
-        val taskValues = mutableMapOf<String, String>()
-        synchronized(localStack) {
-            localStack.forEach { scope -> taskValues += scope }
-        }
+        val taskValues = LinkedHashMap<String, String>()
+        taskValues.putAll(baseScope)
+        synchronized(localStack) { localStack.forEach { scope -> taskValues += scope } }
         return TemplateScope(
-            global = globals.toMap(),
-            task = taskValues.toMap(),
+            global = globalScope.snapshot(projectId),
+            task = taskValues,
             event = event.toMap(),
             param = param.toMap(),
             arrays = arrayStore.snapshot(),
         )
     }
-
-    private fun isGlobalName(name: String): Boolean =
-        name.isNotEmpty() && name[0].isUpperCase()
 }

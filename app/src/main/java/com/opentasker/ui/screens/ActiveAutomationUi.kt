@@ -355,7 +355,7 @@ class ActiveAutomationViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val globalVariables: StateFlow<List<Variable>> = db.variableDao()
-        .getAllGlobalAsFlow()
+        .getAllAsFlow()
         .map { entities -> entities.map { it.toDomain() } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -867,16 +867,14 @@ class ActiveAutomationViewModel(
         db.editHistoryDao().deleteFor(EditHistoryDao.TYPE_PROFILE, profileId)
     }
 
-    fun updateVariable(name: String, value: String) {
-        viewModelScope.launch {
-            db.variableDao().insert(VariableEntity(name, value, isGlobal = true))
-        }
+    // Route Vars-screen edits through the cache (single source of truth) so it write-throughs to the
+    // DB and the running engine sees them immediately; projectId 0 = super-global, >0 = project-global.
+    fun updateVariable(projectId: Long, name: String, value: String) {
+        com.opentasker.core.engine.variables.PersistentGlobalScope.set(projectId, name, value)
     }
 
-    fun deleteVariable(name: String) {
-        viewModelScope.launch {
-            db.variableDao().delete(VariableEntity(name, "", isGlobal = true))
-        }
+    fun deleteVariable(projectId: Long, name: String) {
+        com.opentasker.core.engine.variables.PersistentGlobalScope.unset(projectId, name)
     }
 
     private fun launchWithMessage(successMessage: String, block: suspend () -> Unit) {

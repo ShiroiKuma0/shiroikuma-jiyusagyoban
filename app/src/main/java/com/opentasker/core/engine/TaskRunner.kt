@@ -255,9 +255,10 @@ class TaskRunner(
         val resultsPrefix = args[SUB_TASK_RESULTS_PREFIX_KEY]?.trim().orEmpty()
 
         // Isolated child: shares globals + arrays, fresh locals, read-only params, its own returns.
+        // The child resolves its %MixedCase project-globals against ITS OWN project.
         val childCtx = ActionContext(
             app = ctx.app,
-            variables = ctx.variables.childScope(),
+            variables = ctx.variables.childScope(target.projectId),
             eventVariables = emptyMap(),
             parameters = parameters,
             returns = mutableMapOf(),
