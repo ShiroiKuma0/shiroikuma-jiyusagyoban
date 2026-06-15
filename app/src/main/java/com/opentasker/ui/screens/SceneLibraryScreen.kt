@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -43,6 +44,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -78,9 +80,30 @@ fun SceneLibraryScreen(
     contentPadding: PaddingValues,
 ) {
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
-    var elementEditor by remember { mutableStateOf<SceneElementEditorState?>(null) }
-    var pendingElementDelete by remember { mutableStateOf<SceneElementEditorState?>(null) }
+    var elementEditorSceneId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var elementEditorIndex by rememberSaveable { mutableStateOf<Int?>(null) }
+    var pendingElementDeleteSceneId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var pendingElementDeleteIndex by rememberSaveable { mutableStateOf<Int?>(null) }
     val sortedScenes = remember(scenes) { scenes.sortedBy { it.name.lowercase() } }
+    val elementEditor = remember(scenes, elementEditorSceneId, elementEditorIndex) {
+        sceneElementEditorState(scenes, elementEditorSceneId, elementEditorIndex, allowNew = true)
+    }
+    val pendingElementDelete = remember(scenes, pendingElementDeleteSceneId, pendingElementDeleteIndex) {
+        sceneElementEditorState(scenes, pendingElementDeleteSceneId, pendingElementDeleteIndex, allowNew = false)
+    }
+
+    LaunchedEffect(elementEditorSceneId, elementEditor) {
+        if (elementEditorSceneId != null && elementEditor == null) {
+            elementEditorSceneId = null
+            elementEditorIndex = null
+        }
+    }
+    LaunchedEffect(pendingElementDeleteSceneId, pendingElementDelete) {
+        if (pendingElementDeleteSceneId != null && pendingElementDelete == null) {
+            pendingElementDeleteSceneId = null
+            pendingElementDeleteIndex = null
+        }
+    }
 
     if (showCreateDialog) {
         SceneEditorDialog(
@@ -96,7 +119,10 @@ fun SceneLibraryScreen(
         SceneElementEditorDialog(
             state = state,
             tasks = tasks,
-            onDismiss = { elementEditor = null },
+            onDismiss = {
+                elementEditorSceneId = null
+                elementEditorIndex = null
+            },
             onSave = { element ->
                 val updatedScene = if (state.index == null) {
                     state.scene.copy(elements = state.scene.elements + element)
@@ -108,7 +134,8 @@ fun SceneLibraryScreen(
                     )
                 }
                 onUpdateScene(updatedScene, if (state.index == null) "Element added" else "Element updated")
-                elementEditor = null
+                elementEditorSceneId = null
+                elementEditorIndex = null
             },
         )
     }
@@ -116,7 +143,10 @@ fun SceneLibraryScreen(
     pendingElementDelete?.let { state ->
         SceneElementDeleteDialog(
             state = state,
-            onDismiss = { pendingElementDelete = null },
+            onDismiss = {
+                pendingElementDeleteSceneId = null
+                pendingElementDeleteIndex = null
+            },
             onConfirm = {
                 val index = state.index
                 if (index != null) {
@@ -125,7 +155,8 @@ fun SceneLibraryScreen(
                         "Element removed",
                     )
                 }
-                pendingElementDelete = null
+                pendingElementDeleteSceneId = null
+                pendingElementDeleteIndex = null
             },
         )
     }
@@ -156,9 +187,18 @@ fun SceneLibraryScreen(
             SceneCard(
                 scene = scene,
                 tasks = tasks,
-                onAddElement = { elementEditor = SceneElementEditorState(scene = scene) },
-                onEditElement = { index, element -> elementEditor = SceneElementEditorState(scene, index, element) },
-                onDeleteElement = { index, element -> pendingElementDelete = SceneElementEditorState(scene, index, element) },
+                onAddElement = {
+                    elementEditorSceneId = scene.id
+                    elementEditorIndex = null
+                },
+                onEditElement = { index, _ ->
+                    elementEditorSceneId = scene.id
+                    elementEditorIndex = index
+                },
+                onDeleteElement = { index, _ ->
+                    pendingElementDeleteSceneId = scene.id
+                    pendingElementDeleteIndex = index
+                },
                 onMoveElement = { index, element ->
                     onUpdateScene(
                         scene.copy(
@@ -172,6 +212,24 @@ fun SceneLibraryScreen(
                 onDelete = { onDeleteScene(scene) },
             )
         }
+    }
+}
+
+private fun sceneElementEditorState(
+    scenes: List<Scene>,
+    sceneId: Long?,
+    index: Int?,
+    allowNew: Boolean,
+): SceneElementEditorState? {
+    val scene = scenes.firstOrNull { it.id == sceneId } ?: return null
+    return if (index == null) {
+        if (allowNew) SceneElementEditorState(scene = scene) else null
+    } else {
+        SceneElementEditorState(
+            scene = scene,
+            index = index,
+            element = scene.elements.getOrNull(index) ?: return null,
+        )
     }
 }
 
@@ -508,6 +566,13 @@ private fun SceneElementDeleteDialog(
     val element = state.element
     AlertDialog(
         onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                Icons.Filled.Delete,
+                contentDescription = "Remove element",
+                tint = MaterialTheme.colorScheme.error,
+            )
+        },
         title = { Text("Remove element?") },
         text = {
             Text(
@@ -516,7 +581,15 @@ private fun SceneElementDeleteDialog(
             )
         },
         confirmButton = {
-            Button(onClick = onConfirm) { Text("Remove") }
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+            ) {
+                Text("Remove Element")
+            }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
@@ -534,20 +607,22 @@ private fun SceneElementEditorDialog(
     val initial = remember(state) {
         state.element ?: SceneElementDrafts.defaultElement(state.scene, SceneElementType.BUTTON)
     }
-    var type by remember(state) { mutableStateOf(initial.type.takeIf { it in SceneElementDrafts.editableTypes } ?: SceneElementType.BUTTON) }
-    var x by remember(state) { mutableStateOf(initial.xDp.toString()) }
-    var y by remember(state) { mutableStateOf(initial.yDp.toString()) }
-    var width by remember(state) { mutableStateOf(initial.widthDp.toString()) }
-    var height by remember(state) { mutableStateOf(initial.heightDp.toString()) }
-    var label by remember(state) {
+    var type by rememberSaveable(state.scene.id, state.index) {
+        mutableStateOf(initial.type.takeIf { it in SceneElementDrafts.editableTypes } ?: SceneElementType.BUTTON)
+    }
+    var x by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.xDp.toString()) }
+    var y by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.yDp.toString()) }
+    var width by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.widthDp.toString()) }
+    var height by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.heightDp.toString()) }
+    var label by rememberSaveable(state.scene.id, state.index) {
         mutableStateOf(initial.config["label"] ?: initial.config["text"] ?: "")
     }
-    var sliderMin by remember(state) { mutableStateOf(initial.config["min"] ?: "0") }
-    var sliderMax by remember(state) { mutableStateOf(initial.config["max"] ?: "100") }
-    var sliderValue by remember(state) { mutableStateOf(initial.config["value"] ?: "50") }
-    var imageSource by remember(state) { mutableStateOf(initial.config["source"] ?: "") }
-    var tapTaskId by remember(state) { mutableStateOf(initial.tapTaskId) }
-    var longPressTaskId by remember(state) { mutableStateOf(initial.longPressTaskId) }
+    var sliderMin by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.config["min"] ?: "0") }
+    var sliderMax by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.config["max"] ?: "100") }
+    var sliderValue by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.config["value"] ?: "50") }
+    var imageSource by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.config["source"] ?: "") }
+    var tapTaskId by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.tapTaskId) }
+    var longPressTaskId by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.longPressTaskId) }
 
     val parsedX = x.toIntOrNull()
     val parsedY = y.toIntOrNull()
