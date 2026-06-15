@@ -2566,8 +2566,16 @@ private fun ActionRow(
     val capability = ActionCapabilityRegistry.get(action.type)
     val context = LocalContext.current
     val isNotification = action.type.startsWith("notify.")
+    // Re-evaluate the notification permission live, so a granted notify.* action no longer claims "needs setup".
+    var permRefresh by remember { mutableStateOf(0) }
+    val notifGranted = remember(permRefresh) {
+        Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    }
+    val effectiveLevel = if (isNotification && notifGranted) CapabilityLevel.Supported else capability.level
     // Granting POST_NOTIFICATIONS from the card; if the system won't prompt (already denied), fall to settings.
     val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        permRefresh++
         if (!granted) openNotificationSettings(context)
     }
     Surface(
@@ -2596,10 +2604,10 @@ private fun ActionRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (capability.level != CapabilityLevel.Supported) {
+                if (effectiveLevel != CapabilityLevel.Supported) {
                     StatusPill(
-                        if (capability.level == CapabilityLevel.Unsupported) "Unsupported" else "Needs setup",
-                        if (capability.level == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        if (effectiveLevel == CapabilityLevel.Unsupported) "Unsupported" else "Needs setup",
+                        if (effectiveLevel == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                     )
                 }
                 Icon(
@@ -2629,9 +2637,9 @@ private fun ActionRow(
                     if (action.continueOnError) {
                         Text("Continues on error", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    if (capability.level != CapabilityLevel.Supported) {
+                    if (effectiveLevel != CapabilityLevel.Supported) {
                         Text(capability.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                        if (capability.level == CapabilityLevel.RequiresSetup) {
+                        if (effectiveLevel == CapabilityLevel.RequiresSetup) {
                             TextButton(onClick = {
                                 when {
                                     isNotification && Build.VERSION.SDK_INT >= 33 &&
