@@ -58,12 +58,24 @@ object DatabaseMigrations {
         }
     }
 
+    val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Manual sort order per tab: a `position` column on each groupable table. Seed it from
+            // the row id so the existing (insertion) order is preserved as the initial manual order.
+            for (table in listOf("profiles", "tasks", "scenes")) {
+                db.execSQL("ALTER TABLE $table ADD COLUMN position INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("UPDATE $table SET position = id")
+            }
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
             MIGRATION_3_4,
             MIGRATION_4_5,
+            MIGRATION_5_6,
         )
     }
 }

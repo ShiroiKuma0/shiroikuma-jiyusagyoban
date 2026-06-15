@@ -20,17 +20,18 @@ data class SceneEntity(
     val heightDp: Int,
     val elementsJson: String,
     val projectId: Long? = null,
+    val position: Int = 0,
 ) {
     fun toDomain() = try {
-        Scene(id, name, widthDp, heightDp, Json.decodeFromString(elementsJson), projectId)
+        Scene(id, name, widthDp, heightDp, Json.decodeFromString(elementsJson), projectId, position)
     } catch (e: Exception) {
         android.util.Log.e("SceneDao", "Failed to deserialize scene $id: ${e.message}", e)
         // Return scene with empty elements as fallback
-        Scene(id, name, widthDp, heightDp, emptyList(), projectId)
+        Scene(id, name, widthDp, heightDp, emptyList(), projectId, position)
     }
 }
 
-fun Scene.toEntity() = SceneEntity(id, name, widthDp, heightDp, Json.encodeToString(elements), projectId)
+fun Scene.toEntity() = SceneEntity(id, name, widthDp, heightDp, Json.encodeToString(elements), projectId, position)
 
 @Dao
 interface SceneDao {
@@ -38,6 +39,8 @@ interface SceneDao {
     @Update suspend fun update(s: SceneEntity)
     @Delete suspend fun delete(s: SceneEntity)
     @Query("SELECT * FROM scenes WHERE id = :id") suspend fun getById(id: Long): SceneEntity?
-    @Query("SELECT * FROM scenes") suspend fun getAll(): List<SceneEntity>
-    @Query("SELECT * FROM scenes") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<SceneEntity>>
+    @Query("SELECT * FROM scenes ORDER BY position, id") suspend fun getAll(): List<SceneEntity>
+    @Query("SELECT * FROM scenes ORDER BY position, id") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<SceneEntity>>
+    @Query("UPDATE scenes SET position = :position WHERE id = :id") suspend fun setPosition(id: Long, position: Int)
+    @Query("SELECT COALESCE(MAX(position), -1) + 1 FROM scenes") suspend fun nextPosition(): Int
 }

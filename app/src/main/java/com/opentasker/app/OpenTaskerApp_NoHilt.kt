@@ -29,6 +29,7 @@ class OpenTaskerApp_NoHilt : Application() {
         super.onCreate()
         // Seed the black-yellow appearance defaults before any Compose code reads the theme.
         ThemeStore.init(this)
+        com.opentasker.core.storage.ListSortStore.init(this)
         registerActionMetadata()
         registerCoreRuntime()
          

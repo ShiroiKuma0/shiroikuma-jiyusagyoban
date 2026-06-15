@@ -40,6 +40,8 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.SortByAlpha
+import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PlayArrow
@@ -147,6 +149,9 @@ import com.opentasker.core.storage.RunLogRetentionOptions
 import com.opentasker.core.storage.VariableEntity
 import com.opentasker.core.storage.RunLogRetentionPolicy
 import com.opentasker.core.storage.ProjectSelectionStore
+import com.opentasker.core.storage.ListSortStore
+import com.opentasker.core.storage.SortMethod
+import com.opentasker.core.storage.SortTab
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.displayLabel
 import com.opentasker.core.storage.minimumTimestamp
@@ -167,6 +172,7 @@ import com.opentasker.core.templates.TemplateAvailability
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -304,20 +310,23 @@ class ActiveAutomationViewModel(
     private val runLogRetentionSettings = RunLogRetentionSettings(appContext)
     private val databaseBackupManager = DatabaseBackupManager(appContext, db)
 
-    val profiles: StateFlow<List<Profile>> = db.profileDao()
-        .getAllAsFlow()
-        .map { entities -> entities.map { it.toDomain() }.sortedBy { it.name.lowercase() } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val profiles: StateFlow<List<Profile>> =
+        combine(db.profileDao().getAllAsFlow(), ListSortStore.state) { entities, sort ->
+            val items = entities.map { it.toDomain() }
+            if (sort.profiles == SortMethod.ALPHABETICAL) items.sortedBy { it.name.lowercase() } else items.sortedBy { it.position }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val tasks: StateFlow<List<Task>> = db.taskDao()
-        .getAllAsFlow()
-        .map { entities -> entities.map { it.toDomain() }.sortedBy { it.name.lowercase() } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val tasks: StateFlow<List<Task>> =
+        combine(db.taskDao().getAllAsFlow(), ListSortStore.state) { entities, sort ->
+            val items = entities.map { it.toDomain() }
+            if (sort.tasks == SortMethod.ALPHABETICAL) items.sortedBy { it.name.lowercase() } else items.sortedBy { it.position }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val scenes: StateFlow<List<Scene>> = db.sceneDao()
-        .getAllAsFlow()
-        .map { entities -> entities.map { it.toDomain() }.sortedBy { it.name.lowercase() } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val scenes: StateFlow<List<Scene>> =
+        combine(db.sceneDao().getAllAsFlow(), ListSortStore.state) { entities, sort ->
+            val items = entities.map { it.toDomain() }
+            if (sort.scenes == SortMethod.ALPHABETICAL) items.sortedBy { it.name.lowercase() } else items.sortedBy { it.position }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val projects: StateFlow<List<Project>> = db.projectDao()
         .getAllAsFlow()
@@ -366,7 +375,13 @@ class ActiveAutomationViewModel(
     }
 
     fun createTask(name: String, priority: Int, projectId: Long? = null) = launchWithMessage("Task created") {
-        db.taskDao().insert(Task(name = name.trim(), priority = priority.coerceIn(0, 10), projectId = projectId).toEntity())
+        db.taskDao().insert(Task(name = name.trim(), priority = priority.coerceIn(0, 10), projectId = projectId, position = db.taskDao().nextPosition()).toEntity())
+    }
+
+    /** Persist a manual reorder of the visible (filtered) tasks by reusing their own position slots. */
+    fun reorderTasks(orderedVisible: List<Task>) = viewModelScope.launch {
+        val slots = orderedVisible.map { it.position }.sorted()
+        orderedVisible.forEachIndexed { index, task -> db.taskDao().setPosition(task.id, slots[index]) }
     }
 
     fun updateTask(task: Task, message: String = "Task updated") = launchWithMessage(message) {
@@ -407,8 +422,15 @@ class ActiveAutomationViewModel(
                 widthDp = widthDp.coerceIn(120, 1440),
                 heightDp = heightDp.coerceIn(80, 2560),
                 projectId = projectId,
+                position = db.sceneDao().nextPosition(),
             ).toEntity()
         )
+    }
+
+    /** Persist a manual reorder of the visible (filtered) scenes by reusing their own position slots. */
+    fun reorderScenes(orderedVisible: List<Scene>) = viewModelScope.launch {
+        val slots = orderedVisible.map { it.position }.sorted()
+        orderedVisible.forEachIndexed { index, scene -> db.sceneDao().setPosition(scene.id, slots[index]) }
     }
 
     fun updateScene(scene: Scene, message: String = "Scene updated") = launchWithMessage(message) {
@@ -497,9 +519,16 @@ class ActiveAutomationViewModel(
                     cooldownSec = cooldownSec.coerceAtLeast(0),
                     automationMode = automationMode,
                     projectId = projectId,
+                    position = db.profileDao().nextPosition(),
                 ).toEntity()
             )
         }
+
+    /** Persist a manual reorder of the visible (filtered) profiles by reusing their own position slots. */
+    fun reorderProfiles(orderedVisible: List<Profile>) = viewModelScope.launch {
+        val slots = orderedVisible.map { it.position }.sorted()
+        orderedVisible.forEachIndexed { index, profile -> db.profileDao().setPosition(profile.id, slots[index]) }
+    }
 
     fun updateProfile(profile: Profile, message: String = "Profile updated") =
         launchWithMessage(message) {
@@ -894,6 +923,7 @@ fun ActiveAutomationUi(
     val runLogRetentionPolicy = viewModel.runLogRetentionPolicy
     val backupSetupState = viewModel.backupSetupState
     val themePrefs by ThemeStore.state.collectAsState()
+    val sortPrefs by ListSortStore.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var screen by remember { mutableStateOf(OpenTaskerScreen.Profiles) }
@@ -1112,6 +1142,24 @@ fun ActiveAutomationUi(
                     if (screen == OpenTaskerScreen.Tasks) {
                         IconButton(onClick = { showTaskLibrary = true }) {
                             Icon(Icons.Filled.Info, contentDescription = "Task library")
+                        }
+                    }
+                    val sortTab = when (screen) {
+                        OpenTaskerScreen.Profiles -> SortTab.PROFILES
+                        OpenTaskerScreen.Tasks -> SortTab.TASKS
+                        OpenTaskerScreen.Scenes -> SortTab.SCENES
+                        else -> null
+                    }
+                    if (sortTab != null) {
+                        val method = sortPrefs.of(sortTab)
+                        val alpha = method == SortMethod.ALPHABETICAL
+                        IconButton(onClick = {
+                            ListSortStore.set(sortTab, if (alpha) SortMethod.MANUAL else SortMethod.ALPHABETICAL)
+                        }) {
+                            Icon(
+                                if (alpha) Icons.Filled.SortByAlpha else Icons.Filled.FormatListNumbered,
+                                contentDescription = if (alpha) "Sorting: alphabetical (tap for manual)" else "Sorting: manual (tap for alphabetical)",
+                            )
                         }
                     }
                     if (screen == OpenTaskerScreen.Profiles ||

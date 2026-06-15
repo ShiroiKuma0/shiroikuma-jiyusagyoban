@@ -21,20 +21,21 @@ data class TaskEntity(
     val collisionMode: String,
     val actionsJson: String,
     val projectId: Long? = null,
+    val position: Int = 0,
 ) {
     fun toDomain() = try {
         Task(
-            id, name, priority, CollisionMode.valueOf(collisionMode), Json.decodeFromString(actionsJson), projectId
+            id, name, priority, CollisionMode.valueOf(collisionMode), Json.decodeFromString(actionsJson), projectId, position
         )
     } catch (e: Exception) {
         android.util.Log.e("TaskDao", "Failed to deserialize task $id: ${e.message}", e)
         // Return task with empty actions as fallback
-        Task(id, name, priority, CollisionMode.ABORT_NEW, emptyList(), projectId)
+        Task(id, name, priority, CollisionMode.ABORT_NEW, emptyList(), projectId, position)
     }
 }
 
 fun Task.toEntity() = TaskEntity(
-    id, name, priority, collisionMode.name, Json.encodeToString(actions), projectId
+    id, name, priority, collisionMode.name, Json.encodeToString(actions), projectId, position
 )
 
 @Dao
@@ -43,7 +44,9 @@ interface TaskDao {
     @Update suspend fun update(t: TaskEntity)
     @Delete suspend fun delete(t: TaskEntity)
     @Query("SELECT * FROM tasks WHERE id = :id") suspend fun getById(id: Long): TaskEntity?
-    @Query("SELECT * FROM tasks") suspend fun getAll(): List<TaskEntity>
-    @Query("SELECT * FROM tasks") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<TaskEntity>>
+    @Query("SELECT * FROM tasks ORDER BY position, id") suspend fun getAll(): List<TaskEntity>
+    @Query("SELECT * FROM tasks ORDER BY position, id") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<TaskEntity>>
     @Query("SELECT * FROM tasks WHERE name = :name LIMIT 1") suspend fun getByName(name: String): TaskEntity?
+    @Query("UPDATE tasks SET position = :position WHERE id = :id") suspend fun setPosition(id: Long, position: Int)
+    @Query("SELECT COALESCE(MAX(position), -1) + 1 FROM tasks") suspend fun nextPosition(): Int
 }
