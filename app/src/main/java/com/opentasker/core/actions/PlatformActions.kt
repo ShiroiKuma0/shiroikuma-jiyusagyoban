@@ -11,7 +11,6 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
-import android.widget.Toast
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
@@ -23,15 +22,41 @@ import com.opentasker.core.engine.ActionResult
 
 private fun onMain(block: () -> Unit) = Handler(Looper.getMainLooper()).post(block)
 
-/** `Flash` (Tasker 548) — show a toast. */
+/**
+ * `Flash` (Tasker 548) — show a styled overlay "flash". Defaults (background, text, border colours,
+ * width, corner, size, weight) come from the 白い熊 自由作業盤 UI "Flash / toast" settings; per-action
+ * fields override colours and position, and an HTML toggle interprets HTML in the text.
+ */
 class FlashAction : Action {
     override val id = "flash"
     override val category = ActionCategory.SYSTEM
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val text = args["text"] ?: return ActionResult.Failure("missing text")
-        val dur = if (truthy(args["long"])) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
-        onMain { Toast.makeText(ctx.app, text, dur).show() }
-        ctx.logger("Flash: $text")
+        val raw = args["text"] ?: return ActionResult.Failure("missing text")
+        val prefs = com.opentasker.ui.theme.ThemeStore.state.value
+        val text: CharSequence = if (truthy(args["html"])) {
+            android.text.Html.fromHtml(raw, android.text.Html.FROM_HTML_MODE_COMPACT)
+        } else {
+            raw
+        }
+        val gravity = flashGravity(args["position"])
+        onMain {
+            FlashOverlay.show(
+                context = ctx.app,
+                text = text,
+                backgroundColor = parseColorOr(args["background_color"], prefs.flashBackground),
+                textColor = parseColorOr(args["text_color"], prefs.flashText),
+                borderColor = parseColorOr(args["border_color"], prefs.flashBorder),
+                borderWidthDp = prefs.flashBorderWidthDp,
+                cornerRadiusDp = prefs.flashCornerRadiusDp,
+                textSizeSp = prefs.flashTextSizeSp,
+                fontWeight = prefs.flashFontWeight,
+                gravity = gravity,
+                xDp = args["x"]?.trim()?.toIntOrNull() ?: 0,
+                yDp = args["y"]?.trim()?.toIntOrNull() ?: 0,
+                longDuration = truthy(args["long"]),
+            )
+        }
+        ctx.logger("Flash: $raw")
         return ActionResult.Success
     }
 }

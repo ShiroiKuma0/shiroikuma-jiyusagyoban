@@ -29,6 +29,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.opentasker.ui.components.ReorderableRow
 import com.opentasker.ui.components.rememberListReorderState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,6 +44,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.filled.FormatListNumbered
@@ -3762,17 +3765,51 @@ private fun ActionConfigDialog(
     val capability = remember(state.metadata.id) { ActionCapabilityRegistry.get(state.metadata.id) }
     val missingRequired = state.metadata.fields.any { it.required && values[it.key].isNullOrBlank() }
 
-    AlertDialog(
-        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
-        onDismissRequest = onDismiss,
-        title = { Text(state.metadata.name) },
-        text = {
-            LazyColumn(
-                modifier = Modifier.height(420.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                item {
-                    Text(state.metadata.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Column(Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "Cancel") }
+                    Text(
+                        state.metadata.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).padding(start = 4.dp),
+                    )
+                    OutlinedButton(
+                        enabled = !missingRequired && capability.canAdd,
+                        onClick = {
+                            val dynamicArgs = if (dynamicPrefix != null) {
+                                dynamicPairs.filter { it.first.isNotBlank() }
+                                    .associate { (name, value) -> "$dynamicPrefix${name.trim()}" to value }
+                            } else {
+                                emptyMap()
+                            }
+                            onSave(
+                                ActionSpec(
+                                    id = state.existing?.id ?: 0,
+                                    type = state.metadata.id,
+                                    label = label.trim().ifBlank { state.metadata.name },
+                                    args = values.filterValues { it.isNotBlank() } + dynamicArgs,
+                                    continueOnError = continueOnError,
+                                    condition = state.existing?.condition,
+                                )
+                            )
+                        },
+                    ) { Text("Save") }
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                    contentPadding = PaddingValues(vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    item {
+                        Text(state.metadata.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (capability.level != CapabilityLevel.Supported) {
                         Spacer(Modifier.height(8.dp))
                         Surface(
@@ -3856,36 +3893,10 @@ private fun ActionConfigDialog(
                         }
                     }
                 }
+                }
             }
-        },
-        confirmButton = {
-            OutlinedButton(
-                enabled = !missingRequired && capability.canAdd,
-                onClick = {
-                    val dynamicArgs = if (dynamicPrefix != null) {
-                        dynamicPairs
-                            .filter { it.first.isNotBlank() }
-                            .associate { (name, value) -> "$dynamicPrefix${name.trim()}" to value }
-                    } else {
-                        emptyMap()
-                    }
-                    onSave(
-                        ActionSpec(
-                            id = state.existing?.id ?: 0,
-                            type = state.metadata.id,
-                            label = label.trim().ifBlank { state.metadata.name },
-                            args = values.filterValues { it.isNotBlank() } + dynamicArgs,
-                            continueOnError = continueOnError,
-                            condition = state.existing?.condition,
-                        )
-                    )
-                },
-            ) {
-                Text("Save")
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
+        }
+    }
 
     if (showTaskPicker) {
         TaskPickerDialog(

@@ -15,6 +15,7 @@ navigationCompose = "2.9.8"
 room = "2.8.4"
 re2j = "1.8"
 serializationJson = "1.11.0"
+shizuku = "13.1.5"
 work = "2.11.2"
 
 [libraries]

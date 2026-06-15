@@ -309,10 +309,18 @@ fun registerActionMetadata() {
         ActionMetadata(
             id = "flash",
             name = "Flash",
-            description = "Show a brief toast message",
+            description = "Show a styled overlay message. Colours/size default to the UI Flash settings.",
             category = "System",
             fields = listOf(
-                ActionField("text", "Text", required = true, hint = "message; supports %expansion"),
+                ActionField("text", "Text", FieldType.MULTILINE, required = true, hint = "message; supports %expansion"),
+                ActionField("html", "Use HTML", FieldType.CHECKBOX, hint = "interpret HTML tags (<b>, <h1>, <font color>, …)"),
+                ActionField("text_color", "Text color", hint = "#RRGGBB — blank uses the UI default"),
+                ActionField("background_color", "Background color", hint = "#RRGGBB — blank uses the UI default"),
+                ActionField("border_color", "Border color", hint = "#RRGGBB — blank uses the UI default"),
+                ActionField("position", "Position", FieldType.DROPDOWN,
+                    hint = "top-left / top / top-right / left / center / right / bottom-left / bottom / bottom-right"),
+                ActionField("x", "X offset (dp)", FieldType.NUMBER, hint = "horizontal offset from the anchor"),
+                ActionField("y", "Y offset (dp)", FieldType.NUMBER, hint = "vertical offset from the anchor"),
                 ActionField("long", "Long", FieldType.CHECKBOX, hint = "longer display time"),
             )
         )
