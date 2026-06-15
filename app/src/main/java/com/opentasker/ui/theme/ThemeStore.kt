@@ -203,11 +203,12 @@ object ThemeStore {
     private val typefaceCache = mutableMapOf<String, android.graphics.Typeface?>()
 
     /** An android.graphics.Typeface for an imported font file (for Canvas drawing, e.g. widgets). */
-    fun typeface(fileName: String): android.graphics.Typeface? = when {
-        fileName.isEmpty() || fileName == MONOSPACE -> null
-        else -> typefaceCache.getOrPut(fileName) {
+    fun typeface(fileName: String): android.graphics.Typeface? {
+        val requested = fileName.trim()
+        if (requested.isEmpty() || requested == MONOSPACE) return null
+        return typefaceCache.getOrPut(requested) {
             runCatching {
-                val file = File(fontsDir(), fileName)
+                val file = File(fontsDir(), requested)
                 if (file.exists()) android.graphics.Typeface.createFromFile(file) else null
             }.getOrNull()
         }
@@ -247,7 +248,11 @@ object ThemeStore {
         appContext.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
             ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
 
-    private fun sanitize(name: String): String = name.replace(Regex("[^A-Za-z0-9._-]"), "_")
+    // Keep UTF-8 (kanji, accents, spaces) in font file names; only neutralise path separators and
+    // control characters, which are the only things actually unsafe in a filename.
+    private fun sanitize(name: String): String =
+        name.trim().map { c -> if (c == '/' || c == '\\' || c.code < 0x20) '_' else c }
+            .joinToString("").ifBlank { "font" }
 
     private val FONT_EXTENSIONS = setOf("ttf", "otf")
 }

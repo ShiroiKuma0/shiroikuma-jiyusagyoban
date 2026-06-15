@@ -67,6 +67,12 @@ default **`standard`**.
   the explicit intent to `shiroikuma.jami` resolves on Android 11+.
 
 ## Hard rules
+- **Never tell 白い熊 to build a task by hand.** Whenever 白い熊 needs a task (test task, example,
+  repro, a widget-driver task, etc.), export it as an importable **JSON bundle** (`OpenTaskerBundle`
+  schema — `schemaVersion`/`tasks[]/actions[]` with `type` + `args`) and `adb push` it to
+  `/sdcard/tmp/` for 白い熊 to import. Never a tabular spec or "add these actions" instructions.
+- **Always run `adb` with `dangerouslyDisableSandbox: true`** (the sandbox blocks adb's server
+  socket, so `adb devices` shows empty). Every `adb` invocation goes through the unsandboxed path.
 - **Never `adb install` / `adb uninstall`.** Push to `/sdcard/tmp/`; 白い熊 installs manually.
 - **Never commit/push unprompted.** Build-only until 白い熊 says **"Push"** (`custom` rebases →
   `git push --force-with-lease origin custom`; `master` fast-forwards).

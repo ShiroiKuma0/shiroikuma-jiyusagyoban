@@ -214,7 +214,9 @@ class WidgetRenderer(
             else -> Typeface.NORMAL
         }
         return TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = Typeface.create(base, style)
+            // Use the loaded face as-is for normal style; Typeface.create(custom, NORMAL) can drop a
+            // single-style custom font. Only derive a synthetic style when bold/italic is requested.
+            typeface = if (style == Typeface.NORMAL) base else Typeface.create(base, style)
             textSize = dpf(node.size ?: inh.size ?: 14)
             color = color(node.color ?: inh.color, Color.WHITE)
         }
