@@ -95,7 +95,7 @@ class BrightnessAction : Action {
     override val category = ActionCategory.SETTINGS
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val brightness = args["brightness"] ?: return ActionResult.Failure("missing brightness")
+        val brightness = args["brightness"] ?: args["level"] ?: return ActionResult.Failure("missing brightness")
         if (!Settings.System.canWrite(ctx.app)) {
             return ActionResult.Failure("Write system settings permission is not granted")
         }

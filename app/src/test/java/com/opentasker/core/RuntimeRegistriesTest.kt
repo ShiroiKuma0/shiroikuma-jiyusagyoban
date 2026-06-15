@@ -6,6 +6,7 @@ import com.opentasker.core.contexts.ContextSourceRegistry
 import com.opentasker.core.engine.ActionRegistry
 import com.opentasker.core.engine.FlowControl
 import com.opentasker.core.engine.SUB_TASK_ACTION_ID
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -38,11 +39,35 @@ class RuntimeRegistriesTest {
     }
 
     @Test
+    fun dynamicFormMetadataUsesRuntimeArgumentKeys() {
+        registerActionMetadata()
+
+        assertFieldKeys("brightness.set", "brightness")
+        assertFieldKeys("screenshot.take", "path")
+        assertFieldKeys("file.read", "path", "var")
+        assertFieldKeys("file.write", "path", "text")
+        assertFieldKeys("file.append", "path", "text")
+        assertFieldKeys("file.list", "path", "var")
+        assertFieldKeys("http.get", "url", "var", "allow_http")
+        assertFieldKeys("http.post", "url", "data", "var", "allow_http")
+    }
+
+    @Test
     fun coreContextSourcesIncludeLiveLocationSource() {
         registerCoreRuntime()
 
         val registered = ContextSourceRegistry.all().map { it.type }.toSet()
 
         assertTrue("Location context source must be registered: $registered", "location" in registered)
+    }
+
+    private fun assertFieldKeys(actionId: String, vararg expected: String) {
+        val metadata = ActionMetadataRegistry.get(actionId)
+        assertTrue("Missing metadata for $actionId", metadata != null)
+        assertEquals(
+            "$actionId field keys",
+            expected.toList(),
+            metadata!!.fields.map { it.key },
+        )
     }
 }

@@ -410,7 +410,7 @@ private fun PermissionMetric(value: String, label: String, modifier: Modifier = 
 private fun PermissionStatusPill(label: String, color: Color) {
     Surface(
         color = color.copy(alpha = 0.14f),
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, color.copy(alpha = 0.32f)),
     ) {
         Text(
