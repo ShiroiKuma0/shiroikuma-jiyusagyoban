@@ -83,6 +83,10 @@ import com.opentasker.core.actions.PowerDialogAction
 import com.opentasker.core.actions.LockScreenAction
 import com.opentasker.core.actions.PlaceCallAction
 import com.opentasker.core.actions.AutoBrightnessAction
+import com.opentasker.core.actions.OpenFileAction
+import com.opentasker.core.actions.ToggleProfileAction
+import com.opentasker.core.actions.GetSettingAction
+import com.opentasker.core.actions.PutSettingAction
 import com.opentasker.core.contexts.ApplicationContextSourceImpl
 import com.opentasker.core.contexts.ContextSourceRegistry
 import com.opentasker.core.contexts.EventContextSourceImpl
@@ -179,6 +183,10 @@ private fun registerBuiltInActions() {
         LockScreenAction(),
         PlaceCallAction(),
         AutoBrightnessAction(),
+        OpenFileAction(),
+        ToggleProfileAction(),
+        GetSettingAction(),
+        PutSettingAction(),
         TermuxScriptAction(),
         TaskerUnsupportedAction(),
     ).forEach(ActionRegistry::register)

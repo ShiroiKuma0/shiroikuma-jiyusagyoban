@@ -1,5 +1,8 @@
 package com.opentasker.core.actions
 
+import android.content.Intent
+import android.webkit.MimeTypeMap
+import androidx.core.content.FileProvider
 import java.io.File
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
@@ -197,6 +200,37 @@ class MakeDirectoryAction : Action {
             ActionResult.Success
         } else {
             ActionResult.Failure("could not create directory")
+        }
+    }
+}
+
+/**
+ * Open a file with another app (ACTION_VIEW) via a content:// URI from our FileProvider.
+ *
+ * Args:
+ *   - "path": file path (must exist)
+ *   - "mime": optional MIME type override (otherwise guessed from the extension)
+ */
+class OpenFileAction : Action {
+    override val id = "file.open"
+    override val category = ActionCategory.FILE
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val path = args["path"] ?: return ActionResult.Failure("missing path")
+        val file = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
+        return try {
+            val uri = FileProvider.getUriForFile(ctx.app, "${ctx.app.packageName}.fileprovider", file)
+            val mime = args["mime"]?.takeIf { it.isNotBlank() }
+                ?: MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension.lowercase())
+                ?: "*/*"
+            val intent = Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, mime)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            ctx.app.startActivity(intent)
+            ctx.logger("Opened ${file.name}")
+            ActionResult.Success
+        } catch (e: Exception) {
+            ActionResult.Failure("could not open file: ${e.message}")
         }
     }
 }

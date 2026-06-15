@@ -493,6 +493,60 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "file.open",
+            name = "Open File",
+            description = "Open a file in the app's files with another app",
+            category = "File",
+            fields = listOf(
+                ActionField("path", "Path", required = true, hint = "file path"),
+                ActionField("mime", "MIME type", hint = "optional; guessed from extension if blank"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "profile.toggle",
+            name = "Profile Status",
+            description = "Enable, disable, or toggle a profile by name",
+            category = "System",
+            fields = listOf(
+                ActionField("profile", "Profile name", required = true, hint = "exact profile name"),
+                ActionField("state", "State", FieldType.DROPDOWN, hint = "on / off / toggle"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "setting.get",
+            name = "Get Setting",
+            description = "Read a System/Secure/Global setting into a variable",
+            category = "Settings",
+            fields = listOf(
+                ActionField("namespace", "Namespace", FieldType.DROPDOWN, hint = "system / secure / global"),
+                ActionField("name", "Setting name", required = true, hint = "e.g. screen_off_timeout"),
+                ActionField("store", "Store in", required = true, hint = "variable name"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "setting.put",
+            name = "Set Setting",
+            description = "Write a System setting (Write Settings access; System namespace only)",
+            category = "Settings",
+            fields = listOf(
+                ActionField("namespace", "Namespace", FieldType.DROPDOWN, hint = "system (secure/global need Shizuku)"),
+                ActionField("name", "Setting name", required = true, hint = "e.g. screen_off_timeout"),
+                ActionField("value", "Value", hint = "value to write"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "tts.speak",
             name = "Say (Text-to-Speech)",
             description = "Speak text aloud using the device speaker",
