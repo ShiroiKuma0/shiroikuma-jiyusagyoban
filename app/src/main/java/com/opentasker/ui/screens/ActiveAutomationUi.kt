@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,7 +53,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -81,6 +81,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -855,11 +856,15 @@ fun ActiveAutomationUi(
                             showCreateProfileDialog = true
                         }
                     },
+                    shape = RoundedCornerShape(12.dp),
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = if (tasks.isEmpty()) "Create task" else "Create profile")
                 }
 
-                OpenTaskerScreen.Tasks -> FloatingActionButton(onClick = { showCreateTaskDialog = true }) {
+                OpenTaskerScreen.Tasks -> FloatingActionButton(
+                    onClick = { showCreateTaskDialog = true },
+                    shape = RoundedCornerShape(12.dp),
+                ) {
                     Icon(Icons.Filled.Add, contentDescription = "Create task")
                 }
 
@@ -873,30 +878,26 @@ fun ActiveAutomationUi(
         },
         bottomBar = {
             NavigationBar {
-                val navigationBarScope = this
                 primaryNavigationScreens.forEach { destination ->
-                    NavigationBarItem(
+                    OpenTaskerNavigationItem(
                         selected = screen == destination,
                         onClick = {
                             screenOrdinal = destination.ordinal
                             showMoreDestinations = false
                         },
-                        icon = { Icon(destination.icon(), contentDescription = destination.label) },
-                        label = { Text(destination.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        alwaysShowLabel = true,
+                        icon = destination.icon(),
+                        label = destination.label,
+                        modifier = Modifier.weight(1f),
                     )
                 }
                 Box(Modifier.weight(1f)) {
-                    with(navigationBarScope) {
-                        NavigationBarItem(
-                            selected = screen in secondaryNavigationScreens,
-                            onClick = { showMoreDestinations = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            icon = { Icon(Icons.Filled.Menu, contentDescription = "More screens") },
-                            label = { Text("More", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            alwaysShowLabel = true,
-                        )
-                    }
+                    OpenTaskerNavigationItem(
+                        selected = screen in secondaryNavigationScreens,
+                        onClick = { showMoreDestinations = true },
+                        icon = Icons.Filled.Menu,
+                        label = "More",
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     DropdownMenu(
                         expanded = showMoreDestinations,
                         onDismissRequest = { showMoreDestinations = false },
@@ -1199,6 +1200,53 @@ fun ActiveAutomationUi(
                 )
                 contextEdit = null
             },
+        )
+    }
+}
+
+@Composable
+private fun OpenTaskerNavigationItem(
+    selected: Boolean,
+    onClick: () -> Unit,
+    icon: ImageVector,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    val contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    Column(
+        modifier = modifier
+            .heightIn(min = 72.dp)
+            .clickable(role = Role.Tab, onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                this.selected = selected
+                stateDescription = if (selected) "Selected" else "Not selected"
+            }
+            .padding(horizontal = 4.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Surface(
+            color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f) else Color.Transparent,
+            shape = RoundedCornerShape(8.dp),
+            border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)) else null,
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 5.dp)
+                    .size(24.dp),
+            )
+        }
+        Spacer(Modifier.height(2.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = contentColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
         )
     }
 }

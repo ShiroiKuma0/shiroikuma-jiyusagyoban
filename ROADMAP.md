@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.65 → v0.3.x. Reconciles current repo state with competitive research across Android automation apps, adjacent workflow engines, platform constraints (API 35–36), distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.66 → v0.3.x. Reconciles current repo state with competitive research across Android automation apps, adjacent workflow engines, platform constraints (API 35–36), distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-06-15
-**Roadmap version:** 2026.06.15 stricter release-polish pass (v0.2.65 scene-state/accessibility reconciliation)
-**Current app version:** 0.2.65
+**Roadmap version:** 2026.06.15 stricter release-polish pass (v0.2.66 shell and scene accessibility reconciliation)
+**Current app version:** 0.2.66
 **Planning rule:** items marked "Now" must ship before the v0.3.0 public beta claim. Items already completed in 0.2.x are retained in the **Completed Backlog** appendix for traceability and explicitly removed from active tiers.
 
 ## Reconciliation note (2026-05-06 pass)
@@ -133,7 +133,7 @@ Key local constraints:
 
 ### N9 (2026.05.06) - Documentation truth pass post-v0.2.59
 
-**Status:** Partially refreshed through v0.2.65: README, ROADMAP.md, RESEARCH.md, Gradle version values, F-Droid metadata gates, compact More-menu phone navigation, saveable editor/context/template/scene-element state, numeric keyboard hints, row-level switch semantics, and destructive variable/scene-element affordances now reflect the target-SDK-36/action-metadata and stricter UI polish passes. Older architecture and readiness docs still need a current-version truth pass before this item closes. [L14]
+**Status:** Partially refreshed through v0.2.66: README, ROADMAP.md, RESEARCH.md, Gradle version values, F-Droid metadata gates, compact More-menu phone navigation, squared-off navigation/FAB affordances, saveable editor/context/template/scene-element state, scene-element nudge controls, numeric keyboard hints, row-level switch semantics, and destructive variable/scene-element affordances now reflect the target-SDK-36/action-metadata and stricter UI polish passes. Older architecture and readiness docs still need a current-version truth pass before this item closes. [L14]
 **Description:** Refresh README, CLAUDE.md, ARCHITECTURE.md, IMPROVEMENT_PLAN.md, and FDROID_READINESS.md to reflect the current release. Restructure long status copy into skimmable feature lists where needed. Sync version strings, toolchain versions, workflow filenames, fdroid metadata, Gradle properties, ROADMAP, and CHANGELOG.
 **Sources:** Local repo state [L1][L5], existing improvement plan [L7], dependency/release audit [L14].
 **Category:** docs, dev-experience.
@@ -163,7 +163,7 @@ Key local constraints:
 
 ### X1 (2026.05.06) - Scene editor finishing pass
 
-**Status:** Element creation/editing, drag-to-move, and scaled previews shipped in v0.2.59. Resize handles, multi-select layout edits, alignment guides, and overlay launch (`SYSTEM_ALERT_WINDOW`) remain.
+**Status:** Element creation/editing, drag-to-move, scaled previews, and row-level 1 dp nudge controls shipped through v0.2.66. Resize handles, multi-select layout edits, alignment guides, and overlay launch (`SYSTEM_ALERT_WINDOW`) remain.
 **Description:** Add resize-handle drag, snap-to-grid + alignment guides, multi-select with bulk move/align/delete, then wire scene-launch action through the existing overlay-permission onboarding so a task can show a configured scene. Keep Android 15 background-FGS overlay restrictions in scope.
 **Sources:** Tasker scenes [S16], Android 15 overlay/FGS behavior [S36], Play foreground-service declaration requirements [S51], Android 16 target behavior [S52].
 **Category:** UX, platform/OS.
