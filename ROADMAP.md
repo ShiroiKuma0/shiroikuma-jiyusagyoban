@@ -1,10 +1,10 @@
 # OpenTasker Roadmap
 
-Source-backed product roadmap for OpenTasker v0.2.62 → v0.3.x. Reconciles current repo state with competitive research across Android automation apps, adjacent workflow engines, platform constraints (API 35–36), distribution policy, and dependency changelogs.
+Source-backed product roadmap for OpenTasker v0.2.63 → v0.3.x. Reconciles current repo state with competitive research across Android automation apps, adjacent workflow engines, platform constraints (API 35–36), distribution policy, and dependency changelogs.
 
 **Last updated:** 2026-06-15
-**Roadmap version:** 2026.06.15 implementation/audit pass (post-v0.2.62 action editor and UI reconciliation)
-**Current app version:** 0.2.62
+**Roadmap version:** 2026.06.15 stricter release-polish pass (post-v0.2.63 UI/accessibility/state reconciliation)
+**Current app version:** 0.2.63
 **Planning rule:** items marked "Now" must ship before the v0.3.0 public beta claim. Items already completed in 0.2.x are retained in the **Completed Backlog** appendix for traceability and explicitly removed from active tiers.
 
 ## Reconciliation note (2026-05-06 pass)
@@ -133,7 +133,7 @@ Key local constraints:
 
 ### N9 (2026.05.06) - Documentation truth pass post-v0.2.59
 
-**Status:** Partially refreshed in v0.2.62: README, CLAUDE.md, ROADMAP.md, RESEARCH.md, CHANGELOG.md, Gradle version values, and F-Droid metadata gates now reflect the target-SDK-36/action-metadata pass. Older architecture and readiness docs still need a current-version truth pass before this item closes. [L14]
+**Status:** Partially refreshed through v0.2.63: README, ROADMAP.md, RESEARCH.md, Gradle version values, and F-Droid metadata gates now reflect the target-SDK-36/action-metadata and stricter UI polish passes. Older architecture and readiness docs still need a current-version truth pass before this item closes. [L14]
 **Description:** Refresh README, CLAUDE.md, ARCHITECTURE.md, IMPROVEMENT_PLAN.md, and FDROID_READINESS.md to reflect the current release. Restructure long status copy into skimmable feature lists where needed. Sync version strings, toolchain versions, workflow filenames, fdroid metadata, Gradle properties, ROADMAP, and CHANGELOG.
 **Sources:** Local repo state [L1][L5], existing improvement plan [L7], dependency/release audit [L14].
 **Category:** docs, dev-experience.

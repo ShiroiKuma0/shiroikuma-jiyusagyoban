@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -795,7 +796,9 @@ fun ActiveAutomationUi(
     }
 
     Scaffold(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .imePadding(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
@@ -827,7 +830,7 @@ fun ActiveAutomationUi(
                         }
                     },
                 ) {
-                    Icon(Icons.Filled.Add, contentDescription = if (tasks.isEmpty()) "Create task first" else "Create profile")
+                    Icon(Icons.Filled.Add, contentDescription = if (tasks.isEmpty()) "Create task" else "Create profile")
                 }
 
                 OpenTaskerScreen.Tasks -> FloatingActionButton(onClick = { showCreateTaskDialog = true }) {
@@ -861,8 +864,8 @@ fun ActiveAutomationUi(
                             }
                             Icon(icon, contentDescription = destination.label)
                         },
-                        label = { Text(destination.label) },
-                        alwaysShowLabel = true,
+                        label = { Text(destination.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        alwaysShowLabel = false,
                     )
                 }
             }
@@ -2814,8 +2817,8 @@ private fun TaskEditorDialog(
     onDismiss: () -> Unit,
     onSave: (String, Int) -> Unit,
 ) {
-    var name by remember(task?.id) { mutableStateOf(task?.name.orEmpty()) }
-    var priority by remember(task?.id) { mutableStateOf((task?.priority ?: 5).toString()) }
+    var name by rememberSaveable(task?.id) { mutableStateOf(task?.name.orEmpty()) }
+    var priority by rememberSaveable(task?.id) { mutableStateOf((task?.priority ?: 5).toString()) }
     val parsedPriority = priority.toIntOrNull()
     val canSave = name.isNotBlank() && parsedPriority != null && parsedPriority in 0..10
 
@@ -2861,11 +2864,11 @@ private fun ProfileEditorDialog(
     onSave: (String, Boolean, Long, Int, AutomationMode) -> Unit,
 ) {
     val initialTaskId = profile?.enterTaskId ?: tasks.firstOrNull()?.id ?: 0L
-    var name by remember(profile?.id) { mutableStateOf(profile?.name.orEmpty()) }
-    var enabled by remember(profile?.id) { mutableStateOf(profile?.enabled ?: true) }
-    var enterTaskId by remember(profile?.id, tasks) { mutableLongStateOf(initialTaskId) }
-    var cooldown by remember(profile?.id) { mutableStateOf((profile?.cooldownSec ?: 0).toString()) }
-    var automationMode by remember(profile?.id) { mutableStateOf(profile?.automationMode ?: AutomationMode.SINGLE) }
+    var name by rememberSaveable(profile?.id) { mutableStateOf(profile?.name.orEmpty()) }
+    var enabled by rememberSaveable(profile?.id) { mutableStateOf(profile?.enabled ?: true) }
+    var enterTaskId by rememberSaveable(profile?.id, tasks) { mutableLongStateOf(initialTaskId) }
+    var cooldown by rememberSaveable(profile?.id) { mutableStateOf((profile?.cooldownSec ?: 0).toString()) }
+    var automationMode by rememberSaveable(profile?.id) { mutableStateOf(profile?.automationMode ?: AutomationMode.SINGLE) }
     val parsedCooldown = cooldown.toIntOrNull()
     val canSave = name.isNotBlank() && enterTaskId > 0 && (cooldown.isBlank() || parsedCooldown != null)
 
@@ -3075,10 +3078,10 @@ private fun ActionConfigDialog(
     onDismiss: () -> Unit,
     onSave: (ActionSpec) -> Unit,
 ) {
-    var label by remember(state.existing?.id, state.metadata.id) {
+    var label by rememberSaveable(state.existing?.id, state.metadata.id) {
         mutableStateOf(state.existing?.label ?: state.metadata.name)
     }
-    var values by remember(state.existing?.id, state.metadata.id) {
+    var values by rememberSaveable(state.existing?.id, state.metadata.id) {
         mutableStateOf(
             state.metadata.fields.associate { field ->
                 field.key to existingActionArgValue(
