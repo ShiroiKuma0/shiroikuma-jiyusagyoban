@@ -39,13 +39,13 @@ object ActionCapabilityRegistry {
         "mobile.toggle" to elevatedUnsupported("mobile.toggle", "Mobile data changes require carrier, system, or device-owner privileges."),
         "sms.send" to smsCapability(),
         "screenshot.take" to elevatedUnsupported("screenshot.take", "Screenshots require MediaProjection consent or privileged shell access."),
-        "sound.play" to ActionCapability(CapabilityLevel.Supported, "Plays audio from a file path or content URI."),
+        "sound.play" to audioOutputCapability("Plays audio from a file path or content URI."),
         "sound.stop" to mediaKeyCapability("Stop playback via media key dispatch."),
         "sound.pause" to mediaKeyCapability("Pause playback via media key dispatch."),
         "track.next" to mediaKeyCapability("Next track via media key dispatch."),
         "track.previous" to mediaKeyCapability("Previous track via media key dispatch."),
         "media.mute" to volumeCapability("Mutes a stream. May be blocked by Do Not Disturb policy."),
-        "tts.speak" to ActionCapability(CapabilityLevel.Supported, "Uses Android TTS engine to speak text aloud."),
+        "tts.speak" to audioOutputCapability("Uses Android TTS engine to speak text aloud."),
         "reboot" to elevatedUnsupported("reboot", "Reboot requires privileged device-owner or system app access."),
         "lock" to ActionCapability(CapabilityLevel.Unsupported, "Device lock requires configured device-admin support."),
         "screen.off" to elevatedUnsupported("screen.off", "Screen-off requires privileged power management access."),
@@ -72,6 +72,13 @@ object ActionCapabilityRegistry {
             ActionCapability(CapabilityLevel.RequiresSetup, "Requires SMS permission; Play builds omit SMS actions for policy compliance.")
         } else {
             ActionCapability(CapabilityLevel.Unsupported, "SMS action is unavailable in this distribution because SMS and phone-state permissions are omitted for Play policy compliance.")
+        }
+
+    private fun audioOutputCapability(reason: String): ActionCapability =
+        if (android.os.Build.VERSION.SDK_INT >= ANDROID_17_API) {
+            ActionCapability(CapabilityLevel.Unsupported, "Android 17+ restricts background audio output without a media foreground-service type. $reason")
+        } else {
+            ActionCapability(CapabilityLevel.Supported, reason)
         }
 
     private fun mediaKeyCapability(reason: String): ActionCapability =

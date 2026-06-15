@@ -102,6 +102,45 @@ class TemplateExpressionEngineTest {
     }
 
     @Test
+    fun dateFormatsEpochMillis() {
+        // 2000-06-15 12:00:00 UTC — unambiguous in any timezone
+        val result = engine.expand(
+            template = "{{ ts | date:'yyyy' }}",
+            scope = TemplateScope(task = mapOf("ts" to "961070400000")),
+        )
+        assertEquals("2000", result.value)
+        assertTrue(result.warnings.isEmpty())
+    }
+
+    @Test
+    fun dateDefaultPatternFormatsCurrentTime() {
+        val result = engine.expand(
+            template = "{{ ts | date }}",
+            scope = TemplateScope(task = mapOf("ts" to System.currentTimeMillis().toString())),
+        )
+        assertTrue("formatted date should not be empty", result.value.isNotBlank())
+        assertTrue(result.warnings.isEmpty())
+    }
+
+    @Test
+    fun dateRejectsInvalidPattern() {
+        val result = engine.expand(
+            template = "{{ ts | date:'QQQQQ' }}",
+            scope = TemplateScope(task = mapOf("ts" to "0")),
+        )
+        assertTrue(result.warnings.any { it.contains("Invalid date pattern") })
+    }
+
+    @Test
+    fun dateRejectsNonNumericValue() {
+        val result = engine.expand(
+            template = "{{ ts | date:'yyyy' }}",
+            scope = TemplateScope(task = mapOf("ts" to "not-a-number")),
+        )
+        assertTrue(result.warnings.any { it.contains("numeric epoch-millis") })
+    }
+
+    @Test
     fun resolvedValueLimitPreventsExpansionAbuse() {
         val limitedEngine = TemplateExpressionEngine(
             TemplateExpressionLimits(maxResolvedValueLength = 8),

@@ -25,9 +25,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.isSystemInDarkTheme
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.model.Task
 import com.opentasker.ui.theme.OpenTaskerTheme
+import com.opentasker.ui.theme.ThemeMode
+import com.opentasker.ui.theme.ThemePreference
 import kotlinx.coroutines.flow.map
 
 class TaskWidgetConfigActivity : ComponentActivity() {
@@ -52,7 +55,13 @@ class TaskWidgetConfigActivity : ComponentActivity() {
             .map { entities -> entities.map { it.toDomain() } }
 
         setContent {
-            OpenTaskerTheme {
+            val themeMode by ThemePreference.observe(this).collectAsState(initial = ThemeMode.System)
+            val darkTheme = when (themeMode) {
+                ThemeMode.Dark -> true
+                ThemeMode.Light -> false
+                ThemeMode.System -> isSystemInDarkTheme()
+            }
+            OpenTaskerTheme(darkTheme = darkTheme) {
                 val tasks by tasksFlow.collectAsState(initial = emptyList())
                 ConfigScreen(tasks = tasks, onTaskSelected = ::onTaskPicked)
             }

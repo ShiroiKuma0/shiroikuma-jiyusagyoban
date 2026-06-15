@@ -24,6 +24,12 @@ class PlaySoundAction : Action {
     override val category = ActionCategory.MEDIA
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        if (Build.VERSION.SDK_INT >= ANDROID_17_API) {
+            return ActionResult.Failure(
+                "Android 17+ restricts background audio playback; " +
+                    "sound.play may produce no output from a background service without a media foreground-service type"
+            )
+        }
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         val volume = args["volume"]?.toFloatOrNull()?.let { (it / 100f).coerceIn(0f, 1f) }
 
