@@ -5,6 +5,7 @@
     android:minResizeWidth="80dp"
     android:minResizeHeight="80dp"
     android:resizeMode="horizontal|vertical"
+    android:widgetFeatures="reconfigurable"
     android:widgetCategory="home_screen"
     android:configure="com.opentasker.widget.StyledWidgetConfigActivity"
     android:initialLayout="@layout/styled_widget"

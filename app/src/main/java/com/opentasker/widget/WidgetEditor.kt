@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -42,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -54,6 +56,7 @@ import com.opentasker.core.widget.Offset
 import com.opentasker.core.widget.WidgetLayoutCodec
 import com.opentasker.core.widget.WidgetNode
 import com.opentasker.core.widget.WidgetRenderer
+import com.opentasker.ui.components.RgbaColorPickerDialog
 import com.opentasker.ui.theme.ThemeStore
 
 // ---- immutable tree edits, addressed by a path of child indices --------------------------------
@@ -265,11 +268,15 @@ private fun TextField2(label: String, value: String, onChange: (String) -> Unit)
 
 @Composable
 private fun NumberField(label: String, value: Int?, onChange: (Int?) -> Unit) {
-    OutlinedTextField(
-        value = value?.toString().orEmpty(),
-        onValueChange = { s -> onChange(s.filter { it.isDigit() || it == '-' }.toIntOrNull()) },
-        label = { Text(label) }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-    )
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        OutlinedTextField(
+            value = value?.toString().orEmpty(),
+            onValueChange = { s -> onChange(s.filter { it.isDigit() || it == '-' }.toIntOrNull()) },
+            label = { Text(label) }, singleLine = true, modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = { onChange((value ?: 0) - 1) }) { Icon(Icons.Filled.Remove, contentDescription = "Decrease $label") }
+        IconButton(onClick = { onChange((value ?: 0) + 1) }) { Icon(Icons.Filled.Add, contentDescription = "Increase $label") }
+    }
 }
 
 @Composable
@@ -282,18 +289,34 @@ private fun BoolField(label: String, value: Boolean, onChange: (Boolean) -> Unit
 
 @Composable
 private fun ColorField(label: String, value: String?, onChange: (String?) -> Unit) {
+    var show by remember { mutableStateOf(false) }
     val parsed = remember(value) { runCatching { if (value.isNullOrBlank()) null else android.graphics.Color.parseColor(value) }.getOrNull() }
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(
-            value = value.orEmpty(),
-            onValueChange = { onChange(it.takeIf { s -> s.isNotBlank() }) },
-            label = { Text(label) }, placeholder = { Text("#AARRGGBB") },
-            singleLine = true, modifier = Modifier.weight(1f),
-        )
+    Row(
+        Modifier.fillMaxWidth().clickable { show = true }.padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                if (parsed == null) "Default" else value!!.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Box(
-            Modifier.size(36.dp)
-                .background(parsed?.let { Color(it) } ?: Color.Transparent, RoundedCornerShape(8.dp))
+            Modifier.size(32.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(parsed?.let { Color(it) } ?: Color.Transparent)
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
+        )
+    }
+    if (show) {
+        RgbaColorPickerDialog(
+            initial = value.orEmpty(),
+            onConfirm = { onChange(it); show = false },
+            onClear = { onChange(null); show = false },
+            onDismiss = { show = false },
         )
     }
 }

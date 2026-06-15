@@ -20,6 +20,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,8 +55,17 @@ class StyledWidgetConfigActivity : ComponentActivity() {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     var name by remember { mutableStateOf(StyledWidgetStore.getName(this@StyledWidgetConfigActivity, widgetId)) }
                     var tapTask by remember { mutableStateOf("") }
-                    var layout by remember { mutableStateOf(DEFAULT_LAYOUT) }
+                    var layout by remember {
+                        mutableStateOf(StyledWidgetStore.getLayout(this@StyledWidgetConfigActivity, widgetId) ?: DEFAULT_LAYOUT)
+                    }
                     var editing by remember { mutableStateOf(false) }
+                    // On reconfigure, pre-fill the tap-task name from the stored id.
+                    LaunchedEffect(Unit) {
+                        val id = StyledWidgetStore.getTapTask(applicationContext, widgetId)
+                        if (id > 0) {
+                            tapTask = runCatching { OpenTaskerApp_NoHilt.db.taskDao().getById(id)?.name }.getOrNull().orEmpty()
+                        }
+                    }
                     if (editing) {
                         WidgetEditor(
                             initialJson = layout,
