@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.compose.runtime.collectAsState
@@ -51,8 +52,13 @@ object SceneOverlayManager {
 
     fun canOverlay(context: Context): Boolean = Settings.canDrawOverlays(context.applicationContext)
 
-    /** Show [scene] as an overlay (no-op if it's already showing). Safe to call from any thread. */
-    fun show(context: Context, scene: Scene) {
+    /**
+     * Show [scene] as an overlay (no-op if it's already showing). [modal] dims + blocks the app
+     * underneath (focusable, tap scrim/Back to dismiss); non-modal is a tap-through HUD sized to the
+     * card and placed by [position] ("top"/"center"/"bottom"). [timeoutMs] > 0 auto-dismisses.
+     * Safe to call from any thread.
+     */
+    fun show(context: Context, scene: Scene, position: String? = null, modal: Boolean = true, timeoutMs: Long = 0L, dismissOnOutside: Boolean = true) {
         val app = context.applicationContext
         main.post {
             appContext = app
@@ -63,17 +69,22 @@ object SceneOverlayManager {
                 setViewTreeLifecycleOwner(owner)
                 setViewTreeSavedStateRegistryOwner(owner)
                 setViewTreeViewModelStoreOwner(owner)
-                isFocusableInTouchMode = true
-                setOnKeyListener { _, keyCode, event ->
-                    if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
-                        hide(scene.id); true
-                    } else false
+                if (modal) {
+                    isFocusableInTouchMode = true
+                    setOnKeyListener { _, keyCode, event ->
+                        if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                            hide(scene.id); true
+                        } else false
+                    }
                 }
                 setContent {
                     val prefs by ThemeStore.state.collectAsState()
                     OpenTaskerTheme(prefs) {
                         SceneOverlay(
                             scene = scene,
+                            modal = modal,
+                            position = sceneAlignment(position),
+                            dismissOnOutside = dismissOnOutside,
                             onDismiss = { hide(scene.id) },
                             onRunTask = ::runTask,
                             onSetVar = ::setVar,
@@ -86,17 +97,44 @@ object SceneOverlayManager {
             } else {
                 @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
             }
-            val params = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT,
-                type,
-                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
-                PixelFormat.TRANSLUCENT,
-            )
+            val params = if (modal) {
+                // Full-screen, focusable: the scrim blocks the app underneath; the card is placed by
+                // the composable's [position] alignment.
+                WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    type,
+                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                    PixelFormat.TRANSLUCENT,
+                )
+            } else {
+                // Tap-through HUD: wrap the card, not-focusable so touches outside it reach the app,
+                // placed by window gravity.
+                WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    type,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                    PixelFormat.TRANSLUCENT,
+                ).apply {
+                    gravity = sceneGravity(position)
+                    if (gravity != Gravity.CENTER) y = (48 * app.resources.displayMetrics.density).toInt()
+                }
+            }
             runCatching { wm.addView(composeView, params) }
-                .onSuccess { owner.onResume(); active[scene.id] = Overlay(composeView, owner) }
+                .onSuccess {
+                    owner.onResume()
+                    active[scene.id] = Overlay(composeView, owner)
+                    if (timeoutMs > 0) main.postDelayed({ hide(scene.id) }, timeoutMs)
+                }
                 .onFailure { owner.onDestroy() }
         }
+    }
+
+    private fun sceneGravity(position: String?): Int = when (position?.trim()?.lowercase()) {
+        "top" -> Gravity.TOP or Gravity.CENTER_HORIZONTAL
+        "bottom" -> Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+        else -> Gravity.CENTER
     }
 
     /** Dismiss the overlay for [sceneId], if shown. */

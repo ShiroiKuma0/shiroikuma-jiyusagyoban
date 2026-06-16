@@ -82,6 +82,9 @@ class SceneActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         open.add(WeakReference(this))
         val sceneId = intent.getLongExtra(EXTRA_SCENE_ID, -1L)
+        val position = sceneAlignment(intent.getStringExtra(EXTRA_POSITION))
+        val timeoutMs = intent.getLongExtra(EXTRA_TIMEOUT_MS, 0L)
+        val dismissOnOutside = intent.getBooleanExtra(EXTRA_DISMISS_OUTSIDE, true)
 
         setContent {
             val prefs by ThemeStore.state.collectAsState()
@@ -92,7 +95,11 @@ class SceneActivity : ComponentActivity() {
                         OpenTaskerApp_NoHilt.db.sceneDao().getById(sceneId)?.toDomain()
                     }
                 }
-                SceneOverlay(scene, onDismiss = { finish() }, onRunTask = ::runTask, onSetVar = ::setVar)
+                // The Activity fallback is always modal; honour position + auto-dismiss timeout.
+                if (timeoutMs > 0) {
+                    LaunchedEffect(sceneId) { kotlinx.coroutines.delay(timeoutMs); finish() }
+                }
+                SceneOverlay(scene, modal = true, position = position, dismissOnOutside = dismissOnOutside, onDismiss = { finish() }, onRunTask = ::runTask, onSetVar = ::setVar)
             }
         }
     }
@@ -123,6 +130,9 @@ class SceneActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_SCENE_ID = "com.opentasker.scenes.SCENE_ID"
+        const val EXTRA_POSITION = "com.opentasker.scenes.POSITION"
+        const val EXTRA_TIMEOUT_MS = "com.opentasker.scenes.TIMEOUT_MS"
+        const val EXTRA_DISMISS_OUTSIDE = "com.opentasker.scenes.DISMISS_OUTSIDE"
         private val open = mutableListOf<WeakReference<SceneActivity>>()
 
         /** Dismiss every open scene (the `scene.hide` action). Returns how many were closed. */
@@ -135,46 +145,71 @@ class SceneActivity : ComponentActivity() {
     }
 }
 
-/** The scene's modal content (scrim + scaled card). Shared by [SceneActivity] and the system-wide
- *  [SceneOverlayManager] window. */
+/**
+ * The scene's content. Shared by [SceneActivity] and the system-wide [SceneOverlayManager] window.
+ * [modal] = full-screen dimmed scrim with the card scaled to fit and placed at [position] (tap the
+ * scrim to dismiss); non-modal = just the card at its exact size (the window handles placement),
+ * leaving the app underneath visible and touchable around it.
+ */
 @Composable
 internal fun SceneOverlay(
     scene: Scene?,
+    modal: Boolean = true,
+    position: Alignment = Alignment.Center,
+    dismissOnOutside: Boolean = true,
     onDismiss: () -> Unit,
     onRunTask: (Long) -> Unit,
     onSetVar: (sceneProjectId: Long?, name: String, value: String) -> Unit,
 ) {
+    if (scene == null) return
+    if (modal) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.55f))
+                // Scrim always consumes the tap (blocks the app); it dismisses only when allowed.
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                    if (dismissOnOutside) onDismiss()
+                },
+            contentAlignment = position,
+        ) {
+            BoxWithConstraints {
+                val sw = scene.widthDp.coerceAtLeast(1)
+                val sh = scene.heightDp.coerceAtLeast(1)
+                val scale = minOf(1f, (maxWidth.value * 0.94f) / sw, (maxHeight.value * 0.94f) / sh)
+                SceneCard(scene, scale, absorbTaps = true, onRunTask = onRunTask, onSetVar = onSetVar)
+            }
+        }
+    } else {
+        SceneCard(scene, scale = 1f, absorbTaps = false, onRunTask = onRunTask, onSetVar = onSetVar)
+    }
+}
+
+@Composable
+private fun SceneCard(
+    scene: Scene,
+    scale: Float,
+    absorbTaps: Boolean,
+    onRunTask: (Long) -> Unit,
+    onSetVar: (sceneProjectId: Long?, name: String, value: String) -> Unit,
+) {
+    val sw = scene.widthDp.coerceAtLeast(1)
+    val sh = scene.heightDp.coerceAtLeast(1)
     Box(
         Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.55f))
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss),
-        contentAlignment = Alignment.Center,
+            .size((sw * scale).dp, (sh * scale).dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            // Modal: absorb taps so tapping the card (not the scrim) doesn't dismiss.
+            .then(if (absorbTaps) Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {} else Modifier),
     ) {
-        if (scene == null) return@Box
-        BoxWithConstraints {
-            val availW = maxWidth.value
-            val availH = maxHeight.value
-            val sw = scene.widthDp.coerceAtLeast(1)
-            val sh = scene.heightDp.coerceAtLeast(1)
-            val scale = minOf(1f, (availW * 0.94f) / sw, (availH * 0.94f) / sh)
+        scene.elements.forEach { element ->
             Box(
                 Modifier
-                    .size((sw * scale).dp, (sh * scale).dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surface)
-                    // Absorb taps so tapping the scene (not the scrim) doesn't dismiss.
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
+                    .offset((element.xDp * scale).dp, (element.yDp * scale).dp)
+                    .size((element.widthDp * scale).dp, (element.heightDp * scale).dp),
             ) {
-                scene.elements.forEach { element ->
-                    Box(
-                        Modifier
-                            .offset((element.xDp * scale).dp, (element.yDp * scale).dp)
-                            .size((element.widthDp * scale).dp, (element.heightDp * scale).dp),
-                    ) {
-                        SceneElementView(element, onRunTask) { name, value -> onSetVar(scene.projectId, name, value) }
-                    }
-                }
+                SceneElementView(element, onRunTask) { name, value -> onSetVar(scene.projectId, name, value) }
             }
         }
     }
@@ -363,6 +398,13 @@ private fun SceneElementView(
 
 /** Truthy parse for checkbox/toggle scene values. */
 private fun sceneBool(s: String): Boolean = s.trim().lowercase() in setOf("true", "1", "on", "yes")
+
+/** Map a scene `position` arg to where the card sits on screen. */
+internal fun sceneAlignment(position: String?): Alignment = when (position?.trim()?.lowercase()) {
+    "top" -> Alignment.TopCenter
+    "bottom" -> Alignment.BottomCenter
+    else -> Alignment.Center
+}
 
 /** Parse a "#AARRGGBB"/"#RRGGBB" scene colour, or null (use the element's default). */
 private fun sceneColor(s: String?): Color? =

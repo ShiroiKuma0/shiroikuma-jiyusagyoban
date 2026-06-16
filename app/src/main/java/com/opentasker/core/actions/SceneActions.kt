@@ -26,12 +26,21 @@ class ShowSceneAction : Action {
             ?: dao.getAll().firstOrNull { it.toDomain().name.equals(ref, ignoreCase = true) }
             ?: return ActionResult.Failure("scene not found: \"$ref\"")
         val scene = entity.toDomain()
+        val position = args["position"]?.trim()?.lowercase()?.ifBlank { null }
+        // Default modal (blocks the app underneath); anything other than an explicit off → modal.
+        val modal = args["modal"]?.trim()?.lowercase() !in setOf("false", "0", "off", "no")
+        val timeoutMs = (args["timeout"]?.trim()?.toDoubleOrNull()?.times(1000))?.toLong()?.coerceAtLeast(0L) ?: 0L
+        // Default: a tap outside (on the scrim) closes a modal scene; set off to require Back/button/timeout.
+        val dismissOnOutside = args["dismissOnOutside"]?.trim()?.lowercase() !in setOf("false", "0", "off", "no")
         if (SceneOverlayManager.canOverlay(ctx.app)) {
-            SceneOverlayManager.show(ctx.app, scene)
-            ctx.logger("Show scene \"${scene.name}\" (overlay)")
+            SceneOverlayManager.show(ctx.app, scene, position, modal, timeoutMs, dismissOnOutside)
+            ctx.logger("Show scene \"${scene.name}\" (overlay, ${if (modal) "modal" else "tap-through"})")
         } else {
             val intent = Intent(ctx.app, SceneActivity::class.java).apply {
                 putExtra(SceneActivity.EXTRA_SCENE_ID, entity.id)
+                position?.let { putExtra(SceneActivity.EXTRA_POSITION, it) }
+                if (timeoutMs > 0) putExtra(SceneActivity.EXTRA_TIMEOUT_MS, timeoutMs)
+                putExtra(SceneActivity.EXTRA_DISMISS_OUTSIDE, dismissOnOutside)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             ctx.app.startActivity(intent)

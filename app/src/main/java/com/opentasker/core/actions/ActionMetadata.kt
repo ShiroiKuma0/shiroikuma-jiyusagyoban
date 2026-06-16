@@ -674,10 +674,14 @@ fun registerActionMetadata() {
         ActionMetadata(
             id = "scene.show",
             name = "Show Scene",
-            description = "Display a scene (from the Scenes tab) as a modal overlay. Its elements run tasks on tap; %vars in text are expanded.",
+            description = "Display a scene (from the Scenes tab). With the Display-over-other-apps permission it shows over other apps; its elements run tasks on tap and %vars in text are expanded.",
             category = "System",
             fields = listOf(
                 ActionField("scene", "Scene name", required = true, hint = "the scene's name (or id)"),
+                ActionField("position", "Position", FieldType.DROPDOWN, hint = "top / center / bottom (default center)"),
+                ActionField("modal", "Modal", FieldType.CHECKBOX, hint = "block the app underneath (on) vs tap-through HUD (off)"),
+                ActionField("dismissOnOutside", "Tap outside closes", FieldType.CHECKBOX, hint = "default on; off = close only via Back, a button, or timeout"),
+                ActionField("timeout", "Auto-dismiss (s)", FieldType.NUMBER, hint = "seconds before it closes itself; blank = stay"),
             )
         )
     )
