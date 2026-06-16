@@ -57,6 +57,8 @@ import com.opentasker.ui.components.rememberListReorderState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Delete
@@ -119,6 +121,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -1017,21 +1020,27 @@ fun ActiveAutomationUi(
     val projects by viewModel.projects.collectAsState()
     val projectFilter = viewModel.projectFilter
     val currentProjectId = (projectFilter as? ProjectFilter.Of)?.projectId
+    // Name search for the list tabs (Profiles/Tasks/Scenes/Vars/Widgets): a case-insensitive filter
+    // folded into the visible lists below, so the header count, expand-all and selection all track it.
+    // Reset whenever the tab changes (see the LaunchedEffect after `screen`).
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val nameQuery = searchQuery.trim()
+    fun matchesSearch(name: String) = nameQuery.isEmpty() || name.contains(nameQuery, ignoreCase = true)
     val visibleProfiles = when (projectFilter) {
         ProjectFilter.All -> profiles
         ProjectFilter.Unfiled -> profiles.filter { it.projectId == null }
         is ProjectFilter.Of -> profiles.filter { it.projectId == projectFilter.projectId }
-    }
+    }.filter { matchesSearch(it.name) }
     val visibleTasks = when (projectFilter) {
         ProjectFilter.All -> tasks
         ProjectFilter.Unfiled -> tasks.filter { it.projectId == null }
         is ProjectFilter.Of -> tasks.filter { it.projectId == projectFilter.projectId }
-    }
+    }.filter { matchesSearch(it.name) }
     val visibleScenes = when (projectFilter) {
         ProjectFilter.All -> scenes
         ProjectFilter.Unfiled -> scenes.filter { it.projectId == null }
         is ProjectFilter.Of -> scenes.filter { it.projectId == projectFilter.projectId }
-    }
+    }.filter { matchesSearch(it.name) }
     val runLogs by viewModel.runLogs.collectAsState()
     // Unread-failure dot on the Log nav icon: runLogs are timestamp-DESC, so the first failure is the
     // newest; the dot shows while it's newer than what 白い熊 last saw (cleared on opening the Log tab).
@@ -1045,8 +1054,9 @@ fun ActiveAutomationUi(
         ProjectFilter.All -> globalVariables
         ProjectFilter.Unfiled -> globalVariables.filter { it.projectId == 0L }
         is ProjectFilter.Of -> globalVariables.filter { it.projectId == 0L || it.projectId == f.projectId }
-    }
-    val widgetTemplates by com.opentasker.widget.TemplateStore.state.collectAsState()
+    }.filter { matchesSearch(it.name) }
+    val allWidgetTemplates by com.opentasker.widget.TemplateStore.state.collectAsState()
+    val widgetTemplates = allWidgetTemplates.filter { matchesSearch(it.name) }
     val runLogRetentionPolicy = viewModel.runLogRetentionPolicy
     val backupSetupState = viewModel.backupSetupState
     val themePrefs by ThemeStore.state.collectAsState()
@@ -1054,6 +1064,8 @@ fun ActiveAutomationUi(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var screen by remember { mutableStateOf(OpenTaskerScreen.Profiles) }
+    // Clear the name search when switching tabs so each list starts unfiltered.
+    LaunchedEffect(screen) { searchQuery = "" }
     var showUiCustomization by remember { mutableStateOf(false) }
     var showProjectManagement by remember { mutableStateOf(false) }
     var showTaskLibrary by remember { mutableStateOf(false) }
@@ -1298,6 +1310,7 @@ fun ActiveAutomationUi(
             }
         },
         topBar = {
+          Column(Modifier.background(MaterialTheme.colorScheme.background)) {
             TopAppBar(
                 title = {
                     Column {
@@ -1366,6 +1379,27 @@ fun ActiveAutomationUi(
                     scrolledContainerColor = MaterialTheme.colorScheme.background,
                 ),
             )
+            // Pinned name-search bar, uniform across the list tabs.
+            if (screen == OpenTaskerScreen.Profiles || screen == OpenTaskerScreen.Tasks ||
+                screen == OpenTaskerScreen.Scenes || screen == OpenTaskerScreen.Vars ||
+                screen == OpenTaskerScreen.Widgets
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .padding(bottom = 8.dp),
+                    placeholder = { Text("Search ${screen.label.lowercase()}…") },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    trailingIcon = if (searchQuery.isNotEmpty()) {
+                        { IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Filled.Clear, contentDescription = "Clear search") } }
+                    } else null,
+                    singleLine = true,
+                )
+            }
+          }
         },
         floatingActionButton = {
             // Uniform per-tab "+" menu: New <item> / Import JSON / Import Tasker (where it applies) /
@@ -1897,7 +1931,7 @@ fun ActiveAutomationUi(
         val taskNames = tasks.mapTo(HashSet()) { it.name.lowercase() }
         val profileNames = profiles.mapTo(HashSet()) { it.name.lowercase() }
         val sceneNames = scenes.mapTo(HashSet()) { it.name.lowercase() }
-        val templateNames = widgetTemplates.mapTo(HashSet()) { it.name.lowercase() }
+        val templateNames = allWidgetTemplates.mapTo(HashSet()) { it.name.lowercase() }
         buildList {
             b.tasks.filter { it.name.lowercase() in taskNames }.forEach { add("Task “${it.name}”") }
             b.profiles.filter { it.name.lowercase() in profileNames }.forEach { add("Profile “${it.name}”") }

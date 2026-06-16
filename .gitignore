@@ -44,3 +44,7 @@ build.sh
 # shiroikuma fork: CLAUDE.md, .claude/skills, .md docs and hand-off.md ARE committed;
 # only host-specific local Claude settings stay out.
 .claude/settings.local.json
+
+# Claude's scratch space: generator/demo/sim scripts and their JSON output live here
+# (never in ~/tmp — that's 白い熊's). Pushed to the device's /sdcard/tmp/ from here.
+.scratch/
