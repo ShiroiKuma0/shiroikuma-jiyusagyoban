@@ -40,11 +40,18 @@ object DatabaseMigrations {
         }
     }
 
+    val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE profiles ADD COLUMN profileGroup TEXT")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
             MIGRATION_3_4,
+            MIGRATION_4_5,
         )
     }
 }
@@ -65,8 +72,11 @@ object DatabaseMigrations {
  * Version 3:
  *   - edit_history: id, entityType, entityId, previousJson, timestamp
  *
- * Version 4 (current):
+ * Version 4:
  *   - run_logs: adds nullable source (typed trigger key) and sourceLabel (human label)
+ *
+ * Version 5 (current):
+ *   - profiles: adds nullable profileGroup for folder/tag organization
  *
  * To add a migration:
  * 1. Increment database version in @Database annotation

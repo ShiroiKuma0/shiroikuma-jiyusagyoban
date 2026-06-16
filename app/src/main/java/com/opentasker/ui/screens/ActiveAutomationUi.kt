@@ -46,6 +46,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
@@ -394,7 +395,7 @@ class ActiveAutomationViewModel(
         db.sceneDao().delete(scene.toEntity())
     }
 
-    fun createProfile(name: String, enabled: Boolean, enterTaskId: Long, cooldownSec: Int, automationMode: AutomationMode) =
+    fun createProfile(name: String, enabled: Boolean, enterTaskId: Long, cooldownSec: Int, automationMode: AutomationMode, group: String? = null) =
         launchWithMessage("Profile created") {
             db.profileDao().insert(
                 Profile(
@@ -403,6 +404,7 @@ class ActiveAutomationViewModel(
                     enterTaskId = enterTaskId,
                     cooldownSec = cooldownSec.coerceAtLeast(0),
                     automationMode = automationMode,
+                    group = group,
                 ).toEntity()
             )
         }
@@ -1256,8 +1258,8 @@ fun ActiveAutomationUi(
             profile = null,
             tasks = tasks,
             onDismiss = { showCreateProfileDialog = false },
-            onSave = { name, enabled, enterTaskId, cooldown, automationMode ->
-                viewModel.createProfile(name, enabled, enterTaskId, cooldown, automationMode)
+            onSave = { name, enabled, enterTaskId, cooldown, automationMode, group ->
+                viewModel.createProfile(name, enabled, enterTaskId, cooldown, automationMode, group)
                 showCreateProfileDialog = false
             },
         )
@@ -1290,7 +1292,7 @@ fun ActiveAutomationUi(
             profile = profile,
             tasks = tasks,
             onDismiss = { clearProfileDialog() },
-            onSave = { name, enabled, enterTaskId, cooldown, automationMode ->
+            onSave = { name, enabled, enterTaskId, cooldown, automationMode, group ->
                 viewModel.updateProfile(
                     profile.copy(
                         name = name.trim(),
@@ -1298,6 +1300,7 @@ fun ActiveAutomationUi(
                         enterTaskId = enterTaskId,
                         cooldownSec = cooldown.coerceAtLeast(0),
                         automationMode = automationMode,
+                        group = group,
                     )
                 )
                 clearProfileDialog()
@@ -1463,8 +1466,13 @@ private fun ProfilesScreen(
     }
 
     var profileSearchQuery by rememberSaveable { mutableStateOf("") }
-    val filteredProfiles = if (profileSearchQuery.isBlank()) profiles
-        else profiles.filter { it.name.contains(profileSearchQuery, ignoreCase = true) }
+    var selectedGroup by rememberSaveable { mutableStateOf<String?>(null) }
+    val groups = remember(profiles) {
+        profiles.mapNotNull { it.group }.distinct().sorted()
+    }
+    val filteredProfiles = profiles
+        .filter { selectedGroup == null || it.group == selectedGroup }
+        .filter { profileSearchQuery.isBlank() || it.name.contains(profileSearchQuery, ignoreCase = true) }
 
     LazyColumn(
         modifier = Modifier
@@ -1502,6 +1510,26 @@ private fun ProfilesScreen(
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
             )
+        }
+        if (groups.isNotEmpty()) {
+            item {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        FilterChip(
+                            selected = selectedGroup == null,
+                            onClick = { selectedGroup = null },
+                            label = { Text("All") },
+                        )
+                    }
+                    items(groups, key = { it }) { group ->
+                        FilterChip(
+                            selected = selectedGroup == group,
+                            onClick = { selectedGroup = if (selectedGroup == group) null else group },
+                            label = { Text(group) },
+                        )
+                    }
+                }
+            }
         }
         items(filteredProfiles, key = { it.id }) { profile ->
             val enterTaskName = tasks.firstOrNull { it.id == profile.enterTaskId }?.name ?: "Missing task #${profile.enterTaskId}"
@@ -1812,6 +1840,7 @@ private fun ProfileCard(
                 )
                 StatusPill("${profile.contexts.size} context${plural(profile.contexts.size)}", MaterialTheme.colorScheme.primary)
                 StatusPill("${profile.cooldownSec}s cooldown", MaterialTheme.colorScheme.secondary)
+                profile.group?.let { StatusPill(it, MaterialTheme.colorScheme.inversePrimary) }
             }
             StatusPill(profile.automationMode.name.lowercase(), MaterialTheme.colorScheme.onSurfaceVariant)
             if (profile.contexts.isEmpty()) {
@@ -3130,7 +3159,7 @@ private fun ProfileEditorDialog(
     profile: Profile?,
     tasks: List<Task>,
     onDismiss: () -> Unit,
-    onSave: (String, Boolean, Long, Int, AutomationMode) -> Unit,
+    onSave: (String, Boolean, Long, Int, AutomationMode, String?) -> Unit,
 ) {
     val initialTaskId = profile?.enterTaskId ?: tasks.firstOrNull()?.id ?: 0L
     var name by rememberSaveable(profile?.id) { mutableStateOf(profile?.name.orEmpty()) }
@@ -3138,6 +3167,7 @@ private fun ProfileEditorDialog(
     var enterTaskId by rememberSaveable(profile?.id, tasks) { mutableLongStateOf(initialTaskId) }
     var cooldown by rememberSaveable(profile?.id) { mutableStateOf((profile?.cooldownSec ?: 0).toString()) }
     var automationMode by rememberSaveable(profile?.id) { mutableStateOf(profile?.automationMode ?: AutomationMode.SINGLE) }
+    var group by rememberSaveable(profile?.id) { mutableStateOf(profile?.group.orEmpty()) }
     val parsedCooldown = cooldown.toIntOrNull()
     val canSave = name.isNotBlank() && enterTaskId > 0 && (cooldown.isBlank() || parsedCooldown != null)
 
@@ -3152,6 +3182,15 @@ private fun ProfileEditorDialog(
                     label = { Text("Profile name") },
                     placeholder = { Text("Weekday work mode") },
                     supportingText = { Text("Profiles read best when they describe the situation they detect.") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = group,
+                    onValueChange = { group = it },
+                    label = { Text("Group") },
+                    placeholder = { Text("Work, Home, Travel") },
+                    supportingText = { Text("Optional. Groups profiles for filtering.") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -3217,7 +3256,7 @@ private fun ProfileEditorDialog(
             }
         },
         confirmButton = {
-            Button(enabled = canSave, onClick = { onSave(name, enabled, enterTaskId, parsedCooldown ?: 0, automationMode) }) {
+            Button(enabled = canSave, onClick = { onSave(name, enabled, enterTaskId, parsedCooldown ?: 0, automationMode, group.trim().ifBlank { null }) }) {
                 Text("Save")
             }
         },

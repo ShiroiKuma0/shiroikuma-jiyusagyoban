@@ -17,6 +17,7 @@ data class Profile(
     val exitTaskId: Long? = null,
     val cooldownSec: Int = 0,
     val automationMode: AutomationMode = AutomationMode.SINGLE,
+    val group: String? = null,
 )
 
 @Serializable
