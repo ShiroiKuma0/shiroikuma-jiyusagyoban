@@ -605,6 +605,8 @@ private fun SceneElementEditorDialog(
     var sliderVertical by remember(state) { mutableStateOf(initial.config["orientation"].equals("vertical", ignoreCase = true)) }
     // Checkbox/Toggle initial on/off state.
     var boolValue by remember(state) { mutableStateOf((initial.config["value"] ?: "false").trim().lowercase() in setOf("true", "1", "on", "yes")) }
+    // Edit-text initial text.
+    var textValue by remember(state) { mutableStateOf(initial.config["value"] ?: "") }
     var imageSource by remember(state) { mutableStateOf(initial.config["source"] ?: "") }
     var tapTaskId by remember(state) { mutableStateOf(initial.tapTaskId) }
     var longPressTaskId by remember(state) { mutableStateOf(initial.longPressTaskId) }
@@ -656,6 +658,7 @@ private fun SceneElementEditorDialog(
                         sliderVar = defaults.config["var"] ?: ""
                         sliderVertical = defaults.config["orientation"].equals("vertical", ignoreCase = true)
                         boolValue = (defaults.config["value"] ?: "false").trim().lowercase() in setOf("true", "1", "on", "yes")
+                        textValue = if (selected == SceneElementType.EDIT_TEXT) (defaults.config["value"] ?: "") else ""
                         imageSource = defaults.config["source"] ?: ""
                     },
                 )
@@ -695,6 +698,36 @@ private fun SceneElementEditorDialog(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
+
+                    SceneElementType.EDIT_TEXT -> {
+                        OutlinedTextField(
+                            value = label,
+                            onValueChange = { label = it.take(48) },
+                            label = { Text("Field label / hint") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = textValue,
+                            onValueChange = { textValue = it.take(160) },
+                            label = { Text("Initial text") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = sliderVar,
+                            onValueChange = { sliderVar = it.take(40) },
+                            label = { Text("Store value in variable") },
+                            placeholder = { Text("%NAME") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            "When you press Done or leave the field, the text is written to this variable and the Tap task runs.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
 
                     SceneElementType.SLIDER -> {
                         OutlinedTextField(
@@ -806,7 +839,7 @@ private fun SceneElementEditorDialog(
                             yDp = parsedY ?: 0,
                             widthDp = parsedWidth ?: 1,
                             heightDp = parsedHeight ?: 1,
-                            config = elementConfig(type, label, sliderMin, sliderMax, sliderValue, sliderVar, sliderVertical, boolValue, imageSource),
+                            config = elementConfig(type, label, sliderMin, sliderMax, sliderValue, sliderVar, sliderVertical, boolValue, textValue, imageSource),
                             tapTaskId = tapTaskId,
                             longPressTaskId = longPressTaskId,
                         ),
@@ -991,6 +1024,11 @@ private fun sceneElementSummary(element: SceneElement): String? = when (element.
         val on = element.config["value"].orEmpty().trim().lowercase() in setOf("true", "1", "on", "yes")
         "$label (${if (on) "on" else "off"})"
     }
+    SceneElementType.EDIT_TEXT -> {
+        val label = element.config["label"].orEmpty().ifBlank { "Text field" }
+        val value = element.config["value"].orEmpty()
+        if (value.isBlank()) label else "$label: $value"
+    }
     SceneElementType.IMAGE -> element.config["source"]?.takeIf { it.isNotBlank() }
     else -> null
 }
@@ -1004,10 +1042,16 @@ private fun elementConfig(
     sliderVar: String,
     sliderVertical: Boolean,
     boolValue: Boolean,
+    textValue: String,
     imageSource: String,
 ): Map<String, String> = when (type) {
     SceneElementType.TEXT -> mapOf("text" to label.ifBlank { "Text" })
     SceneElementType.BUTTON -> mapOf("label" to label.ifBlank { "Button" })
+    SceneElementType.EDIT_TEXT -> buildMap {
+        put("label", label.ifBlank { "Text" })
+        put("value", textValue)
+        sliderVar.trim().removePrefix("%").takeIf { it.isNotBlank() }?.let { put("var", it) }
+    }
     SceneElementType.CHECKBOX, SceneElementType.TOGGLE -> buildMap {
         put("label", label.ifBlank { sceneElementTypeLabel(type) })
         put("value", boolValue.toString())

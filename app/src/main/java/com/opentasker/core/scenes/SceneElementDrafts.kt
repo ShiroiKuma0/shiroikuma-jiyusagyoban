@@ -8,6 +8,7 @@ object SceneElementDrafts {
     val editableTypes = listOf(
         SceneElementType.BUTTON,
         SceneElementType.TEXT,
+        SceneElementType.EDIT_TEXT,
         SceneElementType.SLIDER,
         SceneElementType.CHECKBOX,
         SceneElementType.TOGGLE,
@@ -42,6 +43,7 @@ object SceneElementDrafts {
             "max" to "100",
             "value" to "50",
         )
+        SceneElementType.EDIT_TEXT -> mapOf("label" to "Text field", "value" to "")
         SceneElementType.CHECKBOX -> mapOf("label" to "Checkbox", "value" to "false")
         SceneElementType.TOGGLE -> mapOf("label" to "Toggle", "value" to "false")
         SceneElementType.IMAGE -> mapOf("source" to "Image")
@@ -51,6 +53,7 @@ object SceneElementDrafts {
     private fun defaultSize(type: SceneElementType): Pair<Int, Int> = when (type) {
         SceneElementType.TEXT -> 160 to 40
         SceneElementType.BUTTON -> 160 to 48
+        SceneElementType.EDIT_TEXT -> 220 to 64
         SceneElementType.SLIDER -> 220 to 56
         SceneElementType.CHECKBOX -> 200 to 48
         SceneElementType.TOGGLE -> 200 to 48

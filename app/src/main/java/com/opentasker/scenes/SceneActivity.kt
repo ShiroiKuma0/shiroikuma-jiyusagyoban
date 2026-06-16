@@ -17,11 +17,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -36,9 +39,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.OpenTaskerApp_NoHilt
@@ -243,6 +248,35 @@ private fun SceneElementView(
                     )
                 }
             }
+        }
+
+        SceneElementType.EDIT_TEXT -> {
+            val varName = cfg["var"]?.trim()
+            var text by remember(element.id) { mutableStateOf(v("value")) }
+            var focused by remember(element.id) { mutableStateOf(false) }
+            // Seed the bound variable with the initial value so other elements/tasks can read it before
+            // any edit (e.g. a button that flashes %NAME without the field being touched).
+            LaunchedEffect(element.id) { if (!varName.isNullOrBlank()) onSetVar(varName, text) }
+            OutlinedTextField(
+                value = text,
+                onValueChange = {
+                    text = it
+                    // Keep the variable live on every keystroke, so anything reading it (a button, a
+                    // task) sees the current text without waiting for Done/focus-loss.
+                    if (!varName.isNullOrBlank()) onSetVar(varName, it)
+                },
+                label = { Text(v("label", "Text")) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                // Run the element's tap task when the user presses Done or the field loses focus.
+                keyboardActions = KeyboardActions(onDone = { element.tapTaskId?.let(onRunTask) }),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .onFocusChanged { st ->
+                        if (focused && !st.isFocused) element.tapTaskId?.let(onRunTask)
+                        focused = st.isFocused
+                    },
+            )
         }
 
         SceneElementType.CHECKBOX, SceneElementType.TOGGLE -> {
