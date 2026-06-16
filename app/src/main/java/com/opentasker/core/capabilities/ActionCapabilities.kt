@@ -57,6 +57,7 @@ object ActionCapabilityRegistry {
                 ?: "Termux script backend is not active.",
         ),
         "flash" to ActionCapability(CapabilityLevel.RequiresSetup, "Custom colours, border and position need \"display over other apps\"; without it the flash falls back to a plain toast."),
+        "state.get" to ActionCapability(CapabilityLevel.Supported, "Reads battery / charging / WiFi / airplane into variables; no permissions needed."),
         "clipboard.get" to ActionCapability(CapabilityLevel.RequiresSetup, "Android 10+ blocks clipboard reads unless the app is focused; may return empty from the background."),
         "apps.list" to ActionCapability(CapabilityLevel.RequiresSetup, "Android 11+ package visibility limits the result to apps this app can see."),
         "nav.back" to accessibilityCapability(),

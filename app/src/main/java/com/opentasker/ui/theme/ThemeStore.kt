@@ -206,6 +206,12 @@ object ThemeStore {
     fun typeface(fileName: String): android.graphics.Typeface? {
         val requested = fileName.trim()
         if (requested.isEmpty() || requested == MONOSPACE) return null
+        // Built-in family keywords (e.g. widgets that want Minchō without importing a font): on Android,
+        // SERIF resolves CJK glyphs to Noto Serif CJK (= 明朝/Minchō); SANS_SERIF to the gothic default.
+        when (requested.lowercase()) {
+            "serif", "mincho", "minchō", "明朝" -> return android.graphics.Typeface.SERIF
+            "sans", "sans-serif", "gothic", "ゴシック" -> return android.graphics.Typeface.SANS_SERIF
+        }
         return typefaceCache.getOrPut(requested) {
             runCatching {
                 val file = File(fontsDir(), requested)

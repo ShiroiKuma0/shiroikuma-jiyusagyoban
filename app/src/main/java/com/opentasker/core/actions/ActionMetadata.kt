@@ -985,6 +985,21 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "state.get",
+            name = "Get Device State",
+            description = "Read battery %, charging, WiFi and airplane state into variables (no permissions needed)",
+            category = "Settings",
+            fields = listOf(
+                ActionField("battery", "Battery % → variable", hint = "var for 00..99 or 100 (e.g. BATT)"),
+                ActionField("charging", "Charging → variable", hint = "var for true/false (e.g. CHG)"),
+                ActionField("wifi", "WiFi on → variable", hint = "var for true/false (e.g. WIFI)"),
+                ActionField("airplane", "Airplane on → variable", hint = "var for true/false (e.g. AIR)"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "airplane.toggle",
             name = "Toggle Airplane Mode",
             description = "Turn Airplane mode on or off",

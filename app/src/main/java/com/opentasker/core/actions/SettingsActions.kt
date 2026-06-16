@@ -210,10 +210,13 @@ class AirplaneModeAction : Action {
             "toggle" -> Settings.Global.getInt(ctx.app.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) == 0
             else -> return ActionResult.Failure("invalid state: $state")
         }
+        // The AIRPLANE_MODE broadcast is a protected, system-only broadcast — sending it from the
+        // Shizuku shell fails, which previously failed the whole action even though the setting (which
+        // the system observes) was applied. Make the broadcast best-effort so success tracks the put.
         return runElevated(
             ctx, "Airplane mode",
-            "settings put global airplane_mode_on ${if (target) 1 else 0} ; " +
-                "am broadcast -a android.intent.action.AIRPLANE_MODE --ez state $target",
+            "settings put global airplane_mode_on ${if (target) 1 else 0} && " +
+                "(am broadcast -a android.intent.action.AIRPLANE_MODE --ez state $target >/dev/null 2>&1 || true)",
         )
     }
 }
