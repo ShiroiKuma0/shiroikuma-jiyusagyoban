@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Calendar
 
 class DayScheduleTest {
     @Test
@@ -25,5 +26,25 @@ class DayScheduleTest {
         assertTrue(DaySchedule.matches("FRI-MON", "0"))
         assertFalse(DaySchedule.matches("weekend", "TUE"))
         assertFalse(DaySchedule.matches("not-a-day", "MON"))
+    }
+
+    @Test
+    fun calendarTokensUseStableUppercaseScheduleTokens() {
+        val calendar = Calendar.getInstance()
+
+        val expected = mapOf(
+            Calendar.MONDAY to "MON",
+            Calendar.TUESDAY to "TUE",
+            Calendar.WEDNESDAY to "WED",
+            Calendar.THURSDAY to "THU",
+            Calendar.FRIDAY to "FRI",
+            Calendar.SATURDAY to "SAT",
+            Calendar.SUNDAY to "SUN",
+        )
+
+        expected.forEach { (dayOfWeek, token) ->
+            calendar.set(Calendar.DAY_OF_WEEK, dayOfWeek)
+            assertEquals(token, DaySchedule.tokenFor(calendar))
+        }
     }
 }

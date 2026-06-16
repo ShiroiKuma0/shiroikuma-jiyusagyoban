@@ -45,8 +45,11 @@ object DaySchedule {
     }
 
     fun currentDayToken(): String {
-        val calendar = Calendar.getInstance()
-        return when (calendar.get(Calendar.DAY_OF_WEEK)) {
+        return tokenFor(Calendar.getInstance())
+    }
+
+    fun tokenFor(calendar: Calendar): String =
+        when (calendar.get(Calendar.DAY_OF_WEEK)) {
             Calendar.MONDAY -> "MON"
             Calendar.TUESDAY -> "TUE"
             Calendar.WEDNESDAY -> "WED"
@@ -56,7 +59,6 @@ object DaySchedule {
             Calendar.SUNDAY -> "SUN"
             else -> "SUN"
         }
-    }
 
     fun normalizeToken(value: String): String? = when (value.trim().uppercase(Locale.US)) {
         "SUN", "SUNDAY", "0", "7" -> "SUN"
