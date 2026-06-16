@@ -189,6 +189,9 @@ private fun SceneElementView(
     // Shared styling (see the element editor's Style section).
     val styleSize = cfg["textSize"]?.toIntOrNull()?.sp ?: TextUnit.Unspecified
     val styleWeight = if (sceneBool(cfg["bold"] ?: "")) FontWeight.Bold else FontWeight.Normal
+    // For elements with a styled label (slider/checkbox/toggle) keep the label's own weight unless bold.
+    val styleWeightOrNull = if (sceneBool(cfg["bold"] ?: "")) FontWeight.Bold else null
+    val styleLabelColor = sceneColor(cfg["textColor"])
     val styleAlign = sceneAlign(cfg["align"])
     val styleBorderW = cfg["borderWidth"]?.toIntOrNull() ?: 0
     val styleBorderColor = sceneColor(cfg["borderColor"])
@@ -255,7 +258,7 @@ private fun SceneElementView(
                 // A horizontal Slider rotated 90° CCW: its track length follows the element height, so
                 // the top is max and dragging up increases the value.
                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+                    Text(label, style = MaterialTheme.typography.labelMedium, color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontWeight = styleWeightOrNull)
                     BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                         val trackLength = maxHeight
                         Slider(
@@ -271,7 +274,7 @@ private fun SceneElementView(
                 }
             } else {
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
-                    Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+                    Text(label, style = MaterialTheme.typography.labelMedium, color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontWeight = styleWeightOrNull)
                     Slider(
                         value = value,
                         onValueChange = { value = it },
@@ -328,9 +331,9 @@ private fun SceneElementView(
             ) {
                 if (element.type == SceneElementType.CHECKBOX) {
                     Checkbox(checked = checked, onCheckedChange = onChanged)
-                    Text(v("label", "Checkbox"), color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                    Text(v("label", "Checkbox"), color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontWeight = styleWeightOrNull, modifier = Modifier.weight(1f))
                 } else {
-                    Text(v("label", "Toggle"), color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                    Text(v("label", "Toggle"), color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontWeight = styleWeightOrNull, modifier = Modifier.weight(1f))
                     Switch(checked = checked, onCheckedChange = onChanged)
                 }
             }

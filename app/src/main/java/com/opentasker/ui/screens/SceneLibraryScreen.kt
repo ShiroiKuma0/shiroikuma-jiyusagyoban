@@ -834,39 +834,44 @@ private fun SceneElementEditorDialog(
 
                     else -> Unit
                 }
-                if (type == SceneElementType.TEXT || type == SceneElementType.BUTTON) {
+                val boxStyled = type == SceneElementType.TEXT || type == SceneElementType.BUTTON
+                val textStyled = boxStyled ||
+                    type == SceneElementType.SLIDER || type == SceneElementType.CHECKBOX || type == SceneElementType.TOGGLE
+                if (textStyled) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Text("Style", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                     SceneColorField(
-                        label = if (type == SceneElementType.BUTTON) "Label colour" else "Text colour",
+                        label = if (type == SceneElementType.TEXT) "Text colour" else "Label colour",
                         value = styleTextColor,
                         onChange = { styleTextColor = it },
-                    )
-                    SceneColorField(
-                        label = if (type == SceneElementType.BUTTON) "Button colour" else "Background colour",
-                        value = styleBgColor,
-                        onChange = { styleBgColor = it },
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         NumberField("Size (sp)", styleSize, { styleSize = it.filter(Char::isDigit).take(3) }, isError = false, modifier = Modifier.weight(1f))
                         Text("Bold", style = MaterialTheme.typography.bodyMedium)
                         Switch(checked = styleBold, onCheckedChange = { styleBold = it })
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        listOf("start" to "Left", "center" to "Center", "end" to "Right").forEach { (key, text) ->
-                            FilterChip(
-                                selected = styleAlign == key,
-                                onClick = { styleAlign = key },
-                                label = { Text(text) },
-                                modifier = Modifier.weight(1f),
-                            )
+                    if (boxStyled) {
+                        SceneColorField(
+                            label = if (type == SceneElementType.BUTTON) "Button colour" else "Background colour",
+                            value = styleBgColor,
+                            onChange = { styleBgColor = it },
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            listOf("start" to "Left", "center" to "Center", "end" to "Right").forEach { (key, text) ->
+                                FilterChip(
+                                    selected = styleAlign == key,
+                                    onClick = { styleAlign = key },
+                                    label = { Text(text) },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
                         }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.weight(1f)) {
-                            SceneColorField(label = "Border colour", value = styleBorderColor, onChange = { styleBorderColor = it })
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.weight(1f)) {
+                                SceneColorField(label = "Border colour", value = styleBorderColor, onChange = { styleBorderColor = it })
+                            }
+                            NumberField("Border (dp)", styleBorderWidth, { styleBorderWidth = it.filter(Char::isDigit).take(2) }, isError = false, modifier = Modifier.weight(1f))
                         }
-                        NumberField("Border (dp)", styleBorderWidth, { styleBorderWidth = it.filter(Char::isDigit).take(2) }, isError = false, modifier = Modifier.weight(1f))
                     }
                 }
                 SceneTaskBindingSelector(
@@ -1175,6 +1180,7 @@ private fun elementConfig(
         put("label", label.ifBlank { sceneElementTypeLabel(type) })
         put("value", boolValue.toString())
         sliderVar.trim().removePrefix("%").takeIf { it.isNotBlank() }?.let { put("var", it) }
+        putStyle(style)
     }
     SceneElementType.SLIDER -> {
         val min = sliderMin.toIntOrNull() ?: 0
@@ -1189,6 +1195,7 @@ private fun elementConfig(
             put("value", value)
             sliderVar.trim().removePrefix("%").takeIf { it.isNotBlank() }?.let { put("var", it) }
             if (sliderVertical) put("orientation", "vertical")
+            putStyle(style)
         }
     }
     SceneElementType.IMAGE -> mapOf("source" to imageSource.ifBlank { "Image" })
