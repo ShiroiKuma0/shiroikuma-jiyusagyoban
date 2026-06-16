@@ -298,4 +298,52 @@ class ActionGuardsTest {
         assertTrue("missing name should fail", result is ActionResult.Failure)
         assertEquals("missing name", (result as ActionResult.Failure).message)
     }
+
+    // --- TermuxScriptAction fail-closed ---
+
+    @Test
+    fun termuxScriptFailsClosed() = runBlocking {
+        val action = TermuxScriptAction()
+        val result = action.run(ctx(), mapOf("executable" to "/bin/sh"))
+        assertTrue("Termux script should fail closed", result is ActionResult.Failure)
+        assertTrue((result as ActionResult.Failure).message.contains("not implemented"))
+    }
+
+    // --- VolumeAction guards ---
+
+    @Test
+    fun volumeMissingLevelFails() = runBlocking {
+        val action = VolumeAction()
+        val result = action.run(ctx(), emptyMap())
+        assertTrue("missing level should fail", result is ActionResult.Failure)
+        assertEquals("missing level", (result as ActionResult.Failure).message)
+    }
+
+    // --- LaunchIntentAction guards ---
+
+    @Test
+    fun launchIntentMissingPackageFails() = runBlocking {
+        val action = LaunchIntentAction()
+        val result = action.run(ctx(), emptyMap())
+        assertTrue("missing package should fail", result is ActionResult.Failure)
+        assertTrue((result as ActionResult.Failure).message.contains("package"))
+    }
+
+    // --- LogAction always succeeds ---
+
+    @Test
+    fun logActionSucceedsWithEmptyMessage() = runBlocking {
+        val action = LogAction()
+        val result = action.run(ctx(), emptyMap())
+        assertTrue("log with no message should succeed", result is ActionResult.Success)
+    }
+
+    // --- TaskerUnsupportedAction fail-closed ---
+
+    @Test
+    fun taskerUnsupportedActionFailsClosed() = runBlocking {
+        val action = TaskerUnsupportedAction()
+        val result = action.run(ctx(), mapOf("taskerCode" to "999"))
+        assertTrue("unsupported action should fail", result is ActionResult.Failure)
+    }
 }
