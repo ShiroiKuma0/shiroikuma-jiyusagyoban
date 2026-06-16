@@ -1,6 +1,6 @@
 # OpenTasker Roadmap
 
-**Current app version:** 0.2.71
+**Current app version:** 0.2.72
 **Last updated:** 2026-06-16
 
 Items are organized by tier and priority. Completed items are deleted, not checked off. See CHANGELOG.md for shipped work.
@@ -55,7 +55,7 @@ Not started. Add an `app:benchmark` module for cold start, service start latency
 
 ### N9 - Documentation truth pass
 
-README and UX polish docs synced for v0.2.71. F-Droid readiness docs refreshed locally. ARCHITECTURE.md and IMPROVEMENT_PLAN.md are current. Remaining: sync any version strings missed in non-tracked docs.
+README and UX polish docs synced for v0.2.72. F-Droid readiness docs refreshed locally. ARCHITECTURE.md and IMPROVEMENT_PLAN.md are current. Remaining: sync any version strings missed in non-tracked docs.
 
 ### N10 - Target-SDK-36 adaptive layout and intent hardening rehearsal
 
