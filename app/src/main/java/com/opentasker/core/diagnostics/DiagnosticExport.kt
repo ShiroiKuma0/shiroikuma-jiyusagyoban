@@ -71,7 +71,7 @@ object DiagnosticExport {
         return sb.toString()
     }
 
-    private fun redactSensitive(text: String): String {
+    internal fun redactSensitive(text: String): String {
         return text
             .replace(Regex("""(?i)(password|secret|token|key|auth)\s*[:=]\s*\S+"""), "$1=[REDACTED]")
             .replace(Regex("""\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b"""), "[REDACTED-CARD]")

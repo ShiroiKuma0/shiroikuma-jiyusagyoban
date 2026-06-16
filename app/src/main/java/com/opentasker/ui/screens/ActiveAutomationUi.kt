@@ -1,6 +1,7 @@
 package com.opentasker.ui.screens
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -95,6 +96,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.withTransaction
 import com.opentasker.app.BuildConfig
 import com.opentasker.core.actions.ActionField
+import com.opentasker.core.diagnostics.DiagnosticExport
 import com.opentasker.core.actions.ActionMetadata
 import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.actions.FieldType
@@ -586,6 +588,23 @@ class ActiveAutomationViewModel(
             maxEntries = policy.maxEntries,
             minimumTimestamp = policy.minimumTimestamp(System.currentTimeMillis()),
         )
+
+    fun shareDiagnosticReport() {
+        viewModelScope.launch {
+            try {
+                val report = DiagnosticExport.buildReport(appContext, db)
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_SUBJECT, "OpenTasker Diagnostic Report")
+                    putExtra(Intent.EXTRA_TEXT, report)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                appContext.startActivity(Intent.createChooser(intent, "Share diagnostic report").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            } catch (ex: Exception) {
+                events.send("Error: ${ex.message ?: "Failed to share diagnostic report"}")
+            }
+        }
+    }
 
     fun createDatabaseBackup() {
         viewModelScope.launch {
@@ -1163,6 +1182,7 @@ fun ActiveAutomationUi(
                 tasks = tasks,
                 retentionPolicy = runLogRetentionPolicy,
                 onRetentionPolicyChange = viewModel::updateRunLogRetention,
+                onShareDiagnostic = viewModel::shareDiagnosticReport,
                 contentPadding = innerPadding,
             )
         }
@@ -2080,6 +2100,7 @@ private fun RunLogScreenContent(
     tasks: List<Task>,
     retentionPolicy: RunLogRetentionPolicy,
     onRetentionPolicyChange: (RunLogRetentionPolicy) -> Unit,
+    onShareDiagnostic: () -> Unit,
     contentPadding: PaddingValues,
 ) {
     var statusFilterOrdinal by rememberSaveable { mutableIntStateOf(0) }
@@ -2107,7 +2128,7 @@ private fun RunLogScreenContent(
             }
         } else {
             item {
-                RunLogSummaryCard(logs)
+                RunLogSummaryCard(logs, onShareDiagnostic)
             }
         }
         item {
@@ -2341,7 +2362,7 @@ private fun RunLogFilterChip(
 }
 
 @Composable
-private fun RunLogSummaryCard(logs: List<RunLogEntry>) {
+private fun RunLogSummaryCard(logs: List<RunLogEntry>, onShareDiagnostic: () -> Unit = {}) {
     val outcomes = remember(logs) { logs.map { it.outcome() } }
     val failures = outcomes.count { it == RunLogOutcome.Failed }
     val skipped = outcomes.count { it == RunLogOutcome.Skipped }
@@ -2388,6 +2409,12 @@ private fun RunLogSummaryCard(logs: List<RunLogEntry>) {
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            OutlinedButton(
+                onClick = onShareDiagnostic,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Share diagnostic report")
             }
         }
     }
