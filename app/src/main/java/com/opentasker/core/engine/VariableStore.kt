@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap
  * Enhanced with operator support:
  *   - Math: %VAR(+5), %VAR(*2), %VAR(//), %VAR(/round)
  *   - Strings: %VAR(upper), %VAR(lower), %VAR(trim), %VAR(substring:0:5)
- *   - Regex: %VAR(regex:pattern:group), %VAR(replace:pattern:replacement)
+ *   - Linear-time regex: %VAR(regex:pattern:group), %VAR(replace:pattern:replacement)
  *   - Arrays: %list(#), %list(1), %list()
  *   - JSON: %json.path.to.field
  */
