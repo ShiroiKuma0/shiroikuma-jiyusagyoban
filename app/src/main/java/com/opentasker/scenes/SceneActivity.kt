@@ -228,7 +228,7 @@ private fun SceneCard(
 }
 
 @Composable
-private fun SceneElementView(
+internal fun SceneElementView(
     element: SceneElement,
     onRunTask: (Long) -> Unit,
     onSetVar: (name: String, value: String) -> Unit,

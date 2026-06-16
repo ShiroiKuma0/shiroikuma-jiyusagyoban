@@ -90,6 +90,7 @@ import com.opentasker.core.scenes.SceneElementDrafts
 import com.opentasker.core.scenes.SceneIssue
 import com.opentasker.core.scenes.SceneIssueSeverity
 import com.opentasker.core.scenes.SceneValidator
+import com.opentasker.scenes.SceneElementView
 
 @Composable
 fun SceneLibraryScreen(
@@ -413,6 +414,11 @@ private fun SceneCard(
                             onMoveElement(index, element.copy(xDp = xDp, yDp = yDp))
                         }
                     },
+                    onResizeElement = { index, widthDp, heightDp ->
+                        scene.elements.getOrNull(index)?.let { element ->
+                            onMoveElement(index, element.copy(widthDp = widthDp, heightDp = heightDp))
+                        }
+                    },
                 )
 
                 OutlinedButton(onClick = onAddElement, modifier = Modifier.fillMaxWidth()) {
@@ -454,6 +460,7 @@ private fun SceneCard(
 private fun ScenePreviewBox(
     scene: Scene,
     onMoveElement: (Int, Int, Int) -> Unit,
+    onResizeElement: (Int, Int, Int) -> Unit,
 ) {
     Surface(
         modifier = Modifier
@@ -495,6 +502,7 @@ private fun ScenePreviewBox(
                                     canvasWidth = canvasWidth,
                                     canvasHeight = canvasHeight,
                                     onMoveElement = onMoveElement,
+                                    onResizeElement = onResizeElement,
                                 )
                             }
                         }
@@ -513,11 +521,14 @@ private fun SceneCanvasElement(
     canvasWidth: Float,
     canvasHeight: Float,
     onMoveElement: (Int, Int, Int) -> Unit,
+    onResizeElement: (Int, Int, Int) -> Unit,
 ) {
     val element = projection.element
     val density = LocalDensity.current
     var dragX by remember(scene.id, element.id, projection.x, projection.y) { mutableStateOf(0f) }
     var dragY by remember(scene.id, element.id, projection.x, projection.y) { mutableStateOf(0f) }
+    var resizeW by remember(scene.id, element.id, projection.width, projection.height) { mutableStateOf(0f) }
+    var resizeH by remember(scene.id, element.id, projection.width, projection.height) { mutableStateOf(0f) }
     val color = when (element.type) {
         SceneElementType.BUTTON -> MaterialTheme.colorScheme.primary
         SceneElementType.TEXT -> MaterialTheme.colorScheme.tertiary
@@ -525,50 +536,94 @@ private fun SceneCanvasElement(
         SceneElementType.IMAGE -> MaterialTheme.colorScheme.error
         else -> MaterialTheme.colorScheme.primary
     }
-    Surface(
-        modifier = Modifier
+    Box(
+        Modifier
             .offset(x = (projection.x + dragX).dp, y = (projection.y + dragY).dp)
             .size(
-                width = projection.width.coerceAtLeast(12f).dp,
-                height = projection.height.coerceAtLeast(12f).dp,
-            )
-            .pointerInput(scene.id, element.id, projection.x, projection.y, canvasWidth, canvasHeight, density.density) {
-                detectDragGestures(
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        dragX += dragAmount.x / density.density
-                        dragY += dragAmount.y / density.density
-                    },
-                    onDragEnd = {
-                        val (xDp, yDp) = SceneCanvasProjector.scenePositionForCanvasOffset(
-                            scene = scene,
-                            element = element,
-                            canvasX = projection.x + dragX,
-                            canvasY = projection.y + dragY,
-                            canvasWidth = canvasWidth,
-                            canvasHeight = canvasHeight,
-                        )
-                        dragX = 0f
-                        dragY = 0f
-                        onMoveElement(index, xDp, yDp)
-                    },
-                    onDragCancel = {
-                        dragX = 0f
-                        dragY = 0f
-                    },
-                )
-            },
-        color = color.copy(alpha = 0.14f),
-        shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.52f)),
+                width = (projection.width + resizeW).coerceAtLeast(12f).dp,
+                height = (projection.height + resizeH).coerceAtLeast(12f).dp,
+            ),
     ) {
-        Box(Modifier.fillMaxSize().padding(4.dp), contentAlignment = Alignment.Center) {
-            Text(
-                text = sceneElementSummary(element) ?: sceneElementTypeLabel(element.type),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(scene.id, element.id, projection.x, projection.y, canvasWidth, canvasHeight, density.density) {
+                    detectDragGestures(
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            dragX += dragAmount.x / density.density
+                            dragY += dragAmount.y / density.density
+                        },
+                        onDragEnd = {
+                            val (xDp, yDp) = SceneCanvasProjector.scenePositionForCanvasOffset(
+                                scene = scene,
+                                element = element,
+                                canvasX = projection.x + dragX,
+                                canvasY = projection.y + dragY,
+                                canvasWidth = canvasWidth,
+                                canvasHeight = canvasHeight,
+                            )
+                            dragX = 0f
+                            dragY = 0f
+                            onMoveElement(index, xDp, yDp)
+                        },
+                        onDragCancel = {
+                            dragX = 0f
+                            dragY = 0f
+                        },
+                    )
+                },
+            color = color.copy(alpha = 0.14f),
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(1.dp, color.copy(alpha = 0.52f)),
+        ) {
+            Box(Modifier.fillMaxSize().padding(4.dp), contentAlignment = Alignment.Center) {
+                Text(
+                    text = sceneElementSummary(element) ?: sceneElementTypeLabel(element.type),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        // Bottom-right resize grip: drag to change the element's width/height (top-left stays put).
+        Box(
+            Modifier
+                .align(Alignment.BottomEnd)
+                .size(18.dp)
+                .pointerInput(scene.id, element.id, projection.width, projection.height, canvasWidth, canvasHeight, density.density) {
+                    detectDragGestures(
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            resizeW += dragAmount.x / density.density
+                            resizeH += dragAmount.y / density.density
+                        },
+                        onDragEnd = {
+                            val (wDp, hDp) = SceneCanvasProjector.sceneSizeForCanvasSize(
+                                scene = scene,
+                                element = element,
+                                canvasW = projection.width + resizeW,
+                                canvasH = projection.height + resizeH,
+                                canvasWidth = canvasWidth,
+                                canvasHeight = canvasHeight,
+                            )
+                            resizeW = 0f
+                            resizeH = 0f
+                            onResizeElement(index, wDp, hDp)
+                        },
+                        onDragCancel = {
+                            resizeW = 0f
+                            resizeH = 0f
+                        },
+                    )
+                },
+            contentAlignment = Alignment.BottomEnd,
+        ) {
+            Box(
+                Modifier
+                    .size(12.dp)
+                    .background(color.copy(alpha = 0.9f), RoundedCornerShape(topStart = 7.dp, bottomEnd = 8.dp)),
             )
         }
     }
@@ -743,12 +798,55 @@ private fun SceneElementEditorDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (state.index == null) "Add Element" else "Edit Element") },
         text = {
-            Column(
-                modifier = Modifier
-                    .heightIn(max = 560.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
+            // Live preview: render the element exactly as the runtime would, from the current
+            // in-dialog state, so style/colour/size/text edits show immediately. Pinned above the
+            // scrolling field list.
+            val previewWidth = (parsedWidth ?: initial.widthDp).coerceIn(8, 280)
+            val previewHeight = (parsedHeight ?: initial.heightDp).coerceIn(8, 160)
+            val previewElement = SceneElement(
+                id = initial.id,
+                type = type,
+                xDp = 0,
+                yDp = 0,
+                widthDp = previewWidth,
+                heightDp = previewHeight,
+                config = elementConfig(
+                    type, label, sliderMin, sliderMax, sliderValue, sliderVar, sliderVertical, boolValue,
+                    textValue, spinnerOptions, shapeCorner, imageSource,
+                    SceneElementStyle(styleTextColor, styleBgColor, styleSize, styleBold, styleAlign, styleBorderColor, styleBorderWidth),
+                ),
+                tapTaskId = null,
+                longPressTaskId = null,
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Live preview", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = state.scene.bgColor
+                        ?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() }
+                        ?: MaterialTheme.colorScheme.background,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 84.dp)
+                            .padding(12.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(Modifier.size(previewWidth.dp, previewHeight.dp)) {
+                            SceneElementView(previewElement, onRunTask = {}, onSetVar = { _, _ -> })
+                        }
+                    }
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                 SceneElementTypeSelector(
                     selected = type,
                     onSelect = { selected ->
@@ -1035,6 +1133,7 @@ private fun SceneElementEditorDialog(
                     selectedTaskId = longPressTaskId,
                     onSelect = { longPressTaskId = it },
                 )
+                }
             }
         },
         confirmButton = {
