@@ -270,6 +270,10 @@ object TaskerXmlImporter {
         )
 
     private fun parseDocument(rawXml: String): Document {
+        // A 白い熊 自由作業盤 JSON bundle imported here by mistake parses as garbage XML; say so clearly.
+        if (rawXml.trimStart().firstOrNull().let { it == '{' || it == '[' }) {
+            throw IllegalArgumentException("This looks like a 白い熊 自由作業盤 JSON bundle, not a Tasker XML export — use \"Import JSON\" instead.")
+        }
         val factory = DocumentBuilderFactory.newInstance().apply {
             isNamespaceAware = false
             isExpandEntityReferences = false
