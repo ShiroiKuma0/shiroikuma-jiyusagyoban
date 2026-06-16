@@ -173,6 +173,13 @@ private val DATABASE_BACKUP_MIME_TYPES = arrayOf(
     "application/vnd.sqlite3",
     "*/*",
 )
+private const val NO_DIALOG_ENTITY_ID = 0L
+private const val NO_DIALOG_INDEX = -1
+private const val DELETE_TARGET_PROFILE = "profile"
+private const val DELETE_TARGET_TASK = "task"
+private const val DELETE_TARGET_SCENE = "scene"
+private const val DELETE_TARGET_ACTION = "action"
+private const val DELETE_TARGET_CONTEXT = "context"
 
 private fun databaseBackupExportName(): String =
     "opentasker_backup_${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())}.db"
@@ -729,17 +736,23 @@ fun ActiveAutomationUi(
     val scope = rememberCoroutineScope()
     var screenOrdinal by rememberSaveable { mutableIntStateOf(0) }
     val screen = OpenTaskerScreen.entries.getOrElse(screenOrdinal) { OpenTaskerScreen.Profiles }
-    var taskDialog by remember { mutableStateOf<Task?>(null) }
-    var showCreateTaskDialog by remember { mutableStateOf(false) }
-    var profileDialog by remember { mutableStateOf<Profile?>(null) }
-    var showCreateProfileDialog by remember { mutableStateOf(false) }
-    var showTemplateDialog by remember { mutableStateOf(false) }
-    var selectedTemplate by remember { mutableStateOf<ProfileTemplate?>(null) }
-    var actionPickerTask by remember { mutableStateOf<Task?>(null) }
-    var actionEdit by remember { mutableStateOf<ActionEditState?>(null) }
-    var contextPickerProfile by remember { mutableStateOf<Profile?>(null) }
-    var contextEdit by remember { mutableStateOf<ContextEditState?>(null) }
-    var pendingDelete by remember { mutableStateOf<DeleteTarget?>(null) }
+    var taskDialogId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
+    var showCreateTaskDialog by rememberSaveable { mutableStateOf(false) }
+    var profileDialogId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
+    var showCreateProfileDialog by rememberSaveable { mutableStateOf(false) }
+    var showTemplateDialog by rememberSaveable { mutableStateOf(false) }
+    var selectedTemplateId by rememberSaveable { mutableStateOf<String?>(null) }
+    var actionPickerTaskId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
+    var actionEditTaskId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
+    var actionEditActionId by rememberSaveable { mutableStateOf<String?>(null) }
+    var actionEditIndex by rememberSaveable { mutableIntStateOf(NO_DIALOG_INDEX) }
+    var contextPickerProfileId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
+    var contextEditProfileId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
+    var contextEditTypeName by rememberSaveable { mutableStateOf<String?>(null) }
+    var contextEditIndex by rememberSaveable { mutableIntStateOf(NO_DIALOG_INDEX) }
+    var pendingDeleteKind by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingDeleteOwnerId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
+    var pendingDeleteIndex by rememberSaveable { mutableIntStateOf(NO_DIALOG_INDEX) }
     val taskerImportReview by viewModel.taskerImportReview.collectAsState()
     val taskerImportBusy by viewModel.taskerImportBusy.collectAsState()
     val openTaskerBundleReview by viewModel.openTaskerBundleReview.collectAsState()
@@ -763,13 +776,135 @@ fun ActiveAutomationUi(
     val databaseBackupImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.importDatabaseBackup(it) }
     }
+    val taskDialog = taskDialogId.takeIf { it != NO_DIALOG_ENTITY_ID }
+        ?.let { taskId -> tasks.firstOrNull { it.id == taskId } }
+    val profileDialog = profileDialogId.takeIf { it != NO_DIALOG_ENTITY_ID }
+        ?.let { profileId -> profiles.firstOrNull { it.id == profileId } }
+    val selectedTemplate = selectedTemplateId
+        ?.let { templateId -> ProfileTemplateCatalog.all.firstOrNull { it.id == templateId } }
+    val actionPickerTask = actionPickerTaskId.takeIf { it != NO_DIALOG_ENTITY_ID }
+        ?.let { taskId -> tasks.firstOrNull { it.id == taskId } }
+    val actionEdit = actionEditTaskId.takeIf { it != NO_DIALOG_ENTITY_ID }?.let { taskId ->
+        val task = tasks.firstOrNull { it.id == taskId } ?: return@let null
+        val actionId = actionEditActionId ?: return@let null
+        val metadata = ActionMetadataRegistry.get(actionId) ?: return@let null
+        val index = actionEditIndex.takeIf { it != NO_DIALOG_INDEX }
+        val existing = index?.let { task.actions.getOrNull(it) }?.takeIf { it.type == actionId }
+        if (index != null && existing == null) {
+            null
+        } else {
+            ActionEditState(task = task, metadata = metadata, index = index, existing = existing)
+        }
+    }
+    val contextPickerProfile = contextPickerProfileId.takeIf { it != NO_DIALOG_ENTITY_ID }
+        ?.let { profileId -> profiles.firstOrNull { it.id == profileId } }
+    val contextEdit = contextEditProfileId.takeIf { it != NO_DIALOG_ENTITY_ID }?.let { profileId ->
+        val profile = profiles.firstOrNull { it.id == profileId } ?: return@let null
+        val type = contextEditTypeName
+            ?.let { typeName -> runCatching { ContextType.valueOf(typeName) }.getOrNull() }
+            ?: return@let null
+        val index = contextEditIndex.takeIf { it != NO_DIALOG_INDEX }
+        val existing = index?.let { profile.contexts.getOrNull(it) }?.takeIf { it.type == type }
+        if (index != null && existing == null) {
+            null
+        } else {
+            ContextEditState(profile = profile, type = type, index = index, existing = existing)
+        }
+    }
+    val pendingDelete = when (pendingDeleteKind) {
+        DELETE_TARGET_PROFILE -> profiles.firstOrNull { it.id == pendingDeleteOwnerId }
+            ?.let { DeleteTarget.ProfileTarget(it) }
+        DELETE_TARGET_TASK -> tasks.firstOrNull { it.id == pendingDeleteOwnerId }
+            ?.let { DeleteTarget.TaskTarget(it) }
+        DELETE_TARGET_SCENE -> scenes.firstOrNull { it.id == pendingDeleteOwnerId }
+            ?.let { DeleteTarget.SceneTarget(it) }
+        DELETE_TARGET_ACTION -> tasks.firstOrNull { it.id == pendingDeleteOwnerId }
+            ?.let { task -> task.actions.getOrNull(pendingDeleteIndex)?.let { DeleteTarget.ActionTarget(task, pendingDeleteIndex, it) } }
+        DELETE_TARGET_CONTEXT -> profiles.firstOrNull { it.id == pendingDeleteOwnerId }
+            ?.let { profile -> profile.contexts.getOrNull(pendingDeleteIndex)?.let { DeleteTarget.ContextTarget(profile, pendingDeleteIndex, it) } }
+        else -> null
+    }
+    fun clearPendingDelete() {
+        pendingDeleteKind = null
+        pendingDeleteOwnerId = NO_DIALOG_ENTITY_ID
+        pendingDeleteIndex = NO_DIALOG_INDEX
+    }
+    fun openTaskDialog(task: Task) {
+        taskDialogId = task.id
+    }
+    fun clearTaskDialog() {
+        taskDialogId = NO_DIALOG_ENTITY_ID
+    }
+    fun openProfileDialog(profile: Profile) {
+        profileDialogId = profile.id
+    }
+    fun clearProfileDialog() {
+        profileDialogId = NO_DIALOG_ENTITY_ID
+    }
+    fun openActionPicker(task: Task) {
+        actionPickerTaskId = task.id
+    }
+    fun clearActionPicker() {
+        actionPickerTaskId = NO_DIALOG_ENTITY_ID
+    }
+    fun openActionEdit(task: Task, metadata: ActionMetadata, index: Int? = null) {
+        actionEditTaskId = task.id
+        actionEditActionId = metadata.id
+        actionEditIndex = index ?: NO_DIALOG_INDEX
+    }
+    fun clearActionEdit() {
+        actionEditTaskId = NO_DIALOG_ENTITY_ID
+        actionEditActionId = null
+        actionEditIndex = NO_DIALOG_INDEX
+    }
+    fun openContextPicker(profile: Profile) {
+        contextPickerProfileId = profile.id
+    }
+    fun clearContextPicker() {
+        contextPickerProfileId = NO_DIALOG_ENTITY_ID
+    }
+    fun openContextEdit(profile: Profile, type: ContextType, index: Int? = null) {
+        contextEditProfileId = profile.id
+        contextEditTypeName = type.name
+        contextEditIndex = index ?: NO_DIALOG_INDEX
+    }
+    fun clearContextEdit() {
+        contextEditProfileId = NO_DIALOG_ENTITY_ID
+        contextEditTypeName = null
+        contextEditIndex = NO_DIALOG_INDEX
+    }
+    fun openDeleteProfile(profile: Profile) {
+        pendingDeleteKind = DELETE_TARGET_PROFILE
+        pendingDeleteOwnerId = profile.id
+        pendingDeleteIndex = NO_DIALOG_INDEX
+    }
+    fun openDeleteTask(task: Task) {
+        pendingDeleteKind = DELETE_TARGET_TASK
+        pendingDeleteOwnerId = task.id
+        pendingDeleteIndex = NO_DIALOG_INDEX
+    }
+    fun openDeleteScene(scene: Scene) {
+        pendingDeleteKind = DELETE_TARGET_SCENE
+        pendingDeleteOwnerId = scene.id
+        pendingDeleteIndex = NO_DIALOG_INDEX
+    }
+    fun openDeleteAction(task: Task, index: Int) {
+        pendingDeleteKind = DELETE_TARGET_ACTION
+        pendingDeleteOwnerId = task.id
+        pendingDeleteIndex = index
+    }
+    fun openDeleteContext(profile: Profile, index: Int) {
+        pendingDeleteKind = DELETE_TARGET_CONTEXT
+        pendingDeleteOwnerId = profile.id
+        pendingDeleteIndex = index
+    }
     val openFlowTarget: (AutomationFlowTarget) -> Unit = { target ->
         var opened = true
         when (target) {
             is AutomationFlowTarget.Profile -> {
                 profiles.firstOrNull { it.id == target.profileId }?.let { profile ->
                     screenOrdinal = OpenTaskerScreen.Profiles.ordinal
-                    profileDialog = profile
+                    openProfileDialog(profile)
                 } ?: run { opened = false }
             }
 
@@ -778,7 +913,7 @@ fun ActiveAutomationUi(
                 val contextSpec = profile?.contexts?.getOrNull(target.index)
                 if (profile != null && contextSpec != null) {
                     screenOrdinal = OpenTaskerScreen.Profiles.ordinal
-                    contextEdit = ContextEditState(profile, contextSpec.type, target.index, contextSpec)
+                    openContextEdit(profile, contextSpec.type, target.index)
                 } else {
                     opened = false
                 }
@@ -787,7 +922,7 @@ fun ActiveAutomationUi(
             is AutomationFlowTarget.Task -> {
                 tasks.firstOrNull { it.id == target.taskId }?.let { task ->
                     screenOrdinal = OpenTaskerScreen.Tasks.ordinal
-                    taskDialog = task
+                    openTaskDialog(task)
                 } ?: run { opened = false }
             }
 
@@ -797,7 +932,7 @@ fun ActiveAutomationUi(
                 val metadata = action?.let { ActionMetadataRegistry.get(it.type) }
                 if (task != null && action != null && metadata != null) {
                     screenOrdinal = OpenTaskerScreen.Tasks.ordinal
-                    actionEdit = ActionEditState(task, metadata, target.index, action)
+                    openActionEdit(task, metadata, target.index)
                 } else {
                     opened = false
                 }
@@ -936,19 +1071,17 @@ fun ActiveAutomationUi(
                 openTaskerBundleBusy = openTaskerBundleBusy,
                 onImportTaskerXml = { taskerXmlLauncher.launch(TASKER_XML_MIME_TYPES) },
                 taskerImportBusy = taskerImportBusy,
-                onEditProfile = { profileDialog = it },
-                onDeleteProfile = { pendingDelete = DeleteTarget.ProfileTarget(it) },
+                onEditProfile = { openProfileDialog(it) },
+                onDeleteProfile = { openDeleteProfile(it) },
                 onToggleProfile = { profile, enabled ->
                     viewModel.updateProfile(profile.copy(enabled = enabled), "Profile ${if (enabled) "enabled" else "disabled"}")
                 },
-                onAddContext = { contextPickerProfile = it },
+                onAddContext = { openContextPicker(it) },
                 onEditContext = { profile, index, context ->
-                    contextEdit = ContextEditState(profile, context.type, index, context)
+                    openContextEdit(profile, context.type, index)
                 },
                 onDeleteContext = { profile, index ->
-                    profile.contexts.getOrNull(index)?.let { context ->
-                        pendingDelete = DeleteTarget.ContextTarget(profile, index, context)
-                    }
+                    if (profile.contexts.getOrNull(index) != null) openDeleteContext(profile, index)
                 },
                 contentPadding = innerPadding,
             )
@@ -956,20 +1089,18 @@ fun ActiveAutomationUi(
             OpenTaskerScreen.Tasks -> TasksScreen(
                 tasks = tasks,
                 onCreateTask = { showCreateTaskDialog = true },
-                onEditTask = { taskDialog = it },
-                onDeleteTask = { pendingDelete = DeleteTarget.TaskTarget(it) },
+                onEditTask = { openTaskDialog(it) },
+                onDeleteTask = { openDeleteTask(it) },
                 onRunTask = { viewModel.runTaskNow(it) },
                 onPinTask = { viewModel.pinTaskShortcut(it) },
-                onAddAction = { actionPickerTask = it },
+                onAddAction = { openActionPicker(it) },
                 onEditAction = { task, index, action ->
                     ActionMetadataRegistry.get(action.type)?.let { metadata ->
-                        actionEdit = ActionEditState(task, metadata, index, action)
+                        openActionEdit(task, metadata, index)
                     }
                 },
                 onDeleteAction = { task, index ->
-                    task.actions.getOrNull(index)?.let { action ->
-                        pendingDelete = DeleteTarget.ActionTarget(task, index, action)
-                    }
+                    if (task.actions.getOrNull(index) != null) openDeleteAction(task, index)
                 },
                 contentPadding = innerPadding,
             )
@@ -983,7 +1114,7 @@ fun ActiveAutomationUi(
                     val profile = profiles.firstOrNull { it.id == profileId }
                     if (profile != null) {
                         screenOrdinal = OpenTaskerScreen.Profiles.ordinal
-                        contextPickerProfile = profile
+                        openContextPicker(profile)
                     } else {
                         scope.launch { snackbarHostState.showSnackbar("Flow target no longer exists") }
                     }
@@ -992,7 +1123,7 @@ fun ActiveAutomationUi(
                     val task = tasks.firstOrNull { it.id == taskId }
                     if (task != null) {
                         screenOrdinal = OpenTaskerScreen.Tasks.ordinal
-                        actionPickerTask = task
+                        openActionPicker(task)
                     } else {
                         scope.launch { snackbarHostState.showSnackbar("Flow target no longer exists") }
                     }
@@ -1012,7 +1143,7 @@ fun ActiveAutomationUi(
                 tasks = tasks,
                 onCreateScene = viewModel::createScene,
                 onUpdateScene = viewModel::updateScene,
-                onDeleteScene = { pendingDelete = DeleteTarget.SceneTarget(it) },
+                onDeleteScene = { openDeleteScene(it) },
                 contentPadding = innerPadding,
             )
 
@@ -1040,7 +1171,7 @@ fun ActiveAutomationUi(
     pendingDelete?.let { target ->
         DeleteConfirmationDialog(
             target = target,
-            onDismiss = { pendingDelete = null },
+            onDismiss = { clearPendingDelete() },
             onConfirm = {
                 when (target) {
                     is DeleteTarget.ProfileTarget -> viewModel.deleteProfile(target.profile)
@@ -1055,7 +1186,7 @@ fun ActiveAutomationUi(
                         "Context removed",
                     )
                 }
-                pendingDelete = null
+                clearPendingDelete()
             },
         )
     }
@@ -1092,10 +1223,10 @@ fun ActiveAutomationUi(
     taskDialog?.let { task ->
         TaskEditorDialog(
             task = task,
-            onDismiss = { taskDialog = null },
+            onDismiss = { clearTaskDialog() },
             onSave = { name, priority ->
                 viewModel.updateTask(task.copy(name = name.trim(), priority = priority.coerceIn(0, 10)))
-                taskDialog = null
+                clearTaskDialog()
             },
         )
     }
@@ -1117,7 +1248,7 @@ fun ActiveAutomationUi(
             onDismiss = { showTemplateDialog = false },
             onSelect = { template ->
                 showTemplateDialog = false
-                selectedTemplate = template
+                selectedTemplateId = template.id
             },
         )
     }
@@ -1125,10 +1256,10 @@ fun ActiveAutomationUi(
     selectedTemplate?.let { template ->
         TemplateSlotDialog(
             template = template,
-            onDismiss = { selectedTemplate = null },
+            onDismiss = { selectedTemplateId = null },
             onInstall = { values ->
                 viewModel.installProfileTemplate(template, values)
-                selectedTemplate = null
+                selectedTemplateId = null
                 screenOrdinal = OpenTaskerScreen.Profiles.ordinal
             },
         )
@@ -1138,7 +1269,7 @@ fun ActiveAutomationUi(
         ProfileEditorDialog(
             profile = profile,
             tasks = tasks,
-            onDismiss = { profileDialog = null },
+            onDismiss = { clearProfileDialog() },
             onSave = { name, enabled, enterTaskId, cooldown, automationMode ->
                 viewModel.updateProfile(
                     profile.copy(
@@ -1149,17 +1280,17 @@ fun ActiveAutomationUi(
                         automationMode = automationMode,
                     )
                 )
-                profileDialog = null
+                clearProfileDialog()
             },
         )
     }
 
     actionPickerTask?.let { task ->
         ActionPickerDialog(
-            onDismiss = { actionPickerTask = null },
+            onDismiss = { clearActionPicker() },
             onSelect = { metadata ->
-                actionPickerTask = null
-                actionEdit = ActionEditState(task, metadata)
+                clearActionPicker()
+                openActionEdit(task, metadata)
             },
         )
     }
@@ -1167,23 +1298,23 @@ fun ActiveAutomationUi(
     actionEdit?.let { state ->
         ActionConfigDialog(
             state = state,
-            onDismiss = { actionEdit = null },
+            onDismiss = { clearActionEdit() },
             onSave = { action ->
                 val updatedActions = state.index?.let { index ->
                     state.task.actions.mapIndexed { i, existing -> if (i == index) action else existing }
                 } ?: (state.task.actions + action)
                 viewModel.updateTask(state.task.copy(actions = updatedActions), if (state.index == null) "Action added" else "Action updated")
-                actionEdit = null
+                clearActionEdit()
             },
         )
     }
 
     contextPickerProfile?.let { profile ->
         ContextTypePickerDialog(
-            onDismiss = { contextPickerProfile = null },
+            onDismiss = { clearContextPicker() },
             onSelect = { type ->
-                contextPickerProfile = null
-                contextEdit = ContextEditState(profile, type)
+                clearContextPicker()
+                openContextEdit(profile, type)
             },
         )
     }
@@ -1191,7 +1322,7 @@ fun ActiveAutomationUi(
     contextEdit?.let { state ->
         ContextConfigDialog(
             state = state,
-            onDismiss = { contextEdit = null },
+            onDismiss = { clearContextEdit() },
             onSave = { context ->
                 val updatedContexts = state.index?.let { index ->
                     state.profile.contexts.mapIndexed { i, existing -> if (i == index) context else existing }
@@ -1200,7 +1331,7 @@ fun ActiveAutomationUi(
                     state.profile.copy(contexts = updatedContexts),
                     if (state.index == null) "Context added" else "Context updated",
                 )
-                contextEdit = null
+                clearContextEdit()
             },
         )
     }
