@@ -1039,6 +1039,13 @@ fun ActiveAutomationUi(
     val newestFailureTs = remember(runLogs) { runLogs.firstOrNull { !it.success }?.timestamp ?: 0L }
     val showLogBadge = newestFailureTs > lastSeenFailureTs
     val globalVariables by viewModel.globalVariables.collectAsState()
+    // Vars tab honours the project filter: super-globals (projectId 0) are always shown; a selected
+    // project adds its own project-globals. (Variables are stored with projectId 0 or a project id.)
+    val visibleVariables = when (val f = projectFilter) {
+        ProjectFilter.All -> globalVariables
+        ProjectFilter.Unfiled -> globalVariables.filter { it.projectId == 0L }
+        is ProjectFilter.Of -> globalVariables.filter { it.projectId == 0L || it.projectId == f.projectId }
+    }
     val widgetTemplates by com.opentasker.widget.TemplateStore.state.collectAsState()
     val runLogRetentionPolicy = viewModel.runLogRetentionPolicy
     val backupSetupState = viewModel.backupSetupState
@@ -1204,7 +1211,7 @@ fun ActiveAutomationUi(
         // Counts mirror the *visible* (project-filtered) list so the header never disagrees with what's shown.
         OpenTaskerScreen.Profiles -> "${visibleProfiles.count { it.enabled }} enabled - ${visibleProfiles.size} total"
         OpenTaskerScreen.Tasks -> "${visibleTasks.sumOf { it.actions.size }} actions - ${visibleTasks.size} tasks"
-        OpenTaskerScreen.Vars -> "${globalVariables.size} global variables"
+        OpenTaskerScreen.Vars -> "${visibleVariables.size} variables"
         OpenTaskerScreen.Flow -> "${profiles.size} profiles - ${tasks.size} tasks"
         OpenTaskerScreen.Scenes -> "${visibleScenes.sumOf { it.elements.size }} elements - ${visibleScenes.size} scenes"
         OpenTaskerScreen.Widgets -> "${widgetTemplates.size} widget templates"
@@ -1316,7 +1323,7 @@ fun ActiveAutomationUi(
                         OpenTaskerScreen.Tasks -> expandAllControl(expandedTasks, visibleTasks.map { it.id })
                         OpenTaskerScreen.Scenes -> expandAllControl(expandedScenes, visibleScenes.map { it.id })
                         OpenTaskerScreen.Widgets -> expandAllControl(expandedTemplates, widgetTemplates.map { it.name })
-                        OpenTaskerScreen.Vars -> expandAllControl(expandedVars, globalVariables.map { variableKey(it) })
+                        OpenTaskerScreen.Vars -> expandAllControl(expandedVars, visibleVariables.map { variableKey(it) })
                         else -> null
                     }
                     if (expandAll != null) {
@@ -1345,17 +1352,14 @@ fun ActiveAutomationUi(
                             )
                         }
                     }
-                    if (screen == OpenTaskerScreen.Profiles ||
-                        screen == OpenTaskerScreen.Tasks ||
-                        screen == OpenTaskerScreen.Scenes
-                    ) {
-                        ProjectSwitcher(
-                            filter = projectFilter,
-                            projects = projects,
-                            onSelect = { viewModel.selectProject(it) },
-                            onManage = { showProjectManagement = true },
-                        )
-                    }
+                    // Project selector is shown on every tab so the top bar is uniform. It always sets
+                    // the active project (where new items land); on non-project tabs it doesn't filter.
+                    ProjectSwitcher(
+                        filter = projectFilter,
+                        projects = projects,
+                        onSelect = { viewModel.selectProject(it) },
+                        onManage = { showProjectManagement = true },
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
@@ -1634,7 +1638,7 @@ fun ActiveAutomationUi(
             )
 
             OpenTaskerScreen.Vars -> VariablesScreen(
-                variables = globalVariables,
+                variables = visibleVariables,
                 contentPadding = innerPadding,
                 onUpdate = viewModel::updateVariable,
                 onDelete = viewModel::deleteVariable,
@@ -1643,7 +1647,7 @@ fun ActiveAutomationUi(
                 selectedKeys = selectedVarKeys,
                 onLongPressVar = { selectedVarKeys = selectedVarKeys + variableKey(it) },
                 onToggleSelectVar = { val k = variableKey(it); selectedVarKeys = if (k in selectedVarKeys) selectedVarKeys - k else selectedVarKeys + k },
-                onSelectAllVars = { selectedVarKeys = globalVariables.map { variableKey(it) }.toSet() },
+                onSelectAllVars = { selectedVarKeys = visibleVariables.map { variableKey(it) }.toSet() },
                 onClearVarSelection = { selectedVarKeys = emptySet() },
                 onDeleteSelectedVars = { confirmDeleteSelectedVars = true },
             )
