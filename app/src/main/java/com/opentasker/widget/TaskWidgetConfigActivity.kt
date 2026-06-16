@@ -28,12 +28,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.isSystemInDarkTheme
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.model.Task
 import com.opentasker.ui.theme.OpenTaskerTheme
-import com.opentasker.ui.theme.ThemeMode
-import com.opentasker.ui.theme.ThemePreference
+import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.flow.map
 
 class TaskWidgetConfigActivity : ComponentActivity() {
@@ -58,14 +56,8 @@ class TaskWidgetConfigActivity : ComponentActivity() {
             .map { entities -> entities.map { it.toDomain() } }
 
         setContent {
-            val themeMode by ThemePreference.observe(this).collectAsState(initial = ThemeMode.System)
-            val darkTheme = when (themeMode) {
-                ThemeMode.Dark -> true
-                ThemeMode.Light -> false
-                ThemeMode.HighContrast -> true
-                ThemeMode.System -> isSystemInDarkTheme()
-            }
-            OpenTaskerTheme(darkTheme = darkTheme, highContrast = themeMode == ThemeMode.HighContrast) {
+            val themePrefs by ThemeStore.state.collectAsState()
+            OpenTaskerTheme(prefs = themePrefs) {
                 val tasks by tasksFlow.collectAsState(initial = emptyList())
                 ConfigScreen(tasks = tasks, onTaskSelected = ::onTaskPicked)
             }
