@@ -1,6 +1,8 @@
 package com.opentasker.core.engine
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class VariableStoreTest {
@@ -71,6 +73,29 @@ class VariableStoreTest {
 
         assertEquals("", store.expand("%text(regex:(?<=a)b:0)"))
         assertEquals("ab", store.expand("%text(replace:(?<=a)b:x)"))
+    }
+
+    @Test
+    fun conditionParserHandlesOrderedOperatorsAndLogic() {
+        val store = VariableStore().apply {
+            set("mode", "on")
+            set("battery", "50")
+            set("wifi", "off")
+        }
+
+        assertTrue(store.evaluateCondition("%battery <= 50"))
+        assertTrue(store.evaluateCondition("%mode == on && %battery <= 50"))
+        assertTrue(store.evaluateCondition("%mode == off || %battery < 60"))
+        assertTrue(store.evaluateCondition("(%mode == on && %battery <= 50) || %wifi == on"))
+        assertFalse(store.evaluateCondition("%mode == on && %battery > 60"))
+    }
+
+    @Test
+    fun conditionParserFailsClosedForUnjoinedCompoundComparisons() {
+        val store = VariableStore()
+
+        assertFalse(store.evaluateCondition("1 <= 2 != false"))
+        assertFalse(store.evaluateCondition("a == a == a"))
     }
 
     private fun regexEvalThreadCount(): Int =

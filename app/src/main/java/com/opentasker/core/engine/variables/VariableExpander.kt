@@ -204,42 +204,104 @@ class VariableExpander {
         }
 
     private fun evaluateConditionInternal(cond: String, store: VariableStore, arrays: ArrayStore): Boolean {
-        // Simple comparison operators: ==, !=, <, >, <=, >=
-        return when {
-            cond.contains("==") -> {
-                val (left, right) = cond.split("==", limit = 2).map { it.trim() }
-                expandInternal(left, store, arrays) == expandInternal(right, store, arrays)
-            }
-            cond.contains("!=") -> {
-                val (left, right) = cond.split("!=", limit = 2).map { it.trim() }
-                expandInternal(left, store, arrays) != expandInternal(right, store, arrays)
-            }
-            cond.contains("<=") -> {
-                val (left, right) = cond.split("<=", limit = 2).map { it.trim() }
-                val l = expandInternal(left, store, arrays).toDoubleOrNull() ?: return false
-                val r = expandInternal(right, store, arrays).toDoubleOrNull() ?: return false
-                l <= r
-            }
-            cond.contains(">=") -> {
-                val (left, right) = cond.split(">=", limit = 2).map { it.trim() }
-                val l = expandInternal(left, store, arrays).toDoubleOrNull() ?: return false
-                val r = expandInternal(right, store, arrays).toDoubleOrNull() ?: return false
-                l >= r
-            }
-            cond.contains("<") -> {
-                val (left, right) = cond.split("<", limit = 2).map { it.trim() }
-                val l = expandInternal(left, store, arrays).toDoubleOrNull() ?: return false
-                val r = expandInternal(right, store, arrays).toDoubleOrNull() ?: return false
-                l < r
-            }
-            cond.contains(">") -> {
-                val (left, right) = cond.split(">", limit = 2).map { it.trim() }
-                val l = expandInternal(left, store, arrays).toDoubleOrNull() ?: return false
-                val r = expandInternal(right, store, arrays).toDoubleOrNull() ?: return false
-                l > r
-            }
-            else -> cond.toBoolean()
+        val normalized = stripOuterParens(cond.trim())
+        if (normalized.isEmpty()) return false
+
+        splitTopLevel(normalized, "||")?.let { parts ->
+            return parts.any { evaluateConditionInternal(it, store, arrays) }
         }
+        splitTopLevel(normalized, "&&")?.let { parts ->
+            return parts.all { evaluateConditionInternal(it, store, arrays) }
+        }
+
+        val comparison = parseComparison(normalized) ?: return normalized.toBoolean()
+        val left = expandInternal(comparison.left, store, arrays)
+        val right = expandInternal(comparison.right, store, arrays)
+
+        return when (comparison.operator) {
+            ComparisonOperator.EQ -> left == right
+            ComparisonOperator.NE -> left != right
+            ComparisonOperator.LE -> compareNumbers(left, right) { l, r -> l <= r }
+            ComparisonOperator.GE -> compareNumbers(left, right) { l, r -> l >= r }
+            ComparisonOperator.LT -> compareNumbers(left, right) { l, r -> l < r }
+            ComparisonOperator.GT -> compareNumbers(left, right) { l, r -> l > r }
+        }
+    }
+
+    private fun splitTopLevel(expr: String, delimiter: String): List<String>? {
+        val parts = mutableListOf<String>()
+        var depth = 0
+        var partStart = 0
+        var index = 0
+        while (index < expr.length) {
+            when (expr[index]) {
+                '(' -> depth++
+                ')' -> if (depth > 0) depth--
+            }
+            if (depth == 0 && expr.startsWith(delimiter, index)) {
+                parts += expr.substring(partStart, index).trim()
+                index += delimiter.length
+                partStart = index
+                continue
+            }
+            index++
+        }
+        if (parts.isEmpty()) return null
+        parts += expr.substring(partStart).trim()
+        return parts
+    }
+
+    private fun stripOuterParens(expr: String): String {
+        var result = expr
+        while (result.length >= 2 && result.first() == '(' && matchingCloseParen(result, 0) == result.lastIndex) {
+            result = result.substring(1, result.lastIndex).trim()
+        }
+        return result
+    }
+
+    private fun matchingCloseParen(expr: String, openIndex: Int): Int {
+        var depth = 0
+        for (index in openIndex until expr.length) {
+            when (expr[index]) {
+                '(' -> depth++
+                ')' -> {
+                    depth--
+                    if (depth == 0) return index
+                }
+            }
+        }
+        return -1
+    }
+
+    private fun parseComparison(expr: String): ConditionComparison? {
+        val matches = mutableListOf<ConditionComparison>()
+        var depth = 0
+        var index = 0
+        while (index < expr.length) {
+            when (expr[index]) {
+                '(' -> depth++
+                ')' -> if (depth > 0) depth--
+            }
+            if (depth == 0) {
+                val operator = COMPARISON_OPERATORS.firstOrNull { expr.startsWith(it.token, index) }
+                if (operator != null) {
+                    val left = expr.substring(0, index).trim()
+                    val right = expr.substring(index + operator.token.length).trim()
+                    if (left.isEmpty() || right.isEmpty()) return null
+                    matches += ConditionComparison(left, operator, right)
+                    index += operator.token.length
+                    continue
+                }
+            }
+            index++
+        }
+        return matches.singleOrNull()
+    }
+
+    private fun compareNumbers(left: String, right: String, predicate: (Double, Double) -> Boolean): Boolean {
+        val l = left.toDoubleOrNull() ?: return false
+        val r = right.toDoubleOrNull() ?: return false
+        return predicate(l, r)
     }
 
     private fun evaluateJsonPath(json: String, path: String): String {
@@ -307,8 +369,31 @@ class VariableExpander {
         val nextIndex: Int,
     )
 
+    private data class ConditionComparison(
+        val left: String,
+        val operator: ComparisonOperator,
+        val right: String,
+    )
+
+    private enum class ComparisonOperator(val token: String) {
+        EQ("=="),
+        NE("!="),
+        LE("<="),
+        GE(">="),
+        LT("<"),
+        GT(">"),
+    }
+
     companion object {
         private val TERNARY_PATTERN = Regex("""^\(([^)]+)\)\s*\?\s*([^:]+)\s*:\s*(.+)$""")
+        private val COMPARISON_OPERATORS = listOf(
+            ComparisonOperator.EQ,
+            ComparisonOperator.NE,
+            ComparisonOperator.LE,
+            ComparisonOperator.GE,
+            ComparisonOperator.LT,
+            ComparisonOperator.GT,
+        )
         private const val MAX_REGEX_LENGTH = 256
         private const val MAX_REGEX_INPUT_LENGTH = 10_000
 
