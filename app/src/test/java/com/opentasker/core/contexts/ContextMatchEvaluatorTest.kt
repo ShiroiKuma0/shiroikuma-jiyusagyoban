@@ -277,4 +277,101 @@ class ContextMatchEvaluatorTest {
         assertFalse(ContextMatchEvaluator.matches(offsetSpec, event))
         assertFalse(ContextMatchEvaluator.matches(wrongEventSpec, event))
     }
+
+    @Test
+    fun pluginContextSourceKeyIsPlugin() {
+        assertEquals("plugin", ContextMatchEvaluator.sourceKey(ContextType.PLUGIN))
+    }
+
+    @Test
+    fun pluginContextMatchesSatisfiedResultForConfiguredPackage() {
+        val spec = ContextSpec(
+            ContextType.PLUGIN,
+            mapOf("package" to "com.example.plugin", "bundleJson" to "{\"key\":\"val\"}"),
+        )
+        val satisfied = ContextEvent("plugin", true, mapOf(
+            "package" to "com.example.plugin",
+            "bundleJson" to "{\"key\":\"val\"}",
+            "state" to "satisfied",
+        ))
+        assertTrue(ContextMatchEvaluator.matches(spec, satisfied))
+    }
+
+    @Test
+    fun pluginContextRejectsUnsatisfiedState() {
+        val spec = ContextSpec(
+            ContextType.PLUGIN,
+            mapOf("package" to "com.example.plugin"),
+        )
+        val unsatisfied = ContextEvent("plugin", true, mapOf(
+            "package" to "com.example.plugin",
+            "bundleJson" to "{}",
+            "state" to "unsatisfied",
+        ))
+        assertFalse(ContextMatchEvaluator.matches(spec, unsatisfied))
+    }
+
+    @Test
+    fun pluginContextRejectsWrongPackage() {
+        val spec = ContextSpec(
+            ContextType.PLUGIN,
+            mapOf("package" to "com.example.plugin"),
+        )
+        val wrongPackage = ContextEvent("plugin", true, mapOf(
+            "package" to "com.other.plugin",
+            "bundleJson" to "{}",
+            "state" to "satisfied",
+        ))
+        assertFalse(ContextMatchEvaluator.matches(spec, wrongPackage))
+    }
+
+    @Test
+    fun pluginContextRejectsWrongBundleJson() {
+        val spec = ContextSpec(
+            ContextType.PLUGIN,
+            mapOf("package" to "com.example.plugin", "bundleJson" to "{\"a\":\"1\"}"),
+        )
+        val wrongBundle = ContextEvent("plugin", true, mapOf(
+            "package" to "com.example.plugin",
+            "bundleJson" to "{\"b\":\"2\"}",
+            "state" to "satisfied",
+        ))
+        assertFalse(ContextMatchEvaluator.matches(spec, wrongBundle))
+    }
+
+    @Test
+    fun pluginContextDefaultsBundleJsonToEmptyObject() {
+        val spec = ContextSpec(ContextType.PLUGIN, mapOf("package" to "com.example.plugin"))
+        val event = ContextEvent("plugin", true, mapOf(
+            "package" to "com.example.plugin",
+            "bundleJson" to "{}",
+            "state" to "satisfied",
+        ))
+        assertTrue(ContextMatchEvaluator.matches(spec, event))
+    }
+
+    @Test
+    fun pluginContextRejectsBlankPackage() {
+        val spec = ContextSpec(ContextType.PLUGIN, mapOf("package" to ""))
+        val event = ContextEvent("plugin", true, mapOf(
+            "package" to "",
+            "state" to "satisfied",
+        ))
+        assertFalse(ContextMatchEvaluator.matches(spec, event))
+    }
+
+    @Test
+    fun pluginContextInvertMatchesUnsatisfied() {
+        val spec = ContextSpec(
+            ContextType.PLUGIN,
+            mapOf("package" to "com.example.plugin"),
+            invert = true,
+        )
+        val unsatisfied = ContextEvent("plugin", true, mapOf(
+            "package" to "com.example.plugin",
+            "bundleJson" to "{}",
+            "state" to "unsatisfied",
+        ))
+        assertFalse(ContextMatchEvaluator.matches(spec, unsatisfied))
+    }
 }

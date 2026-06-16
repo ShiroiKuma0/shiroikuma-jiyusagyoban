@@ -1043,7 +1043,7 @@ fun ActiveAutomationUi(
                         secondaryNavigationScreens.forEach { destination ->
                             DropdownMenuItem(
                                 text = { Text(destination.label) },
-                                leadingIcon = { Icon(destination.icon(), contentDescription = null) },
+                                leadingIcon = { Icon(destination.icon(), contentDescription = destination.label) },
                                 onClick = {
                                     screenOrdinal = destination.ordinal
                                     showMoreDestinations = false
@@ -3763,23 +3763,46 @@ private fun contextFields(type: ContextType): List<ActionField> = when (type) {
         ActionField("filter", "Any metadata filter", hint = "Optional text/package/action filter"),
         ActionField("regex", "Use regex matching", FieldType.CHECKBOX),
     )
+    ContextType.PLUGIN -> listOf(
+        ActionField("package", "Plugin package", required = true, hint = "com.example.plugin"),
+        ActionField("bundleJson", "Plugin config JSON", hint = "{\"key\":\"value\"}"),
+        ActionField("blurb", "Description", hint = "Optional label from plugin config"),
+        ActionField("timeoutMs", "Query timeout ms", FieldType.NUMBER, hint = "5000"),
+    )
 }
 
 private fun contextConfigForSave(type: ContextType, config: Map<String, String>): Map<String, String> {
     val nonBlank = config.filterValues { it.isNotBlank() }
-    if (type != ContextType.DAY) return nonBlank
-    val canonicalDays = DaySchedule.canonicalize(config["days"].orEmpty()).orEmpty()
-    return if (canonicalDays.isBlank()) {
-        nonBlank - "days"
-    } else {
-        nonBlank + ("days" to canonicalDays)
+    if (type == ContextType.DAY) {
+        val canonicalDays = DaySchedule.canonicalize(config["days"].orEmpty()).orEmpty()
+        return if (canonicalDays.isBlank()) {
+            nonBlank - "days"
+        } else {
+            nonBlank + ("days" to canonicalDays)
+        }
     }
+    if (type == ContextType.PLUGIN) {
+        val result = nonBlank.toMutableMap()
+        val bundle = result["bundleJson"]?.trim().orEmpty()
+        if (bundle.isBlank() || bundle == "{}") {
+            result.remove("bundleJson")
+        }
+        val timeout = result["timeoutMs"]?.toLongOrNull()?.coerceIn(1_000, 30_000)
+        if (timeout != null) {
+            result["timeoutMs"] = timeout.toString()
+        } else {
+            result.remove("timeoutMs")
+        }
+        return result
+    }
+    return nonBlank
 }
 
 private fun defaultContextConfig(type: ContextType): Map<String, String> = when (type) {
     ContextType.TIME -> mapOf("start" to "09:00", "end" to "17:00")
     ContextType.DAY -> mapOf("days" to "MON,TUE,WED,THU,FRI")
     ContextType.LOCATION -> mapOf("radiusMeters" to "100")
+    ContextType.PLUGIN -> mapOf("timeoutMs" to "5000")
     else -> emptyMap()
 }
 
@@ -3857,6 +3880,7 @@ private fun contextDescription(type: ContextType): String = when (type) {
     ContextType.LOCATION -> "Matches near a latitude/longitude radius with optional accuracy and dwell checks."
     ContextType.STATE -> "Matches a device state such as battery level, charging, headphones, or screen."
     ContextType.EVENT -> "Matches a one-shot event such as boot, notification, NFC, Bluetooth connect/disconnect, calendar, sun, shake, or Locale plugin queries."
+    ContextType.PLUGIN -> "Matches when a Locale/Tasker condition plugin reports satisfied. The plugin is polled periodically and its last known state is cached."
 }
 
 private fun runLogTaskOptions(logs: List<RunLogEntry>, tasks: List<Task>): List<Pair<Long, String>> {

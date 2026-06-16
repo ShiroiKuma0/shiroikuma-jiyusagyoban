@@ -23,6 +23,7 @@ object ContextMatchEvaluator {
         ContextType.LOCATION -> "location"
         ContextType.STATE -> "state"
         ContextType.EVENT -> "event"
+        ContextType.PLUGIN -> "plugin"
     }
 
     fun matches(spec: ContextSpec, event: ContextEvent): Boolean {
@@ -37,6 +38,7 @@ object ContextMatchEvaluator {
             ContextType.LOCATION -> matchesLocation(spec, event)
             ContextType.STATE -> matchesState(spec, event)
             ContextType.EVENT -> matchesEvent(spec, event)
+            ContextType.PLUGIN -> matchesPlugin(spec, event)
         }
     }
 
@@ -152,6 +154,17 @@ object ContextMatchEvaluator {
         val filter = spec.config["filter"]?.trim().orEmpty()
         if (filter.isBlank()) return actualEvent.isNotBlank()
         return event.metadata.values.any { textMatches(it, filter, regex) }
+    }
+
+    private fun matchesPlugin(spec: ContextSpec, event: ContextEvent): Boolean {
+        val expectedPackage = spec.config["package"]?.trim().orEmpty()
+        if (expectedPackage.isBlank()) return false
+        val actualPackage = event.metadata["package"].orEmpty()
+        if (!actualPackage.equals(expectedPackage, ignoreCase = true)) return false
+        val expectedBundle = spec.config["bundleJson"]?.trim().orEmpty().ifBlank { "{}" }
+        val actualBundle = event.metadata["bundleJson"].orEmpty().ifBlank { "{}" }
+        if (expectedBundle != actualBundle) return false
+        return event.metadata["state"].equals("satisfied", ignoreCase = true)
     }
 
     private fun matchesSunEvent(spec: ContextSpec, event: ContextEvent, expectedEvent: String): Boolean {
