@@ -222,7 +222,12 @@ private fun SceneElementView(
     onSetVar: (name: String, value: String) -> Unit,
 ) {
     val cfg = element.config
-    fun v(key: String, fallback: String = "") = expandAgainstGlobals(cfg[key] ?: fallback)
+    // Re-expand %vars whenever any global changes, so a shown scene/HUD stays live (e.g. a clock).
+    val revision by PersistentGlobalScope.revision.collectAsState()
+    fun v(key: String, fallback: String = ""): String {
+        revision // subscribe: reading the value here recomposes this element on any variable change.
+        return expandAgainstGlobals(cfg[key] ?: fallback)
+    }
     // Shared styling (see the element editor's Style section).
     val styleSize = cfg["textSize"]?.toIntOrNull()?.sp ?: TextUnit.Unspecified
     val styleWeight = if (sceneBool(cfg["bold"] ?: "")) FontWeight.Bold else FontWeight.Normal

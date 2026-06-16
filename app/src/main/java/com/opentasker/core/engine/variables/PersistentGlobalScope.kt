@@ -7,6 +7,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.ConcurrentHashMap
@@ -27,6 +31,10 @@ object PersistentGlobalScope : GlobalVariableScope {
     private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val writeOps = Channel<suspend () -> Unit>(Channel.UNLIMITED)
 
+    // Bumped on every change so reactive readers (live scene overlays) re-expand their %vars.
+    private val _revision = MutableStateFlow(0)
+    val revision: StateFlow<Int> = _revision.asStateFlow()
+
     /** Warm the cache from the database. Call once in Application.onCreate after the DB is built. */
     fun init(dao: VariableDao) {
         this.dao = dao
@@ -45,12 +53,14 @@ object PersistentGlobalScope : GlobalVariableScope {
 
     override fun set(projectId: Long, name: String, value: String) {
         bucket(projectId)[name] = value
+        _revision.update { it + 1 }
         val d = dao ?: return
         writeOps.trySend { d.insert(VariableEntity(projectId, name, value)) }
     }
 
     override fun unset(projectId: Long, name: String) {
         buckets[projectId]?.remove(name)
+        _revision.update { it + 1 }
         val d = dao ?: return
         writeOps.trySend { d.delete(projectId, name) }
     }
