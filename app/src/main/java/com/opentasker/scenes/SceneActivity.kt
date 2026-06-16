@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -424,6 +425,50 @@ internal fun SceneElementView(
                             element.tapTaskId?.let(onRunTask)
                         })
                     }
+                }
+            }
+        }
+
+        SceneElementType.NUMBER_PICKER -> {
+            val min = cfg["min"]?.toIntOrNull() ?: 0
+            val max = (cfg["max"]?.toIntOrNull() ?: 100).coerceAtLeast(min)
+            val step = (cfg["step"]?.toIntOrNull() ?: 1).coerceAtLeast(1)
+            val varName = cfg["var"]?.trim()
+            // Start value is expanded against globals, so `value: "%COUNT"` opens at the live variable.
+            var value by remember(element.id) { mutableStateOf((v("value").toIntOrNull() ?: min).coerceIn(min, max)) }
+            // Seed the bound variable so tasks/elements can read it before any tap.
+            LaunchedEffect(element.id) { if (!varName.isNullOrBlank()) onSetVar(varName, value.toString()) }
+            val onChanged: (Int) -> Unit = { next ->
+                value = next.coerceIn(min, max)
+                if (!varName.isNullOrBlank()) onSetVar(varName, value.toString())
+                element.tapTaskId?.let(onRunTask)
+            }
+            val label = v("label", "")
+            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                if (label.isNotBlank()) {
+                    Text(label, style = MaterialTheme.typography.labelMedium, color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontWeight = styleWeightOrNull)
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { onChanged(value - step) },
+                        enabled = value > min,
+                        contentPadding = PaddingValues(0.dp),
+                        modifier = Modifier.size(44.dp),
+                    ) { Text("−", fontSize = 20.sp) }
+                    Text(
+                        value.toString(),
+                        color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface,
+                        fontSize = if (styleSize != TextUnit.Unspecified) styleSize else 18.sp,
+                        fontWeight = styleWeight,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedButton(
+                        onClick = { onChanged(value + step) },
+                        enabled = value < max,
+                        contentPadding = PaddingValues(0.dp),
+                        modifier = Modifier.size(44.dp),
+                    ) { Text("+", fontSize = 20.sp) }
                 }
             }
         }

@@ -10,6 +10,7 @@ object SceneElementDrafts {
         SceneElementType.TEXT,
         SceneElementType.EDIT_TEXT,
         SceneElementType.SLIDER,
+        SceneElementType.NUMBER_PICKER,
         SceneElementType.CHECKBOX,
         SceneElementType.TOGGLE,
         SceneElementType.SPINNER,
@@ -46,6 +47,13 @@ object SceneElementDrafts {
             "max" to "100",
             "value" to "50",
         )
+        SceneElementType.NUMBER_PICKER -> mapOf(
+            "label" to "Number",
+            "min" to "0",
+            "max" to "100",
+            "step" to "1",
+            "value" to "0",
+        )
         SceneElementType.EDIT_TEXT -> mapOf("label" to "Text field", "value" to "")
         SceneElementType.CHECKBOX -> mapOf("label" to "Checkbox", "value" to "false")
         SceneElementType.TOGGLE -> mapOf("label" to "Toggle", "value" to "false")
@@ -62,6 +70,7 @@ object SceneElementDrafts {
         SceneElementType.BUTTON -> 160 to 48
         SceneElementType.EDIT_TEXT -> 220 to 64
         SceneElementType.SLIDER -> 220 to 56
+        SceneElementType.NUMBER_PICKER -> 200 to 64
         SceneElementType.CHECKBOX -> 200 to 48
         SceneElementType.TOGGLE -> 200 to 48
         SceneElementType.SPINNER -> 200 to 48

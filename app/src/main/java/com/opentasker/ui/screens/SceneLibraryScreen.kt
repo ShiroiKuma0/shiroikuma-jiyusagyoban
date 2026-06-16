@@ -751,6 +751,8 @@ private fun SceneElementEditorDialog(
     var sliderMax by remember(state) { mutableStateOf(initial.config["max"] ?: "100") }
     var sliderValue by remember(state) { mutableStateOf(initial.config["value"] ?: "50") }
     var sliderVar by remember(state) { mutableStateOf(initial.config["var"] ?: "") }
+    // Number-picker step (defaults to 1).
+    var numberStep by remember(state) { mutableStateOf(initial.config["step"] ?: "1") }
     var sliderVertical by remember(state) { mutableStateOf(initial.config["orientation"].equals("vertical", ignoreCase = true)) }
     // Checkbox/Toggle initial on/off state.
     var boolValue by remember(state) { mutableStateOf((initial.config["value"] ?: "false").trim().lowercase() in setOf("true", "1", "on", "yes")) }
@@ -780,7 +782,7 @@ private fun SceneElementEditorDialog(
     // Value may be a number (the start position) or a %var that resolves at show time.
     val sliderValueIsVar = sliderValue.trim().startsWith("%")
     val parsedSliderValue = if (sliderValueIsVar) null else sliderValue.toIntOrNull()
-    val sliderValid = type != SceneElementType.SLIDER ||
+    val sliderValid = (type != SceneElementType.SLIDER && type != SceneElementType.NUMBER_PICKER) ||
         (parsedSliderMin != null && parsedSliderMax != null && parsedSliderMin <= parsedSliderMax &&
             (sliderValueIsVar || parsedSliderValue != null))
     val canSave = parsedX != null &&
@@ -811,7 +813,7 @@ private fun SceneElementEditorDialog(
                 widthDp = previewWidth,
                 heightDp = previewHeight,
                 config = elementConfig(
-                    type, label, sliderMin, sliderMax, sliderValue, sliderVar, sliderVertical, boolValue,
+                    type, label, sliderMin, sliderMax, sliderValue, sliderVar, sliderVertical, numberStep, boolValue,
                     textValue, spinnerOptions, shapeCorner, imageSource,
                     SceneElementStyle(styleTextColor, styleBgColor, styleSize, styleBold, styleAlign, styleBorderColor, styleBorderWidth),
                 ),
@@ -859,6 +861,7 @@ private fun SceneElementEditorDialog(
                         sliderMax = defaults.config["max"] ?: "100"
                         sliderValue = defaults.config["value"] ?: "50"
                         sliderVar = defaults.config["var"] ?: ""
+                        numberStep = defaults.config["step"] ?: "1"
                         sliderVertical = defaults.config["orientation"].equals("vertical", ignoreCase = true)
                         boolValue = (defaults.config["value"] ?: "false").trim().lowercase() in setOf("true", "1", "on", "yes")
                         textValue = if (selected == SceneElementType.EDIT_TEXT || selected == SceneElementType.SPINNER) (defaults.config["value"] ?: "") else ""
@@ -984,6 +987,42 @@ private fun SceneElementEditorDialog(
                         )
                     }
 
+                    SceneElementType.NUMBER_PICKER -> {
+                        OutlinedTextField(
+                            value = label,
+                            onValueChange = { label = it.take(48) },
+                            label = { Text("Label (optional)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            NumberField("Min", sliderMin, { sliderMin = it.filter(Char::isDigit).take(6) }, parsedSliderMin == null, Modifier.weight(1f))
+                            NumberField("Max", sliderMax, { sliderMax = it.filter(Char::isDigit).take(6) }, parsedSliderMax == null || (parsedSliderMin != null && parsedSliderMax < parsedSliderMin), Modifier.weight(1f))
+                            NumberField("Step", numberStep, { numberStep = it.filter(Char::isDigit).take(4) }, isError = false, modifier = Modifier.weight(1f))
+                        }
+                        OutlinedTextField(
+                            value = sliderValue,
+                            onValueChange = { sliderValue = it.take(16) },
+                            label = { Text("Start") },
+                            singleLine = true,
+                            isError = !(sliderValueIsVar || parsedSliderValue != null),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = sliderVar,
+                            onValueChange = { sliderVar = it.take(40) },
+                            label = { Text("Store value in variable") },
+                            placeholder = { Text("%COUNT") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            "Tapping − / + changes the value by Step (clamped to Min–Max), writes it to this variable, and runs the Tap task. Set Start to a %var (e.g. %COUNT) to open at that variable's current value.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
                     SceneElementType.CHECKBOX, SceneElementType.TOGGLE -> {
                         OutlinedTextField(
                             value = label,
@@ -1082,7 +1121,8 @@ private fun SceneElementEditorDialog(
                 }
                 val boxStyled = type == SceneElementType.TEXT || type == SceneElementType.BUTTON
                 val textStyled = boxStyled ||
-                    type == SceneElementType.SLIDER || type == SceneElementType.CHECKBOX ||
+                    type == SceneElementType.SLIDER || type == SceneElementType.NUMBER_PICKER ||
+                    type == SceneElementType.CHECKBOX ||
                     type == SceneElementType.TOGGLE || type == SceneElementType.SPINNER
                 if (textStyled) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -1149,7 +1189,7 @@ private fun SceneElementEditorDialog(
                             widthDp = parsedWidth ?: 1,
                             heightDp = parsedHeight ?: 1,
                             config = elementConfig(
-                                type, label, sliderMin, sliderMax, sliderValue, sliderVar, sliderVertical, boolValue,
+                                type, label, sliderMin, sliderMax, sliderValue, sliderVar, sliderVertical, numberStep, boolValue,
                                 textValue, spinnerOptions, shapeCorner, imageSource,
                                 SceneElementStyle(styleTextColor, styleBgColor, styleSize, styleBold, styleAlign, styleBorderColor, styleBorderWidth),
                             ),
@@ -1358,6 +1398,14 @@ private fun sceneElementSummary(element: SceneElement): String? = when (element.
         val max = element.config["max"].orEmpty().ifBlank { "100" }
         "$label: $value ($min-$max)"
     }
+    SceneElementType.NUMBER_PICKER -> {
+        val label = element.config["label"].orEmpty().ifBlank { "Number" }
+        val value = element.config["value"].orEmpty().ifBlank { "0" }
+        val min = element.config["min"].orEmpty().ifBlank { "0" }
+        val max = element.config["max"].orEmpty().ifBlank { "100" }
+        val step = element.config["step"].orEmpty().ifBlank { "1" }
+        "$label: $value ($min-$max, step $step)"
+    }
     SceneElementType.CHECKBOX, SceneElementType.TOGGLE -> {
         val label = element.config["label"].orEmpty().ifBlank { sceneElementTypeLabel(element.type) }
         val on = element.config["value"].orEmpty().trim().lowercase() in setOf("true", "1", "on", "yes")
@@ -1443,6 +1491,7 @@ private fun elementConfig(
     sliderValue: String,
     sliderVar: String,
     sliderVertical: Boolean,
+    numberStep: String,
     boolValue: Boolean,
     textValue: String,
     spinnerOptions: String,
@@ -1476,6 +1525,23 @@ private fun elementConfig(
             put("value", value)
             sliderVar.trim().removePrefix("%").takeIf { it.isNotBlank() }?.let { put("var", it) }
             if (sliderVertical) put("orientation", "vertical")
+            putStyle(style)
+        }
+    }
+    SceneElementType.NUMBER_PICKER -> {
+        val min = sliderMin.toIntOrNull() ?: 0
+        val max = (sliderMax.toIntOrNull() ?: 100).coerceAtLeast(min)
+        val step = (numberStep.toIntOrNull() ?: 1).coerceAtLeast(1)
+        // A %var start value is kept literal (resolved at show time); a number is clamped to range.
+        val value = if (sliderValue.trim().startsWith("%")) sliderValue.trim()
+        else (sliderValue.toIntOrNull() ?: min).coerceIn(min, max).toString()
+        buildMap {
+            label.trim().takeIf { it.isNotBlank() }?.let { put("label", it) }
+            put("min", min.toString())
+            put("max", max.toString())
+            put("step", step.toString())
+            put("value", value)
+            sliderVar.trim().removePrefix("%").takeIf { it.isNotBlank() }?.let { put("var", it) }
             putStyle(style)
         }
     }
