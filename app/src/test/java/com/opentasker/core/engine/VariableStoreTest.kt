@@ -47,4 +47,32 @@ class VariableStoreTest {
         assertEquals("two", store.expand("%items(1)"))
         assertEquals("one,two,three", store.expand("%items(,)"))
     }
+
+    @Test
+    fun regexOperatorsDoNotCreateWorkerThreads() {
+        val store = VariableStore().apply {
+            set("text", "OpenTasker 123")
+        }
+        val threadCountBefore = regexEvalThreadCount()
+
+        repeat(5) {
+            assertEquals("123", store.expand("%text(regex:(\\d+):1)"))
+            assertEquals("OpenTasker #", store.expand("%text(replace:\\d+:#)"))
+        }
+
+        assertEquals(threadCountBefore, regexEvalThreadCount())
+    }
+
+    @Test
+    fun unsupportedRegexSyntaxFailsClosed() {
+        val store = VariableStore().apply {
+            set("text", "ab")
+        }
+
+        assertEquals("", store.expand("%text(regex:(?<=a)b:0)"))
+        assertEquals("ab", store.expand("%text(replace:(?<=a)b:x)"))
+    }
+
+    private fun regexEvalThreadCount(): Int =
+        Thread.getAllStackTraces().keys.count { it.name == "regex-eval" }
 }

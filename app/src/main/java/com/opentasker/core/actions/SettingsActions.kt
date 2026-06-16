@@ -6,16 +6,22 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.hardware.camera2.CameraAccessException
+import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.media.AudioManager
 import android.net.wifi.WifiManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.resume
 
 /**
  * Toggle or set WiFi.
@@ -252,27 +258,96 @@ class TorchAction : Action {
         val state = args["state"] ?: "toggle"
         val cm = ctx.app.getSystemService(CameraManager::class.java)
             ?: return ActionResult.Failure("camera service not available")
-        val cameraId = try {
-            cm.cameraIdList.firstOrNull()
-        } catch (_: CameraAccessException) { null }
+        val cameraId = findTorchCameraId(cm)
             ?: return ActionResult.Failure("no camera with flash found")
 
         return try {
-            when (state.lowercase()) {
-                "on" -> cm.setTorchMode(cameraId, true)
-                "off" -> cm.setTorchMode(cameraId, false)
+            val targetState = when (state.lowercase()) {
+                "on" -> true
+                "off" -> false
                 "toggle" -> {
-                    cm.setTorchMode(cameraId, true)
-                    ctx.logger("Torch: on (toggle always turns on; use explicit on/off for reliable state)")
-                    return ActionResult.Success
+                    val currentState = awaitTorchState(cm, cameraId)
+                        ?: return ActionResult.Failure(
+                            "torch toggle state is unavailable; use explicit on/off for reliable state"
+                        )
+                    currentState.not()
                 }
                 else -> return ActionResult.Failure("invalid state: $state (use on/off/toggle)")
             }
-            ctx.logger("Torch: $state")
+            cm.setTorchMode(cameraId, targetState)
+            ctx.logger("Torch: ${if (targetState) "on" else "off"}")
             ActionResult.Success
+        } catch (ex: SecurityException) {
+            ActionResult.Failure("torch blocked by camera permission or policy: ${ex.message}", ex)
+        } catch (ex: IllegalArgumentException) {
+            ActionResult.Failure("torch failed: ${ex.message}", ex)
         } catch (ex: CameraAccessException) {
             ActionResult.Failure("torch failed: ${ex.message}", ex)
         }
+    }
+
+    companion object {
+        internal fun targetStateFor(requestedState: String, currentState: Boolean?): Boolean? =
+            when (requestedState.lowercase()) {
+                "on" -> true
+                "off" -> false
+                "toggle" -> currentState?.not()
+                else -> null
+            }
+
+        internal const val TORCH_STATE_TIMEOUT_MS = 750L
+    }
+}
+
+private fun findTorchCameraId(cameraManager: CameraManager): String? =
+    try {
+        cameraManager.cameraIdList.firstOrNull { cameraId ->
+            try {
+                cameraManager.getCameraCharacteristics(cameraId)
+                    .get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+            } catch (_: CameraAccessException) {
+                false
+            } catch (_: IllegalArgumentException) {
+                false
+            }
+        }
+    } catch (_: CameraAccessException) {
+        null
+    }
+
+private suspend fun awaitTorchState(cameraManager: CameraManager, cameraId: String): Boolean? =
+    withTimeoutOrNull(TorchAction.TORCH_STATE_TIMEOUT_MS) {
+        suspendCancellableCoroutine { continuation ->
+            val handler = Handler(Looper.getMainLooper())
+            val callback = object : CameraManager.TorchCallback() {
+                override fun onTorchModeChanged(id: String, enabled: Boolean) {
+                    if (id != cameraId || !continuation.isActive) return
+                    safelyUnregisterTorchCallback(cameraManager, this)
+                    continuation.resume(enabled)
+                }
+
+                override fun onTorchModeUnavailable(id: String) {
+                    if (id != cameraId || !continuation.isActive) return
+                    safelyUnregisterTorchCallback(cameraManager, this)
+                    continuation.resume(null)
+                }
+            }
+
+            try {
+                cameraManager.registerTorchCallback(callback, handler)
+            } catch (_: RuntimeException) {
+                if (continuation.isActive) continuation.resume(null)
+            }
+            continuation.invokeOnCancellation {
+                safelyUnregisterTorchCallback(cameraManager, callback)
+            }
+        }
+    }
+
+private fun safelyUnregisterTorchCallback(cameraManager: CameraManager, callback: CameraManager.TorchCallback) {
+    try {
+        cameraManager.unregisterTorchCallback(callback)
+    } catch (_: RuntimeException) {
     }
 }
 
@@ -288,8 +363,12 @@ class TileStateAction : Action {
             else -> return ActionResult.Failure("invalid state: $state (use active/inactive)")
         }
         val label = args["label"]
+        if (android.os.Build.VERSION.SDK_INT < 33) {
+            ctx.logger("Tile state: $state (update deferred until tile next listens)")
+            return ActionResult.Success
+        }
         val service = ctx.app.getSystemService(android.app.StatusBarManager::class.java)
-        if (android.os.Build.VERSION.SDK_INT < 33 || service == null) {
+        if (service == null) {
             ctx.logger("Tile state: $state (update deferred until tile next listens)")
             return ActionResult.Success
         }

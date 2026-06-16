@@ -13,6 +13,7 @@ ksp = "2.3.7"
 lifecycle = "2.10.0"
 navigationCompose = "2.9.8"
 room = "2.8.4"
+re2j = "1.8"
 serializationJson = "1.11.0"
 work = "2.11.2"
 
@@ -39,6 +40,7 @@ junit = { module = "junit:junit", version.ref = "junit" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serializationJson" }
+re2j = { module = "com.google.re2j:re2j", version.ref = "re2j" }
 work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
 
 [plugins]

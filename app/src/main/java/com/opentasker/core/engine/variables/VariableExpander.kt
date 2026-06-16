@@ -2,10 +2,7 @@ package com.opentasker.core.engine.variables
 
 import com.opentasker.core.engine.VariableStore
 import org.json.JSONObject
-import java.util.concurrent.Callable
-import java.util.concurrent.FutureTask
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
+import com.google.re2j.Pattern as Re2Pattern
 import kotlin.math.floor
 import kotlin.math.roundToLong
 
@@ -13,7 +10,7 @@ import kotlin.math.roundToLong
  * Enhanced variable expression evaluator supporting:
  * - Math operators: %var(+5), %var(*2), %var(//) floor, %var(/round)
  * - String operations: %var(upper), %var(lower), %var(substring:0:5), %var(trim), %var(split:,), %var(join:-)
- * - Regex: %var(regex:pattern:group) extract, %var(replace:pattern:replacement)
+ * - Linear-time regex: %var(regex:pattern:group) extract, %var(replace:pattern:replacement)
  * - Conditionals: %var = (expr) ? true_val : false_val
  * - Arrays: %list(#) count, %list(1) indexed, %list() join
  * - JSON: %json.path.to.field parse nested JSON
@@ -91,7 +88,7 @@ class VariableExpander {
         }
 
         if (cursor < expr.length && expr[cursor] == '(') {
-            val close = expr.indexOf(')', startIndex = cursor + 1)
+            val close = findOperatorClose(expr, cursor)
             if (close != -1) {
                 val op = expr.substring(cursor + 1, close)
                 return TokenExpansion(
@@ -102,6 +99,20 @@ class VariableExpander {
         }
 
         return TokenExpansion(variableStore.get(name) ?: "", cursor)
+    }
+
+    private fun findOperatorClose(expr: String, openIndex: Int): Int {
+        var depth = 0
+        for (index in openIndex until expr.length) {
+            when (expr[index]) {
+                '(' -> depth++
+                ')' -> {
+                    depth--
+                    if (depth == 0) return index
+                }
+            }
+        }
+        return -1
     }
 
     private fun evaluateVarOp(name: String, op: String, store: VariableStore, arrays: ArrayStore): String {
@@ -165,19 +176,14 @@ class VariableExpander {
             op.startsWith("regex:") -> {
                 val (pattern, groupIdx) = parseRegexOp(op.substring(6))
                 if (pattern.length > MAX_REGEX_LENGTH || baseValue.length > MAX_REGEX_INPUT_LENGTH) return ""
-                runWithTimeout {
-                    val match = Regex(pattern).find(baseValue)
-                    match?.groups?.get(groupIdx)?.value ?: ""
-                } ?: ""
+                extractRegexGroup(pattern, baseValue, groupIdx)
             }
             op.startsWith("replace:") -> {
                 val parts = op.substring(8).split(":", limit = 2)
                 val pattern = parts.getOrNull(0) ?: ""
                 val replacement = parts.getOrNull(1) ?: ""
                 if (pattern.length > MAX_REGEX_LENGTH || baseValue.length > MAX_REGEX_INPUT_LENGTH) return baseValue
-                runWithTimeout {
-                    baseValue.replace(Regex(pattern), replacement)
-                } ?: baseValue
+                replaceRegex(pattern, baseValue, replacement) ?: baseValue
             }
             else -> baseValue
         }
@@ -273,6 +279,25 @@ class VariableExpander {
         return TokenExpansion(path.toString(), cursor)
     }
 
+    private fun extractRegexGroup(pattern: String, input: String, groupIdx: Int): String {
+        val matcher = compileLinearRegex(pattern)?.matcher(input) ?: return ""
+        return try {
+            if (!matcher.find()) ""
+            else matcher.group(groupIdx) ?: ""
+        } catch (_: RuntimeException) {
+            ""
+        }
+    }
+
+    private fun replaceRegex(pattern: String, input: String, replacement: String): String? {
+        val matcher = compileLinearRegex(pattern)?.matcher(input) ?: return null
+        return try {
+            matcher.replaceAll(replacement)
+        } catch (_: RuntimeException) {
+            null
+        }
+    }
+
     private fun isVariableNameChar(c: Char): Boolean = c.isLetterOrDigit() || c == '_'
 
     private fun isJsonPathSegmentChar(c: Char): Boolean = c.isLetterOrDigit() || c == '_' || c == '-'
@@ -286,19 +311,11 @@ class VariableExpander {
         private val TERNARY_PATTERN = Regex("""^\(([^)]+)\)\s*\?\s*([^:]+)\s*:\s*(.+)$""")
         private const val MAX_REGEX_LENGTH = 256
         private const val MAX_REGEX_INPUT_LENGTH = 10_000
-        private const val REGEX_TIMEOUT_MS = 2_000L
 
-        private fun <T> runWithTimeout(block: () -> T): T? {
-            val task = FutureTask(Callable { block() })
-            val thread = Thread(task, "regex-eval")
-            thread.isDaemon = true
-            thread.start()
+        private fun compileLinearRegex(pattern: String): Re2Pattern? {
             return try {
-                task.get(REGEX_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-            } catch (_: TimeoutException) {
-                thread.interrupt()
-                null
-            } catch (_: Exception) {
+                Re2Pattern.compile(pattern)
+            } catch (_: RuntimeException) {
                 null
             }
         }

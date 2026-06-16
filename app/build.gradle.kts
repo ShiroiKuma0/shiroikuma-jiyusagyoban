@@ -10,8 +10,8 @@ val releaseKeystorePath = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE")
 val releaseKeystorePassword = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE_PASSWORD")
 val releaseKeyAlias = System.getenv("OPEN_TASKER_RELEASE_KEY_ALIAS")
 val releaseKeyPassword = System.getenv("OPEN_TASKER_RELEASE_KEY_PASSWORD")
-val appVersionCode = 69
-val appVersionName = "0.2.67"
+val appVersionCode = 70
+val appVersionName = "0.2.68"
 val allowedDistributions = setOf("standard", "fdroid", "play")
 val selectedDistribution = providers.gradleProperty("openTaskerDistribution")
     .orElse("standard")
@@ -135,6 +135,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.re2j)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.runner)
