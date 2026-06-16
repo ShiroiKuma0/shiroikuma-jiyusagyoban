@@ -237,4 +237,52 @@ class ContextInspectorTest {
         assertEquals("inside", result.contexts.single().lastObservation?.event?.metadata?.get("dwellState"))
         assertEquals("0", result.contexts.single().lastObservation?.event?.metadata?.get("insideSinceEpochMs"))
     }
+
+    @Test
+    fun pluginSourceLabelResolvesCorrectly() {
+        assertEquals("Plugin condition", "plugin".toContextSourceLabel())
+    }
+
+    @Test
+    fun pluginContextConfigSummaryShowsPackageAndBlurb() {
+        val specWithBlurb = ContextSpec(
+            ContextType.PLUGIN,
+            mapOf("package" to "com.example.plugin", "blurb" to "WiFi connected"),
+        )
+        assertEquals("com.example.plugin (WiFi connected)", contextConfigSummary(specWithBlurb))
+
+        val specNoBlurb = ContextSpec(ContextType.PLUGIN, mapOf("package" to "com.example.plugin"))
+        assertEquals("com.example.plugin", contextConfigSummary(specNoBlurb))
+    }
+
+    @Test
+    fun pluginContextConfigSummaryShowsInvertedSuffix() {
+        val spec = ContextSpec(
+            ContextType.PLUGIN,
+            mapOf("package" to "com.example.plugin"),
+            invert = true,
+        )
+        assertEquals("com.example.plugin; inverted", contextConfigSummary(spec))
+    }
+
+    @Test
+    fun pluginContextInspectionShowsWaitingBeforeFirstEvent() {
+        val profile = Profile(
+            id = 30,
+            name = "Plugin test",
+            enterTaskId = 1,
+            enabled = true,
+            contexts = listOf(ContextSpec(ContextType.PLUGIN, mapOf("package" to "com.example.plugin"))),
+        )
+        val source = ContextSourceSnapshot(
+            key = "plugin",
+            label = "Plugin condition",
+            registered = true,
+        )
+        val result = inspectProfiles(listOf(profile), listOf(source)).single()
+        assertFalse(result.matching)
+        val check = result.contexts.single()
+        assertEquals("plugin", check.sourceKey)
+        assertEquals(ContextSourceStatus.Waiting, check.sourceStatus)
+    }
 }

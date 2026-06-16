@@ -159,6 +159,11 @@ private fun inspectContextForProfile(
 fun contextConfigSummary(spec: ContextSpec): String {
     val summary = when (spec.type) {
         ContextType.DAY -> DaySchedule.displayLabel(spec.config["days"] ?: spec.config["day"].orEmpty())
+        ContextType.PLUGIN -> {
+            val pkg = spec.config["package"].orEmpty().ifBlank { "none" }
+            val blurb = spec.config["blurb"]?.takeIf { it.isNotBlank() }
+            if (blurb != null) "$pkg ($blurb)" else pkg
+        }
         else -> spec.config.entries
             .sortedBy { it.key }
             .joinToString { "${it.key}=${it.value}" }
@@ -173,6 +178,7 @@ fun String.toContextSourceLabel(): String = when (this) {
     "state" -> "Device state"
     "event" -> "System event"
     "location" -> "Location"
+    "plugin" -> "Plugin condition"
     else -> replaceFirstChar { it.titlecase(Locale.US) }
 }
 

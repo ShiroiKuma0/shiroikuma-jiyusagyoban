@@ -22,4 +22,5 @@ enum class ContextType {
     LOCATION,      // geofence
     STATE,         // device state (battery, headphones, charging, screen, ...)
     EVENT,         // one-shot triggers (boot, notification, NFC, calendar, ...)
+    PLUGIN,        // Locale/Tasker condition plugin (polled state)
 }

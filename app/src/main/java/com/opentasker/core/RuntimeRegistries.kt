@@ -52,6 +52,7 @@ import com.opentasker.core.actions.WriteFileAction
 import com.opentasker.core.contexts.ApplicationContextSourceImpl
 import com.opentasker.core.contexts.ContextSourceRegistry
 import com.opentasker.core.contexts.EventContextSourceImpl
+import com.opentasker.core.contexts.LocalePluginConditionContextSource
 import com.opentasker.core.contexts.LocationContextSourceImpl
 import com.opentasker.core.contexts.StateContextSourceImpl
 import com.opentasker.core.contexts.TimeContextSourceImpl
@@ -123,5 +124,6 @@ private fun registerContextSources() {
         StateContextSourceImpl(),
         EventContextSourceImpl(),
         LocationContextSourceImpl(),
+        LocalePluginConditionContextSource(),
     ).forEach(ContextSourceRegistry::register)
 }

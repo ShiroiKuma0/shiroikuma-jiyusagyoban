@@ -25,6 +25,8 @@ import com.opentasker.core.contexts.BluetoothContextEvents
 import com.opentasker.core.contexts.BootContextEvents
 import com.opentasker.core.contexts.CameraMicContextEvents
 import com.opentasker.core.contexts.PackageContextEvents
+import com.opentasker.core.contexts.PluginConditionSubscription
+import com.opentasker.core.contexts.PluginConditionSubscriptions
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
@@ -113,6 +115,7 @@ class AutomationService : Service() {
         runCatching { unregisterReceiver(PackageContextEvents.receiver) }
         runCatching { unregisterReceiver(BluetoothContextEvents.receiver) }
         CameraMicContextEvents.stop(this)
+        PluginConditionSubscriptions.clear()
         job.cancel()
         super.onDestroy()
     }
@@ -122,9 +125,10 @@ class AutomationService : Service() {
         matcherJobs.values.forEach { it.cancel() }
         matcherJobs.clear()
         matchers.clear()
-        
+
         val profiles = db.profileDao().getAllEnabled()
         cooldownStore.pruneDeleted(profiles.map { it.id }.toSet())
+        registerPluginSubscriptions(profiles.map { it.toDomain() })
         for (profile in profiles) {
             val domain = profile.toDomain()
             val matcher = ProfileMatcher(this, domain)
@@ -153,6 +157,23 @@ class AutomationService : Service() {
             matcherJobs[domain.id] = matcherJob
             matchers[domain.id] = matcher
         }
+    }
+
+    private fun registerPluginSubscriptions(profiles: List<Profile>) {
+        val subs = profiles.flatMap { profile ->
+            profile.contexts
+                .filter { it.type == com.opentasker.core.model.ContextType.PLUGIN }
+                .mapNotNull { spec ->
+                    val pkg = spec.config["package"]?.trim().orEmpty()
+                    if (pkg.isBlank()) return@mapNotNull null
+                    PluginConditionSubscription(
+                        packageName = pkg,
+                        bundleJson = spec.config["bundleJson"]?.trim().orEmpty().ifBlank { "{}" },
+                        timeoutMs = spec.config["timeoutMs"]?.toLongOrNull()?.coerceIn(1_000, 30_000) ?: 5_000,
+                    )
+                }
+        }.toSet()
+        PluginConditionSubscriptions.replaceAll(subs)
     }
 
     private suspend fun onProfileActivated(profile: com.opentasker.core.model.Profile) {
