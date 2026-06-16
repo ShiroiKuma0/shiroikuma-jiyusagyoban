@@ -3,7 +3,10 @@ package com.opentasker.ui.screens
 import android.provider.Settings
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -24,6 +27,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Checkbox
 import com.opentasker.ui.components.ReorderableRow
+import com.opentasker.ui.components.RgbaColorPickerDialog
 import com.opentasker.ui.components.SelectionBar
 import com.opentasker.ui.components.SelectionCheck
 import com.opentasker.ui.components.rememberListReorderState
@@ -42,6 +46,7 @@ import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -63,6 +68,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -608,6 +614,14 @@ private fun SceneElementEditorDialog(
     // Edit-text initial text.
     var textValue by remember(state) { mutableStateOf(initial.config["value"] ?: "") }
     var imageSource by remember(state) { mutableStateOf(initial.config["source"] ?: "") }
+    // Style (Text / Button): colours as "#AARRGGBB" (blank = element default), size in sp, bold, align.
+    var styleTextColor by remember(state) { mutableStateOf(initial.config["textColor"] ?: "") }
+    var styleBgColor by remember(state) { mutableStateOf(initial.config["bgColor"] ?: "") }
+    var styleSize by remember(state) { mutableStateOf(initial.config["textSize"] ?: "") }
+    var styleBold by remember(state) { mutableStateOf((initial.config["bold"] ?: "").trim().lowercase() in setOf("true", "1", "on", "yes")) }
+    var styleAlign by remember(state) { mutableStateOf(initial.config["align"]?.trim()?.lowercase() ?: "start") }
+    var styleBorderColor by remember(state) { mutableStateOf(initial.config["borderColor"] ?: "") }
+    var styleBorderWidth by remember(state) { mutableStateOf(initial.config["borderWidth"] ?: "") }
     var tapTaskId by remember(state) { mutableStateOf(initial.tapTaskId) }
     var longPressTaskId by remember(state) { mutableStateOf(initial.longPressTaskId) }
 
@@ -660,6 +674,13 @@ private fun SceneElementEditorDialog(
                         boolValue = (defaults.config["value"] ?: "false").trim().lowercase() in setOf("true", "1", "on", "yes")
                         textValue = if (selected == SceneElementType.EDIT_TEXT) (defaults.config["value"] ?: "") else ""
                         imageSource = defaults.config["source"] ?: ""
+                        styleTextColor = ""
+                        styleBgColor = ""
+                        styleSize = ""
+                        styleBold = false
+                        styleAlign = "start"
+                        styleBorderColor = ""
+                        styleBorderWidth = ""
                     },
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -813,6 +834,41 @@ private fun SceneElementEditorDialog(
 
                     else -> Unit
                 }
+                if (type == SceneElementType.TEXT || type == SceneElementType.BUTTON) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Text("Style", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    SceneColorField(
+                        label = if (type == SceneElementType.BUTTON) "Label colour" else "Text colour",
+                        value = styleTextColor,
+                        onChange = { styleTextColor = it },
+                    )
+                    SceneColorField(
+                        label = if (type == SceneElementType.BUTTON) "Button colour" else "Background colour",
+                        value = styleBgColor,
+                        onChange = { styleBgColor = it },
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        NumberField("Size (sp)", styleSize, { styleSize = it.filter(Char::isDigit).take(3) }, isError = false, modifier = Modifier.weight(1f))
+                        Text("Bold", style = MaterialTheme.typography.bodyMedium)
+                        Switch(checked = styleBold, onCheckedChange = { styleBold = it })
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        listOf("start" to "Left", "center" to "Center", "end" to "Right").forEach { (key, text) ->
+                            FilterChip(
+                                selected = styleAlign == key,
+                                onClick = { styleAlign = key },
+                                label = { Text(text) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.weight(1f)) {
+                            SceneColorField(label = "Border colour", value = styleBorderColor, onChange = { styleBorderColor = it })
+                        }
+                        NumberField("Border (dp)", styleBorderWidth, { styleBorderWidth = it.filter(Char::isDigit).take(2) }, isError = false, modifier = Modifier.weight(1f))
+                    }
+                }
                 SceneTaskBindingSelector(
                     label = "Tap task",
                     tasks = tasks,
@@ -839,7 +895,10 @@ private fun SceneElementEditorDialog(
                             yDp = parsedY ?: 0,
                             widthDp = parsedWidth ?: 1,
                             heightDp = parsedHeight ?: 1,
-                            config = elementConfig(type, label, sliderMin, sliderMax, sliderValue, sliderVar, sliderVertical, boolValue, textValue, imageSource),
+                            config = elementConfig(
+                                type, label, sliderMin, sliderMax, sliderValue, sliderVar, sliderVertical, boolValue, textValue, imageSource,
+                                SceneElementStyle(styleTextColor, styleBgColor, styleSize, styleBold, styleAlign, styleBorderColor, styleBorderWidth),
+                            ),
                             tapTaskId = tapTaskId,
                             longPressTaskId = longPressTaskId,
                         ),
@@ -1033,6 +1092,65 @@ private fun sceneElementSummary(element: SceneElement): String? = when (element.
     else -> null
 }
 
+@Composable
+private fun SceneColorField(label: String, value: String, onChange: (String) -> Unit) {
+    var showPicker by remember { mutableStateOf(false) }
+    val parsed = remember(value) {
+        runCatching { if (value.isBlank()) null else android.graphics.Color.parseColor(value) }.getOrNull()
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { showPicker = true }.padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                if (parsed == null) "Default" else value.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Box(
+            Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(if (parsed == null) Color.Transparent else Color(parsed))
+                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
+        )
+    }
+    if (showPicker) {
+        RgbaColorPickerDialog(
+            initial = value,
+            onConfirm = { onChange(it); showPicker = false },
+            onClear = { onChange(""); showPicker = false },
+            onDismiss = { showPicker = false },
+        )
+    }
+}
+
+/** Style fields shared by Text/Button elements. Colours are "#AARRGGBB" (blank = default). */
+private data class SceneElementStyle(
+    val textColor: String,
+    val bgColor: String,
+    val size: String,
+    val bold: Boolean,
+    val align: String,
+    val borderColor: String,
+    val borderWidth: String,
+)
+
+/** Adds the non-default style keys to a config builder. */
+private fun MutableMap<String, String>.putStyle(style: SceneElementStyle) {
+    style.textColor.trim().takeIf { it.isNotBlank() }?.let { put("textColor", it) }
+    style.bgColor.trim().takeIf { it.isNotBlank() }?.let { put("bgColor", it) }
+    style.size.trim().toIntOrNull()?.takeIf { it > 0 }?.let { put("textSize", it.toString()) }
+    if (style.bold) put("bold", "true")
+    if (style.align.isNotBlank() && style.align != "start") put("align", style.align)
+    style.borderColor.trim().takeIf { it.isNotBlank() }?.let { put("borderColor", it) }
+    style.borderWidth.trim().toIntOrNull()?.takeIf { it > 0 }?.let { put("borderWidth", it.toString()) }
+}
+
 private fun elementConfig(
     type: SceneElementType,
     label: String,
@@ -1044,9 +1162,10 @@ private fun elementConfig(
     boolValue: Boolean,
     textValue: String,
     imageSource: String,
+    style: SceneElementStyle,
 ): Map<String, String> = when (type) {
-    SceneElementType.TEXT -> mapOf("text" to label.ifBlank { "Text" })
-    SceneElementType.BUTTON -> mapOf("label" to label.ifBlank { "Button" })
+    SceneElementType.TEXT -> buildMap { put("text", label.ifBlank { "Text" }); putStyle(style) }
+    SceneElementType.BUTTON -> buildMap { put("label", label.ifBlank { "Button" }); putStyle(style) }
     SceneElementType.EDIT_TEXT -> buildMap {
         put("label", label.ifBlank { "Text" })
         put("value", textValue)

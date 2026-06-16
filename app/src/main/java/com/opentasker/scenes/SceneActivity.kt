@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -43,9 +44,12 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.engine.variables.PersistentGlobalScope
@@ -182,16 +186,39 @@ private fun SceneElementView(
 ) {
     val cfg = element.config
     fun v(key: String, fallback: String = "") = expandAgainstGlobals(cfg[key] ?: fallback)
+    // Shared styling (see the element editor's Style section).
+    val styleSize = cfg["textSize"]?.toIntOrNull()?.sp ?: TextUnit.Unspecified
+    val styleWeight = if (sceneBool(cfg["bold"] ?: "")) FontWeight.Bold else FontWeight.Normal
+    val styleAlign = sceneAlign(cfg["align"])
+    val styleBorderW = cfg["borderWidth"]?.toIntOrNull() ?: 0
+    val styleBorderColor = sceneColor(cfg["borderColor"])
     when (element.type) {
-        SceneElementType.TEXT -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
-            Text(v("text"), color = MaterialTheme.colorScheme.onSurface)
+        SceneElementType.TEXT -> {
+            val bg = sceneColor(cfg["bgColor"])
+            val shape = RoundedCornerShape(8.dp)
+            Box(
+                Modifier.fillMaxSize()
+                    .then(if (bg != null) Modifier.background(bg, shape) else Modifier)
+                    .then(if (styleBorderW > 0) Modifier.border(styleBorderW.dp, styleBorderColor ?: MaterialTheme.colorScheme.outline, shape) else Modifier),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    v("text"),
+                    color = sceneColor(cfg["textColor"]) ?: MaterialTheme.colorScheme.onSurface,
+                    fontSize = styleSize,
+                    fontWeight = styleWeight,
+                    textAlign = styleAlign ?: TextAlign.Start,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
 
         SceneElementType.BUTTON -> Box(
             Modifier
                 .fillMaxSize()
                 .clip(RoundedCornerShape(10.dp))
-                .background(MaterialTheme.colorScheme.primary)
+                .background(sceneColor(cfg["bgColor"]) ?: MaterialTheme.colorScheme.primary)
+                .then(if (styleBorderW > 0) Modifier.border(styleBorderW.dp, styleBorderColor ?: MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp)) else Modifier)
                 .pointerInput(element.id) {
                     detectTapGestures(
                         onTap = { element.tapTaskId?.let(onRunTask) },
@@ -200,7 +227,13 @@ private fun SceneElementView(
                 },
             contentAlignment = Alignment.Center,
         ) {
-            Text(v("label", "Button"), color = MaterialTheme.colorScheme.onPrimary, textAlign = TextAlign.Center)
+            Text(
+                v("label", "Button"),
+                color = sceneColor(cfg["textColor"]) ?: MaterialTheme.colorScheme.onPrimary,
+                fontSize = styleSize,
+                fontWeight = styleWeight,
+                textAlign = styleAlign ?: TextAlign.Center,
+            )
         }
 
         SceneElementType.SLIDER -> {
@@ -325,3 +358,17 @@ private fun SceneElementView(
 
 /** Truthy parse for checkbox/toggle scene values. */
 private fun sceneBool(s: String): Boolean = s.trim().lowercase() in setOf("true", "1", "on", "yes")
+
+/** Parse a "#AARRGGBB"/"#RRGGBB" scene colour, or null (use the element's default). */
+private fun sceneColor(s: String?): Color? =
+    s?.trim()?.takeIf { it.isNotBlank() }?.let {
+        runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull()
+    }
+
+/** Map a scene `align` value to a [TextAlign], or null (default per element). */
+private fun sceneAlign(s: String?): TextAlign? = when (s?.trim()?.lowercase()) {
+    "center" -> TextAlign.Center
+    "end", "right" -> TextAlign.End
+    "start", "left" -> TextAlign.Start
+    else -> null
+}

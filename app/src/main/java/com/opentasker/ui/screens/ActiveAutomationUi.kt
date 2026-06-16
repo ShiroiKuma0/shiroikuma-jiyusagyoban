@@ -3614,16 +3614,16 @@ private fun ImportItemConflictDialog(
                     }
                 }
                 Text(
-                    "Import with new names keeps both. Overwrite current backs up the existing ones (renamed “.<timestamp>.bak”) before importing. Overwrite and delete current removes them first.",
+                    "Import with new names keeps both. Overwrite and backup current renames the existing ones to “.<timestamp>.bak” before importing. Overwrite and delete current removes them first.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         },
-        // Stacked; default (Overwrite current — backs up then imports) on top.
+        // Stacked; default (backs up then imports) on top.
         confirmButton = {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
-                TextButton(onClick = onOverwriteBackup) { Text("Overwrite current") }
+                TextButton(onClick = onOverwriteBackup) { Text("Overwrite and backup current") }
                 TextButton(onClick = onOverwriteDelete) { Text("Overwrite and delete current") }
                 TextButton(onClick = onRename) { Text("Import with new names") }
                 TextButton(onClick = onDismiss) { Text("Cancel") }
