@@ -213,4 +213,89 @@ class ActionGuardsTest {
         assertEquals(null, TorchAction.targetStateFor("toggle", null))
         assertEquals(null, TorchAction.targetStateFor("invalid", true))
     }
+
+    // --- SayAction guards ---
+
+    @Test
+    fun sayMissingTextFails() = runBlocking {
+        val action = SayAction()
+        val result = action.run(ctx(), emptyMap())
+        assertTrue("missing text should fail", result is ActionResult.Failure)
+        assertTrue((result as ActionResult.Failure).message.contains("missing text"))
+    }
+
+    @Test
+    fun sayRejectsOversizedText() = runBlocking {
+        val action = SayAction()
+        val bigText = "x".repeat(4001)
+        val result = action.run(ctx(), mapOf("text" to bigText))
+        assertTrue("oversized text should fail", result is ActionResult.Failure)
+        assertTrue((result as ActionResult.Failure).message.contains("character limit"))
+    }
+
+    // --- OpenUrl expanded scheme validation ---
+
+    @Test
+    fun openUrlAllowsTelAndMailtoSchemes() {
+        val allowed = OpenUrlAction.allowedSchemes()
+        assertTrue("tel must be allowed", "tel" in allowed)
+        assertTrue("mailto must be allowed", "mailto" in allowed)
+        assertTrue("geo must be allowed", "geo" in allowed)
+    }
+
+    @Test
+    fun openUrlBlocksDataAndBlobSchemes() {
+        val allowed = OpenUrlAction.allowedSchemes()
+        assertTrue("data must NOT be allowed", "data" !in allowed)
+        assertTrue("blob must NOT be allowed", "blob" !in allowed)
+    }
+
+    // --- ReadFileAction guards ---
+
+    @Test
+    fun readFileMissingPathFails() = runBlocking {
+        val action = ReadFileAction()
+        val result = action.run(ctx(), emptyMap())
+        assertTrue("missing path should fail", result is ActionResult.Failure)
+        assertEquals("missing path", (result as ActionResult.Failure).message)
+    }
+
+    // --- WriteFileAction guards ---
+
+    @Test
+    fun writeFileMissingPathFails() = runBlocking {
+        val action = WriteFileAction()
+        val result = action.run(ctx(), emptyMap())
+        assertTrue("missing path should fail", result is ActionResult.Failure)
+        assertEquals("missing path", (result as ActionResult.Failure).message)
+    }
+
+    // --- PlaySoundAction guards ---
+
+    @Test
+    fun playSoundMissingPathFails() = runBlocking {
+        val action = PlaySoundAction()
+        val result = action.run(ctx(), emptyMap())
+        assertTrue("missing path should fail", result is ActionResult.Failure)
+        assertEquals("missing path", (result as ActionResult.Failure).message)
+    }
+
+    // --- LaunchAppAction guards ---
+
+    @Test
+    fun launchAppMissingPackageFails() = runBlocking {
+        val action = LaunchAppAction()
+        val result = action.run(ctx(), emptyMap())
+        assertTrue("missing package should fail", result is ActionResult.Failure)
+    }
+
+    // --- SetVariable guards ---
+
+    @Test
+    fun setVariableMissingNameFails() = runBlocking {
+        val action = SetVariableAction()
+        val result = action.run(ctx(), emptyMap())
+        assertTrue("missing name should fail", result is ActionResult.Failure)
+        assertEquals("missing name", (result as ActionResult.Failure).message)
+    }
 }
