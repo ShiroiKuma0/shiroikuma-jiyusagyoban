@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,7 +24,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -544,14 +542,36 @@ private fun InspectorEmptyState(contentPadding: PaddingValues) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(Icons.Filled.Info, contentDescription = "Info", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
-        Spacer(Modifier.height(12.dp))
-        Text("Context inspector unavailable", style = MaterialTheme.typography.titleLarge)
-        Text(
-            "Runtime context sources have not registered yet.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f),
+            shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Icon(
+                    Icons.Filled.Info,
+                    contentDescription = "Context inspector unavailable",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp),
+                )
+                Text("Context inspector unavailable", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "Runtime context sources have not registered yet. Open Setup to confirm permissions, then refresh after sources begin reporting.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                InspectorStatusPill(
+                    label = "Waiting for sources",
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
     }
 }
 

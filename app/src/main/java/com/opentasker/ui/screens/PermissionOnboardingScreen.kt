@@ -18,19 +18,24 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -49,6 +54,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -212,6 +221,9 @@ private fun ThemeSetupCard() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val currentMode by ThemePreference.observe(context).collectAsState(initial = ThemeMode.System)
+    val onSelectMode: (ThemeMode) -> Unit = { mode ->
+        scope.launch { ThemePreference.set(context, mode) }
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -220,32 +232,86 @@ private fun ThemeSetupCard() {
         shape = RoundedCornerShape(16.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Theme", style = MaterialTheme.typography.titleMedium)
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("Theme", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Choose the display mode used across navigation, setup, and runtime review surfaces.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 ThemeMode.entries.chunked(2).forEach { rowModes ->
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         rowModes.forEach { mode ->
-                            val label = when (mode) {
-                                ThemeMode.System -> "System"
-                                ThemeMode.Dark -> "Dark"
-                                ThemeMode.Light -> "Light"
-                                ThemeMode.HighContrast -> "High contrast"
-                            }
-                            val selected = mode == currentMode
-                            if (selected) {
-                                Button(
-                                    onClick = {},
-                                    modifier = Modifier.weight(1f),
-                                ) { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                            } else {
-                                OutlinedButton(
-                                    onClick = { scope.launch { ThemePreference.set(context, mode) } },
-                                    modifier = Modifier.weight(1f),
-                                ) { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                            }
+                            ThemeChoice(
+                                mode = mode,
+                                selected = mode == currentMode,
+                                onSelect = onSelectMode,
+                                modifier = Modifier.weight(1f),
+                            )
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemeChoice(
+    mode: ThemeMode,
+    selected: Boolean,
+    onSelect: (ThemeMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val label = when (mode) {
+        ThemeMode.System -> "System"
+        ThemeMode.Dark -> "Dark"
+        ThemeMode.Light -> "Light"
+        ThemeMode.HighContrast -> "High contrast"
+    }
+    val accent = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+    Surface(
+        modifier = modifier
+            .heightIn(min = 52.dp)
+            .selectable(
+                selected = selected,
+                role = Role.RadioButton,
+                onClick = { if (!selected) onSelect(mode) },
+            )
+            .semantics {
+                this.selected = selected
+                stateDescription = if (selected) "$label selected" else "$label not selected"
+            },
+        color = if (selected) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+        } else {
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.48f)
+        },
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, accent.copy(alpha = if (selected) 0.58f else 0.72f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (selected) {
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    Icons.Filled.CheckCircle,
+                    contentDescription = "$label selected",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
             }
         }
     }
@@ -268,42 +334,83 @@ private fun BackupSetupCard(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Backup and restore", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Create an on-device SQLite backup, export a fresh copy with Android's file picker, or import a backup to apply on the next app restart.",
+                    "Create a local database snapshot, export a copy, or stage an import for the next restart.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Text(
-                when {
-                    state.pendingRestore -> "Restore staged. Restart OpenTasker to apply it before the database opens."
-                    state.latestBackupName != null -> "Latest backup: ${state.latestBackupName}"
-                    else -> "No local backup has been created yet."
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = if (state.pendingRestore) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            BackupStateBanner(state)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 Button(
                     onClick = onCreateBackup,
                     enabled = !state.busy,
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
                 ) {
-                    Text(if (state.busy) "Working..." else "Create Backup")
+                    Text(if (state.busy) "Working..." else "Create Local Backup")
                 }
-                OutlinedButton(
-                    onClick = onExportBackup,
-                    enabled = !state.busy,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Export Current Backup")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = onExportBackup,
+                        enabled = !state.busy,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
+                    ) {
+                        Text("Export", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    OutlinedButton(
+                        onClick = onImportBackup,
+                        enabled = !state.busy,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
+                    ) {
+                        Text("Import", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
-                OutlinedButton(
-                    onClick = onImportBackup,
-                    enabled = !state.busy,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Import Backup")
-                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BackupStateBanner(state: BackupSetupState) {
+    val color = when {
+        state.pendingRestore -> MaterialTheme.colorScheme.primary
+        state.latestBackupName != null -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.secondary
+    }
+    val title = when {
+        state.pendingRestore -> "Restore staged"
+        state.latestBackupName != null -> "Backup available"
+        else -> "No backup yet"
+    }
+    val body = when {
+        state.pendingRestore -> "Restart OpenTasker to apply the staged restore before the database opens."
+        state.latestBackupName != null -> "Latest backup: ${state.latestBackupName}"
+        else -> "Create a local backup before testing imports or risky automation changes."
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = color.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.26f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                if (state.latestBackupName != null || state.pendingRestore) Icons.Filled.CheckCircle else Icons.Filled.Info,
+                contentDescription = title,
+                tint = color,
+                modifier = Modifier.size(20.dp),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+                Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -384,11 +491,11 @@ private fun PermissionSetupCard(
             Text(item.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             PermissionRequirement(label = if (item.optional) "Optional: ${item.requiredFor}" else item.requiredFor)
             if (!item.granted) {
-                Button(onClick = onRunAction, modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = onRunAction, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                     Text(item.actionLabel)
                 }
             } else if (item.action is PermissionAction.SettingsIntent && item.title == "App visibility") {
-                OutlinedButton(onClick = onRunAction, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = onRunAction, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                     Text("Review app settings")
                 }
             }

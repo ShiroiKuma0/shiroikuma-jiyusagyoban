@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,6 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -102,16 +104,35 @@ private fun FlowEmptyState(contentPadding: PaddingValues) {
             .padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f),
+            shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
         ) {
-            Text("No profiles to graph", style = MaterialTheme.typography.titleLarge)
-            Text(
-                "Create or install a profile before opening the flow view.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Column(
+                modifier = Modifier.padding(18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Icon(
+                    Icons.Filled.Info,
+                    contentDescription = "Flow view empty",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp),
+                )
+                Text("No profile graph yet", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "Create or import a profile to generate a readable automation graph with contexts, tasks, actions, and missing references.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                FlowStatusPill(
+                    label = "Waiting for profile",
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
     }
 }

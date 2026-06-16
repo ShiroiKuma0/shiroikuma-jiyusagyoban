@@ -29,6 +29,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
@@ -264,16 +265,39 @@ private fun SceneEmptyState(
             .padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("No scenes yet", style = MaterialTheme.typography.titleLarge)
-            Text(
-                "Create a panel before adding overlay elements.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Button(onClick = onCreateScene) {
-                Icon(Icons.Filled.Add, contentDescription = "Create scene")
-                Text("Create Scene")
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f),
+            shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Icon(
+                    Icons.Filled.Info,
+                    contentDescription = "Scene library empty",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp),
+                )
+                Text("No scenes yet", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "Create an overlay panel, then add buttons, text, sliders, or image placeholders with task bindings.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                Button(
+                    onClick = onCreateScene,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "Create scene")
+                    Spacer(Modifier.width(6.dp))
+                    Text("Create Scene")
+                }
             }
         }
     }
@@ -318,8 +342,9 @@ private fun SceneOverviewCard(
                 SceneMetric("${scenes.sumOf { it.elements.size }}", "Elements", Modifier.weight(1f))
                 SceneMetric("$errorCount", "Errors", Modifier.weight(1f))
             }
-            Button(onClick = onCreateScene, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = onCreateScene, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                 Icon(Icons.Filled.Add, contentDescription = "Add scene")
+                Spacer(Modifier.width(6.dp))
                 Text("Create Scene")
             }
         }
