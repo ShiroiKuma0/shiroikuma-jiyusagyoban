@@ -21,17 +21,22 @@ data class SceneEntity(
     val elementsJson: String,
     val projectId: Long? = null,
     val position: Int = 0,
+    val bgColor: String? = null,
+    val cornerRadiusDp: Int = 16,
+    val scrimAlpha: Int = 55,
+    val borderColor: String? = null,
+    val borderWidth: Int = 0,
 ) {
     fun toDomain() = try {
-        Scene(id, name, widthDp, heightDp, Json.decodeFromString(elementsJson), projectId, position)
+        Scene(id, name, widthDp, heightDp, Json.decodeFromString(elementsJson), projectId, position, bgColor, cornerRadiusDp, scrimAlpha, borderColor, borderWidth)
     } catch (e: Exception) {
         android.util.Log.e("SceneDao", "Failed to deserialize scene $id: ${e.message}", e)
         // Return scene with empty elements as fallback
-        Scene(id, name, widthDp, heightDp, emptyList(), projectId, position)
+        Scene(id, name, widthDp, heightDp, emptyList(), projectId, position, bgColor, cornerRadiusDp, scrimAlpha, borderColor, borderWidth)
     }
 }
 
-fun Scene.toEntity() = SceneEntity(id, name, widthDp, heightDp, Json.encodeToString(elements), projectId, position)
+fun Scene.toEntity() = SceneEntity(id, name, widthDp, heightDp, Json.encodeToString(elements), projectId, position, bgColor, cornerRadiusDp, scrimAlpha, borderColor, borderWidth)
 
 @Dao
 interface SceneDao {

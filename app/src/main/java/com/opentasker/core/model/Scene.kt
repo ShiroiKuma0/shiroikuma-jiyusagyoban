@@ -12,6 +12,11 @@ data class Scene(
     val elements: List<SceneElement> = emptyList(),
     val projectId: Long? = null,            // null = Unfiled
     val position: Int = 0,                  // manual sort order within its tab
+    val bgColor: String? = null,            // panel background "#AARRGGBB"; null = theme background (black)
+    val cornerRadiusDp: Int = 16,           // panel corner radius
+    val scrimAlpha: Int = 55,               // modal scrim darkness, 0..100 %
+    val borderColor: String? = null,        // panel border "#AARRGGBB"; null = theme outline (yellow)
+    val borderWidth: Int = 0,               // panel border thickness dp (0 = none)
 )
 
 @Serializable

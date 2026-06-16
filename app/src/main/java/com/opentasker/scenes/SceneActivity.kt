@@ -166,7 +166,7 @@ internal fun SceneOverlay(
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.55f))
+                .background(Color.Black.copy(alpha = scene.scrimAlpha.coerceIn(0, 100) / 100f))
                 // Scrim always consumes the tap (blocks the app); it dismisses only when allowed.
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
                     if (dismissOnOutside) onDismiss()
@@ -195,11 +195,15 @@ private fun SceneCard(
 ) {
     val sw = scene.widthDp.coerceAtLeast(1)
     val sh = scene.heightDp.coerceAtLeast(1)
+    val shape = RoundedCornerShape((scene.cornerRadiusDp.coerceAtLeast(0) * scale).dp)
+    val borderW = scene.borderWidth.coerceAtLeast(0)
     Box(
         Modifier
             .size((sw * scale).dp, (sh * scale).dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surface)
+            .clip(shape)
+            // Blank background defaults to the theme background (black); blank border to outline (yellow).
+            .background(sceneColor(scene.bgColor) ?: MaterialTheme.colorScheme.background)
+            .then(if (borderW > 0) Modifier.border((borderW * scale).dp, sceneColor(scene.borderColor) ?: MaterialTheme.colorScheme.outline, shape) else Modifier)
             // Modal: absorb taps so tapping the card (not the scrim) doesn't dismiss.
             .then(if (absorbTaps) Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {} else Modifier),
     ) {

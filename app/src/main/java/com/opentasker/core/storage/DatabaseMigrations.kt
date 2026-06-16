@@ -86,6 +86,23 @@ object DatabaseMigrations {
         }
     }
 
+    val MIGRATION_7_8 = object : Migration(7, 8) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Scene panel styling: optional background colour, corner radius and modal scrim darkness.
+            db.execSQL("ALTER TABLE scenes ADD COLUMN bgColor TEXT")
+            db.execSQL("ALTER TABLE scenes ADD COLUMN cornerRadiusDp INTEGER NOT NULL DEFAULT 16")
+            db.execSQL("ALTER TABLE scenes ADD COLUMN scrimAlpha INTEGER NOT NULL DEFAULT 55")
+        }
+    }
+
+    val MIGRATION_8_9 = object : Migration(8, 9) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Scene panel border (colour + thickness).
+            db.execSQL("ALTER TABLE scenes ADD COLUMN borderColor TEXT")
+            db.execSQL("ALTER TABLE scenes ADD COLUMN borderWidth INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -94,6 +111,8 @@ object DatabaseMigrations {
             MIGRATION_4_5,
             MIGRATION_5_6,
             MIGRATION_6_7,
+            MIGRATION_7_8,
+            MIGRATION_8_9,
         )
     }
 }

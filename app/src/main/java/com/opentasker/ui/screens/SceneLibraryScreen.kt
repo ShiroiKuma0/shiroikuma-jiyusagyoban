@@ -91,7 +91,7 @@ import com.opentasker.core.scenes.SceneValidator
 fun SceneLibraryScreen(
     scenes: List<Scene>,
     tasks: List<Task>,
-    onCreateScene: (String, Int, Int) -> Unit,
+    onCreateScene: (name: String, widthDp: Int, heightDp: Int, bgColor: String?, cornerRadiusDp: Int, scrimAlpha: Int, borderColor: String?, borderWidth: Int) -> Unit,
     onUpdateScene: (Scene, String) -> Unit,
     onDeleteScene: (Scene) -> Unit,
     onMoveScene: (Scene) -> Unit,
@@ -111,6 +111,7 @@ fun SceneLibraryScreen(
     contentPadding: PaddingValues,
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
+    var editSceneTarget by remember { mutableStateOf<Scene?>(null) }
     var elementEditor by remember { mutableStateOf<SceneElementEditorState?>(null) }
     var pendingElementDelete by remember { mutableStateOf<SceneElementEditorState?>(null) }
     // Order comes from the ViewModel (Alphabetical or Manual); don't re-sort here.
@@ -121,11 +122,29 @@ fun SceneLibraryScreen(
         if (createSignal > 0) showCreateDialog = true
     }
 
+    editSceneTarget?.let { target ->
+        SceneEditorDialog(
+            initial = target,
+            onDismiss = { editSceneTarget = null },
+            onSave = { name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth ->
+                onUpdateScene(
+                    target.copy(
+                        name = name, widthDp = widthDp, heightDp = heightDp,
+                        bgColor = bgColor, cornerRadiusDp = corner, scrimAlpha = scrim,
+                        borderColor = borderColor, borderWidth = borderWidth,
+                    ),
+                    "Scene updated",
+                )
+                editSceneTarget = null
+            },
+        )
+    }
+
     if (showCreateDialog) {
         SceneEditorDialog(
             onDismiss = { showCreateDialog = false },
-            onSave = { name, widthDp, heightDp ->
-                onCreateScene(name, widthDp, heightDp)
+            onSave = { name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth ->
+                onCreateScene(name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth)
                 showCreateDialog = false
             },
         )
@@ -225,6 +244,7 @@ fun SceneLibraryScreen(
                     onDelete = { onDeleteScene(scene) },
                     onMoveToProject = { onMoveScene(scene) },
                     onExportToBundle = { onExportScene(scene) },
+                    onEditScene = { editSceneTarget = scene },
                     )
                 }
             }
@@ -291,6 +311,7 @@ private fun SceneCard(
     onDelete: () -> Unit,
     onMoveToProject: () -> Unit,
     onExportToBundle: () -> Unit,
+    onEditScene: () -> Unit,
 ) {
     val taskNames = remember(tasks) { tasks.associate { it.id to it.name } }
     val issues = remember(scene, tasks) { SceneValidator.validate(scene, tasks) }
@@ -331,6 +352,9 @@ private fun SceneCard(
                     )
                 }
                 if (expanded) {
+                    IconButton(onClick = onEditScene) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Edit scene properties")
+                    }
                     IconButton(onClick = onExportToBundle) {
                         Icon(Icons.Filled.Upload, contentDescription = "Export scene")
                     }
@@ -1010,12 +1034,18 @@ private fun SceneIssueText(issue: SceneIssue) {
 
 @Composable
 private fun SceneEditorDialog(
+    initial: Scene? = null,
     onDismiss: () -> Unit,
-    onSave: (String, Int, Int) -> Unit,
+    onSave: (name: String, widthDp: Int, heightDp: Int, bgColor: String?, cornerRadiusDp: Int, scrimAlpha: Int, borderColor: String?, borderWidth: Int) -> Unit,
 ) {
-    var name by remember { mutableStateOf("") }
-    var width by remember { mutableStateOf("320") }
-    var height by remember { mutableStateOf("240") }
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var width by remember { mutableStateOf((initial?.widthDp ?: 320).toString()) }
+    var height by remember { mutableStateOf((initial?.heightDp ?: 240).toString()) }
+    var bgColor by remember { mutableStateOf(initial?.bgColor ?: "") }
+    var corner by remember { mutableStateOf((initial?.cornerRadiusDp ?: 16).toString()) }
+    var scrim by remember { mutableStateOf((initial?.scrimAlpha ?: 55).toString()) }
+    var borderColor by remember { mutableStateOf(initial?.borderColor ?: "") }
+    var border by remember { mutableStateOf((initial?.borderWidth ?: 0).toString()) }
     val parsedWidth = width.toIntOrNull()
     val parsedHeight = height.toIntOrNull()
     val canSave = name.isNotBlank() && parsedWidth != null && parsedHeight != null && parsedWidth > 0 && parsedHeight > 0
@@ -1023,9 +1053,12 @@ private fun SceneEditorDialog(
     AlertDialog(
         modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
-        title = { Text("Create Scene") },
+        title = { Text(if (initial == null) "Create Scene" else "Edit Scene") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -1033,30 +1066,47 @@ private fun SceneEditorDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
-                    value = width,
-                    onValueChange = { width = it.filter(Char::isDigit).take(4) },
-                    label = { Text("Width dp") },
-                    isError = parsedWidth == null || parsedWidth <= 0,
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = height,
-                    onValueChange = { height = it.filter(Char::isDigit).take(4) },
-                    label = { Text("Height dp") },
-                    isError = parsedHeight == null || parsedHeight <= 0,
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    NumberField("Width dp", width, { width = it.filter(Char::isDigit).take(4) }, parsedWidth == null || parsedWidth <= 0, Modifier.weight(1f))
+                    NumberField("Height dp", height, { height = it.filter(Char::isDigit).take(4) }, parsedHeight == null || parsedHeight <= 0, Modifier.weight(1f))
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Text("Panel", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                SceneColorField(label = "Background colour", value = bgColor, onChange = { bgColor = it })
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    NumberField("Corner (dp)", corner, { corner = it.filter(Char::isDigit).take(2) }, isError = false, modifier = Modifier.weight(1f))
+                    NumberField("Scrim %", scrim, { scrim = it.filter(Char::isDigit).take(3) }, isError = false, modifier = Modifier.weight(1f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) {
+                        SceneColorField(label = "Border colour", value = borderColor, onChange = { borderColor = it })
+                    }
+                    NumberField("Border (dp)", border, { border = it.filter(Char::isDigit).take(2) }, isError = false, modifier = Modifier.weight(1f))
+                }
+                Text(
+                    "Blanks use the theme: background = black, text/borders = yellow. Scrim is the dim behind a modal scene (0 = clear, 100 = black); border 0 = none.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         },
         confirmButton = {
             OutlinedButton(
                 enabled = canSave,
-                onClick = { onSave(name.trim(), parsedWidth ?: 320, parsedHeight ?: 240) },
+                onClick = {
+                    onSave(
+                        name.trim(),
+                        parsedWidth ?: 320,
+                        parsedHeight ?: 240,
+                        bgColor.trim().ifBlank { null },
+                        corner.toIntOrNull()?.coerceAtLeast(0) ?: 16,
+                        (scrim.toIntOrNull() ?: 55).coerceIn(0, 100),
+                        borderColor.trim().ifBlank { null },
+                        border.toIntOrNull()?.coerceAtLeast(0) ?: 0,
+                    )
+                },
             ) {
-                Text("Create")
+                Text(if (initial == null) "Create" else "Save")
             }
         },
         dismissButton = {
