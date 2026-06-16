@@ -14,13 +14,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -242,6 +245,30 @@ private fun SceneElementView(
             }
         }
 
+        SceneElementType.CHECKBOX, SceneElementType.TOGGLE -> {
+            val varName = cfg["var"]?.trim()
+            var checked by remember(element.id) { mutableStateOf(sceneBool(v("value"))) }
+            // On change: write the boolean to `var` (true/false) and run the tap task.
+            val onChanged: (Boolean) -> Unit = { c ->
+                checked = c
+                if (!varName.isNullOrBlank()) onSetVar(varName, c.toString())
+                element.tapTaskId?.let(onRunTask)
+            }
+            Row(
+                Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (element.type == SceneElementType.CHECKBOX) {
+                    Checkbox(checked = checked, onCheckedChange = onChanged)
+                    Text(v("label", "Checkbox"), color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                } else {
+                    Text(v("label", "Toggle"), color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                    Switch(checked = checked, onCheckedChange = onChanged)
+                }
+            }
+        }
+
         SceneElementType.IMAGE -> {
             val source = v("source")
             val bmp = remember(source) {
@@ -261,3 +288,6 @@ private fun SceneElementView(
         }
     }
 }
+
+/** Truthy parse for checkbox/toggle scene values. */
+private fun sceneBool(s: String): Boolean = s.trim().lowercase() in setOf("true", "1", "on", "yes")

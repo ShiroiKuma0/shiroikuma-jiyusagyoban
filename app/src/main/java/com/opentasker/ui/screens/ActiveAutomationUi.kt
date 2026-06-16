@@ -197,6 +197,7 @@ import com.opentasker.core.storage.minimumTimestamp
 import com.opentasker.core.storage.normalized
 import com.opentasker.core.storage.toEntity
 import com.opentasker.core.transfer.BundleImportPlan
+import com.opentasker.core.transfer.BundleImportReport
 import com.opentasker.core.transfer.OpenTaskerBundle
 import com.opentasker.core.transfer.OpenTaskerBundleCodec
 import com.opentasker.core.transfer.ItemConflictStrategy
@@ -417,6 +418,12 @@ class ActiveAutomationViewModel(
 
     internal var openTaskerBundleReview by mutableStateOf<OpenTaskerBundleReviewState?>(null)
         private set
+
+    // Set after a successful import so the UI can show a persistent result dialog (counts + project).
+    internal var openTaskerImportResult by mutableStateOf<BundleImportReport?>(null)
+        private set
+
+    fun clearImportResult() { openTaskerImportResult = null }
 
     var openTaskerBundleBusy by mutableStateOf(false)
         private set
@@ -700,10 +707,7 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess { importReport ->
                     taskerImportReview = null
-                    events.send(
-                        "Imported ${importReport.insertedTasks} task${plural(importReport.insertedTasks)}, " +
-                            "${importReport.insertedProfiles} disabled profile${plural(importReport.insertedProfiles)}"
-                    )
+                    openTaskerImportResult = importReport
                 }
                 .onFailure { events.send("Error: ${it.message ?: "Tasker XML import failed"}") }
             taskerImportBusy = false
@@ -829,13 +833,7 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess { importReport ->
                     openTaskerBundleReview = null
-                    events.send(
-                        "Imported ${importReport.insertedTasks} task${plural(importReport.insertedTasks)}, " +
-                            "${importReport.insertedProfiles} disabled profile${plural(importReport.insertedProfiles)}, " +
-                            "${importReport.insertedScenes} scene${plural(importReport.insertedScenes)}" +
-                            (if (importReport.insertedTemplates > 0) ", ${importReport.insertedTemplates} template${plural(importReport.insertedTemplates)}" else "") +
-                            (if (importReport.insertedProjects > 0) ", ${importReport.insertedProjects} project${plural(importReport.insertedProjects)}" else "")
-                    )
+                    openTaskerImportResult = importReport
                 }
                 .onFailure { events.send("Error: ${it.message ?: "白い熊 自由作業盤 bundle import failed"}") }
             openTaskerBundleBusy = false
@@ -1947,6 +1945,10 @@ fun ActiveAutomationUi(
             },
             onDismiss = { importItemConflict = null },
         )
+    }
+
+    viewModel.openTaskerImportResult?.let { report ->
+        ImportResultDialog(report = report, onDismiss = { viewModel.clearImportResult() })
     }
 
     if (showCreateTaskDialog) {
@@ -3622,6 +3624,43 @@ private fun ImportItemConflictDialog(
                 TextButton(onClick = onDismiss) { Text("Cancel") }
             }
         },
+    )
+}
+
+@Composable
+private fun ImportResultDialog(report: BundleImportReport, onDismiss: () -> Unit) {
+    val counts = buildList {
+        if (report.insertedTasks > 0) add("${report.insertedTasks} task${plural(report.insertedTasks)}")
+        if (report.insertedProfiles > 0) add("${report.insertedProfiles} disabled profile${plural(report.insertedProfiles)}")
+        if (report.insertedScenes > 0) add("${report.insertedScenes} scene${plural(report.insertedScenes)}")
+        if (report.insertedTemplates > 0) add("${report.insertedTemplates} template${plural(report.insertedTemplates)}")
+        if (report.insertedVariables > 0) add("${report.insertedVariables} variable${plural(report.insertedVariables)}")
+        if (report.insertedProjects > 0) add("${report.insertedProjects} new project${plural(report.insertedProjects)}")
+    }
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = onDismiss,
+        title = { Text("Import complete") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(if (counts.isEmpty()) "Nothing new was imported." else "Imported ${counts.joinToString()}.", style = MaterialTheme.typography.bodyMedium)
+                if (report.projectNames.isNotEmpty()) {
+                    Text(
+                        "Filed under: ${report.projectNames.joinToString { "“$it”" }}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                if (report.lossyWarnings.isNotEmpty()) {
+                    Text(
+                        report.lossyWarnings.joinToString("\n") { "• $it" },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } },
     )
 }
 

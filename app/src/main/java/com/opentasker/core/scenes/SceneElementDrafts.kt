@@ -9,6 +9,8 @@ object SceneElementDrafts {
         SceneElementType.BUTTON,
         SceneElementType.TEXT,
         SceneElementType.SLIDER,
+        SceneElementType.CHECKBOX,
+        SceneElementType.TOGGLE,
         SceneElementType.IMAGE,
     )
 
@@ -40,6 +42,8 @@ object SceneElementDrafts {
             "max" to "100",
             "value" to "50",
         )
+        SceneElementType.CHECKBOX -> mapOf("label" to "Checkbox", "value" to "false")
+        SceneElementType.TOGGLE -> mapOf("label" to "Toggle", "value" to "false")
         SceneElementType.IMAGE -> mapOf("source" to "Image")
         else -> emptyMap()
     }
@@ -48,6 +52,8 @@ object SceneElementDrafts {
         SceneElementType.TEXT -> 160 to 40
         SceneElementType.BUTTON -> 160 to 48
         SceneElementType.SLIDER -> 220 to 56
+        SceneElementType.CHECKBOX -> 200 to 48
+        SceneElementType.TOGGLE -> 200 to 48
         SceneElementType.IMAGE -> 180 to 120
         else -> 160 to 48
     }

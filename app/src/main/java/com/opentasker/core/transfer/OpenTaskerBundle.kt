@@ -110,6 +110,8 @@ data class BundleImportReport(
     val insertedScenes: Int,
     val insertedTemplates: Int = 0,
     val insertedProjects: Int = 0,
+    /** Distinct projects the imported tasks/profiles/scenes landed in ("Unfiled" for items with none). */
+    val projectNames: List<String> = emptyList(),
     val warnings: List<String> = emptyList(),
     val lossyWarnings: List<String> = emptyList(),
 )
@@ -332,6 +334,8 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
         var insertedProjects = 0
         val importWarnings = plan.warnings.toMutableList()
         val lossyWarnings = plan.lossyWarnings.toMutableList()
+        // Resolved project ids the imported tasks/profiles/scenes landed in (null = Unfiled).
+        val targetProjectIds = mutableSetOf<Long?>()
 
         db.withTransaction {
             // Resolve each bundle project against existing names per the chosen strategy: MERGE
@@ -370,9 +374,11 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             val taskIdMap = mutableMapOf<Long, Long>()
             bundle.tasks.sortedWith(compareBy<Task> { it.name.lowercase() }.thenBy { it.id }).forEach { task ->
                 val newName = uniqueName(task.name, takenTaskNames)
-                val newId = db.taskDao().insert(task.copy(id = 0, name = newName, projectId = remapProjectId(task.projectId)).toEntity())
+                val pid = remapProjectId(task.projectId)
+                val newId = db.taskDao().insert(task.copy(id = 0, name = newName, projectId = pid).toEntity())
                 takenTaskNames += newName.lowercase()
                 taskIdMap[task.id] = newId
+                targetProjectIds += pid
                 insertedTasks++
             }
 
@@ -400,16 +406,18 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
                     return@forEach
                 }
                 val newName = uniqueName(profile.name, takenProfileNames)
+                val pid = remapProjectId(profile.projectId)
                 val remappedProfile = profile.copy(
                     id = 0,
                     name = newName,
                     enabled = false,
                     enterTaskId = enterTaskId,
                     exitTaskId = profile.exitTaskId?.let { taskIdMap[it] },
-                    projectId = remapProjectId(profile.projectId),
+                    projectId = pid,
                 )
                 db.profileDao().insert(remappedProfile.toEntity())
                 takenProfileNames += newName.lowercase()
+                targetProjectIds += pid
                 insertedProfiles++
             }
 
@@ -427,8 +435,10 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
                     remapSceneElement(element, taskIdMap)
                 }
                 val newName = uniqueName(scene.name, takenSceneNames)
-                db.sceneDao().insert(scene.copy(id = 0, name = newName, elements = remappedElements, projectId = remapProjectId(scene.projectId)).toEntity())
+                val pid = remapProjectId(scene.projectId)
+                db.sceneDao().insert(scene.copy(id = 0, name = newName, elements = remappedElements, projectId = pid).toEntity())
                 takenSceneNames += newName.lowercase()
+                targetProjectIds += pid
                 insertedScenes++
             }
         }
@@ -456,6 +466,12 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
         // default to Alphabetical).
         ListSortStore.setAll(bundle.sort.toPrefs())
 
+        // Resolve the target project ids to names for the import-result dialog.
+        val projectNamesById = db.projectDao().getAll().associate { it.id to it.name }
+        val projectNames = targetProjectIds
+            .map { id -> if (id == null) "Unfiled" else (projectNamesById[id] ?: "Unfiled") }
+            .distinct()
+
         return BundleImportReport(
             insertedTasks = insertedTasks,
             insertedProfiles = insertedProfiles,
@@ -463,6 +479,7 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             insertedScenes = insertedScenes,
             insertedTemplates = insertedTemplates,
             insertedProjects = insertedProjects,
+            projectNames = projectNames,
             warnings = importWarnings,
             lossyWarnings = lossyWarnings.distinct(),
         )
