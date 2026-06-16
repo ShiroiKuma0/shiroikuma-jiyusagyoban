@@ -1055,6 +1055,8 @@ fun ActiveAutomationUi(
     val expandedScenes = remember { mutableStateMapOf<Long, Boolean>() }
     val expandedTemplates = remember { mutableStateMapOf<String, Boolean>() }
     val expandedVars = remember { mutableStateMapOf<String, Boolean>() }
+    // Help sections start collapsed; hoisted so the open/closed state survives leaving the tab.
+    val expandedHelpSections = remember { mutableStateMapOf<String, Boolean>() }
     var taskDialog by remember { mutableStateOf<Task?>(null) }
     var showCreateTaskDialog by remember { mutableStateOf(false) }
     var profileDialog by remember { mutableStateOf<Profile?>(null) }
@@ -1685,7 +1687,10 @@ fun ActiveAutomationUi(
 
             OpenTaskerScreen.Inspector -> ContextInspectorScreen(db = db, contentPadding = innerPadding)
 
-            OpenTaskerScreen.Help -> HelpDocumentationScreen(contentPadding = innerPadding)
+            OpenTaskerScreen.Help -> HelpDocumentationScreen(
+                contentPadding = innerPadding,
+                expandedSections = expandedHelpSections,
+            )
 
             OpenTaskerScreen.RunLog -> RunLogScreenContent(
                 logs = runLogs,

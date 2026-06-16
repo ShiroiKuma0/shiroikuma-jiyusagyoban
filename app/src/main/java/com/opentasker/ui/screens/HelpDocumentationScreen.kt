@@ -1,6 +1,8 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,14 +13,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -29,9 +37,15 @@ import com.opentasker.core.actions.ActionMetadataRegistry
  * The "Help" tab: in-app documentation. The concept/schema prose lives in [docSections] (kept in sync
  * with `docs/bundle-schema.md` in the repo); the **action reference** is generated live from
  * [ActionMetadataRegistry], so it can never drift from the actual built-in actions.
+ *
+ * Every section folds (collapsed by default); [expandedSections] is hoisted to the host so the
+ * open/closed state survives leaving and re-entering the tab.
  */
 @Composable
-fun HelpDocumentationScreen(contentPadding: PaddingValues) {
+fun HelpDocumentationScreen(
+    contentPadding: PaddingValues,
+    expandedSections: SnapshotStateMap<String, Boolean>,
+) {
     val actionsByCategory = remember {
         ActionMetadataRegistry.all().sortedBy { it.name }.groupBy { it.category }.toSortedMap()
     }
@@ -41,12 +55,12 @@ fun HelpDocumentationScreen(contentPadding: PaddingValues) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         items(docSections, key = { it.title }) { section ->
-            DocCard(section.title) {
+            DocCard(section.title, expandedSections) {
                 section.blocks.forEach { RenderBlock(it) }
             }
         }
-        item {
-            DocCard("Action reference") {
+        item(key = "Action reference") {
+            DocCard("Action reference", expandedSections) {
                 Para("Every built-in action, generated from the live registry. The `type` is the id you put in a bundle's `actions[]`; the fields are the keys that go in that action's `args` map.")
                 Text(
                     "${actionsByCategory.values.sumOf { it.size }} actions in ${actionsByCategory.size} categories",
@@ -57,7 +71,7 @@ fun HelpDocumentationScreen(contentPadding: PaddingValues) {
         }
         actionsByCategory.forEach { (category, actions) ->
             item(key = "cat:$category") {
-                DocCard(category) {
+                DocCard(category, expandedSections, key = "cat:$category") {
                     actions.forEachIndexed { index, action ->
                         if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         ActionDoc(action)
@@ -68,17 +82,34 @@ fun HelpDocumentationScreen(contentPadding: PaddingValues) {
     }
 }
 
+/** A collapsible doc section; collapsed by default, toggle state stored in [expandedSections] by [key]. */
 @Composable
-private fun DocCard(title: String, content: @Composable () -> Unit) {
+private fun DocCard(
+    title: String,
+    expandedSections: SnapshotStateMap<String, Boolean>,
+    key: String = title,
+    content: @Composable () -> Unit,
+) {
+    val expanded = expandedSections[key] == true
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         shape = RoundedCornerShape(16.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-            content()
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { expandedSections[key] = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Collapse $title" else "Expand $title",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (expanded) content()
         }
     }
 }
