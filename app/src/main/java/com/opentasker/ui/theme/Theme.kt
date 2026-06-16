@@ -143,7 +143,9 @@ fun OpenTaskerTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (view.context as Activity).window
+            // Only an Activity has a status bar to tint; in a scene overlay window the context is the
+            // Application, so skip it (casting unconditionally would crash the overlay).
+            val window = (view.context as? Activity)?.window ?: return@SideEffect
             window.statusBarColor = colors.background.toArgb()
             // Background is user-chosen and usually dark; keep light status-bar icons unless the
             // chosen background is itself light.

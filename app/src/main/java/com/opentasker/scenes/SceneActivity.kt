@@ -135,8 +135,10 @@ class SceneActivity : ComponentActivity() {
     }
 }
 
+/** The scene's modal content (scrim + scaled card). Shared by [SceneActivity] and the system-wide
+ *  [SceneOverlayManager] window. */
 @Composable
-private fun SceneOverlay(
+internal fun SceneOverlay(
     scene: Scene?,
     onDismiss: () -> Unit,
     onRunTask: (Long) -> Unit,
