@@ -17,7 +17,7 @@ arrays, date/time, dialogs, accessibility gestures, and a **Shizuku-powered elev
 Installs **side-by-side** with upstream OpenTasker — package `shiroikuma.jiyusagyoban`, label
 **白い熊 自由作業盤**.
 
-**📥 Latest release: [`0.2.60+35`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.68+3`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 </div>
 
