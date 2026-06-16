@@ -33,9 +33,10 @@ class MainActivity : ComponentActivity() {
             val darkTheme = when (themeMode) {
                 ThemeMode.Dark -> true
                 ThemeMode.Light -> false
+                ThemeMode.HighContrast -> true
                 ThemeMode.System -> isSystemInDarkTheme()
             }
-            OpenTaskerTheme(darkTheme = darkTheme) {
+            OpenTaskerTheme(darkTheme = darkTheme, highContrast = themeMode == ThemeMode.HighContrast) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

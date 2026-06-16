@@ -221,24 +221,29 @@ private fun ThemeSetupCard() {
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Theme", style = MaterialTheme.typography.titleMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                ThemeMode.entries.forEach { mode ->
-                    val label = when (mode) {
-                        ThemeMode.System -> "System"
-                        ThemeMode.Dark -> "Dark"
-                        ThemeMode.Light -> "Light"
-                    }
-                    val selected = mode == currentMode
-                    if (selected) {
-                        Button(
-                            onClick = {},
-                            modifier = Modifier.weight(1f),
-                        ) { Text(label) }
-                    } else {
-                        OutlinedButton(
-                            onClick = { scope.launch { ThemePreference.set(context, mode) } },
-                            modifier = Modifier.weight(1f),
-                        ) { Text(label) }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                ThemeMode.entries.chunked(2).forEach { rowModes ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        rowModes.forEach { mode ->
+                            val label = when (mode) {
+                                ThemeMode.System -> "System"
+                                ThemeMode.Dark -> "Dark"
+                                ThemeMode.Light -> "Light"
+                                ThemeMode.HighContrast -> "High contrast"
+                            }
+                            val selected = mode == currentMode
+                            if (selected) {
+                                Button(
+                                    onClick = {},
+                                    modifier = Modifier.weight(1f),
+                                ) { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                            } else {
+                                OutlinedButton(
+                                    onClick = { scope.launch { ThemePreference.set(context, mode) } },
+                                    modifier = Modifier.weight(1f),
+                                ) { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                            }
+                        }
                     }
                 }
             }
