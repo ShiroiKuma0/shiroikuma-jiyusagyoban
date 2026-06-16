@@ -4,13 +4,13 @@ import android.content.Context
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
-import android.os.Build
 import android.view.KeyEvent
 import kotlinx.coroutines.suspendCancellableCoroutine
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.platform.AndroidAudioHardening
 
 /**
  * Play a sound or music file.
@@ -24,11 +24,8 @@ class PlaySoundAction : Action {
     override val category = ActionCategory.MEDIA
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        if (Build.VERSION.SDK_INT >= ANDROID_17_API) {
-            return ActionResult.Failure(
-                "Android 17+ restricts background audio playback; " +
-                    "sound.play may produce no output from a background service without a media foreground-service type"
-            )
+        if (AndroidAudioHardening.isRestricted()) {
+            return AndroidAudioHardening.soundPlaybackFailure()
         }
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         val volume = args["volume"]?.toFloatOrNull()?.let { (it / 100f).coerceIn(0f, 1f) }
@@ -125,11 +122,8 @@ class MuteAction : Action {
     override val category = ActionCategory.MEDIA
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        if (Build.VERSION.SDK_INT >= ANDROID_17_API) {
-            return ActionResult.Failure(
-                "Android 17+ restricts background volume changes; " +
-                    "mute may not work from a background service"
-            )
+        if (AndroidAudioHardening.isRestricted()) {
+            return AndroidAudioHardening.volumeFailure("mute")
         }
         val stream = args["stream"] ?: "music"
         val am = ctx.app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -146,11 +140,8 @@ class MuteAction : Action {
 }
 
 private fun dispatchMediaKey(ctx: ActionContext, keyCode: Int): ActionResult {
-    if (Build.VERSION.SDK_INT >= ANDROID_17_API) {
-        return ActionResult.Failure(
-            "Android 17+ restricts background audio control; " +
-                "media key dispatch may not reach the active player from a background service"
-        )
+    if (AndroidAudioHardening.isRestricted()) {
+        return AndroidAudioHardening.mediaKeyFailure()
     }
     val audioManager = ctx.app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         ?: return ActionResult.Failure("audio service not available")
@@ -163,8 +154,6 @@ private fun dispatchMediaKey(ctx: ActionContext, keyCode: Int): ActionResult {
         ActionResult.Failure("media key dispatch failed: ${ex.message}", ex)
     }
 }
-
-private const val ANDROID_17_API = 37
 
 private fun streamType(name: String): Int? = when (name.lowercase()) {
     "music", "media" -> AudioManager.STREAM_MUSIC

@@ -1,10 +1,9 @@
 package com.opentasker.core.capabilities
 
 import com.opentasker.app.BuildConfig
+import com.opentasker.core.platform.AndroidAudioHardening
 import com.opentasker.core.power.ShizukuPowerBackend
 import com.opentasker.core.scripting.TermuxScriptBackend
-
-private const val ANDROID_17_API = 37
 
 enum class CapabilityLevel {
     Supported,
@@ -74,26 +73,35 @@ object ActionCapabilityRegistry {
             ActionCapability(CapabilityLevel.Unsupported, "SMS action is unavailable in this distribution because SMS and phone-state permissions are omitted for Play policy compliance.")
         }
 
-    private fun audioOutputCapability(reason: String): ActionCapability =
-        if (android.os.Build.VERSION.SDK_INT >= ANDROID_17_API) {
-            ActionCapability(CapabilityLevel.Unsupported, "Android 17+ restricts background audio output without a media foreground-service type. $reason")
+    internal fun audioOutputCapabilityForSdk(sdkInt: Int, reason: String): ActionCapability =
+        if (AndroidAudioHardening.isRestricted(sdkInt)) {
+            ActionCapability(CapabilityLevel.Unsupported, AndroidAudioHardening.outputCapabilityReason(reason))
         } else {
             ActionCapability(CapabilityLevel.Supported, reason)
         }
 
-    private fun mediaKeyCapability(reason: String): ActionCapability =
-        if (android.os.Build.VERSION.SDK_INT >= ANDROID_17_API) {
-            ActionCapability(CapabilityLevel.Unsupported, "Android 17+ restricts background media key dispatch. $reason")
+    internal fun mediaKeyCapabilityForSdk(sdkInt: Int, reason: String): ActionCapability =
+        if (AndroidAudioHardening.isRestricted(sdkInt)) {
+            ActionCapability(CapabilityLevel.Unsupported, AndroidAudioHardening.mediaKeyCapabilityReason(reason))
         } else {
             ActionCapability(CapabilityLevel.Supported, reason)
         }
 
-    private fun volumeCapability(reason: String): ActionCapability =
-        if (android.os.Build.VERSION.SDK_INT >= ANDROID_17_API) {
-            ActionCapability(CapabilityLevel.Unsupported, "Android 17+ restricts background volume changes. $reason")
+    internal fun volumeCapabilityForSdk(sdkInt: Int, reason: String): ActionCapability =
+        if (AndroidAudioHardening.isRestricted(sdkInt)) {
+            ActionCapability(CapabilityLevel.Unsupported, AndroidAudioHardening.volumeCapabilityReason(reason))
         } else {
             ActionCapability(CapabilityLevel.RequiresSetup, reason)
         }
+
+    private fun audioOutputCapability(reason: String): ActionCapability =
+        audioOutputCapabilityForSdk(android.os.Build.VERSION.SDK_INT, reason)
+
+    private fun mediaKeyCapability(reason: String): ActionCapability =
+        mediaKeyCapabilityForSdk(android.os.Build.VERSION.SDK_INT, reason)
+
+    private fun volumeCapability(reason: String): ActionCapability =
+        volumeCapabilityForSdk(android.os.Build.VERSION.SDK_INT, reason)
 
     private fun elevatedUnsupported(actionId: String, reason: String): ActionCapability =
         ActionCapability(

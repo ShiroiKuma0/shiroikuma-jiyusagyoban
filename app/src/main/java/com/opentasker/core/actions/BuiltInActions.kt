@@ -15,6 +15,7 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.platform.AndroidAudioHardening
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -180,11 +181,8 @@ class SayAction : Action {
     override val category = ActionCategory.NOTIFICATION
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        if (android.os.Build.VERSION.SDK_INT >= ANDROID_17_API) {
-            return ActionResult.Failure(
-                "Android 17+ restricts background audio output; " +
-                    "TTS may produce no speech from a background service without a media foreground-service type"
-            )
+        if (AndroidAudioHardening.isRestricted()) {
+            return AndroidAudioHardening.ttsFailure()
         }
         val text = args["text"]?.takeIf { it.isNotBlank() }
             ?: return ActionResult.Failure("missing text argument")
@@ -259,8 +257,6 @@ class WaitAction : Action {
  *   - "action": intent action (optional, defaults to MAIN)
  *   - "category": intent category (optional)
  */
-private const val ANDROID_17_API = 37
-
 class LaunchIntentAction : Action {
     override val id = "intent.launch"
     override val category = ActionCategory.APP
