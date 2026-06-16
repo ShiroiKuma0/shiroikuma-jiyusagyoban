@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -31,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
@@ -197,23 +199,46 @@ private fun SceneElementView(
             val min = cfg["min"]?.toFloatOrNull() ?: 0f
             val max = (cfg["max"]?.toFloatOrNull() ?: 100f).coerceAtLeast(min + 1f)
             val varName = cfg["var"]?.trim()
+            val vertical = cfg["orientation"].equals("vertical", ignoreCase = true)
             // Initial value is expanded against globals, so `value: "%VOL"` starts the slider at the
             // live variable (e.g. the current volume, seeded by a Get Volume action before scene.show).
             var value by remember(element.id) { mutableStateOf((v("value").toFloatOrNull() ?: min).coerceIn(min, max)) }
-            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
-                Text(v("label", "Slider"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
-                Slider(
-                    value = value,
-                    onValueChange = { value = it },
-                    // On release: publish the settled value to `var` (if set), then run the tap task —
-                    // which can read that variable (e.g. a Set Volume action with level = %VOL).
-                    onValueChangeFinished = {
-                        if (!varName.isNullOrBlank()) onSetVar(varName, value.roundToInt().toString())
-                        element.tapTaskId?.let(onRunTask)
-                    },
-                    valueRange = min..max,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+            // On release: publish the settled value to `var` (if set), then run the tap task — which can
+            // read that variable (e.g. a Set Volume action with level = %VOL).
+            val onSettled: () -> Unit = {
+                if (!varName.isNullOrBlank()) onSetVar(varName, value.roundToInt().toString())
+                element.tapTaskId?.let(onRunTask)
+            }
+            val label = v("label", "Slider")
+            if (vertical) {
+                // A horizontal Slider rotated 90° CCW: its track length follows the element height, so
+                // the top is max and dragging up increases the value.
+                Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+                    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        val trackLength = maxHeight
+                        Slider(
+                            value = value,
+                            onValueChange = { value = it },
+                            onValueChangeFinished = onSettled,
+                            valueRange = min..max,
+                            // requiredWidth ignores the (narrow) element width so the rotated track can
+                            // span the full element height instead of being clamped to its width.
+                            modifier = Modifier.requiredWidth(trackLength).rotate(-90f),
+                        )
+                    }
+                }
+            } else {
+                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
+                    Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+                    Slider(
+                        value = value,
+                        onValueChange = { value = it },
+                        onValueChangeFinished = onSettled,
+                        valueRange = min..max,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         }
 

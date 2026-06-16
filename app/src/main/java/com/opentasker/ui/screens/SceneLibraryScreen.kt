@@ -51,6 +51,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -600,6 +601,8 @@ private fun SceneElementEditorDialog(
     var sliderMin by remember(state) { mutableStateOf(initial.config["min"] ?: "0") }
     var sliderMax by remember(state) { mutableStateOf(initial.config["max"] ?: "100") }
     var sliderValue by remember(state) { mutableStateOf(initial.config["value"] ?: "50") }
+    var sliderVar by remember(state) { mutableStateOf(initial.config["var"] ?: "") }
+    var sliderVertical by remember(state) { mutableStateOf(initial.config["orientation"].equals("vertical", ignoreCase = true)) }
     var imageSource by remember(state) { mutableStateOf(initial.config["source"] ?: "") }
     var tapTaskId by remember(state) { mutableStateOf(initial.tapTaskId) }
     var longPressTaskId by remember(state) { mutableStateOf(initial.longPressTaskId) }
@@ -610,9 +613,12 @@ private fun SceneElementEditorDialog(
     val parsedHeight = height.toIntOrNull()
     val parsedSliderMin = sliderMin.toIntOrNull()
     val parsedSliderMax = sliderMax.toIntOrNull()
-    val parsedSliderValue = sliderValue.toIntOrNull()
+    // Value may be a number (the start position) or a %var that resolves at show time.
+    val sliderValueIsVar = sliderValue.trim().startsWith("%")
+    val parsedSliderValue = if (sliderValueIsVar) null else sliderValue.toIntOrNull()
     val sliderValid = type != SceneElementType.SLIDER ||
-        (parsedSliderMin != null && parsedSliderMax != null && parsedSliderValue != null && parsedSliderMin <= parsedSliderMax)
+        (parsedSliderMin != null && parsedSliderMax != null && parsedSliderMin <= parsedSliderMax &&
+            (sliderValueIsVar || parsedSliderValue != null))
     val canSave = parsedX != null &&
         parsedY != null &&
         parsedWidth != null &&
@@ -645,6 +651,8 @@ private fun SceneElementEditorDialog(
                         sliderMin = defaults.config["min"] ?: "0"
                         sliderMax = defaults.config["max"] ?: "100"
                         sliderValue = defaults.config["value"] ?: "50"
+                        sliderVar = defaults.config["var"] ?: ""
+                        sliderVertical = defaults.config["orientation"].equals("vertical", ignoreCase = true)
                         imageSource = defaults.config["source"] ?: ""
                     },
                 )
@@ -696,8 +704,36 @@ private fun SceneElementEditorDialog(
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                             NumberField("Min", sliderMin, { sliderMin = it.filter(Char::isDigit).take(5) }, parsedSliderMin == null, Modifier.weight(1f))
                             NumberField("Max", sliderMax, { sliderMax = it.filter(Char::isDigit).take(5) }, parsedSliderMax == null || (parsedSliderMin != null && parsedSliderMax < parsedSliderMin), Modifier.weight(1f))
-                            NumberField("Value", sliderValue, { sliderValue = it.filter(Char::isDigit).take(5) }, parsedSliderValue == null, Modifier.weight(1f))
+                            OutlinedTextField(
+                                value = sliderValue,
+                                onValueChange = { sliderValue = it.take(16) },
+                                label = { Text("Start") },
+                                singleLine = true,
+                                isError = !(sliderValueIsVar || parsedSliderValue != null),
+                                modifier = Modifier.weight(1f),
+                            )
                         }
+                        OutlinedTextField(
+                            value = sliderVar,
+                            onValueChange = { sliderVar = it.take(40) },
+                            label = { Text("Store value in variable") },
+                            placeholder = { Text("%VOL") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text("Vertical", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                            Switch(checked = sliderVertical, onCheckedChange = { sliderVertical = it })
+                        }
+                        Text(
+                            "On release the value is written to this variable and the Tap task runs. Set Start to a %var (e.g. %VOL) to open at that variable's current value. Vertical fills the element's height (size it tall).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
 
                     SceneElementType.IMAGE -> OutlinedTextField(
@@ -736,7 +772,7 @@ private fun SceneElementEditorDialog(
                             yDp = parsedY ?: 0,
                             widthDp = parsedWidth ?: 1,
                             heightDp = parsedHeight ?: 1,
-                            config = elementConfig(type, label, sliderMin, sliderMax, sliderValue, imageSource),
+                            config = elementConfig(type, label, sliderMin, sliderMax, sliderValue, sliderVar, sliderVertical, imageSource),
                             tapTaskId = tapTaskId,
                             longPressTaskId = longPressTaskId,
                         ),
@@ -926,6 +962,8 @@ private fun elementConfig(
     sliderMin: String,
     sliderMax: String,
     sliderValue: String,
+    sliderVar: String,
+    sliderVertical: Boolean,
     imageSource: String,
 ): Map<String, String> = when (type) {
     SceneElementType.TEXT -> mapOf("text" to label.ifBlank { "Text" })
@@ -933,13 +971,17 @@ private fun elementConfig(
     SceneElementType.SLIDER -> {
         val min = sliderMin.toIntOrNull() ?: 0
         val max = (sliderMax.toIntOrNull() ?: 100).coerceAtLeast(min)
-        val value = (sliderValue.toIntOrNull() ?: min).coerceIn(min, max)
-        mapOf(
-            "label" to label.ifBlank { "Slider" },
-            "min" to min.toString(),
-            "max" to max.toString(),
-            "value" to value.toString(),
-        )
+        // A %var start value is kept literal (resolved at show time); a number is clamped to range.
+        val value = if (sliderValue.trim().startsWith("%")) sliderValue.trim()
+        else (sliderValue.toIntOrNull() ?: min).coerceIn(min, max).toString()
+        buildMap {
+            put("label", label.ifBlank { "Slider" })
+            put("min", min.toString())
+            put("max", max.toString())
+            put("value", value)
+            sliderVar.trim().removePrefix("%").takeIf { it.isNotBlank() }?.let { put("var", it) }
+            if (sliderVertical) put("orientation", "vertical")
+        }
     }
     SceneElementType.IMAGE -> mapOf("source" to imageSource.ifBlank { "Image" })
     else -> emptyMap()
