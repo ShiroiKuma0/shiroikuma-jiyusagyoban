@@ -8,16 +8,18 @@
 
 **A FOSS, Tasker-style Android automation app — privacy-respecting, no accounts, no cloud.**
 
-A fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with **major additions**: a
-generic **Send Intent** action to drive other apps, a **~100-action catalogue** (variables &
-arrays, date/time, dialogs, accessibility gestures, and a **Shizuku-powered elevated tier**),
-**named task parameters & returns**, **Projects**, **per-tab sorting with drag-and-drop**, versioned
-**JSON export/import**, and a fully-customisable **black-and-yellow theme**.
+A fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with **major additions**:
+**Scenes** (a floating-overlay UI builder), a **home-screen widget engine** with a template library
+and a fully app-driven **kanji clock**, a generic **Send Intent** action to drive other apps, a
+**~100-action catalogue** (variables & arrays, date/time, dialogs, accessibility gestures, and a
+**Shizuku-powered elevated tier**), **named task parameters & returns**, **Projects** with
+**persistent project-scoped variables**, name search & multi-select on every list, and a
+fully-customisable **black-and-yellow theme**.
 
 Installs **side-by-side** with upstream OpenTasker — package `shiroikuma.jiyusagyoban`, label
 **白い熊 自由作業盤**.
 
-**📥 Latest release: [`0.2.68+3`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.68+10`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 </div>
 
@@ -30,6 +32,46 @@ URI, MIME type, up to three `key:value` extras, an explicit target package/class
 broadcast / activity / service target. That makes 白い熊 自由作業盤 a controller for the sister
 apps' token-gated automation intents (e.g. `白い熊 GNU Jami`'s send-message / place-call /
 open-conversation intents) — and for anything else on the device that listens for an intent.
+
+---
+
+## 🪟 Scenes — build a floating UI
+
+**Scenes** are interactive overlays you design in-app and pop up from any task — as a foreground
+panel or, with “display over other apps”, a **system-wide overlay** that floats over other apps and
+fires from background triggers. Build them from **eleven element types** — Text, Button, Edit Text,
+Slider (horizontal & vertical), Number picker, Checkbox, Toggle, Spinner, Image, Rectangle and Oval.
+Input elements **write a variable and run a task**, and a shown scene **re-renders live** when a
+bound variable changes — so a scene is a real, reactive control panel, not a static popup. Style each
+element (colour, size, weight, alignment, border) and the panel itself (background, corner radius,
+modal scrim, border), choose how it shows (`scene.show`: top/centre/bottom, modal vs tap-through HUD,
+auto-dismiss timeout, dismiss-on-outside — or per-scene defaults), and arrange it on a **live canvas**
+with drag-to-move, **drag-to-resize**, a live styling preview, and **duplicate / z-order**.
+
+---
+
+## 🧩 Home-screen widgets & a template library
+
+A styled **bitmap-widget engine** draws rich layouts (text, rows/columns, fonts, colours, padding)
+onto the home screen via the **Set Widget** action, designed in a visual **layout editor** — RGBA
+colour pickers, ± number steppers, per-field sliders, a resizable preview, and **Tasker Widget V2
+import**. Named layouts live in a **Template Library** (the “Widgets” tab): edit a design once and
+every widget using it updates. Widgets follow a **pull / placeholder model** — bind a widget to a
+template, pick its tap task from a list (**bound by name**, so it survives bundle re-imports), and
+**Refresh Widgets** re-renders them all from the current variables. Templates ride inside the JSON
+bundles, and the **`serif`** keyword renders CJK in **Minchō** without importing a font.
+
+---
+
+## 🕐 A kanji clock & live status widgets (時間と日付)
+
+A fully **app-driven** port of a 勘亭流-font kanji clock/date: calc tasks compose the spoken-kanji
+**time and date into variables**, an **every-minute trigger** refreshes the widgets, and the whole
+set ships as an importable bundle. Alongside it, **live status widgets** read real device state — a
+no-permission **Get Device State** action exposes battery / charging / WiFi / airplane, so **WiFi**,
+**Airplane** and **Battery** (the percent rendered as 八割三分 / 全, with a charging line) show as
+kanji — and tapping the WiFi or Airplane widget **toggles it through Shizuku**, flipping the kanji
+instantly with a haptic tap and a black-and-yellow confirmation.
 
 ---
 
@@ -68,11 +110,15 @@ and arrays, fresh locals).
 
 ---
 
-## 🗂 Projects
+## 🗂 Projects & persistent variables
 
-Tasker-style **Projects** group your profiles, tasks and scenes. A top-bar switcher filters every
-tab to the active project, with full management (create, rename, recolour, reorder, move items
-between projects) and an **Unfiled** catch-all.
+Tasker-style **Projects** group your profiles, tasks and scenes; a top-bar switcher (on **every**
+tab) filters to the active project, with full management (create, rename, recolour, reorder, move
+items between projects) and an **Unfiled** catch-all. **Variables are persistent and project-scoped
+by case** — `%ALLCAPS` is an app-wide super-global, `%MixedCase` a project-global, `%lowercase` a
+task-local — and globals now **survive across runs and reboots** (so a widget can read them outside
+any task). Every list tab also has **multi-select** (batch delete / move-to-project) and a pinned,
+case-insensitive **name search**.
 
 ---
 
@@ -109,9 +155,11 @@ defaults set once in the UI.
 
 ## 📦 Export / Import
 
-Workspaces and individual items export to versioned **JSON bundles** (schema v3): export everything,
-a whole project, or hand-picked items; imports prompt on name conflicts, uniquify names, and restore
-each item's **manual position** and the tab's **sort method**.
+Workspaces and individual items export to versioned **JSON bundles** (schema v4 — projects, tasks,
+profiles, variables, scenes and **widget templates**): export everything, a whole project, or
+hand-picked items; imports prompt on name conflicts, uniquify names, and restore each item's
+**manual position** and the tab's **sort method**. A **Help tab** documents the bundle schema and an
+auto-generated reference for every action.
 
 ---
 
