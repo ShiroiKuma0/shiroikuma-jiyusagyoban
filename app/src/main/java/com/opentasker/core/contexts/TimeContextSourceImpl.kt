@@ -6,7 +6,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import java.util.Calendar
-import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -36,7 +35,7 @@ class TimeContextSourceImpl : ContextSource {
                             true,
                             mapOf(
                                 "time" to "%02d:%02d".format(cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE)),
-                                "day" to dayToken(cal),
+                                "day" to DaySchedule.tokenFor(cal),
                             )
                         )
                     )
@@ -48,9 +47,6 @@ class TimeContextSourceImpl : ContextSource {
         awaitClose { tickJob.cancel() }
     }
 }
-
-private fun dayToken(calendar: Calendar): String =
-    calendar.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.SHORT, Locale.US)?.uppercase(Locale.US).orEmpty()
 
 fun timeMatches(from: String, to: String): Boolean {
     val cal = Calendar.getInstance()
