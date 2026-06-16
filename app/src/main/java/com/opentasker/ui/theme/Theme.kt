@@ -99,6 +99,33 @@ private val Light = lightColorScheme(
     outlineVariant = LatteOverlay.copy(alpha = 0.5f),
 )
 
+private val HighContrast = darkColorScheme(
+    primary = Color(0xFFFFFF00),
+    onPrimary = Color.Black,
+    primaryContainer = Color(0xFF303000),
+    onPrimaryContainer = Color.White,
+    secondary = Color(0xFF00E5FF),
+    onSecondary = Color.Black,
+    secondaryContainer = Color(0xFF003740),
+    onSecondaryContainer = Color.White,
+    tertiary = Color(0xFF00E676),
+    onTertiary = Color.Black,
+    tertiaryContainer = Color(0xFF003A1D),
+    onTertiaryContainer = Color.White,
+    error = Color(0xFFFF5252),
+    onError = Color.Black,
+    errorContainer = Color(0xFF4A0000),
+    onErrorContainer = Color.White,
+    background = Color.Black,
+    onBackground = Color.White,
+    surface = Color.Black,
+    onSurface = Color.White,
+    surfaceVariant = Color(0xFF171717),
+    onSurfaceVariant = Color(0xFFF5F5F5),
+    outline = Color.White,
+    outlineVariant = Color(0xFFE0E0E0),
+)
+
 private val OpenTaskerTypography = Typography(
     headlineSmall = TextStyle(
         fontWeight = FontWeight.SemiBold,
@@ -156,15 +183,20 @@ private val OpenTaskerShapes = Shapes(
 @Composable
 fun OpenTaskerTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    highContrast: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val colors = if (darkTheme) Amoled else Light
+    val colors = when {
+        highContrast -> HighContrast
+        darkTheme -> Amoled
+        else -> Light
+    }
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
             window.statusBarColor = colors.background.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme && !highContrast
         }
     }
     MaterialTheme(

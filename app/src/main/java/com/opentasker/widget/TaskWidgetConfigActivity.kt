@@ -62,9 +62,10 @@ class TaskWidgetConfigActivity : ComponentActivity() {
             val darkTheme = when (themeMode) {
                 ThemeMode.Dark -> true
                 ThemeMode.Light -> false
+                ThemeMode.HighContrast -> true
                 ThemeMode.System -> isSystemInDarkTheme()
             }
-            OpenTaskerTheme(darkTheme = darkTheme) {
+            OpenTaskerTheme(darkTheme = darkTheme, highContrast = themeMode == ThemeMode.HighContrast) {
                 val tasks by tasksFlow.collectAsState(initial = emptyList())
                 ConfigScreen(tasks = tasks, onTaskSelected = ::onTaskPicked)
             }
