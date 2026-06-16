@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.engine.executeAndLogTask
+import com.opentasker.core.engine.variables.PersistentGlobalScope
 import com.opentasker.core.engine.variables.expandAgainstGlobals
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
@@ -51,6 +52,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.lang.ref.WeakReference
+import kotlin.math.roundToInt
 
 /**
  * Runtime display of a [Scene]: a modal overlay (scrim + the scene laid out by its elements'
@@ -76,7 +78,7 @@ class SceneActivity : ComponentActivity() {
                         OpenTaskerApp_NoHilt.db.sceneDao().getById(sceneId)?.toDomain()
                     }
                 }
-                SceneOverlay(scene, onDismiss = { finish() }, onRunTask = ::runTask)
+                SceneOverlay(scene, onDismiss = { finish() }, onRunTask = ::runTask, onSetVar = ::setVar)
             }
         }
     }
@@ -87,6 +89,17 @@ class SceneActivity : ComponentActivity() {
             val task = db.taskDao().getById(taskId)?.toDomain() ?: return@launch
             executeAndLogTask(applicationContext, db, task, source = "Scene")
         }
+    }
+
+    /**
+     * Write a scene input element's value to a persisted global so a task (the element's tap task) can
+     * read it. Scope follows the variable name's case: `%ALLCAPS` is super-global, anything else is
+     * scoped to the scene's project (Unfiled → super-global).
+     */
+    private fun setVar(sceneProjectId: Long?, name: String, value: String) {
+        val clean = name.trim().removePrefix("%").ifBlank { return }
+        val superGlobal = clean.any { it.isLetter() } && clean == clean.uppercase()
+        PersistentGlobalScope.set(if (superGlobal) 0L else (sceneProjectId ?: 0L), clean, value)
     }
 
     override fun onDestroy() {
@@ -109,7 +122,12 @@ class SceneActivity : ComponentActivity() {
 }
 
 @Composable
-private fun SceneOverlay(scene: Scene?, onDismiss: () -> Unit, onRunTask: (Long) -> Unit) {
+private fun SceneOverlay(
+    scene: Scene?,
+    onDismiss: () -> Unit,
+    onRunTask: (Long) -> Unit,
+    onSetVar: (sceneProjectId: Long?, name: String, value: String) -> Unit,
+) {
     Box(
         Modifier
             .fillMaxSize()
@@ -138,7 +156,7 @@ private fun SceneOverlay(scene: Scene?, onDismiss: () -> Unit, onRunTask: (Long)
                             .offset((element.xDp * scale).dp, (element.yDp * scale).dp)
                             .size((element.widthDp * scale).dp, (element.heightDp * scale).dp),
                     ) {
-                        SceneElementView(element, onRunTask)
+                        SceneElementView(element, onRunTask) { name, value -> onSetVar(scene.projectId, name, value) }
                     }
                 }
             }
@@ -147,7 +165,11 @@ private fun SceneOverlay(scene: Scene?, onDismiss: () -> Unit, onRunTask: (Long)
 }
 
 @Composable
-private fun SceneElementView(element: SceneElement, onRunTask: (Long) -> Unit) {
+private fun SceneElementView(
+    element: SceneElement,
+    onRunTask: (Long) -> Unit,
+    onSetVar: (name: String, value: String) -> Unit,
+) {
     val cfg = element.config
     fun v(key: String, fallback: String = "") = expandAgainstGlobals(cfg[key] ?: fallback)
     when (element.type) {
@@ -174,10 +196,24 @@ private fun SceneElementView(element: SceneElement, onRunTask: (Long) -> Unit) {
         SceneElementType.SLIDER -> {
             val min = cfg["min"]?.toFloatOrNull() ?: 0f
             val max = (cfg["max"]?.toFloatOrNull() ?: 100f).coerceAtLeast(min + 1f)
-            var value by remember(element.id) { mutableStateOf((cfg["value"]?.toFloatOrNull() ?: min).coerceIn(min, max)) }
+            val varName = cfg["var"]?.trim()
+            // Initial value is expanded against globals, so `value: "%VOL"` starts the slider at the
+            // live variable (e.g. the current volume, seeded by a Get Volume action before scene.show).
+            var value by remember(element.id) { mutableStateOf((v("value").toFloatOrNull() ?: min).coerceIn(min, max)) }
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
                 Text(v("label", "Slider"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
-                Slider(value = value, onValueChange = { value = it }, valueRange = min..max, modifier = Modifier.fillMaxWidth())
+                Slider(
+                    value = value,
+                    onValueChange = { value = it },
+                    // On release: publish the settled value to `var` (if set), then run the tap task —
+                    // which can read that variable (e.g. a Set Volume action with level = %VOL).
+                    onValueChangeFinished = {
+                        if (!varName.isNullOrBlank()) onSetVar(varName, value.roundToInt().toString())
+                        element.tapTaskId?.let(onRunTask)
+                    },
+                    valueRange = min..max,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
 

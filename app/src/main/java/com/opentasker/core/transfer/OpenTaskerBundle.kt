@@ -11,6 +11,8 @@ import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.ListSortStore
+import com.opentasker.widget.TemplateStore
+import com.opentasker.widget.WidgetTemplate
 import com.opentasker.core.storage.SortMethod
 import com.opentasker.core.storage.SortPrefs
 import com.opentasker.core.storage.VariableEntity
@@ -18,13 +20,16 @@ import com.opentasker.core.storage.toEntity
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromString
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-// v3 adds a per-item `position` and a per-category `sort` method. v2 added the `projects` array and a
-// projectId on profiles/tasks/scenes. Older bundles still import (their missing fields default), so
-// the version is a floor on what THIS build can read, not a gate.
-const val OPEN_TASKER_BUNDLE_SCHEMA_VERSION = 3
+// v4 adds `templates` (widget-layout templates, previously a separate processor). v3 added per-item
+// `position` + per-category `sort`; v2 added `projects` + projectId. Older bundles still import (missing
+// fields default), so the version is a floor on what THIS build can read, not a gate.
+const val OPEN_TASKER_BUNDLE_SCHEMA_VERSION = 4
 
 @Serializable
 data class OpenTaskerBundle(
@@ -37,6 +42,7 @@ data class OpenTaskerBundle(
     val profiles: List<Profile> = emptyList(),
     val variables: List<Variable> = emptyList(),
     val scenes: List<Scene> = emptyList(),
+    val templates: List<WidgetTemplate> = emptyList(),
     val sort: BundleSortConfig = BundleSortConfig(),
 )
 
@@ -78,6 +84,19 @@ enum class ProjectConflictStrategy {
     RENAME,
 }
 
+/** How to handle a bundle item (task/profile/scene/template) whose name already exists. */
+enum class ItemConflictStrategy {
+    /** Keep both — the incoming item gets a uniquified name (e.g. "Foo (2)"). */
+    RENAME,
+
+    /** Delete the existing same-name item(s), then import the incoming under its original name. */
+    OVERWRITE_DELETE,
+
+    /** Back up the existing same-name item(s) (rename to "<name>.<timestamp>.bak"), then import the
+     *  incoming under its original name. */
+    OVERWRITE_BACKUP,
+}
+
 data class BundleImportPlan(
     val canImport: Boolean,
     val warnings: List<String> = emptyList(),
@@ -89,6 +108,7 @@ data class BundleImportReport(
     val insertedProfiles: Int,
     val insertedVariables: Int,
     val insertedScenes: Int,
+    val insertedTemplates: Int = 0,
     val insertedProjects: Int = 0,
     val warnings: List<String> = emptyList(),
     val lossyWarnings: List<String> = emptyList(),
@@ -110,6 +130,7 @@ object OpenTaskerBundleCodec {
         tasks: List<Task>,
         variables: List<Variable> = emptyList(),
         scenes: List<Scene> = emptyList(),
+        templates: List<WidgetTemplate> = emptyList(),
         projects: List<Project> = emptyList(),
         sort: BundleSortConfig = BundleSortConfig(),
         name: String = "白い熊 自由作業盤 Export",
@@ -121,6 +142,7 @@ object OpenTaskerBundleCodec {
         val sortedProfiles = profiles.sortedWith(compareBy<Profile> { it.position }.thenBy { it.name.lowercase() }.thenBy { it.id })
         val sortedVariables = variables.sortedWith(compareBy<Variable> { it.name.lowercase() }.thenBy { it.name })
         val sortedScenes = scenes.sortedWith(compareBy<Scene> { it.position }.thenBy { it.name.lowercase() }.thenBy { it.id })
+        val sortedTemplates = templates.sortedBy { it.name.lowercase() }
         val sortedProjects = projects.sortedWith(compareBy<Project> { it.sortOrder }.thenBy { it.name.lowercase() })
         val base = OpenTaskerBundle(
             appVersion = appVersion,
@@ -131,6 +153,7 @@ object OpenTaskerBundleCodec {
             profiles = sortedProfiles,
             variables = sortedVariables,
             scenes = sortedScenes,
+            templates = sortedTemplates,
             sort = sort,
         )
         val plan = validate(base)
@@ -234,6 +257,7 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             tasks = tasks,
             variables = variables,
             scenes = scenes,
+            templates = TemplateStore.state.value,
             projects = projects,
             sort = BundleSortConfig.from(ListSortStore.state.value),
             name = name,
@@ -256,11 +280,19 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
         includeVariables: Boolean,
         name: String,
         description: String = "",
+        templateNames: Set<String> = emptySet(),
+        variableKeys: Set<String> = emptySet(),
     ): OpenTaskerBundle {
         val profiles = db.profileDao().getAll().map { it.toDomain() }.filter { it.id in profileIds }
         val tasks = db.taskDao().getAll().map { it.toDomain() }.filter { it.id in taskIds }
         val scenes = db.sceneDao().getAll().map { it.toDomain() }.filter { it.id in sceneIds }
-        val variables = if (includeVariables) db.variableDao().getAll().map { it.toDomain() } else emptyList()
+        val allVariables = db.variableDao().getAll().map { it.toDomain() }
+        val variables = when {
+            includeVariables -> allVariables
+            variableKeys.isNotEmpty() -> allVariables.filter { "${it.projectId}:${it.name}" in variableKeys }
+            else -> emptyList()
+        }
+        val templates = TemplateStore.state.value.filter { it.name in templateNames }
         val referencedProjectIds =
             (profiles.mapNotNull { it.projectId } + tasks.mapNotNull { it.projectId } + scenes.mapNotNull { it.projectId }).toSet()
         val projects = db.projectDao().getAll().map { it.toDomain() }.filter { it.id in referencedProjectIds }
@@ -272,6 +304,7 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             tasks = tasks,
             variables = variables,
             scenes = scenes,
+            templates = templates,
             projects = projects,
             sort = BundleSortConfig.from(ListSortStore.state.value),
             name = name,
@@ -282,14 +315,20 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
     suspend fun importBundle(
         bundle: OpenTaskerBundle,
         projectConflictStrategy: ProjectConflictStrategy = ProjectConflictStrategy.MERGE,
+        itemConflictStrategy: ItemConflictStrategy = ItemConflictStrategy.RENAME,
     ): BundleImportReport {
         val plan = OpenTaskerBundleCodec.validate(bundle)
         require(plan.canImport) { plan.warnings.joinToString() }
+
+        // Suffix for OVERWRITE_BACKUP — the existing same-name item is renamed "<name>.<stamp>.bak".
+        val backupStamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
+        fun backupName(name: String) = "$name.$backupStamp.bak"
 
         var insertedTasks = 0
         var insertedProfiles = 0
         var insertedVariables = 0
         var insertedScenes = 0
+        var insertedTemplates = 0
         var insertedProjects = 0
         val importWarnings = plan.warnings.toMutableList()
         val lossyWarnings = plan.lossyWarnings.toMutableList()
@@ -315,6 +354,18 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             }
             fun remapProjectId(projectId: Long?): Long? = projectId?.let { projectIdMap[it] }
 
+            // Resolve incoming-vs-existing name clashes per [itemConflictStrategy] before inserting:
+            // OVERWRITE_DELETE removes the existing same-name rows; OVERWRITE_BACKUP renames them to
+            // ".bak" (freeing the original name); RENAME leaves them (the incoming gets uniquified).
+            val incomingTaskNames = bundle.tasks.mapTo(mutableSetOf()) { it.name.lowercase() }
+            db.taskDao().getAll().filter { it.name.lowercase() in incomingTaskNames }.forEach { existing ->
+                when (itemConflictStrategy) {
+                    ItemConflictStrategy.OVERWRITE_DELETE -> db.taskDao().delete(existing)
+                    ItemConflictStrategy.OVERWRITE_BACKUP -> db.taskDao().update(existing.copy(name = backupName(existing.name)))
+                    ItemConflictStrategy.RENAME -> Unit
+                }
+            }
+
             val takenTaskNames = db.taskDao().getAll().mapTo(mutableSetOf()) { it.name.lowercase() }
             val taskIdMap = mutableMapOf<Long, Long>()
             bundle.tasks.sortedWith(compareBy<Task> { it.name.lowercase() }.thenBy { it.id }).forEach { task ->
@@ -333,6 +384,14 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
                 insertedVariables++
             }
 
+            val incomingProfileNames = bundle.profiles.mapTo(mutableSetOf()) { it.name.lowercase() }
+            db.profileDao().getAll().filter { it.name.lowercase() in incomingProfileNames }.forEach { existing ->
+                when (itemConflictStrategy) {
+                    ItemConflictStrategy.OVERWRITE_DELETE -> db.profileDao().delete(existing)
+                    ItemConflictStrategy.OVERWRITE_BACKUP -> db.profileDao().update(existing.copy(name = backupName(existing.name)))
+                    ItemConflictStrategy.RENAME -> Unit
+                }
+            }
             val takenProfileNames = db.profileDao().getAll().mapTo(mutableSetOf()) { it.name.lowercase() }
             bundle.profiles.sortedWith(compareBy<Profile> { it.name.lowercase() }.thenBy { it.id }).forEach { profile ->
                 val enterTaskId = taskIdMap[profile.enterTaskId]
@@ -354,6 +413,14 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
                 insertedProfiles++
             }
 
+            val incomingSceneNames = bundle.scenes.mapTo(mutableSetOf()) { it.name.lowercase() }
+            db.sceneDao().getAll().filter { it.name.lowercase() in incomingSceneNames }.forEach { existing ->
+                when (itemConflictStrategy) {
+                    ItemConflictStrategy.OVERWRITE_DELETE -> db.sceneDao().delete(existing)
+                    ItemConflictStrategy.OVERWRITE_BACKUP -> db.sceneDao().update(existing.copy(name = backupName(existing.name)))
+                    ItemConflictStrategy.RENAME -> Unit
+                }
+            }
             val takenSceneNames = db.sceneDao().getAll().mapTo(mutableSetOf()) { it.name.lowercase() }
             bundle.scenes.sortedWith(compareBy<Scene> { it.name.lowercase() }.thenBy { it.id }).forEach { scene ->
                 val remappedElements = scene.elements.map { element ->
@@ -366,6 +433,25 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             }
         }
 
+        // Widget templates live in SharedPreferences (TemplateStore), not the DB — apply after the
+        // transaction, honouring the same item-conflict strategy as the DB entities.
+        val takenTemplateNames = TemplateStore.names().mapTo(mutableSetOf()) { it.lowercase() }
+        bundle.templates.forEach { tpl ->
+            val collides = tpl.name.lowercase() in takenTemplateNames
+            if (collides && itemConflictStrategy == ItemConflictStrategy.OVERWRITE_BACKUP) {
+                TemplateStore.get(tpl.name)?.let { TemplateStore.put(backupName(tpl.name), it) }
+                takenTemplateNames += backupName(tpl.name).lowercase()
+            }
+            val targetName = if (collides && itemConflictStrategy == ItemConflictStrategy.RENAME) {
+                uniqueName(tpl.name, takenTemplateNames)
+            } else {
+                tpl.name // OVERWRITE_DELETE / OVERWRITE_BACKUP / no clash → original name (put replaces)
+            }
+            TemplateStore.put(targetName, tpl.layout)
+            takenTemplateNames += targetName.lowercase()
+            insertedTemplates++
+        }
+
         // Restore the per-category sort method the bundle was exported with (v3+; older bundles
         // default to Alphabetical).
         ListSortStore.setAll(bundle.sort.toPrefs())
@@ -375,6 +461,7 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             insertedProfiles = insertedProfiles,
             insertedVariables = insertedVariables,
             insertedScenes = insertedScenes,
+            insertedTemplates = insertedTemplates,
             insertedProjects = insertedProjects,
             warnings = importWarnings,
             lossyWarnings = lossyWarnings.distinct(),

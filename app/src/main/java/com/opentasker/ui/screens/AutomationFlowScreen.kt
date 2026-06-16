@@ -75,13 +75,6 @@ fun AutomationFlowScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            FlowOverviewCard(
-                profiles = profiles,
-                tasks = tasks,
-                graphs = graphs,
-            )
-        }
         items(graphs, key = { it.profileId }) { graph ->
             FlowGraphCard(
                 graph = graph,
@@ -112,46 +105,6 @@ private fun FlowEmptyState(contentPadding: PaddingValues) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-    }
-}
-
-@Composable
-private fun FlowOverviewCard(
-    profiles: List<Profile>,
-    tasks: List<Task>,
-    graphs: List<AutomationFlowGraph>,
-) {
-    val contextCount = profiles.sumOf { it.contexts.size }
-    val actionCount = tasks.sumOf { it.actions.size }
-    val warningCount = graphs.sumOf { it.warnings.size }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shape = RoundedCornerShape(18.dp),
-    ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(Modifier.weight(1f)) {
-                    Text("Flow overview", style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        "Read-only profile graph generated from the active Room data.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                FlowStatusPill(
-                    label = if (warningCount == 0) "Ready" else "$warningCount issue${plural(warningCount)}",
-                    color = if (warningCount == 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                FlowMetric("${profiles.size}", "Profiles", Modifier.weight(1f))
-                FlowMetric("$contextCount", "Contexts", Modifier.weight(1f))
-                FlowMetric("$actionCount", "Actions", Modifier.weight(1f))
-            }
         }
     }
 }
@@ -460,24 +413,6 @@ private fun FlowEdgeLabel(label: String) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-        }
-    }
-}
-
-@Composable
-private fun FlowMetric(value: String, label: String, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(value, style = MaterialTheme.typography.titleMedium)
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

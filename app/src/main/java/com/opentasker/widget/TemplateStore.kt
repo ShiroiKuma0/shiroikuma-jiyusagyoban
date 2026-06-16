@@ -6,11 +6,13 @@ import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
 /** A named, reusable widget layout (JSON, with `%vars` left raw — expanded at Set-Widget time). */
+@Serializable
 data class WidgetTemplate(val name: String, val layout: String)
 
 /**

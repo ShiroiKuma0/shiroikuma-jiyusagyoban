@@ -169,6 +169,30 @@ class VolumeAction : Action {
 }
 
 /**
+ * Read the current volume of a stream into a variable.
+ *
+ * Args:
+ *   - "stream": "music", "alarm", "ring", "notification", etc. (default "music")
+ *   - "var": variable to store the level in (0..stream max). Reading is allowed on all OS versions.
+ */
+class VolumeGetAction : Action {
+    override val id = "volume.get"
+    override val category = ActionCategory.SETTINGS
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val varName = args["var"]?.trim()?.removePrefix("%")?.ifBlank { null }
+            ?: return ActionResult.Failure("missing var")
+        val audioManager = ctx.app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            ?: return ActionResult.Failure("audio service not available")
+        val streamType = streamType(args["stream"] ?: "music") ?: return ActionResult.Failure("invalid stream")
+        val level = audioManager.getStreamVolume(streamType)
+        ctx.variables.set(varName, level.toString())
+        ctx.logger("Volume ${args["stream"] ?: "music"} = $level -> %$varName")
+        return ActionResult.Success
+    }
+}
+
+/**
  * Toggle Airplane mode.
  *
  * Args:

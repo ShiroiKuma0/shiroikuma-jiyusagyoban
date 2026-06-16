@@ -968,6 +968,19 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "volume.get",
+            name = "Get Volume",
+            description = "Read the current volume of a stream into a variable",
+            category = "Settings",
+            fields = listOf(
+                ActionField("stream", "Stream", FieldType.DROPDOWN, required = true, hint = "music / ring / alarm / notification / call / system"),
+                ActionField("var", "Store in variable", required = true, hint = "Variable name (e.g. VOL) to receive 0..max"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "airplane.toggle",
             name = "Toggle Airplane Mode",
             description = "Turn Airplane mode on or off",

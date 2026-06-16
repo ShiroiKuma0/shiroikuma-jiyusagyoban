@@ -3,6 +3,7 @@ package com.opentasker.ui.screens
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,6 +27,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -36,10 +41,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,6 +63,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.opentasker.core.widget.WidgetLayoutCodec
 import com.opentasker.core.widget.WidgetRenderer
 import com.opentasker.ui.components.SelectionBar
+import com.opentasker.ui.components.SelectionCheck
 import com.opentasker.ui.components.selectableItem
 import com.opentasker.ui.theme.ThemeStore
 import com.opentasker.widget.WidgetEditor
@@ -70,9 +78,9 @@ fun WidgetTemplatesScreen(
     templates: List<WidgetTemplate>,
     onSave: (name: String, layout: String) -> Unit,
     onDelete: (name: String) -> Unit,
-    onImport: (String) -> Int,
-    onExportAll: () -> String,
     onMessage: (String) -> Unit,
+    createSignal: Int,
+    expandedTemplates: SnapshotStateMap<String, Boolean>,
     selectedNames: Set<String>,
     onLongPressTemplate: (WidgetTemplate) -> Unit,
     onToggleSelectTemplate: (WidgetTemplate) -> Unit,
@@ -85,24 +93,12 @@ fun WidgetTemplatesScreen(
     var editing by remember { mutableStateOf<WidgetTemplate?>(null) }
     var showNameDialog by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
-    val context = LocalContext.current
     val selectionActive = selectedNames.isNotEmpty()
 
-    // File-based import/export (a {name: layoutJson} JSON file) — the same shape Export writes.
-    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        val text = runCatching {
-            context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-        }.getOrNull()
-        if (text == null) { onMessage("Couldn’t read that file"); return@rememberLauncherForActivityResult }
-        val n = onImport(text)
-        onMessage(if (n >= 0) "Imported $n template(s)" else "Couldn’t parse that templates file")
-    }
-    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        runCatching { context.contentResolver.openOutputStream(uri)?.use { it.write(onExportAll().toByteArray()) } }
-            .onSuccess { onMessage("Exported ${templates.size} template(s)") }
-            .onFailure { onMessage("Export failed: ${it.message}") }
+    // "New template" lives in the tab's + menu (TabActionsFab); a tick of [createSignal] opens the
+    // name dialog. Import/export run through the unified JSON-bundle flow, also from the + menu.
+    LaunchedEffect(createSignal) {
+        if (createSignal > 0) showNameDialog = true
     }
 
     Column(Modifier.fillMaxSize().padding(contentPadding)) {
@@ -114,21 +110,6 @@ fun WidgetTemplatesScreen(
                 onClear = onClearTemplateSelection,
                 onDelete = onDeleteSelectedTemplates,
             )
-        }
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OutlinedButton(onClick = { showNameDialog = true }, modifier = Modifier.weight(1f)) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("  New")
-            }
-            OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/json", "text/*", "*/*")) }) { Text("Import") }
-            OutlinedButton(
-                enabled = templates.isNotEmpty(),
-                onClick = { exportLauncher.launch("widget-templates.json") },
-            ) { Text("Export") }
         }
 
         if (templates.isEmpty()) {
@@ -145,6 +126,8 @@ fun WidgetTemplatesScreen(
                     template = template,
                     selectionActive = selectionActive,
                     selected = template.name in selectedNames,
+                    expanded = expandedTemplates[template.name] == true,
+                    onToggleExpanded = { expandedTemplates[template.name] = expandedTemplates[template.name] != true },
                     onLongPress = { onLongPressTemplate(template) },
                     onToggleSelect = { onToggleSelectTemplate(template) },
                     onEdit = { editing = template },
@@ -185,6 +168,8 @@ private fun TemplateRow(
     template: WidgetTemplate,
     selectionActive: Boolean,
     selected: Boolean,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
     onLongPress: () -> Unit,
     onToggleSelect: () -> Unit,
     onEdit: () -> Unit,
@@ -192,26 +177,47 @@ private fun TemplateRow(
     onDelete: () -> Unit,
 ) {
     Card(
-        border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).selectableItem(
+        border = BorderStroke(
+            if (selected) 2.dp else 1.dp,
+            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        ),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).animateContentSize().selectableItem(
             selectionActive = selectionActive,
             onLongPress = onLongPress,
             onToggleSelect = onToggleSelect,
-            onTapNormal = onEdit,
+            onTapNormal = onToggleExpanded,
         ),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (selectionActive) {
-                Checkbox(checked = selected, onCheckedChange = { onToggleSelect() })
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (selectionActive) {
+                    SelectionCheck(selected)
+                }
+                Text(template.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Collapse template" else "Expand template",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            TemplatePreview(template.layout)
-            Text(template.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-            IconButton(onClick = onCopy) { Icon(Icons.Filled.ContentCopy, contentDescription = "Copy layout JSON") }
-            IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = "Delete template") }
+            if (expanded) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    TemplatePreview(template.layout)
+                    Spacer(Modifier.weight(1f))
+                    IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = "Edit template") }
+                    IconButton(onClick = onCopy) { Icon(Icons.Filled.ContentCopy, contentDescription = "Copy layout JSON") }
+                    IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = "Delete template") }
+                }
+            }
         }
     }
 }

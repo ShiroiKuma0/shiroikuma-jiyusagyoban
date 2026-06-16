@@ -1,6 +1,7 @@
 package com.opentasker.ui.screens
 
 import android.provider.Settings
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Checkbox
 import com.opentasker.ui.components.ReorderableRow
 import com.opentasker.ui.components.SelectionBar
+import com.opentasker.ui.components.SelectionCheck
 import com.opentasker.ui.components.rememberListReorderState
 import com.opentasker.ui.components.selectableItem
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,6 +35,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
@@ -50,10 +54,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -61,6 +67,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.model.Scene
@@ -90,6 +97,10 @@ fun SceneLibraryScreen(
     onSelectAllScenes: () -> Unit,
     onClearSceneSelection: () -> Unit,
     onDeleteSelectedScenes: () -> Unit,
+    onMoveSelectedToProject: () -> Unit,
+    createSignal: Int,
+    hiddenByFilter: Int,
+    expandedScenes: SnapshotStateMap<Long, Boolean>,
     contentPadding: PaddingValues,
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -97,6 +108,11 @@ fun SceneLibraryScreen(
     var pendingElementDelete by remember { mutableStateOf<SceneElementEditorState?>(null) }
     // Order comes from the ViewModel (Alphabetical or Manual); don't re-sort here.
     val sortedScenes = scenes
+
+    // "New scene" lives in the tab's + menu (TabActionsFab); a tick of [createSignal] opens the dialog.
+    LaunchedEffect(createSignal) {
+        if (createSignal > 0) showCreateDialog = true
+    }
 
     if (showCreateDialog) {
         SceneEditorDialog(
@@ -149,6 +165,7 @@ fun SceneLibraryScreen(
     if (sortedScenes.isEmpty()) {
         SceneEmptyState(
             contentPadding = contentPadding,
+            hiddenByFilter = hiddenByFilter,
             onCreateScene = { showCreateDialog = true },
         )
         return
@@ -165,21 +182,15 @@ fun SceneLibraryScreen(
                 onSelectAll = onSelectAllScenes,
                 onClear = onClearSceneSelection,
                 onDelete = onDeleteSelectedScenes,
+                onMoveToProject = onMoveSelectedToProject,
             )
         }
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().weight(1f),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            item {
-                SceneOverviewCard(
-                    scenes = sortedScenes,
-                    tasks = tasks,
-                    onCreateScene = { showCreateDialog = true },
-                )
-            }
             items(sortedScenes, key = { it.id }) { scene ->
                 ReorderableRow(reorder, listState, sortedScenes, scene, { it.id }, manualSort && !selectionActive, onReorder) {
                     SceneCard(
@@ -187,6 +198,8 @@ fun SceneLibraryScreen(
                         tasks = tasks,
                         selectionActive = selectionActive,
                         selected = scene.id in selectedIds,
+                        expanded = expandedScenes[scene.id] == true,
+                        onToggleExpanded = { expandedScenes[scene.id] = expandedScenes[scene.id] != true },
                         onLongPress = { onLongPressScene(scene) },
                         onToggleSelect = { onToggleSelectScene(scene) },
                     onAddElement = { elementEditor = SceneElementEditorState(scene = scene) },
@@ -221,6 +234,7 @@ private data class SceneElementEditorState(
 @Composable
 private fun SceneEmptyState(
     contentPadding: PaddingValues,
+    hiddenByFilter: Int,
     onCreateScene: () -> Unit,
 ) {
     Box(
@@ -237,54 +251,15 @@ private fun SceneEmptyState(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            OutlinedButton(onClick = onCreateScene) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Create Scene")
-            }
-        }
-    }
-}
-
-@Composable
-private fun SceneOverviewCard(
-    scenes: List<Scene>,
-    tasks: List<Task>,
-    onCreateScene: () -> Unit,
-) {
-    val context = LocalContext.current
-    val overlayReady = Settings.canDrawOverlays(context)
-    val issues = remember(scenes, tasks) {
-        scenes.flatMap { scene -> SceneValidator.validate(scene, tasks) }
-    }
-    val errorCount = issues.count { it.severity == SceneIssueSeverity.ERROR }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shape = RoundedCornerShape(18.dp),
-    ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(Modifier.weight(1f)) {
-                    Text("Scene library", style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        "${scenes.sumOf { it.elements.size }} element${plural(scenes.sumOf { it.elements.size })} across ${scenes.size} scene${plural(scenes.size)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                SceneStatusPill(
-                    label = if (overlayReady) "Overlay ready" else "Setup needed",
-                    color = if (overlayReady) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+            if (hiddenByFilter > 0) {
+                Text(
+                    "$hiddenByFilter scene${plural(hiddenByFilter)} ${if (hiddenByFilter == 1) "is" else "are"} filed under another project — switch the project filter (top-right) to see ${if (hiddenByFilter == 1) "it" else "them"}.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center,
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                SceneMetric("${scenes.size}", "Scenes", Modifier.weight(1f))
-                SceneMetric("${scenes.sumOf { it.elements.size }}", "Elements", Modifier.weight(1f))
-                SceneMetric("$errorCount", "Errors", Modifier.weight(1f))
-            }
-            OutlinedButton(onClick = onCreateScene, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = onCreateScene) {
                 Icon(Icons.Filled.Add, contentDescription = null)
                 Text("Create Scene")
             }
@@ -298,6 +273,8 @@ private fun SceneCard(
     tasks: List<Task>,
     selectionActive: Boolean,
     selected: Boolean,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
     onLongPress: () -> Unit,
     onToggleSelect: () -> Unit,
     onAddElement: () -> Unit,
@@ -312,7 +289,7 @@ private fun SceneCard(
     val issues = remember(scene, tasks) { SceneValidator.validate(scene, tasks) }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
         colors = CardDefaults.cardColors(
             containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
             else MaterialTheme.colorScheme.surface,
@@ -323,71 +300,82 @@ private fun SceneCard(
         ),
         shape = RoundedCornerShape(18.dp),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth().selectableItem(
                     selectionActive = selectionActive,
                     onLongPress = onLongPress,
                     onToggleSelect = onToggleSelect,
+                    onTapNormal = onToggleExpanded,
                 ),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (selectionActive) {
-                    Checkbox(checked = selected, onCheckedChange = { onToggleSelect() })
+                    SelectionCheck(selected)
                 }
                 Column(Modifier.weight(1f)) {
                     Text(scene.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        "${scene.widthDp} x ${scene.heightDp} dp - ${scene.elements.size} element${plural(scene.elements.size)}",
+                        "${scene.widthDp} x ${scene.heightDp} dp - ${scene.elements.size} element${plural(scene.elements.size)}" +
+                            if (!expanded && issues.isNotEmpty()) " - ${issues.size} issue${plural(issues.size)}" else "",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(onClick = onExportToBundle) {
-                    Icon(Icons.Filled.Upload, contentDescription = "Export scene")
-                }
-                IconButton(onClick = onMoveToProject) {
-                    Icon(Icons.Filled.Folder, contentDescription = "Move scene to project")
-                }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete scene", tint = MaterialTheme.colorScheme.error)
-                }
-            }
-
-            ScenePreviewBox(
-                scene = scene,
-                onMoveElement = { index, xDp, yDp ->
-                    scene.elements.getOrNull(index)?.let { element ->
-                        onMoveElement(index, element.copy(xDp = xDp, yDp = yDp))
+                if (expanded) {
+                    IconButton(onClick = onExportToBundle) {
+                        Icon(Icons.Filled.Upload, contentDescription = "Export scene")
                     }
-                },
-            )
-
-            OutlinedButton(onClick = onAddElement, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
-                Text("Add Element")
-            }
-
-            if (scene.elements.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    scene.elements.forEachIndexed { index, element ->
-                        SceneElementRow(
-                            element = element,
-                            taskNames = taskNames,
-                            onEdit = { onEditElement(index, element) },
-                            onDelete = { onDeleteElement(index, element) },
-                        )
+                    IconButton(onClick = onMoveToProject) {
+                        Icon(Icons.Filled.Folder, contentDescription = "Move scene to project")
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Delete scene", tint = MaterialTheme.colorScheme.error)
                     }
                 }
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Collapse scene" else "Expand scene",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
-            if (issues.isNotEmpty()) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    issues.take(4).forEach { issue ->
-                        SceneIssueText(issue)
+            if (expanded) {
+                ScenePreviewBox(
+                    scene = scene,
+                    onMoveElement = { index, xDp, yDp ->
+                        scene.elements.getOrNull(index)?.let { element ->
+                            onMoveElement(index, element.copy(xDp = xDp, yDp = yDp))
+                        }
+                    },
+                )
+
+                OutlinedButton(onClick = onAddElement, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Add Element")
+                }
+
+                if (scene.elements.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        scene.elements.forEachIndexed { index, element ->
+                            SceneElementRow(
+                                element = element,
+                                taskNames = taskNames,
+                                onEdit = { onEditElement(index, element) },
+                                onDelete = { onDeleteElement(index, element) },
+                            )
+                        }
+                    }
+                }
+
+                if (issues.isNotEmpty()) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        issues.take(4).forEach { issue ->
+                            SceneIssueText(issue)
+                        }
                     }
                 }
             }
@@ -851,45 +839,6 @@ private fun SceneIssueText(issue: SceneIssue) {
         SceneIssueSeverity.WARNING -> MaterialTheme.colorScheme.tertiary
     }
     Text(issue.message, style = MaterialTheme.typography.bodySmall, color = color)
-}
-
-@Composable
-private fun SceneMetric(value: String, label: String, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(value, style = MaterialTheme.typography.titleMedium)
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
-private fun SceneStatusPill(
-    label: String,
-    color: Color,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier,
-        color = color.copy(alpha = 0.14f),
-        shape = RoundedCornerShape(999.dp),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.34f)),
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = color,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-        )
-    }
 }
 
 @Composable

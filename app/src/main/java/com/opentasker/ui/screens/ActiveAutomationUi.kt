@@ -24,13 +24,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -45,13 +49,19 @@ import com.opentasker.ui.components.ReorderableRow
 import com.opentasker.ui.components.ConfirmDeleteSelected
 import com.opentasker.ui.components.RgbaColorPickerDialog
 import com.opentasker.ui.components.SelectionBar
+import com.opentasker.ui.components.SelectionCheck
+import com.opentasker.ui.components.TabAction
+import com.opentasker.ui.components.TabActionsFab
 import com.opentasker.ui.components.selectableItem
 import com.opentasker.ui.components.rememberListReorderState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ExpandLess
@@ -60,14 +70,20 @@ import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.filled.FormatListNumbered
+import androidx.compose.material.icons.filled.UnfoldLess
+import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -106,6 +122,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -171,6 +188,7 @@ import com.opentasker.core.storage.VariableEntity
 import com.opentasker.core.storage.RunLogRetentionPolicy
 import com.opentasker.core.storage.ProjectSelectionStore
 import com.opentasker.core.storage.ListSortStore
+import com.opentasker.core.storage.RunLogSeenStore
 import com.opentasker.core.storage.SortMethod
 import com.opentasker.core.storage.SortTab
 import com.opentasker.core.storage.RunLogRetentionSettings
@@ -181,6 +199,7 @@ import com.opentasker.core.storage.toEntity
 import com.opentasker.core.transfer.BundleImportPlan
 import com.opentasker.core.transfer.OpenTaskerBundle
 import com.opentasker.core.transfer.OpenTaskerBundleCodec
+import com.opentasker.core.transfer.ItemConflictStrategy
 import com.opentasker.core.transfer.ProjectConflictStrategy
 import com.opentasker.core.transfer.OpenTaskerBundleRepository
 import com.opentasker.core.transfer.TaskerImportPlanner
@@ -232,6 +251,7 @@ private enum class OpenTaskerScreen(val label: String) {
     Inspector("Inspect"),
     Setup("Setup"),
     RunLog("Log"),
+    Help("Help"),
 }
 
 private data class ActionEditState(
@@ -265,11 +285,22 @@ private data class ExportRequest(
     val profileIds: Set<Long> = emptySet(),
     val taskIds: Set<Long> = emptySet(),
     val sceneIds: Set<Long> = emptySet(),
+    val templateNames: Set<String> = emptySet(),
+    val variableKeys: Set<String> = emptySet(),
     val includeVariables: Boolean = false,
 )
 
 private fun exportFileName(label: String): String =
     label.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_').ifEmpty { "export" } + ".json"
+
+/**
+ * Drives the top-bar expand/collapse-all toggle for a list tab: returns (anyExpanded, onToggle) where
+ * onToggle collapses everything if any card is open, otherwise expands every visible card.
+ */
+private fun <K> expandAllControl(map: SnapshotStateMap<K, Boolean>, keys: List<K>): Pair<Boolean, () -> Unit> {
+    val anyExpanded = keys.any { map[it] == true }
+    return anyExpanded to { keys.forEach { map[it] = !anyExpanded } }
+}
 
 private sealed interface MoveTarget {
     val currentProjectId: Long?
@@ -554,6 +585,21 @@ class ActiveAutomationViewModel(
         db.sceneDao().update(scene.copy(projectId = projectId).toEntity())
     }
 
+    fun moveProfilesToProject(items: List<Profile>, projectId: Long?) =
+        launchWithMessage("${items.size} profile${plural(items.size)} moved") {
+            items.forEach { db.profileDao().update(it.copy(projectId = projectId).toEntity()) }
+        }
+
+    fun moveTasksToProject(items: List<Task>, projectId: Long?) =
+        launchWithMessage("${items.size} task${plural(items.size)} moved") {
+            items.forEach { db.taskDao().update(it.copy(projectId = projectId).toEntity()) }
+        }
+
+    fun moveScenesToProject(items: List<Scene>, projectId: Long?) =
+        launchWithMessage("${items.size} scene${plural(items.size)} moved") {
+            items.forEach { db.sceneDao().update(it.copy(projectId = projectId).toEntity()) }
+        }
+
     fun createProfile(name: String, enabled: Boolean, enterTaskId: Long, cooldownSec: Int, automationMode: AutomationMode, projectId: Long? = null) =
         launchWithMessage("Profile created") {
             db.profileDao().insert(
@@ -702,6 +748,8 @@ class ActiveAutomationViewModel(
         sceneIds: Set<Long>,
         includeVariables: Boolean,
         name: String,
+        templateNames: Set<String> = emptySet(),
+        variableKeys: Set<String> = emptySet(),
     ) {
         viewModelScope.launch {
             if (openTaskerBundleBusy) return@launch
@@ -715,6 +763,8 @@ class ActiveAutomationViewModel(
                         sceneIds = sceneIds,
                         includeVariables = includeVariables,
                         name = name,
+                        templateNames = templateNames,
+                        variableKeys = variableKeys,
                     )
                     val encoded = OpenTaskerBundleCodec.encode(bundle)
                     val stream = appContext.contentResolver.openOutputStream(uri)
@@ -729,6 +779,7 @@ class ActiveAutomationViewModel(
                         if (bundle.tasks.isNotEmpty()) add("${bundle.tasks.size} task${plural(bundle.tasks.size)}")
                         if (bundle.scenes.isNotEmpty()) add("${bundle.scenes.size} scene${plural(bundle.scenes.size)}")
                         if (bundle.variables.isNotEmpty()) add("${bundle.variables.size} variable${plural(bundle.variables.size)}")
+                        if (bundle.templates.isNotEmpty()) add("${bundle.templates.size} template${plural(bundle.templates.size)}")
                     }
                     events.send("Exported ${parts.joinToString().ifEmpty { "nothing" }}")
                 }
@@ -766,13 +817,14 @@ class ActiveAutomationViewModel(
     fun confirmOpenTaskerBundleImport(
         bundle: OpenTaskerBundle,
         projectConflictStrategy: ProjectConflictStrategy = ProjectConflictStrategy.MERGE,
+        itemConflictStrategy: ItemConflictStrategy = ItemConflictStrategy.RENAME,
     ) {
         viewModelScope.launch {
             if (openTaskerBundleBusy) return@launch
             openTaskerBundleBusy = true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    bundleRepository.importBundle(bundle, projectConflictStrategy)
+                    bundleRepository.importBundle(bundle, projectConflictStrategy, itemConflictStrategy)
                 }
             }
                 .onSuccess { importReport ->
@@ -781,7 +833,8 @@ class ActiveAutomationViewModel(
                         "Imported ${importReport.insertedTasks} task${plural(importReport.insertedTasks)}, " +
                             "${importReport.insertedProfiles} disabled profile${plural(importReport.insertedProfiles)}, " +
                             "${importReport.insertedScenes} scene${plural(importReport.insertedScenes)}" +
-                            if (importReport.insertedProjects > 0) ", ${importReport.insertedProjects} project${plural(importReport.insertedProjects)}" else ""
+                            (if (importReport.insertedTemplates > 0) ", ${importReport.insertedTemplates} template${plural(importReport.insertedTemplates)}" else "") +
+                            (if (importReport.insertedProjects > 0) ", ${importReport.insertedProjects} project${plural(importReport.insertedProjects)}" else "")
                     )
                 }
                 .onFailure { events.send("Error: ${it.message ?: "白い熊 自由作業盤 bundle import failed"}") }
@@ -969,6 +1022,11 @@ fun ActiveAutomationUi(
         is ProjectFilter.Of -> scenes.filter { it.projectId == projectFilter.projectId }
     }
     val runLogs by viewModel.runLogs.collectAsState()
+    // Unread-failure dot on the Log nav icon: runLogs are timestamp-DESC, so the first failure is the
+    // newest; the dot shows while it's newer than what 白い熊 last saw (cleared on opening the Log tab).
+    val lastSeenFailureTs by RunLogSeenStore.state.collectAsState()
+    val newestFailureTs = remember(runLogs) { runLogs.firstOrNull { !it.success }?.timestamp ?: 0L }
+    val showLogBadge = newestFailureTs > lastSeenFailureTs
     val globalVariables by viewModel.globalVariables.collectAsState()
     val widgetTemplates by com.opentasker.widget.TemplateStore.state.collectAsState()
     val runLogRetentionPolicy = viewModel.runLogRetentionPolicy
@@ -982,12 +1040,23 @@ fun ActiveAutomationUi(
     var showProjectManagement by remember { mutableStateOf(false) }
     var showTaskLibrary by remember { mutableStateOf(false) }
     var moveTarget by remember { mutableStateOf<MoveTarget?>(null) }
+    // Bulk "move to project" for the active tab's multi-selection (Profiles/Tasks/Scenes only).
+    var bulkMoveTab by remember { mutableStateOf<OpenTaskerScreen?>(null) }
     var exportRequest by remember { mutableStateOf<ExportRequest?>(null) }
     var pendingExportWrite by remember { mutableStateOf<ExportRequest?>(null) }
     var importConflict by remember { mutableStateOf<OpenTaskerBundle?>(null) }
-    // Fold state hoisted to the root so it survives full-screen overlays (e.g. the action picker).
+    // A bundle waiting for the item-name-conflict choice (rename / overwrite+delete / overwrite+backup),
+    // plus the project strategy already chosen (or default) before this step.
+    var importItemConflict by remember { mutableStateOf<OpenTaskerBundle?>(null) }
+    var pendingProjectStrategy by remember { mutableStateOf(ProjectConflictStrategy.MERGE) }
+    // Fold state hoisted to the root so it survives full-screen overlays (e.g. the action picker) and
+    // so the top-bar expand/collapse-all can drive whichever list tab is showing. Default = collapsed.
     val expandedTasks = remember { mutableStateMapOf<Long, Boolean>() }
     val expandedActions = remember { mutableStateMapOf<String, Boolean>() }
+    val expandedProfiles = remember { mutableStateMapOf<Long, Boolean>() }
+    val expandedScenes = remember { mutableStateMapOf<Long, Boolean>() }
+    val expandedTemplates = remember { mutableStateMapOf<String, Boolean>() }
+    val expandedVars = remember { mutableStateMapOf<String, Boolean>() }
     var taskDialog by remember { mutableStateOf<Task?>(null) }
     var showCreateTaskDialog by remember { mutableStateOf(false) }
     var profileDialog by remember { mutableStateOf<Profile?>(null) }
@@ -1010,6 +1079,11 @@ fun ActiveAutomationUi(
     var confirmDeleteSelectedTemplates by remember { mutableStateOf(false) }
     var selectedVarKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
     var confirmDeleteSelectedVars by remember { mutableStateOf(false) }
+    // The "+" menu on the Scenes/Widgets tabs lives outside those screens; bumping a signal triggers
+    // each screen's own create dialog. Vars has no in-screen create, so its dialog lives here.
+    var sceneCreateSignal by remember { mutableIntStateOf(0) }
+    var widgetCreateSignal by remember { mutableIntStateOf(0) }
+    var showNewVarDialog by remember { mutableStateOf(false) }
     val taskerImportReview = viewModel.taskerImportReview
     val taskerImportBusy = viewModel.taskerImportBusy
     val openTaskerBundleReview = viewModel.openTaskerBundleReview
@@ -1039,6 +1113,8 @@ fun ActiveAutomationUi(
                 sceneIds = req.sceneIds,
                 includeVariables = req.includeVariables,
                 name = req.name,
+                templateNames = req.templateNames,
+                variableKeys = req.variableKeys,
             )
         }
     }
@@ -1106,17 +1182,23 @@ fun ActiveAutomationUi(
         selectedTemplateNames = emptySet()
         selectedVarKeys = emptySet()
     }
+    // Opening the Log tab marks all current failures as seen (clears the nav dot).
+    LaunchedEffect(screen, newestFailureTs) {
+        if (screen == OpenTaskerScreen.RunLog) RunLogSeenStore.markSeen(newestFailureTs)
+    }
 
     val headerDetail = when (screen) {
-        OpenTaskerScreen.Profiles -> "${profiles.count { it.enabled }} enabled - ${profiles.size} total"
-        OpenTaskerScreen.Tasks -> "${tasks.sumOf { it.actions.size }} actions - ${tasks.size} tasks"
+        // Counts mirror the *visible* (project-filtered) list so the header never disagrees with what's shown.
+        OpenTaskerScreen.Profiles -> "${visibleProfiles.count { it.enabled }} enabled - ${visibleProfiles.size} total"
+        OpenTaskerScreen.Tasks -> "${visibleTasks.sumOf { it.actions.size }} actions - ${visibleTasks.size} tasks"
         OpenTaskerScreen.Vars -> "${globalVariables.size} global variables"
         OpenTaskerScreen.Flow -> "${profiles.size} profiles - ${tasks.size} tasks"
-        OpenTaskerScreen.Scenes -> "${scenes.sumOf { it.elements.size }} elements - ${scenes.size} scenes"
+        OpenTaskerScreen.Scenes -> "${visibleScenes.sumOf { it.elements.size }} elements - ${visibleScenes.size} scenes"
         OpenTaskerScreen.Widgets -> "${widgetTemplates.size} widget templates"
         OpenTaskerScreen.Inspector -> "Live context health"
         OpenTaskerScreen.Setup -> "Permission and reliability checks"
         OpenTaskerScreen.RunLog -> "${runLogs.size} recent entries"
+        OpenTaskerScreen.Help -> "Schema & action reference"
     }
 
     if (showUiCustomization) {
@@ -1215,6 +1297,23 @@ fun ActiveAutomationUi(
                             Icon(Icons.Filled.Info, contentDescription = "Task library")
                         }
                     }
+                    // Expand / collapse every card on the current list tab (handy with many items).
+                    val expandAll: Pair<Boolean, () -> Unit>? = when (screen) {
+                        OpenTaskerScreen.Profiles -> expandAllControl(expandedProfiles, visibleProfiles.map { it.id })
+                        OpenTaskerScreen.Tasks -> expandAllControl(expandedTasks, visibleTasks.map { it.id })
+                        OpenTaskerScreen.Scenes -> expandAllControl(expandedScenes, visibleScenes.map { it.id })
+                        OpenTaskerScreen.Widgets -> expandAllControl(expandedTemplates, widgetTemplates.map { it.name })
+                        OpenTaskerScreen.Vars -> expandAllControl(expandedVars, globalVariables.map { variableKey(it) })
+                        else -> null
+                    }
+                    if (expandAll != null) {
+                        IconButton(onClick = expandAll.second) {
+                            Icon(
+                                if (expandAll.first) Icons.Filled.UnfoldLess else Icons.Filled.UnfoldMore,
+                                contentDescription = if (expandAll.first) "Collapse all" else "Expand all",
+                            )
+                        }
+                    }
                     val sortTab = when (screen) {
                         OpenTaskerScreen.Profiles -> SortTab.PROFILES
                         OpenTaskerScreen.Tasks -> SortTab.TASKS
@@ -1252,62 +1351,107 @@ fun ActiveAutomationUi(
             )
         },
         floatingActionButton = {
-            when (screen) {
-                OpenTaskerScreen.Profiles -> FloatingActionButton(
-                    onClick = {
-                        if (tasks.isEmpty()) {
-                            showCreateTaskDialog = true
-                        } else {
-                            showCreateProfileDialog = true
-                        }
+            // Uniform per-tab "+" menu: New <item> / Import JSON / Import Tasker (where it applies) /
+            // Export. Every import routes through the one unified bundle flow; export reuses ExportRequest.
+            val importJson = TabAction("Import JSON…", Icons.Filled.Download) {
+                openTaskerBundleImportLauncher.launch(OPEN_TASKER_BUNDLE_MIME_TYPES)
+            }
+            val importTasker = TabAction("Import Tasker XML…", Icons.Filled.SwapHoriz) {
+                taskerXmlLauncher.launch(TASKER_XML_MIME_TYPES)
+            }
+            val actions: List<TabAction> = when (screen) {
+                OpenTaskerScreen.Profiles -> listOf(
+                    TabAction(if (tasks.isEmpty()) "New profile (needs a task)" else "New profile", Icons.Filled.Add) {
+                        if (tasks.isEmpty()) showCreateTaskDialog = true else showCreateProfileDialog = true
                     },
-                    containerColor = MaterialTheme.colorScheme.background,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)),
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = if (tasks.isEmpty()) "Create task first" else "Create profile")
-                }
+                    TabAction("From template…", Icons.Filled.Dashboard) { showTemplateDialog = true },
+                    importJson,
+                    importTasker,
+                    TabAction("Export profiles…", Icons.Filled.Upload) {
+                        exportRequest = ExportRequest(
+                            name = "All profiles (${visibleProfiles.size})",
+                            fileName = "profiles.json",
+                            profileIds = visibleProfiles.map { it.id }.toSet(),
+                        )
+                    },
+                )
 
-                OpenTaskerScreen.Tasks -> FloatingActionButton(
-                    onClick = { showCreateTaskDialog = true },
-                    containerColor = MaterialTheme.colorScheme.background,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)),
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Create task")
-                }
+                OpenTaskerScreen.Tasks -> listOf(
+                    TabAction("New task", Icons.Filled.Add) { showCreateTaskDialog = true },
+                    importJson,
+                    importTasker,
+                    TabAction("Export tasks…", Icons.Filled.Upload) {
+                        exportRequest = ExportRequest(
+                            name = "All tasks (${visibleTasks.size})",
+                            fileName = "tasks.json",
+                            taskIds = visibleTasks.map { it.id }.toSet(),
+                        )
+                    },
+                )
 
-                OpenTaskerScreen.Vars,
+                OpenTaskerScreen.Scenes -> listOf(
+                    TabAction("New scene", Icons.Filled.Add) { sceneCreateSignal++ },
+                    importJson,
+                    TabAction("Export scenes…", Icons.Filled.Upload) {
+                        exportRequest = ExportRequest(
+                            name = "All scenes (${visibleScenes.size})",
+                            fileName = "scenes.json",
+                            sceneIds = visibleScenes.map { it.id }.toSet(),
+                        )
+                    },
+                )
+
+                OpenTaskerScreen.Widgets -> listOf(
+                    TabAction("New widget template", Icons.Filled.Add) { widgetCreateSignal++ },
+                    importJson,
+                    TabAction("Export templates…", Icons.Filled.Upload) {
+                        exportRequest = ExportRequest(
+                            name = "All widget templates (${widgetTemplates.size})",
+                            fileName = "widget_templates.json",
+                            templateNames = widgetTemplates.map { it.name }.toSet(),
+                        )
+                    },
+                )
+
+                OpenTaskerScreen.Vars -> listOf(
+                    TabAction("New variable…", Icons.Filled.Add) { showNewVarDialog = true },
+                    importJson,
+                    TabAction("Export variables…", Icons.Filled.Upload) {
+                        exportRequest = ExportRequest(
+                            name = "All variables (${globalVariables.size})",
+                            fileName = "variables.json",
+                            variableKeys = globalVariables.map { variableKey(it) }.toSet(),
+                        )
+                    },
+                )
+
                 OpenTaskerScreen.Flow,
-                OpenTaskerScreen.Scenes,
-                OpenTaskerScreen.Widgets,
                 OpenTaskerScreen.Inspector,
                 OpenTaskerScreen.Setup,
-                OpenTaskerScreen.RunLog -> Unit
+                OpenTaskerScreen.RunLog,
+                OpenTaskerScreen.Help -> emptyList()
             }
+            TabActionsFab(actions)
         },
         bottomBar = {
-            Column {
+            Column(Modifier.background(MaterialTheme.colorScheme.background)) {
                 HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.primary)
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    tonalElevation = 0.dp,
-                ) {
-                    val navItemColors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                        unselectedIconColor = MaterialTheme.colorScheme.primary,
-                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                        unselectedTextColor = MaterialTheme.colorScheme.primary,
-                        indicatorColor = Color.Transparent,
-                    )
-                    OpenTaskerScreen.entries.forEach { destination ->
-                        NavigationBarItem(
-                            selected = screen == destination,
-                            onClick = { screen = destination },
-                            colors = navItemColors,
-                            icon = {
+                // The bar carries 10 tabs, which crowd a narrow screen, so it scrolls horizontally; a
+                // fade + chevron at each edge signals when there's more beyond it.
+                val navScroll = rememberScrollState()
+                val primary = MaterialTheme.colorScheme.primary
+                val background = MaterialTheme.colorScheme.background
+                Box(Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .horizontalScroll(navScroll)
+                            .navigationBarsPadding()
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        OpenTaskerScreen.entries.forEach { destination ->
+                            val selected = screen == destination
                             val icon = when (destination) {
                                 OpenTaskerScreen.Profiles -> Icons.Filled.CheckCircle
                                 OpenTaskerScreen.Tasks -> Icons.Filled.Edit
@@ -1318,28 +1462,62 @@ fun ActiveAutomationUi(
                                 OpenTaskerScreen.Inspector -> Icons.Filled.Info
                                 OpenTaskerScreen.Setup -> Icons.Filled.Settings
                                 OpenTaskerScreen.RunLog -> Icons.Filled.Info
+                                OpenTaskerScreen.Help -> Icons.Filled.Info
                             }
-                            if (destination == OpenTaskerScreen.Setup) {
-                                // Long-press the Setup cog jumps straight to the 白い熊 自由作業盤 UI page;
-                                // a normal tap still selects the Setup tab.
-                                Box(
-                                    modifier = Modifier.pointerInput(Unit) {
-                                        detectTapGestures(
-                                            onTap = { screen = OpenTaskerScreen.Setup },
-                                            onLongPress = { showUiCustomization = true },
-                                        )
-                                    },
-                                ) {
-                                    Icon(icon, contentDescription = null)
+                            val tapModifier = if (destination == OpenTaskerScreen.Setup) {
+                                // Long-press the Setup cog jumps straight to the UI page; tap selects it.
+                                Modifier.pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onTap = { screen = OpenTaskerScreen.Setup },
+                                        onLongPress = { showUiCustomization = true },
+                                    )
                                 }
                             } else {
-                                Icon(icon, contentDescription = null)
+                                Modifier.clickable { screen = destination }
                             }
-                        },
-                        label = { Text(destination.label) },
-                        alwaysShowLabel = true,
-                    )
-                }
+                            Column(
+                                modifier = Modifier
+                                    .widthIn(min = 68.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .then(tapModifier)
+                                    .background(if (selected) primary.copy(alpha = 0.16f) else Color.Transparent)
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(2.dp),
+                            ) {
+                                if (destination == OpenTaskerScreen.RunLog && showLogBadge) {
+                                    BadgedBox(badge = { Badge() }) { Icon(icon, contentDescription = null, tint = primary) }
+                                } else {
+                                    Icon(icon, contentDescription = null, tint = primary)
+                                }
+                                Text(
+                                    destination.label,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = primary,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
+                    // Edge fades + chevrons — only when there's scrollable content past that edge.
+                    if (navScroll.canScrollBackward) {
+                        Box(
+                            Modifier.align(Alignment.CenterStart).fillMaxHeight().width(28.dp)
+                                .background(Brush.horizontalGradient(listOf(background, Color.Transparent))),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            Icon(Icons.Filled.ChevronLeft, contentDescription = null, tint = primary)
+                        }
+                    }
+                    if (navScroll.canScrollForward) {
+                        Box(
+                            Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(28.dp)
+                                .background(Brush.horizontalGradient(listOf(Color.Transparent, background))),
+                            contentAlignment = Alignment.CenterEnd,
+                        ) {
+                            Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = primary)
+                        }
+                    }
                 }
             }
         },
@@ -1348,18 +1526,12 @@ fun ActiveAutomationUi(
             OpenTaskerScreen.Profiles -> ProfilesScreen(
                 profiles = visibleProfiles,
                 tasks = tasks,
-                runLogs = runLogs,
+                expandedProfiles = expandedProfiles,
                 onCreateTaskFirst = {
                     screen = OpenTaskerScreen.Tasks
                     showCreateTaskDialog = true
                 },
                 onCreateProfile = { showCreateProfileDialog = true },
-                onBrowseTemplates = { showTemplateDialog = true },
-                onExportOpenTaskerBundle = { openTaskerBundleExportLauncher.launch(openTaskerBundleExportName()) },
-                onImportOpenTaskerBundle = { openTaskerBundleImportLauncher.launch(OPEN_TASKER_BUNDLE_MIME_TYPES) },
-                openTaskerBundleBusy = openTaskerBundleBusy,
-                onImportTaskerXml = { taskerXmlLauncher.launch(TASKER_XML_MIME_TYPES) },
-                taskerImportBusy = taskerImportBusy,
                 onEditProfile = { profileDialog = it },
                 onDeleteProfile = { pendingDelete = DeleteTarget.ProfileTarget(it) },
                 onToggleProfile = { profile, enabled ->
@@ -1384,6 +1556,7 @@ fun ActiveAutomationUi(
                 onSelectAllProfiles = { selectedProfileIds = visibleProfiles.map { it.id }.toSet() },
                 onClearProfileSelection = { selectedProfileIds = emptySet() },
                 onDeleteSelectedProfiles = { confirmDeleteSelectedProfiles = true },
+                onMoveSelectedToProject = { bulkMoveTab = OpenTaskerScreen.Profiles },
                 contentPadding = innerPadding,
             )
 
@@ -1418,6 +1591,7 @@ fun ActiveAutomationUi(
                 onSelectAllTasks = { selectedTaskIds = visibleTasks.map { it.id }.toSet() },
                 onClearTaskSelection = { selectedTaskIds = emptySet() },
                 onDeleteSelectedTasks = { confirmDeleteSelectedTasks = true },
+                onMoveSelectedToProject = { bulkMoveTab = OpenTaskerScreen.Tasks },
                 contentPadding = innerPadding,
             )
 
@@ -1452,6 +1626,7 @@ fun ActiveAutomationUi(
                 onUpdate = viewModel::updateVariable,
                 onDelete = viewModel::deleteVariable,
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
+                expandedVars = expandedVars,
                 selectedKeys = selectedVarKeys,
                 onLongPressVar = { selectedVarKeys = selectedVarKeys + variableKey(it) },
                 onToggleSelectVar = { val k = variableKey(it); selectedVarKeys = if (k in selectedVarKeys) selectedVarKeys - k else selectedVarKeys + k },
@@ -1476,6 +1651,10 @@ fun ActiveAutomationUi(
                 onSelectAllScenes = { selectedSceneIds = visibleScenes.map { it.id }.toSet() },
                 onClearSceneSelection = { selectedSceneIds = emptySet() },
                 onDeleteSelectedScenes = { confirmDeleteSelectedScenes = true },
+                onMoveSelectedToProject = { bulkMoveTab = OpenTaskerScreen.Scenes },
+                createSignal = sceneCreateSignal,
+                hiddenByFilter = scenes.size - visibleScenes.size,
+                expandedScenes = expandedScenes,
                 contentPadding = innerPadding,
             )
 
@@ -1483,9 +1662,9 @@ fun ActiveAutomationUi(
                 templates = widgetTemplates,
                 onSave = { name, layout -> com.opentasker.widget.TemplateStore.put(name, layout) },
                 onDelete = { com.opentasker.widget.TemplateStore.delete(it) },
-                onImport = { raw -> com.opentasker.widget.TemplateStore.importJson(raw) },
-                onExportAll = { com.opentasker.widget.TemplateStore.exportJson() },
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
+                createSignal = widgetCreateSignal,
+                expandedTemplates = expandedTemplates,
                 selectedNames = selectedTemplateNames,
                 onLongPressTemplate = { selectedTemplateNames = selectedTemplateNames + it.name },
                 onToggleSelectTemplate = { selectedTemplateNames = if (it.name in selectedTemplateNames) selectedTemplateNames - it.name else selectedTemplateNames + it.name },
@@ -1503,9 +1682,12 @@ fun ActiveAutomationUi(
                 onCreateBackup = viewModel::createDatabaseBackup,
                 onExportBackup = { databaseBackupExportLauncher.launch(databaseBackupExportName()) },
                 onImportBackup = { databaseBackupImportLauncher.launch(DATABASE_BACKUP_MIME_TYPES) },
+                onExportWorkspace = { openTaskerBundleExportLauncher.launch(openTaskerBundleExportName()) },
             )
 
             OpenTaskerScreen.Inspector -> ContextInspectorScreen(db = db, contentPadding = innerPadding)
+
+            OpenTaskerScreen.Help -> HelpDocumentationScreen(contentPadding = innerPadding)
 
             OpenTaskerScreen.RunLog -> RunLogScreenContent(
                 logs = runLogs,
@@ -1534,6 +1716,42 @@ fun ActiveAutomationUi(
         )
     }
 
+    bulkMoveTab?.let { tab ->
+        val noun = when (tab) {
+            OpenTaskerScreen.Profiles -> "profile"
+            OpenTaskerScreen.Tasks -> "task"
+            else -> "scene"
+        }
+        val count = when (tab) {
+            OpenTaskerScreen.Profiles -> selectedProfileIds.size
+            OpenTaskerScreen.Tasks -> selectedTaskIds.size
+            else -> selectedSceneIds.size
+        }
+        ProjectPickerDialog(
+            title = "Move $count $noun${if (count == 1) "" else "s"} to project",
+            projects = projects,
+            currentProjectId = null,
+            onPick = { projectId ->
+                when (tab) {
+                    OpenTaskerScreen.Profiles -> {
+                        viewModel.moveProfilesToProject(visibleProfiles.filter { it.id in selectedProfileIds }, projectId)
+                        selectedProfileIds = emptySet()
+                    }
+                    OpenTaskerScreen.Tasks -> {
+                        viewModel.moveTasksToProject(visibleTasks.filter { it.id in selectedTaskIds }, projectId)
+                        selectedTaskIds = emptySet()
+                    }
+                    else -> {
+                        viewModel.moveScenesToProject(visibleScenes.filter { it.id in selectedSceneIds }, projectId)
+                        selectedSceneIds = emptySet()
+                    }
+                }
+                bulkMoveTab = null
+            },
+            onDismiss = { bulkMoveTab = null },
+        )
+    }
+
     exportRequest?.let { req ->
         ExportOptionsDialog(
             request = req,
@@ -1543,6 +1761,17 @@ fun ActiveAutomationUi(
                 exportRequest = null
                 pendingExportWrite = resolved
                 selectiveExportLauncher.launch(resolved.fileName)
+            },
+        )
+    }
+
+    if (showNewVarDialog) {
+        NewVariableDialog(
+            existingKeys = globalVariables.map { variableKey(it) }.toSet(),
+            onDismiss = { showNewVarDialog = false },
+            onConfirm = { name, value ->
+                viewModel.updateVariable(0L, name, value)
+                showNewVarDialog = false
             },
         )
     }
@@ -1641,6 +1870,29 @@ fun ActiveAutomationUi(
         )
     }
 
+    // Names of incoming items that clash with existing ones (so we can warn before overwriting).
+    val itemCollisions: (OpenTaskerBundle) -> List<String> = { b ->
+        val taskNames = tasks.mapTo(HashSet()) { it.name.lowercase() }
+        val profileNames = profiles.mapTo(HashSet()) { it.name.lowercase() }
+        val sceneNames = scenes.mapTo(HashSet()) { it.name.lowercase() }
+        val templateNames = widgetTemplates.mapTo(HashSet()) { it.name.lowercase() }
+        buildList {
+            b.tasks.filter { it.name.lowercase() in taskNames }.forEach { add("Task “${it.name}”") }
+            b.profiles.filter { it.name.lowercase() in profileNames }.forEach { add("Profile “${it.name}”") }
+            b.scenes.filter { it.name.lowercase() in sceneNames }.forEach { add("Scene “${it.name}”") }
+            b.templates.filter { it.name.lowercase() in templateNames }.forEach { add("Widget template “${it.name}”") }
+        }
+    }
+    // After the project choice, ask the item-conflict question if any names clash; else import directly.
+    val startBundleImport: (OpenTaskerBundle, ProjectConflictStrategy) -> Unit = { b, projStrat ->
+        if (itemCollisions(b).isNotEmpty()) {
+            pendingProjectStrategy = projStrat
+            importItemConflict = b
+        } else {
+            viewModel.confirmOpenTaskerBundleImport(b, projStrat, ItemConflictStrategy.RENAME)
+        }
+    }
+
     openTaskerBundleReview?.let { state ->
         OpenTaskerBundleReviewDialog(
             state = state,
@@ -1650,11 +1902,11 @@ fun ActiveAutomationUi(
                 val hasProjectCollision = state.bundle.projects.any { incoming ->
                     projects.any { it.name.equals(incoming.name, ignoreCase = true) }
                 }
+                viewModel.clearOpenTaskerBundleReview()
                 if (hasProjectCollision) {
                     importConflict = state.bundle
-                    viewModel.clearOpenTaskerBundleReview()
                 } else {
-                    viewModel.confirmOpenTaskerBundleImport(state.bundle, ProjectConflictStrategy.RENAME)
+                    startBundleImport(state.bundle, ProjectConflictStrategy.RENAME)
                 }
             },
         )
@@ -1667,14 +1919,33 @@ fun ActiveAutomationUi(
         ImportProjectConflictDialog(
             conflictingNames = conflictingNames,
             onOverwrite = {
-                viewModel.confirmOpenTaskerBundleImport(bundle, ProjectConflictStrategy.MERGE)
                 importConflict = null
+                startBundleImport(bundle, ProjectConflictStrategy.MERGE)
             },
             onKeepBoth = {
-                viewModel.confirmOpenTaskerBundleImport(bundle, ProjectConflictStrategy.RENAME)
                 importConflict = null
+                startBundleImport(bundle, ProjectConflictStrategy.RENAME)
             },
             onDismiss = { importConflict = null },
+        )
+    }
+
+    importItemConflict?.let { bundle ->
+        ImportItemConflictDialog(
+            collisions = itemCollisions(bundle),
+            onRename = {
+                importItemConflict = null
+                viewModel.confirmOpenTaskerBundleImport(bundle, pendingProjectStrategy, ItemConflictStrategy.RENAME)
+            },
+            onOverwriteDelete = {
+                importItemConflict = null
+                viewModel.confirmOpenTaskerBundleImport(bundle, pendingProjectStrategy, ItemConflictStrategy.OVERWRITE_DELETE)
+            },
+            onOverwriteBackup = {
+                importItemConflict = null
+                viewModel.confirmOpenTaskerBundleImport(bundle, pendingProjectStrategy, ItemConflictStrategy.OVERWRITE_BACKUP)
+            },
+            onDismiss = { importItemConflict = null },
         )
     }
 
@@ -1817,15 +2088,9 @@ fun ActiveAutomationUi(
 private fun ProfilesScreen(
     profiles: List<Profile>,
     tasks: List<Task>,
-    runLogs: List<RunLogEntry>,
+    expandedProfiles: SnapshotStateMap<Long, Boolean>,
     onCreateTaskFirst: () -> Unit,
     onCreateProfile: () -> Unit,
-    onBrowseTemplates: () -> Unit,
-    onExportOpenTaskerBundle: () -> Unit,
-    onImportOpenTaskerBundle: () -> Unit,
-    openTaskerBundleBusy: Boolean,
-    onImportTaskerXml: () -> Unit,
-    taskerImportBusy: Boolean,
     onEditProfile: (Profile) -> Unit,
     onDeleteProfile: (Profile) -> Unit,
     onToggleProfile: (Profile, Boolean) -> Unit,
@@ -1842,22 +2107,15 @@ private fun ProfilesScreen(
     onSelectAllProfiles: () -> Unit,
     onClearProfileSelection: () -> Unit,
     onDeleteSelectedProfiles: () -> Unit,
+    onMoveSelectedToProject: () -> Unit,
     contentPadding: PaddingValues,
 ) {
     if (tasks.isEmpty()) {
         EmptyState(
-            title = "Start with a template or task",
-            body = "Import a 白い熊 自由作業盤 JSON bundle, migrate an existing Tasker XML export, start from a guided template, or create a blank task manually.",
-            actionLabel = if (openTaskerBundleBusy) "Reading Bundle..." else "Import 白い熊 自由作業盤 JSON",
-            onAction = onImportOpenTaskerBundle,
-            actionEnabled = !openTaskerBundleBusy,
-            secondaryActionLabel = "Browse Templates",
-            onSecondaryAction = onBrowseTemplates,
-            tertiaryActionLabel = if (taskerImportBusy) "Reading Tasker XML..." else "Import Tasker XML",
-            onTertiaryAction = onImportTaskerXml,
-            tertiaryActionEnabled = !taskerImportBusy,
-            quaternaryActionLabel = "Create Blank Task",
-            onQuaternaryAction = onCreateTaskFirst,
+            title = "No tasks yet",
+            body = "Profiles run tasks, so start with a task. Tap ＋ to create one, or to import a 白い熊 自由作業盤 JSON bundle or a Tasker XML export.",
+            actionLabel = "Create blank task",
+            onAction = onCreateTaskFirst,
             contentPadding = contentPadding,
         )
         return
@@ -1865,17 +2123,9 @@ private fun ProfilesScreen(
     if (profiles.isEmpty()) {
         EmptyState(
             title = "No profiles yet",
-            body = "Profiles connect contexts to tasks. Import a 白い熊 自由作業盤 JSON bundle, migrate Tasker XML, start from a curated template, or create a blank profile.",
-            actionLabel = if (openTaskerBundleBusy) "Reading Bundle..." else "Import 白い熊 自由作業盤 JSON",
-            onAction = onImportOpenTaskerBundle,
-            actionEnabled = !openTaskerBundleBusy,
-            secondaryActionLabel = "Browse Templates",
-            onSecondaryAction = onBrowseTemplates,
-            tertiaryActionLabel = if (taskerImportBusy) "Reading Tasker XML..." else "Import Tasker XML",
-            onTertiaryAction = onImportTaskerXml,
-            tertiaryActionEnabled = !taskerImportBusy,
-            quaternaryActionLabel = "Create Blank Profile",
-            onQuaternaryAction = onCreateProfile,
+            body = "Profiles connect contexts to tasks. Tap ＋ to create a blank profile, start from a template, or import a bundle.",
+            actionLabel = "Create blank profile",
+            onAction = onCreateProfile,
             contentPadding = contentPadding,
         )
         return
@@ -1892,30 +2142,15 @@ private fun ProfilesScreen(
                 onSelectAll = onSelectAllProfiles,
                 onClear = onClearProfileSelection,
                 onDelete = onDeleteSelectedProfiles,
+                onMoveToProject = onMoveSelectedToProject,
             )
         }
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().weight(1f),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            item {
-                WorkspaceSummaryCard(
-                    profiles = profiles,
-                    tasks = tasks,
-                    runLogs = runLogs,
-                    onBrowseTemplates = onBrowseTemplates,
-                    onExportOpenTaskerBundle = onExportOpenTaskerBundle,
-                    onImportOpenTaskerBundle = onImportOpenTaskerBundle,
-                    openTaskerBundleBusy = openTaskerBundleBusy,
-                    onImportTaskerXml = onImportTaskerXml,
-                    taskerImportBusy = taskerImportBusy,
-                )
-            }
-            item {
-                TemplatePromptCard(onBrowseTemplates)
-            }
             items(profiles, key = { it.id }) { profile ->
                 ReorderableRow(reorder, listState, profiles, profile, { it.id }, manualSort && !selectionActive, onReorder) {
                     val enterTaskName = tasks.firstOrNull { it.id == profile.enterTaskId }?.name ?: "Missing task #${profile.enterTaskId}"
@@ -1924,6 +2159,8 @@ private fun ProfilesScreen(
                         enterTaskName = enterTaskName,
                         selectionActive = selectionActive,
                         selected = profile.id in selectedIds,
+                        expanded = expandedProfiles[profile.id] == true,
+                        onToggleExpanded = { expandedProfiles[profile.id] = expandedProfiles[profile.id] != true },
                         onLongPress = { onLongPressProfile(profile) },
                         onToggleSelect = { onToggleSelectProfile(profile) },
                         onEdit = { onEditProfile(profile) },
@@ -1977,91 +2214,6 @@ private fun readBoundedDocumentText(context: Context, uri: Uri, maxBytes: Int, l
             }
         }
         return output.toString(Charsets.UTF_8.name())
-    }
-}
-
-@Composable
-private fun WorkspaceSummaryCard(
-    profiles: List<Profile>,
-    tasks: List<Task>,
-    runLogs: List<RunLogEntry>,
-    onBrowseTemplates: () -> Unit,
-    onExportOpenTaskerBundle: () -> Unit,
-    onImportOpenTaskerBundle: () -> Unit,
-    openTaskerBundleBusy: Boolean,
-    onImportTaskerXml: () -> Unit,
-    taskerImportBusy: Boolean,
-) {
-    val enabledProfiles = profiles.count { it.enabled }
-    val configuredContexts = profiles.sumOf { it.contexts.size }
-    val totalActions = tasks.sumOf { it.actions.size }
-    val recentFailure = runLogs.firstOrNull { !it.success }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shape = RoundedCornerShape(18.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(Modifier.weight(1f)) {
-                    Text("Automation workspace", style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        "Review readiness before enabling profiles. Templates stay disabled until you approve them.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                StatusPill(
-                    label = if (enabledProfiles > 0) "$enabledProfiles live" else "Paused",
-                    color = if (enabledProfiles > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                SummaryMetric("${profiles.size}", "Profiles", Modifier.weight(1f))
-                SummaryMetric("$configuredContexts", "Contexts", Modifier.weight(1f))
-                SummaryMetric("$totalActions", "Actions", Modifier.weight(1f))
-            }
-            if (recentFailure != null) {
-                InlineNotice(
-                    title = "Recent failure",
-                    body = "${recentFailure.taskName}: ${recentFailure.message.ifBlank { "Review the run log for details." }}",
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = onBrowseTemplates, modifier = Modifier.weight(1f)) {
-                    Text("Templates")
-                }
-                OutlinedButton(
-                    onClick = onImportTaskerXml,
-                    enabled = !taskerImportBusy,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(if (taskerImportBusy) "Reading XML" else "Import Tasker")
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(
-                    onClick = onExportOpenTaskerBundle,
-                    enabled = !openTaskerBundleBusy,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(if (openTaskerBundleBusy) "Working" else "Export JSON")
-                }
-                OutlinedButton(
-                    onClick = onImportOpenTaskerBundle,
-                    enabled = !openTaskerBundleBusy,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(if (openTaskerBundleBusy) "Reading JSON" else "Import JSON")
-                }
-            }
-        }
     }
 }
 
@@ -2159,39 +2311,13 @@ private fun InlineNotice(title: String, body: String, color: Color) {
 }
 
 @Composable
-private fun TemplatePromptCard(onBrowseTemplates: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-        shape = RoundedCornerShape(16.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text("Templates", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Create starter profiles with named slots, clear safety notes, and disabled-by-default review.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            OutlinedButton(onClick = onBrowseTemplates) {
-                Text("Browse")
-            }
-        }
-    }
-}
-
-@Composable
 private fun ProfileCard(
     profile: Profile,
     enterTaskName: String,
     selectionActive: Boolean,
     selected: Boolean,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
     onLongPress: () -> Unit,
     onToggleSelect: () -> Unit,
     onEdit: () -> Unit,
@@ -2221,73 +2347,90 @@ private fun ProfileCard(
         ),
         shape = RoundedCornerShape(16.dp),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth().selectableItem(
                     selectionActive = selectionActive,
                     onLongPress = onLongPress,
                     onToggleSelect = onToggleSelect,
+                    onTapNormal = onToggleExpanded,
                 ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (selectionActive) {
-                    Checkbox(checked = selected, onCheckedChange = { onToggleSelect() })
+                    SelectionCheck(selected)
                 }
                 Column(Modifier.weight(1f)) {
                     Text(profile.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("Runs: $enterTaskName", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                IconButton(onClick = onExport) {
-                    Icon(Icons.Filled.Upload, contentDescription = "Export profile")
-                }
-                Switch(checked = profile.enabled, onCheckedChange = onToggle)
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatusPill(
-                    label = if (profile.enabled) "Enabled" else "Paused",
-                    color = if (profile.enabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                StatusPill("${profile.contexts.size} context${plural(profile.contexts.size)}", MaterialTheme.colorScheme.primary)
-                StatusPill("${profile.cooldownSec}s cooldown", MaterialTheme.colorScheme.secondary)
-            }
-            StatusPill(profile.automationMode.name.lowercase(), MaterialTheme.colorScheme.onSurfaceVariant)
-            if (profile.contexts.isEmpty()) {
-                InlineNotice(
-                    title = "Profile cannot match yet",
-                    body = "Add at least one context before relying on this profile.",
-                    color = MaterialTheme.colorScheme.error,
-                )
-            } else {
-                profile.contexts.forEachIndexed { index, context ->
-                    ContextRow(
-                        context = context,
-                        onEdit = { onEditContext(index, context) },
-                        onDelete = { onDeleteContext(index) },
+                    Text(
+                        "Runs: $enterTaskName" +
+                            if (!expanded) " - ${if (profile.enabled) "enabled" else "paused"}, ${profile.contexts.size} context${plural(profile.contexts.size)}" else "",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
+                if (expanded) {
+                    IconButton(onClick = onExport) {
+                        Icon(Icons.Filled.Upload, contentDescription = "Export profile")
+                    }
+                }
+                Switch(checked = profile.enabled, onCheckedChange = onToggle)
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Collapse profile" else "Expand profile",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Edit, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Edit")
+            if (expanded) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatusPill(
+                        label = if (profile.enabled) "Enabled" else "Paused",
+                        color = if (profile.enabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    StatusPill("${profile.contexts.size} context${plural(profile.contexts.size)}", MaterialTheme.colorScheme.primary)
+                    StatusPill("${profile.cooldownSec}s cooldown", MaterialTheme.colorScheme.secondary)
                 }
-                OutlinedButton(onClick = onAddContext, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Add Context")
+                StatusPill(profile.automationMode.name.lowercase(), MaterialTheme.colorScheme.onSurfaceVariant)
+                if (profile.contexts.isEmpty()) {
+                    InlineNotice(
+                        title = "Profile cannot match yet",
+                        body = "Add at least one context before relying on this profile.",
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                } else {
+                    profile.contexts.forEachIndexed { index, context ->
+                        ContextRow(
+                            context = context,
+                            onEdit = { onEditContext(index, context) },
+                            onDelete = { onDeleteContext(index) },
+                        )
+                    }
                 }
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                TextButton(onClick = onMove) {
-                    Icon(Icons.Filled.Folder, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Move")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Edit, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Edit")
+                    }
+                    OutlinedButton(onClick = onAddContext, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Add Context")
+                    }
                 }
-                TextButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Delete Profile")
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    TextButton(onClick = onMove) {
+                        Icon(Icons.Filled.Folder, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Move")
+                    }
+                    TextButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Delete, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Delete Profile")
+                    }
                 }
             }
         }
@@ -2318,6 +2461,7 @@ private fun TasksScreen(
     onSelectAllTasks: () -> Unit,
     onClearTaskSelection: () -> Unit,
     onDeleteSelectedTasks: () -> Unit,
+    onMoveSelectedToProject: () -> Unit,
     contentPadding: PaddingValues,
 ) {
     if (tasks.isEmpty()) {
@@ -2341,13 +2485,14 @@ private fun TasksScreen(
                 onSelectAll = onSelectAllTasks,
                 onClear = onClearTaskSelection,
                 onDelete = onDeleteSelectedTasks,
+                onMoveToProject = onMoveSelectedToProject,
             )
         }
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().weight(1f),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(tasks, key = { it.id }) { task ->
                 ReorderableRow(reorder, listState, tasks, task, { it.id }, manualSort && !selectionActive, onReorder) {
@@ -2420,7 +2565,7 @@ private fun TaskCard(
         ),
         shape = RoundedCornerShape(16.dp),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth().selectableItem(
                     selectionActive = selectionActive,
@@ -2431,7 +2576,7 @@ private fun TaskCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (selectionActive) {
-                    Checkbox(checked = selected, onCheckedChange = { onToggleSelect() })
+                    SelectionCheck(selected)
                 }
                 Column(Modifier.weight(1f)) {
                     Text(task.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -2748,6 +2893,9 @@ private fun RunLogScreenContent(
     val filteredLogs = remember(logs, statusFilter, taskIdFilter, query) {
         filterRunLogs(logs, RunLogFilterState(status = statusFilter, taskId = taskIdFilter, query = query))
     }
+    // The latest failure (logs are timestamp-DESC) gets a banner atop the Log tab — this is where
+    // run failures surface now that the Profiles workspace card is gone.
+    val latestFailure = logs.firstOrNull { !it.success }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -2755,6 +2903,15 @@ private fun RunLogScreenContent(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (latestFailure != null) {
+            item {
+                InlineNotice(
+                    title = "Last failure: ${latestFailure.taskName}",
+                    body = latestFailure.message.ifBlank { "Tap the matching entry below for the full trace." },
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
         if (logs.isEmpty()) {
             item {
                 InlineNotice(
@@ -3322,12 +3479,58 @@ private fun EmptyState(
 }
 
 @Composable
+private fun NewVariableDialog(
+    existingKeys: Set<String>,
+    onDismiss: () -> Unit,
+    onConfirm: (name: String, value: String) -> Unit,
+) {
+    var rawName by remember { mutableStateOf("%") }
+    var value by remember { mutableStateOf("") }
+    // Normalise to a leading %; a manually-added var is a super-global (projectId 0).
+    val name = rawName.trim().let { if (it.startsWith("%")) it else "%$it" }
+    val duplicate = "0:$name" in existingKeys
+    val valid = name.length > 1 && !duplicate
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = onDismiss,
+        title = { Text("New variable") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = rawName,
+                    onValueChange = { rawName = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    isError = duplicate,
+                    supportingText = {
+                        Text(
+                            if (duplicate) "A variable named $name already exists." else "Stored as a super-global (%ALLCAPS stays global everywhere).",
+                        )
+                    },
+                )
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it },
+                    label = { Text("Value") },
+                    singleLine = true,
+                )
+            }
+        },
+        confirmButton = { TextButton(enabled = valid, onClick = { onConfirm(name, value) }) { Text("Create") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
 private fun ExportOptionsDialog(
     request: ExportRequest,
     onDismiss: () -> Unit,
     onExport: (Boolean) -> Unit,
 ) {
     var includeVariables by remember { mutableStateOf(false) }
+    // The "also bundle all global variables" option only makes sense for profile/task/scene exports;
+    // a variables or widget-templates export already carries exactly what it should.
+    val canIncludeVars = request.variableKeys.isEmpty() && request.templateNames.isEmpty()
     AlertDialog(
         modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
@@ -3335,13 +3538,15 @@ private fun ExportOptionsDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(request.name, style = MaterialTheme.typography.bodyMedium)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Checkbox(checked = includeVariables, onCheckedChange = { includeVariables = it })
-                    Text("Include global variables", style = MaterialTheme.typography.bodyMedium)
+                if (canIncludeVars) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Checkbox(checked = includeVariables, onCheckedChange = { includeVariables = it })
+                        Text("Include global variables", style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onExport(includeVariables) }) { Text("Export") } },
+        confirmButton = { TextButton(onClick = { onExport(canIncludeVars && includeVariables) }) { Text("Export") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
@@ -3353,23 +3558,67 @@ private fun ImportProjectConflictDialog(
     onKeepBoth: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val single = conflictingNames.singleOrNull()
     AlertDialog(
         modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text("Project already exists") },
         text = {
             Text(
-                if (conflictingNames.size == 1) {
-                    "A project named \"${conflictingNames.first()}\" already exists. Import into it (file the imported items under the existing project), or create a separate new (renamed) project?"
+                if (single != null) {
+                    "A project named “$single” already exists. Import into it (file the imported items under the existing project), or create a separate new (renamed) project?"
                 } else {
-                    "These projects already exist: ${conflictingNames.joinToString()}. Import into them, or create separate new (renamed) projects?"
+                    "These projects already exist: ${conflictingNames.joinToString { "“$it”" }}. Import into them, or create separate new (renamed) projects?"
                 },
             )
         },
-        confirmButton = { TextButton(onClick = onOverwrite) { Text("Import into") } },
-        dismissButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(onClick = onKeepBoth) { Text("New project") }
+        // Stacked so long names don't overflow; default (import into existing) on top.
+        confirmButton = {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+                TextButton(onClick = onOverwrite) {
+                    Text(if (single != null) "Import into “$single”" else "Import into existing")
+                }
+                TextButton(onClick = onKeepBoth) { Text("Create new project") }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        },
+    )
+}
+
+@Composable
+private fun ImportItemConflictDialog(
+    collisions: List<String>,
+    onRename: () -> Unit,
+    onOverwriteDelete: () -> Unit,
+    onOverwriteBackup: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = onDismiss,
+        title = { Text("Some items already exist") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("These already exist in your workspace:", style = MaterialTheme.typography.bodyMedium)
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    collisions.take(12).forEach { Text("•  $it", style = MaterialTheme.typography.bodySmall) }
+                    if (collisions.size > 12) {
+                        Text("…and ${collisions.size - 12} more", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Text(
+                    "Import with new names keeps both. Overwrite current backs up the existing ones (renamed “.<timestamp>.bak”) before importing. Overwrite and delete current removes them first.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        // Stacked; default (Overwrite current — backs up then imports) on top.
+        confirmButton = {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+                TextButton(onClick = onOverwriteBackup) { Text("Overwrite current") }
+                TextButton(onClick = onOverwriteDelete) { Text("Overwrite and delete current") }
+                TextButton(onClick = onRename) { Text("Import with new names") }
                 TextButton(onClick = onDismiss) { Text("Cancel") }
             }
         },
@@ -3467,6 +3716,7 @@ private fun OpenTaskerBundleReviewDialog(
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         SummaryMetric("${bundle.scenes.size}", "Scenes", Modifier.weight(1f))
+                        SummaryMetric("${bundle.templates.size}", "Templates", Modifier.weight(1f))
                         SummaryMetric("${capabilityRequirements.size}", "Setup notes", Modifier.weight(1f))
                         SummaryMetric("${reviewWarnings.size}", "Warnings", Modifier.weight(1f))
                     }

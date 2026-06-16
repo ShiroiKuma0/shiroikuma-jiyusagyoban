@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -104,6 +105,7 @@ fun PermissionOnboardingScreen(
     onCreateBackup: () -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
+    onExportWorkspace: () -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -215,6 +217,7 @@ fun PermissionOnboardingScreen(
                 onCreateBackup = onCreateBackup,
                 onExportBackup = onExportBackup,
                 onImportBackup = onImportBackup,
+                onExportWorkspace = onExportWorkspace,
             )
         }
 
@@ -284,6 +287,7 @@ private fun BackupSetupCard(
     onCreateBackup: () -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
+    onExportWorkspace: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -330,6 +334,19 @@ private fun BackupSetupCard(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text("Import Backup")
+                }
+                HorizontalDivider()
+                Text(
+                    "Or export everything as a portable 白い熊 自由作業盤 JSON bundle (projects, profiles, tasks, scenes, variables and widget templates) — the same format every tab's + menu imports.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(
+                    onClick = onExportWorkspace,
+                    enabled = !state.busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Export Workspace (JSON)")
                 }
             }
         }

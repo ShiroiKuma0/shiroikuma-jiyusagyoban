@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +15,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -28,12 +32,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.model.Variable
 import com.opentasker.ui.components.SelectionBar
+import com.opentasker.ui.components.SelectionCheck
 import com.opentasker.ui.components.selectableItem
 
 private val SENSITIVE_NAMES = setOf("password", "token", "secret", "key", "credential", "auth")
@@ -51,6 +57,7 @@ fun VariablesScreen(
     onUpdate: (projectId: Long, name: String, value: String) -> Unit,
     onDelete: (projectId: Long, name: String) -> Unit,
     onMessage: (String) -> Unit,
+    expandedVars: SnapshotStateMap<String, Boolean>,
     selectedKeys: Set<String>,
     onLongPressVar: (Variable) -> Unit,
     onToggleSelectVar: (Variable) -> Unit,
@@ -98,10 +105,13 @@ fun VariablesScreen(
 
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             items(filtered, key = { variableKey(it) }) { variable ->
+                val key = variableKey(variable)
                 VariableRow(
                     variable = variable,
                     selectionActive = selectionActive,
-                    selected = variableKey(variable) in selectedKeys,
+                    selected = key in selectedKeys,
+                    expanded = expandedVars[key] == true,
+                    onToggleExpanded = { expandedVars[key] = expandedVars[key] != true },
                     onLongPress = { onLongPressVar(variable) },
                     onToggleSelect = { onToggleSelectVar(variable) },
                     onEdit = { editTarget = variable },
@@ -129,47 +139,71 @@ private fun VariableRow(
     variable: Variable,
     selectionActive: Boolean,
     selected: Boolean,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
     onLongPress: () -> Unit,
     onToggleSelect: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Card(
-        border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).selectableItem(
+        border = BorderStroke(
+            if (selected) 2.dp else 1.dp,
+            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        ),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).animateContentSize().selectableItem(
             selectionActive = selectionActive,
             onLongPress = onLongPress,
             onToggleSelect = onToggleSelect,
-            onTapNormal = onEdit,
+            onTapNormal = onToggleExpanded,
         ),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (selectionActive) {
-                Checkbox(checked = selected, onCheckedChange = { onToggleSelect() })
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "%${variable.name}",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontFamily = FontFamily.Monospace,
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (selectionActive) {
+                    SelectionCheck(selected)
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "%${variable.name}",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                    Text(
+                        text = if (variable.projectId == 0L) "super-global" else "project-global",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Collapse variable" else "Expand variable",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            if (expanded) {
                 Text(
                     text = if (isSensitive(variable.name)) "***" else variable.value,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 2,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = FontFamily.Monospace,
                 )
-                Text(
-                    text = if (variable.projectId == 0L) "super-global" else "project-global",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete variable")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onEdit) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Edit variable")
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Delete variable")
+                    }
+                }
             }
         }
     }

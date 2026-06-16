@@ -47,6 +47,7 @@ import com.opentasker.core.actions.TileStateAction
 import com.opentasker.core.actions.TorchAction
 import com.opentasker.core.actions.VibrateAction
 import com.opentasker.core.actions.VolumeAction
+import com.opentasker.core.actions.VolumeGetAction
 import com.opentasker.core.actions.WaitAction
 import com.opentasker.core.actions.WakeAction
 import com.opentasker.core.actions.WakeOnLanAction
@@ -126,6 +127,7 @@ private fun registerBuiltInActions() {
         BluetoothToggleAction(),
         BrightnessAction(),
         VolumeAction(),
+        VolumeGetAction(),
         AirplaneModeAction(),
         MobileDataAction(),
         ScreenTimeoutAction(),
