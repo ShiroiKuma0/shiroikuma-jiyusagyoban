@@ -203,4 +203,14 @@ class ActionGuardsTest {
             (result as ActionResult.Failure).message.contains("allow_http")
         )
     }
+
+    @Test
+    fun torchToggleNeedsKnownCurrentState() {
+        assertEquals(true, TorchAction.targetStateFor("on", null))
+        assertEquals(false, TorchAction.targetStateFor("off", null))
+        assertEquals(false, TorchAction.targetStateFor("toggle", true))
+        assertEquals(true, TorchAction.targetStateFor("toggle", false))
+        assertEquals(null, TorchAction.targetStateFor("toggle", null))
+        assertEquals(null, TorchAction.targetStateFor("invalid", true))
+    }
 }
