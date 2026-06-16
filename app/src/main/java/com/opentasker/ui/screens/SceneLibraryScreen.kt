@@ -635,8 +635,11 @@ private fun SceneElementEditorDialog(
     var sliderVertical by remember(state) { mutableStateOf(initial.config["orientation"].equals("vertical", ignoreCase = true)) }
     // Checkbox/Toggle initial on/off state.
     var boolValue by remember(state) { mutableStateOf((initial.config["value"] ?: "false").trim().lowercase() in setOf("true", "1", "on", "yes")) }
-    // Edit-text initial text.
+    // Edit-text / spinner initial value.
     var textValue by remember(state) { mutableStateOf(initial.config["value"] ?: "") }
+    var spinnerOptions by remember(state) { mutableStateOf(initial.config["options"] ?: "") }
+    // Rectangle corner radius (dp).
+    var shapeCorner by remember(state) { mutableStateOf(initial.config["cornerRadius"] ?: "0") }
     var imageSource by remember(state) { mutableStateOf(initial.config["source"] ?: "") }
     // Style (Text / Button): colours as "#AARRGGBB" (blank = element default), size in sp, bold, align.
     var styleTextColor by remember(state) { mutableStateOf(initial.config["textColor"] ?: "") }
@@ -696,15 +699,17 @@ private fun SceneElementEditorDialog(
                         sliderVar = defaults.config["var"] ?: ""
                         sliderVertical = defaults.config["orientation"].equals("vertical", ignoreCase = true)
                         boolValue = (defaults.config["value"] ?: "false").trim().lowercase() in setOf("true", "1", "on", "yes")
-                        textValue = if (selected == SceneElementType.EDIT_TEXT) (defaults.config["value"] ?: "") else ""
+                        textValue = if (selected == SceneElementType.EDIT_TEXT || selected == SceneElementType.SPINNER) (defaults.config["value"] ?: "") else ""
+                        spinnerOptions = defaults.config["options"] ?: ""
+                        shapeCorner = defaults.config["cornerRadius"] ?: "0"
                         imageSource = defaults.config["source"] ?: ""
-                        styleTextColor = ""
-                        styleBgColor = ""
-                        styleSize = ""
-                        styleBold = false
-                        styleAlign = "start"
-                        styleBorderColor = ""
-                        styleBorderWidth = ""
+                        styleTextColor = defaults.config["textColor"] ?: ""
+                        styleBgColor = defaults.config["bgColor"] ?: ""
+                        styleSize = defaults.config["textSize"] ?: ""
+                        styleBold = (defaults.config["bold"] ?: "").trim().lowercase() in setOf("true", "1", "on", "yes")
+                        styleAlign = defaults.config["align"]?.trim()?.lowercase() ?: "start"
+                        styleBorderColor = defaults.config["borderColor"] ?: ""
+                        styleBorderWidth = defaults.config["borderWidth"] ?: ""
                     },
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -848,6 +853,61 @@ private fun SceneElementEditorDialog(
                         )
                     }
 
+                    SceneElementType.SPINNER -> {
+                        OutlinedTextField(
+                            value = label,
+                            onValueChange = { label = it.take(48) },
+                            label = { Text("Label (shown when empty)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = spinnerOptions,
+                            onValueChange = { spinnerOptions = it.take(600) },
+                            label = { Text("Options (comma or new line)") },
+                            minLines = 2,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = textValue,
+                            onValueChange = { textValue = it.take(80) },
+                            label = { Text("Initial value") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = sliderVar,
+                            onValueChange = { sliderVar = it.take(40) },
+                            label = { Text("Store value in variable") },
+                            placeholder = { Text("%CHOICE") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            "Selecting an option writes it to this variable and runs the Tap task.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
+                    SceneElementType.RECTANGLE, SceneElementType.OVAL -> {
+                        SceneColorField(label = "Fill colour", value = styleBgColor, onChange = { styleBgColor = it })
+                        if (type == SceneElementType.RECTANGLE) {
+                            NumberField("Corner (dp)", shapeCorner, { shapeCorner = it.filter(Char::isDigit).take(2) }, isError = false, modifier = Modifier.fillMaxWidth())
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.weight(1f)) {
+                                SceneColorField(label = "Border colour", value = styleBorderColor, onChange = { styleBorderColor = it })
+                            }
+                            NumberField("Border (dp)", styleBorderWidth, { styleBorderWidth = it.filter(Char::isDigit).take(2) }, isError = false, modifier = Modifier.weight(1f))
+                        }
+                        Text(
+                            "Blank fill = transparent; blank border colour = theme yellow.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
                     SceneElementType.IMAGE -> OutlinedTextField(
                         value = imageSource,
                         onValueChange = { imageSource = it.take(160) },
@@ -860,7 +920,8 @@ private fun SceneElementEditorDialog(
                 }
                 val boxStyled = type == SceneElementType.TEXT || type == SceneElementType.BUTTON
                 val textStyled = boxStyled ||
-                    type == SceneElementType.SLIDER || type == SceneElementType.CHECKBOX || type == SceneElementType.TOGGLE
+                    type == SceneElementType.SLIDER || type == SceneElementType.CHECKBOX ||
+                    type == SceneElementType.TOGGLE || type == SceneElementType.SPINNER
                 if (textStyled) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Text("Style", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
@@ -925,7 +986,8 @@ private fun SceneElementEditorDialog(
                             widthDp = parsedWidth ?: 1,
                             heightDp = parsedHeight ?: 1,
                             config = elementConfig(
-                                type, label, sliderMin, sliderMax, sliderValue, sliderVar, sliderVertical, boolValue, textValue, imageSource,
+                                type, label, sliderMin, sliderMax, sliderValue, sliderVar, sliderVertical, boolValue,
+                                textValue, spinnerOptions, shapeCorner, imageSource,
                                 SceneElementStyle(styleTextColor, styleBgColor, styleSize, styleBold, styleAlign, styleBorderColor, styleBorderWidth),
                             ),
                             tapTaskId = tapTaskId,
@@ -1143,6 +1205,10 @@ private fun sceneElementSummary(element: SceneElement): String? = when (element.
         val value = element.config["value"].orEmpty()
         if (value.isBlank()) label else "$label: $value"
     }
+    SceneElementType.SPINNER -> {
+        val value = element.config["value"].orEmpty()
+        value.ifBlank { element.config["options"]?.takeIf { it.isNotBlank() } ?: "Spinner" }
+    }
     SceneElementType.IMAGE -> element.config["source"]?.takeIf { it.isNotBlank() }
     else -> null
 }
@@ -1216,6 +1282,8 @@ private fun elementConfig(
     sliderVertical: Boolean,
     boolValue: Boolean,
     textValue: String,
+    spinnerOptions: String,
+    shapeCorner: String,
     imageSource: String,
     style: SceneElementStyle,
 ): Map<String, String> = when (type) {
@@ -1247,6 +1315,19 @@ private fun elementConfig(
             if (sliderVertical) put("orientation", "vertical")
             putStyle(style)
         }
+    }
+    SceneElementType.SPINNER -> buildMap {
+        put("label", label.ifBlank { "Spinner" })
+        spinnerOptions.trim().takeIf { it.isNotBlank() }?.let { put("options", it) }
+        put("value", textValue)
+        sliderVar.trim().removePrefix("%").takeIf { it.isNotBlank() }?.let { put("var", it) }
+        putStyle(style)
+    }
+    SceneElementType.RECTANGLE, SceneElementType.OVAL -> buildMap {
+        style.bgColor.trim().takeIf { it.isNotBlank() }?.let { put("bgColor", it) }
+        style.borderColor.trim().takeIf { it.isNotBlank() }?.let { put("borderColor", it) }
+        style.borderWidth.trim().toIntOrNull()?.takeIf { it > 0 }?.let { put("borderWidth", it.toString()) }
+        if (type == SceneElementType.RECTANGLE) shapeCorner.trim().toIntOrNull()?.takeIf { it > 0 }?.let { put("cornerRadius", it.toString()) }
     }
     SceneElementType.IMAGE -> mapOf("source" to imageSource.ifBlank { "Image" })
     else -> emptyMap()

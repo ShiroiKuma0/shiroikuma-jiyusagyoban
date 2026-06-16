@@ -12,7 +12,10 @@ object SceneElementDrafts {
         SceneElementType.SLIDER,
         SceneElementType.CHECKBOX,
         SceneElementType.TOGGLE,
+        SceneElementType.SPINNER,
         SceneElementType.IMAGE,
+        SceneElementType.RECTANGLE,
+        SceneElementType.OVAL,
     )
 
     fun nextElementId(scene: Scene): Long = (scene.elements.maxOfOrNull { it.id } ?: 0L) + 1L
@@ -46,7 +49,11 @@ object SceneElementDrafts {
         SceneElementType.EDIT_TEXT -> mapOf("label" to "Text field", "value" to "")
         SceneElementType.CHECKBOX -> mapOf("label" to "Checkbox", "value" to "false")
         SceneElementType.TOGGLE -> mapOf("label" to "Toggle", "value" to "false")
+        SceneElementType.SPINNER -> mapOf("label" to "Spinner", "options" to "A, B, C", "value" to "A")
         SceneElementType.IMAGE -> mapOf("source" to "Image")
+        // Shapes: blank fill (transparent), a thin theme-yellow outline so they're visible by default.
+        SceneElementType.RECTANGLE -> mapOf("borderWidth" to "1")
+        SceneElementType.OVAL -> mapOf("borderWidth" to "1")
         else -> emptyMap()
     }
 
@@ -57,7 +64,10 @@ object SceneElementDrafts {
         SceneElementType.SLIDER -> 220 to 56
         SceneElementType.CHECKBOX -> 200 to 48
         SceneElementType.TOGGLE -> 200 to 48
+        SceneElementType.SPINNER -> 200 to 48
         SceneElementType.IMAGE -> 180 to 120
+        SceneElementType.RECTANGLE -> 140 to 70
+        SceneElementType.OVAL -> 90 to 90
         else -> 160 to 48
     }
 
