@@ -37,11 +37,15 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -241,6 +245,32 @@ fun SceneLibraryScreen(
                             "Element moved",
                         )
                     },
+                    onDuplicateElement = { index ->
+                        val source = scene.elements[index]
+                        val copy = source.copy(
+                            id = SceneElementDrafts.nextElementId(scene),
+                            xDp = (source.xDp + 8).coerceAtMost((scene.widthDp - source.widthDp).coerceAtLeast(0)),
+                            yDp = (source.yDp + 8).coerceAtMost((scene.heightDp - source.heightDp).coerceAtLeast(0)),
+                        )
+                        onUpdateScene(
+                            scene.copy(
+                                elements = scene.elements.toMutableList().apply { add(index + 1, copy) },
+                            ),
+                            "Element duplicated",
+                        )
+                    },
+                    onMoveElementForward = { index ->
+                        if (index < scene.elements.lastIndex) {
+                            val reordered = scene.elements.toMutableList().apply { add(index + 1, removeAt(index)) }
+                            onUpdateScene(scene.copy(elements = reordered), "Element brought forward")
+                        }
+                    },
+                    onMoveElementBackward = { index ->
+                        if (index > 0) {
+                            val reordered = scene.elements.toMutableList().apply { add(index - 1, removeAt(index)) }
+                            onUpdateScene(scene.copy(elements = reordered), "Element sent back")
+                        }
+                    },
                     onDelete = { onDeleteScene(scene) },
                     onMoveToProject = { onMoveScene(scene) },
                     onExportToBundle = { onExportScene(scene) },
@@ -308,6 +338,9 @@ private fun SceneCard(
     onEditElement: (Int, SceneElement) -> Unit,
     onDeleteElement: (Int, SceneElement) -> Unit,
     onMoveElement: (Int, SceneElement) -> Unit,
+    onDuplicateElement: (Int) -> Unit,
+    onMoveElementForward: (Int) -> Unit,
+    onMoveElementBackward: (Int) -> Unit,
     onDelete: () -> Unit,
     onMoveToProject: () -> Unit,
     onExportToBundle: () -> Unit,
@@ -396,6 +429,9 @@ private fun SceneCard(
                                 taskNames = taskNames,
                                 onEdit = { onEditElement(index, element) },
                                 onDelete = { onDeleteElement(index, element) },
+                                onDuplicate = { onDuplicateElement(index) },
+                                onMoveForward = { onMoveElementForward(index) },
+                                onMoveBackward = { onMoveElementBackward(index) },
                             )
                         }
                     }
@@ -544,6 +580,9 @@ private fun SceneElementRow(
     taskNames: Map<Long, String>,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onDuplicate: () -> Unit,
+    onMoveForward: () -> Unit,
+    onMoveBackward: () -> Unit,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f),
@@ -576,8 +615,33 @@ private fun SceneElementRow(
                 IconButton(onClick = onEdit) {
                     Icon(Icons.Filled.Edit, contentDescription = "Edit element")
                 }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete element", tint = MaterialTheme.colorScheme.error)
+                Box {
+                    var menuOpen by remember { mutableStateOf(false) }
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "More element actions")
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Duplicate") },
+                            leadingIcon = { Icon(Icons.Filled.ContentCopy, contentDescription = null) },
+                            onClick = { menuOpen = false; onDuplicate() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Bring forward") },
+                            leadingIcon = { Icon(Icons.Filled.ArrowUpward, contentDescription = null) },
+                            onClick = { menuOpen = false; onMoveForward() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Send back") },
+                            leadingIcon = { Icon(Icons.Filled.ArrowDownward, contentDescription = null) },
+                            onClick = { menuOpen = false; onMoveBackward() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete") },
+                            leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                            onClick = { menuOpen = false; onDelete() },
+                        )
+                    }
                 }
             }
         }
