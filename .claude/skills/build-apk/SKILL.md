@@ -1,6 +1,6 @@
 ---
 name: build-apk
-description: Build the signed release APK with the buildFork Gradle task, then always ask whether to scp it to skhw (first choice) or adb push it to the connected phone. Always build first without asking for permission to build — the ONLY question you ever ask is the transfer question afterward. Use whenever 白い熊 asks to build the app, build the APK, make a release build, or build and send to the phone.
+description: Build the signed release APK with the buildFork Gradle task, then always ask whether to adb push it to the connected phone (first choice) or scp it to skhw. Always build first without asking for permission to build — the ONLY question you ever ask is the transfer question afterward. Use whenever 白い熊 asks to build the app, build the APK, make a release build, or build and send to the phone.
 ---
 
 # Build the release APK and optionally send to the phone
@@ -39,19 +39,19 @@ Kotlin/Compose, no native code, no Fossify Commons.
      root with `sdk.dir=/home/shiroikuma/android-sdk` (a background shell doesn't inherit `ANDROID_HOME`).
 
 3. **At the end of every successful build, ALWAYS ask** via `AskUserQuestion` how to transfer the APK —
-   no exceptions, no assuming. Options, in this order: **"Scp to skhw"** (FIRST) / **"adb push"** /
+   no exceptions, no assuming. Options, in this order: **"adb push"** (FIRST) / **"Scp to skhw"** /
    **"No, just build"**. Fire this as soon as the build reports `BUILD SUCCESSFUL`.
 
 4. **Transfer per the answer:**
-   - **Scp to skhw** — invoke the global **scp** skill (copies the newest APK in `~/tmp/` to `skhw:~/tmp/`).
-     If skhw is unreachable (its tunnel is served by the phone's sshd and may be down), report that and
-     offer the adb push instead.
    - **adb push:**
      - `adb devices` — confirm a device is connected.
      - `adb shell mkdir -p /sdcard/tmp`
      - `adb push ~/tmp/<apk name> /sdcard/tmp/<apk name>`
      - Verify: `adb shell ls -l /sdcard/tmp/<apk name>`.
      - Never `adb install` — 白い熊 installs manually from `/sdcard/tmp/`.
+   - **Scp to skhw** — invoke the global **scp** skill (copies the newest APK in `~/tmp/` to `skhw:~/tmp/`).
+     If skhw is unreachable (its tunnel is served by the phone's sshd and may be down), report that and
+     offer the adb push instead.
 
 ## Notes / invariants
 
