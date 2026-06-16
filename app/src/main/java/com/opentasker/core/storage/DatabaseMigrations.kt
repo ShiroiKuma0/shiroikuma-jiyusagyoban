@@ -103,6 +103,15 @@ object DatabaseMigrations {
         }
     }
 
+    val MIGRATION_9_10 = object : Migration(9, 10) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Per-scene default presentation (used by scene.show when the matching arg is omitted).
+            db.execSQL("ALTER TABLE scenes ADD COLUMN defaultPosition TEXT NOT NULL DEFAULT 'center'")
+            db.execSQL("ALTER TABLE scenes ADD COLUMN defaultModal INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("ALTER TABLE scenes ADD COLUMN defaultDismissOnOutside INTEGER NOT NULL DEFAULT 1")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -113,6 +122,7 @@ object DatabaseMigrations {
             MIGRATION_6_7,
             MIGRATION_7_8,
             MIGRATION_8_9,
+            MIGRATION_9_10,
         )
     }
 }

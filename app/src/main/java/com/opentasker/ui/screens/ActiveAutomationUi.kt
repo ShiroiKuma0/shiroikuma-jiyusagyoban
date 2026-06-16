@@ -498,6 +498,7 @@ class ActiveAutomationViewModel(
         name: String, widthDp: Int, heightDp: Int, projectId: Long? = null,
         bgColor: String? = null, cornerRadiusDp: Int = 16, scrimAlpha: Int = 55,
         borderColor: String? = null, borderWidth: Int = 0,
+        defaultPosition: String = "center", defaultModal: Boolean = true, defaultDismissOnOutside: Boolean = true,
     ) = launchWithMessage("Scene created") {
         db.sceneDao().insert(
             Scene(
@@ -511,6 +512,9 @@ class ActiveAutomationViewModel(
                 scrimAlpha = scrimAlpha,
                 borderColor = borderColor,
                 borderWidth = borderWidth,
+                defaultPosition = defaultPosition,
+                defaultModal = defaultModal,
+                defaultDismissOnOutside = defaultDismissOnOutside,
             ).toEntity()
         )
     }
@@ -1647,8 +1651,8 @@ fun ActiveAutomationUi(
             OpenTaskerScreen.Scenes -> SceneLibraryScreen(
                 scenes = visibleScenes,
                 tasks = tasks,
-                onCreateScene = { name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth ->
-                    viewModel.createScene(name, widthDp, heightDp, currentProjectId, bgColor, corner, scrim, borderColor, borderWidth)
+                onCreateScene = { name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside ->
+                    viewModel.createScene(name, widthDp, heightDp, currentProjectId, bgColor, corner, scrim, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside)
                 },
                 onUpdateScene = viewModel::updateScene,
                 onDeleteScene = { pendingDelete = DeleteTarget.SceneTarget(it) },

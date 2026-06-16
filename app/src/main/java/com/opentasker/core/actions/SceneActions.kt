@@ -26,12 +26,14 @@ class ShowSceneAction : Action {
             ?: dao.getAll().firstOrNull { it.toDomain().name.equals(ref, ignoreCase = true) }
             ?: return ActionResult.Failure("scene not found: \"$ref\"")
         val scene = entity.toDomain()
-        val position = args["position"]?.trim()?.lowercase()?.ifBlank { null }
-        // Default modal (blocks the app underneath); anything other than an explicit off → modal.
-        val modal = args["modal"]?.trim()?.lowercase() !in setOf("false", "0", "off", "no")
+        // Resolution for the presentation flags: an explicit arg wins; otherwise fall back to the
+        // scene's own remembered default (set in the editor).
+        fun boolArg(key: String): Boolean? = args[key]?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+            ?.let { it !in setOf("false", "0", "off", "no") }
+        val position = args["position"]?.trim()?.lowercase()?.ifBlank { null } ?: scene.defaultPosition
+        val modal = boolArg("modal") ?: scene.defaultModal
         val timeoutMs = (args["timeout"]?.trim()?.toDoubleOrNull()?.times(1000))?.toLong()?.coerceAtLeast(0L) ?: 0L
-        // Default: a tap outside (on the scrim) closes a modal scene; set off to require Back/button/timeout.
-        val dismissOnOutside = args["dismissOnOutside"]?.trim()?.lowercase() !in setOf("false", "0", "off", "no")
+        val dismissOnOutside = boolArg("dismissOnOutside") ?: scene.defaultDismissOnOutside
         if (SceneOverlayManager.canOverlay(ctx.app)) {
             SceneOverlayManager.show(ctx.app, scene, position, modal, timeoutMs, dismissOnOutside)
             ctx.logger("Show scene \"${scene.name}\" (overlay, ${if (modal) "modal" else "tap-through"})")

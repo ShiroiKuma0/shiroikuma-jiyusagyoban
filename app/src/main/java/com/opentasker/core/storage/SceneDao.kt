@@ -26,17 +26,20 @@ data class SceneEntity(
     val scrimAlpha: Int = 55,
     val borderColor: String? = null,
     val borderWidth: Int = 0,
+    val defaultPosition: String = "center",
+    val defaultModal: Boolean = true,
+    val defaultDismissOnOutside: Boolean = true,
 ) {
     fun toDomain() = try {
-        Scene(id, name, widthDp, heightDp, Json.decodeFromString(elementsJson), projectId, position, bgColor, cornerRadiusDp, scrimAlpha, borderColor, borderWidth)
+        Scene(id, name, widthDp, heightDp, Json.decodeFromString(elementsJson), projectId, position, bgColor, cornerRadiusDp, scrimAlpha, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside)
     } catch (e: Exception) {
         android.util.Log.e("SceneDao", "Failed to deserialize scene $id: ${e.message}", e)
         // Return scene with empty elements as fallback
-        Scene(id, name, widthDp, heightDp, emptyList(), projectId, position, bgColor, cornerRadiusDp, scrimAlpha, borderColor, borderWidth)
+        Scene(id, name, widthDp, heightDp, emptyList(), projectId, position, bgColor, cornerRadiusDp, scrimAlpha, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside)
     }
 }
 
-fun Scene.toEntity() = SceneEntity(id, name, widthDp, heightDp, Json.encodeToString(elements), projectId, position, bgColor, cornerRadiusDp, scrimAlpha, borderColor, borderWidth)
+fun Scene.toEntity() = SceneEntity(id, name, widthDp, heightDp, Json.encodeToString(elements), projectId, position, bgColor, cornerRadiusDp, scrimAlpha, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside)
 
 @Dao
 interface SceneDao {

@@ -17,6 +17,10 @@ data class Scene(
     val scrimAlpha: Int = 55,               // modal scrim darkness, 0..100 %
     val borderColor: String? = null,        // panel border "#AARRGGBB"; null = theme outline (yellow)
     val borderWidth: Int = 0,               // panel border thickness dp (0 = none)
+    // Default presentation, used by scene.show when the matching arg is omitted (an explicit arg wins).
+    val defaultPosition: String = "center", // "top" / "center" / "bottom"
+    val defaultModal: Boolean = true,       // true = block the app underneath; false = tap-through HUD
+    val defaultDismissOnOutside: Boolean = true, // tap outside (scrim) dismisses a modal scene
 )
 
 @Serializable

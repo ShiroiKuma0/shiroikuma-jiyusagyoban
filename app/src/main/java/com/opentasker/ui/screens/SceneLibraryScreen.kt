@@ -96,7 +96,7 @@ import com.opentasker.scenes.SceneElementView
 fun SceneLibraryScreen(
     scenes: List<Scene>,
     tasks: List<Task>,
-    onCreateScene: (name: String, widthDp: Int, heightDp: Int, bgColor: String?, cornerRadiusDp: Int, scrimAlpha: Int, borderColor: String?, borderWidth: Int) -> Unit,
+    onCreateScene: (name: String, widthDp: Int, heightDp: Int, bgColor: String?, cornerRadiusDp: Int, scrimAlpha: Int, borderColor: String?, borderWidth: Int, defaultPosition: String, defaultModal: Boolean, defaultDismissOnOutside: Boolean) -> Unit,
     onUpdateScene: (Scene, String) -> Unit,
     onDeleteScene: (Scene) -> Unit,
     onMoveScene: (Scene) -> Unit,
@@ -131,12 +131,14 @@ fun SceneLibraryScreen(
         SceneEditorDialog(
             initial = target,
             onDismiss = { editSceneTarget = null },
-            onSave = { name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth ->
+            onSave = { name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside ->
                 onUpdateScene(
                     target.copy(
                         name = name, widthDp = widthDp, heightDp = heightDp,
                         bgColor = bgColor, cornerRadiusDp = corner, scrimAlpha = scrim,
                         borderColor = borderColor, borderWidth = borderWidth,
+                        defaultPosition = defaultPosition, defaultModal = defaultModal,
+                        defaultDismissOnOutside = defaultDismissOnOutside,
                     ),
                     "Scene updated",
                 )
@@ -148,8 +150,8 @@ fun SceneLibraryScreen(
     if (showCreateDialog) {
         SceneEditorDialog(
             onDismiss = { showCreateDialog = false },
-            onSave = { name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth ->
-                onCreateScene(name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth)
+            onSave = { name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside ->
+                onCreateScene(name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside)
                 showCreateDialog = false
             },
         )
@@ -1301,7 +1303,7 @@ private fun SceneIssueText(issue: SceneIssue) {
 private fun SceneEditorDialog(
     initial: Scene? = null,
     onDismiss: () -> Unit,
-    onSave: (name: String, widthDp: Int, heightDp: Int, bgColor: String?, cornerRadiusDp: Int, scrimAlpha: Int, borderColor: String?, borderWidth: Int) -> Unit,
+    onSave: (name: String, widthDp: Int, heightDp: Int, bgColor: String?, cornerRadiusDp: Int, scrimAlpha: Int, borderColor: String?, borderWidth: Int, defaultPosition: String, defaultModal: Boolean, defaultDismissOnOutside: Boolean) -> Unit,
 ) {
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var width by remember { mutableStateOf((initial?.widthDp ?: 320).toString()) }
@@ -1311,6 +1313,9 @@ private fun SceneEditorDialog(
     var scrim by remember { mutableStateOf((initial?.scrimAlpha ?: 55).toString()) }
     var borderColor by remember { mutableStateOf(initial?.borderColor ?: "") }
     var border by remember { mutableStateOf((initial?.borderWidth ?: 0).toString()) }
+    var defaultPosition by remember { mutableStateOf(initial?.defaultPosition?.lowercase() ?: "center") }
+    var defaultModal by remember { mutableStateOf(initial?.defaultModal ?: true) }
+    var defaultDismissOnOutside by remember { mutableStateOf(initial?.defaultDismissOnOutside ?: true) }
     val parsedWidth = width.toIntOrNull()
     val parsedHeight = height.toIntOrNull()
     val canSave = name.isNotBlank() && parsedWidth != null && parsedHeight != null && parsedWidth > 0 && parsedHeight > 0
@@ -1353,6 +1358,31 @@ private fun SceneEditorDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Text("Default presentation", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    listOf("top" to "Top", "center" to "Center", "bottom" to "Bottom").forEach { (key, text) ->
+                        FilterChip(
+                            selected = defaultPosition == key,
+                            onClick = { defaultPosition = key },
+                            label = { Text(text) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Modal (block underneath)", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Switch(checked = defaultModal, onCheckedChange = { defaultModal = it })
+                }
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Tap outside dismisses", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Switch(checked = defaultDismissOnOutside, onCheckedChange = { defaultDismissOnOutside = it }, enabled = defaultModal)
+                }
+                Text(
+                    "How this scene shows when scene.show omits position/modal/dismiss. An explicit action argument still wins. Non-modal is a tap-through HUD (can't take text input).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         },
         confirmButton = {
@@ -1368,6 +1398,9 @@ private fun SceneEditorDialog(
                         (scrim.toIntOrNull() ?: 55).coerceIn(0, 100),
                         borderColor.trim().ifBlank { null },
                         border.toIntOrNull()?.coerceAtLeast(0) ?: 0,
+                        defaultPosition,
+                        defaultModal,
+                        defaultDismissOnOutside,
                     )
                 },
             ) {

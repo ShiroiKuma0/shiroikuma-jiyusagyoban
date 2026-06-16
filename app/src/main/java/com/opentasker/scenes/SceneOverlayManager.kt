@@ -39,8 +39,9 @@ import kotlinx.coroutines.launch
  * `ComposeView`, rather than the foreground-only [SceneActivity]. Requires the "Display over other
  * apps" permission ([canOverlay]); the `scene.show` action falls back to [SceneActivity] without it.
  *
- * The overlay is focusable so buttons/sliders/toggles (and Back to dismiss) work; text-field input in
- * an overlay window is best-effort.
+ * A modal overlay is focusable so buttons/sliders/toggles (and Back to dismiss) work and an EDIT_TEXT
+ * can raise the soft keyboard (ADJUST_RESIZE). A non-modal HUD is tap-through (not focusable), so it
+ * can't take text input — use a modal scene for fields.
  */
 object SceneOverlayManager {
     private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -99,14 +100,17 @@ object SceneOverlayManager {
             }
             val params = if (modal) {
                 // Full-screen, focusable: the scrim blocks the app underneath; the card is placed by
-                // the composable's [position] alignment.
+                // the composable's [position] alignment. Focusable (no FLAG_NOT_FOCUSABLE) + ADJUST_RESIZE
+                // lets an EDIT_TEXT inside the scene raise the soft keyboard and stay visible above it.
                 WindowManager.LayoutParams(
                     WindowManager.LayoutParams.MATCH_PARENT,
                     WindowManager.LayoutParams.MATCH_PARENT,
                     type,
                     WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                     PixelFormat.TRANSLUCENT,
-                )
+                ).apply {
+                    softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                }
             } else {
                 // Tap-through HUD: wrap the card, not-focusable so touches outside it reach the app,
                 // placed by window gravity.
