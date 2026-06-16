@@ -19,6 +19,7 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.platform.AndroidAudioHardening
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
@@ -134,11 +135,8 @@ class VolumeAction : Action {
     override val category = ActionCategory.SETTINGS
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        if (Build.VERSION.SDK_INT >= ANDROID_17_API) {
-            return ActionResult.Failure(
-                "Android 17+ restricts background volume changes; " +
-                    "volume control may not work from a background service"
-            )
+        if (AndroidAudioHardening.isRestricted()) {
+            return AndroidAudioHardening.volumeFailure("volume control")
         }
         val levelArg = args["level"] ?: return ActionResult.Failure("missing level")
         val audioManager = ctx.app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -376,8 +374,6 @@ class TileStateAction : Action {
         return ActionResult.Success
     }
 }
-
-private const val ANDROID_17_API = 37
 
 private fun streamType(name: String): Int? = when (name.lowercase()) {
     "music", "media" -> AudioManager.STREAM_MUSIC
