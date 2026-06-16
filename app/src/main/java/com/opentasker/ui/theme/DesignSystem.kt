@@ -1,14 +1,6 @@
 package com.opentasker.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Shapes
-import androidx.compose.material3.Typography
-import androidx.compose.runtime.Immutable
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 /**
  * OpenTasker design system: Unified spacing, radius, and component utilities.
@@ -24,6 +16,15 @@ object DesignSystem {
         val lg = 16.dp     // Large spacing (page padding, major sections)
         val xl = 24.dp     // Extra large spacing (screen sections, major gaps)
         val xxl = 32.dp    // Double extra large (top-level section gaps)
+    }
+
+    object Screen {
+        val horizontalPadding = 16.dp
+        val verticalPadding = 16.dp
+        val cardPadding = 16.dp
+        val heroCardPadding = 18.dp
+        val sectionGap = 12.dp
+        val cardGap = 12.dp
     }
 
     // ========== Border Radius Scale ==========
@@ -72,6 +73,9 @@ object DesignSystem {
         
         // Status indicator size
         val statusIndicator = 12.dp
+
+        val compactControlHeight = 40.dp
+        val cardActionHeight = 44.dp
     }
 
     // ========== Semantic Colors ==========
@@ -86,5 +90,9 @@ object DesignSystem {
         val secondary = 0.60f
         val tertiary = 0.38f
         val hintText = 0.60f
+        val elevatedSurface = 0.64f
+        val restingSurface = 0.56f
+        val selectedSurface = 0.42f
+        val subtleBorder = 0.46f
     }
 }
