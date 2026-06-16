@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -7,16 +8,23 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,10 +35,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.model.Variable
+import com.opentasker.ui.theme.DesignSystem
 
 private val SENSITIVE_NAMES = setOf("password", "token", "secret", "key", "credential", "auth")
 
@@ -57,24 +67,52 @@ fun VariablesScreen(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            label = { Text("Search variables") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-
-        if (filtered.isEmpty()) {
-            Text(
-                text = if (variables.isEmpty()) "No global variables set" else "No matches",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(16.dp),
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(contentPadding),
+        contentPadding = PaddingValues(DesignSystem.Screen.horizontalPadding),
+        verticalArrangement = Arrangement.spacedBy(DesignSystem.Screen.cardGap),
+    ) {
+        item {
+            VariableSummaryCard(
+                totalCount = variables.size,
+                visibleCount = filtered.size,
+                sensitiveCount = variables.count { isSensitive(it.name) },
             )
         }
-
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                label = { Text("Search variables") },
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search") },
+                trailingIcon = if (searchQuery.isNotBlank()) {
+                    {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Filled.Clear, contentDescription = "Clear variable search")
+                        }
+                    }
+                } else {
+                    null
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(DesignSystem.Radii.md),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        if (filtered.isEmpty()) {
+            item {
+                VariableEmptyState(
+                    title = if (variables.isEmpty()) "No global variables yet" else "No matching variables",
+                    body = if (variables.isEmpty()) {
+                        "Global variables appear here after a task saves shared values. Sensitive names are masked automatically."
+                    } else {
+                        "Clear search to review all saved variables."
+                    },
+                )
+            }
+        } else {
             items(filtered, key = { it.name }) { variable ->
                 VariableRow(
                     variable = variable,
@@ -138,21 +176,104 @@ fun VariablesScreen(
 }
 
 @Composable
+private fun VariableSummaryCard(
+    totalCount: Int,
+    visibleCount: Int,
+    sensitiveCount: Int,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = DesignSystem.Opacity.elevatedSurface)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = DesignSystem.Opacity.subtleBorder)),
+        shape = RoundedCornerShape(DesignSystem.Radii.xxl),
+    ) {
+        Column(Modifier.padding(DesignSystem.Screen.heroCardPadding), verticalArrangement = Arrangement.spacedBy(DesignSystem.Screen.sectionGap)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text("Variable vault", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "Global values used by tasks, templates, and runtime expressions.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                VariablePill(
+                    label = "$visibleCount shown",
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                VariableMetric("$totalCount", "Saved", Modifier.weight(1f))
+                VariableMetric("$sensitiveCount", "Masked", Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun VariableMetric(value: String, label: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(value, style = MaterialTheme.typography.titleMedium)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun VariableEmptyState(title: String, body: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.20f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Icon(
+                Icons.Filled.Info,
+                contentDescription = "Info",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(title, style = MaterialTheme.typography.titleSmall)
+                Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
 private fun VariableRow(
     variable: Variable,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val sensitive = isSensitive(variable.name)
     Card(
         onClick = onEdit,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = DesignSystem.Opacity.restingSurface)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = DesignSystem.Opacity.subtleBorder)),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = "%${variable.name}",
                     style = MaterialTheme.typography.titleSmall,
@@ -161,20 +282,42 @@ private fun VariableRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = if (isSensitive(variable.name)) "***" else variable.value,
+                    text = if (sensitive) "Masked sensitive value" else variable.value,
                     style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (sensitive) {
+                    VariablePill("Hidden", MaterialTheme.colorScheme.secondary)
+                }
             }
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Filled.Delete,
-                    contentDescription = "Delete variable",
+                    contentDescription = "Delete ${variable.name}",
                     tint = MaterialTheme.colorScheme.error,
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun VariablePill(label: String, color: Color) {
+    Surface(
+        color = color.copy(alpha = 0.14f),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.32f)),
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = color,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+        )
     }
 }
 
@@ -193,7 +336,7 @@ private fun EditVariableDialog(
             OutlinedTextField(
                 value = value,
                 onValueChange = { value = it },
-                label = { Text("Value") },
+                label = { Text("Value for %${variable.name}") },
                 modifier = Modifier.fillMaxWidth(),
             )
         },

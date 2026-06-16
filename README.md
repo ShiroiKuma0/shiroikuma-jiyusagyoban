@@ -1,6 +1,6 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.70-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.71-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.3.21-7f52ff.svg)](https://kotlinlang.org)
@@ -75,6 +75,9 @@ Privileged actions (airplane, mobile data, screenshot, reboot, screen off) are g
 ### UI and theming
 
 - AMOLED-first Catppuccin Mocha (dark) and Latte (light) palettes, high contrast mode
+- Refined mobile shell with clearer primary navigation, bottom-bar contrast, and edge-to-edge system bar theming
+- Compact-safe profile, task, and run-log cards with horizontally safe status chips and filtered empty states
+- Variable vault view with summary metrics, clear search affordance, masked-sensitive-value labeling, and polished empty states
 - Guided profile templates with variable slots and safety notes
 - Scene element editor with drag-to-move, scaled canvas previews, and tap/long-press task bindings
 - Read-only flow graphs mapping profiles to contexts, tasks, and actions

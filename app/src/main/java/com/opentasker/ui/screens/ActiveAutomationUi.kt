@@ -193,19 +193,19 @@ private fun openTaskerBundleExportName(): String =
 private enum class OpenTaskerScreen(val label: String) {
     Profiles("Profiles"),
     Tasks("Tasks"),
-    Vars("Vars"),
+    Vars("Variables"),
     Flow("Flow"),
     Scenes("Scenes"),
-    Inspector("Inspect"),
+    Inspector("Inspector"),
     Setup("Setup"),
-    RunLog("Log"),
+    RunLog("Run Log"),
 }
 
 private val primaryNavigationScreens = listOf(
     OpenTaskerScreen.Profiles,
     OpenTaskerScreen.Tasks,
-    OpenTaskerScreen.Vars,
     OpenTaskerScreen.Setup,
+    OpenTaskerScreen.RunLog,
 )
 
 private val secondaryNavigationScreens = OpenTaskerScreen.entries.filterNot { it in primaryNavigationScreens }
@@ -1035,7 +1035,10 @@ fun ActiveAutomationUi(
             }
         },
         bottomBar = {
-            NavigationBar {
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+                tonalElevation = 0.dp,
+            ) {
                 primaryNavigationScreens.forEach { destination ->
                     OpenTaskerNavigationItem(
                         selected = screen == destination,
@@ -1371,7 +1374,7 @@ private fun OpenTaskerNavigationItem(
     val contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
     Column(
         modifier = modifier
-            .heightIn(min = 72.dp)
+            .heightIn(min = 68.dp)
             .clickable(role = Role.Tab, onClick = onClick)
             .semantics(mergeDescendants = true) {
                 this.selected = selected
@@ -1382,18 +1385,21 @@ private fun OpenTaskerNavigationItem(
         verticalArrangement = Arrangement.Center,
     ) {
         Surface(
-            color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f) else Color.Transparent,
-            shape = RoundedCornerShape(8.dp),
-            border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)) else null,
+            color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.46f) else Color.Transparent,
+            shape = RoundedCornerShape(6.dp),
+            border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)) else null,
         ) {
-            Icon(
-                icon,
-                contentDescription = label,
-                tint = contentColor,
-                modifier = Modifier
-                    .padding(horizontal = 16.dp, vertical = 5.dp)
-                    .size(24.dp),
-            )
+            Box(
+                modifier = Modifier.size(width = 48.dp, height = 32.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = label,
+                    tint = contentColor,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
         }
         Spacer(Modifier.height(2.dp))
         Text(
@@ -1529,6 +1535,15 @@ private fun ProfilesScreen(
                         )
                     }
                 }
+            }
+        }
+        if (filteredProfiles.isEmpty()) {
+            item {
+                InlineNotice(
+                    title = "No matching profiles",
+                    body = "Clear search or switch groups to see more automations.",
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
         }
         items(filteredProfiles, key = { it.id }) { profile ->
@@ -1742,6 +1757,8 @@ private fun StatusPill(
             style = MaterialTheme.typography.labelMedium,
             color = color,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -1833,16 +1850,20 @@ private fun ProfileCard(
                 }
                 Switch(checked = profile.enabled, onCheckedChange = onToggle)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatusPill(
-                    label = if (profile.enabled) "Enabled" else "Paused",
-                    color = if (profile.enabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                StatusPill("${profile.contexts.size} context${plural(profile.contexts.size)}", MaterialTheme.colorScheme.primary)
-                StatusPill("${profile.cooldownSec}s cooldown", MaterialTheme.colorScheme.secondary)
-                profile.group?.let { StatusPill(it, MaterialTheme.colorScheme.inversePrimary) }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                item {
+                    StatusPill(
+                        label = if (profile.enabled) "Enabled" else "Paused",
+                        color = if (profile.enabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                item { StatusPill("${profile.contexts.size} context${plural(profile.contexts.size)}", MaterialTheme.colorScheme.primary) }
+                item { StatusPill("${profile.cooldownSec}s cooldown", MaterialTheme.colorScheme.secondary) }
+                item { StatusPill(profile.automationMode.name.lowercase(), MaterialTheme.colorScheme.onSurfaceVariant) }
+                profile.group?.let { group ->
+                    item { StatusPill(group, MaterialTheme.colorScheme.inversePrimary) }
+                }
             }
-            StatusPill(profile.automationMode.name.lowercase(), MaterialTheme.colorScheme.onSurfaceVariant)
             if (profile.contexts.isEmpty()) {
                 InlineNotice(
                     title = "Profile cannot match yet",
@@ -1932,6 +1953,15 @@ private fun TasksScreen(
                 shape = RoundedCornerShape(12.dp),
             )
         }
+        if (filteredTasks.isEmpty()) {
+            item {
+                InlineNotice(
+                    title = "No matching tasks",
+                    body = "Clear search to return to the full task library.",
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
         items(filteredTasks, key = { it.id }) { task ->
             TaskCard(
                 task = task,
@@ -1977,12 +2007,10 @@ private fun TaskCard(
                     )
                 }
             }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatusPill("${task.actions.size} action${plural(task.actions.size)}", MaterialTheme.colorScheme.primary)
-                    StatusPill("Priority ${task.priority}", MaterialTheme.colorScheme.secondary)
-                }
-                StatusPill(task.collisionMode.name.lowercase().replace('_', ' '), MaterialTheme.colorScheme.onSurfaceVariant)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                item { StatusPill("${task.actions.size} action${plural(task.actions.size)}", MaterialTheme.colorScheme.primary) }
+                item { StatusPill("Priority ${task.priority}", MaterialTheme.colorScheme.secondary) }
+                item { StatusPill(task.collisionMode.name.lowercase().replace('_', ' '), MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             if (task.actions.isEmpty()) {
                 InlineNotice(
@@ -2012,23 +2040,27 @@ private fun TaskCard(
                     Text("Add Action")
                 }
             }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                item {
                     OutlinedButton(onClick = onRun) {
                         Icon(Icons.Filled.PlayArrow, contentDescription = "Run task")
                         Spacer(Modifier.width(6.dp))
                         Text("Run")
                     }
+                }
+                item {
                     OutlinedButton(onClick = onPin) {
                         Icon(Icons.Filled.PushPin, contentDescription = "Pin task")
                         Spacer(Modifier.width(6.dp))
                         Text("Pin")
                     }
                 }
-                TextButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete task")
-                    Spacer(Modifier.width(6.dp))
-                    Text("Delete Task")
+                item {
+                    TextButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Delete task")
+                        Spacer(Modifier.width(6.dp))
+                        Text("Delete Task")
+                    }
                 }
             }
         }
@@ -2216,13 +2248,13 @@ private fun RunLogRetentionCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                items(RunLogRetentionOptions.all, key = { it.label }) { option ->
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                RunLogRetentionOptions.all.forEach { option ->
                     val selected = option.policy == policy
                     OutlinedButton(
                         onClick = { onPolicyChange(option.policy) },
                         modifier = Modifier
-                            .width(220.dp)
+                            .fillMaxWidth()
                             .animateContentSize(),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
@@ -2258,6 +2290,8 @@ private fun RunLogRetentionCard(
                                         contentDescription = "Selected",
                                         modifier = Modifier.size(16.dp),
                                     )
+                                } else {
+                                    Spacer(Modifier.size(16.dp))
                                 }
                                 Text(option.label, style = MaterialTheme.typography.labelLarge)
                             }
@@ -2462,6 +2496,10 @@ private fun RunLogCard(entry: RunLogEntry) {
         RunLogOutcome.Failed -> MaterialTheme.colorScheme.error
         RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondary
     }
+    val sourceText = entry.source?.let { key ->
+        val name = RunLogSource.displayName(key)
+        entry.sourceLabel?.let { "$name: $it" } ?: name
+    } ?: diagnostics.source
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -2481,39 +2519,47 @@ private fun RunLogCard(entry: RunLogEntry) {
         ),
         shape = RoundedCornerShape(16.dp),
     ) {
-        Row(
+        Column(
             modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(
-                when (outcome) {
-                    RunLogOutcome.Succeeded -> Icons.Filled.CheckCircle
-                    RunLogOutcome.Failed -> Icons.Filled.Error
-                    RunLogOutcome.Skipped -> Icons.Filled.Info
-                },
-                contentDescription = when (outcome) {
-                    RunLogOutcome.Succeeded -> "Succeeded"
-                    RunLogOutcome.Failed -> "Failed"
-                    RunLogOutcome.Skipped -> "Skipped"
-                },
-                tint = accent,
-            )
-            Column(Modifier.weight(1f)) {
-                Text(entry.taskName, style = MaterialTheme.typography.titleMedium)
-                Text(time, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                // Prefer the typed source column (no regex); fall back to the parsed message for legacy rows.
-                val sourceText = entry.source?.let { key ->
-                    val name = RunLogSource.displayName(key)
-                    entry.sourceLabel?.let { "$name: $it" } ?: name
-                } ?: diagnostics.source
-                sourceText?.let { source ->
-                    Text(
-                        "Source: $source",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            Row(
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Icon(
+                    when (outcome) {
+                        RunLogOutcome.Succeeded -> Icons.Filled.CheckCircle
+                        RunLogOutcome.Failed -> Icons.Filled.Error
+                        RunLogOutcome.Skipped -> Icons.Filled.Info
+                    },
+                    contentDescription = when (outcome) {
+                        RunLogOutcome.Succeeded -> "Succeeded"
+                        RunLogOutcome.Failed -> "Failed"
+                        RunLogOutcome.Skipped -> "Skipped"
+                    },
+                    tint = accent,
+                    modifier = Modifier.size(22.dp),
+                )
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(entry.taskName, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(time, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    sourceText?.let { source ->
+                        Text(
+                            "Source: $source",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
+            }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                item { StatusPill(outcome.label, accent) }
+                item { StatusPill("${entry.durationMs} ms", accent) }
+            }
+            Column(Modifier.fillMaxWidth()) {
                 if (hasStructuredDiagnostics && diagnostics.detailLines.isNotEmpty()) {
                     Text(
                         diagnostics.detailLines.joinToString("  "),
@@ -2548,10 +2594,6 @@ private fun RunLogCard(entry: RunLogEntry) {
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-            }
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                StatusPill(outcome.label, accent)
-                StatusPill("${entry.durationMs} ms", accent)
             }
         }
     }
