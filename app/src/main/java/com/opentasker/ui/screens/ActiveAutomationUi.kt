@@ -149,8 +149,10 @@ import com.opentasker.core.templates.ProfileTemplateCatalog
 import com.opentasker.core.templates.TemplateAvailability
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -306,27 +308,27 @@ class ActiveAutomationViewModel(
     private val events = Channel<String>(Channel.BUFFERED)
     val messages = events.receiveAsFlow()
 
-    var runLogRetentionPolicy by mutableStateOf(runLogRetentionSettings.load())
-        private set
+    private val _runLogRetentionPolicy = MutableStateFlow(runLogRetentionSettings.load())
+    val runLogRetentionPolicy: StateFlow<RunLogRetentionPolicy> = _runLogRetentionPolicy.asStateFlow()
 
-    var backupSetupState by mutableStateOf(loadBackupSetupState(busy = false))
-        private set
+    private val _backupSetupState = MutableStateFlow(loadBackupSetupState(busy = false))
+    val backupSetupState: StateFlow<BackupSetupState> = _backupSetupState.asStateFlow()
 
-    internal var taskerImportReview by mutableStateOf<TaskerImportReviewState?>(null)
-        private set
+    private val _taskerImportReview = MutableStateFlow<TaskerImportReviewState?>(null)
+    internal val taskerImportReview: StateFlow<TaskerImportReviewState?> = _taskerImportReview.asStateFlow()
 
-    var taskerImportBusy by mutableStateOf(false)
-        private set
+    private val _taskerImportBusy = MutableStateFlow(false)
+    val taskerImportBusy: StateFlow<Boolean> = _taskerImportBusy.asStateFlow()
 
-    internal var openTaskerBundleReview by mutableStateOf<OpenTaskerBundleReviewState?>(null)
-        private set
+    private val _openTaskerBundleReview = MutableStateFlow<OpenTaskerBundleReviewState?>(null)
+    internal val openTaskerBundleReview: StateFlow<OpenTaskerBundleReviewState?> = _openTaskerBundleReview.asStateFlow()
 
-    var openTaskerBundleBusy by mutableStateOf(false)
-        private set
+    private val _openTaskerBundleBusy = MutableStateFlow(false)
+    val openTaskerBundleBusy: StateFlow<Boolean> = _openTaskerBundleBusy.asStateFlow()
 
     init {
         viewModelScope.launch {
-            runCatching { pruneRunLogs(runLogRetentionPolicy) }
+            runCatching { pruneRunLogs(_runLogRetentionPolicy.value) }
         }
     }
 
@@ -433,8 +435,8 @@ class ActiveAutomationViewModel(
 
     fun previewTaskerXml(uri: Uri, appVersion: String) {
         viewModelScope.launch {
-            if (taskerImportBusy) return@launch
-            taskerImportBusy = true
+            if (_taskerImportBusy.value) return@launch
+            _taskerImportBusy.value = true
             runCatching {
                 withContext(Dispatchers.IO) {
                     val rawXml = readBoundedTaskerXml(appContext, uri)
@@ -443,45 +445,45 @@ class ActiveAutomationViewModel(
                 }
             }
                 .onSuccess {
-                    taskerImportReview = it
+                    _taskerImportReview.value = it
                     events.send("Tasker XML ready for review")
                 }
                 .onFailure { events.send("Error: ${it.message ?: "Tasker XML import preview failed"}") }
-            taskerImportBusy = false
+            _taskerImportBusy.value = false
         }
     }
 
     fun clearTaskerImportReview() {
-        if (!taskerImportBusy) {
-            taskerImportReview = null
+        if (!_taskerImportBusy.value) {
+            _taskerImportReview.value = null
         }
     }
 
     fun confirmTaskerImport(report: TaskerXmlImportReport) {
         viewModelScope.launch {
-            if (taskerImportBusy) return@launch
-            taskerImportBusy = true
+            if (_taskerImportBusy.value) return@launch
+            _taskerImportBusy.value = true
             runCatching {
                 withContext(Dispatchers.IO) {
                     bundleRepository.importBundle(TaskerImportPlanner.confirmedBundle(report))
                 }
             }
                 .onSuccess { importReport ->
-                    taskerImportReview = null
+                    _taskerImportReview.value = null
                     events.send(
                         "Imported ${importReport.insertedTasks} task${plural(importReport.insertedTasks)}, " +
                             "${importReport.insertedProfiles} disabled profile${plural(importReport.insertedProfiles)}"
                     )
                 }
                 .onFailure { events.send("Error: ${it.message ?: "Tasker XML import failed"}") }
-            taskerImportBusy = false
+            _taskerImportBusy.value = false
         }
     }
 
     fun exportOpenTaskerBundle(uri: Uri, appVersion: String) {
         viewModelScope.launch {
-            if (openTaskerBundleBusy) return@launch
-            openTaskerBundleBusy = true
+            if (_openTaskerBundleBusy.value) return@launch
+            _openTaskerBundleBusy.value = true
             runCatching {
                 withContext(Dispatchers.IO) {
                     val bundle = bundleRepository.exportBundle(
@@ -504,14 +506,14 @@ class ActiveAutomationViewModel(
                     )
                 }
                 .onFailure { events.send("Error: ${it.message ?: "OpenTasker bundle export failed"}") }
-            openTaskerBundleBusy = false
+            _openTaskerBundleBusy.value = false
         }
     }
 
     fun previewOpenTaskerBundle(uri: Uri) {
         viewModelScope.launch {
-            if (openTaskerBundleBusy) return@launch
-            openTaskerBundleBusy = true
+            if (_openTaskerBundleBusy.value) return@launch
+            _openTaskerBundleBusy.value = true
             runCatching {
                 withContext(Dispatchers.IO) {
                     val rawJson = readBoundedOpenTaskerBundle(appContext, uri)
@@ -520,31 +522,31 @@ class ActiveAutomationViewModel(
                 }
             }
                 .onSuccess {
-                    openTaskerBundleReview = it
+                    _openTaskerBundleReview.value = it
                     events.send("OpenTasker bundle ready for review")
                 }
                 .onFailure { events.send("Error: ${it.message ?: "OpenTasker bundle preview failed"}") }
-            openTaskerBundleBusy = false
+            _openTaskerBundleBusy.value = false
         }
     }
 
     fun clearOpenTaskerBundleReview() {
-        if (!openTaskerBundleBusy) {
-            openTaskerBundleReview = null
+        if (!_openTaskerBundleBusy.value) {
+            _openTaskerBundleReview.value = null
         }
     }
 
     fun confirmOpenTaskerBundleImport(bundle: OpenTaskerBundle) {
         viewModelScope.launch {
-            if (openTaskerBundleBusy) return@launch
-            openTaskerBundleBusy = true
+            if (_openTaskerBundleBusy.value) return@launch
+            _openTaskerBundleBusy.value = true
             runCatching {
                 withContext(Dispatchers.IO) {
                     bundleRepository.importBundle(bundle)
                 }
             }
                 .onSuccess { importReport ->
-                    openTaskerBundleReview = null
+                    _openTaskerBundleReview.value = null
                     events.send(
                         "Imported ${importReport.insertedTasks} task${plural(importReport.insertedTasks)}, " +
                             "${importReport.insertedProfiles} disabled profile${plural(importReport.insertedProfiles)}, " +
@@ -552,7 +554,7 @@ class ActiveAutomationViewModel(
                     )
                 }
                 .onFailure { events.send("Error: ${it.message ?: "OpenTasker bundle import failed"}") }
-            openTaskerBundleBusy = false
+            _openTaskerBundleBusy.value = false
         }
     }
 
@@ -561,7 +563,7 @@ class ActiveAutomationViewModel(
             val normalized = policy.normalized()
             runCatching {
                 runLogRetentionSettings.save(normalized)
-                runLogRetentionPolicy = normalized
+                _runLogRetentionPolicy.value = normalized
                 pruneRunLogs(normalized)
             }
                 .onSuccess { deleted ->
@@ -616,7 +618,7 @@ class ActiveAutomationViewModel(
     }
 
     private fun setBackupBusy(busy: Boolean) {
-        backupSetupState = loadBackupSetupState(busy)
+        _backupSetupState.value = loadBackupSetupState(busy)
     }
 
     private fun loadBackupSetupState(busy: Boolean): BackupSetupState =
@@ -721,8 +723,8 @@ fun ActiveAutomationUi(
     val scenes by viewModel.scenes.collectAsState()
     val runLogs by viewModel.runLogs.collectAsState()
     val globalVariables by viewModel.globalVariables.collectAsState()
-    val runLogRetentionPolicy = viewModel.runLogRetentionPolicy
-    val backupSetupState = viewModel.backupSetupState
+    val runLogRetentionPolicy by viewModel.runLogRetentionPolicy.collectAsState()
+    val backupSetupState by viewModel.backupSetupState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var screenOrdinal by rememberSaveable { mutableIntStateOf(0) }
@@ -738,10 +740,10 @@ fun ActiveAutomationUi(
     var contextPickerProfile by remember { mutableStateOf<Profile?>(null) }
     var contextEdit by remember { mutableStateOf<ContextEditState?>(null) }
     var pendingDelete by remember { mutableStateOf<DeleteTarget?>(null) }
-    val taskerImportReview = viewModel.taskerImportReview
-    val taskerImportBusy = viewModel.taskerImportBusy
-    val openTaskerBundleReview = viewModel.openTaskerBundleReview
-    val openTaskerBundleBusy = viewModel.openTaskerBundleBusy
+    val taskerImportReview by viewModel.taskerImportReview.collectAsState()
+    val taskerImportBusy by viewModel.taskerImportBusy.collectAsState()
+    val openTaskerBundleReview by viewModel.openTaskerBundleReview.collectAsState()
+    val openTaskerBundleBusy by viewModel.openTaskerBundleBusy.collectAsState()
     val taskerXmlLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.previewTaskerXml(it, BuildConfig.VERSION_NAME) }
     }
