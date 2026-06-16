@@ -27,8 +27,12 @@ object StyledWidgetStore {
     fun setTapTask(ctx: Context, id: Int, taskId: Long) = prefs(ctx).edit { putLong("$id.taptask", taskId) }
     fun getTapTask(ctx: Context, id: Int): Long = prefs(ctx).getLong("$id.taptask", -1L)
 
+    // Tap task bound by NAME (resolved at tap time), so it survives bundle re-imports that change ids.
+    fun setTapTaskName(ctx: Context, id: Int, name: String) = prefs(ctx).edit { putString("$id.taptaskname", name) }
+    fun getTapTaskName(ctx: Context, id: Int): String = prefs(ctx).getString("$id.taptaskname", "") ?: ""
+
     fun clear(ctx: Context, id: Int) = prefs(ctx).edit {
-        remove("$id.name"); remove("$id.layout"); remove("$id.template"); remove("$id.taptask")
+        remove("$id.name"); remove("$id.layout"); remove("$id.template"); remove("$id.taptask"); remove("$id.taptaskname")
     }
 
     /** All placed styled-widget ids whose bound name matches [name] (case-insensitive). */

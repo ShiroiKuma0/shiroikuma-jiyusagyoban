@@ -37,7 +37,10 @@ class StyledWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
-        private const val MAX_PX = 1440
+        // Cap the rendered bitmap. Generous so a wide one-line widget (big font, many glyphs) can be
+        // drawn at full width instead of being clamped and wrapping; a widget can't exceed the screen
+        // anyway, so this only lifts the artificial limit.
+        private const val MAX_PX = 2880
 
         fun renderWidget(context: Context, manager: AppWidgetManager, id: Int) {
             val dm = context.resources.displayMetrics
@@ -62,10 +65,13 @@ class StyledWidgetProvider : AppWidgetProvider() {
             val views = RemoteViews(context.packageName, R.layout.styled_widget)
             if (bitmap != null) views.setImageViewBitmap(R.id.styled_widget_image, bitmap)
 
-            val tapTask = StyledWidgetStore.getTapTask(context, id)
-            if (tapTask > 0) {
+            // Prefer the task NAME (survives bundle re-imports that change ids); fall back to a legacy id.
+            val tapName = StyledWidgetStore.getTapTaskName(context, id)
+            val legacyTapId = StyledWidgetStore.getTapTask(context, id)
+            if (tapName.isNotBlank() || legacyTapId > 0) {
                 val intent = Intent(context, TaskRunActivity::class.java).apply {
-                    putExtra(TaskRunActivity.EXTRA_TASK_ID, tapTask)
+                    if (tapName.isNotBlank()) putExtra(TaskRunActivity.EXTRA_TASK_NAME, tapName)
+                    else putExtra(TaskRunActivity.EXTRA_TASK_ID, legacyTapId)
                     putExtra(TaskRunActivity.EXTRA_SOURCE, TaskRunActivity.SOURCE_WIDGET)
                 }
                 val pi = PendingIntent.getActivity(
@@ -97,7 +103,7 @@ class StyledWidgetProvider : AppWidgetProvider() {
         }
 
         /** Expand `%vars` in a template against all persisted globals (super + every project), merged. */
-        private fun expandGlobals(raw: String): String {
+        internal fun expandGlobals(raw: String): String {
             val scope = InMemoryGlobalScope()
             PersistentGlobalScope.snapshotAll().forEach { (k, v) -> scope.set(SUPER_GLOBAL_PROJECT_ID, k, v) }
             return runCatching { VariableStore(scope, SUPER_GLOBAL_PROJECT_ID).expand(raw) }.getOrDefault(raw)

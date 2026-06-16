@@ -66,12 +66,16 @@ class StyledWidgetConfigActivity : ComponentActivity() {
                     }
                     var templateMenu by remember { mutableStateOf(false) }
                     val templateNames = remember { TemplateStore.names() }
+                    var tapMenu by remember { mutableStateOf(false) }
+                    var taskNames by remember { mutableStateOf(listOf<String>()) }
                     var editing by remember { mutableStateOf(false) }
-                    // On reconfigure, pre-fill the tap-task name from the stored id.
+                    // Load the task list for the picker and pre-fill the bound tap task by name.
                     LaunchedEffect(Unit) {
-                        val id = StyledWidgetStore.getTapTask(applicationContext, widgetId)
-                        if (id > 0) {
-                            tapTask = runCatching { OpenTaskerApp_NoHilt.db.taskDao().getById(id)?.name }.getOrNull().orEmpty()
+                        taskNames = runCatching { OpenTaskerApp_NoHilt.db.taskDao().getAll().map { it.name } }.getOrDefault(emptyList())
+                        val stored = StyledWidgetStore.getTapTaskName(applicationContext, widgetId)
+                        tapTask = stored.ifBlank {
+                            val id = StyledWidgetStore.getTapTask(applicationContext, widgetId)
+                            if (id > 0) runCatching { OpenTaskerApp_NoHilt.db.taskDao().getById(id)?.name }.getOrNull().orEmpty() else ""
                         }
                     }
                     if (editing) {
@@ -93,12 +97,17 @@ class StyledWidgetConfigActivity : ComponentActivity() {
                             supportingText = { Text("Tasks target this with the Set Widget action.") },
                             singleLine = true, modifier = Modifier.fillMaxWidth(),
                         )
-                        OutlinedTextField(
-                            value = tapTask, onValueChange = { tapTask = it },
-                            label = { Text("Tap task (optional)") },
-                            supportingText = { Text("Exact task name to run when the widget is tapped.") },
-                            singleLine = true, modifier = Modifier.fillMaxWidth(),
-                        )
+                        Box(Modifier.fillMaxWidth()) {
+                            OutlinedButton(onClick = { tapMenu = true }, modifier = Modifier.fillMaxWidth()) {
+                                Text(if (tapTask.isBlank()) "Tap task: none" else "Tap task: $tapTask")
+                            }
+                            DropdownMenu(expanded = tapMenu, onDismissRequest = { tapMenu = false }) {
+                                DropdownMenuItem(text = { Text("None") }, onClick = { tapTask = ""; tapMenu = false })
+                                taskNames.forEach { n ->
+                                    DropdownMenuItem(text = { Text(n) }, onClick = { tapTask = n; tapMenu = false })
+                                }
+                            }
+                        }
                         Box(Modifier.fillMaxWidth()) {
                             OutlinedButton(onClick = { templateMenu = true }, modifier = Modifier.fillMaxWidth()) {
                                 Text(if (template.isBlank()) "Content: Custom layout" else "Content: template \"$template\"")
@@ -147,9 +156,9 @@ class StyledWidgetConfigActivity : ComponentActivity() {
         val json = if (WidgetLayoutCodec.decode(layout) != null) layout else WidgetLayoutCodec.encode(WidgetLayoutCodec.PLACEHOLDER)
         StyledWidgetStore.setLayout(ctx, widgetId, json)
         lifecycleScope.launch {
-            val taskId = tapTaskName.trim().takeIf { it.isNotEmpty() }
-                ?.let { runCatching { OpenTaskerApp_NoHilt.db.taskDao().getByName(it)?.id }.getOrNull() } ?: -1L
-            StyledWidgetStore.setTapTask(ctx, widgetId, taskId)
+            // Bind by NAME (resolved at tap time) so it survives bundle re-imports; clear any legacy id.
+            StyledWidgetStore.setTapTaskName(ctx, widgetId, tapTaskName.trim())
+            StyledWidgetStore.setTapTask(ctx, widgetId, -1L)
             StyledWidgetProvider.renderWidget(ctx, AppWidgetManager.getInstance(ctx), widgetId)
             setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId))
             finish()

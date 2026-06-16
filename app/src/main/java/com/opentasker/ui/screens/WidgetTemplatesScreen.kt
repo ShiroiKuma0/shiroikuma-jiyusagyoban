@@ -62,6 +62,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.opentasker.core.widget.WidgetLayoutCodec
 import com.opentasker.core.widget.WidgetRenderer
+import com.opentasker.widget.StyledWidgetProvider
+import androidx.compose.ui.layout.ContentScale
 import com.opentasker.ui.components.SelectionBar
 import com.opentasker.ui.components.SelectionCheck
 import com.opentasker.ui.components.selectableItem
@@ -222,24 +224,39 @@ private fun TemplateRow(
     }
 }
 
-/** A small bitmap thumbnail of the layout (raw `%vars` render as literal text — they fill in at run time). */
+/** A small bitmap thumbnail of the layout. Renders at a canvas scaled to the template's biggest font
+ *  (so big-screen clock fonts don't overflow the tiny box into a narrow strip), with `%vars` expanded
+ *  against the live globals, then scales the bitmap down to fit. */
 @Composable
 private fun TemplatePreview(layout: String) {
-    val density = LocalDensity.current.density
-    val node = remember(layout) { WidgetLayoutCodec.decode(layout) }
+    val node = remember(layout) {
+        val expanded = runCatching { StyledWidgetProvider.expandGlobals(layout) }.getOrDefault(layout)
+        WidgetLayoutCodec.decode(expanded)
+    }
     Box(
         Modifier.size(84.dp, 52.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xFF202020)),
     ) {
         if (node != null) {
-            val wPx = with(LocalDensity.current) { 84.dp.toPx() }.toInt()
-            val hPx = with(LocalDensity.current) { 52.dp.toPx() }.toInt()
+            val maxFont = remember(node) { maxFontSize(node).coerceIn(12, 240) }
+            val wPx = (maxFont * 7).coerceIn(160, 1000)
+            val hPx = wPx * 52 / 84
             val bitmap = remember(node, wPx, hPx) {
-                runCatching { WidgetRenderer(density) { ThemeStore.typeface(it) }.render(node, wPx, hPx) }.getOrNull()
+                // density 1f: dp values map straight to px in the over-sized canvas; the Image scales down.
+                runCatching { WidgetRenderer(1f) { ThemeStore.typeface(it) }.render(node, wPx, hPx) }.getOrNull()
             }
-            if (bitmap != null) Image(bitmap.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize())
+            if (bitmap != null) Image(
+                bitmap.asImageBitmap(),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }
+
+/** Largest text `size` (dp) anywhere in the node tree, for scaling the preview canvas. */
+private fun maxFontSize(node: com.opentasker.core.widget.WidgetNode): Int =
+    maxOf(node.size ?: 0, node.children.maxOfOrNull { maxFontSize(it) } ?: 0)
 
 @Composable
 private fun NameDialog(existing: List<String>, onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
