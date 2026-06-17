@@ -347,6 +347,110 @@ class ActionGuardsTest {
         assertTrue("unsupported action should fail", result is ActionResult.Failure)
     }
 
+    // --- File action guards ---
+
+    @Test
+    fun appendFileMissingPathFails() = runBlocking {
+        val action = AppendFileAction()
+        val result = action.run(ctx(), emptyMap())
+        assertTrue("missing path should fail", result is ActionResult.Failure)
+        assertEquals("missing path", (result as ActionResult.Failure).message)
+    }
+
+    @Test
+    fun deleteFileMissingPathFails() = runBlocking {
+        val action = DeleteFileAction()
+        val result = action.run(ctx(), emptyMap())
+        assertTrue("missing path should fail", result is ActionResult.Failure)
+        assertEquals("missing path", (result as ActionResult.Failure).message)
+    }
+
+    @Test
+    fun listFilesMissingPathFails() = runBlocking {
+        val action = ListFilesAction()
+        val result = action.run(ctx(), emptyMap())
+        assertTrue("missing path should fail", result is ActionResult.Failure)
+        assertEquals("missing path", (result as ActionResult.Failure).message)
+    }
+
+    // --- Settings honest-failure guards ---
+
+    @Test
+    fun brightnessMissingLevelFails() = runBlocking {
+        val action = BrightnessAction()
+        val result = action.run(ctx(), emptyMap())
+        assertTrue("missing brightness should fail", result is ActionResult.Failure)
+        assertEquals("missing brightness", (result as ActionResult.Failure).message)
+    }
+
+    @Test
+    fun airplaneModeAlwaysFailsHonestly() = runBlocking {
+        val action = AirplaneModeAction()
+        val result = action.run(ctx(), mapOf("state" to "on"))
+        assertTrue("airplane mode should fail", result is ActionResult.Failure)
+        assertTrue((result as ActionResult.Failure).message.contains("restricted"))
+    }
+
+    @Test
+    fun mobileDataAlwaysFailsHonestly() = runBlocking {
+        val action = MobileDataAction()
+        val result = action.run(ctx(), mapOf("state" to "on"))
+        assertTrue("mobile data should fail", result is ActionResult.Failure)
+        assertTrue((result as ActionResult.Failure).message.contains("restricted"))
+    }
+
+    @Test
+    fun tileStateMissingStateFails() = runBlocking {
+        val action = TileStateAction()
+        val result = action.run(ctx(), emptyMap())
+        assertTrue("missing state should fail", result is ActionResult.Failure)
+        assertEquals("missing state argument", (result as ActionResult.Failure).message)
+    }
+
+    @Test
+    fun tileStateInvalidStateFails() = runBlocking {
+        val action = TileStateAction()
+        val result = action.run(ctx(), mapOf("state" to "maybe"))
+        assertTrue("invalid tile state should fail", result is ActionResult.Failure)
+        assertTrue((result as ActionResult.Failure).message.contains("invalid state"))
+    }
+
+    // --- App honest-failure guards ---
+
+    @Test
+    fun killAppAlwaysFailsHonestly() = runBlocking {
+        val action = KillAppAction()
+        val result = action.run(ctx(), mapOf("package" to "com.example"))
+        assertTrue("kill app should fail", result is ActionResult.Failure)
+        assertTrue((result as ActionResult.Failure).message.contains("not supported"))
+    }
+
+    // --- Notification channel resolution ---
+
+    @Test
+    fun notificationChannelResolvesKnownKeys() {
+        val quiet = NotificationChannels.resolve("quiet")
+        assertEquals("opentasker.quiet", quiet.id)
+
+        val default = NotificationChannels.resolve("default")
+        assertEquals("opentasker.actions", default.id)
+
+        val urgent = NotificationChannels.resolve("urgent")
+        assertEquals("opentasker.urgent", urgent.id)
+    }
+
+    @Test
+    fun notificationChannelFallsBackToDefault() {
+        val unknown = NotificationChannels.resolve("nonexistent")
+        assertEquals("opentasker.actions", unknown.id)
+    }
+
+    @Test
+    fun notificationChannelTrimsAndLowercases() {
+        val padded = NotificationChannels.resolve("  URGENT  ")
+        assertEquals("opentasker.urgent", padded.id)
+    }
+
     // --- Local network permission guard (pre-API-37 path) ---
 
     @Test
