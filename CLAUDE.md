@@ -15,6 +15,15 @@ This repo (`ShiroiKuma0/shiroikuma-jiyusagyoban`) is a fork. We track upstream
 Before any work, read **`.claude/skills/build-apk/SKILL.md`** (canonical build + transfer) and
 **`.claude/skills/upstream-new-version/SKILL.md`** (upstream sync + rebase).
 
+## Tasker reference projects (for porting)
+
+白い熊's full Tasker setup lives **version-controlled, one XML per entity**, at
+`~/〇/[666] 私資料/[666][1074] tasker/` — each `<project>/` has `tasks/*.tsk.xml`,
+`profiles/*.prf.xml`, `scenes/*.scn.xml`, `_project.xml`. This is the source when porting a Tasker
+project into the app (e.g. `時間   日付` → the kanji clock; `電池線` → the battery line). The path
+has spaces and literal `[...]`, so quote it: `"$HOME/〇/[666] 私資料/[666][1074] tasker"`. Tasker action
+codes are decoded via that dir's `.claude/skills/tasker-action-codes/references/action_codes.md`.
+
 ## Fork workflow — READ THIS FIRST
 
 ### Git remotes & branches
