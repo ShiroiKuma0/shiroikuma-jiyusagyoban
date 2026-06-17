@@ -123,7 +123,7 @@ class VariableExpander {
                 op == "#" -> arrays.length(name).toString()
                 op.toIntOrNull() != null -> arrays.get(name, op.toInt())
                 op.isEmpty() -> arrays.join(name, "")
-                else -> arrays.joinWith(name, op)
+                else -> arrays.join(name, op)
             }
         }
 
@@ -443,10 +443,6 @@ class ArrayStore {
     }
 
     fun join(name: String, delimiter: String): String {
-        return arrays[name]?.joinToString(delimiter) ?: ""
-    }
-
-    fun joinWith(name: String, delimiter: String): String {
         return arrays[name]?.joinToString(delimiter) ?: ""
     }
 
