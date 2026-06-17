@@ -15,7 +15,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.GenericShape
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,6 +49,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -176,6 +185,7 @@ internal fun SceneOverlay(
     dismissOnOutside: Boolean = true,
     fullWidth: Boolean = false,
     fullscreen: Boolean = false,
+    fillHeight: Boolean = false,
     onDismiss: () -> Unit,
     onRunTask: (Long) -> Unit,
     onSetVar: (sceneProjectId: Long?, name: String, value: String) -> Unit,
@@ -200,7 +210,7 @@ internal fun SceneOverlay(
             }
         }
     } else {
-        SceneCard(scene, scale = 1f, absorbTaps = false, fullWidth = fullWidth, fullscreen = fullscreen, onRunTask = onRunTask, onSetVar = onSetVar)
+        SceneCard(scene, scale = 1f, absorbTaps = false, fullWidth = fullWidth, fullscreen = fullscreen, fillHeight = fillHeight, onRunTask = onRunTask, onSetVar = onSetVar)
     }
 }
 
@@ -211,6 +221,7 @@ private fun SceneCard(
     absorbTaps: Boolean,
     fullWidth: Boolean = false,
     fullscreen: Boolean = false,
+    fillHeight: Boolean = false,
     onRunTask: (Long) -> Unit,
     onSetVar: (sceneProjectId: Long?, name: String, value: String) -> Unit,
 ) {
@@ -225,6 +236,8 @@ private fun SceneCard(
             .then(
                 if (fullscreen) Modifier.fillMaxSize()
                 else if (fullWidth) Modifier.fillMaxWidth().height((sh * scale).dp)
+                // fillHeight (an edge strip): keep the configured width, fill the fraction-height window.
+                else if (fillHeight) Modifier.width((sw * scale).dp).fillMaxHeight()
                 else Modifier.size((sw * scale).dp, (sh * scale).dp),
             )
             .clip(shape)
@@ -272,6 +285,8 @@ internal fun SceneElementView(
     val styleBorderColor = sceneColor(cfg["borderColor"])
     // Optional custom font: an imported .ttf/.otf filename (same library the widgets/clock use).
     val styleFont = cfg["font"]?.trim()?.takeIf { it.isNotEmpty() }?.let { ThemeStore.fontFamily(it) }
+    // Optional swipe target: a task id run when the element is dragged/slid (e.g. an edge-bar strip).
+    val swipeTask = cfg["swipeTask"]?.trim()?.toLongOrNull()
     when (element.type) {
         SceneElementType.TEXT -> {
             val bg = sceneColor(cfg["bgColor"])
@@ -294,28 +309,41 @@ internal fun SceneElementView(
             }
         }
 
-        SceneElementType.BUTTON -> Box(
-            Modifier
-                .fillMaxSize()
-                .clip(RoundedCornerShape(10.dp))
-                .background(sceneColor(cfg["bgColor"]) ?: MaterialTheme.colorScheme.primary)
-                .then(if (styleBorderW > 0) Modifier.border(styleBorderW.dp, styleBorderColor ?: MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp)) else Modifier)
-                .pointerInput(element.id) {
-                    detectTapGestures(
-                        onTap = { element.tapTaskId?.let(onRunTask) },
-                        onLongPress = { element.longPressTaskId?.let(onRunTask) },
-                    )
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                v("label", "Button"),
-                color = sceneColor(cfg["textColor"]) ?: MaterialTheme.colorScheme.onPrimary,
-                fontFamily = styleFont,
-                fontSize = styleSize,
-                fontWeight = styleWeight,
-                textAlign = styleAlign ?: TextAlign.Center,
-            )
+        SceneElementType.BUTTON -> {
+            // Swipe via `draggable` — the same primitive the (working) overlay sliders use, so it sees
+            // drags where a hand-rolled pointer loop didn't. Fires once a vertical drag passes ~24dp.
+            val slopPx = with(LocalDensity.current) { 24.dp.toPx() }
+            var acc by remember(element.id) { mutableStateOf(0f) }
+            var fired by remember(element.id) { mutableStateOf(false) }
+            val dragState = rememberDraggableState { delta ->
+                acc += delta
+                if (swipeTask != null && !fired && kotlin.math.abs(acc) > slopPx) { fired = true; onRunTask(swipeTask) }
+            }
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(sceneColor(cfg["bgColor"]) ?: MaterialTheme.colorScheme.primary)
+                    .then(if (styleBorderW > 0) Modifier.border(styleBorderW.dp, styleBorderColor ?: MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp)) else Modifier)
+                    .then(if (swipeTask != null) Modifier.draggable(state = dragState, orientation = Orientation.Vertical, onDragStarted = { acc = 0f; fired = false }) else Modifier)
+                    // No tap detector on a swipe element — it competes with the drag. Tap is for plain buttons.
+                    .then(if (swipeTask == null && (element.tapTaskId != null || element.longPressTaskId != null)) Modifier.pointerInput(element.id) {
+                        detectTapGestures(
+                            onTap = { element.tapTaskId?.let(onRunTask) },
+                            onLongPress = { element.longPressTaskId?.let(onRunTask) },
+                        )
+                    } else Modifier),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    v("label", "Button"),
+                    color = sceneColor(cfg["textColor"]) ?: MaterialTheme.colorScheme.onPrimary,
+                    fontFamily = styleFont,
+                    fontSize = styleSize,
+                    fontWeight = styleWeight,
+                    textAlign = styleAlign ?: TextAlign.Center,
+                )
+            }
         }
 
         SceneElementType.SLIDER -> {
@@ -326,6 +354,12 @@ internal fun SceneElementView(
             // live: also commit (set var + run task) on every integer step during the drag, not just on
             // release — so a volume/brightness slider applies as you slide it.
             val live = sceneBool(cfg["live"] ?: "")
+            // swipeOnly: ignore the initial press (a tap) and only fire once the drag moves — so a tap
+            // doesn't trigger the task (used by the edge-swipe strips, which want slide-only).
+            val swipeOnly = sceneBool(cfg["swipeOnly"] ?: "")
+            // tint: a (possibly %var) colour for the whole slider; transparent = invisible. Read via v()
+            // so a debug task can flip it visible at runtime.
+            val tint = if (cfg["tint"] != null) sceneColor(v("tint")) else null
             // Initial value is expanded against globals, so `value: "%VOL"` starts the slider at the
             // live variable (e.g. the current volume, seeded by a Get Volume action before scene.show).
             var value by remember(element.id) { mutableStateOf((v("value").toFloatOrNull() ?: min).coerceIn(min, max)) }
@@ -336,26 +370,33 @@ internal fun SceneElementView(
                 element.tapTaskId?.let(onRunTask)
             }
             var lastSent by remember(element.id) { mutableStateOf(Int.MIN_VALUE) }
+            var moved by remember(element.id) { mutableStateOf(false) }
             val onChange: (Float) -> Unit = { f ->
+                val firstOfGesture = !moved   // the first change of a gesture is the press position (a tap)
+                moved = true
                 value = f
-                if (live) {
+                if (live && !(swipeOnly && firstOfGesture)) {
                     val r = value.roundToInt()
                     if (r != lastSent) { lastSent = r; onSettled() }
                 }
             }
+            // Reset the gesture tracker on release; a non-swipeOnly slider also commits its final value.
+            val onFinished: () -> Unit = { moved = false; if (!swipeOnly) onSettled() }
+            val sliderColors = tint?.let { SliderDefaults.colors(thumbColor = it, activeTrackColor = it, inactiveTrackColor = it) }
             val label = v("label", "Slider")
             if (vertical) {
                 // A horizontal Slider rotated 90° CCW: its track length follows the element height, so
                 // the top is max and dragging up increases the value.
                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(label, style = MaterialTheme.typography.labelMedium, color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontWeight = styleWeightOrNull)
+                    if (label.isNotBlank()) Text(label, style = MaterialTheme.typography.labelMedium, color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontWeight = styleWeightOrNull)
                     BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                         val trackLength = maxHeight
                         Slider(
                             value = value,
                             onValueChange = onChange,
-                            onValueChangeFinished = onSettled,
+                            onValueChangeFinished = onFinished,
                             valueRange = min..max,
+                            colors = sliderColors ?: SliderDefaults.colors(),
                             // requiredWidth ignores the (narrow) element width so the rotated track can
                             // span the full element height instead of being clamped to its width.
                             modifier = Modifier.requiredWidth(trackLength).rotate(-90f),
@@ -364,12 +405,13 @@ internal fun SceneElementView(
                 }
             } else {
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
-                    Text(label, style = MaterialTheme.typography.labelMedium, color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontWeight = styleWeightOrNull)
+                    if (label.isNotBlank()) Text(label, style = MaterialTheme.typography.labelMedium, color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontWeight = styleWeightOrNull)
                     Slider(
                         value = value,
                         onValueChange = onChange,
-                        onValueChangeFinished = onSettled,
+                        onValueChangeFinished = onFinished,
                         valueRange = min..max,
+                        colors = sliderColors ?: SliderDefaults.colors(),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }

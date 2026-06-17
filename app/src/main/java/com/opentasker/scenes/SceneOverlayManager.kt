@@ -54,6 +54,7 @@ object SceneOverlayManager {
         val owner: OverlayLifecycleOwner,
         val params: WindowManager.LayoutParams,
         val fullscreen: Boolean,
+        val heightFraction: Float = 0f,
         val timeoutMs: Long = 0L,
         var dismissRunnable: Runnable? = null,
     )
@@ -75,15 +76,23 @@ object SceneOverlayManager {
     private fun realMetrics(wm: WindowManager): android.util.DisplayMetrics =
         android.util.DisplayMetrics().also { @Suppress("DEPRECATION") wm.defaultDisplay.getRealMetrics(it) }
 
-    private fun resizeFullscreenOverlays() {
+    private fun resizeDynamicOverlays() {
         val ctx = appContext ?: return
         val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val real = realMetrics(wm)
-        active.values.filter { it.fullscreen }.forEach { ov ->
-            if (ov.params.width != real.widthPixels || ov.params.height != real.heightPixels) {
-                ov.params.width = real.widthPixels
-                ov.params.height = real.heightPixels
-                runCatching { wm.updateViewLayout(ov.view, ov.params) }
+        active.values.forEach { ov ->
+            when {
+                ov.fullscreen ->
+                    if (ov.params.width != real.widthPixels || ov.params.height != real.heightPixels) {
+                        ov.params.width = real.widthPixels
+                        ov.params.height = real.heightPixels
+                        runCatching { wm.updateViewLayout(ov.view, ov.params) }
+                    }
+                // A fraction-height edge strip re-sizes to its fraction of the new screen height.
+                ov.heightFraction > 0f -> {
+                    val h = (ov.heightFraction * real.heightPixels).toInt()
+                    if (ov.params.height != h) { ov.params.height = h; runCatching { wm.updateViewLayout(ov.view, ov.params) } }
+                }
             }
         }
     }
@@ -94,8 +103,8 @@ object SceneOverlayManager {
         val l = object : android.hardware.display.DisplayManager.DisplayListener {
             override fun onDisplayChanged(displayId: Int) {
                 // The metrics can lag the callback slightly on foldables; re-apply now and once more shortly.
-                resizeFullscreenOverlays()
-                main.postDelayed({ resizeFullscreenOverlays() }, 150)
+                resizeDynamicOverlays()
+                main.postDelayed({ resizeDynamicOverlays() }, 150)
             }
             override fun onDisplayAdded(displayId: Int) {}
             override fun onDisplayRemoved(displayId: Int) {}
@@ -110,7 +119,7 @@ object SceneOverlayManager {
      * card and placed by [position] ("top"/"center"/"bottom"). [timeoutMs] > 0 auto-dismisses.
      * Safe to call from any thread.
      */
-    fun show(context: Context, scene: Scene, position: String? = null, modal: Boolean = true, timeoutMs: Long = 0L, dismissOnOutside: Boolean = true, fullWidth: Boolean = false, fullscreen: Boolean = false, edgeCenter: Boolean = false) {
+    fun show(context: Context, scene: Scene, position: String? = null, modal: Boolean = true, timeoutMs: Long = 0L, dismissOnOutside: Boolean = true, fullWidth: Boolean = false, fullscreen: Boolean = false, edgeCenter: Boolean = false, insetDp: Int = 0, heightFraction: Float = 0f) {
         val app = context.applicationContext
         main.post {
             appContext = app
@@ -145,6 +154,7 @@ object SceneOverlayManager {
                             dismissOnOutside = dismissOnOutside,
                             fullWidth = fullWidth,
                             fullscreen = fullscreen,
+                            fillHeight = heightFraction > 0f,
                             onDismiss = { hide(scene.id) },
                             onRunTask = ::runTask,
                             onSetVar = ::setVar,
@@ -193,7 +203,11 @@ object SceneOverlayManager {
                         fullWidth -> WindowManager.LayoutParams.MATCH_PARENT
                         else -> WindowManager.LayoutParams.WRAP_CONTENT
                     },
-                    if (fullscreen) real.heightPixels else WindowManager.LayoutParams.WRAP_CONTENT,
+                    when {
+                        fullscreen -> real.heightPixels
+                        heightFraction > 0f -> (heightFraction * real.heightPixels).toInt()
+                        else -> WindowManager.LayoutParams.WRAP_CONTENT
+                    },
                     type,
                     WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or edgeFlags or
                         (if (dismissOnOutside) WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH else 0),
@@ -206,6 +220,8 @@ object SceneOverlayManager {
                         // Edge HUDs (the music 良/削) sit in the lower-middle, dropping further on the
                         // wider fold states (where the app's controls move down). y is from the v-centre.
                         pos == "left" || pos == "right" -> {
+                            // Inset from the very edge (out of the OEM's edge-gesture region, so a slide reaches us).
+                            if (insetDp > 0) x = (insetDp * app.resources.displayMetrics.density).toInt()
                             y = if (edgeCenter) 0 else {
                                 val frac = when {
                                     real.widthPixels < 1500 -> 0.06f
@@ -223,9 +239,17 @@ object SceneOverlayManager {
             runCatching { wm.addView(composeView, params) }
                 .onSuccess {
                     owner.onResume()
-                    val overlay = Overlay(composeView, owner, params, fullscreen, timeoutMs)
+                    val overlay = Overlay(composeView, owner, params, fullscreen, heightFraction, timeoutMs)
                     active[scene.id] = overlay
-                    if (fullscreen) ensureDisplayListener(app)
+                    if (fullscreen || heightFraction > 0f) ensureDisplayListener(app)
+                    // Keep system edge gestures (e.g. the back swipe) from stealing drags on a tap-through
+                    // panel/strip — otherwise a slide along a screen edge never reaches the overlay.
+                    if (!modal && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        composeView.post {
+                            composeView.systemGestureExclusionRects =
+                                listOf(android.graphics.Rect(0, 0, composeView.width, composeView.height))
+                        }
+                    }
                     if (timeoutMs > 0) {
                         val r = Runnable { hide(scene.id) }
                         overlay.dismissRunnable = r

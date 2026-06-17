@@ -40,8 +40,12 @@ class ShowSceneAction : Action {
         val fullscreen = boolArg("fullscreen") ?: false
         // edgeCenter: for a left/right overlay, sit vertically centred (default left/right drops lower for media HUDs).
         val edgeCenter = boolArg("edgeCenter") ?: false
+        // inset: dp to pull a left/right overlay in from the very edge (clears the OEM edge-gesture region).
+        val insetDp = args["inset"]?.trim()?.toIntOrNull() ?: 0
+        // heightFraction: 0..1 of the screen height (re-sized on fold/rotation). Used by the edge strips.
+        val heightFraction = args["heightFraction"]?.trim()?.toFloatOrNull()?.coerceIn(0f, 1f) ?: 0f
         if (SceneOverlayManager.canOverlay(ctx.app)) {
-            SceneOverlayManager.show(ctx.app, scene, position, modal, timeoutMs, dismissOnOutside, fullWidth, fullscreen, edgeCenter)
+            SceneOverlayManager.show(ctx.app, scene, position, modal, timeoutMs, dismissOnOutside, fullWidth, fullscreen, edgeCenter, insetDp, heightFraction)
             ctx.logger("Show scene \"${scene.name}\" (overlay, ${if (modal) "modal" else "tap-through"})")
         } else {
             val intent = Intent(ctx.app, SceneActivity::class.java).apply {
