@@ -171,6 +171,31 @@ class SetVariableAction : Action {
 }
 
 /**
+ * Persist a variable to global scope.
+ *
+ * Copies the current value of a variable into the global (uppercase) namespace
+ * so it survives across task invocations within the same service lifetime.
+ *
+ * Args:
+ *   - "name": source variable name (local or global)
+ *   - "global_name": target global variable name (auto-uppercased if needed)
+ */
+class PersistVariableAction : Action {
+    override val id = "var.persist"
+    override val category = ActionCategory.VARIABLE
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val name = args["name"] ?: return ActionResult.Failure("missing name")
+        val globalName = args["global_name"] ?: name.replaceFirstChar { it.uppercase() }
+        val value = ctx.variables.get(name)
+            ?: return ActionResult.Failure("variable '$name' is not set")
+        ctx.variables.set(globalName, value)
+        ctx.logger("Persist \$$name → \$$globalName = $value")
+        return ActionResult.Success
+    }
+}
+
+/**
  * Say (text-to-speech) action.
  *
  * Args:

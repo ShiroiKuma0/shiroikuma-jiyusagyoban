@@ -25,6 +25,7 @@ import com.opentasker.core.actions.NotifyAction
 import com.opentasker.core.actions.NotifyCancelAction
 import com.opentasker.core.actions.OpenUrlAction
 import com.opentasker.core.actions.PauseSoundAction
+import com.opentasker.core.actions.PersistVariableAction
 import com.opentasker.core.actions.PingAction
 import com.opentasker.core.actions.PlaySoundAction
 import com.opentasker.core.actions.PreviousTrackAction
@@ -68,6 +69,7 @@ private fun registerBuiltInActions() {
         NotifyAction(),
         NotifyCancelAction(),
         SetVariableAction(),
+        PersistVariableAction(),
         SayAction(),
         WaitAction(),
         LaunchIntentAction(),

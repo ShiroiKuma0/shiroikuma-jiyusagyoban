@@ -100,6 +100,19 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "var.persist",
+            name = "Persist Variable",
+            description = "Copy a variable's current value into the global scope so it survives across task runs",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Source variable", required = true, hint = "local variable name"),
+                ActionField("global_name", "Global name", hint = "Auto-uppercased from source if omitted"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "tts.speak",
             name = "Say (Text-to-Speech)",
             description = "Speak text aloud using the device speaker",
