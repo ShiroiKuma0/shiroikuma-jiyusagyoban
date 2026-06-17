@@ -15,6 +15,7 @@ object SceneElementDrafts {
         SceneElementType.TOGGLE,
         SceneElementType.SPINNER,
         SceneElementType.IMAGE,
+        SceneElementType.PROGRESS,
         SceneElementType.RECTANGLE,
         SceneElementType.OVAL,
     )
@@ -59,6 +60,7 @@ object SceneElementDrafts {
         SceneElementType.TOGGLE -> mapOf("label" to "Toggle", "value" to "false")
         SceneElementType.SPINNER -> mapOf("label" to "Spinner", "options" to "A, B, C", "value" to "A")
         SceneElementType.IMAGE -> mapOf("source" to "Image")
+        SceneElementType.PROGRESS -> mapOf("value" to "50", "fillColor" to "#FFFFC107")
         // Shapes: blank fill (transparent), a thin theme-yellow outline so they're visible by default.
         SceneElementType.RECTANGLE -> mapOf("borderWidth" to "1")
         SceneElementType.OVAL -> mapOf("borderWidth" to "1")
@@ -75,6 +77,7 @@ object SceneElementDrafts {
         SceneElementType.TOGGLE -> 200 to 48
         SceneElementType.SPINNER -> 200 to 48
         SceneElementType.IMAGE -> 180 to 120
+        SceneElementType.PROGRESS -> 220 to 12
         SceneElementType.RECTANGLE -> 140 to 70
         SceneElementType.OVAL -> 90 to 90
         else -> 160 to 48

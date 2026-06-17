@@ -6,6 +6,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.GenericShape
@@ -71,6 +77,7 @@ import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -166,6 +173,7 @@ internal fun SceneOverlay(
     modal: Boolean = true,
     position: Alignment = Alignment.Center,
     dismissOnOutside: Boolean = true,
+    fullWidth: Boolean = false,
     onDismiss: () -> Unit,
     onRunTask: (Long) -> Unit,
     onSetVar: (sceneProjectId: Long?, name: String, value: String) -> Unit,
@@ -190,7 +198,7 @@ internal fun SceneOverlay(
             }
         }
     } else {
-        SceneCard(scene, scale = 1f, absorbTaps = false, onRunTask = onRunTask, onSetVar = onSetVar)
+        SceneCard(scene, scale = 1f, absorbTaps = false, fullWidth = fullWidth, onRunTask = onRunTask, onSetVar = onSetVar)
     }
 }
 
@@ -199,6 +207,7 @@ private fun SceneCard(
     scene: Scene,
     scale: Float,
     absorbTaps: Boolean,
+    fullWidth: Boolean = false,
     onRunTask: (Long) -> Unit,
     onSetVar: (sceneProjectId: Long?, name: String, value: String) -> Unit,
 ) {
@@ -208,7 +217,8 @@ private fun SceneCard(
     val borderW = scene.borderWidth.coerceAtLeast(0)
     Box(
         Modifier
-            .size((sw * scale).dp, (sh * scale).dp)
+            // fullWidth (e.g. a top status bar): span the screen, keep only the configured height.
+            .then(if (fullWidth) Modifier.fillMaxWidth().height((sh * scale).dp) else Modifier.size((sw * scale).dp, (sh * scale).dp))
             .clip(shape)
             // Blank background defaults to the theme background (black); blank border to outline (yellow).
             .background(sceneColor(scene.bgColor) ?: MaterialTheme.colorScheme.background)
@@ -217,10 +227,12 @@ private fun SceneCard(
             .then(if (absorbTaps) Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {} else Modifier),
     ) {
         scene.elements.forEach { element ->
+            // widthDp/heightDp <= 0 means "fill the card" — lets an element span a full-width bar scene.
             Box(
                 Modifier
                     .offset((element.xDp * scale).dp, (element.yDp * scale).dp)
-                    .size((element.widthDp * scale).dp, (element.heightDp * scale).dp),
+                    .then(if (element.widthDp > 0) Modifier.width((element.widthDp * scale).dp) else Modifier.fillMaxWidth())
+                    .then(if (element.heightDp > 0) Modifier.height((element.heightDp * scale).dp) else Modifier.fillMaxHeight()),
             ) {
                 SceneElementView(element, onRunTask) { name, value -> onSetVar(scene.projectId, name, value) }
             }
@@ -506,6 +518,53 @@ internal fun SceneElementView(
             } else {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(source.ifBlank { "Image" }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        SceneElementType.PROGRESS -> {
+            // Horizontal fill bar (e.g. the battery line). value=0..100 (a %var); fillColor over trackColor;
+            // when `charging` is truthy a highlight sweeps along the filled part. Re-renders live via v().
+            val pct = ((v("value").toFloatOrNull() ?: 0f).coerceIn(0f, 100f)) / 100f
+            val fillColor = sceneColor(v("fillColor")) ?: MaterialTheme.colorScheme.primary
+            val trackColor = sceneColor(v("trackColor")) ?: Color.Transparent
+            val charging = sceneBool(v("charging"))
+            Box(Modifier.fillMaxSize().background(trackColor)) {
+                Box(
+                    Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(pct)
+                        .align(Alignment.CenterStart)
+                        .background(fillColor),
+                ) {
+                    if (charging && pct > 0f) {
+                        // Charging indicator. The sweep is driven by a delay loop that advances a State —
+                        // the same state→recompose path as the live colour update, so it animates inside
+                        // the overlay window (where an infinite-transition frame clock may not tick). A
+                        // static brightening on top keeps "charging" unmistakable even on a 3 dp bar.
+                        var sweep by remember { mutableStateOf(0f) }
+                        LaunchedEffect(Unit) {
+                            while (true) {
+                                sweep = if (sweep >= 1f) 0f else sweep + 0.012f
+                                delay(16L)
+                            }
+                        }
+                        Box(
+                            Modifier.matchParentSize().drawWithContent {
+                                drawContent()
+                                drawRect(color = Color.Red.copy(alpha = 0.22f))
+                                val band = size.width * 0.30f
+                                val cx = sweep * (size.width + band) - band
+                                drawRect(
+                                    brush = Brush.horizontalGradient(
+                                        colors = listOf(Color.Transparent, Color.Red.copy(alpha = 0.9f), Color.Transparent),
+                                        startX = cx,
+                                        endX = cx + band,
+                                    ),
+                                )
+                            },
+                        )
+                    }
                 }
             }
         }

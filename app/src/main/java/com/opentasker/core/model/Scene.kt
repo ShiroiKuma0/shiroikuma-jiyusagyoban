@@ -41,4 +41,7 @@ enum class SceneElementType {
     BUTTON, TEXT, EDIT_TEXT, CHECKBOX, TOGGLE, SLIDER,
     NUMBER_PICKER, SPINNER, IMAGE, MAP, WEB, MENU, VIDEO,
     OVAL, RECTANGLE, DOODLE,
+    // A horizontal fill bar: `value` (0..100, usually a %var) fills `fillColor` over `trackColor`;
+    // when `charging` is truthy a highlight sweeps along the filled part. Used by the battery line.
+    PROGRESS,
 }

@@ -38,9 +38,13 @@ class StateGetAction : Action {
         val pct = if (level >= 0 && scale > 0) level * 100 / scale else 0
         val plugged = battery?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
         val status = battery?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        // Belt-and-suspenders: the live BatteryManager service, in case some OEMs report a stale
+        // sticky intent (plugged/status) but a correct isCharging.
+        val bmCharging = (app.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager)?.isCharging == true
         val charging = plugged != 0 ||
             status == BatteryManager.BATTERY_STATUS_CHARGING ||
-            status == BatteryManager.BATTERY_STATUS_FULL
+            status == BatteryManager.BATTERY_STATUS_FULL ||
+            bmCharging
         store("battery", if (pct >= 100) "100" else "%02d".format(pct.coerceIn(0, 99)))
         store("charging", charging.toString())
 

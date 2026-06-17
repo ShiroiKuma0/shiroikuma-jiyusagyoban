@@ -34,8 +34,10 @@ class ShowSceneAction : Action {
         val modal = boolArg("modal") ?: scene.defaultModal
         val timeoutMs = (args["timeout"]?.trim()?.toDoubleOrNull()?.times(1000))?.toLong()?.coerceAtLeast(0L) ?: 0L
         val dismissOnOutside = boolArg("dismissOnOutside") ?: scene.defaultDismissOnOutside
+        // fullWidth: span the screen (status-bar style); ignored for modal scenes. Used by the battery line.
+        val fullWidth = boolArg("fullWidth") ?: false
         if (SceneOverlayManager.canOverlay(ctx.app)) {
-            SceneOverlayManager.show(ctx.app, scene, position, modal, timeoutMs, dismissOnOutside)
+            SceneOverlayManager.show(ctx.app, scene, position, modal, timeoutMs, dismissOnOutside, fullWidth)
             ctx.logger("Show scene \"${scene.name}\" (overlay, ${if (modal) "modal" else "tap-through"})")
         } else {
             val intent = Intent(ctx.app, SceneActivity::class.java).apply {

@@ -59,7 +59,7 @@ object SceneOverlayManager {
      * card and placed by [position] ("top"/"center"/"bottom"). [timeoutMs] > 0 auto-dismisses.
      * Safe to call from any thread.
      */
-    fun show(context: Context, scene: Scene, position: String? = null, modal: Boolean = true, timeoutMs: Long = 0L, dismissOnOutside: Boolean = true) {
+    fun show(context: Context, scene: Scene, position: String? = null, modal: Boolean = true, timeoutMs: Long = 0L, dismissOnOutside: Boolean = true, fullWidth: Boolean = false) {
         val app = context.applicationContext
         main.post {
             appContext = app
@@ -86,6 +86,7 @@ object SceneOverlayManager {
                             modal = modal,
                             position = sceneAlignment(position),
                             dismissOnOutside = dismissOnOutside,
+                            fullWidth = fullWidth,
                             onDismiss = { hide(scene.id) },
                             onRunTask = ::runTask,
                             onSetVar = ::setVar,
@@ -115,14 +116,17 @@ object SceneOverlayManager {
                 // Tap-through HUD: wrap the card, not-focusable so touches outside it reach the app,
                 // placed by window gravity.
                 WindowManager.LayoutParams(
-                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    if (fullWidth) WindowManager.LayoutParams.MATCH_PARENT else WindowManager.LayoutParams.WRAP_CONTENT,
                     WindowManager.LayoutParams.WRAP_CONTENT,
                     type,
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or
+                        // A full-width bar lays out in the whole screen (over the status bar) at the very edge.
+                        (if (fullWidth) WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS else 0),
                     PixelFormat.TRANSLUCENT,
                 ).apply {
                     gravity = sceneGravity(position)
-                    if (gravity != Gravity.CENTER) y = (48 * app.resources.displayMetrics.density).toInt()
+                    // A full-width bar sits flush over the status bar; a regular HUD gets a small inset.
+                    if (!fullWidth && gravity != Gravity.CENTER) y = (48 * app.resources.displayMetrics.density).toInt()
                 }
             }
             runCatching { wm.addView(composeView, params) }
