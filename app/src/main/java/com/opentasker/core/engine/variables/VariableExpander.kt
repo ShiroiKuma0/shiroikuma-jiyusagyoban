@@ -415,7 +415,19 @@ class ArrayStore {
     private val arrays = java.util.concurrent.ConcurrentHashMap<String, List<String>>()
 
     fun put(name: String, values: List<String>) {
+        if (arrays.size >= MAX_ARRAYS) {
+            val oldest = arrays.keys.firstOrNull() ?: return
+            arrays.remove(oldest)
+        }
         arrays[name] = values
+    }
+
+    fun clear() {
+        arrays.clear()
+    }
+
+    companion object {
+        private const val MAX_ARRAYS = 500
     }
 
     fun get(name: String, index: Int): String {

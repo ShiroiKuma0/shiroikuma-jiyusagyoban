@@ -102,8 +102,15 @@ object OpenTaskerBundleCodec {
 
     fun encode(bundle: OpenTaskerBundle): String = json.encodeToString(bundle)
 
-    @Throws(SerializationException::class)
-    fun decode(rawJson: String): OpenTaskerBundle = json.decodeFromString(rawJson)
+    @Throws(SerializationException::class, IllegalArgumentException::class)
+    fun decode(rawJson: String): OpenTaskerBundle {
+        require(rawJson.length <= MAX_BUNDLE_JSON_CHARS) {
+            "Bundle JSON exceeds ${MAX_BUNDLE_JSON_CHARS / 1024 / 1024} MB size limit"
+        }
+        return json.decodeFromString(rawJson)
+    }
+
+    private const val MAX_BUNDLE_JSON_CHARS = 16 * 1024 * 1024
 
     fun validate(bundle: OpenTaskerBundle): BundleImportPlan {
         val warnings = mutableListOf<String>()

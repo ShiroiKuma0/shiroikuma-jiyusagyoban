@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class ConnectivityMonitor(context: Context) {
 
     private val appContext = context.applicationContext
-    private val cm = appContext.getSystemService(ConnectivityManager::class.java)
+    private val cm: ConnectivityManager? = appContext.getSystemService(ConnectivityManager::class.java)
     private val started = AtomicBoolean(false)
     @Volatile private var lastState: ConnState? = null
 
@@ -32,11 +32,18 @@ class ConnectivityMonitor(context: Context) {
 
     fun start() {
         if (!started.compareAndSet(false, true)) return
+        val manager = cm
+        if (manager == null) {
+            started.set(false)
+            Log.w(TAG, "ConnectivityManager unavailable; connectivity monitoring disabled")
+            emitState(ConnState(internet = false, networkType = "none", vpn = false))
+            return
+        }
         val request = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
         try {
-            cm.registerNetworkCallback(request, callback)
+            manager.registerNetworkCallback(request, callback)
             emitCurrentState()
             Log.d(TAG, "Connectivity callback registered")
         } catch (ex: RuntimeException) {
@@ -49,7 +56,7 @@ class ConnectivityMonitor(context: Context) {
     fun stop() {
         if (!started.compareAndSet(true, false)) return
         try {
-            cm.unregisterNetworkCallback(callback)
+            cm?.unregisterNetworkCallback(callback)
             Log.d(TAG, "Connectivity callback unregistered")
         } catch (ex: RuntimeException) {
             Log.w(TAG, "Connectivity callback was already unregistered", ex)
@@ -57,8 +64,9 @@ class ConnectivityMonitor(context: Context) {
     }
 
     private fun emitCurrentState() {
-        val network = cm.activeNetwork
-        val caps = network?.let { cm.getNetworkCapabilities(it) }
+        val manager = cm ?: return
+        val network = manager.activeNetwork
+        val caps = network?.let { manager.getNetworkCapabilities(it) }
         val internet = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
         val vpn = caps?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
         val networkType = when {
