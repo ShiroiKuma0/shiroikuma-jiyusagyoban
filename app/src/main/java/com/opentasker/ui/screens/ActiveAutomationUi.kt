@@ -135,6 +135,7 @@ import com.opentasker.core.storage.RunLogRetentionOptions
 import com.opentasker.core.storage.VariableEntity
 import com.opentasker.core.storage.RunLogRetentionPolicy
 import com.opentasker.core.storage.RunLogRetentionSettings
+import com.opentasker.core.storage.StorageDecodeIssue
 import com.opentasker.core.storage.displayLabel
 import com.opentasker.core.storage.minimumTimestamp
 import com.opentasker.core.storage.normalized
@@ -156,6 +157,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -290,14 +292,31 @@ class ActiveAutomationViewModel(
     private val runLogRetentionSettings = RunLogRetentionSettings(appContext)
     private val databaseBackupManager = DatabaseBackupManager(appContext, db)
 
-    val profiles: StateFlow<List<Profile>> = db.profileDao()
+    private val profileDecodeResults = db.profileDao()
         .getAllAsFlow()
-        .map { entities -> entities.map { it.toDomain() }.sortedBy { it.name.lowercase() } }
+        .map { entities -> entities.map { it.toDomainDecodeResult() } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val tasks: StateFlow<List<Task>> = db.taskDao()
+    private val taskDecodeResults = db.taskDao()
         .getAllAsFlow()
-        .map { entities -> entities.map { it.toDomain() }.sortedBy { it.name.lowercase() } }
+        .map { entities -> entities.map { it.toDomainDecodeResult() } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val profiles: StateFlow<List<Profile>> = profileDecodeResults
+        .map { results -> results.map { it.value }.sortedBy { it.name.lowercase() } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val tasks: StateFlow<List<Task>> = taskDecodeResults
+        .map { results -> results.map { it.value }.sortedBy { it.name.lowercase() } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val storageDecodeIssues: StateFlow<List<StorageDecodeIssue>> = combine(
+        profileDecodeResults,
+        taskDecodeResults,
+    ) { profileResults, taskResults ->
+        (profileResults.mapNotNull { it.issue } + taskResults.mapNotNull { it.issue })
+            .sortedWith(compareBy<StorageDecodeIssue> { it.recordType.label }.thenBy { it.recordName.lowercase() })
+    }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val scenes: StateFlow<List<Scene>> = db.sceneDao()
@@ -753,6 +772,7 @@ fun ActiveAutomationUi(
     val globalVariables by viewModel.globalVariables.collectAsState()
     val runLogRetentionPolicy by viewModel.runLogRetentionPolicy.collectAsState()
     val backupSetupState by viewModel.backupSetupState.collectAsState()
+    val storageDecodeIssues by viewModel.storageDecodeIssues.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var screenOrdinal by rememberSaveable { mutableIntStateOf(0) }
@@ -1084,6 +1104,7 @@ fun ActiveAutomationUi(
                 profiles = profiles,
                 tasks = tasks,
                 runLogs = runLogs,
+                storageDecodeIssues = storageDecodeIssues,
                 onCreateTaskFirst = {
                     screenOrdinal = OpenTaskerScreen.Tasks.ordinal
                     showCreateTaskDialog = true
@@ -1112,6 +1133,7 @@ fun ActiveAutomationUi(
 
             OpenTaskerScreen.Tasks -> TasksScreen(
                 tasks = tasks,
+                storageDecodeIssues = storageDecodeIssues,
                 onCreateTask = { showCreateTaskDialog = true },
                 onEditTask = { openTaskDialog(it) },
                 onDeleteTask = { openDeleteTask(it) },
@@ -1418,6 +1440,7 @@ private fun ProfilesScreen(
     profiles: List<Profile>,
     tasks: List<Task>,
     runLogs: List<RunLogEntry>,
+    storageDecodeIssues: List<StorageDecodeIssue>,
     onCreateTaskFirst: () -> Unit,
     onCreateProfile: () -> Unit,
     onBrowseTemplates: () -> Unit,
@@ -1502,6 +1525,11 @@ private fun ProfilesScreen(
         }
         item {
             TemplatePromptCard(onBrowseTemplates)
+        }
+        if (storageDecodeIssues.isNotEmpty()) {
+            item {
+                StorageDecodeWarningCard(storageDecodeIssues)
+            }
         }
         item {
             OutlinedTextField(
@@ -1791,6 +1819,20 @@ private fun InlineNotice(title: String, body: String, color: Color) {
 }
 
 @Composable
+private fun StorageDecodeWarningCard(issues: List<StorageDecodeIssue>) {
+    val issueSummary = issues.take(3).joinToString(separator = "; ") { issue ->
+        "${issue.recordType.label} \"${issue.recordName}\" #${issue.recordId}: ${issue.fieldName}"
+    }
+    val remaining = issues.size - 3
+    val suffix = if (remaining > 0) "; $remaining more" else ""
+    InlineNotice(
+        title = "Stored data needs review",
+        body = "OpenTasker loaded affected records with safe fallbacks. $issueSummary$suffix.",
+        color = MaterialTheme.colorScheme.error,
+    )
+}
+
+@Composable
 private fun TemplatePromptCard(onBrowseTemplates: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -1905,6 +1947,7 @@ private fun ProfileCard(
 @Composable
 private fun TasksScreen(
     tasks: List<Task>,
+    storageDecodeIssues: List<StorageDecodeIssue>,
     onCreateTask: () -> Unit,
     onEditTask: (Task) -> Unit,
     onDeleteTask: (Task) -> Unit,
@@ -1938,6 +1981,11 @@ private fun TasksScreen(
     ) {
         item {
             TaskLibrarySummaryCard(tasks = tasks, onCreateTask = onCreateTask)
+        }
+        if (storageDecodeIssues.isNotEmpty()) {
+            item {
+                StorageDecodeWarningCard(storageDecodeIssues)
+            }
         }
         item {
             OutlinedTextField(

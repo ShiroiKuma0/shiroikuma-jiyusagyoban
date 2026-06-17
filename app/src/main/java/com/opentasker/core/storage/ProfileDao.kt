@@ -25,21 +25,43 @@ data class ProfileEntity(
     val automationMode: String = AutomationMode.SINGLE.name,
     val profileGroup: String? = null,
 ) {
-    fun toDomain() = try {
-        Profile(
-            id,
-            name,
-            enabled,
-            Json.decodeFromString(contextsJson),
-            enterTaskId,
-            exitTaskId,
-            cooldownSec,
-            runCatching { AutomationMode.valueOf(automationMode) }.getOrDefault(AutomationMode.SINGLE),
-            profileGroup,
+    fun toDomain(): Profile {
+        val result = toDomainDecodeResult()
+        result.issue?.let { issue ->
+            android.util.Log.e("ProfileDao", "Failed to deserialize profile $id: ${issue.message}")
+        }
+        return result.value
+    }
+
+    fun toDomainDecodeResult(): StorageDecodeResult<Profile> {
+        val mode = runCatching { AutomationMode.valueOf(automationMode) }.getOrDefault(AutomationMode.SINGLE)
+        val contexts = runCatching { Json.decodeFromString<List<ContextSpec>>(contextsJson) }
+            .getOrElse { error ->
+                return StorageDecodeResult(
+                    value = Profile(id, name, enabled, emptyList(), enterTaskId, exitTaskId, cooldownSec, mode, profileGroup),
+                    issue = StorageDecodeIssue(
+                        recordType = StorageRecordType.PROFILE,
+                        recordId = id,
+                        recordName = name,
+                        fieldName = "contextsJson",
+                        message = error.storageDecodeMessage(),
+                    ),
+                )
+            }
+
+        return StorageDecodeResult(
+            value = Profile(
+                id,
+                name,
+                enabled,
+                contexts,
+                enterTaskId,
+                exitTaskId,
+                cooldownSec,
+                mode,
+                profileGroup,
+            ),
         )
-    } catch (e: Exception) {
-        android.util.Log.e("ProfileDao", "Failed to deserialize profile $id: ${e.message}", e)
-        Profile(id, name, enabled, emptyList(), enterTaskId, exitTaskId, cooldownSec, AutomationMode.SINGLE, profileGroup)
     }
 }
 
