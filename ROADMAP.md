@@ -1,7 +1,7 @@
 # OpenTasker Roadmap
 
 **Current app version:** 0.2.72
-**Last updated:** 2026-06-16
+**Last updated:** 2026-06-17
 
 Items are organized by tier and priority. Completed items are deleted, not checked off. See CHANGELOG.md for shipped work.
 
@@ -136,6 +136,58 @@ Current BOM is 2026.04.01. Evaluate 2026.05.00 with compile, test, F-Droid, and 
 - **MQTT publish action (RD34)** — outbound-only `mqtt.publish` for Home Assistant/Node-RED integration. Needs library decision spike (Paho vs HiveMQ).
 - **Locale/Tasker plugin target bridge (RD37)** — expose OpenTasker as a Locale-compatible plugin target so Tasker/MacroDroid can invoke approved tasks.
 - **Mobile hotspot toggle** — privileged action via Shizuku allowlist. *Depends on X3.*
+
+---
+
+## Research-Driven Additions
+
+### P0
+
+- [ ] P0 — Track Room schema v5 and add a migration drift gate
+  Why: Room is the persistence boundary for user automations, and the current schema version 5 export exists only as an untracked file while migration tests do not cover every adjacent path.
+  Evidence: `app/src/main/java/com/opentasker/core/storage/AppDatabase.kt`, `app/schemas/com.opentasker.core.storage.AppDatabase/5.json`, `app/src/androidTest/java/com/opentasker/core/storage/DatabaseMigrationInstrumentedTest.kt`, Room release docs.
+  Touches: `app/schemas/com.opentasker.core.storage.AppDatabase/`, `app/src/androidTest/java/com/opentasker/core/storage/DatabaseMigrationInstrumentedTest.kt`, CI/build verification.
+  Acceptance: CI fails when the current Room schema is missing or untracked; migration tests validate every adjacent migration and a full 1 -> current path.
+  Complexity: M
+
+- [ ] P0 — Apply Android 17 local-network permission checks to every LAN socket action
+  Why: Setup presents `ACCESS_LOCAL_NETWORK` as required for LAN communication, but only HTTP/Download paths enforce it; Ping and Wake-on-LAN can drift from Android 17 policy.
+  Evidence: `app/src/main/AndroidManifest.xml`, `app/src/main/java/com/opentasker/ui/screens/PermissionOnboardingScreen.kt`, `app/src/main/java/com/opentasker/core/actions/NetworkActions.kt`, Android local-network permission docs.
+  Touches: `app/src/main/java/com/opentasker/core/actions/NetworkActions.kt`, action metadata/help text, `app/src/test/java/com/opentasker/core/actions/ActionGuardsTest.kt`.
+  Acceptance: API 37 guard behavior covers HTTP, Download, Ping to private/link-local hosts, and Wake-on-LAN; setup copy and action failure messages agree; tests simulate missing permission.
+  Complexity: S
+
+### P1
+
+- [ ] P1 — Enable Gradle dependency verification and dependency-update governance
+  Why: GitHub Actions are pinned, but Gradle artifacts are still trusted without checksum/signature metadata or an explicit update policy.
+  Evidence: `gradle/libs.versions.toml`, absence of `gradle/verification-metadata.xml`, Gradle dependency verification docs, Android dependency verification docs.
+  Touches: `gradle/verification-metadata.xml`, optional keyring metadata, dependency update workflow or manual upgrade recipe, CI.
+  Acceptance: CI builds with Gradle dependency verification enabled; dependency upgrades include a documented metadata refresh path; mutable workflow-action pins remain forbidden.
+  Complexity: M
+
+- [ ] P1 — Add current F-Droid build and reproducibility evidence to the release gate
+  Why: Version metadata gates exist, but release readiness still depends on stale local build evidence rather than a fresh fdroidserver or reproducibility result for the current version.
+  Evidence: `tools/verify-fdroid-release.ps1`, `fdroid/metadata/com.opentasker.app.yml`, `docs/FDROID_READINESS.md`, F-Droid reproducible-build and submission docs.
+  Touches: `tools/verify-fdroid-release.ps1`, release checklist/gate, F-Droid evidence capture.
+  Acceptance: the release gate produces current-version fdroidserver build evidence or a documented blocker; stale version evidence is detected before release.
+  Complexity: M
+
+### P2
+
+- [ ] P2 — Build a Locale plugin compatibility matrix harness
+  Why: Locale compatibility is central to automation ecosystem trust, but current validation is manual and depends on whichever plugin is installed.
+  Evidence: `docs/LOCALE_PLUGIN_HOST.md`, `tools/validate-locale-plugin.ps1`, Locale developer docs, openHAB Android Tasker integration, ntfy Tasker/intent integration request.
+  Touches: Locale host validation tooling, test fixture plugin or scripted emulator fixture, plugin result evidence output.
+  Acceptance: a synthetic setting/condition plugin validates discovery, config parsing, fire/query/request-query flows, redacted bundle logging, and pass/fail reporting; at least three representative real plugins can be recorded when available.
+  Complexity: M
+
+- [ ] P2 — Split ActiveAutomationUi into workflow-owned modules
+  Why: The largest Compose file owns unrelated profiles, tasks, run logs, imports, dialogs, and navigation state, making future polish and accessibility work riskier than necessary.
+  Evidence: `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationUi.kt`, `app/src/main/java/com/opentasker/ui/DesignSystem.kt`, RESEARCH.md architecture assessment.
+  Touches: profile/task/run-log/import/export UI modules, ViewModel state boundaries, UI smoke tests.
+  Acceptance: no single screen file owns unrelated profile, task, run-log, import/export, and dialog code; existing empty/loading/error states remain visible; smoke tests or source tests cover the split.
+  Complexity: L
 
 ---
 

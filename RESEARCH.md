@@ -1,140 +1,119 @@
 # Research - OpenTasker
 
-Updated: 2026-06-15 (stricter release-polish pass; replaces previous research content)
-
 ## Executive Summary
-
-OpenTasker is a Kotlin/Compose Android automation app at source version 0.2.66 with a Room-backed profile -> context -> task -> action engine, 49 registered runtime actions, engine-handled flow control, FOSS LocationManager geofencing, Locale/Tasker plugin hosting, Tasker XML import, OpenTasker JSON transfer, Quick Settings/widget triggers, OEM battery guidance, and F-Droid/Play release checks. The repo's best trait is explicit failure behavior: unsupported privileged actions fail honestly, imports are review-gated, sensitive run-log data is redacted, destructive variable and scene-element deletion are visually confirmed, and prior high-risk guards remain in place.
-
-The highest-value direction is trust and scale before more action breadth. Existing roadmap items already cover target-SDK readiness, Android 17 audio gating, work/private-profile app automation, TalkBack accessibility, profile/task organization, action implementation tests, WorkManager resilience, diagnostics, Tasker XML export, scoped LAN cleartext, date/time templates, camera/mic privacy triggers, Wake-on-LAN, and optional BYO-key AI authoring.
-
-Recent continuation passes found three additional non-duplicate gaps; v0.2.62 closed the first one in code and tests, leaving the latter two as active roadmap work:
-
-1. `http.post` response/download paths were bounded, but the request body was not size-capped and was written without `setFixedLengthStreamingMode`; v0.2.62 now caps request bodies at 1 MB, uses fixed-length streaming, and tests legacy `body` compatibility.
-2. GitHub Actions workflows use tag-pinned actions and the build workflow has no explicit least-privilege `permissions`; the repo also lacks Gradle dependency verification metadata and Dependabot/Renovate config.
-3. Release shrinker rules still keep removed Hilt-era classes while the manifest now uses `.OpenTaskerApp_NoHilt`, leaving release hardening stale after the no-Hilt migration.
+OpenTasker is a local-first Android automation app: a FOSS Tasker-style profile, context, task, action, scene, import/export, and plugin-host product built with Kotlin, Jetpack Compose, Room, WorkManager, and Material 3. Its strongest current shape is trust-centered Android automation: explicit unsupported-action failures, redacted diagnostics, signature-protected external intents, review-gated imports, F-Droid/Play metadata gates, optional Shizuku/Termux lanes, and a privacy-first no-cloud stance. Highest-value direction: make the v0.3 beta harder to break and easier to validate before expanding feature breadth. Priority opportunities are: 1) close Room schema and migration drift, 2) make Android 17 local-network permission handling cover every LAN socket action, 3) add Gradle dependency verification and dependency-update governance, 4) turn F-Droid reproducibility into a current release gate, 5) make Locale plugin compatibility repeatable with fixtures and a matrix, 6) split the largest Compose surface into workflow modules, and 7) keep existing roadmap work on target-SDK behavior, geofence evidence, macrobenchmarks, scenes, visual flow, Shizuku, Termux, i18n, accessibility, MQTT, UnifiedPush, and encrypted backup.
 
 ## Product Map
-
-- Core workflows: build profiles from contexts, attach enter/exit tasks, configure action/template arguments, inspect source health, review run logs, import/export bundles, and trigger tasks from widgets, Quick Settings, shortcuts, external intents, Locale/Tasker plugins, NFC, calendar, time, package, app-usage, notification, and location sources.
-- User personas: privacy-first Android power users, Tasker migrants, F-Droid users, home-automation/sysadmin users, and BYOD users whose personal/work/private profiles can affect app automation correctness.
-- Platforms and distribution: Android API 26+, compileSdk 36, targetSdk 36, GitHub APKs, draft F-Droid metadata, Play policy gates, and flavor-specific SMS/phone permissions.
-- Data flows: Room stores profiles, tasks, scenes, variables, run logs, app settings, and source state; configs are JSON blobs; `AutomationService` owns context subscriptions and task dispatch; SAF/document-picker flows protect import/export.
-- Key dependencies: Compose Material3, Room, WorkManager, kotlinx serialization plus Gson, AppCompat, Shizuku API, and Gradle/GitHub Actions release tooling.
+- Core workflows: create profiles from contexts, attach enter/exit tasks, configure built-in actions, use template expressions, inspect source health, review run logs, import/export OpenTasker JSON bundles, import Tasker XML, manage scenes, and trigger tasks through widgets, Quick Settings, shortcuts, NFC, external intents, and Locale-compatible plugins.
+- User personas: privacy-first Android power users, Tasker migrants, F-Droid users, home-automation users, Android sysadmins, and advanced users who need optional elevated execution without making root/Shizuku mandatory.
+- Platforms and distribution: Android API 26+, compile/target SDK 36, standard/F-Droid/Play Gradle distributions, GitHub release artifacts, draft F-Droid metadata, and Play policy validation tasks.
+- Key integrations and data flows: Room stores profiles, tasks, contexts, scenes, variables, run logs, settings, and source state; WorkManager handles periodic cleanup; `AutomationService` owns runtime subscriptions and dispatch; SAF/document-picker flows protect imports and exports; Locale host APIs and a signature-protected receiver expose opt-in external automation.
 
 ## Competitive Landscape
 
 ### Tasker
-
-- Does well: deepest Android automation ecosystem, Projects tabs, Taskernet sharing, Locale plugin ecosystem, Shizuku support, and AI generation that can emit importable profiles/tasks/widgets.
-- Learn: project/task organization, search, BYO-key generation against the app's own export format, and mature round-trip import/export.
-- Avoid: accreted UI complexity and setup burden.
+- Does well: deep Android automation coverage, mature variables, Taskernet sharing, Locale plugin ecosystem, Shizuku support, scenes, and import/export culture.
+- Learn: migration completeness, project organization, community sharing, and plugin compatibility expectations.
+- Avoid: accreted complexity and unclear setup burden that make first-run trust harder.
 
 ### MacroDroid
-
-- Does well: approachable trigger/action/constraint model, AI Macro Builder, large built-in library, community templates, and camera/mic-in-use privacy triggers.
-- Learn: guided creation, privacy triggers through platform signals, and template/community UX.
-- Avoid: proprietary/freemium limits and opaque portability.
+- Does well: approachable trigger/action/constraint model, guided creation, templates, community sharing, privacy-adjacent triggers, and a clear freemium packaging story.
+- Learn: setup guidance, template discoverability, and readable action creation.
+- Avoid: artificial macro/action limits and proprietary portability.
 
 ### Automate
+- Does well: visual flow authoring, searchable block catalog, explicit outputs, and a graph model that makes control flow inspectable.
+- Learn: visual flow debugging and readable node documentation once OpenTasker's current list editor is stable.
+- Avoid: forcing graph editing as the only mental model.
 
-- Does well: mature visual flowchart model, large block catalog, app-usage statistics blocks, and explicit variable outputs.
-- Learn: visual flow authoring and debugging once OpenTasker's list editor and runtime trust gaps are stable.
-- Avoid: making graph editing the only mental model.
+### Easer and Automation by Jens
+- Do well: FOSS Android automation, F-Droid distribution, open community expectations, and a smaller but relevant set of triggers/actions.
+- Learn: F-Droid-first release discipline and simple automation affordances.
+- Avoid: older UI density and weak migration/plugin surfaces.
 
-### vFlow
+### Node-RED
+- Does well: documented flows, reusable node ecosystem, inspectable wiring, and clear separation between editor/runtime concepts.
+- Learn: flow documentation, importable examples, and testable node metadata.
+- Avoid: server-required architecture that conflicts with OpenTasker's phone-local stance.
 
-- Does well: fast-moving visual workflow editor, module registry, typed "magic variables", Shizuku/root worker separation, searchable workflow picker, AI agent flow, hotspot control, and app-switch modules.
-- Learn: typed data-flow, searchable workflow selection, privilege-worker isolation, and Shizuku-gated elevated actions.
-- Avoid: limited distribution surface and weaker Tasker/F-Droid/Locale interop.
+### Home Assistant Companion and openHAB Android
+- Do well: phone-to-automation-server integration through sensors, notification commands, Tasker hooks, and explicit mobile permission guidance.
+- Learn: user-visible diagnostics for background restrictions, location, and remote-trigger flows.
+- Avoid: assuming a home server exists.
 
-### Automation by Jens
-
-- Does well: active F-Droid/GPL Android automation app with location, NFC, notifications, calendar, Bluetooth, speech/audio, tethering, HTTP, and script actions.
-- Learn: FOSS baseline breadth and translation/community expectations.
-- Avoid: older UI and limited plugin/migration ecosystem.
+### Locale Plugin Ecosystem
+- Does well: standard condition/setting/event contracts that many Android automation tools understand.
+- Learn: compatibility matrices, fixture plugins, and opt-in boundaries for third-party automation.
+- Avoid: broad plugin execution without review, audit, or signature/permission boundaries.
 
 ## Security, Privacy, and Reliability
-
-- Prior high-risk issues remain fixed: URL scheme allowlist, file read caps, response/download caps, notification ID overflow, screen-timeout unit conversion, explicit unsupported privileged actions, SMS Play gating, bounded template expansion, run-log redaction, and backup/restore staging.
-- Target-SDK wording risk remains: live Google target-API pages checked on 2026-06-15 still publish the API 35 / August 31, 2025 requirement, not a public API 36 Play deadline. Target-36 code has shipped, but docs must not mark an unpublished deadline as verified.
-- Android 17 audio risk remains: `MediaActions.kt` and TTS/sound code can run from background profiles while `AutomationService` uses `specialUse|location`; background audio hardening can fail playback or volume changes silently unless a valid foreground-service/while-in-use path exists.
-- Work profile / Private Space risk remains: app-open contexts, package broadcasts, and app launch actions are package-name/current-profile based; no model currently records `UserHandle`, profile labels, hidden-profile state, or profile-local disclosure.
-- Accessibility gap is narrowed but remains: action checkbox rows, profile/context form switches, widget task rows, flow graph targets, and the custom bottom navigation expose better roles/state; numeric fields request numeric keyboards, small day-token controls meet 48 dp minimum height, and scene element edit/delete dialog state is restored from stable scene id/index state with row-level nudge controls for non-drag movement. A full TalkBack sweep and accessibility-checks instrumentation gate are still missing.
-- Action test gap is narrowed but remains: `core/actions/ActionGuardsTest.kt` now covers key network, URL, wait, ping, and Wake-on-LAN guards, while file, media, settings, app, notification, and download edge cases still need coverage.
-- Network hardening gap closed in v0.2.62: `HttpPostAction` caps request bodies at 1 MB, uses fixed-length streaming, and keeps legacy `body` compatibility under the same cap.
-- New supply-chain gap: `.github/workflows/build.yml` and `release.yml` consume tag-pinned actions (`@v4`), the build workflow has no explicit `permissions`, `gradle/verification-metadata.xml` is absent, and no Dependabot config is present.
-- New release-hardening gap: `app/proguard-rules.pro` still keeps `OpenTaskerApp`, `Hilt_OpenTaskerApp`, and a Dagger/Hilt type pattern while `AndroidManifest.xml` uses `.OpenTaskerApp_NoHilt`.
+- Verified: `.github/workflows/build.yml` and `.github/workflows/release.yml` already use full-SHA pinned actions and least-privilege permissions, so older research that called out tag-pinned workflows is stale.
+- Verified: `gradle/verification-metadata.xml` is absent, while `gradle/libs.versions.toml` carries the active third-party dependency set. Gradle and Android build docs both support dependency verification as the next supply-chain control.
+- Verified: `app/src/main/java/com/opentasker/core/storage/AppDatabase.kt` is at Room schema version 5 and the exported `app/schemas/com.opentasker.core.storage.AppDatabase/5.json` exists only as an untracked file in the working tree. `DatabaseMigrationInstrumentedTest.kt` covers selected migrations but not every adjacent path through version 5.
+- Verified: `app/src/main/AndroidManifest.xml` declares `android.permission.ACCESS_LOCAL_NETWORK` and `PermissionOnboardingScreen.kt` exposes it, but `NetworkActions.kt` checks it only for HTTP/Download URL paths. `PingAction` and `WakeOnLanAction` are LAN-capable socket actions that do not use the same Android 17 guard.
+- Verified: `AndroidManifest.xml` sets `android:allowBackup="false"` and external intent entry is protected by a signature permission; the trust boundary should stay same-signer unless a separate user-review flow is designed.
+- Verified: `tools/verify-fdroid-release.ps1` and F-Droid metadata are current enough to gate version values, but `docs/FDROID_READINESS.md` still contains local build evidence from an older version. A fresh `fdroidserver` or documented blocker should be part of the release gate.
+- Likely: Android 17 background audio and Android 16/17 behavior changes remain runtime-sensitive even with compile/target SDK 36; existing roadmap device evidence items should stay above new feature breadth.
+- Needs live validation: local-network permission behavior, foreground-service denial behavior, geofence durability, and macrobenchmarks require API 35-37 devices/emulators; static inspection is not enough.
 
 ## Architecture Assessment
-
-- `ActiveAutomationUi.kt` remains too broad: navigation, ViewModel state, import/export, dialogs, and screen composables are concentrated in one file. This blocks small, testable accessibility and saveable-state improvements.
-- App/profile boundaries are implicit. App-open contexts, package events, app-launch actions, and plugin discovery are package-name based, so identical packages across personal/work/private profiles cannot be distinguished.
-- Action registry and metadata parity is now covered by JVM tests, including engine-handled flow-control allowlisting and the dynamic form keys that previously drifted from runtime argument names.
-- `TemplateExpressionEngine.kt` has safe string/math/array/JSON pipes but no bounded date/time formatting function, leaving a concrete Tasker migration gap.
-- `TaskerXmlImport.kt` is parse-only. A writer for the mappable subset would support round-trip migration and reduce lock-in.
-- WorkManager now backs periodic run-log pruning. Remaining architecture work is retention/service re-arm evidence plus worker-level tests.
-- Release and CI hardening trails app architecture changes. The no-Hilt migration removed runtime architecture but left stale shrinker rules; CI still trusts mutable tags and unverified Gradle artifacts.
+- `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationUi.kt` is a broad multi-workflow file covering navigation, ViewModel state, profiles, tasks, run logs, imports, dialogs, and secondary surfaces. This raises regression risk for polish work; split by workflow before larger UI changes.
+- `app/src/main/java/com/opentasker/core/actions/NetworkActions.kt` has good HTTP URL and size guards, but LAN permission logic should be centralized so each socket-like action cannot drift from platform policy.
+- `app/src/main/java/com/opentasker/core/storage/DatabaseMigrations.kt` documents the migration protocol, but CI needs to prove schema exports and adjacent migrations whenever `AppDatabase` changes.
+- `docs/LOCALE_PLUGIN_HOST.md` and `tools/validate-locale-plugin.ps1` describe manual validation against an installed sample plugin. A synthetic fixture plugin and compatibility matrix would make plugin-host regressions testable.
+- `app/src/main/java/com/opentasker/ui/DesignSystem.kt` exists, while many screens still own local spacing and copy. Existing roadmap items for DesignSystem token adoption and strings centralization are still valid; do not duplicate them.
+- Test gaps that matter most before feature breadth: Room 1->5 and adjacent migration tests, Android 17 LAN guard tests, Locale plugin fixture tests, F-Droid release evidence, and UI smoke tests around split workflow modules.
+- Documentation gaps that matter most: current F-Droid build evidence, platform-behavior evidence matrices, and plugin compatibility results.
 
 ## Rejected Ideas
-
-| Idea | Reason | Source |
-|---|---|---|
-| Treat API 36 Play deadline as verified today | Public Google pages checked on 2026-06-14 still state API 35 / August 31, 2025; target-36 remains platform-readiness work, not a verified public Play deadline. | Google Play target API docs |
-| Normal-app hotspot/tether toggle | Privileged on modern Android; should remain Shizuku-gated and fail honestly without elevation. | vFlow parity research; Android privilege model |
-| Clipboard-change as reliable background trigger | Android background clipboard restrictions make it unreliable outside foreground/IME contexts. | Android clipboard/privacy model; vFlow parity research |
-| Cloud-required backend or mandatory AI | Conflicts with no-cloud/no-telemetry positioning. Any AI must be explicit, user-initiated, and BYO-key. | Project philosophy; F-Droid posture |
-| Google Fit triggers | Fit APIs are sunset in favor of Health Connect. | Health Connect migration docs |
-| Cloud crash reporting | Telemetry-hosted crash reporting conflicts with privacy posture; local user-initiated diagnostic export fits. | Project philosophy |
+- Cloud-required automation backend - rejected from Tasker/IFTTT-style parity pressure because it conflicts with OpenTasker's local-first README and existing roadmap philosophy.
+- Mandatory root/Shizuku/ADB - rejected despite Tasker/Shizuku and AutoX-style elevated automation; elevated execution should remain opt-in and action-scoped.
+- FBP-only visual editor - rejected despite Automate and Node-RED influence because OpenTasker's list/form editor is the lower-friction default.
+- Proprietary marketplace or closed Taskernet clone - rejected despite Taskernet and MacroDroid community value; OpenTasker should keep open JSON bundles and reviewable sharing.
+- Unbounded JavaScript/accessibility scripting - rejected despite AutoX-style power because it creates high security, accessibility-service, and review risk for a F-Droid-oriented app.
+- Server-dependent home-automation model - rejected despite Home Assistant, openHAB, and Node-RED strengths; OpenTasker should integrate with servers without requiring one.
+- Cloud crash analytics by default - rejected because local redacted diagnostics fit the privacy stance better.
+- Standalone APK/App Factory export as near-term work - rejected for now because signing, policy, and code-generation surface area are much larger than the beta trust gaps.
 
 ## Sources
 
-### Competitors
-
+### Direct and OSS competitors
 - https://tasker.joaoapps.com/
-- https://tasker.joaoapps.com/changes/changes6.5.html
-- https://tasker.joaoapps.com/userguide/en/activity_main.html
+- https://tasker.joaoapps.com/userguide/en/variables.html
 - https://www.macrodroid.com/
 - https://llamalab.com/automate/
-- https://github.com/ChaoMixian/vFlow
-- https://github.com/ChaoMixian/vFlow/releases
+- https://llamalab.com/automate/doc/flow.html
+- https://github.com/renyuneyun/Easer
 - https://f-droid.org/packages/com.jens.automation2/
+- https://server47.de/automation/
+- https://github.com/henrichg/phoneprofilesplus
+- https://github.com/automan-bot/AutoX/blob/dev-test/README_en.md
 
-### Community / Adjacent
+### Adjacent products and ecosystems
+- https://www.twofortyfouram.com/developer
+- https://github.com/twofortyfouram/android-plugin-api-for-locale
+- https://github.com/termux/termux-app/wiki/RUN_COMMAND-Intent
+- https://github.com/RikkaApps/Shizuku-API
+- https://www.openhab.org/docs/apps/android
+- https://companion.home-assistant.io/docs/notifications/notification-commands/
+- https://nodered.org/docs/developing-flows/documenting-flows
+- https://flows.nodered.org/
+- https://github.com/binwiederhier/ntfy/issues/31
 
-- https://github.com/guifelix/awesome-tasker
-- https://docs.ntfy.sh/integrations/
-- https://github.com/ActivityWatch/aw-android/issues/135
-- https://github.com/timschneeb/awesome-shizuku
-
-### Android Platform / API
-
-- https://developer.android.com/google/play/requirements/target-sdk
-- https://support.google.com/googleplay/android-developer/answer/11926878
+### Standards, distribution, security, and dependencies
 - https://developer.android.com/about/versions/16/behavior-changes-16
-- https://developer.android.com/about/versions/17/changes/bg-audio
-- https://support.google.com/googleplay/android-developer/answer/16926792
-- https://developer.android.com/work/managed-profiles
-- https://developer.android.com/reference/android/content/pm/LauncherApps
-- https://developer.android.com/reference/android/app/usage/UsageStatsManager
-- https://developer.android.com/reference/java/net/HttpURLConnection
+- https://developer.android.com/about/versions/17/behavior-changes-17
 - https://developer.android.com/privacy-and-security/local-network-permission
-
-### Dependency / Security
-
-- https://developer.android.com/jetpack/androidx/releases/work
-- https://developer.android.com/jetpack/androidx/releases/room3
-- https://developer.android.com/develop/ui/compose/bom/bom-mapping
-- https://github.com/advisories/GHSA-4jrv-ppp4-jm57
-- https://docs.github.com/en/actions/reference/security/secure-use
-- https://docs.github.com/en/actions/tutorials/authenticate-with-github_token
-- https://developer.android.com/build/dependency-verification
+- https://developer.android.com/about/versions/17/changes/bg-audio
+- https://developer.android.com/about/versions/14/changes/fgs-types-required
+- https://source.android.com/docs/security/features/private-space
 - https://docs.gradle.org/current/userguide/dependency_verification.html
+- https://developer.android.com/build/dependency-verification
+- https://f-droid.org/en/docs/Reproducible_Builds/
+- https://f-droid.org/en/docs/Submitting_to_F-Droid_Quick_Start_Guide/
+- https://developer.android.com/jetpack/androidx/releases/room
 
 ## Open Questions
-
-1. Does OpenTasker's Play Console show any API 36 enforcement date that is not yet reflected in public Google docs?
-2. On Android 17, do background TTS/sound/volume actions fail with `AudioHardening` full or partial denial when no location while-in-use grant is active?
-3. Should OpenTasker support explicit work/private profile targeting via `LauncherApps`, or disclose profile-local limits until users install OpenTasker in each profile?
-4. Should CI adopt full SHA pinning immediately for all actions, or pair it with Dependabot/Renovate first so pinned actions remain maintainable?
-5. Should the stale Hilt shrinker keeps be removed immediately, or retained until release-build symbol inspection confirms no generated references remain?
+- Which API 37 device or emulator will be used for local-network, background-audio, and foreground-service behavior validation?
+- Should F-Droid readiness target upstream-signed reproducible evidence before submission, or source-build acceptance first?
+- Which real Locale plugins should become compatibility fixtures beyond a synthetic test plugin?
