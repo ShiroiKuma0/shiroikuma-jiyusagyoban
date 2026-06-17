@@ -143,6 +143,22 @@ dependencies {
     androidTestImplementation(libs.androidx.room.testing)
 }
 
+tasks.register("verifyRoomSchema") {
+    group = "verification"
+    description = "Checks that all Room schema versions up to the current are exported and tracked."
+
+    doLast {
+        val schemaDir = file("$projectDir/schemas/com.opentasker.core.storage.AppDatabase")
+        check(schemaDir.isDirectory) { "Room schema directory missing: $schemaDir" }
+        val currentVersion = 5
+        val missing = (1..currentVersion).filter { !File(schemaDir, "$it.json").isFile }
+        check(missing.isEmpty()) {
+            "Room schema files missing for version(s): ${missing.joinToString()}. Run a build to regenerate, then commit."
+        }
+        println("Room schema drift gate passed: versions 1..$currentVersion present.")
+    }
+}
+
 tasks.register("verifyFdroidReadiness") {
     group = "verification"
     description = "Checks the F-Droid distribution profile for known proprietary dependency families."

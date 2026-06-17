@@ -99,6 +99,112 @@ class DatabaseMigrationInstrumentedTest {
         }
     }
 
+    @Test
+    fun appDatabaseMigratesFrom2To3AndCreatesEditHistoryTable() {
+        appDatabaseHelper.createDatabase(APP_DATABASE_NAME, 2).apply {
+            close()
+        }
+
+        val migrated = appDatabaseHelper.runMigrationsAndValidate(
+            APP_DATABASE_NAME,
+            3,
+            true,
+            DatabaseMigrations.MIGRATION_2_3,
+        )
+
+        migrated.execSQL(
+            """
+            INSERT INTO edit_history (
+                id, entityType, entityId, previousJson, timestamp
+            ) VALUES (
+                1, 'profile', 42, '{"name":"old"}', 1000
+            )
+            """.trimIndent()
+        )
+        migrated.query("SELECT entityType, entityId, previousJson FROM edit_history WHERE id = 1")
+            .use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("profile", cursor.getString(0))
+                assertEquals(42L, cursor.getLong(1))
+                assertEquals("{\"name\":\"old\"}", cursor.getString(2))
+            }
+    }
+
+    @Test
+    fun appDatabaseMigratesFrom4To5AndAddsNullableProfileGroup() {
+        appDatabaseHelper.createDatabase(APP_DATABASE_NAME, 4).apply {
+            execSQL(
+                """
+                INSERT INTO profiles (
+                    id, name, enabled, enterTaskId, exitTaskId, cooldownSec, contextsJson, automationMode
+                ) VALUES (
+                    1, 'Bedtime', 1, 10, NULL, 0, '[]', 'SINGLE'
+                )
+                """.trimIndent()
+            )
+            close()
+        }
+
+        val migrated = appDatabaseHelper.runMigrationsAndValidate(
+            APP_DATABASE_NAME,
+            5,
+            true,
+            DatabaseMigrations.MIGRATION_4_5,
+        )
+
+        migrated.query("SELECT name, automationMode, profileGroup FROM profiles WHERE id = 1")
+            .use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("Bedtime", cursor.getString(0))
+                assertEquals("SINGLE", cursor.getString(1))
+                assertTrue("profileGroup should default to NULL", cursor.isNull(2))
+            }
+
+        migrated.execSQL(
+            """
+            INSERT INTO profiles (
+                id, name, enabled, enterTaskId, exitTaskId, cooldownSec, contextsJson, automationMode, profileGroup
+            ) VALUES (
+                2, 'Work', 0, 11, NULL, 0, '[]', 'RESTART', 'Office')
+            """.trimIndent()
+        )
+        migrated.query("SELECT profileGroup FROM profiles WHERE id = 2").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("Office", cursor.getString(0))
+        }
+    }
+
+    @Test
+    fun appDatabaseMigratesFullPathFrom1ToCurrent() {
+        appDatabaseHelper.createDatabase(APP_DATABASE_NAME, 1).apply {
+            execSQL(
+                """
+                INSERT INTO profiles (
+                    id, name, enabled, enterTaskId, exitTaskId, cooldownSec, contextsJson
+                ) VALUES (
+                    1, 'Full path test', 1, 1, NULL, 0, '[]'
+                )
+                """.trimIndent()
+            )
+            close()
+        }
+
+        val migrated = appDatabaseHelper.runMigrationsAndValidate(
+            APP_DATABASE_NAME,
+            5,
+            true,
+            *DatabaseMigrations.getAllMigrations(),
+        )
+
+        migrated.query("SELECT name, automationMode, profileGroup FROM profiles WHERE id = 1")
+            .use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("Full path test", cursor.getString(0))
+                assertEquals("SINGLE", cursor.getString(1))
+                assertTrue("profileGroup should be NULL after full migration", cursor.isNull(2))
+            }
+    }
+
     companion object {
         private const val APP_DATABASE_NAME = "app-migration-test.db"
     }
