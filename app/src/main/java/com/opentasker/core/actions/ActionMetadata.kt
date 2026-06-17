@@ -10,6 +10,9 @@ data class ActionField(
     val fieldType: FieldType = FieldType.TEXT,
     val required: Boolean = false,
     val hint: String? = null,
+    // For DROPDOWN: the selectable values. The field stays free-text (so it can be a %variable); these
+    // just populate the picker. Empty = a plain text field with no picker.
+    val options: List<String> = emptyList(),
 )
 
 enum class FieldType {
@@ -496,7 +499,7 @@ fun registerActionMetadata() {
             description = "Turn automatic screen brightness on/off (Write Settings access)",
             category = "Settings",
             fields = listOf(
-                ActionField("state", "State", FieldType.DROPDOWN, hint = "on / off / toggle"),
+                ActionField("state", "State", FieldType.DROPDOWN, hint = "on / off / toggle (or a %variable)", options = listOf("on", "off", "toggle")),
             )
         )
     )
@@ -522,7 +525,7 @@ fun registerActionMetadata() {
             category = "System",
             fields = listOf(
                 ActionField("profile", "Profile name", required = true, hint = "exact profile name"),
-                ActionField("state", "State", FieldType.DROPDOWN, hint = "on / off / toggle"),
+                ActionField("state", "State", FieldType.DROPDOWN, hint = "on / off / toggle (or a %variable)", options = listOf("on", "off", "toggle")),
             )
         )
     )
@@ -629,7 +632,7 @@ fun registerActionMetadata() {
             description = "Turn location services on/off (via Shizuku)",
             category = "Settings",
             fields = listOf(
-                ActionField("state", "State", FieldType.DROPDOWN, hint = "on / off / toggle"),
+                ActionField("state", "State", FieldType.DROPDOWN, hint = "on / off / toggle (or a %variable)", options = listOf("on", "off", "toggle")),
             )
         )
     )

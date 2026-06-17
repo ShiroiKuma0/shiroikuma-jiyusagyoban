@@ -117,7 +117,10 @@ class BrightnessAction : Action {
             if (brightness.lowercase() == "auto") {
                 Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC)
             } else {
-                val value = brightness.toInt().coerceIn(0, 255)
+                // percent=true treats the value as 0..100; else it's the raw 0..255 system value.
+                val percent = args["percent"]?.trim()?.lowercase() in setOf("true", "1", "yes", "on")
+                val raw = brightness.toIntOrNull() ?: return ActionResult.Failure("invalid brightness: $brightness")
+                val value = if (percent) (raw.coerceIn(0, 100) * 255 + 50) / 100 else raw.coerceIn(0, 255)
                 Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
                 Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS, value)
             }
@@ -155,8 +158,10 @@ class VolumeAction : Action {
                 "unmute" -> audioManager.adjustStreamVolume(streamType, AudioManager.ADJUST_UNMUTE, 0)
                 else -> {
                     val max = audioManager.getStreamMaxVolume(streamType)
-                    val level = levelArg.toIntOrNull()?.coerceIn(0, max)
-                        ?: return ActionResult.Failure("invalid level: $levelArg")
+                    val raw = levelArg.toIntOrNull() ?: return ActionResult.Failure("invalid level: $levelArg")
+                    // percent=true treats `level` as 0..100 of the stream's max (so one slider fits any stream).
+                    val percent = args["percent"]?.trim()?.lowercase() in setOf("true", "1", "yes", "on")
+                    val level = if (percent) (raw.coerceIn(0, 100) * max + 50) / 100 else raw.coerceIn(0, max)
                     audioManager.setStreamVolume(streamType, level, 0)
                 }
             }
@@ -185,9 +190,14 @@ class VolumeGetAction : Action {
         val audioManager = ctx.app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
             ?: return ActionResult.Failure("audio service not available")
         val streamType = streamType(args["stream"] ?: "music") ?: return ActionResult.Failure("invalid stream")
-        val level = audioManager.getStreamVolume(streamType)
+        val rawLevel = audioManager.getStreamVolume(streamType)
+        val percent = args["percent"]?.trim()?.lowercase() in setOf("true", "1", "yes", "on")
+        val level = if (percent) {
+            val max = audioManager.getStreamMaxVolume(streamType).coerceAtLeast(1)
+            (rawLevel * 100 + max / 2) / max
+        } else rawLevel
         ctx.variables.set(varName, level.toString())
-        ctx.logger("Volume ${args["stream"] ?: "music"} = $level -> %$varName")
+        ctx.logger("Volume ${args["stream"] ?: "music"} = $level${if (percent) "%" else ""} -> %$varName")
         return ActionResult.Success
     }
 }

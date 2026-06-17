@@ -56,6 +56,7 @@ import com.opentasker.ui.components.selectableItem
 import com.opentasker.ui.components.rememberListReorderState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
@@ -92,6 +93,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -4778,14 +4781,41 @@ private fun ActionFieldInput(field: ActionField, value: String, onChange: (Strin
             }
         }
 
-        FieldType.DROPDOWN,
+        // Editable combo: free-text (so it can be a %variable) PLUS a picker of the field's options.
+        FieldType.DROPDOWN -> {
+            var expanded by remember { mutableStateOf(false) }
+            Box(Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = onChange,
+                    label = { Text(label) },
+                    placeholder = field.hint?.let { { Text(it) } },
+                    supportingText = if (field.required) {{ Text("Required") }} else null,
+                    singleLine = true,
+                    trailingIcon = if (field.options.isEmpty()) null else {
+                        {
+                            IconButton(onClick = { expanded = true }) {
+                                Icon(Icons.Filled.ArrowDropDown, contentDescription = "Choose a value")
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    field.options.forEach { opt ->
+                        DropdownMenuItem(text = { Text(opt) }, onClick = { onChange(opt); expanded = false })
+                    }
+                }
+            }
+        }
+
         FieldType.TEXT -> OutlinedTextField(
             value = value,
             onValueChange = onChange,
             label = { Text(label) },
             placeholder = field.hint?.let { { Text(it) } },
             supportingText = if (field.required) {{ Text("Required") }} else null,
-            singleLine = field.fieldType != FieldType.MULTILINE,
+            singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
     }
