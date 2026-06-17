@@ -43,15 +43,12 @@ class LocationContextSourceImpl(
             return@callbackFlow
         }
 
-        var activeListener: LocationListener? = null
-        var activeProviders: Set<String> = emptySet()
+        val registration = LocationListenerRegistrationState { listener ->
+            runCatching { locationManager.removeUpdates(listener) }
+        }
 
         fun stopUpdates() {
-            activeListener?.let { listener ->
-                runCatching { locationManager.removeUpdates(listener) }
-            }
-            activeListener = null
-            activeProviders = emptySet()
+            registration.stop()
         }
 
         fun emitBlocked(reason: String, detail: String) {
@@ -92,9 +89,8 @@ class LocationContextSourceImpl(
             }
 
             val providerSet = providers.toSet()
-            if (activeListener != null && activeProviders == providerSet) return
+            if (registration.isActiveFor(providerSet)) return
 
-            stopUpdates()
             val listener = object : LocationListener {
                 override fun onLocationChanged(location: Location) {
                     trySend(LocationContextEvents.location(location.toPlatformSample()))
@@ -118,18 +114,18 @@ class LocationContextSourceImpl(
                 override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
             }
 
-            providers.forEach { provider ->
-                val cadence = requestPolicy.cadenceFor(provider)
-                locationManager.requestLocationUpdates(
-                    provider,
-                    cadence.minTimeMs,
-                    cadence.minDistanceMeters,
-                    listener,
-                    Looper.getMainLooper(),
-                )
+            registration.replace(providerSet, listener) {
+                providers.forEach { provider ->
+                    val cadence = requestPolicy.cadenceFor(provider)
+                    locationManager.requestLocationUpdates(
+                        provider,
+                        cadence.minTimeMs,
+                        cadence.minDistanceMeters,
+                        listener,
+                        Looper.getMainLooper(),
+                    )
+                }
             }
-            activeListener = listener
-            activeProviders = providerSet
 
             if (!emitBestLastKnown(providers)) {
                 trySend(
@@ -192,6 +188,38 @@ class LocationContextSourceImpl(
 
     companion object {
         private const val DEFAULT_SETUP_RECHECK_MS = 60_000L
+    }
+}
+
+internal class LocationListenerRegistrationState(
+    private val removeUpdates: (LocationListener) -> Unit,
+) {
+    private var activeListener: LocationListener? = null
+    private var activeProviders: Set<String> = emptySet()
+
+    fun isActiveFor(providers: Set<String>): Boolean =
+        activeListener != null && activeProviders == providers
+
+    fun replace(
+        providers: Set<String>,
+        listener: LocationListener,
+        register: () -> Unit,
+    ) {
+        stop()
+        activeListener = listener
+        activeProviders = providers
+        try {
+            register()
+        } catch (error: Throwable) {
+            stop()
+            throw error
+        }
+    }
+
+    fun stop() {
+        activeListener?.let(removeUpdates)
+        activeListener = null
+        activeProviders = emptySet()
     }
 }
 
