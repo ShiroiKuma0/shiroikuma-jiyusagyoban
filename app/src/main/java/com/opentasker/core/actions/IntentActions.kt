@@ -71,10 +71,19 @@ class SendIntentAction : Action {
             mime != null -> intent.type = mime
         }
 
-        // Fixed string-extra slots extra1..extra6 (mirrors the notification button slots).
+        // Fixed extra slots extra1..extra6. Default to a String extra; an optional `extraN_type`
+        // (int/long/float/bool) sends a typed extra — some app APIs (e.g. Poweramp's API_COMMAND
+        // `rating`) read getIntExtra and ignore a String.
         for (i in 1..MAX_EXTRAS) {
             val key = args["extra${i}_key"]?.trim()?.ifBlank { null } ?: continue
-            intent.putExtra(key, args["extra${i}_value"] ?: "")
+            val value = args["extra${i}_value"] ?: ""
+            when (args["extra${i}_type"]?.trim()?.lowercase()) {
+                "int" -> value.trim().toIntOrNull()?.let { intent.putExtra(key, it) } ?: intent.putExtra(key, value)
+                "long" -> value.trim().toLongOrNull()?.let { intent.putExtra(key, it) } ?: intent.putExtra(key, value)
+                "float" -> value.trim().toFloatOrNull()?.let { intent.putExtra(key, it) } ?: intent.putExtra(key, value)
+                "bool", "boolean" -> intent.putExtra(key, value.trim().lowercase() in setOf("true", "1", "yes", "on"))
+                else -> intent.putExtra(key, value)
+            }
         }
 
         // Optional caller-supplied flags (decimal or 0x-hex), OR'd in.

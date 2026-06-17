@@ -23,9 +23,11 @@ import com.opentasker.automation.sensor.ShakeDetector
 import com.opentasker.automation.scheduler.TimeEventScheduler
 import com.opentasker.core.contexts.BluetoothContextEvents
 import com.opentasker.core.contexts.BootContextEvents
+import com.opentasker.core.contexts.BroadcastContextEvents
 import com.opentasker.core.contexts.CameraMicContextEvents
 import com.opentasker.core.contexts.PackageContextEvents
 import com.opentasker.core.model.AutomationMode
+import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.RunLogRetentionSettings
@@ -37,6 +39,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.ArrayDeque
@@ -83,6 +86,12 @@ class AutomationService : Service() {
         CameraMicContextEvents.start(this)
         profileCooldowns.putAll(cooldownStore.loadAll())
         scope.launch { pruneRunLogs(force = true) }
+        // Re-arm matchers (and dynamic receivers like the broadcast trigger) whenever profiles change,
+        // so enabling/importing a profile takes effect without relaunching the app. drop(1) skips the
+        // initial emission — onStartCommand does the first load.
+        scope.launch {
+            db.profileDao().getAllAsFlow().drop(1).collect { reloadProfiles() }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -113,6 +122,7 @@ class AutomationService : Service() {
         runCatching { unregisterReceiver(PackageContextEvents.receiver) }
         runCatching { unregisterReceiver(BluetoothContextEvents.receiver) }
         CameraMicContextEvents.stop(this)
+        BroadcastContextEvents.stop(this)
         job.cancel()
         super.onDestroy()
     }
@@ -125,8 +135,17 @@ class AutomationService : Service() {
         
         val profiles = db.profileDao().getAllEnabled()
         cooldownStore.pruneDeleted(profiles.map { it.id }.toSet())
-        for (profile in profiles) {
-            val domain = profile.toDomain()
+        val domains = profiles.map { it.toDomain() }
+        // Keep the broadcast (Intent Received) receiver listening for exactly the actions in use.
+        val broadcastActions = domains
+            .flatMap { it.contexts }
+            .filter { it.type == ContextType.EVENT && it.config["event"]?.trim().equals("broadcast", ignoreCase = true) }
+            .flatMap { (it.config["action"] ?: it.config["actions"] ?: "").split(",") }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toSet()
+        BroadcastContextEvents.setActions(this, broadcastActions)
+        for (domain in domains) {
             val matcher = ProfileMatcher(this, domain)
 
             val matcherJob = scope.launch {

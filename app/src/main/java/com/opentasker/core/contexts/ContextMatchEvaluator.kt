@@ -132,6 +132,16 @@ object ContextMatchEvaluator {
             if (actualPackage !in packageAllowlist) return false
         }
 
+        // Broadcast (Intent Received) trigger: narrow by the intent action(s). Case-sensitive.
+        val configuredActions = firstConfig(spec, "action", "actions")
+            .splitCsv()
+            .filter { it.isNotBlank() }
+            .toSet()
+        if (configuredActions.isNotEmpty()) {
+            val actualAction = event.metadata["action"].orEmpty()
+            if (actualAction !in configuredActions) return false
+        }
+
         val configuredTagIds = firstConfig(spec, "tagId", "tagIds", "tag")
             .splitCsv()
             .map(NfcContextEvents::normalizeTagId)
