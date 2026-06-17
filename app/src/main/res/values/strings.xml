@@ -6,4 +6,44 @@
     <string name="error_prefix">Error: %1$s</string>
     <string name="success_prefix">Success: %1$s</string>
     <string name="widget_task_description">Run an OpenTasker task with one tap</string>
+
+    <!-- Navigation -->
+    <string name="nav_profiles">Profiles</string>
+    <string name="nav_tasks">Tasks</string>
+    <string name="nav_run_log">Run Log</string>
+    <string name="nav_setup">Setup</string>
+    <string name="nav_variables">Variables</string>
+    <string name="nav_flow">Flow</string>
+    <string name="nav_scenes">Scenes</string>
+    <string name="nav_inspector">Inspector</string>
+
+    <!-- Common dialog buttons -->
+    <string name="action_create">Create</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_save">Save</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_dismiss">Dismiss</string>
+    <string name="action_import">Import</string>
+    <string name="action_export">Export</string>
+
+    <!-- Setup permissions -->
+    <string name="setup_title">Setup</string>
+    <string name="setup_notifications_title">Notification permission</string>
+    <string name="setup_notifications_body">Needed for action notifications and alerts. Can be revoked later in system settings.</string>
+    <string name="setup_exact_alarm_title">Exact alarm scheduling</string>
+    <string name="setup_exact_alarm_body">Needed for precise time-based triggers. Without it, time triggers use inexact scheduling with up to 10 minutes of drift.</string>
+    <string name="setup_battery_title">Battery optimization</string>
+    <string name="setup_battery_body">Disable battery optimization so background automations survive long idle periods.</string>
+    <string name="setup_usage_title">App usage access</string>
+    <string name="setup_usage_body">Needed for app-open triggers. Without it, profile contexts that watch for foreground apps will not fire.</string>
+    <string name="setup_local_network_title">Local network access</string>
+    <string name="setup_local_network_body">Android 17+ requires this permission for any LAN device communication (HTTP, Ping, Wake-on-LAN, MQTT, mDNS). Without it, network actions targeting local addresses will fail.</string>
+
+    <!-- Empty states -->
+    <string name="empty_profiles_title">No profiles yet</string>
+    <string name="empty_profiles_body">Profiles combine triggers with tasks to automate your device.</string>
+    <string name="empty_tasks_title">No tasks yet</string>
+    <string name="empty_tasks_body">Tasks contain the actions your automations will execute.</string>
+    <string name="empty_run_log_title">No run log entries</string>
+    <string name="empty_run_log_body">Entries appear here after profiles trigger task execution.</string>
 </resources>
