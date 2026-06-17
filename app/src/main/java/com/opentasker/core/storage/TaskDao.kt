@@ -21,14 +21,46 @@ data class TaskEntity(
     val collisionMode: String,
     val actionsJson: String,
 ) {
-    fun toDomain() = try {
-        Task(
-            id, name, priority, CollisionMode.valueOf(collisionMode), Json.decodeFromString(actionsJson)
+    fun toDomain(): Task {
+        val result = toDomainDecodeResult()
+        result.issue?.let { issue ->
+            android.util.Log.e("TaskDao", "Failed to deserialize task $id: ${issue.message}")
+        }
+        return result.value
+    }
+
+    fun toDomainDecodeResult(): StorageDecodeResult<Task> {
+        val mode = runCatching { CollisionMode.valueOf(collisionMode) }
+            .getOrElse { error ->
+                return StorageDecodeResult(
+                    value = Task(id, name, priority, CollisionMode.ABORT_NEW, emptyList()),
+                    issue = StorageDecodeIssue(
+                        recordType = StorageRecordType.TASK,
+                        recordId = id,
+                        recordName = name,
+                        fieldName = "collisionMode",
+                        message = error.storageDecodeMessage(),
+                    ),
+                )
+            }
+
+        val actions = runCatching { Json.decodeFromString<List<ActionSpec>>(actionsJson) }
+            .getOrElse { error ->
+                return StorageDecodeResult(
+                    value = Task(id, name, priority, mode, emptyList()),
+                    issue = StorageDecodeIssue(
+                        recordType = StorageRecordType.TASK,
+                        recordId = id,
+                        recordName = name,
+                        fieldName = "actionsJson",
+                        message = error.storageDecodeMessage(),
+                    ),
+                )
+            }
+
+        return StorageDecodeResult(
+            value = Task(id, name, priority, mode, actions),
         )
-    } catch (e: Exception) {
-        android.util.Log.e("TaskDao", "Failed to deserialize task $id: ${e.message}", e)
-        // Return task with empty actions as fallback
-        Task(id, name, priority, CollisionMode.ABORT_NEW, emptyList())
     }
 }
 
