@@ -38,8 +38,10 @@ class ShowSceneAction : Action {
         val fullWidth = boolArg("fullWidth") ?: false
         // fullscreen: cover the whole screen, fully tap-through (a purely visual overlay). The music edge-light.
         val fullscreen = boolArg("fullscreen") ?: false
+        // edgeCenter: for a left/right overlay, sit vertically centred (default left/right drops lower for media HUDs).
+        val edgeCenter = boolArg("edgeCenter") ?: false
         if (SceneOverlayManager.canOverlay(ctx.app)) {
-            SceneOverlayManager.show(ctx.app, scene, position, modal, timeoutMs, dismissOnOutside, fullWidth, fullscreen)
+            SceneOverlayManager.show(ctx.app, scene, position, modal, timeoutMs, dismissOnOutside, fullWidth, fullscreen, edgeCenter)
             ctx.logger("Show scene \"${scene.name}\" (overlay, ${if (modal) "modal" else "tap-through"})")
         } else {
             val intent = Intent(ctx.app, SceneActivity::class.java).apply {

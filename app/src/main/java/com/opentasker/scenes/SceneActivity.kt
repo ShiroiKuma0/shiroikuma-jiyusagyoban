@@ -323,6 +323,9 @@ internal fun SceneElementView(
             val max = (cfg["max"]?.toFloatOrNull() ?: 100f).coerceAtLeast(min + 1f)
             val varName = cfg["var"]?.trim()
             val vertical = cfg["orientation"].equals("vertical", ignoreCase = true)
+            // live: also commit (set var + run task) on every integer step during the drag, not just on
+            // release — so a volume/brightness slider applies as you slide it.
+            val live = sceneBool(cfg["live"] ?: "")
             // Initial value is expanded against globals, so `value: "%VOL"` starts the slider at the
             // live variable (e.g. the current volume, seeded by a Get Volume action before scene.show).
             var value by remember(element.id) { mutableStateOf((v("value").toFloatOrNull() ?: min).coerceIn(min, max)) }
@@ -331,6 +334,14 @@ internal fun SceneElementView(
             val onSettled: () -> Unit = {
                 if (!varName.isNullOrBlank()) onSetVar(varName, value.roundToInt().toString())
                 element.tapTaskId?.let(onRunTask)
+            }
+            var lastSent by remember(element.id) { mutableStateOf(Int.MIN_VALUE) }
+            val onChange: (Float) -> Unit = { f ->
+                value = f
+                if (live) {
+                    val r = value.roundToInt()
+                    if (r != lastSent) { lastSent = r; onSettled() }
+                }
             }
             val label = v("label", "Slider")
             if (vertical) {
@@ -342,7 +353,7 @@ internal fun SceneElementView(
                         val trackLength = maxHeight
                         Slider(
                             value = value,
-                            onValueChange = { value = it },
+                            onValueChange = onChange,
                             onValueChangeFinished = onSettled,
                             valueRange = min..max,
                             // requiredWidth ignores the (narrow) element width so the rotated track can
@@ -356,7 +367,7 @@ internal fun SceneElementView(
                     Text(label, style = MaterialTheme.typography.labelMedium, color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontWeight = styleWeightOrNull)
                     Slider(
                         value = value,
-                        onValueChange = { value = it },
+                        onValueChange = onChange,
                         onValueChangeFinished = onSettled,
                         valueRange = min..max,
                         modifier = Modifier.fillMaxWidth(),

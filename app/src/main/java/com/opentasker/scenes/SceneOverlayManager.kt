@@ -54,7 +54,17 @@ object SceneOverlayManager {
         val owner: OverlayLifecycleOwner,
         val params: WindowManager.LayoutParams,
         val fullscreen: Boolean,
+        val timeoutMs: Long = 0L,
+        var dismissRunnable: Runnable? = null,
     )
+
+    /** Restart the auto-dismiss countdown of every timed overlay (called when a panel is interacted with). */
+    private fun resetTimeouts() {
+        active.values.forEach { ov ->
+            val r = ov.dismissRunnable ?: return@forEach
+            if (ov.timeoutMs > 0) { main.removeCallbacks(r); main.postDelayed(r, ov.timeoutMs) }
+        }
+    }
 
     // Re-size fullscreen overlays when the display geometry changes (fold/unfold, rotation) — they are
     // pinned to an explicit pixel size, so they don't auto-track like MATCH_PARENT would.
@@ -100,7 +110,7 @@ object SceneOverlayManager {
      * card and placed by [position] ("top"/"center"/"bottom"). [timeoutMs] > 0 auto-dismisses.
      * Safe to call from any thread.
      */
-    fun show(context: Context, scene: Scene, position: String? = null, modal: Boolean = true, timeoutMs: Long = 0L, dismissOnOutside: Boolean = true, fullWidth: Boolean = false, fullscreen: Boolean = false) {
+    fun show(context: Context, scene: Scene, position: String? = null, modal: Boolean = true, timeoutMs: Long = 0L, dismissOnOutside: Boolean = true, fullWidth: Boolean = false, fullscreen: Boolean = false, edgeCenter: Boolean = false) {
         val app = context.applicationContext
         main.post {
             appContext = app
@@ -117,6 +127,12 @@ object SceneOverlayManager {
                         if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
                             hide(scene.id); true
                         } else false
+                    }
+                } else if (dismissOnOutside) {
+                    // A tap-through panel: a tap outside it (delivered via FLAG_WATCH_OUTSIDE_TOUCH as
+                    // ACTION_OUTSIDE) closes it. Inside touches are consumed by Compose, so they don't fire here.
+                    setOnTouchListener { _, event ->
+                        if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) { hide(scene.id); true } else false
                     }
                 }
                 setContent {
@@ -179,7 +195,8 @@ object SceneOverlayManager {
                     },
                     if (fullscreen) real.heightPixels else WindowManager.LayoutParams.WRAP_CONTENT,
                     type,
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or edgeFlags,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or edgeFlags or
+                        (if (dismissOnOutside) WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH else 0),
                     PixelFormat.TRANSLUCENT,
                 ).apply {
                     gravity = if (fullscreen) Gravity.TOP or Gravity.START else sceneGravity(position)
@@ -189,12 +206,14 @@ object SceneOverlayManager {
                         // Edge HUDs (the music 良/削) sit in the lower-middle, dropping further on the
                         // wider fold states (where the app's controls move down). y is from the v-centre.
                         pos == "left" || pos == "right" -> {
-                            val frac = when {
-                                real.widthPixels < 1500 -> 0.06f
-                                real.widthPixels < 2150 -> 0.19f
-                                else -> 0.27f
+                            y = if (edgeCenter) 0 else {
+                                val frac = when {
+                                    real.widthPixels < 1500 -> 0.06f
+                                    real.widthPixels < 2150 -> 0.19f
+                                    else -> 0.27f
+                                }
+                                (frac * real.heightPixels).toInt()
                             }
-                            y = (frac * real.heightPixels).toInt()
                         }
                         // A full-width bar sits flush over the status bar; a regular HUD gets a small inset.
                         !fullWidth && gravity != Gravity.CENTER -> y = (48 * app.resources.displayMetrics.density).toInt()
@@ -204,9 +223,14 @@ object SceneOverlayManager {
             runCatching { wm.addView(composeView, params) }
                 .onSuccess {
                     owner.onResume()
-                    active[scene.id] = Overlay(composeView, owner, params, fullscreen)
+                    val overlay = Overlay(composeView, owner, params, fullscreen, timeoutMs)
+                    active[scene.id] = overlay
                     if (fullscreen) ensureDisplayListener(app)
-                    if (timeoutMs > 0) main.postDelayed({ hide(scene.id) }, timeoutMs)
+                    if (timeoutMs > 0) {
+                        val r = Runnable { hide(scene.id) }
+                        overlay.dismissRunnable = r
+                        main.postDelayed(r, timeoutMs)
+                    }
                 }
                 .onFailure { owner.onDestroy() }
         }
@@ -248,6 +272,8 @@ object SceneOverlayManager {
 
     /** Mirrors SceneActivity.setVar — case-based scope (%ALLCAPS super-global, else the scene's project). */
     private fun setVar(sceneProjectId: Long?, name: String, value: String) {
+        // Dragging a panel slider keeps the panel alive (restarts its auto-dismiss countdown).
+        main.post { resetTimeouts() }
         val clean = name.trim().removePrefix("%").ifBlank { return }
         val superGlobal = clean.any { it.isLetter() } && clean == clean.uppercase()
         PersistentGlobalScope.set(if (superGlobal) 0L else (sceneProjectId ?: 0L), clean, value)
