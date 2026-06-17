@@ -3837,7 +3837,7 @@ private fun ContextConfigDialog(
 }
 
 private fun contextFields(type: ContextType): List<ActionField> = when (type) {
-    ContextType.APPLICATION -> listOf(ActionField("package", "Package name", required = true, hint = "com.example.app"))
+    ContextType.APPLICATION -> listOf(ActionField("package", "Package name", required = true, hint = "com.example.app (personal profile only)"))
     ContextType.TIME -> listOf(
         ActionField("start", "Start HH:mm", required = true, hint = "09:00"),
         ActionField("end", "End HH:mm", required = true, hint = "17:00"),
