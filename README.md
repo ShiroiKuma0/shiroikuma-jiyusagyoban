@@ -19,7 +19,7 @@ fully-customisable **black-and-yellow theme**.
 Installs **side-by-side** with upstream OpenTasker — package `shiroikuma.jiyusagyoban`, label
 **白い熊 自由作業盤**.
 
-**📥 Latest release: [`0.2.68+10`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.68+16`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 </div>
 
@@ -39,14 +39,17 @@ open-conversation intents) — and for anything else on the device that listens 
 
 **Scenes** are interactive overlays you design in-app and pop up from any task — as a foreground
 panel or, with “display over other apps”, a **system-wide overlay** that floats over other apps and
-fires from background triggers. Build them from **eleven element types** — Text, Button, Edit Text,
-Slider (horizontal & vertical), Number picker, Checkbox, Toggle, Spinner, Image, Rectangle and Oval.
-Input elements **write a variable and run a task**, and a shown scene **re-renders live** when a
-bound variable changes — so a scene is a real, reactive control panel, not a static popup. Style each
-element (colour, size, weight, alignment, border) and the panel itself (background, corner radius,
-modal scrim, border), choose how it shows (`scene.show`: top/centre/bottom, modal vs tap-through HUD,
-auto-dismiss timeout, dismiss-on-outside — or per-scene defaults), and arrange it on a **live canvas**
-with drag-to-move, **drag-to-resize**, a live styling preview, and **duplicate / z-order**.
+fires from background triggers. Build them from **twelve element types** — Text, Button, Edit Text,
+Slider (horizontal & vertical), Number picker, Checkbox, Toggle, Spinner, Image, **Progress bar**,
+Rectangle and Oval. Input elements **write a variable and run a task**, and a shown scene
+**re-renders live** when a bound variable changes — so a scene is a real, reactive control panel, not a
+static popup. Style each element (colour, size, weight, alignment, border) and the panel itself
+(background, corner radius, modal scrim, border), choose how it shows (`scene.show`: top/centre/bottom,
+modal vs tap-through HUD, auto-dismiss timeout, dismiss-on-outside — or per-scene defaults), and arrange
+it on a **live canvas** with drag-to-move, **drag-to-resize**, a live styling preview, and
+**duplicate / z-order**. A scene can also show as a **full-width bar over the status bar** — the basis
+for the **battery line** (電池線): a thin top-edge bar whose length tracks the battery, colours by
+level, and shows a red sweeping glow while charging.
 
 ---
 
