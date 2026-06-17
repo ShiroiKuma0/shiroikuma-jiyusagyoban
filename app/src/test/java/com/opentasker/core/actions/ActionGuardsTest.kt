@@ -425,6 +425,48 @@ class ActionGuardsTest {
         assertTrue((result as ActionResult.Failure).message.contains("not supported"))
     }
 
+    // --- Persist variable action ---
+
+    @Test
+    fun persistVariableMissingNameFails() = runBlocking {
+        val action = PersistVariableAction()
+        val result = action.run(ctx(), emptyMap())
+        assertTrue("missing name should fail", result is ActionResult.Failure)
+        assertEquals("missing name", (result as ActionResult.Failure).message)
+    }
+
+    @Test
+    fun persistVariableUnsetSourceFails() = runBlocking {
+        val action = PersistVariableAction()
+        val result = action.run(ctx(), mapOf("name" to "unset_var"))
+        assertTrue("unset variable should fail", result is ActionResult.Failure)
+        assertTrue((result as ActionResult.Failure).message.contains("not set"))
+    }
+
+    @Test
+    fun persistVariableCopiesLocalToGlobal() = runBlocking {
+        val variables = VariableStore()
+        variables.pushScope()
+        variables.set("counter", "42")
+        val context = ActionContext(ContextWrapper(null), variables)
+        val action = PersistVariableAction()
+        val result = action.run(context, mapOf("name" to "counter"))
+        assertTrue("persist should succeed", result is ActionResult.Success)
+        assertEquals("42", variables.get("Counter"))
+    }
+
+    @Test
+    fun persistVariableUsesExplicitGlobalName() = runBlocking {
+        val variables = VariableStore()
+        variables.pushScope()
+        variables.set("temp", "hello")
+        val context = ActionContext(ContextWrapper(null), variables)
+        val action = PersistVariableAction()
+        val result = action.run(context, mapOf("name" to "temp", "global_name" to "GREETING"))
+        assertTrue("persist should succeed", result is ActionResult.Success)
+        assertEquals("hello", variables.get("GREETING"))
+    }
+
     // --- Notification channel resolution ---
 
     @Test
