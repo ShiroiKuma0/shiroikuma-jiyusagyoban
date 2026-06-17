@@ -1,8 +1,12 @@
 package com.opentasker.core.contexts
 
+import android.location.Location
+import android.location.LocationListener
 import android.location.LocationManager
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 
 class LocationProviderRequestPolicyTest {
@@ -36,4 +40,43 @@ class LocationProviderRequestPolicyTest {
     fun cadenceRejectsNegativeDistance() {
         LocationProviderCadence(minTimeMs = 60_000L, minDistanceMeters = -1f)
     }
+
+    @Test
+    fun registrationStateRemovesOldListenerBeforeReplacingProviders() {
+        val removed = mutableListOf<LocationListener>()
+        val state = LocationListenerRegistrationState { removed += it }
+        val first = testListener()
+        val second = testListener()
+
+        state.replace(setOf(LocationManager.GPS_PROVIDER), first) { }
+        state.replace(setOf(LocationManager.NETWORK_PROVIDER), second) {
+            assertEquals(listOf(first), removed)
+        }
+
+        assertEquals(listOf(first), removed)
+        assertFalse(state.isActiveFor(setOf(LocationManager.GPS_PROVIDER)))
+        assertTrue(state.isActiveFor(setOf(LocationManager.NETWORK_PROVIDER)))
+    }
+
+    @Test
+    fun registrationStateRemovesNewListenerWhenRegistrationFails() {
+        val removed = mutableListOf<LocationListener>()
+        val state = LocationListenerRegistrationState { removed += it }
+        val listener = testListener()
+
+        try {
+            state.replace(setOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER), listener) {
+                throw IllegalStateException("network provider rejected listener")
+            }
+            fail("Expected registration failure")
+        } catch (_: IllegalStateException) {
+            assertEquals(listOf(listener), removed)
+            assertFalse(state.isActiveFor(setOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)))
+        }
+    }
+
+    private fun testListener(): LocationListener =
+        object : LocationListener {
+            override fun onLocationChanged(location: Location) = Unit
+        }
 }
