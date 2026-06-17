@@ -1,6 +1,7 @@
 package com.opentasker.core.location
 
 import android.content.Context
+import android.content.SharedPreferences
 import com.opentasker.core.contexts.ContextEvent
 import com.opentasker.core.contexts.LocationContextEvents
 import com.opentasker.core.model.ContextSpec
@@ -76,11 +77,51 @@ object LocationDwellStateTracker {
     private val INSIDE_SINCE_KEYS = setOf("insideSinceEpochMs", "enteredAtEpochMs")
 }
 
-class LocationDwellStateStore(
-    context: Context,
+internal interface LocationDwellStateStorage {
+    fun getLong(key: String, defaultValue: Long): Long
+    fun putLong(key: String, value: Long)
+    fun remove(key: String)
+    fun keys(): Set<String>
+    fun removeAll(keys: Collection<String>)
+}
+
+private class SharedPreferencesLocationDwellStateStorage(
+    private val prefs: SharedPreferences,
+) : LocationDwellStateStorage {
+    override fun getLong(key: String, defaultValue: Long): Long =
+        prefs.getLong(key, defaultValue)
+
+    override fun putLong(key: String, value: Long) {
+        prefs.edit().putLong(key, value).apply()
+    }
+
+    override fun remove(key: String) {
+        prefs.edit().remove(key).apply()
+    }
+
+    override fun keys(): Set<String> =
+        prefs.all.keys.toSet()
+
+    override fun removeAll(keys: Collection<String>) {
+        prefs.edit().also { editor ->
+            keys.forEach { editor.remove(it) }
+        }.apply()
+    }
+}
+
+class LocationDwellStateStore internal constructor(
+    private val storage: LocationDwellStateStorage,
     private val clock: () -> Long = { System.currentTimeMillis() },
 ) {
-    private val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    constructor(
+        context: Context,
+        clock: () -> Long = { System.currentTimeMillis() },
+    ) : this(
+        SharedPreferencesLocationDwellStateStorage(
+            context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
+        ),
+        clock,
+    )
 
     fun enrich(
         profileId: Long,
@@ -93,41 +134,44 @@ class LocationDwellStateStore(
         }
 
         val key = LocationDwellStateKey.from(profileId, contextIndex, spec.config)
-        val existing = prefs.getLong(key.storageKey, MISSING_INSIDE_SINCE)
-            .takeIf { it != MISSING_INSIDE_SINCE }
-        val update = LocationDwellStateTracker.apply(
-            config = spec.config,
-            metadata = event.metadata,
-            existingInsideSinceEpochMs = existing,
-            nowEpochMs = clock(),
-        )
+        return synchronized(preferenceLock) {
+            val existing = storage.getLong(key.storageKey, MISSING_INSIDE_SINCE)
+                .takeIf { it != MISSING_INSIDE_SINCE }
+            val update = LocationDwellStateTracker.apply(
+                config = spec.config,
+                metadata = event.metadata,
+                existingInsideSinceEpochMs = existing,
+                nowEpochMs = clock(),
+            )
 
-        when (val persistence = update.persistence) {
-            LocationDwellPersistence.Keep -> Unit
-            LocationDwellPersistence.Clear -> prefs.edit().remove(key.storageKey).apply()
-            is LocationDwellPersistence.Persist -> prefs.edit()
-                .putLong(key.storageKey, persistence.insideSinceEpochMs)
-                .apply()
+            when (val persistence = update.persistence) {
+                LocationDwellPersistence.Keep -> Unit
+                LocationDwellPersistence.Clear -> storage.remove(key.storageKey)
+                is LocationDwellPersistence.Persist -> storage.putLong(
+                    key.storageKey,
+                    persistence.insideSinceEpochMs,
+                )
+            }
+
+            event.copy(metadata = update.metadata)
         }
-
-        return event.copy(metadata = update.metadata)
     }
 
     fun clearProfile(profileId: Long): Int =
         clearKeysWithPrefix(LocationDwellStateKey.profilePrefix(profileId))
 
-    private fun clearKeysWithPrefix(prefix: String): Int {
-        val keys = prefs.all.keys.filter { it.startsWith(prefix) }
-        if (keys.isEmpty()) return 0
-        prefs.edit().also { editor ->
-            keys.forEach { editor.remove(it) }
-        }.apply()
-        return keys.size
+    private fun clearKeysWithPrefix(prefix: String): Int = synchronized(preferenceLock) {
+        val keys = storage.keys().filter { it.startsWith(prefix) }
+        if (keys.isNotEmpty()) {
+            storage.removeAll(keys)
+        }
+        keys.size
     }
 
     companion object {
         private const val PREFS_NAME = "opentasker_location_dwell_state"
         private const val MISSING_INSIDE_SINCE = -1L
+        private val preferenceLock = Any()
     }
 }
 
