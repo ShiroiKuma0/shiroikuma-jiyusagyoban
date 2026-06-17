@@ -16,7 +16,7 @@ class WiFiNetworkMonitor(
     context: Context,
 ) {
     private val appContext = context.applicationContext
-    private val connectivityManager = appContext.getSystemService(ConnectivityManager::class.java)
+    private val connectivityManager: ConnectivityManager? = appContext.getSystemService(ConnectivityManager::class.java)
     private val started = AtomicBoolean(false)
     @Volatile private var lastState: WiFiState? = null
 
@@ -36,13 +36,20 @@ class WiFiNetworkMonitor(
 
     fun start() {
         if (!started.compareAndSet(false, true)) return
+        val cm = connectivityManager
+        if (cm == null) {
+            started.set(false)
+            Log.w(TAG, "ConnectivityManager unavailable; WiFi monitoring disabled")
+            emitState(WiFiState(connected = false, ssid = UNKNOWN_SSID))
+            return
+        }
 
         val request = NetworkRequest.Builder()
             .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
             .build()
 
         try {
-            connectivityManager.registerNetworkCallback(request, callback)
+            cm.registerNetworkCallback(request, callback)
             emitCurrentState()
             Log.d(TAG, "WiFi NetworkCallback registered")
         } catch (ex: RuntimeException) {
@@ -55,7 +62,7 @@ class WiFiNetworkMonitor(
     fun stop() {
         if (!started.compareAndSet(true, false)) return
         try {
-            connectivityManager.unregisterNetworkCallback(callback)
+            connectivityManager?.unregisterNetworkCallback(callback)
             Log.d(TAG, "WiFi NetworkCallback unregistered")
         } catch (ex: RuntimeException) {
             Log.w(TAG, "WiFi NetworkCallback was already unregistered", ex)
@@ -63,8 +70,8 @@ class WiFiNetworkMonitor(
     }
 
     private fun emitCurrentState(
-        network: Network? = connectivityManager.activeNetwork,
-        capabilities: NetworkCapabilities? = network?.let { connectivityManager.getNetworkCapabilities(it) },
+        network: Network? = connectivityManager?.activeNetwork,
+        capabilities: NetworkCapabilities? = network?.let { connectivityManager?.getNetworkCapabilities(it) },
     ) {
         val connected = capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
         val ssid = if (connected) readSsid(capabilities) else UNKNOWN_SSID

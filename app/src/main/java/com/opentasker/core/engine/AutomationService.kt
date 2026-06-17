@@ -99,12 +99,13 @@ class AutomationService : Service() {
     }
 
     override fun onDestroy() {
-        // Cancel all matcher collection jobs first
-        matcherJobs.values.forEach { it.cancel() }
+        val matcherJobSnapshot = matcherJobs.values.toList()
+        val taskJobSnapshot = profileTaskJobs.values.toList()
+        matcherJobSnapshot.forEach { it.cancel() }
+        taskJobSnapshot.forEach { it.cancel() }
         matcherJobs.clear()
         matchers.clear()
         profileCooldowns.clear()
-        profileTaskJobs.values.forEach { it.cancel() }
         profileTaskJobs.clear()
         queuedProfileTasks.clear()
         timeEventScheduler.cancel()
@@ -121,13 +122,17 @@ class AutomationService : Service() {
     }
 
     private suspend fun reloadProfiles() {
-        // Cancel previous matcher jobs
-        matcherJobs.values.forEach { it.cancel() }
+        val oldJobs = matcherJobs.values.toList()
         matcherJobs.clear()
         matchers.clear()
+        oldJobs.forEach { it.cancel() }
 
         val profiles = db.profileDao().getAllEnabled()
-        cooldownStore.pruneDeleted(profiles.map { it.id }.toSet())
+        val activeIds = profiles.map { it.id }.toSet()
+        cooldownStore.pruneDeleted(activeIds)
+        synchronized(queuedProfileTasks) {
+            queuedProfileTasks.keys.removeAll { it !in activeIds }
+        }
         registerPluginSubscriptions(profiles.map { it.toDomain() })
         for (profile in profiles) {
             val domain = profile.toDomain()
