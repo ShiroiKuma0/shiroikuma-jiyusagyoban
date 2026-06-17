@@ -126,6 +126,7 @@ class PingAction : Action {
         val host = args["host"] ?: return ActionResult.Failure("missing host")
         val varName = args["var"] ?: "result"
         if (!HOST_PATTERN.matches(host)) return ActionResult.Failure("invalid host")
+        checkLocalNetworkPermission(ctx)?.let { return it }
         val timeoutMs = (args["timeout_sec"]?.toIntOrNull() ?: 5).coerceIn(1, 30) * 1000
         return try {
             val reachable = java.net.InetAddress.getByName(host).isReachable(timeoutMs)
@@ -208,6 +209,7 @@ class WakeOnLanAction : Action {
         val macStr = args["mac"] ?: return ActionResult.Failure("missing mac")
         val broadcast = args["broadcast"] ?: "255.255.255.255"
         val port = (args["port"]?.toIntOrNull() ?: 9).coerceIn(1, 65535)
+        checkLocalNetworkPermission(ctx)?.let { return it }
 
         val macBytes = parseMac(macStr)
             ?: return ActionResult.Failure("invalid MAC address: $macStr")

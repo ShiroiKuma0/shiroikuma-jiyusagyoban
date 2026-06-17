@@ -674,11 +674,11 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
         if (Build.VERSION.SDK_INT >= ANDROID_17_API) PermissionSetupItem(
             title = "Local network access",
-            body = "Android 17+ requires this permission for any LAN device communication (HTTP, MQTT, mDNS). Without it, HTTP actions to private-range addresses will fail.",
+            body = "Android 17+ requires this permission for any LAN device communication (HTTP, Ping, Wake-on-LAN, MQTT, mDNS). Without it, network actions targeting local addresses will fail.",
             granted = hasPermission(context, "android.permission.ACCESS_LOCAL_NETWORK"),
             actionLabel = "Request",
             action = PermissionAction.RuntimePermission("android.permission.ACCESS_LOCAL_NETWORK"),
-            requiredFor = "LAN HTTP/MQTT actions",
+            requiredFor = "LAN network actions",
         ) else null,
         if (BuildConfig.SMS_ACTION_AVAILABLE) PermissionSetupItem(
             title = "SMS send",
