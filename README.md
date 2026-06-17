@@ -1,6 +1,6 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.72-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.73-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.3.21-7f52ff.svg)](https://kotlinlang.org)
