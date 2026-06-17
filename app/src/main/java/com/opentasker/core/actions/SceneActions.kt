@@ -36,8 +36,10 @@ class ShowSceneAction : Action {
         val dismissOnOutside = boolArg("dismissOnOutside") ?: scene.defaultDismissOnOutside
         // fullWidth: span the screen (status-bar style); ignored for modal scenes. Used by the battery line.
         val fullWidth = boolArg("fullWidth") ?: false
+        // fullscreen: cover the whole screen, fully tap-through (a purely visual overlay). The music edge-light.
+        val fullscreen = boolArg("fullscreen") ?: false
         if (SceneOverlayManager.canOverlay(ctx.app)) {
-            SceneOverlayManager.show(ctx.app, scene, position, modal, timeoutMs, dismissOnOutside, fullWidth)
+            SceneOverlayManager.show(ctx.app, scene, position, modal, timeoutMs, dismissOnOutside, fullWidth, fullscreen)
             ctx.logger("Show scene \"${scene.name}\" (overlay, ${if (modal) "modal" else "tap-through"})")
         } else {
             val intent = Intent(ctx.app, SceneActivity::class.java).apply {
@@ -54,12 +56,25 @@ class ShowSceneAction : Action {
     }
 }
 
-/** `Hide Scene` — dismiss any scene currently shown (overlay window or foreground Activity). */
+/**
+ * `Hide Scene` — dismiss shown scenes. With no args, hides every scene; with a `scene` arg
+ * (name or id), hides just that one (so e.g. hiding the music edge-light leaves the battery line up).
+ */
 class HideSceneAction : Action {
     override val id = "scene.hide"
     override val category = ActionCategory.SYSTEM
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val ref = args["scene"]?.trim().orEmpty()
+        if (ref.isNotEmpty()) {
+            val dao = OpenTaskerApp_NoHilt.db.sceneDao()
+            val entity = ref.toLongOrNull()?.let { dao.getById(it) }
+                ?: dao.getAll().firstOrNull { it.toDomain().name.equals(ref, ignoreCase = true) }
+                ?: return ActionResult.Failure("scene not found: \"$ref\"")
+            SceneOverlayManager.hide(entity.id)
+            ctx.logger("Hid scene \"${entity.toDomain().name}\"")
+            return ActionResult.Success
+        }
         val n = SceneOverlayManager.hideAll() + SceneActivity.dismissAll()
         ctx.logger("Hid $n scene(s)")
         return ActionResult.Success

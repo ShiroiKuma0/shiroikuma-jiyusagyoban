@@ -65,6 +65,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.engine.variables.PersistentGlobalScope
@@ -174,6 +175,7 @@ internal fun SceneOverlay(
     position: Alignment = Alignment.Center,
     dismissOnOutside: Boolean = true,
     fullWidth: Boolean = false,
+    fullscreen: Boolean = false,
     onDismiss: () -> Unit,
     onRunTask: (Long) -> Unit,
     onSetVar: (sceneProjectId: Long?, name: String, value: String) -> Unit,
@@ -198,7 +200,7 @@ internal fun SceneOverlay(
             }
         }
     } else {
-        SceneCard(scene, scale = 1f, absorbTaps = false, fullWidth = fullWidth, onRunTask = onRunTask, onSetVar = onSetVar)
+        SceneCard(scene, scale = 1f, absorbTaps = false, fullWidth = fullWidth, fullscreen = fullscreen, onRunTask = onRunTask, onSetVar = onSetVar)
     }
 }
 
@@ -208,6 +210,7 @@ private fun SceneCard(
     scale: Float,
     absorbTaps: Boolean,
     fullWidth: Boolean = false,
+    fullscreen: Boolean = false,
     onRunTask: (Long) -> Unit,
     onSetVar: (sceneProjectId: Long?, name: String, value: String) -> Unit,
 ) {
@@ -217,8 +220,13 @@ private fun SceneCard(
     val borderW = scene.borderWidth.coerceAtLeast(0)
     Box(
         Modifier
-            // fullWidth (e.g. a top status bar): span the screen, keep only the configured height.
-            .then(if (fullWidth) Modifier.fillMaxWidth().height((sh * scale).dp) else Modifier.size((sw * scale).dp, (sh * scale).dp))
+            // fullscreen (e.g. the music edge-light): cover the whole screen. fullWidth: span the
+            // screen width, keep the configured height (e.g. a top status bar). Else a fixed card.
+            .then(
+                if (fullscreen) Modifier.fillMaxSize()
+                else if (fullWidth) Modifier.fillMaxWidth().height((sh * scale).dp)
+                else Modifier.size((sw * scale).dp, (sh * scale).dp),
+            )
             .clip(shape)
             // Blank background defaults to the theme background (black); blank border to outline (yellow).
             .background(sceneColor(scene.bgColor) ?: MaterialTheme.colorScheme.background)
@@ -262,6 +270,8 @@ internal fun SceneElementView(
     val styleAlign = sceneAlign(cfg["align"])
     val styleBorderW = cfg["borderWidth"]?.toIntOrNull() ?: 0
     val styleBorderColor = sceneColor(cfg["borderColor"])
+    // Optional custom font: an imported .ttf/.otf filename (same library the widgets/clock use).
+    val styleFont = cfg["font"]?.trim()?.takeIf { it.isNotEmpty() }?.let { ThemeStore.fontFamily(it) }
     when (element.type) {
         SceneElementType.TEXT -> {
             val bg = sceneColor(cfg["bgColor"])
@@ -275,6 +285,7 @@ internal fun SceneElementView(
                 Text(
                     v("text"),
                     color = sceneColor(cfg["textColor"]) ?: MaterialTheme.colorScheme.onSurface,
+                    fontFamily = styleFont,
                     fontSize = styleSize,
                     fontWeight = styleWeight,
                     textAlign = styleAlign ?: TextAlign.Start,
@@ -300,6 +311,7 @@ internal fun SceneElementView(
             Text(
                 v("label", "Button"),
                 color = sceneColor(cfg["textColor"]) ?: MaterialTheme.colorScheme.onPrimary,
+                fontFamily = styleFont,
                 fontSize = styleSize,
                 fontWeight = styleWeight,
                 textAlign = styleAlign ?: TextAlign.Center,
@@ -534,7 +546,7 @@ internal fun SceneElementView(
                     Modifier
                         .fillMaxHeight()
                         .fillMaxWidth(pct)
-                        .align(Alignment.CenterStart)
+                        .align(Alignment.Center)
                         .background(fillColor),
                 ) {
                     if (charging && pct > 0f) {
@@ -569,6 +581,45 @@ internal fun SceneElementView(
             }
         }
 
+        SceneElementType.WEB -> {
+            // A transparent, JS-enabled WebView showing raw HTML from config (e.g. the music
+            // edge-light's canvas meteor animation). The page body is loaded RAW — not %var-expanded —
+            // because its JS uses '%' (modulo) that expansion would mangle. Instead, an optional `vars`
+            // config (newline-separated name=value, value %var-expanded) is injected as window.<name>
+            // JS globals, so a settings task can tune the animation. Tap-through via pointer-events:none.
+            val rawHtml = cfg["html"] ?: ""
+            val inject = (cfg["vars"] ?: "").lineSequence().mapNotNull { line ->
+                val eq = line.indexOf('=')
+                if (eq <= 0) return@mapNotNull null
+                val name = line.substring(0, eq).trim()
+                val value = expandAgainstGlobals(line.substring(eq + 1).trim())
+                if (name.isEmpty() || value.isEmpty()) null else "window.$name=${jsString(value)};"
+            }.joinToString("")
+            val html = when {
+                inject.isEmpty() -> rawHtml
+                rawHtml.contains("</head>", ignoreCase = true) ->
+                    rawHtml.replaceFirst("</head>", "<script>$inject</script></head>")
+                else -> "<script>$inject</script>$rawHtml"
+            }
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
+                    android.webkit.WebView(ctx).apply {
+                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                        isVerticalScrollBarEnabled = false
+                        isHorizontalScrollBarEnabled = false
+                        settings.javaScriptEnabled = true
+                    }
+                },
+                update = { wv ->
+                    if (wv.tag != html) {
+                        wv.tag = html
+                        wv.loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
+                    }
+                },
+            )
+        }
+
         else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(element.type.name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -578,6 +629,10 @@ internal fun SceneElementView(
 /** Truthy parse for checkbox/toggle scene values. */
 private fun sceneBool(s: String): Boolean = s.trim().lowercase() in setOf("true", "1", "on", "yes")
 
+/** Encode a string as a safe double-quoted JS literal (for WebView variable injection). */
+private fun jsString(s: String): String =
+    "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "") + "\""
+
 /** An ellipse filling the element's bounds (the OVAL shape). */
 private val ovalShape = GenericShape { size, _ -> addOval(Rect(0f, 0f, size.width, size.height)) }
 
@@ -585,6 +640,8 @@ private val ovalShape = GenericShape { size, _ -> addOval(Rect(0f, 0f, size.widt
 internal fun sceneAlignment(position: String?): Alignment = when (position?.trim()?.lowercase()) {
     "top" -> Alignment.TopCenter
     "bottom" -> Alignment.BottomCenter
+    "left" -> Alignment.CenterStart
+    "right" -> Alignment.CenterEnd
     else -> Alignment.Center
 }
 

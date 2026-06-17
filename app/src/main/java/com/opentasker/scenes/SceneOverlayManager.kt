@@ -49,9 +49,50 @@ object SceneOverlayManager {
     private val active = LinkedHashMap<Long, Overlay>()
     private var appContext: Context? = null
 
-    private class Overlay(val view: ComposeView, val owner: OverlayLifecycleOwner)
+    private class Overlay(
+        val view: ComposeView,
+        val owner: OverlayLifecycleOwner,
+        val params: WindowManager.LayoutParams,
+        val fullscreen: Boolean,
+    )
+
+    // Re-size fullscreen overlays when the display geometry changes (fold/unfold, rotation) — they are
+    // pinned to an explicit pixel size, so they don't auto-track like MATCH_PARENT would.
+    private var displayListener: android.hardware.display.DisplayManager.DisplayListener? = null
 
     fun canOverlay(context: Context): Boolean = Settings.canDrawOverlays(context.applicationContext)
+
+    private fun realMetrics(wm: WindowManager): android.util.DisplayMetrics =
+        android.util.DisplayMetrics().also { @Suppress("DEPRECATION") wm.defaultDisplay.getRealMetrics(it) }
+
+    private fun resizeFullscreenOverlays() {
+        val ctx = appContext ?: return
+        val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val real = realMetrics(wm)
+        active.values.filter { it.fullscreen }.forEach { ov ->
+            if (ov.params.width != real.widthPixels || ov.params.height != real.heightPixels) {
+                ov.params.width = real.widthPixels
+                ov.params.height = real.heightPixels
+                runCatching { wm.updateViewLayout(ov.view, ov.params) }
+            }
+        }
+    }
+
+    private fun ensureDisplayListener(app: Context) {
+        if (displayListener != null) return
+        val dm = app.getSystemService(android.hardware.display.DisplayManager::class.java) ?: return
+        val l = object : android.hardware.display.DisplayManager.DisplayListener {
+            override fun onDisplayChanged(displayId: Int) {
+                // The metrics can lag the callback slightly on foldables; re-apply now and once more shortly.
+                resizeFullscreenOverlays()
+                main.postDelayed({ resizeFullscreenOverlays() }, 150)
+            }
+            override fun onDisplayAdded(displayId: Int) {}
+            override fun onDisplayRemoved(displayId: Int) {}
+        }
+        dm.registerDisplayListener(l, main)
+        displayListener = l
+    }
 
     /**
      * Show [scene] as an overlay (no-op if it's already showing). [modal] dims + blocks the app
@@ -59,7 +100,7 @@ object SceneOverlayManager {
      * card and placed by [position] ("top"/"center"/"bottom"). [timeoutMs] > 0 auto-dismisses.
      * Safe to call from any thread.
      */
-    fun show(context: Context, scene: Scene, position: String? = null, modal: Boolean = true, timeoutMs: Long = 0L, dismissOnOutside: Boolean = true, fullWidth: Boolean = false) {
+    fun show(context: Context, scene: Scene, position: String? = null, modal: Boolean = true, timeoutMs: Long = 0L, dismissOnOutside: Boolean = true, fullWidth: Boolean = false, fullscreen: Boolean = false) {
         val app = context.applicationContext
         main.post {
             appContext = app
@@ -87,6 +128,7 @@ object SceneOverlayManager {
                             position = sceneAlignment(position),
                             dismissOnOutside = dismissOnOutside,
                             fullWidth = fullWidth,
+                            fullscreen = fullscreen,
                             onDismiss = { hide(scene.id) },
                             onRunTask = ::runTask,
                             onSetVar = ::setVar,
@@ -115,24 +157,55 @@ object SceneOverlayManager {
             } else {
                 // Tap-through HUD: wrap the card, not-focusable so touches outside it reach the app,
                 // placed by window gravity.
+                // fullscreen: cover the whole screen and pass ALL touches through (a purely visual
+                // edge-light); fullWidth: span the screen over the status bar; else wrap the card.
+                val edgeFlags = when {
+                    fullscreen -> WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                    fullWidth -> WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                    else -> 0
+                }
+                // For fullscreen, size to the REAL physical display at (0,0): MATCH_PARENT gives the
+                // (mis)reported content area on some foldables (Huawei folded), leaving a gap under the
+                // status bar. Pinning TOP|START at the real size covers the whole screen, edge to edge.
+                val real = realMetrics(wm)
                 WindowManager.LayoutParams(
-                    if (fullWidth) WindowManager.LayoutParams.MATCH_PARENT else WindowManager.LayoutParams.WRAP_CONTENT,
-                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    when {
+                        fullscreen -> real.widthPixels
+                        fullWidth -> WindowManager.LayoutParams.MATCH_PARENT
+                        else -> WindowManager.LayoutParams.WRAP_CONTENT
+                    },
+                    if (fullscreen) real.heightPixels else WindowManager.LayoutParams.WRAP_CONTENT,
                     type,
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or
-                        // A full-width bar lays out in the whole screen (over the status bar) at the very edge.
-                        (if (fullWidth) WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS else 0),
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or edgeFlags,
                     PixelFormat.TRANSLUCENT,
                 ).apply {
-                    gravity = sceneGravity(position)
-                    // A full-width bar sits flush over the status bar; a regular HUD gets a small inset.
-                    if (!fullWidth && gravity != Gravity.CENTER) y = (48 * app.resources.displayMetrics.density).toInt()
+                    gravity = if (fullscreen) Gravity.TOP or Gravity.START else sceneGravity(position)
+                    val pos = position?.trim()?.lowercase()
+                    when {
+                        fullscreen -> { x = 0; y = 0 }
+                        // Edge HUDs (the music 良/削) sit in the lower-middle, dropping further on the
+                        // wider fold states (where the app's controls move down). y is from the v-centre.
+                        pos == "left" || pos == "right" -> {
+                            val frac = when {
+                                real.widthPixels < 1500 -> 0.06f
+                                real.widthPixels < 2150 -> 0.19f
+                                else -> 0.27f
+                            }
+                            y = (frac * real.heightPixels).toInt()
+                        }
+                        // A full-width bar sits flush over the status bar; a regular HUD gets a small inset.
+                        !fullWidth && gravity != Gravity.CENTER -> y = (48 * app.resources.displayMetrics.density).toInt()
+                    }
                 }
             }
             runCatching { wm.addView(composeView, params) }
                 .onSuccess {
                     owner.onResume()
-                    active[scene.id] = Overlay(composeView, owner)
+                    active[scene.id] = Overlay(composeView, owner, params, fullscreen)
+                    if (fullscreen) ensureDisplayListener(app)
                     if (timeoutMs > 0) main.postDelayed({ hide(scene.id) }, timeoutMs)
                 }
                 .onFailure { owner.onDestroy() }
@@ -142,6 +215,8 @@ object SceneOverlayManager {
     private fun sceneGravity(position: String?): Int = when (position?.trim()?.lowercase()) {
         "top" -> Gravity.TOP or Gravity.CENTER_HORIZONTAL
         "bottom" -> Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+        "left" -> Gravity.START or Gravity.CENTER_VERTICAL
+        "right" -> Gravity.END or Gravity.CENTER_VERTICAL
         else -> Gravity.CENTER
     }
 
