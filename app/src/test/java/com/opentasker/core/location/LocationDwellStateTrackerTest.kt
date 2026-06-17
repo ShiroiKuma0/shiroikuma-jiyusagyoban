@@ -1,5 +1,16 @@
 package com.opentasker.core.location
 
+import com.opentasker.core.contexts.ContextEvent
+import com.opentasker.core.contexts.LocationContextEvents
+import com.opentasker.core.model.ContextSpec
+import com.opentasker.core.model.ContextType
+import java.util.concurrent.Callable
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -98,5 +109,97 @@ class LocationDwellStateTrackerTest {
         assertTrue(first.storageKey.startsWith("${profilePrefix}context:1:"))
         assertTrue(first.storageKey.length > "profile:7:context:1:".length)
         assertFalse(first == changedRadius)
+    }
+
+    @Test
+    fun storeSerializesReadModifyWriteAcrossConcurrentEnrichCalls() {
+        val storage = BlockingLocationDwellStateStorage()
+        val store = LocationDwellStateStore(storage) { 200_000L }
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val first = executor.submit(Callable {
+                store.enrich(
+                    profileId = 7,
+                    contextIndex = 1,
+                    spec = locationSpec(),
+                    event = insideEvent(observedAt = 100_000L),
+                )
+            })
+            assertTrue("First write did not reach the storage gate", storage.firstPutEntered.await(1, TimeUnit.SECONDS))
+
+            val second = executor.submit(Callable {
+                store.enrich(
+                    profileId = 7,
+                    contextIndex = 1,
+                    spec = locationSpec(),
+                    event = insideEvent(observedAt = 160_000L),
+                )
+            })
+
+            Thread.sleep(100)
+            assertFalse(
+                "Second enrich read dwell state before the first read-modify-write completed",
+                storage.secondGetEntered.get(),
+            )
+
+            storage.releaseFirstPut.countDown()
+            assertEquals("100000", first.get(1, TimeUnit.SECONDS).metadata["insideSinceEpochMs"])
+            assertEquals("100000", second.get(1, TimeUnit.SECONDS).metadata["insideSinceEpochMs"])
+        } finally {
+            storage.releaseFirstPut.countDown()
+            executor.shutdownNow()
+        }
+    }
+
+    private fun locationSpec(): ContextSpec =
+        ContextSpec(
+            type = ContextType.LOCATION,
+            config = config,
+        )
+
+    private fun insideEvent(observedAt: Long): ContextEvent =
+        ContextEvent(
+            type = LocationContextEvents.TYPE,
+            matched = true,
+            metadata = mapOf(
+                "latitude" to "40.7581",
+                "longitude" to "-73.9856",
+                "observedAtEpochMs" to observedAt.toString(),
+            ),
+        )
+
+    private class BlockingLocationDwellStateStorage : LocationDwellStateStorage {
+        private val values = ConcurrentHashMap<String, Long>()
+        private val getCalls = AtomicInteger()
+        private val blockNextPut = AtomicBoolean(true)
+        val firstPutEntered = CountDownLatch(1)
+        val releaseFirstPut = CountDownLatch(1)
+        val secondGetEntered = AtomicBoolean(false)
+
+        override fun getLong(key: String, defaultValue: Long): Long {
+            if (getCalls.incrementAndGet() == 2) {
+                secondGetEntered.set(true)
+            }
+            return values[key] ?: defaultValue
+        }
+
+        override fun putLong(key: String, value: Long) {
+            if (blockNextPut.compareAndSet(true, false)) {
+                firstPutEntered.countDown()
+                assertTrue("Timed out waiting to release the first dwell write", releaseFirstPut.await(2, TimeUnit.SECONDS))
+            }
+            values[key] = value
+        }
+
+        override fun remove(key: String) {
+            values.remove(key)
+        }
+
+        override fun keys(): Set<String> =
+            values.keys.toSet()
+
+        override fun removeAll(keys: Collection<String>) {
+            keys.forEach(values::remove)
+        }
     }
 }
