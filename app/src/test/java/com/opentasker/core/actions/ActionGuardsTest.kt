@@ -346,4 +346,32 @@ class ActionGuardsTest {
         val result = action.run(ctx(), mapOf("taskerCode" to "999"))
         assertTrue("unsupported action should fail", result is ActionResult.Failure)
     }
+
+    // --- Local network permission guard (pre-API-37 path) ---
+
+    @Test
+    fun localNetworkPermissionPassesBelowApi37() {
+        val result = checkLocalNetworkPermission(ctx())
+        assertEquals("pre-API-37 should not block", null, result)
+    }
+
+    @Test
+    fun pingGuardsLocalNetworkPermission() = runBlocking {
+        val action = PingAction()
+        val result = action.run(ctx(), mapOf("host" to "192.168.1.1"))
+        assertTrue(
+            "ping on pre-API-37 should not fail with permission error",
+            result !is ActionResult.Failure || !(result as ActionResult.Failure).message.contains("ACCESS_LOCAL_NETWORK")
+        )
+    }
+
+    @Test
+    fun wolGuardsLocalNetworkPermission() = runBlocking {
+        val action = WakeOnLanAction()
+        val result = action.run(ctx(), mapOf("mac" to "AA:BB:CC:DD:EE:FF"))
+        assertTrue(
+            "WoL on pre-API-37 should not fail with permission error",
+            result !is ActionResult.Failure || !(result as ActionResult.Failure).message.contains("ACCESS_LOCAL_NETWORK")
+        )
+    }
 }
