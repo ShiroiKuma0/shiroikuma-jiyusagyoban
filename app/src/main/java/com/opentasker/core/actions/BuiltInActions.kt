@@ -258,7 +258,11 @@ class WaitAction : Action {
     override val category = ActionCategory.FLOW
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val ms = args["millis"]?.toLongOrNull() ?: 0L
+        val rawMillis = args["millis"] ?: return ActionResult.Failure("missing millis")
+        val ms = rawMillis.toLongOrNull() ?: return ActionResult.Failure("invalid millis: $rawMillis")
+        if (ms < 0) {
+            return ActionResult.Failure("wait duration must be non-negative")
+        }
         if (ms > MAX_WAIT_MS) {
             return ActionResult.Failure("wait duration ${ms}ms exceeds maximum of ${MAX_WAIT_MS / 60_000} minutes")
         }
