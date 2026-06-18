@@ -4,7 +4,9 @@ import android.content.ContextWrapper
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.engine.VariableStore
+import com.sun.net.httpserver.HttpServer
 import java.io.File
+import java.net.InetSocketAddress
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -152,6 +154,60 @@ class ActionGuardsTest {
         val result = action.run(ctx(), mapOf("url" to "https://example.com/file"))
         assertTrue("missing path should fail", result is ActionResult.Failure)
         assertEquals("missing path", (result as ActionResult.Failure).message)
+    }
+
+    @Test
+    fun downloadRejectsInvalidMaxBytesBeforeReadingNetwork() = runBlocking {
+        val filesDir = Files.createTempDirectory("opentasker-download-max").toFile()
+        try {
+            val result = DownloadAction().run(
+                ctx(filesDir),
+                mapOf(
+                    "url" to "https://example.com/file",
+                    "path" to "out.txt",
+                    "max_bytes" to "-1",
+                ),
+            )
+
+            assertTrue("invalid max_bytes should fail", result is ActionResult.Failure)
+            assertEquals("max_bytes must be a positive integer", (result as ActionResult.Failure).message)
+        } finally {
+            filesDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun downloadKeepsExistingFileWhenResponseExceedsLimit() = runBlocking {
+        val server = fixedResponseServer("oversized")
+        val filesDir = Files.createTempDirectory("opentasker-download-atomic").toFile()
+        try {
+            server.start()
+            val destination = File(filesDir, "downloads/existing.txt").apply {
+                parentFile?.mkdirs()
+                writeText("original")
+            }
+
+            val result = DownloadAction().run(
+                ctx(filesDir),
+                mapOf(
+                    "url" to "http://127.0.0.1:${server.address.port}/file",
+                    "allow_http" to "true",
+                    "path" to "existing.txt",
+                    "max_bytes" to "4",
+                ),
+            )
+
+            assertTrue("oversized download should fail", result is ActionResult.Failure)
+            assertTrue((result as ActionResult.Failure).message.contains("4 byte limit"))
+            assertEquals("original", destination.readText())
+            assertTrue(
+                "partial temp files should be removed",
+                destination.parentFile?.listFiles()?.none { it.name.endsWith(".part") } ?: true,
+            )
+        } finally {
+            server.stop(0)
+            filesDir.deleteRecursively()
+        }
     }
 
     @Test
@@ -628,7 +684,7 @@ class ActionGuardsTest {
         val result = action.run(ctx(), mapOf("host" to "192.168.1.1"))
         assertTrue(
             "ping on pre-API-37 should not fail with permission error",
-            result !is ActionResult.Failure || !(result as ActionResult.Failure).message.contains("ACCESS_LOCAL_NETWORK")
+            result !is ActionResult.Failure || !result.message.contains("ACCESS_LOCAL_NETWORK")
         )
     }
 
@@ -638,7 +694,19 @@ class ActionGuardsTest {
         val result = action.run(ctx(), mapOf("mac" to "AA:BB:CC:DD:EE:FF"))
         assertTrue(
             "WoL on pre-API-37 should not fail with permission error",
-            result !is ActionResult.Failure || !(result as ActionResult.Failure).message.contains("ACCESS_LOCAL_NETWORK")
+            result !is ActionResult.Failure || !result.message.contains("ACCESS_LOCAL_NETWORK")
         )
+    }
+
+    private fun fixedResponseServer(body: String): HttpServer {
+        val bytes = body.toByteArray(Charsets.UTF_8)
+        return HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0).apply {
+            createContext("/file") { exchange ->
+                exchange.sendResponseHeaders(200, bytes.size.toLong())
+                exchange.responseBody.use { output ->
+                    output.write(bytes)
+                }
+            }
+        }
     }
 }
