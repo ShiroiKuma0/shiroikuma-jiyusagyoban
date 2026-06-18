@@ -15,6 +15,9 @@ import java.net.DatagramSocket
 import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.URL
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /**
  * HTTP GET request.
@@ -172,15 +175,22 @@ class DownloadAction : Action {
                 connection.connectTimeout = timeout
                 connection.readTimeout = timeout
                 connection.instanceFollowRedirects = false
-                val maxDownload = args["max_bytes"]?.toLongOrNull() ?: MAX_DOWNLOAD_BYTES
-                connection.inputStream.use { input ->
-                    destination.outputStream().use { output ->
-                        val copied = input.copyBounded(output, maxDownload.coerceAtMost(MAX_DOWNLOAD_BYTES))
-                        if (copied < 0) {
-                            destination.delete()
-                            return ActionResult.Failure("download exceeds ${maxDownload / 1024 / 1024} MB limit")
+                val maxDownload = parseMaxDownloadBytes(args)
+                    ?: return ActionResult.Failure("max_bytes must be a positive integer")
+                val effectiveLimit = maxDownload.coerceAtMost(MAX_DOWNLOAD_BYTES)
+                val tempFile = File.createTempFile(tempFilePrefix(destination), ".part", destination.parentFile)
+                try {
+                    connection.inputStream.use { input ->
+                        tempFile.outputStream().use { output ->
+                            val copied = input.copyBounded(output, effectiveLimit)
+                            if (copied < 0) {
+                                return ActionResult.Failure("download exceeds $effectiveLimit byte limit")
+                            }
                         }
                     }
+                    replaceFile(tempFile, destination)
+                } finally {
+                    if (tempFile.exists()) tempFile.delete()
                 }
                 ctx.logger("Downloaded ${parsedUrl.host} to ${destination.name}")
                 ActionResult.Success
@@ -280,6 +290,31 @@ private fun InputStream.copyBounded(out: java.io.OutputStream, maxBytes: Long): 
 }
 
 private const val ANDROID_17_API = 37
+
+private fun parseMaxDownloadBytes(args: Map<String, String>): Long? {
+    val raw = args["max_bytes"] ?: return MAX_DOWNLOAD_BYTES
+    return raw.toLongOrNull()?.takeIf { it > 0 }
+}
+
+private fun tempFilePrefix(destination: File): String =
+    destination.name.ifBlank { "download" }.padEnd(3, '_')
+
+private fun replaceFile(source: File, destination: File) {
+    try {
+        Files.move(
+            source.toPath(),
+            destination.toPath(),
+            StandardCopyOption.ATOMIC_MOVE,
+            StandardCopyOption.REPLACE_EXISTING,
+        )
+    } catch (_: AtomicMoveNotSupportedException) {
+        Files.move(
+            source.toPath(),
+            destination.toPath(),
+            StandardCopyOption.REPLACE_EXISTING,
+        )
+    }
+}
 
 private fun enforceHttpPolicy(url: URL, args: Map<String, String>): ActionResult? {
     if (url.protocol == "https") return null
