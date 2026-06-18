@@ -25,6 +25,7 @@ Hardening, test coverage, and expression engine improvements.
 - **Fix**: implemented deterministic `file.list` filename glob filtering and added the missing action editor field for `pattern`.
 - **Security**: tightened import validation by rejecting oversized/DOCTYPE Tasker XML before parsing and blocking OpenTasker bundles with duplicate task IDs or variable names.
 - **UX**: bounded long Tasker/OpenTasker import review dialogs so warnings and mapped-action lists stay scrollable on compact screens.
+- **Reliability**: replaced API 33-only service receiver registration with AndroidX compatibility calls and gated camera/mic active watchers to Android 11+ APIs.
 - **Cleanup**: removed duplicate `ArrayStore.joinWith` method (identical to `join`).
 
 ## v0.2.72 - 2026-06-16
