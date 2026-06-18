@@ -51,6 +51,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -64,6 +65,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
@@ -495,8 +497,8 @@ private fun SceneCanvasElement(
 ) {
     val element = projection.element
     val density = LocalDensity.current
-    var dragX by remember(scene.id, element.id, projection.x, projection.y) { mutableStateOf(0f) }
-    var dragY by remember(scene.id, element.id, projection.x, projection.y) { mutableStateOf(0f) }
+    var dragX by remember(scene.id, element.id, projection.x, projection.y) { mutableFloatStateOf(0f) }
+    var dragY by remember(scene.id, element.id, projection.x, projection.y) { mutableFloatStateOf(0f) }
     val color = when (element.type) {
         SceneElementType.BUTTON -> MaterialTheme.colorScheme.primary
         SceneElementType.TEXT -> MaterialTheme.colorScheme.tertiary
@@ -506,7 +508,14 @@ private fun SceneCanvasElement(
     }
     Surface(
         modifier = Modifier
-            .offset(x = (projection.x + dragX).dp, y = (projection.y + dragY).dp)
+            .offset {
+                with(density) {
+                    IntOffset(
+                        x = (projection.x + dragX).dp.roundToPx(),
+                        y = (projection.y + dragY).dp.roundToPx(),
+                    )
+                }
+            }
             .size(
                 width = projection.width.coerceAtLeast(12f).dp,
                 height = projection.height.coerceAtLeast(12f).dp,
