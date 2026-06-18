@@ -47,7 +47,7 @@ class RuntimeRegistriesTest {
         assertFieldKeys("file.read", "path", "var")
         assertFieldKeys("file.write", "path", "text")
         assertFieldKeys("file.append", "path", "text")
-        assertFieldKeys("file.list", "path", "var")
+        assertFieldKeys("file.list", "path", "var", "pattern")
         assertFieldKeys("http.get", "url", "var", "allow_http")
         assertFieldKeys("http.post", "url", "data", "var", "allow_http")
     }

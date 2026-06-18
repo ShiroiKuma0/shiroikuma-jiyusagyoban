@@ -21,6 +21,8 @@ Hardening, test coverage, and expression engine improvements.
 - **Safety**: surfaced corrupted profile/task JSON as visible UI warnings while keeping safe fallback domain objects.
 - **Safety**: hardened database backup validation with current schema-shape checks, required-table row-count reads, and a consumed WAL checkpoint before copy.
 - **Maintainability**: split run-log rendering and import-review dialogs out of `ActiveAutomationUi.kt`, with source tests guarding the screen ownership boundary.
+- **Reliability**: made `flow.wait`, `vibrate`, and `screen.timeout` fail clearly on missing, malformed, or out-of-range durations instead of silently defaulting or clamping.
+- **Fix**: implemented deterministic `file.list` filename glob filtering and added the missing action editor field for `pattern`.
 - **Cleanup**: removed duplicate `ArrayStore.joinWith` method (identical to `join`).
 
 ## v0.2.72 - 2026-06-16

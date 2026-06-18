@@ -1,6 +1,7 @@
 package com.opentasker.core.actions
 
 import java.io.File
+import java.nio.file.FileSystems
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
@@ -133,10 +134,16 @@ class ListFilesAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         val varName = args["var"] ?: args["variable"] ?: "result"
+        val pattern = args["pattern"].orEmpty()
         return try {
             val dir = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside OpenTasker files")
             if (!dir.isDirectory) return ActionResult.Failure("path is not a directory")
-            val files = dir.listFiles()?.joinToString("\n") { it.name } ?: ""
+            val matcher = fileNameMatcher(pattern)
+            val files = dir.listFiles()
+                ?.filter { file -> matcher?.matches(File(file.name).toPath()) ?: true }
+                ?.sortedWith(compareBy<File> { it.name.lowercase() }.thenBy { it.name })
+                ?.joinToString("\n") { it.name }
+                ?: ""
             ctx.variables.set(varName, files)
             ctx.logger("List ${dir.name} to \$$varName")
             ActionResult.Success
@@ -144,6 +151,18 @@ class ListFilesAction : Action {
             ActionResult.Failure("list failed: ${e.message}")
         }
     }
+}
+
+private fun fileNameMatcher(pattern: String): java.nio.file.PathMatcher? {
+    val trimmed = pattern.trim()
+    if (trimmed.isBlank()) return null
+    require(trimmed.length <= MAX_LIST_PATTERN_CHARS) {
+        "pattern exceeds $MAX_LIST_PATTERN_CHARS characters"
+    }
+    require(trimmed.none { it == '/' || it == '\\' || it == '\u0000' }) {
+        "pattern must match file names only"
+    }
+    return FileSystems.getDefault().getPathMatcher("glob:$trimmed")
 }
 
 private fun safeUserFile(ctx: ActionContext, path: String, mustExist: Boolean = false): File? {
@@ -154,3 +173,5 @@ private fun safeUserFile(ctx: ActionContext, path: String, mustExist: Boolean = 
     if (mustExist && !requested.exists()) return null
     return requested
 }
+
+private const val MAX_LIST_PATTERN_CHARS = 128

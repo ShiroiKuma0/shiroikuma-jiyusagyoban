@@ -551,6 +551,7 @@ fun registerActionMetadata() {
             fields = listOf(
                 ActionField("path", "Directory path", required = true),
                 ActionField("var", "Store in variable", required = true, hint = "%var"),
+                ActionField("pattern", "Filename pattern", hint = "*.txt"),
             )
         )
     )

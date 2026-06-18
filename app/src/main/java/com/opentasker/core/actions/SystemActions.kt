@@ -21,7 +21,11 @@ class VibrateAction : Action {
     override val category = ActionCategory.NOTIFICATION
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val millis = (args["millis"]?.toLongOrNull() ?: 100L).coerceIn(1L, 10_000L)
+        val rawMillis = args["millis"] ?: return ActionResult.Failure("missing millis")
+        val millis = rawMillis.toLongOrNull() ?: return ActionResult.Failure("invalid millis: $rawMillis")
+        if (millis !in MIN_VIBRATE_MS..MAX_VIBRATE_MS) {
+            return ActionResult.Failure("vibrate duration must be between $MIN_VIBRATE_MS and $MAX_VIBRATE_MS ms")
+        }
         return try {
             val vibrator = if (Build.VERSION.SDK_INT >= 31) {
                 ctx.app.getSystemService(Context.VIBRATOR_MANAGER_SERVICE)?.let {
@@ -38,6 +42,11 @@ class VibrateAction : Action {
         } catch (e: Exception) {
             ActionResult.Failure("vibrate failed: ${e.message}")
         }
+    }
+
+    companion object {
+        private const val MIN_VIBRATE_MS = 1L
+        private const val MAX_VIBRATE_MS = 10_000L
     }
 }
 

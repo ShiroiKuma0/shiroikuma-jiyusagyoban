@@ -396,7 +396,11 @@ class ScreenTimeoutAction : Action {
     override val category = ActionCategory.SETTINGS
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val ms = (args["millis"]?.toLongOrNull() ?: 30000L).coerceIn(0L, MAX_SCREEN_TIMEOUT_MS)
+        val rawMillis = args["millis"] ?: return ActionResult.Failure("missing millis")
+        val ms = rawMillis.toLongOrNull() ?: return ActionResult.Failure("invalid millis: $rawMillis")
+        if (ms !in 0L..MAX_SCREEN_TIMEOUT_MS) {
+            return ActionResult.Failure("screen timeout must be between 0 and $MAX_SCREEN_TIMEOUT_MS ms")
+        }
         if (!Settings.System.canWrite(ctx.app)) {
             return ActionResult.Failure("Write system settings permission is not granted")
         }

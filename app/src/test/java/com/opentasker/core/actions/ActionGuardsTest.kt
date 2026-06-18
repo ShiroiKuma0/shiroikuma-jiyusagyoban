@@ -4,6 +4,8 @@ import android.content.ContextWrapper
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.engine.VariableStore
+import java.io.File
+import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -12,6 +14,13 @@ import org.junit.Test
 class ActionGuardsTest {
 
     private fun ctx() = ActionContext(ContextWrapper(null), VariableStore())
+    private fun ctx(filesDir: File, variables: VariableStore = VariableStore()) =
+        ActionContext(
+            object : ContextWrapper(null) {
+                override fun getFilesDir(): File = filesDir
+            },
+            variables,
+        )
 
     @Test
     fun httpPostRejectsOversizedBody() = runBlocking {
@@ -79,6 +88,30 @@ class ActionGuardsTest {
             "failure mentions maximum",
             (result as ActionResult.Failure).message.contains("maximum")
         )
+    }
+
+    @Test
+    fun waitMissingDurationFails() = runBlocking {
+        val action = WaitAction()
+        val result = action.run(ctx(), emptyMap())
+        assertTrue("missing wait duration should fail", result is ActionResult.Failure)
+        assertEquals("missing millis", (result as ActionResult.Failure).message)
+    }
+
+    @Test
+    fun waitRejectsMalformedDuration() = runBlocking {
+        val action = WaitAction()
+        val result = action.run(ctx(), mapOf("millis" to "soon"))
+        assertTrue("malformed wait duration should fail", result is ActionResult.Failure)
+        assertTrue((result as ActionResult.Failure).message.contains("invalid millis"))
+    }
+
+    @Test
+    fun waitRejectsNegativeDuration() = runBlocking {
+        val action = WaitAction()
+        val result = action.run(ctx(), mapOf("millis" to "-1"))
+        assertTrue("negative wait duration should fail", result is ActionResult.Failure)
+        assertTrue((result as ActionResult.Failure).message.contains("non-negative"))
     }
 
     @Test
@@ -319,6 +352,30 @@ class ActionGuardsTest {
         assertEquals("missing level", (result as ActionResult.Failure).message)
     }
 
+    @Test
+    fun vibrateMissingDurationFails() = runBlocking {
+        val action = VibrateAction()
+        val result = action.run(ctx(), emptyMap())
+        assertTrue("missing vibration duration should fail", result is ActionResult.Failure)
+        assertEquals("missing millis", (result as ActionResult.Failure).message)
+    }
+
+    @Test
+    fun vibrateRejectsMalformedDuration() = runBlocking {
+        val action = VibrateAction()
+        val result = action.run(ctx(), mapOf("millis" to "long"))
+        assertTrue("malformed vibration duration should fail", result is ActionResult.Failure)
+        assertTrue((result as ActionResult.Failure).message.contains("invalid millis"))
+    }
+
+    @Test
+    fun vibrateRejectsOutOfRangeDuration() = runBlocking {
+        val action = VibrateAction()
+        val result = action.run(ctx(), mapOf("millis" to "0"))
+        assertTrue("out-of-range vibration duration should fail", result is ActionResult.Failure)
+        assertTrue((result as ActionResult.Failure).message.contains("between"))
+    }
+
     // --- LaunchIntentAction guards ---
 
     @Test
@@ -373,6 +430,46 @@ class ActionGuardsTest {
         assertEquals("missing path", (result as ActionResult.Failure).message)
     }
 
+    @Test
+    fun listFilesAppliesFilenamePatternDeterministically() = runBlocking {
+        val filesDir = Files.createTempDirectory("opentasker-file-list").toFile()
+        try {
+            val userFiles = File(filesDir, "user_files/reports").apply { mkdirs() }
+            File(userFiles, "zeta.log").writeText("skip")
+            File(userFiles, "alpha.txt").writeText("one")
+            File(userFiles, "Beta.txt").writeText("two")
+            val variables = VariableStore()
+
+            val result = ListFilesAction().run(
+                ctx(filesDir, variables),
+                mapOf("path" to "reports", "pattern" to "*.txt", "var" to "matches"),
+            )
+
+            assertTrue("patterned list should succeed", result is ActionResult.Success)
+            assertEquals("alpha.txt\nBeta.txt", variables.get("matches"))
+        } finally {
+            filesDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun listFilesRejectsPathLikePattern() = runBlocking {
+        val filesDir = Files.createTempDirectory("opentasker-file-list-pattern").toFile()
+        try {
+            File(filesDir, "user_files/reports").mkdirs()
+
+            val result = ListFilesAction().run(
+                ctx(filesDir),
+                mapOf("path" to "reports", "pattern" to "../*.txt"),
+            )
+
+            assertTrue("path-like pattern should fail", result is ActionResult.Failure)
+            assertTrue((result as ActionResult.Failure).message.contains("file names only"))
+        } finally {
+            filesDir.deleteRecursively()
+        }
+    }
+
     // --- Settings honest-failure guards ---
 
     @Test
@@ -381,6 +478,30 @@ class ActionGuardsTest {
         val result = action.run(ctx(), emptyMap())
         assertTrue("missing brightness should fail", result is ActionResult.Failure)
         assertEquals("missing brightness", (result as ActionResult.Failure).message)
+    }
+
+    @Test
+    fun screenTimeoutMissingDurationFails() = runBlocking {
+        val action = ScreenTimeoutAction()
+        val result = action.run(ctx(), emptyMap())
+        assertTrue("missing screen timeout should fail", result is ActionResult.Failure)
+        assertEquals("missing millis", (result as ActionResult.Failure).message)
+    }
+
+    @Test
+    fun screenTimeoutRejectsMalformedDuration() = runBlocking {
+        val action = ScreenTimeoutAction()
+        val result = action.run(ctx(), mapOf("millis" to "later"))
+        assertTrue("malformed screen timeout should fail", result is ActionResult.Failure)
+        assertTrue((result as ActionResult.Failure).message.contains("invalid millis"))
+    }
+
+    @Test
+    fun screenTimeoutRejectsOutOfRangeDuration() = runBlocking {
+        val action = ScreenTimeoutAction()
+        val result = action.run(ctx(), mapOf("millis" to "-1"))
+        assertTrue("out-of-range screen timeout should fail", result is ActionResult.Failure)
+        assertTrue((result as ActionResult.Failure).message.contains("between"))
     }
 
     @Test
