@@ -24,6 +24,9 @@ import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.draggable2D
 import androidx.compose.foundation.gestures.rememberDraggable2DState
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
+import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -92,6 +95,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.lang.ref.WeakReference
 import kotlin.math.roundToInt
@@ -312,17 +316,17 @@ internal fun SceneElementView(
         }
 
         SceneElementType.BUTTON -> {
-            // Directional swipes (edge bars): the dominant axis of a drag past ~36dp picks up/down/left/
-            // right, each running its own task. So a vertical slide and a horizontal swipe do different
-            // things (e.g. vertical = open a panel; horizontal ≠ that).
+            // Edge bars: a strip binds any of swipe up/down/left/right, tap, double-tap and long-press,
+            // each to its own task (the dominant axis of a drag past ~36dp picks the swipe direction).
             val swipeUp = cfg["swipeUp"]?.toLongOrNull()
             val swipeDown = cfg["swipeDown"]?.toLongOrNull()
             val swipeLeft = cfg["swipeLeft"]?.toLongOrNull()
             val swipeRight = cfg["swipeRight"]?.toLongOrNull()
-            val downTask = cfg["downTask"]?.toLongOrNull()   // DEBUG: fires on touch-down
-            val dragTask = cfg["dragTask"]?.toLongOrNull()   // DEBUG: fires on the first move
-            val hasSwipe = swipeUp != null || swipeDown != null || swipeLeft != null || swipeRight != null ||
-                downTask != null || dragTask != null
+            val doubleTapId = cfg["doubleTap"]?.toLongOrNull()
+            val tapId = element.tapTaskId
+            val longPressId = element.longPressTaskId
+            val hasSwipe = swipeUp != null || swipeDown != null || swipeLeft != null || swipeRight != null
+            val slopPx = with(LocalDensity.current) { 36.dp.toPx() }
             Box(
                 Modifier
                     .fillMaxSize()
@@ -330,38 +334,29 @@ internal fun SceneElementView(
                     // bgColor read via v() so a (debug) task can flip an edge strip visible/invisible live.
                     .background(sceneColor(v("bgColor")) ?: MaterialTheme.colorScheme.primary)
                     .then(if (styleBorderW > 0) Modifier.border(styleBorderW.dp, styleBorderColor ?: MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp)) else Modifier)
-                    .then(if (hasSwipe) Modifier.pointerInput(element.id) {
-                        val slop = 36.dp.toPx()
-                        awaitEachGesture {
-                            // Consume the DOWN so this (FLAG_NOT_FOCUSABLE) overlay window claims the
-                            // gesture — otherwise it "slips" the move stream away after an unclaimed down
-                            // and a drag never registers (a tap, with no move, survives without this).
-                            val down = awaitFirstDown(requireUnconsumed = false)
-                            down.consume()
-                            downTask?.let(onRunTask)
-                            var dx = 0f; var dy = 0f; var fired = false; var dbgMoved = false
-                            while (true) {
-                                val ev = awaitPointerEvent()
-                                val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
-                                if (!ch.pressed) break
-                                val pc = ch.positionChange(); dx += pc.x; dy += pc.y; ch.consume()
-                                if (!dbgMoved && (pc.x != 0f || pc.y != 0f)) { dbgMoved = true; dragTask?.let(onRunTask) }
-                                if (!fired && (kotlin.math.abs(dx) > slop || kotlin.math.abs(dy) > slop)) {
-                                    fired = true
-                                    val t = if (kotlin.math.abs(dx) > kotlin.math.abs(dy)) {
-                                        if (dx > 0) swipeRight else swipeLeft
-                                    } else {
-                                        if (dy > 0) swipeDown else swipeUp
-                                    }
-                                    t?.let(onRunTask)
+                    // Swipe or double-tap bound → the full edge-gesture detector (it consumes the down so
+                    // the tap-through overlay claims the move stream). Otherwise the lightweight tap
+                    // detector, so a plain button's tap stays instant (no double-tap wait).
+                    .then(if (hasSwipe || doubleTapId != null) Modifier.pointerInput(element.id) {
+                        detectEdgeGestures(
+                            slopPx = slopPx,
+                            onSwipe = { dx, dy ->
+                                val t = if (kotlin.math.abs(dx) > kotlin.math.abs(dy)) {
+                                    if (dx > 0) swipeRight else swipeLeft
+                                } else {
+                                    if (dy > 0) swipeDown else swipeUp
                                 }
-                            }
-                        }
+                                t?.let(onRunTask)
+                            },
+                            onTap = tapId?.let { id -> { onRunTask(id) } },
+                            onDoubleTap = doubleTapId?.let { id -> { onRunTask(id) } },
+                            onLongPress = longPressId?.let { id -> { onRunTask(id) } },
+                        )
                     }
-                    else if (element.tapTaskId != null || element.longPressTaskId != null) Modifier.pointerInput(element.id) {
+                    else if (tapId != null || longPressId != null) Modifier.pointerInput(element.id) {
                         detectTapGestures(
-                            onTap = { element.tapTaskId?.let(onRunTask) },
-                            onLongPress = { element.longPressTaskId?.let(onRunTask) },
+                            onTap = { tapId?.let(onRunTask) },
+                            onLongPress = { longPressId?.let(onRunTask) },
                         )
                     } else Modifier),
                 contentAlignment = Alignment.Center,
@@ -712,6 +707,68 @@ internal fun SceneElementView(
 
 /** Truthy parse for checkbox/toggle scene values. */
 private fun sceneBool(s: String): Boolean = s.trim().lowercase() in setOf("true", "1", "on", "yes")
+
+/**
+ * One detector for an edge strip's whole gesture set: 4-direction swipe, tap, double-tap, long-press.
+ * It consumes the DOWN so a FLAG_NOT_FOCUSABLE tap-through overlay actually claims the move stream
+ * (without that the window slips moves away and only taps survive). A drag past [slopPx] fires [onSwipe]
+ * with the accumulated delta; holding past the long-press timeout fires [onLongPress]; a quick release
+ * fires [onTap] — unless [onDoubleTap] is bound and a second tap lands within the double-tap window.
+ * Single taps stay instant when no double-tap is bound (no wait).
+ */
+private suspend fun PointerInputScope.detectEdgeGestures(
+    slopPx: Float,
+    onSwipe: (Float, Float) -> Unit,
+    onTap: (() -> Unit)?,
+    onDoubleTap: (() -> Unit)?,
+    onLongPress: (() -> Unit)?,
+) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        down.consume()
+        var dx = 0f
+        var dy = 0f
+        // Only arm the long-press clock when a long-press is bound, so otherwise a held press just waits
+        // for release (a tap) rather than being swallowed as a no-op long-press.
+        val timeout = if (onLongPress != null) viewConfiguration.longPressTimeoutMillis else Long.MAX_VALUE
+        // "swipe" = moved past slop; "tap" = released first; null = timed out (held) → long-press.
+        val phase = withTimeoutOrNull(timeout) {
+            while (true) {
+                val ev = awaitPointerEvent()
+                val ch = ev.changes.firstOrNull { it.id == down.id } ?: return@withTimeoutOrNull "tap"
+                if (!ch.pressed) return@withTimeoutOrNull "tap"
+                val pc = ch.positionChange(); dx += pc.x; dy += pc.y; ch.consume()
+                if (kotlin.math.abs(dx) > slopPx || kotlin.math.abs(dy) > slopPx) return@withTimeoutOrNull "swipe"
+            }
+            @Suppress("UNREACHABLE_CODE") "tap"
+        }
+        when (phase) {
+            "swipe" -> { onSwipe(dx, dy); drainPressed(down.id) }
+            null -> { onLongPress?.invoke(); drainPressed(down.id) }
+            else -> {
+                if (onDoubleTap != null) {
+                    val second = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
+                        awaitFirstDown(requireUnconsumed = false)
+                    }
+                    if (second != null) { second.consume(); onDoubleTap(); drainPressed(second.id) }
+                    else onTap?.invoke()
+                } else {
+                    onTap?.invoke()
+                }
+            }
+        }
+    }
+}
+
+/** Consume the rest of a claimed gesture until the pointer lifts (so it doesn't leak to anything else). */
+private suspend fun AwaitPointerEventScope.drainPressed(id: PointerId) {
+    while (true) {
+        val ev = awaitPointerEvent()
+        val ch = ev.changes.firstOrNull { it.id == id } ?: return
+        if (!ch.pressed) return
+        ch.consume()
+    }
+}
 
 /** Encode a string as a safe double-quoted JS literal (for WebView variable injection). */
 private fun jsString(s: String): String =

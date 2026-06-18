@@ -487,7 +487,7 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
 
     // Config keys whose value is a task id (gesture handlers), so they must be remapped on import too —
     // unlike the tapTaskId/longPressTaskId fields, these live in the free-form config map.
-    private val taskIdConfigKeys = setOf("swipeUp", "swipeDown", "swipeLeft", "swipeRight", "downTask", "dragTask")
+    private val taskIdConfigKeys = setOf("swipeUp", "swipeDown", "swipeLeft", "swipeRight", "doubleTap")
 
     private fun remapSceneElement(element: SceneElement, taskIdMap: Map<Long, Long>): SceneElement =
         element.copy(

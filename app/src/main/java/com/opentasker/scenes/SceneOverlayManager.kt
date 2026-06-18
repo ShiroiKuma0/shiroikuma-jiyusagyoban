@@ -119,7 +119,7 @@ object SceneOverlayManager {
      * card and placed by [position] ("top"/"center"/"bottom"). [timeoutMs] > 0 auto-dismisses.
      * Safe to call from any thread.
      */
-    fun show(context: Context, scene: Scene, position: String? = null, modal: Boolean = true, timeoutMs: Long = 0L, dismissOnOutside: Boolean = true, fullWidth: Boolean = false, fullscreen: Boolean = false, edgeCenter: Boolean = false, insetDp: Int = 0, heightFraction: Float = 0f) {
+    fun show(context: Context, scene: Scene, position: String? = null, modal: Boolean = true, timeoutMs: Long = 0L, dismissOnOutside: Boolean = true, fullWidth: Boolean = false, fullscreen: Boolean = false, edgeCenter: Boolean = false, insetDp: Int = 0, heightFraction: Float = 0f, vAlign: String? = null) {
         val app = context.applicationContext
         main.post {
             appContext = app
@@ -222,13 +222,24 @@ object SceneOverlayManager {
                         pos == "left" || pos == "right" -> {
                             // Inset from the very edge (out of the OEM's edge-gesture region, so a slide reaches us).
                             if (insetDp > 0) x = (insetDp * app.resources.displayMetrics.density).toInt()
-                            y = if (edgeCenter) 0 else {
-                                val frac = when {
-                                    real.widthPixels < 1500 -> 0.06f
-                                    real.widthPixels < 2150 -> 0.19f
-                                    else -> 0.27f
+                            // vAlign places an edge strip in the top / middle / bottom third (its vertical
+                            // gravity); keeping the horizontal (left/right) part. Falls back to the legacy
+                            // edgeCenter / media-HUD fraction when unset.
+                            val horiz = gravity and Gravity.HORIZONTAL_GRAVITY_MASK
+                            when (vAlign?.trim()?.lowercase()) {
+                                "top" -> { gravity = horiz or Gravity.TOP; y = 0 }
+                                "bottom" -> { gravity = horiz or Gravity.BOTTOM; y = 0 }
+                                "center", "middle" -> { gravity = horiz or Gravity.CENTER_VERTICAL; y = 0 }
+                                else -> {
+                                    y = if (edgeCenter) 0 else {
+                                        val frac = when {
+                                            real.widthPixels < 1500 -> 0.06f
+                                            real.widthPixels < 2150 -> 0.19f
+                                            else -> 0.27f
+                                        }
+                                        (frac * real.heightPixels).toInt()
+                                    }
                                 }
-                                (frac * real.heightPixels).toInt()
                             }
                         }
                         // A full-width bar sits flush over the status bar; a regular HUD gets a small inset.
