@@ -32,7 +32,11 @@ class DatabaseBackupManager(
                 throw IOException("Database file does not exist")
             }
 
-            db.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { }
+            db.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { cursor ->
+                while (cursor.moveToNext()) {
+                    // Consume the pragma cursor so SQLite performs the checkpoint before the file copy.
+                }
+            }
             val backupFile = File(backupDir, "${databaseName.removeSuffix(".db")}_backup_${timestamp()}.db")
             sourceFile.inputStream().use { input ->
                 FileOutputStream(backupFile).use { output ->
@@ -217,9 +221,10 @@ class DatabaseBackupManager(
                         throw IOException("Backup failed SQLite integrity check")
                     }
                 }
-                val requiredTables = setOf("profiles", "tasks", "run_logs")
+                val requiredSchema = requiredSchemaColumns()
+                val requiredTables = requiredSchema.keys
                 sqlite.rawQuery(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('profiles','tasks','run_logs')",
+                    "SELECT name FROM sqlite_master WHERE type='table'",
                     null,
                 ).use { cursor ->
                     val found = mutableSetOf<String>()
@@ -231,8 +236,72 @@ class DatabaseBackupManager(
                         throw IOException("Backup is missing required table(s): ${missing.joinToString()}")
                     }
                 }
+                requiredSchema.forEach { (table, requiredColumns) ->
+                    val foundColumns = tableColumns(sqlite, table)
+                    val missingColumns = requiredColumns - foundColumns
+                    if (missingColumns.isNotEmpty()) {
+                        throw IOException(
+                            "Backup schema version ${OPEN_TASKER_DATABASE_SCHEMA_VERSION} is missing " +
+                                "${table}.${missingColumns.joinToString()}",
+                        )
+                    }
+                    val count = readLong(sqlite, "SELECT COUNT(*) FROM $table")
+                    if (count < 0) {
+                        throw IOException("Backup table $table returned an invalid row count")
+                    }
+                }
             }
         }
+
+        private fun requiredSchemaColumns(): Map<String, Set<String>> = mapOf(
+            "profiles" to setOf(
+                "id",
+                "name",
+                "enabled",
+                "enterTaskId",
+                "exitTaskId",
+                "cooldownSec",
+                "contextsJson",
+                "automationMode",
+                "profileGroup",
+            ),
+            "tasks" to setOf("id", "name", "priority", "collisionMode", "actionsJson"),
+            "scenes" to setOf("id", "name", "widthDp", "heightDp", "elementsJson"),
+            "variables" to setOf("name", "value", "isGlobal"),
+            "run_logs" to setOf(
+                "id",
+                "taskId",
+                "taskName",
+                "timestamp",
+                "durationMs",
+                "success",
+                "message",
+                "source",
+                "sourceLabel",
+            ),
+            "edit_history" to setOf("id", "entityType", "entityId", "previousJson", "timestamp"),
+        )
+
+        private fun tableColumns(sqlite: SQLiteDatabase, table: String): Set<String> =
+            sqlite.rawQuery("PRAGMA table_info($table)", null).use { cursor ->
+                val columns = mutableSetOf<String>()
+                val nameIndex = cursor.getColumnIndex("name")
+                if (nameIndex < 0) {
+                    throw IOException("Backup schema query did not return column names for $table")
+                }
+                while (cursor.moveToNext()) {
+                    columns += cursor.getString(nameIndex)
+                }
+                columns
+            }
+
+        private fun readLong(sqlite: SQLiteDatabase, sql: String): Long =
+            sqlite.rawQuery(sql, null).use { cursor ->
+                if (!cursor.moveToFirst()) {
+                    throw IOException("Backup query returned no rows: $sql")
+                }
+                cursor.getLong(0)
+            }
 
         private fun deleteDatabaseSidecars(dbFile: File) {
             listOf(
