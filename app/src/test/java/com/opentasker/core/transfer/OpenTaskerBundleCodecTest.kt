@@ -80,6 +80,28 @@ class OpenTaskerBundleCodecTest {
     }
 
     @Test
+    fun validateBlocksAmbiguousDuplicateIdsAndVariableNames() {
+        val bundle = OpenTaskerBundle(
+            appVersion = "0.2.73",
+            exportedAtEpochMs = 123L,
+            tasks = listOf(
+                Task(id = 7, name = "First"),
+                Task(id = 7, name = "Second"),
+            ),
+            variables = listOf(
+                Variable(name = "%TOKEN", value = "first", isGlobal = true),
+                Variable(name = "%TOKEN", value = "second", isGlobal = true),
+            ),
+        )
+
+        val plan = OpenTaskerBundleCodec.validate(bundle)
+
+        assertFalse(plan.canImport)
+        assertTrue(plan.warnings.any { it.contains("duplicate task ids: 7") })
+        assertTrue(plan.warnings.any { it.contains("duplicate variable names: %TOKEN") })
+    }
+
+    @Test
     fun jsonRoundTripPreservesBundle() {
         val bundle = OpenTaskerBundleCodec.build(
             appVersion = "0.2.13",

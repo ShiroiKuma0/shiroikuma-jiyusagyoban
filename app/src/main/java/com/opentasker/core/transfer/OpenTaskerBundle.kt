@@ -120,6 +120,13 @@ object OpenTaskerBundleCodec {
             warnings += "Unsupported schema version ${bundle.schemaVersion}; expected $OPEN_TASKER_BUNDLE_SCHEMA_VERSION."
         }
 
+        duplicateLongs(bundle.tasks.map { it.id }).takeIf { it.isNotEmpty() }?.let { duplicates ->
+            warnings += "Bundle has duplicate task ids: ${duplicates.joinToString()}."
+        }
+        duplicateStrings(bundle.variables.map { it.name }).takeIf { it.isNotEmpty() }?.let { duplicates ->
+            warnings += "Bundle has duplicate variable names: ${duplicates.joinToString()}."
+        }
+
         val taskIds = bundle.tasks.map { it.id }.toSet()
         bundle.profiles.forEach { profile ->
             if (profile.enterTaskId !in taskIds) {
@@ -150,11 +157,30 @@ object OpenTaskerBundleCodec {
         }
 
         return BundleImportPlan(
-            canImport = warnings.none { it.startsWith("Unsupported schema version") },
+            canImport = warnings.none { warning -> warning.isBlockingImportWarning() },
             warnings = warnings,
             lossyWarnings = lossyWarnings,
         )
     }
+
+    private fun String.isBlockingImportWarning(): Boolean =
+        startsWith("Unsupported schema version") ||
+            startsWith("Bundle has duplicate task ids") ||
+            startsWith("Bundle has duplicate variable names")
+
+    private fun duplicateLongs(values: List<Long>): List<Long> =
+        values.groupingBy { it }
+            .eachCount()
+            .filterValues { count -> count > 1 }
+            .keys
+            .sorted()
+
+    private fun duplicateStrings(values: List<String>): List<String> =
+        values.groupingBy { it }
+            .eachCount()
+            .filterValues { count -> count > 1 }
+            .keys
+            .sorted()
 
     private fun capabilityRequirements(tasks: List<Task>): List<CapabilityRequirement> =
         tasks

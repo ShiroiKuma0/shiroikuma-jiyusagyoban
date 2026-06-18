@@ -23,6 +23,8 @@ Hardening, test coverage, and expression engine improvements.
 - **Maintainability**: split run-log rendering and import-review dialogs out of `ActiveAutomationUi.kt`, with source tests guarding the screen ownership boundary.
 - **Reliability**: made `flow.wait`, `vibrate`, and `screen.timeout` fail clearly on missing, malformed, or out-of-range durations instead of silently defaulting or clamping.
 - **Fix**: implemented deterministic `file.list` filename glob filtering and added the missing action editor field for `pattern`.
+- **Security**: tightened import validation by rejecting oversized/DOCTYPE Tasker XML before parsing and blocking OpenTasker bundles with duplicate task IDs or variable names.
+- **UX**: bounded long Tasker/OpenTasker import review dialogs so warnings and mapped-action lists stay scrollable on compact screens.
 - **Cleanup**: removed duplicate `ArrayStore.joinWith` method (identical to `join`).
 
 ## v0.2.72 - 2026-06-16
