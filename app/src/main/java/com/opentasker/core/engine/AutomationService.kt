@@ -80,8 +80,18 @@ class AutomationService : Service() {
         connectivityMonitor.start()
         appUsageMonitor.start(scope)
         shakeDetector.start()
-        registerReceiver(PackageContextEvents.receiver, PackageContextEvents.intentFilter(), RECEIVER_NOT_EXPORTED)
-        registerReceiver(BluetoothContextEvents.receiver, BluetoothContextEvents.intentFilter(), RECEIVER_NOT_EXPORTED)
+        ContextCompat.registerReceiver(
+            this,
+            PackageContextEvents.receiver,
+            PackageContextEvents.intentFilter(),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        ContextCompat.registerReceiver(
+            this,
+            BluetoothContextEvents.receiver,
+            BluetoothContextEvents.intentFilter(),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
         CameraMicContextEvents.start(this)
         profileCooldowns.putAll(cooldownStore.loadAll())
         scope.launch { pruneRunLogs(force = true) }

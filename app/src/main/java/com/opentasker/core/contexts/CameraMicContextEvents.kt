@@ -3,6 +3,7 @@ package com.opentasker.core.contexts
 import android.app.AppOpsManager
 import android.content.Context
 import android.os.Build
+import androidx.annotation.RequiresApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -15,7 +16,7 @@ object CameraMicContextEvents {
     @Volatile private var micCallback: AppOpsManager.OnOpActiveChangedListener? = null
 
     fun start(context: Context) {
-        if (Build.VERSION.SDK_INT < 29) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
 
         val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as? AppOpsManager ?: return
 
@@ -65,10 +66,12 @@ object CameraMicContextEvents {
     }
 
     fun stop(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
         val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as? AppOpsManager ?: return
         stop(appOps)
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
     private fun stop(appOps: AppOpsManager) {
         cameraCallback?.let { appOps.stopWatchingActive(it) }
         micCallback?.let { appOps.stopWatchingActive(it) }
