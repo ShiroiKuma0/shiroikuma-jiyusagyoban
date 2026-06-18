@@ -1,5 +1,6 @@
 package com.opentasker.core.storage
 
+import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -61,6 +62,53 @@ class DatabaseBackupManagerInstrumentedTest {
                 .allowMainThreadQueries()
                 .build()
             assertEquals(listOf("Keep me"), db.profileDao().getAll().map { it.name })
+        } finally {
+            db.close()
+            cleanup(context)
+        }
+    }
+
+    @Test
+    fun restoreRejectsIncompatibleSchemaShape() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        cleanup(context)
+
+        val db = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DATABASE)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val manager = DatabaseBackupManager(context, db, TEST_DATABASE)
+            db.profileDao().insert(Profile(name = "Current schema profile", enterTaskId = 1).toEntity())
+            val backup = manager.backup().getOrThrow()
+            SQLiteDatabase.openDatabase(backup.absolutePath, null, SQLiteDatabase.OPEN_READWRITE).use { sqlite ->
+                sqlite.execSQL("ALTER TABLE run_logs RENAME TO run_logs_old")
+                sqlite.execSQL(
+                    """
+                    CREATE TABLE run_logs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        taskId INTEGER NOT NULL,
+                        taskName TEXT NOT NULL,
+                        timestamp INTEGER NOT NULL,
+                        durationMs INTEGER NOT NULL,
+                        success INTEGER NOT NULL,
+                        message TEXT NOT NULL,
+                        source TEXT
+                    )
+                    """.trimIndent(),
+                )
+                sqlite.execSQL(
+                    """
+                    INSERT INTO run_logs (id, taskId, taskName, timestamp, durationMs, success, message, source)
+                    SELECT id, taskId, taskName, timestamp, durationMs, success, message, source FROM run_logs_old
+                    """.trimIndent(),
+                )
+                sqlite.execSQL("DROP TABLE run_logs_old")
+            }
+
+            val failure = manager.restore(backup).exceptionOrNull()
+
+            assertTrue(failure is java.io.IOException)
+            assertTrue(failure?.message?.contains("schema version") == true)
         } finally {
             db.close()
             cleanup(context)
