@@ -43,6 +43,12 @@ object TaskerXmlImporter {
         appVersion: String,
         importedAtEpochMs: Long = System.currentTimeMillis(),
     ): TaskerXmlImportReport {
+        require(rawXml.length <= MAX_TASKER_XML_CHARS) {
+            "Tasker XML exceeds ${MAX_TASKER_XML_CHARS / 1024 / 1024} MB size limit"
+        }
+        require(!DOCTYPE_PATTERN.containsMatchIn(rawXml)) {
+            "Tasker XML with DOCTYPE declarations is not supported"
+        }
         val doc = parseDocument(rawXml)
         val warnings = mutableListOf<String>()
         val lossyWarnings = mutableListOf<String>()
@@ -271,7 +277,7 @@ object TaskerXmlImporter {
         val factory = DocumentBuilderFactory.newInstance().apply {
             isNamespaceAware = false
             isExpandEntityReferences = false
-            setFeatureSafely("http://apache.org/xml/features/disallow-doctype-decl", true)
+            setRequiredFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
             setFeatureSafely("http://xml.org/sax/features/external-general-entities", false)
             setFeatureSafely("http://xml.org/sax/features/external-parameter-entities", false)
             setFeatureSafely("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
@@ -343,6 +349,14 @@ object TaskerXmlImporter {
         runCatching { setFeature(name, value) }
     }
 
+    private fun DocumentBuilderFactory.setRequiredFeature(name: String, value: Boolean) {
+        try {
+            setFeature(name, value)
+        } catch (error: Exception) {
+            throw IllegalStateException("XML parser does not support required secure feature: $name", error)
+        }
+    }
+
     private data class ParsedTaskerAction(
         val action: ActionSpec,
         val mapped: TaskerMappedAction?,
@@ -363,4 +377,6 @@ object TaskerXmlImporter {
     )
 
     const val TASKER_UNSUPPORTED_ACTION_ID = "tasker.unsupported"
+    private const val MAX_TASKER_XML_CHARS = 4 * 1024 * 1024
+    private val DOCTYPE_PATTERN = Regex("""<!\s*DOCTYPE\b""", RegexOption.IGNORE_CASE)
 }

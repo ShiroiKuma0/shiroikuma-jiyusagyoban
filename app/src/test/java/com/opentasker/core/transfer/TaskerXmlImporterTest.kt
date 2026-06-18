@@ -126,6 +126,41 @@ class TaskerXmlImporterTest {
     }
 
     @Test
+    fun rejectsDoctypeDeclarationsBeforeParsing() {
+        val error = runCatching {
+            TaskerXmlImporter.parse(
+                rawXml = """
+                    <!DOCTYPE TaskerData [
+                        <!ENTITY xxe SYSTEM "file:///etc/passwd">
+                    ]>
+                    <TaskerData>
+                        <Task sr="task1"><id>1</id><nme>&xxe;</nme></Task>
+                    </TaskerData>
+                """.trimIndent(),
+                appVersion = "0.2.73",
+                importedAtEpochMs = 123L,
+            )
+        }.exceptionOrNull()
+
+        assertTrue(error is IllegalArgumentException)
+        assertTrue(error!!.message.orEmpty().contains("DOCTYPE"))
+    }
+
+    @Test
+    fun rejectsOversizedTaskerXmlPayloads() {
+        val error = runCatching {
+            TaskerXmlImporter.parse(
+                rawXml = "x".repeat(4 * 1024 * 1024 + 1),
+                appVersion = "0.2.73",
+                importedAtEpochMs = 123L,
+            )
+        }.exceptionOrNull()
+
+        assertTrue(error is IllegalArgumentException)
+        assertTrue(error!!.message.orEmpty().contains("size limit"))
+    }
+
+    @Test
     fun buildsPreviewAndDisabledConfirmedImportBundle() {
         val report = TaskerXmlImporter.parse(
             rawXml = """

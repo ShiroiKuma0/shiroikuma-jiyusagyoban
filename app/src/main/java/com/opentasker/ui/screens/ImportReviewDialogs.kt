@@ -3,6 +3,7 @@ package com.opentasker.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
@@ -32,7 +33,9 @@ internal fun OpenTaskerBundleReviewDialog(
         text = {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 460.dp),
             ) {
                 item {
                     Text(
@@ -124,7 +127,9 @@ internal fun TaskerImportReviewDialog(
         text = {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 460.dp),
             ) {
                 item {
                     Text(

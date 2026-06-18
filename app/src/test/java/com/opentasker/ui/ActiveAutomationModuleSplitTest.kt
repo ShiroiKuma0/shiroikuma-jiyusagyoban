@@ -55,4 +55,14 @@ class ActiveAutomationModuleSplitTest {
             assertTrue("Missing shared helper: $helperDeclaration", shellSource.contains(helperDeclaration))
         }
     }
+
+    @Test
+    fun importReviewDialogsKeepScrollableContentBounded() {
+        val importReviewSource = screensSourceRoot.resolve("ImportReviewDialogs.kt").readText()
+
+        assertTrue(
+            "Import review dialogs must constrain long warning and action lists on small screens",
+            Regex("""heightIn\(max\s*=\s*460\.dp\)""").findAll(importReviewSource).count() >= 2,
+        )
+    }
 }
