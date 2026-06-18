@@ -105,6 +105,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
             android:theme="@style/Theme.OpenTasker">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

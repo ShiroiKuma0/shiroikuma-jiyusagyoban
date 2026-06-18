@@ -59,6 +59,8 @@ class OpenTaskerApp_NoHilt : Application() {
         }
         // Warm the persistent-variable cache (super- and project-globals) before any task runs.
         com.opentasker.core.engine.variables.PersistentGlobalScope.init(requireNotNull(_db).variableDao())
+        // Expose the running build as %APPVER so a task can flash it (catch stale installs).
+        com.opentasker.core.engine.variables.PersistentGlobalScope.set(0L, "APPVER", com.opentasker.app.BuildConfig.VERSION_NAME)
 
         RunLogPruneWorker.enqueue(this)
     }

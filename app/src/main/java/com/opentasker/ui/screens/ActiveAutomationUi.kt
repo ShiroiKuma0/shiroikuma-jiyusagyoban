@@ -16,6 +16,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -1066,9 +1067,19 @@ fun ActiveAutomationUi(
     val sortPrefs by ListSortStore.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    var screen by remember { mutableStateOf(OpenTaskerScreen.Profiles) }
-    // Clear the name search when switching tabs so each list starts unfiltered.
-    LaunchedEffect(screen) { searchQuery = "" }
+    // Remember the last tab across restarts (the app otherwise always reopens on Profiles).
+    val uiStatePrefs = remember { context.getSharedPreferences("ui_state", android.content.Context.MODE_PRIVATE) }
+    var screen by remember {
+        mutableStateOf(
+            runCatching { OpenTaskerScreen.valueOf(uiStatePrefs.getString("last_tab", "") ?: "") }
+                .getOrDefault(OpenTaskerScreen.Profiles),
+        )
+    }
+    // Clear the name search when switching tabs so each list starts unfiltered; persist the tab choice.
+    LaunchedEffect(screen) {
+        searchQuery = ""
+        uiStatePrefs.edit().putString("last_tab", screen.name).apply()
+    }
     var showUiCustomization by remember { mutableStateOf(false) }
     var showProjectManagement by remember { mutableStateOf(false) }
     var showTaskLibrary by remember { mutableStateOf(false) }
@@ -1554,28 +1565,55 @@ fun ActiveAutomationUi(
                         }
                     }
                     // Edge fades + chevrons — only when there's scrollable content past that edge.
+                    // Each sits in a matchParentSize box so it tracks the ROW's height; using
+                    // fillMaxHeight directly would inflate to the Scaffold's loose max (the whole screen),
+                    // which on a narrow/folded screen (where the bar overflows) covered the entire UI.
                     if (navScroll.canScrollBackward) {
-                        Box(
-                            Modifier.align(Alignment.CenterStart).fillMaxHeight().width(28.dp)
-                                .background(Brush.horizontalGradient(listOf(background, Color.Transparent))),
-                            contentAlignment = Alignment.CenterStart,
-                        ) {
-                            Icon(Icons.Filled.ChevronLeft, contentDescription = null, tint = primary)
+                        Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterStart) {
+                            Box(
+                                Modifier.fillMaxHeight().width(28.dp)
+                                    .background(Brush.horizontalGradient(listOf(background, Color.Transparent))),
+                                contentAlignment = Alignment.CenterStart,
+                            ) {
+                                Icon(Icons.Filled.ChevronLeft, contentDescription = null, tint = primary)
+                            }
                         }
                     }
                     if (navScroll.canScrollForward) {
-                        Box(
-                            Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(28.dp)
-                                .background(Brush.horizontalGradient(listOf(Color.Transparent, background))),
-                            contentAlignment = Alignment.CenterEnd,
-                        ) {
-                            Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = primary)
+                        Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
+                            Box(
+                                Modifier.fillMaxHeight().width(28.dp)
+                                    .background(Brush.horizontalGradient(listOf(Color.Transparent, background))),
+                                contentAlignment = Alignment.CenterEnd,
+                            ) {
+                                Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = primary)
+                            }
                         }
                     }
                 }
             }
         },
     ) { innerPadding ->
+        // A horizontal swipe across the page switches to the previous / next tab (pager-like). Vertical
+        // list scrolling is a different axis, so it isn't disturbed.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    val threshold = 64.dp.toPx()
+                    var total = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { total = 0f },
+                        onHorizontalDrag = { _, d -> total += d },
+                        onDragEnd = {
+                            val e = OpenTaskerScreen.entries
+                            val i = screen.ordinal
+                            if (total <= -threshold) screen = e[(i + 1) % e.size]
+                            else if (total >= threshold) screen = e[(i - 1 + e.size) % e.size]
+                        },
+                    )
+                },
+        ) {
         when (screen) {
             OpenTaskerScreen.Profiles -> ProfilesScreen(
                 profiles = visibleProfiles,
@@ -1755,6 +1793,7 @@ fun ActiveAutomationUi(
                 onRetentionPolicyChange = viewModel::updateRunLogRetention,
                 contentPadding = innerPadding,
             )
+        }
         }
     }
 
