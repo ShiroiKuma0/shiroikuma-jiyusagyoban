@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Checkbox
 import com.opentasker.ui.components.ReorderableRow
+import com.opentasker.ui.theme.ThemeStore
 import com.opentasker.ui.components.RgbaColorPickerDialog
 import com.opentasker.ui.components.SelectionBar
 import com.opentasker.ui.components.SelectionCheck
@@ -38,6 +39,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
@@ -772,6 +774,7 @@ private fun SceneElementEditorDialog(
     var styleAlign by remember(state) { mutableStateOf(initial.config["align"]?.trim()?.lowercase() ?: "start") }
     var styleBorderColor by remember(state) { mutableStateOf(initial.config["borderColor"] ?: "") }
     var styleBorderWidth by remember(state) { mutableStateOf(initial.config["borderWidth"] ?: "") }
+    var styleFont by remember(state) { mutableStateOf(initial.config["font"] ?: "") }
     var tapTaskId by remember(state) { mutableStateOf(initial.tapTaskId) }
     var longPressTaskId by remember(state) { mutableStateOf(initial.longPressTaskId) }
 
@@ -817,7 +820,7 @@ private fun SceneElementEditorDialog(
                 config = elementConfig(
                     type, label, sliderMin, sliderMax, sliderValue, sliderVar, sliderVertical, numberStep, boolValue,
                     textValue, spinnerOptions, shapeCorner, imageSource,
-                    SceneElementStyle(styleTextColor, styleBgColor, styleSize, styleBold, styleAlign, styleBorderColor, styleBorderWidth),
+                    SceneElementStyle(styleTextColor, styleBgColor, styleSize, styleBold, styleAlign, styleBorderColor, styleBorderWidth, styleFont),
                 ),
                 tapTaskId = null,
                 longPressTaskId = null,
@@ -877,6 +880,7 @@ private fun SceneElementEditorDialog(
                         styleAlign = defaults.config["align"]?.trim()?.lowercase() ?: "start"
                         styleBorderColor = defaults.config["borderColor"] ?: ""
                         styleBorderWidth = defaults.config["borderWidth"] ?: ""
+                        styleFont = defaults.config["font"] ?: ""
                     },
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -1139,6 +1143,27 @@ private fun SceneElementEditorDialog(
                         Text("Bold", style = MaterialTheme.typography.bodyMedium)
                         Switch(checked = styleBold, onCheckedChange = { styleBold = it })
                     }
+                    // Font picker — the element's text/label font (e.g. a brush font on a slider heading).
+                    val fontOptions = remember { ThemeStore.availableFonts() }
+                    var fontMenuOpen by remember { mutableStateOf(false) }
+                    Box(Modifier.fillMaxWidth()) {
+                        OutlinedButton(onClick = { fontMenuOpen = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                "Font: " + (fontOptions.firstOrNull { it.fileName == styleFont }?.displayName ?: styleFont.ifBlank { "Default" }),
+                                maxLines = 1,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                        }
+                        DropdownMenu(expanded = fontMenuOpen, onDismissRequest = { fontMenuOpen = false }) {
+                            fontOptions.forEach { opt ->
+                                DropdownMenuItem(
+                                    text = { Text(opt.displayName) },
+                                    onClick = { styleFont = opt.fileName; fontMenuOpen = false },
+                                )
+                            }
+                        }
+                    }
                     if (boxStyled) {
                         SceneColorField(
                             label = if (type == SceneElementType.BUTTON) "Button colour" else "Background colour",
@@ -1193,7 +1218,7 @@ private fun SceneElementEditorDialog(
                             config = elementConfig(
                                 type, label, sliderMin, sliderMax, sliderValue, sliderVar, sliderVertical, numberStep, boolValue,
                                 textValue, spinnerOptions, shapeCorner, imageSource,
-                                SceneElementStyle(styleTextColor, styleBgColor, styleSize, styleBold, styleAlign, styleBorderColor, styleBorderWidth),
+                                SceneElementStyle(styleTextColor, styleBgColor, styleSize, styleBold, styleAlign, styleBorderColor, styleBorderWidth, styleFont),
                             ),
                             tapTaskId = tapTaskId,
                             longPressTaskId = longPressTaskId,
@@ -1503,6 +1528,7 @@ private data class SceneElementStyle(
     val align: String,
     val borderColor: String,
     val borderWidth: String,
+    val font: String = "",
 )
 
 /** Adds the non-default style keys to a config builder. */
@@ -1514,6 +1540,7 @@ private fun MutableMap<String, String>.putStyle(style: SceneElementStyle) {
     if (style.align.isNotBlank() && style.align != "start") put("align", style.align)
     style.borderColor.trim().takeIf { it.isNotBlank() }?.let { put("borderColor", it) }
     style.borderWidth.trim().toIntOrNull()?.takeIf { it > 0 }?.let { put("borderWidth", it.toString()) }
+    style.font.trim().takeIf { it.isNotBlank() }?.let { put("font", it) }
 }
 
 private fun elementConfig(
