@@ -57,6 +57,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.opentasker.app.BuildConfig
+import com.opentasker.core.accessibility.ShiroiKumaAccessibilityService
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import com.opentasker.core.location.LocationPolicyDisclosures
@@ -520,6 +521,14 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
                 Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}")),
             ),
             requiredFor = "Scenes, overlay UI",
+        ),
+        PermissionSetupItem(
+            title = "Accessibility service",
+            body = "Lets 白い熊 自由作業盤 perform global navigation — Back, Home, Recents, notification/quick-settings panels — used by the edge-bar gestures.",
+            granted = ShiroiKumaAccessibilityService.isConnected,
+            actionLabel = "Open settings",
+            action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)),
+            requiredFor = "Back / Home / Recents actions",
         ),
         PermissionSetupItem(
             title = "Foreground location",

@@ -12,6 +12,9 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.shizuku.ShizukuShell
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 // ---------------------------------------------------------------------------------------------
 // Wave 3 — gated actions that DO work on stock Android: accessibility global actions (Back,
@@ -20,16 +23,27 @@ import com.opentasker.core.engine.ActionResult
 // the Shizuku integration is built; the backend is currently a stub.)
 // ---------------------------------------------------------------------------------------------
 
-private fun globalAction(ctx: ActionContext, action: Int, label: String): ActionResult {
-    if (!ShiroiKumaAccessibilityService.isConnected) {
-        return ActionResult.Failure("Enable the 白い熊 自由作業盤 accessibility service in Android settings first")
-    }
-    return if (ShiroiKumaAccessibilityService.perform(action)) {
+// Hybrid global action: the in-process accessibility action is instant, so try it first; if the
+// service is off (Android disables accessibility services on every app update) fall back to the
+// equivalent Shizuku key event, where one exists (keyCode != 0). Fast when possible, robust when not.
+private suspend fun globalAction(ctx: ActionContext, action: Int, label: String, keyCode: Int = 0): ActionResult {
+    if (ShiroiKumaAccessibilityService.isConnected && ShiroiKumaAccessibilityService.perform(action)) {
         ctx.logger(label)
-        ActionResult.Success
-    } else {
-        ActionResult.Failure("$label not available on this device")
+        return ActionResult.Success
     }
+    if (keyCode != 0 && ShizukuShell.available()) {
+        val ok = runCatching {
+            withContext(Dispatchers.IO) { ShizukuShell.exec("input keyevent $keyCode").exitCode == 0 }
+        }.getOrDefault(false)
+        if (ok) {
+            ctx.logger("$label (Shizuku)")
+            return ActionResult.Success
+        }
+    }
+    return ActionResult.Failure(
+        if (keyCode != 0) "$label needs the accessibility service enabled, or Shizuku running"
+        else "Enable the 白い熊 自由作業盤 accessibility service in Android settings first",
+    )
 }
 
 /** `Back Button` (Tasker 245). */
@@ -37,7 +51,7 @@ class NavBackAction : Action {
     override val id = "nav.back"
     override val category = ActionCategory.SYSTEM
     override suspend fun run(ctx: ActionContext, args: Map<String, String>) =
-        globalAction(ctx, AccessibilityService.GLOBAL_ACTION_BACK, "Back")
+        globalAction(ctx, AccessibilityService.GLOBAL_ACTION_BACK, "Back", keyCode = 4) // KEYCODE_BACK
 }
 
 /** `Show Recents` (Tasker 247). */
@@ -45,7 +59,7 @@ class NavRecentsAction : Action {
     override val id = "nav.recents"
     override val category = ActionCategory.SYSTEM
     override suspend fun run(ctx: ActionContext, args: Map<String, String>) =
-        globalAction(ctx, AccessibilityService.GLOBAL_ACTION_RECENTS, "Recents")
+        globalAction(ctx, AccessibilityService.GLOBAL_ACTION_RECENTS, "Recents", keyCode = 187) // KEYCODE_APP_SWITCH
 }
 
 /** `Status Bar` / Notifications panel (Tasker 512). */
