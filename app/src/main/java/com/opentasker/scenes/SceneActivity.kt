@@ -21,6 +21,8 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.draggable2D
+import androidx.compose.foundation.gestures.rememberDraggable2DState
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
@@ -310,24 +312,53 @@ internal fun SceneElementView(
         }
 
         SceneElementType.BUTTON -> {
-            // Swipe via `draggable` — the same primitive the (working) overlay sliders use, so it sees
-            // drags where a hand-rolled pointer loop didn't. Fires once a vertical drag passes ~24dp.
-            val slopPx = with(LocalDensity.current) { 24.dp.toPx() }
-            var acc by remember(element.id) { mutableStateOf(0f) }
-            var fired by remember(element.id) { mutableStateOf(false) }
-            val dragState = rememberDraggableState { delta ->
-                acc += delta
-                if (swipeTask != null && !fired && kotlin.math.abs(acc) > slopPx) { fired = true; onRunTask(swipeTask) }
-            }
+            // Directional swipes (edge bars): the dominant axis of a drag past ~36dp picks up/down/left/
+            // right, each running its own task. So a vertical slide and a horizontal swipe do different
+            // things (e.g. vertical = open a panel; horizontal ≠ that).
+            val swipeUp = cfg["swipeUp"]?.toLongOrNull()
+            val swipeDown = cfg["swipeDown"]?.toLongOrNull()
+            val swipeLeft = cfg["swipeLeft"]?.toLongOrNull()
+            val swipeRight = cfg["swipeRight"]?.toLongOrNull()
+            val downTask = cfg["downTask"]?.toLongOrNull()   // DEBUG: fires on touch-down
+            val dragTask = cfg["dragTask"]?.toLongOrNull()   // DEBUG: fires on the first move
+            val hasSwipe = swipeUp != null || swipeDown != null || swipeLeft != null || swipeRight != null ||
+                downTask != null || dragTask != null
             Box(
                 Modifier
                     .fillMaxSize()
                     .clip(RoundedCornerShape(10.dp))
-                    .background(sceneColor(cfg["bgColor"]) ?: MaterialTheme.colorScheme.primary)
+                    // bgColor read via v() so a (debug) task can flip an edge strip visible/invisible live.
+                    .background(sceneColor(v("bgColor")) ?: MaterialTheme.colorScheme.primary)
                     .then(if (styleBorderW > 0) Modifier.border(styleBorderW.dp, styleBorderColor ?: MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp)) else Modifier)
-                    .then(if (swipeTask != null) Modifier.draggable(state = dragState, orientation = Orientation.Vertical, onDragStarted = { acc = 0f; fired = false }) else Modifier)
-                    // No tap detector on a swipe element — it competes with the drag. Tap is for plain buttons.
-                    .then(if (swipeTask == null && (element.tapTaskId != null || element.longPressTaskId != null)) Modifier.pointerInput(element.id) {
+                    .then(if (hasSwipe) Modifier.pointerInput(element.id) {
+                        val slop = 36.dp.toPx()
+                        awaitEachGesture {
+                            // Consume the DOWN so this (FLAG_NOT_FOCUSABLE) overlay window claims the
+                            // gesture — otherwise it "slips" the move stream away after an unclaimed down
+                            // and a drag never registers (a tap, with no move, survives without this).
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            down.consume()
+                            downTask?.let(onRunTask)
+                            var dx = 0f; var dy = 0f; var fired = false; var dbgMoved = false
+                            while (true) {
+                                val ev = awaitPointerEvent()
+                                val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
+                                if (!ch.pressed) break
+                                val pc = ch.positionChange(); dx += pc.x; dy += pc.y; ch.consume()
+                                if (!dbgMoved && (pc.x != 0f || pc.y != 0f)) { dbgMoved = true; dragTask?.let(onRunTask) }
+                                if (!fired && (kotlin.math.abs(dx) > slop || kotlin.math.abs(dy) > slop)) {
+                                    fired = true
+                                    val t = if (kotlin.math.abs(dx) > kotlin.math.abs(dy)) {
+                                        if (dx > 0) swipeRight else swipeLeft
+                                    } else {
+                                        if (dy > 0) swipeDown else swipeUp
+                                    }
+                                    t?.let(onRunTask)
+                                }
+                            }
+                        }
+                    }
+                    else if (element.tapTaskId != null || element.longPressTaskId != null) Modifier.pointerInput(element.id) {
                         detectTapGestures(
                             onTap = { element.tapTaskId?.let(onRunTask) },
                             onLongPress = { element.longPressTaskId?.let(onRunTask) },
