@@ -55,6 +55,7 @@ object SceneOverlayManager {
         val params: WindowManager.LayoutParams,
         val fullscreen: Boolean,
         val heightFraction: Float = 0f,
+        val widthFraction: Float = 0f,
         val timeoutMs: Long = 0L,
         var dismissRunnable: Runnable? = null,
     )
@@ -93,6 +94,11 @@ object SceneOverlayManager {
                     val h = (ov.heightFraction * real.heightPixels).toInt()
                     if (ov.params.height != h) { ov.params.height = h; runCatching { wm.updateViewLayout(ov.view, ov.params) } }
                 }
+                // A fraction-width (bottom) strip re-sizes to its fraction of the new screen width.
+                ov.widthFraction > 0f -> {
+                    val w = (ov.widthFraction * real.widthPixels).toInt()
+                    if (ov.params.width != w) { ov.params.width = w; runCatching { wm.updateViewLayout(ov.view, ov.params) } }
+                }
             }
         }
     }
@@ -119,7 +125,7 @@ object SceneOverlayManager {
      * card and placed by [position] ("top"/"center"/"bottom"). [timeoutMs] > 0 auto-dismisses.
      * Safe to call from any thread.
      */
-    fun show(context: Context, scene: Scene, position: String? = null, modal: Boolean = true, timeoutMs: Long = 0L, dismissOnOutside: Boolean = true, fullWidth: Boolean = false, fullscreen: Boolean = false, edgeCenter: Boolean = false, insetDp: Int = 0, heightFraction: Float = 0f, vAlign: String? = null) {
+    fun show(context: Context, scene: Scene, position: String? = null, modal: Boolean = true, timeoutMs: Long = 0L, dismissOnOutside: Boolean = true, fullWidth: Boolean = false, fullscreen: Boolean = false, edgeCenter: Boolean = false, insetDp: Int = 0, heightFraction: Float = 0f, vAlign: String? = null, widthFraction: Float = 0f, hAlign: String? = null) {
         val app = context.applicationContext
         main.post {
             appContext = app
@@ -155,6 +161,7 @@ object SceneOverlayManager {
                             fullWidth = fullWidth,
                             fullscreen = fullscreen,
                             fillHeight = heightFraction > 0f,
+                            fillWidth = widthFraction > 0f,
                             onDismiss = { hide(scene.id) },
                             onRunTask = ::runTask,
                             onSetVar = ::setVar,
@@ -201,6 +208,7 @@ object SceneOverlayManager {
                     when {
                         fullscreen -> real.widthPixels
                         fullWidth -> WindowManager.LayoutParams.MATCH_PARENT
+                        widthFraction > 0f -> (widthFraction * real.widthPixels).toInt()
                         else -> WindowManager.LayoutParams.WRAP_CONTENT
                     },
                     when {
@@ -242,6 +250,17 @@ object SceneOverlayManager {
                                 }
                             }
                         }
+                        // Bottom edge bar: hAlign picks the left / centre / right third (horizontal
+                        // gravity); flush at the very bottom edge.
+                        pos == "bottom" && (widthFraction > 0f || hAlign != null) -> {
+                            val vert = gravity and Gravity.VERTICAL_GRAVITY_MASK
+                            gravity = vert or when (hAlign?.trim()?.lowercase()) {
+                                "left" -> Gravity.START
+                                "right" -> Gravity.END
+                                else -> Gravity.CENTER_HORIZONTAL
+                            }
+                            y = 0
+                        }
                         // A full-width bar sits flush over the status bar; a regular HUD gets a small inset.
                         !fullWidth && gravity != Gravity.CENTER -> y = (48 * app.resources.displayMetrics.density).toInt()
                     }
@@ -250,9 +269,9 @@ object SceneOverlayManager {
             runCatching { wm.addView(composeView, params) }
                 .onSuccess {
                     owner.onResume()
-                    val overlay = Overlay(composeView, owner, params, fullscreen, heightFraction, timeoutMs)
+                    val overlay = Overlay(composeView, owner, params, fullscreen, heightFraction, widthFraction, timeoutMs)
                     active[scene.id] = overlay
-                    if (fullscreen || heightFraction > 0f) ensureDisplayListener(app)
+                    if (fullscreen || heightFraction > 0f || widthFraction > 0f) ensureDisplayListener(app)
                     // Keep system edge gestures (e.g. the back swipe) from stealing drags on a tap-through
                     // panel/strip — otherwise a slide along a screen edge never reaches the overlay.
                     if (!modal && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

@@ -192,6 +192,7 @@ internal fun SceneOverlay(
     fullWidth: Boolean = false,
     fullscreen: Boolean = false,
     fillHeight: Boolean = false,
+    fillWidth: Boolean = false,
     onDismiss: () -> Unit,
     onRunTask: (Long) -> Unit,
     onSetVar: (sceneProjectId: Long?, name: String, value: String) -> Unit,
@@ -216,7 +217,7 @@ internal fun SceneOverlay(
             }
         }
     } else {
-        SceneCard(scene, scale = 1f, absorbTaps = false, fullWidth = fullWidth, fullscreen = fullscreen, fillHeight = fillHeight, onRunTask = onRunTask, onSetVar = onSetVar)
+        SceneCard(scene, scale = 1f, absorbTaps = false, fullWidth = fullWidth, fullscreen = fullscreen, fillHeight = fillHeight, fillWidth = fillWidth, onRunTask = onRunTask, onSetVar = onSetVar)
     }
 }
 
@@ -228,6 +229,7 @@ private fun SceneCard(
     fullWidth: Boolean = false,
     fullscreen: Boolean = false,
     fillHeight: Boolean = false,
+    fillWidth: Boolean = false,
     onRunTask: (Long) -> Unit,
     onSetVar: (sceneProjectId: Long?, name: String, value: String) -> Unit,
 ) {
@@ -242,8 +244,10 @@ private fun SceneCard(
             .then(
                 if (fullscreen) Modifier.fillMaxSize()
                 else if (fullWidth) Modifier.fillMaxWidth().height((sh * scale).dp)
-                // fillHeight (an edge strip): keep the configured width, fill the fraction-height window.
+                // fillHeight (a side edge strip): keep the configured width, fill the fraction-height window.
                 else if (fillHeight) Modifier.width((sw * scale).dp).fillMaxHeight()
+                // fillWidth (a bottom edge strip): keep the configured height, fill the fraction-width window.
+                else if (fillWidth) Modifier.fillMaxWidth().height((sh * scale).dp)
                 else Modifier.size((sw * scale).dp, (sh * scale).dp),
             )
             .clip(shape)
@@ -316,17 +320,27 @@ internal fun SceneElementView(
         }
 
         SceneElementType.BUTTON -> {
-            // Edge bars: a strip binds any of swipe up/down/left/right, tap, double-tap and long-press,
-            // each to its own task (the dominant axis of a drag past ~36dp picks the swipe direction).
+            // Edge bars: a strip binds any of swipe up/down/left/right (short) and longSwipe* (a longer
+            // drag in that direction), plus tap, double-tap and long-press — each to its own task.
             val swipeUp = cfg["swipeUp"]?.toLongOrNull()
             val swipeDown = cfg["swipeDown"]?.toLongOrNull()
             val swipeLeft = cfg["swipeLeft"]?.toLongOrNull()
             val swipeRight = cfg["swipeRight"]?.toLongOrNull()
+            val longSwipeUp = cfg["longSwipeUp"]?.toLongOrNull()
+            val longSwipeDown = cfg["longSwipeDown"]?.toLongOrNull()
+            val longSwipeLeft = cfg["longSwipeLeft"]?.toLongOrNull()
+            val longSwipeRight = cfg["longSwipeRight"]?.toLongOrNull()
             val doubleTapId = cfg["doubleTap"]?.toLongOrNull()
             val tapId = element.tapTaskId
             val longPressId = element.longPressTaskId
-            val hasSwipe = swipeUp != null || swipeDown != null || swipeLeft != null || swipeRight != null
+            val hasSwipe = swipeUp != null || swipeDown != null || swipeLeft != null || swipeRight != null ||
+                longSwipeUp != null || longSwipeDown != null || longSwipeLeft != null || longSwipeRight != null
             val slopPx = with(LocalDensity.current) { 36.dp.toPx() }
+            val longSwipePx = with(LocalDensity.current) { 140.dp.toPx() }
+            // Pick the task for the swipe's dominant axis from a (up,down,left,right) set.
+            fun pick(dx: Float, dy: Float, up: Long?, down: Long?, left: Long?, right: Long?): Long? =
+                if (kotlin.math.abs(dx) > kotlin.math.abs(dy)) { if (dx > 0) right else left }
+                else { if (dy > 0) down else up }
             Box(
                 Modifier
                     .fillMaxSize()
@@ -340,13 +354,11 @@ internal fun SceneElementView(
                     .then(if (hasSwipe || doubleTapId != null) Modifier.pointerInput(element.id) {
                         detectEdgeGestures(
                             slopPx = slopPx,
-                            onSwipe = { dx, dy ->
-                                val t = if (kotlin.math.abs(dx) > kotlin.math.abs(dy)) {
-                                    if (dx > 0) swipeRight else swipeLeft
-                                } else {
-                                    if (dy > 0) swipeDown else swipeUp
-                                }
-                                t?.let(onRunTask)
+                            longSwipePx = longSwipePx,
+                            onSwipe = { dx, dy -> pick(dx, dy, swipeUp, swipeDown, swipeLeft, swipeRight)?.let(onRunTask) },
+                            onLongSwipe = { dx, dy ->
+                                val t = pick(dx, dy, longSwipeUp, longSwipeDown, longSwipeLeft, longSwipeRight)
+                                t?.let(onRunTask); t != null
                             },
                             onTap = tapId?.let { id -> { onRunTask(id) } },
                             onDoubleTap = doubleTapId?.let { id -> { onRunTask(id) } },
@@ -414,7 +426,7 @@ internal fun SceneElementView(
                 // A horizontal Slider rotated 90° CCW: its track length follows the element height, so
                 // the top is max and dragging up increases the value.
                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    if (label.isNotBlank()) Text(label, style = MaterialTheme.typography.labelMedium, color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontWeight = styleWeightOrNull)
+                    if (label.isNotBlank()) Text(label, style = MaterialTheme.typography.labelMedium, color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontFamily = styleFont, fontWeight = styleWeightOrNull)
                     BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                         val trackLength = maxHeight
                         Slider(
@@ -431,7 +443,7 @@ internal fun SceneElementView(
                 }
             } else {
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
-                    if (label.isNotBlank()) Text(label, style = MaterialTheme.typography.labelMedium, color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontWeight = styleWeightOrNull)
+                    if (label.isNotBlank()) Text(label, style = MaterialTheme.typography.labelMedium, color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontFamily = styleFont, fontWeight = styleWeightOrNull)
                     Slider(
                         value = value,
                         onValueChange = onChange,
@@ -718,7 +730,9 @@ private fun sceneBool(s: String): Boolean = s.trim().lowercase() in setOf("true"
  */
 private suspend fun PointerInputScope.detectEdgeGestures(
     slopPx: Float,
+    longSwipePx: Float,
     onSwipe: (Float, Float) -> Unit,
+    onLongSwipe: (Float, Float) -> Boolean,
     onTap: (() -> Unit)?,
     onDoubleTap: (() -> Unit)?,
     onLongPress: (() -> Unit)?,
@@ -743,7 +757,22 @@ private suspend fun PointerInputScope.detectEdgeGestures(
             @Suppress("UNREACHABLE_CODE") "tap"
         }
         when (phase) {
-            "swipe" -> { onSwipe(dx, dy); drainPressed(down.id) }
+            "swipe" -> {
+                // Keep tracking: cross the long threshold → fire the long-swipe (if one is bound for this
+                // direction); otherwise fire the short swipe on release. So a quick flick = short, a long
+                // drag = long, and a long drag with no long binding falls back to the short task.
+                var firedLong = false
+                while (true) {
+                    val ev = awaitPointerEvent()
+                    val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
+                    if (!ch.pressed) break
+                    val pc = ch.positionChange(); dx += pc.x; dy += pc.y; ch.consume()
+                    if (!firedLong && (kotlin.math.abs(dx) > longSwipePx || kotlin.math.abs(dy) > longSwipePx)) {
+                        firedLong = onLongSwipe(dx, dy)
+                    }
+                }
+                if (!firedLong) onSwipe(dx, dy)
+            }
             null -> { onLongPress?.invoke(); drainPressed(down.id) }
             else -> {
                 if (onDoubleTap != null) {

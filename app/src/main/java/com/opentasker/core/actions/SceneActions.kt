@@ -46,8 +46,11 @@ class ShowSceneAction : Action {
         val heightFraction = args["heightFraction"]?.trim()?.toFloatOrNull()?.coerceIn(0f, 1f) ?: 0f
         // vAlign: top/center/bottom — which third a left/right edge strip sits in.
         val vAlign = args["vAlign"]?.trim()?.lowercase()?.ifBlank { null }
+        // widthFraction + hAlign: a bottom edge strip's width (0..1 of the screen) and which third (left/center/right).
+        val widthFraction = args["widthFraction"]?.trim()?.toFloatOrNull()?.coerceIn(0f, 1f) ?: 0f
+        val hAlign = args["hAlign"]?.trim()?.lowercase()?.ifBlank { null }
         if (SceneOverlayManager.canOverlay(ctx.app)) {
-            SceneOverlayManager.show(ctx.app, scene, position, modal, timeoutMs, dismissOnOutside, fullWidth, fullscreen, edgeCenter, insetDp, heightFraction, vAlign)
+            SceneOverlayManager.show(ctx.app, scene, position, modal, timeoutMs, dismissOnOutside, fullWidth, fullscreen, edgeCenter, insetDp, heightFraction, vAlign, widthFraction, hAlign)
             ctx.logger("Show scene \"${scene.name}\" (overlay, ${if (modal) "modal" else "tap-through"})")
         } else {
             val intent = Intent(ctx.app, SceneActivity::class.java).apply {
