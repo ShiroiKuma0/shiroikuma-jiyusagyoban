@@ -1,0 +1,58 @@
+package com.opentasker.ui
+
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.io.path.readText
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ActiveAutomationModuleSplitTest {
+    private val screensSourceRoot: Path = listOf(
+        Path.of("src/main/java/com/opentasker/ui/screens"),
+        Path.of("app/src/main/java/com/opentasker/ui/screens"),
+    ).first(Files::exists)
+
+    @Test
+    fun activeAutomationShellDelegatesRunLogAndImportReviewWorkflows() {
+        val shellSource = screensSourceRoot.resolve("ActiveAutomationUi.kt").readText()
+        val runLogSource = screensSourceRoot.resolve("RunLogScreenContent.kt").readText()
+        val importReviewSource = screensSourceRoot.resolve("ImportReviewDialogs.kt").readText()
+
+        listOf(
+            "RunLogScreenContent",
+            "RunLogRetentionCard",
+            "RunLogFilterCard",
+            "RunLogCard",
+            "RunLogTraceRow",
+            "OpenTaskerBundleReviewDialog",
+            "TaskerImportReviewDialog",
+            "TaskerImportListSection",
+        ).forEach { functionName ->
+            assertFalse(
+                "ActiveAutomationUi.kt should not own $functionName",
+                Regex("""private fun $functionName\b|internal fun $functionName\b""").containsMatchIn(shellSource),
+            )
+        }
+
+        assertTrue(runLogSource.contains("internal fun RunLogScreenContent"))
+        assertTrue(runLogSource.contains("private fun RunLogCard"))
+        assertTrue(runLogSource.contains("private fun RunLogTraceRow"))
+        assertTrue(importReviewSource.contains("internal fun OpenTaskerBundleReviewDialog"))
+        assertTrue(importReviewSource.contains("internal fun TaskerImportReviewDialog"))
+        assertTrue(importReviewSource.contains("private fun TaskerImportListSection"))
+    }
+
+    @Test
+    fun activeAutomationShellExposesSharedUiHelpersInternally() {
+        val shellSource = screensSourceRoot.resolve("ActiveAutomationUi.kt").readText()
+
+        listOf(
+            "internal fun SummaryMetric",
+            "internal fun StatusPill",
+            "internal fun InlineNotice",
+        ).forEach { helperDeclaration ->
+            assertTrue("Missing shared helper: $helperDeclaration", shellSource.contains(helperDeclaration))
+        }
+    }
+}
