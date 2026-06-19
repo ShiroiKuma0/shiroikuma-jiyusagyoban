@@ -24,6 +24,7 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.core.accessibility.ShiroiKumaAccessibilityService
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.engine.variables.PersistentGlobalScope
 import com.opentasker.core.model.Scene
@@ -53,6 +54,7 @@ object SceneOverlayManager {
         val view: ComposeView,
         val owner: OverlayLifecycleOwner,
         val params: WindowManager.LayoutParams,
+        val wm: WindowManager,
         val fullscreen: Boolean,
         val heightFraction: Float = 0f,
         val widthFraction: Float = 0f,
@@ -87,17 +89,17 @@ object SceneOverlayManager {
                     if (ov.params.width != real.widthPixels || ov.params.height != real.heightPixels) {
                         ov.params.width = real.widthPixels
                         ov.params.height = real.heightPixels
-                        runCatching { wm.updateViewLayout(ov.view, ov.params) }
+                        runCatching { ov.wm.updateViewLayout(ov.view, ov.params) }
                     }
                 // A fraction-height edge strip re-sizes to its fraction of the new screen height.
                 ov.heightFraction > 0f -> {
                     val h = (ov.heightFraction * real.heightPixels).toInt()
-                    if (ov.params.height != h) { ov.params.height = h; runCatching { wm.updateViewLayout(ov.view, ov.params) } }
+                    if (ov.params.height != h) { ov.params.height = h; runCatching { ov.wm.updateViewLayout(ov.view, ov.params) } }
                 }
                 // A fraction-width (bottom) strip re-sizes to its fraction of the new screen width.
                 ov.widthFraction > 0f -> {
                     val w = (ov.widthFraction * real.widthPixels).toInt()
-                    if (ov.params.width != w) { ov.params.width = w; runCatching { wm.updateViewLayout(ov.view, ov.params) } }
+                    if (ov.params.width != w) { ov.params.width = w; runCatching { ov.wm.updateViewLayout(ov.view, ov.params) } }
                 }
             }
         }
@@ -130,9 +132,14 @@ object SceneOverlayManager {
         main.post {
             appContext = app
             if (active.containsKey(scene.id)) return@post
-            val wm = app.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            // The bottom edge bar (widthFraction) is routed through the accessibility service as a
+            // TYPE_ACCESSIBILITY_OVERLAY when it's enabled: that captures the bottom system gesture the
+            // OS otherwise pilfers WITHOUT taking key focus (so the app's keyboard keeps working). When
+            // the service is off, it falls back to a focusable app overlay (captures, but holds focus).
+            val a11y = if (widthFraction > 0f) ShiroiKumaAccessibilityService.service else null
+            val wm = (a11y ?: app).getSystemService(Context.WINDOW_SERVICE) as WindowManager
             val owner = OverlayLifecycleOwner().apply { onCreate() }
-            val composeView = ComposeView(app).apply {
+            val composeView = ComposeView(a11y ?: app).apply {
                 setViewTreeLifecycleOwner(owner)
                 setViewTreeSavedStateRegistryOwner(owner)
                 setViewTreeViewModelStoreOwner(owner)
@@ -169,10 +176,10 @@ object SceneOverlayManager {
                     }
                 }
             }
-            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
+            val type = when {
+                a11y != null -> WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                else -> @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
             }
             val params = if (modal) {
                 // Full-screen, focusable: the scrim blocks the app underneath; the card is placed by
@@ -198,6 +205,12 @@ object SceneOverlayManager {
                         WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
                     fullWidth -> WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                         WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                    // Edge strips (fraction-height side / fraction-width bottom) extend to the TRUE
+                    // screen edge — over the status/nav-bar insets — so a swipe right on the edge lands
+                    // on the strip, not the app behind it (no mini-gap).
+                    heightFraction > 0f || widthFraction > 0f ->
+                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
                     else -> 0
                 }
                 // For fullscreen, size to the REAL physical display at (0,0): MATCH_PARENT gives the
@@ -217,7 +230,11 @@ object SceneOverlayManager {
                         else -> WindowManager.LayoutParams.WRAP_CONTENT
                     },
                     type,
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or edgeFlags or
+                    // On the accessibility overlay the bottom bar stays NOT_FOCUSABLE (it captures the
+                    // gesture without holding key focus, so the keyboard works). Without the service it
+                    // falls back to a focusable window (NOT_TOUCH_MODAL) — captures, but holds focus.
+                    (if (widthFraction > 0f && a11y == null) WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL else WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) or
+                        WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or edgeFlags or
                         (if (dismissOnOutside) WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH else 0),
                     PixelFormat.TRANSLUCENT,
                 ).apply {
@@ -269,15 +286,18 @@ object SceneOverlayManager {
             runCatching { wm.addView(composeView, params) }
                 .onSuccess {
                     owner.onResume()
-                    val overlay = Overlay(composeView, owner, params, fullscreen, heightFraction, widthFraction, timeoutMs)
+                    val overlay = Overlay(composeView, owner, params, wm, fullscreen, heightFraction, widthFraction, timeoutMs)
                     active[scene.id] = overlay
                     if (fullscreen || heightFraction > 0f || widthFraction > 0f) ensureDisplayListener(app)
-                    // Keep system edge gestures (e.g. the back swipe) from stealing drags on a tap-through
-                    // panel/strip — otherwise a slide along a screen edge never reaches the overlay.
+                    // Exclude the strip's whole area from the system edge gestures (back swipe, and on
+                    // devices that honour it the bottom home/recents swipe) so the slide reaches the
+                    // overlay instead of triggering the system gesture. Applied on every layout — a
+                    // post{} can run before the view is measured (width/height 0 → an empty, useless rect).
                     if (!modal && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        composeView.post {
-                            composeView.systemGestureExclusionRects =
-                                listOf(android.graphics.Rect(0, 0, composeView.width, composeView.height))
+                        composeView.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+                            if (v.width > 0 && v.height > 0) {
+                                v.systemGestureExclusionRects = listOf(android.graphics.Rect(0, 0, v.width, v.height))
+                            }
                         }
                     }
                     if (timeoutMs > 0) {
@@ -310,9 +330,7 @@ object SceneOverlayManager {
 
     private fun remove(sceneId: Long) {
         val overlay = active.remove(sceneId) ?: return
-        val ctx = appContext ?: return
-        val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        runCatching { wm.removeView(overlay.view) }
+        runCatching { overlay.wm.removeView(overlay.view) }
         overlay.owner.onDestroy()
     }
 

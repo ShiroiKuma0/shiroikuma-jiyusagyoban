@@ -38,6 +38,9 @@ class ShiroiKumaAccessibilityService : AccessibilityService() {
         /** True when the user has enabled and the system has bound the service. */
         val isConnected: Boolean get() = instance != null
 
+        /** The connected service (an AccessibilityService Context), for adding a TYPE_ACCESSIBILITY_OVERLAY. */
+        val service: AccessibilityService? get() = instance
+
         /** Dispatch a GLOBAL_ACTION_* via the connected service; false if not enabled or it failed. */
         fun perform(globalAction: Int): Boolean = instance?.performGlobalAction(globalAction) ?: false
     }

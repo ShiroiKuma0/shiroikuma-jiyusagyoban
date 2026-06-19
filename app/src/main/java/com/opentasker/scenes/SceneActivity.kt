@@ -331,10 +331,12 @@ internal fun SceneElementView(
             val longSwipeLeft = cfg["longSwipeLeft"]?.toLongOrNull()
             val longSwipeRight = cfg["longSwipeRight"]?.toLongOrNull()
             val doubleTapId = cfg["doubleTap"]?.toLongOrNull()
+            val moveDebug = cfg["moveDebug"]?.toLongOrNull()   // DEBUG: fires once on the first pointer move
             val tapId = element.tapTaskId
             val longPressId = element.longPressTaskId
             val hasSwipe = swipeUp != null || swipeDown != null || swipeLeft != null || swipeRight != null ||
-                longSwipeUp != null || longSwipeDown != null || longSwipeLeft != null || longSwipeRight != null
+                longSwipeUp != null || longSwipeDown != null || longSwipeLeft != null || longSwipeRight != null ||
+                moveDebug != null
             val slopPx = with(LocalDensity.current) { 36.dp.toPx() }
             val longSwipePx = with(LocalDensity.current) { 140.dp.toPx() }
             // Pick the task for the swipe's dominant axis from a (up,down,left,right) set.
@@ -363,6 +365,7 @@ internal fun SceneElementView(
                             onTap = tapId?.let { id -> { onRunTask(id) } },
                             onDoubleTap = doubleTapId?.let { id -> { onRunTask(id) } },
                             onLongPress = longPressId?.let { id -> { onRunTask(id) } },
+                            onFirstMove = moveDebug?.let { id -> { onRunTask(id) } },
                         )
                     }
                     else if (tapId != null || longPressId != null) Modifier.pointerInput(element.id) {
@@ -736,12 +739,14 @@ private suspend fun PointerInputScope.detectEdgeGestures(
     onTap: (() -> Unit)?,
     onDoubleTap: (() -> Unit)?,
     onLongPress: (() -> Unit)?,
+    onFirstMove: (() -> Unit)? = null,
 ) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
         down.consume()
         var dx = 0f
         var dy = 0f
+        var firstMoveSeen = false
         // Only arm the long-press clock when a long-press is bound, so otherwise a held press just waits
         // for release (a tap) rather than being swallowed as a no-op long-press.
         val timeout = if (onLongPress != null) viewConfiguration.longPressTimeoutMillis else Long.MAX_VALUE
@@ -752,6 +757,7 @@ private suspend fun PointerInputScope.detectEdgeGestures(
                 val ch = ev.changes.firstOrNull { it.id == down.id } ?: return@withTimeoutOrNull "tap"
                 if (!ch.pressed) return@withTimeoutOrNull "tap"
                 val pc = ch.positionChange(); dx += pc.x; dy += pc.y; ch.consume()
+                if (!firstMoveSeen && (pc.x != 0f || pc.y != 0f)) { firstMoveSeen = true; onFirstMove?.invoke() }
                 if (kotlin.math.abs(dx) > slopPx || kotlin.math.abs(dy) > slopPx) return@withTimeoutOrNull "swipe"
             }
             @Suppress("UNREACHABLE_CODE") "tap"

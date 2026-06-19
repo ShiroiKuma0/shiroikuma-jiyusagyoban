@@ -489,7 +489,7 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
     // unlike the tapTaskId/longPressTaskId fields, these live in the free-form config map.
     private val taskIdConfigKeys = setOf(
         "swipeUp", "swipeDown", "swipeLeft", "swipeRight",
-        "longSwipeUp", "longSwipeDown", "longSwipeLeft", "longSwipeRight", "doubleTap",
+        "longSwipeUp", "longSwipeDown", "longSwipeLeft", "longSwipeRight", "doubleTap", "moveDebug",
     )
 
     private fun remapSceneElement(element: SceneElement, taskIdMap: Map<Long, Long>): SceneElement =
