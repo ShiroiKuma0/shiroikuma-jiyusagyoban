@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
+import com.opentasker.ui.theme.DesignSystem
 
 @Composable
 internal fun OpenTaskerBundleReviewDialog(
@@ -34,7 +35,7 @@ internal fun OpenTaskerBundleReviewDialog(
         title = { Text(stringResource(R.string.dialog_review_bundle)) },
         text = {
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 460.dp),
@@ -54,14 +55,14 @@ internal fun OpenTaskerBundleReviewDialog(
                     )
                 }
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                         SummaryMetric("${bundle.tasks.size}", stringResource(R.string.import_count_tasks), Modifier.weight(1f))
                         SummaryMetric("${bundle.profiles.size}", stringResource(R.string.import_count_profiles), Modifier.weight(1f))
                         SummaryMetric("${bundle.variables.size}", stringResource(R.string.import_count_variables), Modifier.weight(1f))
                     }
                 }
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                         SummaryMetric("${bundle.scenes.size}", stringResource(R.string.import_count_scenes), Modifier.weight(1f))
                         SummaryMetric("${capabilityRequirements.size}", stringResource(R.string.import_count_setup_notes), Modifier.weight(1f))
                         SummaryMetric("${reviewWarnings.size}", stringResource(R.string.import_count_warnings), Modifier.weight(1f))
@@ -128,7 +129,7 @@ internal fun TaskerImportReviewDialog(
         title = { Text(stringResource(R.string.dialog_review_tasker)) },
         text = {
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 460.dp),
@@ -141,21 +142,21 @@ internal fun TaskerImportReviewDialog(
                     )
                 }
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                         SummaryMetric("${preview.importTaskCount}", stringResource(R.string.import_count_tasks), Modifier.weight(1f))
                         SummaryMetric("${preview.importProfileCount}", stringResource(R.string.import_count_profiles), Modifier.weight(1f))
                         SummaryMetric("${preview.importVariableCount}", stringResource(R.string.import_count_variables), Modifier.weight(1f))
                     }
                 }
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                         SummaryMetric("${preview.sourceTaskCount}", stringResource(R.string.import_count_src_tasks), Modifier.weight(1f))
                         SummaryMetric("${preview.sourceProfileCount}", stringResource(R.string.import_count_src_profiles), Modifier.weight(1f))
                         SummaryMetric("${preview.sourceSceneCount}", stringResource(R.string.import_count_scenes), Modifier.weight(1f))
                     }
                 }
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
                         StatusPill("${preview.mappedActionCount} ${stringResource(R.string.import_mapped)}", MaterialTheme.colorScheme.tertiary)
                         StatusPill("${preview.unsupportedActionCount} ${stringResource(R.string.import_unsupported)}", MaterialTheme.colorScheme.error)
                     }

@@ -86,7 +86,7 @@ internal fun RunLogScreenContent(
             .fillMaxSize()
             .padding(contentPadding),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
     ) {
         if (logs.isEmpty()) {
             item {
@@ -148,7 +148,7 @@ private fun RunLogRetentionCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
         shape = RoundedCornerShape(16.dp),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(stringResource(R.string.run_log_retention_title), style = MaterialTheme.typography.titleMedium)
                 Text(
@@ -157,7 +157,7 @@ private fun RunLogRetentionCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 RunLogRetentionOptions.all.forEach { option ->
                     val selected = option.policy == policy
                     OutlinedButton(
@@ -237,7 +237,7 @@ private fun RunLogFilterCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
         shape = RoundedCornerShape(16.dp),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -263,7 +263,7 @@ private fun RunLogFilterCard(
                     }
                 }
             }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 item {
                     RunLogFilterChip(
                         label = stringResource(R.string.run_log_any_task),
@@ -279,7 +279,7 @@ private fun RunLogFilterCard(
                     )
                 }
             }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 items(RunLogStatusFilter.entries.toList(), key = { it.name }) { filter ->
                     RunLogFilterChip(
                         label = filter.label,
@@ -347,7 +347,7 @@ private fun RunLogSummaryCard(logs: List<RunLogEntry>, onShareDiagnostic: () -> 
         shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.title_execution_history), style = MaterialTheme.typography.titleLarge)
                     Text(
@@ -369,7 +369,7 @@ private fun RunLogSummaryCard(logs: List<RunLogEntry>, onShareDiagnostic: () -> 
                     },
                 )
             }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 item { SummaryMetric("${logs.size}", stringResource(R.string.label_entries), Modifier.width(104.dp)) }
                 item { SummaryMetric("${outcomes.count { it == RunLogOutcome.Succeeded }}", stringResource(R.string.status_succeeded), Modifier.width(104.dp)) }
                 item { SummaryMetric("$failures", stringResource(R.string.status_failed), Modifier.width(104.dp)) }
@@ -434,7 +434,7 @@ private fun RunLogCard(entry: RunLogEntry) {
         ) {
             Row(
                 verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
             ) {
                 Icon(
                     when (outcome) {
@@ -464,7 +464,7 @@ private fun RunLogCard(entry: RunLogEntry) {
                     }
                 }
             }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 item { StatusPill(outcome.label, accent) }
                 item { StatusPill("${entry.durationMs} ms", accent) }
             }
@@ -519,7 +519,7 @@ private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
     ) {
         StatusPill(trace.status.readableName(), color)
         Column(Modifier.weight(1f)) {

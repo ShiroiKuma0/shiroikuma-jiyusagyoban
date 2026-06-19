@@ -69,6 +69,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
+import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
 import com.opentasker.core.model.SceneElementType
@@ -183,7 +184,7 @@ fun SceneLibraryScreen(
             .fillMaxSize()
             .padding(contentPadding),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
     ) {
         item {
             SceneOverviewCard(
@@ -272,13 +273,13 @@ private fun SceneEmptyState(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f),
-            shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+            shape = RoundedCornerShape(DesignSystem.Radii.xxl),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
         ) {
             Column(
                 modifier = Modifier.padding(18.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
             ) {
                 Icon(
                     Icons.Filled.Info,
@@ -296,7 +297,7 @@ private fun SceneEmptyState(
                 Button(
                     onClick = onCreateScene,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(DesignSystem.Radii.lg),
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.scenes_create))
                     Spacer(Modifier.width(6.dp))
@@ -324,10 +325,10 @@ private fun SceneOverviewCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
-        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+        shape = RoundedCornerShape(DesignSystem.Radii.xxl),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.title_scene_library), style = MaterialTheme.typography.titleLarge)
                     Text(
@@ -341,12 +342,12 @@ private fun SceneOverviewCard(
                     color = if (overlayReady) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 SceneMetric("${scenes.size}", "Scenes", Modifier.weight(1f))
                 SceneMetric("${scenes.sumOf { it.elements.size }}", "Elements", Modifier.weight(1f))
                 SceneMetric("$errorCount", "Errors", Modifier.weight(1f))
             }
-            Button(onClick = onCreateScene, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+            Button(onClick = onCreateScene, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(DesignSystem.Radii.lg)) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.scenes_create))
                 Spacer(Modifier.width(6.dp))
                 Text(stringResource(R.string.scenes_create))
@@ -372,10 +373,10 @@ private fun SceneCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)),
-        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+        shape = RoundedCornerShape(DesignSystem.Radii.xxl),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
                 Column(Modifier.weight(1f)) {
                     Text(scene.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
@@ -405,7 +406,7 @@ private fun SceneCard(
             }
 
             if (scene.elements.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
                     scene.elements.forEachIndexed { index, element ->
                         SceneElementRow(
                             scene = scene,
@@ -446,7 +447,7 @@ private fun ScenePreviewBox(
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
     ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
             Text("Canvas ${scene.widthDp} x ${scene.heightDp} dp", style = MaterialTheme.typography.labelLarge)
             if (scene.elements.isEmpty()) {
                 Text("No elements", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -466,7 +467,7 @@ private fun ScenePreviewBox(
                             .size(width = maxWidth, height = canvasHeight.dp)
                             .clipToBounds(),
                         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.70f),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(DesignSystem.Radii.lg),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
                     ) {
                         Box(Modifier.fillMaxSize()) {
@@ -575,16 +576,16 @@ private fun SceneElementRow(
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)),
     ) {
         Column(
             Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
         ) {
             Row(
                 verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
             ) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(sceneElementTypeLabel(element.type), style = MaterialTheme.typography.labelLarge)
@@ -752,7 +753,7 @@ private fun SceneElementEditorDialog(
                 modifier = Modifier
                     .heightIn(max = 560.dp)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
             ) {
                 SceneElementTypeSelector(
                     selected = type,
@@ -768,11 +769,11 @@ private fun SceneElementEditorDialog(
                         imageSource = defaults.config["source"] ?: ""
                     },
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                     NumberField("X dp", x, { x = it.filter(Char::isDigit).take(4) }, parsedX == null, Modifier.weight(1f))
                     NumberField("Y dp", y, { y = it.filter(Char::isDigit).take(4) }, parsedY == null, Modifier.weight(1f))
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                     NumberField(
                         label = "Width dp",
                         value = width,
@@ -813,7 +814,7 @@ private fun SceneElementEditorDialog(
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                             NumberField("Min", sliderMin, { sliderMin = it.filter(Char::isDigit).take(5) }, parsedSliderMin == null, Modifier.weight(1f))
                             NumberField("Max", sliderMax, { sliderMax = it.filter(Char::isDigit).take(5) }, parsedSliderMax == null || (parsedSliderMin != null && parsedSliderMax < parsedSliderMin), Modifier.weight(1f))
                             NumberField("Value", sliderValue, { sliderValue = it.filter(Char::isDigit).take(5) }, parsedSliderValue == null, Modifier.weight(1f))
@@ -958,9 +959,9 @@ private fun SceneIssueText(issue: SceneIssue) {
     val color = when (issue.severity) {
         SceneIssueSeverity.ERROR -> MaterialTheme.colorScheme.error
         SceneIssueSeverity.WARNING -> if (androidx.compose.foundation.isSystemInDarkTheme()) {
-            com.opentasker.ui.theme.DesignSystem.SemanticColor.warningDark
+            DesignSystem.SemanticColor.warningDark
         } else {
-            com.opentasker.ui.theme.DesignSystem.SemanticColor.warningLight
+            DesignSystem.SemanticColor.warningLight
         }
     }
     Text(issue.message, style = MaterialTheme.typography.bodySmall, color = color)
@@ -971,7 +972,7 @@ private fun SceneMetric(value: String, label: String, modifier: Modifier = Modif
     Surface(
         modifier = modifier,
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
     ) {
         Column(
@@ -1021,7 +1022,7 @@ private fun SceneEditorDialog(
         onDismissRequest = onDismiss,
         title = { Text("Create Scene") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
