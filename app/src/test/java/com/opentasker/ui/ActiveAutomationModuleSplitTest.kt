@@ -65,4 +65,13 @@ class ActiveAutomationModuleSplitTest {
             Regex("""heightIn\(max\s*=\s*460\.dp\)""").findAll(importReviewSource).count() >= 2,
         )
     }
+
+    @Test
+    fun appShellKeepsPremiumCreateAndOnboardingActionsDiscoverable() {
+        val shellSource = screensSourceRoot.resolve("ActiveAutomationUi.kt").readText()
+
+        assertTrue("Create actions should stay labeled, not icon-only", shellSource.contains("ExtendedFloatingActionButton"))
+        assertTrue("First-run onboarding should recommend guided templates first", shellSource.contains("actionLabel = \"Browse Templates\""))
+        assertTrue("Empty-state actions should not stretch awkwardly on large screens", shellSource.contains("widthIn(max = 420.dp)"))
+    }
 }
