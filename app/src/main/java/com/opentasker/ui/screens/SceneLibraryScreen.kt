@@ -58,8 +58,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.Canvas
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -74,7 +77,11 @@ import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
 import com.opentasker.core.model.SceneElementType
 import com.opentasker.core.model.Task
+import com.opentasker.core.scenes.AlignmentGuide
+import com.opentasker.core.scenes.GuideOrientation
+import com.opentasker.core.scenes.SceneAlignmentGuides
 import com.opentasker.core.scenes.SceneCanvasProjector
+import com.opentasker.core.scenes.SceneOverlayService
 import com.opentasker.core.scenes.SceneElementDrafts
 import com.opentasker.core.scenes.SceneIssue
 import com.opentasker.core.scenes.SceneIssueSeverity
@@ -194,6 +201,7 @@ fun SceneLibraryScreen(
             )
         }
         items(sortedScenes, key = { it.id }) { scene ->
+            val sceneContext = LocalContext.current
             SceneCard(
                 scene = scene,
                 tasks = tasks,
@@ -220,6 +228,7 @@ fun SceneLibraryScreen(
                     )
                 },
                 onDelete = { onDeleteScene(scene) },
+                onShowOverlay = { SceneOverlayService.show(sceneContext, scene) },
             )
         }
     }
@@ -365,9 +374,13 @@ private fun SceneCard(
     onDeleteElement: (Int, SceneElement) -> Unit,
     onMoveElement: (Int, SceneElement) -> Unit,
     onDelete: () -> Unit,
+    onShowOverlay: () -> Unit = {},
 ) {
     val taskNames = remember(tasks) { tasks.associate { it.id to it.name } }
     val issues = remember(scene, tasks) { SceneValidator.validate(scene, tasks) }
+    var selectedIndices by remember(scene.id) { mutableStateOf(emptySet<Int>()) }
+    val context = LocalContext.current
+    val overlayReady = Settings.canDrawOverlays(context)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -385,6 +398,11 @@ private fun SceneCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                if (overlayReady && scene.elements.isNotEmpty()) {
+                    OutlinedButton(onClick = onShowOverlay) {
+                        Text("Show", maxLines = 1)
+                    }
+                }
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.scenes_delete), tint = MaterialTheme.colorScheme.error)
                 }
@@ -400,6 +418,21 @@ private fun SceneCard(
                 onResizeElement = { index, widthDp, heightDp ->
                     scene.elements.getOrNull(index)?.let { element ->
                         onMoveElement(index, element.copy(widthDp = widthDp, heightDp = heightDp))
+                    }
+                },
+                selectedIndices = selectedIndices,
+                onToggleSelect = { index ->
+                    selectedIndices = if (index in selectedIndices) selectedIndices - index else selectedIndices + index
+                },
+                onMoveSelected = { dx, dy ->
+                    val updated = scene.elements.mapIndexed { i, el ->
+                        if (i in selectedIndices) el.nudgedWithin(scene, dx, dy) else el
+                    }
+                    val updatedScene = scene.copy(elements = updated)
+                    updated.forEachIndexed { i, el ->
+                        if (i in selectedIndices && el != scene.elements[i]) {
+                            onMoveElement(i, el)
+                        }
                     }
                 },
             )
@@ -444,7 +477,11 @@ private fun ScenePreviewBox(
     scene: Scene,
     onMoveElement: (Int, Int, Int) -> Unit,
     onResizeElement: (Int, Int, Int) -> Unit = { _, _, _ -> },
+    selectedIndices: Set<Int> = emptySet(),
+    onToggleSelect: (Int) -> Unit = {},
+    onMoveSelected: (Int, Int) -> Unit = { _, _ -> },
 ) {
+    var activeGuides by remember { mutableStateOf<List<AlignmentGuide>>(emptyList()) }
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -467,6 +504,7 @@ private fun ScenePreviewBox(
                         maxHeight = 280f,
                     )
                     val projections = SceneCanvasProjector.project(scene, canvasWidth, canvasHeight)
+                    val guideColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.50f)
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -484,9 +522,52 @@ private fun ScenePreviewBox(
                                     projection = projection,
                                     canvasWidth = canvasWidth,
                                     canvasHeight = canvasHeight,
-                                    onMoveElement = onMoveElement,
+                                    onMoveElement = { idx, xDp, yDp ->
+                                        if (selectedIndices.size > 1 && idx in selectedIndices) {
+                                            val origElement = scene.elements[idx]
+                                            val dx = xDp - origElement.xDp
+                                            val dy = yDp - origElement.yDp
+                                            onMoveSelected(dx, dy)
+                                        } else {
+                                            onMoveElement(idx, xDp, yDp)
+                                        }
+                                    },
                                     onResizeElement = onResizeElement,
+                                    selected = index in selectedIndices,
+                                    onSelect = { onToggleSelect(index) },
+                                    onAlignmentGuidesChanged = { guides -> activeGuides = guides },
                                 )
+                            }
+                            if (activeGuides.isNotEmpty()) {
+                                val scaleX = canvasWidth / (scene.widthDp.takeIf { it > 0 } ?: 1).toFloat()
+                                val scaleY = canvasHeight / (scene.heightDp.takeIf { it > 0 } ?: 1).toFloat()
+                                Canvas(Modifier.fillMaxSize()) {
+                                    val dash = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))
+                                    activeGuides.forEach { guide ->
+                                        when (guide.orientation) {
+                                            GuideOrientation.VERTICAL -> {
+                                                val x = guide.position * scaleX
+                                                drawLine(
+                                                    color = guideColor,
+                                                    start = Offset(x, 0f),
+                                                    end = Offset(x, size.height),
+                                                    strokeWidth = 1.5f,
+                                                    pathEffect = dash,
+                                                )
+                                            }
+                                            GuideOrientation.HORIZONTAL -> {
+                                                val y = guide.position * scaleY
+                                                drawLine(
+                                                    color = guideColor,
+                                                    start = Offset(0f, y),
+                                                    end = Offset(size.width, y),
+                                                    strokeWidth = 1.5f,
+                                                    pathEffect = dash,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -505,6 +586,9 @@ private fun SceneCanvasElement(
     canvasHeight: Float,
     onMoveElement: (Int, Int, Int) -> Unit,
     onResizeElement: (Int, Int, Int) -> Unit = { _, _, _ -> },
+    selected: Boolean = false,
+    onSelect: () -> Unit = {},
+    onAlignmentGuidesChanged: (List<AlignmentGuide>) -> Unit = {},
 ) {
     val element = projection.element
     val density = LocalDensity.current
@@ -519,6 +603,8 @@ private fun SceneCanvasElement(
         SceneElementType.IMAGE -> MaterialTheme.colorScheme.error
         else -> MaterialTheme.colorScheme.primary
     }
+    val borderColor = if (selected) MaterialTheme.colorScheme.primary else color.copy(alpha = 0.52f)
+    val borderWidth = if (selected) 2.dp else 1.dp
     val currentWidth = (projection.width + resizeDx).coerceAtLeast(12f)
     val currentHeight = (projection.height + resizeDy).coerceAtLeast(12f)
     Box(
@@ -538,13 +624,12 @@ private fun SceneCanvasElement(
                 .fillMaxSize()
                 .pointerInput(scene.id, element.id, projection.x, projection.y, canvasWidth, canvasHeight, density.density) {
                     detectDragGestures(
+                        onDragStart = { onSelect() },
                         onDrag = { change, dragAmount ->
                             change.consume()
                             dragX += dragAmount.x / density.density
                             dragY += dragAmount.y / density.density
-                        },
-                        onDragEnd = {
-                            val (xDp, yDp) = SceneCanvasProjector.scenePositionForCanvasOffset(
+                            val (candidateX, candidateY) = SceneCanvasProjector.scenePositionForCanvasOffset(
                                 scene = scene,
                                 element = element,
                                 canvasX = projection.x + dragX,
@@ -552,19 +637,48 @@ private fun SceneCanvasElement(
                                 canvasWidth = canvasWidth,
                                 canvasHeight = canvasHeight,
                             )
+                            val alignment = SceneAlignmentGuides.findGuides(
+                                scene = scene,
+                                movingIndex = index,
+                                candidateX = candidateX,
+                                candidateY = candidateY,
+                                candidateW = element.widthDp,
+                                candidateH = element.heightDp,
+                            )
+                            onAlignmentGuidesChanged(alignment.guides)
+                        },
+                        onDragEnd = {
+                            val (candidateX, candidateY) = SceneCanvasProjector.scenePositionForCanvasOffset(
+                                scene = scene,
+                                element = element,
+                                canvasX = projection.x + dragX,
+                                canvasY = projection.y + dragY,
+                                canvasWidth = canvasWidth,
+                                canvasHeight = canvasHeight,
+                            )
+                            val alignment = SceneAlignmentGuides.findGuides(
+                                scene = scene,
+                                movingIndex = index,
+                                candidateX = candidateX,
+                                candidateY = candidateY,
+                                candidateW = element.widthDp,
+                                candidateH = element.heightDp,
+                            )
                             dragX = 0f
                             dragY = 0f
-                            onMoveElement(index, xDp, yDp)
+                            onAlignmentGuidesChanged(emptyList())
+                            onMoveElement(index, alignment.snappedX, alignment.snappedY)
                         },
                         onDragCancel = {
                             dragX = 0f
                             dragY = 0f
+                            onAlignmentGuidesChanged(emptyList())
                         },
                     )
                 },
-            color = color.copy(alpha = 0.14f),
+            color = color.copy(alpha = if (selected) 0.22f else 0.14f),
             shape = RoundedCornerShape(8.dp),
-            border = BorderStroke(1.dp, color.copy(alpha = 0.52f)),
+            border = BorderStroke(borderWidth, borderColor),
         ) {
             Box(Modifier.fillMaxSize().padding(4.dp), contentAlignment = Alignment.Center) {
                 Text(
