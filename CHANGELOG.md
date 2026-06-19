@@ -32,6 +32,7 @@ Hardening, test coverage, and expression engine improvements.
 - **Performance**: reduced scene-canvas drag recomposition overhead by using primitive float state and lambda offsets.
 - **UX**: polished first-run onboarding, labeled create actions, the widget task picker, and the home-screen widget treatment so setup and secondary flows feel more guided and intentional.
 - **Reliability**: made widget and launcher-shortcut task runs close with clear feedback even when task execution throws, avoiding stranded translucent runner activities.
+- **Reliability**: guaranteed external automation broadcast pending-results finish even if ordered-result publication fails.
 - **Cleanup**: removed duplicate `ArrayStore.joinWith` method (identical to `join`).
 
 ## v0.2.72 - 2026-06-16
