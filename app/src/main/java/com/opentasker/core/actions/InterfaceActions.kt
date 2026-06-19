@@ -54,6 +54,14 @@ class NavBackAction : Action {
         globalAction(ctx, AccessibilityService.GLOBAL_ACTION_BACK, "Back", keyCode = 4) // KEYCODE_BACK
 }
 
+/** `Take Screenshot` — the system screenshot (flash + saved to the gallery), via accessibility (API 30+). */
+class TakeScreenshotAction : Action {
+    override val id = "nav.screenshot"
+    override val category = ActionCategory.SYSTEM
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>) =
+        globalAction(ctx, AccessibilityService.GLOBAL_ACTION_TAKE_SCREENSHOT, "Screenshot")
+}
+
 /** `Show Recents` (Tasker 247). */
 class NavRecentsAction : Action {
     override val id = "nav.recents"

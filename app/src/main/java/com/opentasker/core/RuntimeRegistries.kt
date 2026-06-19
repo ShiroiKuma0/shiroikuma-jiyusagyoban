@@ -82,6 +82,7 @@ import com.opentasker.core.actions.ListAppsAction
 import com.opentasker.core.actions.ImePickerAction
 import com.opentasker.core.actions.NavBackAction
 import com.opentasker.core.actions.NavRecentsAction
+import com.opentasker.core.actions.TakeScreenshotAction
 import com.opentasker.core.actions.NotificationsPanelAction
 import com.opentasker.core.actions.QuickSettingsPanelAction
 import com.opentasker.core.actions.PowerDialogAction
@@ -197,6 +198,7 @@ private fun registerBuiltInActions() {
         ImePickerAction(),
         NavBackAction(),
         NavRecentsAction(),
+        TakeScreenshotAction(),
         NotificationsPanelAction(),
         QuickSettingsPanelAction(),
         PowerDialogAction(),

@@ -446,6 +446,15 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "nav.screenshot",
+            name = "Take Screenshot",
+            description = "Take a system screenshot (saved to the gallery; needs the accessibility service, API 30+)",
+            category = "Interface",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "panel.notifications",
             name = "Notifications Panel",
             description = "Open the notification shade (needs the accessibility service)",
