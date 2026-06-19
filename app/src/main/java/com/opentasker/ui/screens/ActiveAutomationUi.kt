@@ -1087,7 +1087,17 @@ fun ActiveAutomationUi(
         groupIdOf = { key -> itemMeta.firstOrNull { it.tab == tab && it.itemKey == key }?.groupId },
         projectId = if (scoped) currentProjectId else null,
         setItemGroup = { key, gid -> viewModel.setItemGroup(tab, key, gid) },
-        createGroupForItem = { key, name -> viewModel.moveItemToNewGroup(tab, if (scoped) currentProjectId else null, name, key) },
+        createGroupForItem = { key, name ->
+            // Put the new group in the same project as the item, so it stays visible alongside it (even
+            // when created from the "All" filter). Fall back to the current filter / unscoped null.
+            val pid = when (tab) {
+                "tasks" -> tasks.firstOrNull { it.id.toString() == key }?.projectId
+                "profiles" -> profiles.firstOrNull { it.id.toString() == key }?.projectId
+                "scenes" -> scenes.firstOrNull { it.id.toString() == key }?.projectId
+                else -> null
+            } ?: if (scoped) currentProjectId else null
+            viewModel.moveItemToNewGroup(tab, pid, name, key)
+        },
         createSubgroup = { parent, name -> viewModel.createGroup(parent.tab, parent.projectId, name, parent.id) },
         setGroupParent = { g, pid -> viewModel.setGroupParent(g, pid) },
         toggleGroup = { viewModel.toggleGroupExpanded(it) },
