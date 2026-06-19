@@ -112,6 +112,49 @@ object DatabaseMigrations {
         }
     }
 
+    val MIGRATION_10_11 = object : Migration(10, 11) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Per-item UI metadata (notes + group membership) and foldable groups — shared across all tabs.
+            // CREATE statements match Room's exported v11 schema exactly (so the runtime identity hash matches).
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `item_meta` (`tab` TEXT NOT NULL, `itemId` INTEGER NOT NULL, " +
+                    "`groupId` INTEGER, `note` TEXT NOT NULL, `noteExpanded` INTEGER NOT NULL, " +
+                    "`position` INTEGER NOT NULL, PRIMARY KEY(`tab`, `itemId`))"
+            )
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `item_groups` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`projectId` INTEGER, `tab` TEXT NOT NULL, `name` TEXT NOT NULL, `note` TEXT NOT NULL, " +
+                    "`position` INTEGER NOT NULL, `expanded` INTEGER NOT NULL, `noteExpanded` INTEGER NOT NULL)"
+            )
+        }
+    }
+
+    val MIGRATION_11_12 = object : Migration(11, 12) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Generalise item_meta's per-item key from Long itemId to String itemKey (covers name-keyed
+            // tabs like widgets). Recreate + copy, casting the old numeric ids to text. createSql matches
+            // Room's exported v12 schema exactly.
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `item_meta_new` (`tab` TEXT NOT NULL, `itemKey` TEXT NOT NULL, " +
+                    "`groupId` INTEGER, `note` TEXT NOT NULL, `noteExpanded` INTEGER NOT NULL, " +
+                    "`position` INTEGER NOT NULL, PRIMARY KEY(`tab`, `itemKey`))"
+            )
+            db.execSQL(
+                "INSERT INTO `item_meta_new` (`tab`, `itemKey`, `groupId`, `note`, `noteExpanded`, `position`) " +
+                    "SELECT `tab`, CAST(`itemId` AS TEXT), `groupId`, `note`, `noteExpanded`, `position` FROM `item_meta`"
+            )
+            db.execSQL("DROP TABLE `item_meta`")
+            db.execSQL("ALTER TABLE `item_meta_new` RENAME TO `item_meta`")
+        }
+    }
+
+    val MIGRATION_12_13 = object : Migration(12, 13) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Nested groups: a group may point at an enclosing parent group (null = top level).
+            db.execSQL("ALTER TABLE item_groups ADD COLUMN parentGroupId INTEGER")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -123,6 +166,9 @@ object DatabaseMigrations {
             MIGRATION_7_8,
             MIGRATION_8_9,
             MIGRATION_9_10,
+            MIGRATION_10_11,
+            MIGRATION_11_12,
+            MIGRATION_12_13,
         )
     }
 }

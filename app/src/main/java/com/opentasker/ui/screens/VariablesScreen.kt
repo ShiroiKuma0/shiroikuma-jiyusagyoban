@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.model.Variable
+import com.opentasker.ui.components.ItemNoteSection
 import com.opentasker.ui.components.SelectionBar
 import com.opentasker.ui.components.SelectionCheck
 import com.opentasker.ui.components.selectableItem
@@ -187,6 +188,7 @@ private fun VariableRow(
                 )
             }
             if (expanded) {
+                ItemNoteSection("vars", "${variable.projectId}:${variable.name}")
                 Text(
                     text = if (isSensitive(variable.name)) "***" else variable.value,
                     style = MaterialTheme.typography.bodyMedium,

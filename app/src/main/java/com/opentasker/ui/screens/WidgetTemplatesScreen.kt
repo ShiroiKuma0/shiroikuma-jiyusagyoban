@@ -64,6 +64,7 @@ import com.opentasker.core.widget.WidgetLayoutCodec
 import com.opentasker.core.widget.WidgetRenderer
 import com.opentasker.widget.StyledWidgetProvider
 import androidx.compose.ui.layout.ContentScale
+import com.opentasker.ui.components.ItemNoteSection
 import com.opentasker.ui.components.SelectionBar
 import com.opentasker.ui.components.SelectionCheck
 import com.opentasker.ui.components.selectableItem
@@ -208,6 +209,7 @@ private fun TemplateRow(
                 )
             }
             if (expanded) {
+                ItemNoteSection("widgets", template.name)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,

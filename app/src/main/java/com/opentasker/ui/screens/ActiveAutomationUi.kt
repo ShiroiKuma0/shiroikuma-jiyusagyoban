@@ -46,6 +46,11 @@ import androidx.compose.material3.Slider
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.opentasker.ui.components.GroupOps
+import com.opentasker.ui.components.GroupPickerDialog
+import com.opentasker.ui.components.descendantGroupIds
+import com.opentasker.ui.components.groupedItems
+import com.opentasker.ui.components.ItemNoteSection
 import com.opentasker.ui.components.ReorderableRow
 import com.opentasker.ui.components.ConfirmDeleteSelected
 import com.opentasker.ui.components.RgbaColorPickerDialog
@@ -189,6 +194,8 @@ import com.opentasker.core.model.Variable
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.EditHistoryDao
+import com.opentasker.core.storage.ItemGroupEntity
+import com.opentasker.core.storage.ItemMetaEntity
 import com.opentasker.core.storage.EditHistoryEntity
 import com.opentasker.core.storage.RunLogRetentionOptions
 import com.opentasker.core.storage.VariableEntity
@@ -407,6 +414,41 @@ class ActiveAutomationViewModel(
         .getAllAsFlow()
         .map { entities -> entities.map { it.toDomain() } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // Foldable groups + per-item membership/notes (shared across all list tabs).
+    val itemGroups: StateFlow<List<ItemGroupEntity>> = db.itemGroupDao().getAllAsFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val itemMeta: StateFlow<List<ItemMetaEntity>> = db.itemMetaDao().getAllAsFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun createGroup(tab: String, projectId: Long?, name: String) = viewModelScope.launch {
+        val pos = db.itemGroupDao().getForTab(tab).size
+        db.itemGroupDao().upsert(ItemGroupEntity(projectId = projectId, tab = tab, name = name.trim(), position = pos))
+    }
+    fun renameGroup(group: ItemGroupEntity, name: String) = viewModelScope.launch {
+        db.itemGroupDao().upsert(group.copy(name = name.trim()))
+    }
+    fun deleteGroup(group: ItemGroupEntity) = viewModelScope.launch {
+        db.itemMetaDao().clearGroup(group.tab, group.id) // orphan its members back to top level
+        db.itemGroupDao().orphanChildren(group.id)       // its sub-groups float up to top level
+        db.itemGroupDao().delete(group.id)
+    }
+    fun toggleGroupExpanded(group: ItemGroupEntity) = viewModelScope.launch {
+        db.itemGroupDao().upsert(group.copy(expanded = !group.expanded))
+    }
+    fun setGroupParent(group: ItemGroupEntity, parentId: Long?) = viewModelScope.launch {
+        db.itemGroupDao().upsert(group.copy(parentGroupId = parentId))
+    }
+    fun setItemGroup(tab: String, itemKey: String, groupId: Long?) = viewModelScope.launch {
+        val cur = db.itemMetaDao().get(tab, itemKey) ?: ItemMetaEntity(tab = tab, itemKey = itemKey)
+        db.itemMetaDao().upsert(cur.copy(groupId = groupId))
+    }
+    fun moveItemToNewGroup(tab: String, projectId: Long?, name: String, itemKey: String) = viewModelScope.launch {
+        val pos = db.itemGroupDao().getForTab(tab).size
+        val gid = db.itemGroupDao().upsert(ItemGroupEntity(projectId = projectId, tab = tab, name = name.trim(), position = pos))
+        val cur = db.itemMetaDao().get(tab, itemKey) ?: ItemMetaEntity(tab = tab, itemKey = itemKey)
+        db.itemMetaDao().upsert(cur.copy(groupId = gid))
+    }
 
     private val events = Channel<String>(Channel.BUFFERED)
     val messages = events.receiveAsFlow()
@@ -1024,6 +1066,27 @@ fun ActiveAutomationUi(
     val projects by viewModel.projects.collectAsState()
     val projectFilter = viewModel.projectFilter
     val currentProjectId = (projectFilter as? ProjectFilter.Of)?.projectId
+    val itemGroups by viewModel.itemGroups.collectAsState()
+    val itemMeta by viewModel.itemMeta.collectAsState()
+    fun groupOpsFor(tab: String) = GroupOps(
+        // Show a tab's groups under the SAME project filter as its items, so they appear whenever their
+        // members do (incl. "All") — not only when a specific project is selected.
+        groups = itemGroups.filter {
+            it.tab == tab && when (val f = projectFilter) {
+                is ProjectFilter.All -> true
+                is ProjectFilter.Unfiled -> it.projectId == null
+                is ProjectFilter.Of -> it.projectId == f.projectId
+            }
+        }.sortedBy { it.position },
+        groupIdOf = { key -> itemMeta.firstOrNull { it.tab == tab && it.itemKey == key }?.groupId },
+        projectId = currentProjectId,
+        setItemGroup = { key, gid -> viewModel.setItemGroup(tab, key, gid) },
+        createGroupForItem = { key, name -> viewModel.moveItemToNewGroup(tab, currentProjectId, name, key) },
+        setGroupParent = { g, pid -> viewModel.setGroupParent(g, pid) },
+        toggleGroup = { viewModel.toggleGroupExpanded(it) },
+        renameGroup = { g, n -> viewModel.renameGroup(g, n) },
+        deleteGroup = { viewModel.deleteGroup(it) },
+    )
     // Name search for the list tabs (Profiles/Tasks/Scenes/Vars/Widgets): a case-insensitive filter
     // folded into the visible lists below, so the header count, expand-all and selection all track it.
     // Reset whenever the tab changes (see the LaunchedEffect after `screen`).
@@ -1684,6 +1747,7 @@ fun ActiveAutomationUi(
                 onClearTaskSelection = { selectedTaskIds = emptySet() },
                 onDeleteSelectedTasks = { confirmDeleteSelectedTasks = true },
                 onMoveSelectedToProject = { bulkMoveTab = OpenTaskerScreen.Tasks },
+                groupOps = groupOpsFor("tasks"),
                 contentPadding = innerPadding,
             )
 
@@ -1749,6 +1813,7 @@ fun ActiveAutomationUi(
                 createSignal = sceneCreateSignal,
                 hiddenByFilter = scenes.size - visibleScenes.size,
                 expandedScenes = expandedScenes,
+                groupOps = groupOpsFor("scenes"),
                 contentPadding = innerPadding,
             )
 
@@ -2486,6 +2551,7 @@ private fun ProfileCard(
                 )
             }
             if (expanded) {
+                ItemNoteSection("profiles", profile.id.toString())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     StatusPill(
                         label = if (profile.enabled) "Enabled" else "Paused",
@@ -2564,6 +2630,7 @@ private fun TasksScreen(
     onClearTaskSelection: () -> Unit,
     onDeleteSelectedTasks: () -> Unit,
     onMoveSelectedToProject: () -> Unit,
+    groupOps: GroupOps,
     contentPadding: PaddingValues,
 ) {
     if (tasks.isEmpty()) {
@@ -2590,40 +2657,70 @@ private fun TasksScreen(
                 onMoveToProject = onMoveSelectedToProject,
             )
         }
+        var pickerForKey by remember { mutableStateOf<String?>(null) }
+        var movingGroup by remember { mutableStateOf<ItemGroupEntity?>(null) }
+        val taskCard: @Composable (Task) -> Unit = { task ->
+            TaskCard(
+                task = task,
+                selectionActive = selectionActive,
+                selected = task.id in selectedIds,
+                onLongPress = { onLongPressTask(task) },
+                onToggleSelect = { onToggleSelectTask(task) },
+                expanded = expandedTasks[task.id] == true,
+                onToggleExpanded = { expandedTasks[task.id] = expandedTasks[task.id] != true },
+                isActionExpanded = { index -> expandedActions["${task.id}:$index"] == true },
+                onToggleAction = { index ->
+                    val k = "${task.id}:$index"
+                    expandedActions[k] = expandedActions[k] != true
+                },
+                onEdit = { onEditTask(task) },
+                onDelete = { onDeleteTask(task) },
+                onRun = { onRunTask(task) },
+                onPin = { onPinTask(task) },
+                onAddAction = { onAddAction(task) },
+                onEditAction = { index, action -> onEditAction(task, index, action) },
+                onDeleteAction = { index -> onDeleteAction(task, index) },
+                onMove = { onMoveTask(task) },
+                onExport = { onExportTask(task) },
+                onReorderActions = { newOrder -> onReorderAction(task, newOrder) },
+            )
+        }
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().weight(1f),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(tasks, key = { it.id }) { task ->
-                ReorderableRow(reorder, listState, tasks, task, { it.id }, manualSort && !selectionActive, onReorder) {
-                    TaskCard(
-                        task = task,
-                        selectionActive = selectionActive,
-                        selected = task.id in selectedIds,
-                        onLongPress = { onLongPressTask(task) },
-                        onToggleSelect = { onToggleSelectTask(task) },
-                        expanded = expandedTasks[task.id] == true,
-                    onToggleExpanded = { expandedTasks[task.id] = expandedTasks[task.id] != true },
-                    isActionExpanded = { index -> expandedActions["${task.id}:$index"] == true },
-                    onToggleAction = { index ->
-                        val key = "${task.id}:$index"
-                        expandedActions[key] = expandedActions[key] != true
-                    },
-                    onEdit = { onEditTask(task) },
-                    onDelete = { onDeleteTask(task) },
-                    onRun = { onRunTask(task) },
-                    onPin = { onPinTask(task) },
-                    onAddAction = { onAddAction(task) },
-                    onEditAction = { index, action -> onEditAction(task, index, action) },
-                    onDeleteAction = { index -> onDeleteAction(task, index) },
-                    onMove = { onMoveTask(task) },
-                    onExport = { onExportTask(task) },
-                    onReorderActions = { newOrder -> onReorderAction(task, newOrder) },
-                    )
+            if (groupOps.groups.isEmpty()) {
+                items(tasks, key = { it.id }) { task ->
+                    ReorderableRow(reorder, listState, tasks, task, { it.id }, manualSort && !selectionActive, onReorder) {
+                        taskCard(task)
+                    }
                 }
+            } else {
+                groupedItems(
+                    tasks, { it.id.toString() }, groupOps,
+                    onMoveItem = { pickerForKey = it },
+                    onMoveGroup = { movingGroup = it },
+                ) { task -> taskCard(task) }
             }
+        }
+        pickerForKey?.let { key ->
+            GroupPickerDialog(
+                groups = groupOps.groups,
+                onPick = { gid -> groupOps.setItemGroup(key, gid); pickerForKey = null },
+                onCreate = { name -> groupOps.createGroupForItem(key, name); pickerForKey = null },
+                onDismiss = { pickerForKey = null },
+            )
+        }
+        movingGroup?.let { g ->
+            val excluded = descendantGroupIds(g.id, groupOps.groups) + g.id
+            GroupPickerDialog(
+                groups = groupOps.groups.filter { it.id !in excluded },
+                onPick = { pid -> groupOps.setGroupParent(g, pid); movingGroup = null },
+                onCreate = null,
+                onDismiss = { movingGroup = null },
+            )
         }
     }
 }
@@ -2702,6 +2799,7 @@ private fun TaskCard(
                 )
             }
             if (expanded) {
+                ItemNoteSection("tasks", task.id.toString())
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         StatusPill("${task.actions.size} action${plural(task.actions.size)}", MaterialTheme.colorScheme.primary)

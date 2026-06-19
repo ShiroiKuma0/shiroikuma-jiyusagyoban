@@ -26,6 +26,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Checkbox
+import com.opentasker.ui.components.GroupMoveDialogs
+import com.opentasker.ui.components.GroupOps
+import com.opentasker.ui.components.groupedItems
+import com.opentasker.ui.components.rememberGroupMoveHost
+import com.opentasker.ui.components.ItemNoteSection
 import com.opentasker.ui.components.ReorderableRow
 import com.opentasker.ui.theme.ThemeStore
 import com.opentasker.ui.components.RgbaColorPickerDialog
@@ -115,6 +120,7 @@ fun SceneLibraryScreen(
     createSignal: Int,
     hiddenByFilter: Int,
     expandedScenes: SnapshotStateMap<Long, Boolean>,
+    groupOps: GroupOps,
     contentPadding: PaddingValues,
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -220,14 +226,8 @@ fun SceneLibraryScreen(
                 onMoveToProject = onMoveSelectedToProject,
             )
         }
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize().weight(1f),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(sortedScenes, key = { it.id }) { scene ->
-                ReorderableRow(reorder, listState, sortedScenes, scene, { it.id }, manualSort && !selectionActive, onReorder) {
+        val moveHost = rememberGroupMoveHost()
+        val sceneCard: @Composable (Scene) -> Unit = { scene ->
                     SceneCard(
                         scene = scene,
                         tasks = tasks,
@@ -281,9 +281,28 @@ fun SceneLibraryScreen(
                     onExportToBundle = { onExportScene(scene) },
                     onEditScene = { editSceneTarget = scene },
                     )
+        }
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().weight(1f),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (groupOps.groups.isEmpty()) {
+                items(sortedScenes, key = { it.id }) { scene ->
+                    ReorderableRow(reorder, listState, sortedScenes, scene, { it.id }, manualSort && !selectionActive, onReorder) {
+                        sceneCard(scene)
+                    }
                 }
+            } else {
+                groupedItems(
+                    sortedScenes, { it.id.toString() }, groupOps,
+                    onMoveItem = { moveHost.movingItemKey = it },
+                    onMoveGroup = { moveHost.movingGroup = it },
+                ) { scene -> sceneCard(scene) }
             }
         }
+        GroupMoveDialogs(groupOps, moveHost)
     }
 }
 
@@ -411,6 +430,7 @@ private fun SceneCard(
             }
 
             if (expanded) {
+                ItemNoteSection("scenes", scene.id.toString())
                 ScenePreviewBox(
                     scene = scene,
                     onMoveElement = { index, xDp, yDp ->

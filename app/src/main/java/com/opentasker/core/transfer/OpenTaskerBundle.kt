@@ -10,6 +10,8 @@ import com.opentasker.core.model.SceneElement
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.ItemGroupEntity
+import com.opentasker.core.storage.ItemMetaEntity
 import com.opentasker.core.storage.ListSortStore
 import com.opentasker.widget.TemplateStore
 import com.opentasker.widget.WidgetTemplate
@@ -44,6 +46,35 @@ data class OpenTaskerBundle(
     val scenes: List<Scene> = emptyList(),
     val templates: List<WidgetTemplate> = emptyList(),
     val sort: BundleSortConfig = BundleSortConfig(),
+    val itemMeta: List<ItemMetaSpec> = emptyList(),
+    val groups: List<ItemGroupSpec> = emptyList(),
+)
+
+/**
+ * A per-item note (+ its fold state) and group membership carried in the bundle. On import [itemKey] is
+ * remapped to the item's new key (tasks/profiles/scenes/widgets) and [groupId] to the imported group id.
+ */
+@Serializable
+data class ItemMetaSpec(
+    val tab: String,
+    val itemKey: String,
+    val note: String = "",
+    val noteExpanded: Boolean = false,
+    val groupId: Long? = null,
+)
+
+/** A foldable group carried in the bundle. [id] is bundle-local — items reference it via ItemMetaSpec.groupId. */
+@Serializable
+data class ItemGroupSpec(
+    val id: Long,
+    val tab: String,
+    val projectId: Long? = null,
+    val name: String,
+    val note: String = "",
+    val position: Int = 0,
+    val expanded: Boolean = true,
+    val noteExpanded: Boolean = false,
+    val parentGroupId: Long? = null,
 )
 
 /** Per-category sort method carried in the bundle, so a tab's Alphabetical/Manual choice round-trips. */
@@ -137,6 +168,8 @@ object OpenTaskerBundleCodec {
         sort: BundleSortConfig = BundleSortConfig(),
         name: String = "白い熊 自由作業盤 Export",
         description: String = "",
+        itemMeta: List<ItemMetaSpec> = emptyList(),
+        groups: List<ItemGroupSpec> = emptyList(),
     ): OpenTaskerBundle {
         // Order the arrays by manual position (then name) so the JSON reflects manual order; each
         // item also carries its own `position`, which is what import restores.
@@ -157,6 +190,8 @@ object OpenTaskerBundleCodec {
             scenes = sortedScenes,
             templates = sortedTemplates,
             sort = sort,
+            itemMeta = itemMeta,
+            groups = groups,
         )
         val plan = validate(base)
         return base.copy(
@@ -251,6 +286,11 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
         val variables = db.variableDao().getAll().map { it.toDomain() }
         val scenes = db.sceneDao().getAll().map { it.toDomain() }
         val projects = db.projectDao().getAll().map { it.toDomain() }
+        val itemMeta = db.itemMetaDao().getAll()
+            .filter { it.note.isNotBlank() || it.groupId != null }
+            .map { ItemMetaSpec(it.tab, it.itemKey, it.note, it.noteExpanded, it.groupId) }
+        val groups = db.itemGroupDao().getAll()
+            .map { ItemGroupSpec(it.id, it.tab, it.projectId, it.name, it.note, it.position, it.expanded, it.noteExpanded, it.parentGroupId) }
 
         return OpenTaskerBundleCodec.build(
             appVersion = appVersion,
@@ -264,6 +304,8 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             sort = BundleSortConfig.from(ListSortStore.state.value),
             name = name,
             description = description,
+            itemMeta = itemMeta,
+            groups = groups,
         )
     }
 
@@ -298,6 +340,19 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
         val referencedProjectIds =
             (profiles.mapNotNull { it.projectId } + tasks.mapNotNull { it.projectId } + scenes.mapNotNull { it.projectId }).toSet()
         val projects = db.projectDao().getAll().map { it.toDomain() }.filter { it.id in referencedProjectIds }
+        val selectedKeys = (
+            tasks.map { "tasks" to it.id.toString() } +
+                profiles.map { "profiles" to it.id.toString() } +
+                scenes.map { "scenes" to it.id.toString() } +
+                templates.map { "widgets" to it.name }
+            ).toSet()
+        val itemMeta = db.itemMetaDao().getAll()
+            .filter { (it.tab to it.itemKey) in selectedKeys && (it.note.isNotBlank() || it.groupId != null) }
+            .map { ItemMetaSpec(it.tab, it.itemKey, it.note, it.noteExpanded, it.groupId) }
+        val usedGroupIds = itemMeta.mapNotNull { it.groupId }.toSet()
+        val groups = db.itemGroupDao().getAll()
+            .filter { it.id in usedGroupIds }
+            .map { ItemGroupSpec(it.id, it.tab, it.projectId, it.name, it.note, it.position, it.expanded, it.noteExpanded, it.parentGroupId) }
 
         return OpenTaskerBundleCodec.build(
             appVersion = appVersion,
@@ -311,6 +366,8 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             sort = BundleSortConfig.from(ListSortStore.state.value),
             name = name,
             description = description,
+            itemMeta = itemMeta,
+            groups = groups,
         )
     }
 
@@ -372,6 +429,8 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
 
             val takenTaskNames = db.taskDao().getAll().mapTo(mutableSetOf()) { it.name.lowercase() }
             val taskIdMap = mutableMapOf<Long, Long>()
+            val profileIdMap = mutableMapOf<Long, Long>()
+            val sceneIdMap = mutableMapOf<Long, Long>()
             bundle.tasks.sortedWith(compareBy<Task> { it.name.lowercase() }.thenBy { it.id }).forEach { task ->
                 val newName = uniqueName(task.name, takenTaskNames)
                 val pid = remapProjectId(task.projectId)
@@ -415,7 +474,7 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
                     exitTaskId = profile.exitTaskId?.let { taskIdMap[it] },
                     projectId = pid,
                 )
-                db.profileDao().insert(remappedProfile.toEntity())
+                profileIdMap[profile.id] = db.profileDao().insert(remappedProfile.toEntity())
                 takenProfileNames += newName.lowercase()
                 targetProjectIds += pid
                 insertedProfiles++
@@ -436,16 +495,67 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
                 }
                 val newName = uniqueName(scene.name, takenSceneNames)
                 val pid = remapProjectId(scene.projectId)
-                db.sceneDao().insert(scene.copy(id = 0, name = newName, elements = remappedElements, projectId = pid).toEntity())
+                sceneIdMap[scene.id] = db.sceneDao().insert(scene.copy(id = 0, name = newName, elements = remappedElements, projectId = pid).toEntity())
                 takenSceneNames += newName.lowercase()
                 targetProjectIds += pid
                 insertedScenes++
+            }
+
+            // Foldable groups: MERGE by (tab, project, name) — re-importing over a project updates the
+            // existing groups in place instead of doubling them (preserving each group's fold state). A
+            // second pass resolves nested parents (a parent may be defined after its child in the bundle).
+            val existingGroups = db.itemGroupDao().getAll()
+            val groupIdMap = mutableMapOf<Long, Long>()
+            bundle.groups.forEach { g ->
+                val pid = remapProjectId(g.projectId)
+                val matches = existingGroups.filter { it.tab == g.tab && it.projectId == pid && it.name == g.name }
+                // Collapse any prior-import duplicates: keep the first, drop the rest.
+                matches.drop(1).forEach { dup ->
+                    db.itemMetaDao().clearGroup(dup.tab, dup.id)
+                    db.itemGroupDao().orphanChildren(dup.id)
+                    db.itemGroupDao().delete(dup.id)
+                }
+                val keep = matches.firstOrNull()
+                groupIdMap[g.id] = if (keep != null) {
+                    db.itemGroupDao().upsert(keep.copy(position = g.position, note = g.note))
+                    keep.id
+                } else {
+                    db.itemGroupDao().upsert(
+                        ItemGroupEntity(
+                            projectId = pid, tab = g.tab, name = g.name,
+                            note = g.note, position = g.position, expanded = g.expanded, noteExpanded = g.noteExpanded,
+                        )
+                    )
+                }
+            }
+            bundle.groups.forEach { g ->
+                val newId = groupIdMap[g.id] ?: return@forEach
+                val parentNew = g.parentGroupId?.let { groupIdMap[it] }
+                db.itemGroupDao().getById(newId)?.let { db.itemGroupDao().upsert(it.copy(parentGroupId = parentNew)) }
+            }
+
+            // Per-item notes + group membership for DB entities: remap the numeric key to the item's new id
+            // (by tab) and the groupId to the imported group. Widget notes are name-keyed, applied below.
+            bundle.itemMeta.forEach { m ->
+                val newKey = when (m.tab) {
+                    "tasks" -> m.itemKey.toLongOrNull()?.let { taskIdMap[it]?.toString() }
+                    "profiles" -> m.itemKey.toLongOrNull()?.let { profileIdMap[it]?.toString() }
+                    "scenes" -> m.itemKey.toLongOrNull()?.let { sceneIdMap[it]?.toString() }
+                    else -> null
+                } ?: return@forEach
+                db.itemMetaDao().upsert(
+                    ItemMetaEntity(
+                        tab = m.tab, itemKey = newKey, note = m.note, noteExpanded = m.noteExpanded,
+                        groupId = m.groupId?.let { groupIdMap[it] },
+                    )
+                )
             }
         }
 
         // Widget templates live in SharedPreferences (TemplateStore), not the DB — apply after the
         // transaction, honouring the same item-conflict strategy as the DB entities.
         val takenTemplateNames = TemplateStore.names().mapTo(mutableSetOf()) { it.lowercase() }
+        val templateNameMap = mutableMapOf<String, String>()
         bundle.templates.forEach { tpl ->
             val collides = tpl.name.lowercase() in takenTemplateNames
             if (collides && itemConflictStrategy == ItemConflictStrategy.OVERWRITE_BACKUP) {
@@ -458,8 +568,17 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
                 tpl.name // OVERWRITE_DELETE / OVERWRITE_BACKUP / no clash → original name (put replaces)
             }
             TemplateStore.put(targetName, tpl.layout)
+            templateNameMap[tpl.name] = targetName
             takenTemplateNames += targetName.lowercase()
             insertedTemplates++
+        }
+
+        // Widget notes: templates are name-keyed, so map the bundle's name to the imported name and store.
+        bundle.itemMeta.filter { it.tab == "widgets" }.forEach { m ->
+            val newName = templateNameMap[m.itemKey] ?: return@forEach
+            db.itemMetaDao().upsert(
+                ItemMetaEntity(tab = "widgets", itemKey = newName, note = m.note, noteExpanded = m.noteExpanded)
+            )
         }
 
         // Restore the per-category sort method the bundle was exported with (v3+; older bundles
