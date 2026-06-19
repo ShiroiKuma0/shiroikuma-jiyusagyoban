@@ -98,6 +98,76 @@ class VariableStoreTest {
         assertFalse(store.evaluateCondition("a == a == a"))
     }
 
+    @Test
+    fun setAtPathCreatesNestedJsonObject() {
+        val store = VariableStore()
+        assertTrue(store.setAtPath("Config.theme", "dark"))
+        assertEquals("{\"theme\":\"dark\"}", store.get("Config"))
+    }
+
+    @Test
+    fun setAtPathUpdatesExistingJsonProperty() {
+        val store = VariableStore()
+        store.set("Config", """{"theme":"light","lang":"en"}""")
+        assertTrue(store.setAtPath("Config.theme", "dark"))
+        val json = store.get("Config")!!
+        assertTrue(json.contains("\"theme\":\"dark\""))
+        assertTrue(json.contains("\"lang\":\"en\""))
+    }
+
+    @Test
+    fun setAtPathCreatesDeepNestedPath() {
+        val store = VariableStore()
+        assertTrue(store.setAtPath("Data.user.profile.name", "test"))
+        val json = store.get("Data")!!
+        assertTrue(json.contains("\"name\":\"test\""))
+    }
+
+    @Test
+    fun setAtPathWritesArrayIndex() {
+        val store = VariableStore()
+        store.set("Items", """["a","b","c"]""")
+        assertTrue(store.setAtPath("Items[1]", "replaced"))
+        val json = store.get("Items")!!
+        assertTrue(json.contains("\"replaced\""))
+        assertTrue(json.contains("\"a\""))
+        assertTrue(json.contains("\"c\""))
+    }
+
+    @Test
+    fun setAtPathGrowsArrayForOutOfBoundsIndex() {
+        val store = VariableStore()
+        store.set("Items", """["a"]""")
+        assertTrue(store.setAtPath("Items[3]", "d"))
+        val json = store.get("Items")!!
+        assertTrue(json.contains("\"d\""))
+    }
+
+    @Test
+    fun setAtPathFlatFallback() {
+        val store = VariableStore()
+        assertTrue(store.setAtPath("simple", "value"))
+        assertEquals("value", store.get("simple"))
+    }
+
+    @Test
+    fun setAtPathRejectsInvalidPath() {
+        val store = VariableStore()
+        assertFalse(store.setAtPath("", "value"))
+        assertFalse(store.setAtPath("base[", "value"))
+        assertFalse(store.setAtPath("base[-1]", "value"))
+    }
+
+    @Test
+    fun setAtPathMixedObjectAndArrayPath() {
+        val store = VariableStore()
+        store.set("Config", """{"items":["x","y"]}""")
+        assertTrue(store.setAtPath("Config.items[0]", "replaced"))
+        val json = store.get("Config")!!
+        assertTrue(json.contains("\"replaced\""))
+        assertTrue(json.contains("\"y\""))
+    }
+
     private fun regexEvalThreadCount(): Int =
         Thread.getAllStackTraces().keys.count { it.name == "regex-eval" }
 }
