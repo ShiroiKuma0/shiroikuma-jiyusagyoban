@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -46,10 +47,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -1018,7 +1019,7 @@ fun ActiveAutomationUi(
         },
         floatingActionButton = {
             when (screen) {
-                OpenTaskerScreen.Profiles -> FloatingActionButton(
+                OpenTaskerScreen.Profiles -> ExtendedFloatingActionButton(
                     onClick = {
                         if (tasks.isEmpty()) {
                             showCreateTaskDialog = true
@@ -1027,16 +1028,21 @@ fun ActiveAutomationUi(
                         }
                     },
                     shape = RoundedCornerShape(12.dp),
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = if (tasks.isEmpty()) "Create task" else "Create profile")
-                }
+                    icon = {
+                        Icon(
+                            Icons.Filled.Add,
+                            contentDescription = if (tasks.isEmpty()) "Create task icon" else "Create profile icon",
+                        )
+                    },
+                    text = { Text(if (tasks.isEmpty()) "New task" else "New profile") },
+                )
 
-                OpenTaskerScreen.Tasks -> FloatingActionButton(
+                OpenTaskerScreen.Tasks -> ExtendedFloatingActionButton(
                     onClick = { showCreateTaskDialog = true },
                     shape = RoundedCornerShape(12.dp),
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Create task")
-                }
+                    icon = { Icon(Icons.Filled.Add, contentDescription = "Create task icon") },
+                    text = { Text("New task") },
+                )
 
                 OpenTaskerScreen.Vars,
                 OpenTaskerScreen.Flow,
@@ -1451,14 +1457,14 @@ private fun ProfilesScreen(
 ) {
     if (tasks.isEmpty()) {
         EmptyState(
-            title = "Start with a template or task",
-            body = "Import an OpenTasker JSON bundle, migrate an existing Tasker XML export, start from a guided template, or create a blank task manually.",
-            actionLabel = if (openTaskerBundleBusy) "Reading Bundle..." else "Import OpenTasker JSON",
-            onAction = onImportOpenTaskerBundle,
-            actionEnabled = !openTaskerBundleBusy,
-            secondaryActionLabel = "Browse Templates",
-            onSecondaryAction = onBrowseTemplates,
-            tertiaryActionLabel = if (taskerImportBusy) "Reading Tasker XML..." else "Import Tasker XML",
+            title = "Build your first automation",
+            body = "Start from a guided template for the fastest path, import existing work, or create a blank task when you know the exact steps.",
+            actionLabel = "Browse Templates",
+            onAction = onBrowseTemplates,
+            secondaryActionLabel = if (openTaskerBundleBusy) "Reading Bundle..." else "Import JSON",
+            onSecondaryAction = onImportOpenTaskerBundle,
+            secondaryActionEnabled = !openTaskerBundleBusy,
+            tertiaryActionLabel = if (taskerImportBusy) "Reading XML..." else "Import Tasker XML",
             onTertiaryAction = onImportTaskerXml,
             tertiaryActionEnabled = !taskerImportBusy,
             quaternaryActionLabel = "Create Blank Task",
@@ -1469,14 +1475,14 @@ private fun ProfilesScreen(
     }
     if (profiles.isEmpty()) {
         EmptyState(
-            title = "No profiles yet",
-            body = "Profiles connect contexts to tasks. Import an OpenTasker JSON bundle, migrate Tasker XML, start from a curated template, or create a blank profile.",
-            actionLabel = if (openTaskerBundleBusy) "Reading Bundle..." else "Import OpenTasker JSON",
-            onAction = onImportOpenTaskerBundle,
-            actionEnabled = !openTaskerBundleBusy,
-            secondaryActionLabel = "Browse Templates",
-            onSecondaryAction = onBrowseTemplates,
-            tertiaryActionLabel = if (taskerImportBusy) "Reading Tasker XML..." else "Import Tasker XML",
+            title = "Create your first profile",
+            body = "Profiles decide when a task runs. Use a template for the fastest path, import existing workflows, or connect a blank profile to your task.",
+            actionLabel = "Browse Templates",
+            onAction = onBrowseTemplates,
+            secondaryActionLabel = if (openTaskerBundleBusy) "Reading Bundle..." else "Import JSON",
+            onSecondaryAction = onImportOpenTaskerBundle,
+            secondaryActionEnabled = !openTaskerBundleBusy,
+            tertiaryActionLabel = if (taskerImportBusy) "Reading XML..." else "Import Tasker XML",
             onTertiaryAction = onImportTaskerXml,
             tertiaryActionEnabled = !taskerImportBusy,
             quaternaryActionLabel = "Create Blank Profile",
@@ -2214,6 +2220,10 @@ private fun EmptyState(
     onQuaternaryAction: (() -> Unit)? = null,
     quaternaryActionEnabled: Boolean = true,
 ) {
+    val actionWidth = Modifier
+        .widthIn(max = 420.dp)
+        .fillMaxWidth()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -2250,46 +2260,76 @@ private fun EmptyState(
             Button(
                 onClick = onAction,
                 enabled = actionEnabled,
-                modifier = Modifier
-                    .fillMaxWidth()
+                modifier = actionWidth
                     .heightIn(min = 48.dp),
                 shape = RoundedCornerShape(12.dp),
             ) {
                 Text(actionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
             }
         }
-        if (secondaryActionLabel != null && onSecondaryAction != null) {
+        if (
+            secondaryActionLabel != null &&
+            onSecondaryAction != null &&
+            tertiaryActionLabel != null &&
+            onTertiaryAction != null
+        ) {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = actionWidth,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = onSecondaryAction,
+                    enabled = secondaryActionEnabled,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                ) {
+                    Text(secondaryActionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                }
+                OutlinedButton(
+                    onClick = onTertiaryAction,
+                    enabled = tertiaryActionEnabled,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                ) {
+                    Text(tertiaryActionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                }
+            }
+        } else if (secondaryActionLabel != null && onSecondaryAction != null) {
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
                 onClick = onSecondaryAction,
                 enabled = secondaryActionEnabled,
-                modifier = Modifier
-                    .fillMaxWidth()
+                modifier = actionWidth
                     .heightIn(min = 48.dp),
                 shape = RoundedCornerShape(12.dp),
             ) {
                 Text(secondaryActionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
             }
-        }
-        if (tertiaryActionLabel != null && onTertiaryAction != null) {
+        } else if (tertiaryActionLabel != null && onTertiaryAction != null) {
             Spacer(Modifier.height(8.dp))
-            TextButton(
+            OutlinedButton(
                 onClick = onTertiaryAction,
                 enabled = tertiaryActionEnabled,
-                modifier = Modifier
-                    .fillMaxWidth()
+                modifier = actionWidth
                     .heightIn(min = 48.dp),
+                shape = RoundedCornerShape(12.dp),
             ) {
                 Text(tertiaryActionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
             }
         }
         if (quaternaryActionLabel != null && onQuaternaryAction != null) {
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(6.dp))
             TextButton(
                 onClick = onQuaternaryAction,
                 enabled = quaternaryActionEnabled,
-                modifier = Modifier
-                    .fillMaxWidth()
+                modifier = actionWidth
                     .heightIn(min = 48.dp),
             ) {
                 Text(quaternaryActionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)

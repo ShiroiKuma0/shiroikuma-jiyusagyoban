@@ -5,16 +5,28 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -24,13 +36,15 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.isSystemInDarkTheme
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.model.Task
+import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemeMode
 import com.opentasker.ui.theme.ThemePreference
@@ -96,7 +110,18 @@ private fun ConfigScreen(tasks: List<Task>, onTaskSelected: (Task) -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Pick a task") },
+                title = {
+                    Column {
+                        Text("Choose widget task", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            "Tap a task to assign it to this home-screen widget",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                 ),
@@ -108,42 +133,121 @@ private fun ConfigScreen(tasks: List<Task>, onTaskSelected: (Task) -> Unit) {
                 modifier = Modifier.fillMaxSize().padding(padding),
                 color = MaterialTheme.colorScheme.background,
             ) {
-                Text(
-                    "No tasks yet. Create a task in OpenTasker first.",
-                    modifier = Modifier.padding(24.dp),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                        shape = RoundedCornerShape(DesignSystem.Radii.xxl),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)),
+                    ) {
+                        Box(Modifier.padding(14.dp), contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Filled.Info,
+                                contentDescription = "Setup required",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(30.dp),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.size(20.dp))
+                    Text(
+                        "Create a task first",
+                        style = MaterialTheme.typography.headlineSmall,
+                        textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        "Widgets run saved OpenTasker tasks from your home screen. Build a task in the app, then return here to assign it.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(vertical = 8.dp),
+                contentPadding = PaddingValues(DesignSystem.Screen.horizontalPadding),
+                verticalArrangement = Arrangement.spacedBy(DesignSystem.Screen.cardGap),
             ) {
+                item {
+                    WidgetConfigHeader(taskCount = tasks.size)
+                }
                 items(tasks, key = { it.id }) { task ->
-                    Column(
+                    Card(
+                        onClick = { onTaskSelected(task) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 56.dp)
-                            .clickable(role = Role.Button) { onTaskSelected(task) }
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                            .heightIn(min = 72.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
+                        shape = RoundedCornerShape(14.dp),
                     ) {
-                        Text(
-                            task.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            "${task.actions.size} action${if (task.actions.size != 1) "s" else ""}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Filled.CheckCircle,
+                                contentDescription = "Selectable task",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp),
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    task.name,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    "${task.actions.size} action${if (task.actions.size != 1) "s" else ""}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                "Assign",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
                     }
-                    HorizontalDivider()
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun WidgetConfigHeader(taskCount: Int) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.66f),
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+        shape = RoundedCornerShape(DesignSystem.Radii.xxl),
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Widget action", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                "$taskCount saved task${if (taskCount != 1) "s" else ""} available. Choose the task this widget should run when tapped.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

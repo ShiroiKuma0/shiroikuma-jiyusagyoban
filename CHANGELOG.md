@@ -28,6 +28,7 @@ Hardening, test coverage, and expression engine improvements.
 - **Reliability**: replaced API 33-only service receiver registration with AndroidX compatibility calls and gated camera/mic active watchers to Android 11+ APIs.
 - **Safety**: made downloads write to a temporary file and replace the destination only after a complete bounded copy succeeds.
 - **Performance**: reduced scene-canvas drag recomposition overhead by using primitive float state and lambda offsets.
+- **UX**: polished first-run onboarding, labeled create actions, the widget task picker, and the home-screen widget treatment so setup and secondary flows feel more guided and intentional.
 - **Cleanup**: removed duplicate `ArrayStore.joinWith` method (identical to `join`).
 
 ## v0.2.72 - 2026-06-16
