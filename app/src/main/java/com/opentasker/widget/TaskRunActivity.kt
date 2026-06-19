@@ -19,39 +19,41 @@ class TaskRunActivity : Activity() {
         val taskId = intent.getLongExtra(EXTRA_TASK_ID, -1L)
         val source = intent.getStringExtra(EXTRA_SOURCE) ?: SOURCE_SHORTCUT
         if (taskId < 0) {
-            Toast.makeText(this, "Invalid task", Toast.LENGTH_SHORT).show()
-            finish()
+            finishWithMessage("Invalid task")
             return
         }
 
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         scope.launch {
-            val db = OpenTaskerApp_NoHilt.db
-            val entity = db.taskDao().getById(taskId)
-            if (entity == null) {
-                runOnUiThread {
-                    Toast.makeText(this@TaskRunActivity, "Task not found", Toast.LENGTH_SHORT).show()
-                    finish()
+            val message = try {
+                val db = OpenTaskerApp_NoHilt.db
+                val entity = db.taskDao().getById(taskId)
+                if (entity == null) {
+                    "Task not found"
+                } else {
+                    val task = entity.toDomain()
+                    val result = executeAndLogTask(
+                        appContext = applicationContext,
+                        db = db,
+                        task = task,
+                        source = source,
+                    )
+                    val status = if (result.report.success) "succeeded" else "failed"
+                    "${task.name} $status (${result.report.durationMs}ms)"
                 }
-                return@launch
+            } catch (e: Exception) {
+                Log.e(TAG, "Task run failed", e)
+                "Task run failed"
             }
-            val task = entity.toDomain()
-            val result = executeAndLogTask(
-                appContext = applicationContext,
-                db = db,
-                task = task,
-                source = source,
-            )
-            val status = if (result.report.success) "succeeded" else "failed"
             runOnUiThread {
-                Toast.makeText(
-                    this@TaskRunActivity,
-                    "${task.name} $status (${result.report.durationMs}ms)",
-                    Toast.LENGTH_SHORT,
-                ).show()
-                finish()
+                finishWithMessage(message)
             }
         }
+    }
+
+    private fun finishWithMessage(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        finish()
     }
 
     companion object {
@@ -59,5 +61,6 @@ class TaskRunActivity : Activity() {
         const val EXTRA_SOURCE = "com.opentasker.widget.SOURCE"
         const val SOURCE_WIDGET = "Widget"
         const val SOURCE_SHORTCUT = "Shortcut"
+        private const val TAG = "TaskRunActivity"
     }
 }
