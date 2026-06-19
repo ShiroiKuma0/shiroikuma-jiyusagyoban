@@ -46,10 +46,12 @@ import androidx.compose.material3.Slider
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.opentasker.ui.components.GroupMoveDialogs
 import com.opentasker.ui.components.GroupOps
 import com.opentasker.ui.components.GroupPickerDialog
 import com.opentasker.ui.components.descendantGroupIds
 import com.opentasker.ui.components.groupedItems
+import com.opentasker.ui.components.rememberGroupMoveHost
 import com.opentasker.ui.components.ItemNoteSection
 import com.opentasker.ui.components.ReorderableRow
 import com.opentasker.ui.components.ConfirmDeleteSelected
@@ -64,6 +66,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.CheckCircle
@@ -421,9 +424,11 @@ class ActiveAutomationViewModel(
     val itemMeta: StateFlow<List<ItemMetaEntity>> = db.itemMetaDao().getAllAsFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun createGroup(tab: String, projectId: Long?, name: String) = viewModelScope.launch {
+    fun createGroup(tab: String, projectId: Long?, name: String, parentId: Long? = null) = viewModelScope.launch {
         val pos = db.itemGroupDao().getForTab(tab).size
-        db.itemGroupDao().upsert(ItemGroupEntity(projectId = projectId, tab = tab, name = name.trim(), position = pos))
+        db.itemGroupDao().upsert(
+            ItemGroupEntity(projectId = projectId, tab = tab, name = name.trim(), position = pos, parentGroupId = parentId),
+        )
     }
     fun renameGroup(group: ItemGroupEntity, name: String) = viewModelScope.launch {
         db.itemGroupDao().upsert(group.copy(name = name.trim()))
@@ -1068,20 +1073,21 @@ fun ActiveAutomationUi(
     val currentProjectId = (projectFilter as? ProjectFilter.Of)?.projectId
     val itemGroups by viewModel.itemGroups.collectAsState()
     val itemMeta by viewModel.itemMeta.collectAsState()
-    fun groupOpsFor(tab: String) = GroupOps(
-        // Show a tab's groups under the SAME project filter as its items, so they appear whenever their
-        // members do (incl. "All") — not only when a specific project is selected.
+    fun groupOpsFor(tab: String, scoped: Boolean = true) = GroupOps(
+        // Project-scoped tabs show their groups under the SAME project filter as their items (so they
+        // appear whenever their members do, incl. "All"); unscoped tabs (widgets are global) show all.
         groups = itemGroups.filter {
-            it.tab == tab && when (val f = projectFilter) {
+            it.tab == tab && (!scoped || when (val f = projectFilter) {
                 is ProjectFilter.All -> true
                 is ProjectFilter.Unfiled -> it.projectId == null
                 is ProjectFilter.Of -> it.projectId == f.projectId
-            }
+            })
         }.sortedBy { it.position },
         groupIdOf = { key -> itemMeta.firstOrNull { it.tab == tab && it.itemKey == key }?.groupId },
-        projectId = currentProjectId,
+        projectId = if (scoped) currentProjectId else null,
         setItemGroup = { key, gid -> viewModel.setItemGroup(tab, key, gid) },
-        createGroupForItem = { key, name -> viewModel.moveItemToNewGroup(tab, currentProjectId, name, key) },
+        createGroupForItem = { key, name -> viewModel.moveItemToNewGroup(tab, if (scoped) currentProjectId else null, name, key) },
+        createSubgroup = { parent, name -> viewModel.createGroup(parent.tab, parent.projectId, name, parent.id) },
         setGroupParent = { g, pid -> viewModel.setGroupParent(g, pid) },
         toggleGroup = { viewModel.toggleGroupExpanded(it) },
         renameGroup = { g, n -> viewModel.renameGroup(g, n) },
@@ -1193,6 +1199,7 @@ fun ActiveAutomationUi(
     var sceneCreateSignal by remember { mutableIntStateOf(0) }
     var widgetCreateSignal by remember { mutableIntStateOf(0) }
     var showNewVarDialog by remember { mutableStateOf(false) }
+    var newGroupTab by remember { mutableStateOf<String?>(null) } // tab a "+ New group" was tapped on
     val taskerImportReview = viewModel.taskerImportReview
     val taskerImportBusy = viewModel.taskerImportBusy
     val openTaskerBundleReview = viewModel.openTaskerBundleReview
@@ -1493,6 +1500,7 @@ fun ActiveAutomationUi(
                         if (tasks.isEmpty()) showCreateTaskDialog = true else showCreateProfileDialog = true
                     },
                     TabAction("From template…", Icons.Filled.Dashboard) { showTemplateDialog = true },
+                    TabAction("New group", Icons.Filled.CreateNewFolder) { newGroupTab = "profiles" },
                     importJson,
                     importTasker,
                     TabAction("Export profiles…", Icons.Filled.Upload) {
@@ -1506,6 +1514,7 @@ fun ActiveAutomationUi(
 
                 OpenTaskerScreen.Tasks -> listOf(
                     TabAction("New task", Icons.Filled.Add) { showCreateTaskDialog = true },
+                    TabAction("New group", Icons.Filled.CreateNewFolder) { newGroupTab = "tasks" },
                     importJson,
                     importTasker,
                     TabAction("Export tasks…", Icons.Filled.Upload) {
@@ -1519,6 +1528,7 @@ fun ActiveAutomationUi(
 
                 OpenTaskerScreen.Scenes -> listOf(
                     TabAction("New scene", Icons.Filled.Add) { sceneCreateSignal++ },
+                    TabAction("New group", Icons.Filled.CreateNewFolder) { newGroupTab = "scenes" },
                     importJson,
                     TabAction("Export scenes…", Icons.Filled.Upload) {
                         exportRequest = ExportRequest(
@@ -1531,6 +1541,7 @@ fun ActiveAutomationUi(
 
                 OpenTaskerScreen.Widgets -> listOf(
                     TabAction("New widget template", Icons.Filled.Add) { widgetCreateSignal++ },
+                    TabAction("New group", Icons.Filled.CreateNewFolder) { newGroupTab = "widgets" },
                     importJson,
                     TabAction("Export templates…", Icons.Filled.Upload) {
                         exportRequest = ExportRequest(
@@ -1543,6 +1554,7 @@ fun ActiveAutomationUi(
 
                 OpenTaskerScreen.Vars -> listOf(
                     TabAction("New variable…", Icons.Filled.Add) { showNewVarDialog = true },
+                    TabAction("New group", Icons.Filled.CreateNewFolder) { newGroupTab = "vars" },
                     importJson,
                     TabAction("Export variables…", Icons.Filled.Upload) {
                         exportRequest = ExportRequest(
@@ -1712,6 +1724,7 @@ fun ActiveAutomationUi(
                 onClearProfileSelection = { selectedProfileIds = emptySet() },
                 onDeleteSelectedProfiles = { confirmDeleteSelectedProfiles = true },
                 onMoveSelectedToProject = { bulkMoveTab = OpenTaskerScreen.Profiles },
+                groupOps = groupOpsFor("profiles"),
                 contentPadding = innerPadding,
             )
 
@@ -1789,6 +1802,7 @@ fun ActiveAutomationUi(
                 onSelectAllVars = { selectedVarKeys = visibleVariables.map { variableKey(it) }.toSet() },
                 onClearVarSelection = { selectedVarKeys = emptySet() },
                 onDeleteSelectedVars = { confirmDeleteSelectedVars = true },
+                groupOps = groupOpsFor("vars"),
             )
 
             OpenTaskerScreen.Scenes -> SceneLibraryScreen(
@@ -1830,6 +1844,7 @@ fun ActiveAutomationUi(
                 onSelectAllTemplates = { selectedTemplateNames = widgetTemplates.map { it.name }.toSet() },
                 onClearTemplateSelection = { selectedTemplateNames = emptySet() },
                 onDeleteSelectedTemplates = { confirmDeleteSelectedTemplates = true },
+                groupOps = groupOpsFor("widgets", scoped = false),
                 contentPadding = innerPadding,
             )
 
@@ -1936,6 +1951,31 @@ fun ActiveAutomationUi(
                 viewModel.updateVariable(0L, name, value)
                 showNewVarDialog = false
             },
+        )
+    }
+
+    newGroupTab?.let { tab ->
+        var name by remember(tab) { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { newGroupTab = null },
+            title = { Text("New group") },
+            text = {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    placeholder = { Text("Group name") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (name.isNotBlank()) {
+                        viewModel.createGroup(tab, if (tab == "widgets") null else currentProjectId, name)
+                    }
+                    newGroupTab = null
+                }) { Text("Create") }
+            },
+            dismissButton = { TextButton(onClick = { newGroupTab = null }) { Text("Cancel") } },
         )
     }
 
@@ -2275,6 +2315,7 @@ private fun ProfilesScreen(
     onClearProfileSelection: () -> Unit,
     onDeleteSelectedProfiles: () -> Unit,
     onMoveSelectedToProject: () -> Unit,
+    groupOps: GroupOps,
     contentPadding: PaddingValues,
 ) {
     if (tasks.isEmpty()) {
@@ -2312,36 +2353,49 @@ private fun ProfilesScreen(
                 onMoveToProject = onMoveSelectedToProject,
             )
         }
+        val moveHost = rememberGroupMoveHost()
+        val profileCard: @Composable (Profile) -> Unit = { profile ->
+            val enterTaskName = tasks.firstOrNull { it.id == profile.enterTaskId }?.name ?: "Missing task #${profile.enterTaskId}"
+            ProfileCard(
+                profile = profile,
+                enterTaskName = enterTaskName,
+                selectionActive = selectionActive,
+                selected = profile.id in selectedIds,
+                expanded = expandedProfiles[profile.id] == true,
+                onToggleExpanded = { expandedProfiles[profile.id] = expandedProfiles[profile.id] != true },
+                onLongPress = { onLongPressProfile(profile) },
+                onToggleSelect = { onToggleSelectProfile(profile) },
+                onEdit = { onEditProfile(profile) },
+                onDelete = { onDeleteProfile(profile) },
+                onToggle = { onToggleProfile(profile, it) },
+                onAddContext = { onAddContext(profile) },
+                onEditContext = { index, context -> onEditContext(profile, index, context) },
+                onDeleteContext = { index -> onDeleteContext(profile, index) },
+                onMove = { onMoveProfile(profile) },
+                onExport = { onExportProfile(profile) },
+            )
+        }
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().weight(1f),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(profiles, key = { it.id }) { profile ->
-                ReorderableRow(reorder, listState, profiles, profile, { it.id }, manualSort && !selectionActive, onReorder) {
-                    val enterTaskName = tasks.firstOrNull { it.id == profile.enterTaskId }?.name ?: "Missing task #${profile.enterTaskId}"
-                    ProfileCard(
-                        profile = profile,
-                        enterTaskName = enterTaskName,
-                        selectionActive = selectionActive,
-                        selected = profile.id in selectedIds,
-                        expanded = expandedProfiles[profile.id] == true,
-                        onToggleExpanded = { expandedProfiles[profile.id] = expandedProfiles[profile.id] != true },
-                        onLongPress = { onLongPressProfile(profile) },
-                        onToggleSelect = { onToggleSelectProfile(profile) },
-                        onEdit = { onEditProfile(profile) },
-                    onDelete = { onDeleteProfile(profile) },
-                    onToggle = { onToggleProfile(profile, it) },
-                    onAddContext = { onAddContext(profile) },
-                    onEditContext = { index, context -> onEditContext(profile, index, context) },
-                    onDeleteContext = { index -> onDeleteContext(profile, index) },
-                    onMove = { onMoveProfile(profile) },
-                    onExport = { onExportProfile(profile) },
-                    )
+            if (groupOps.groups.isEmpty()) {
+                items(profiles, key = { it.id }) { profile ->
+                    ReorderableRow(reorder, listState, profiles, profile, { it.id }, manualSort && !selectionActive, onReorder) {
+                        profileCard(profile)
+                    }
                 }
+            } else {
+                groupedItems(
+                    profiles, { it.id.toString() }, groupOps,
+                    onMoveItem = { moveHost.movingItemKey = it },
+                    onMoveGroup = { moveHost.movingGroup = it },
+                ) { profile -> profileCard(profile) }
             }
         }
+        GroupMoveDialogs(groupOps, moveHost)
     }
 }
 

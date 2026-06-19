@@ -64,6 +64,10 @@ import com.opentasker.core.widget.WidgetLayoutCodec
 import com.opentasker.core.widget.WidgetRenderer
 import com.opentasker.widget.StyledWidgetProvider
 import androidx.compose.ui.layout.ContentScale
+import com.opentasker.ui.components.GroupMoveDialogs
+import com.opentasker.ui.components.GroupOps
+import com.opentasker.ui.components.groupedItems
+import com.opentasker.ui.components.rememberGroupMoveHost
 import com.opentasker.ui.components.ItemNoteSection
 import com.opentasker.ui.components.SelectionBar
 import com.opentasker.ui.components.SelectionCheck
@@ -90,6 +94,7 @@ fun WidgetTemplatesScreen(
     onSelectAllTemplates: () -> Unit,
     onClearTemplateSelection: () -> Unit,
     onDeleteSelectedTemplates: () -> Unit,
+    groupOps: GroupOps,
     contentPadding: PaddingValues,
 ) {
     // The template currently open in the full-screen editor (null = none).
@@ -123,22 +128,33 @@ fun WidgetTemplatesScreen(
             )
         }
 
+        val moveHost = rememberGroupMoveHost()
+        val templateRow: @Composable (WidgetTemplate) -> Unit = { template ->
+            TemplateRow(
+                template = template,
+                selectionActive = selectionActive,
+                selected = template.name in selectedNames,
+                expanded = expandedTemplates[template.name] == true,
+                onToggleExpanded = { expandedTemplates[template.name] = expandedTemplates[template.name] != true },
+                onLongPress = { onLongPressTemplate(template) },
+                onToggleSelect = { onToggleSelectTemplate(template) },
+                onEdit = { editing = template },
+                onCopy = { clipboard.setText(AnnotatedString(template.layout)) },
+                onDelete = { onDelete(template.name) },
+            )
+        }
         LazyColumn(Modifier.fillMaxSize()) {
-            items(templates, key = { it.name }) { template ->
-                TemplateRow(
-                    template = template,
-                    selectionActive = selectionActive,
-                    selected = template.name in selectedNames,
-                    expanded = expandedTemplates[template.name] == true,
-                    onToggleExpanded = { expandedTemplates[template.name] = expandedTemplates[template.name] != true },
-                    onLongPress = { onLongPressTemplate(template) },
-                    onToggleSelect = { onToggleSelectTemplate(template) },
-                    onEdit = { editing = template },
-                    onCopy = { clipboard.setText(AnnotatedString(template.layout)) },
-                    onDelete = { onDelete(template.name) },
-                )
+            if (groupOps.groups.isEmpty()) {
+                items(templates, key = { it.name }) { template -> templateRow(template) }
+            } else {
+                groupedItems(
+                    templates, { it.name }, groupOps,
+                    onMoveItem = { moveHost.movingItemKey = it },
+                    onMoveGroup = { moveHost.movingGroup = it },
+                ) { template -> templateRow(template) }
             }
         }
+        GroupMoveDialogs(groupOps, moveHost)
     }
 
     if (showNameDialog) {

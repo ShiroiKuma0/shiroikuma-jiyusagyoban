@@ -38,6 +38,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.model.Variable
+import com.opentasker.ui.components.GroupMoveDialogs
+import com.opentasker.ui.components.GroupOps
+import com.opentasker.ui.components.groupedItems
+import com.opentasker.ui.components.rememberGroupMoveHost
 import com.opentasker.ui.components.ItemNoteSection
 import com.opentasker.ui.components.SelectionBar
 import com.opentasker.ui.components.SelectionCheck
@@ -65,6 +69,7 @@ fun VariablesScreen(
     onSelectAllVars: () -> Unit,
     onClearVarSelection: () -> Unit,
     onDeleteSelectedVars: () -> Unit,
+    groupOps: GroupOps,
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var editTarget by remember { mutableStateOf<Variable?>(null) }
@@ -104,22 +109,33 @@ fun VariablesScreen(
             )
         }
 
+        val moveHost = rememberGroupMoveHost()
+        val variableRow: @Composable (Variable) -> Unit = { variable ->
+            val key = variableKey(variable)
+            VariableRow(
+                variable = variable,
+                selectionActive = selectionActive,
+                selected = key in selectedKeys,
+                expanded = expandedVars[key] == true,
+                onToggleExpanded = { expandedVars[key] = expandedVars[key] != true },
+                onLongPress = { onLongPressVar(variable) },
+                onToggleSelect = { onToggleSelectVar(variable) },
+                onEdit = { editTarget = variable },
+                onDelete = { onDelete(variable.projectId, variable.name) },
+            )
+        }
         LazyColumn(modifier = Modifier.fillMaxSize()) {
-            items(filtered, key = { variableKey(it) }) { variable ->
-                val key = variableKey(variable)
-                VariableRow(
-                    variable = variable,
-                    selectionActive = selectionActive,
-                    selected = key in selectedKeys,
-                    expanded = expandedVars[key] == true,
-                    onToggleExpanded = { expandedVars[key] = expandedVars[key] != true },
-                    onLongPress = { onLongPressVar(variable) },
-                    onToggleSelect = { onToggleSelectVar(variable) },
-                    onEdit = { editTarget = variable },
-                    onDelete = { onDelete(variable.projectId, variable.name) },
-                )
+            if (groupOps.groups.isEmpty()) {
+                items(filtered, key = { variableKey(it) }) { variable -> variableRow(variable) }
+            } else {
+                groupedItems(
+                    filtered, { variableKey(it) }, groupOps,
+                    onMoveItem = { moveHost.movingItemKey = it },
+                    onMoveGroup = { moveHost.movingGroup = it },
+                ) { variable -> variableRow(variable) }
             }
         }
+        GroupMoveDialogs(groupOps, moveHost)
     }
 
     editTarget?.let { target ->

@@ -96,6 +96,7 @@ class GroupOps(
     val projectId: Long?,
     val setItemGroup: (itemKey: String, groupId: Long?) -> Unit,
     val createGroupForItem: (itemKey: String, name: String) -> Unit,
+    val createSubgroup: (parent: ItemGroupEntity, name: String) -> Unit,
     val setGroupParent: (group: ItemGroupEntity, parentId: Long?) -> Unit,
     val toggleGroup: (ItemGroupEntity) -> Unit,
     val renameGroup: (ItemGroupEntity, String) -> Unit,
@@ -128,6 +129,7 @@ fun <T> LazyListScope.groupedItems(
                     onDelete = { ops.deleteGroup(row.group) },
                     onMoveInto = { onMoveGroup(row.group) },
                     onMoveOut = { ops.setGroupParent(row.group, null) },
+                    onAddSubgroup = { ops.createSubgroup(row.group, it) },
                 )
             }
             is GroupRow.Member -> item(key = "itm:${keyOf(row.item)}") {
@@ -170,10 +172,12 @@ fun GroupHeaderRow(
     onDelete: () -> Unit,
     onMoveInto: () -> Unit,
     onMoveOut: () -> Unit,
+    onAddSubgroup: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
+    var addingSub by remember { mutableStateOf(false) }
     Row(
         modifier = modifier
             .padding(start = (depth * GROUP_INDENT_DP).dp)
@@ -204,6 +208,11 @@ fun GroupHeaderRow(
         IconButton(onClick = { menuOpen = true }) {
             Icon(Icons.Filled.MoreVert, contentDescription = "Group actions")
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text("New subgroup") },
+                    leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                    onClick = { menuOpen = false; addingSub = true },
+                )
                 DropdownMenuItem(
                     text = { Text("Rename group") },
                     leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
@@ -237,6 +246,25 @@ fun GroupHeaderRow(
                 TextButton(onClick = { if (text.isNotBlank()) onRename(text.trim()); renaming = false }) { Text("Save") }
             },
             dismissButton = { TextButton(onClick = { renaming = false }) { Text("Cancel") } },
+        )
+    }
+    if (addingSub) {
+        var text by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { addingSub = false },
+            title = { Text("New subgroup in “${group.name}”") },
+            text = {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    placeholder = { Text("Subgroup name") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { if (text.isNotBlank()) onAddSubgroup(text.trim()); addingSub = false }) { Text("Create") }
+            },
+            dismissButton = { TextButton(onClick = { addingSub = false }) { Text("Cancel") } },
         )
     }
 }
