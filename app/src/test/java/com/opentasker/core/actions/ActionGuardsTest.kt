@@ -7,6 +7,7 @@ import com.opentasker.core.engine.VariableStore
 import com.sun.net.httpserver.HttpServer
 import java.io.File
 import java.net.InetSocketAddress
+import java.net.URL
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -291,6 +292,18 @@ class ActionGuardsTest {
             "failure mentions allow_http",
             (result as ActionResult.Failure).message.contains("allow_http")
         )
+    }
+
+    @Test
+    fun urlLocalNetworkDetectionCoversHttpsPrivateTargets() {
+        assertTrue(urlTargetsLocalNetwork(URL("https://127.0.0.1/api")))
+        assertTrue(urlTargetsLocalNetwork(URL("https://192.168.1.10/api")))
+        assertTrue(urlTargetsLocalNetwork(URL("https://169.254.1.2/api")))
+    }
+
+    @Test
+    fun urlLocalNetworkDetectionLeavesPublicHttpsAlone() {
+        assertTrue(!urlTargetsLocalNetwork(URL("https://8.8.8.8/dns-query")))
     }
 
     @Test
