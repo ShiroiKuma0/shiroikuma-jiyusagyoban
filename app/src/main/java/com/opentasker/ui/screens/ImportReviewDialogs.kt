@@ -14,7 +14,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.opentasker.app.R
 
 @Composable
 internal fun OpenTaskerBundleReviewDialog(
@@ -29,7 +31,7 @@ internal fun OpenTaskerBundleReviewDialog(
     val capabilityRequirements = bundle.metadata.capabilityRequirements
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text("Review OpenTasker bundle") },
+        title = { Text(stringResource(R.string.dialog_review_bundle)) },
         text = {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -39,37 +41,37 @@ internal fun OpenTaskerBundleReviewDialog(
             ) {
                 item {
                     Text(
-                        "Imported profiles will be created disabled so contexts, actions, and permissions can be reviewed before use.",
+                        stringResource(R.string.import_disabled_notice),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 item {
                     InlineNotice(
-                        title = bundle.metadata.name.ifBlank { "OpenTasker bundle" },
+                        title = bundle.metadata.name.ifBlank { stringResource(R.string.import_opentasker_bundle) },
                         body = "Schema ${bundle.schemaVersion} - exported by app ${bundle.appVersion}",
                         color = if (plan.canImport) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
                     )
                 }
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        SummaryMetric("${bundle.tasks.size}", "Tasks", Modifier.weight(1f))
-                        SummaryMetric("${bundle.profiles.size}", "Profiles", Modifier.weight(1f))
-                        SummaryMetric("${bundle.variables.size}", "Variables", Modifier.weight(1f))
+                        SummaryMetric("${bundle.tasks.size}", stringResource(R.string.import_count_tasks), Modifier.weight(1f))
+                        SummaryMetric("${bundle.profiles.size}", stringResource(R.string.import_count_profiles), Modifier.weight(1f))
+                        SummaryMetric("${bundle.variables.size}", stringResource(R.string.import_count_variables), Modifier.weight(1f))
                     }
                 }
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        SummaryMetric("${bundle.scenes.size}", "Scenes", Modifier.weight(1f))
-                        SummaryMetric("${capabilityRequirements.size}", "Setup notes", Modifier.weight(1f))
-                        SummaryMetric("${reviewWarnings.size}", "Warnings", Modifier.weight(1f))
+                        SummaryMetric("${bundle.scenes.size}", stringResource(R.string.import_count_scenes), Modifier.weight(1f))
+                        SummaryMetric("${capabilityRequirements.size}", stringResource(R.string.import_count_setup_notes), Modifier.weight(1f))
+                        SummaryMetric("${reviewWarnings.size}", stringResource(R.string.import_count_warnings), Modifier.weight(1f))
                     }
                 }
                 if (!plan.canImport) {
                     item {
                         TaskerImportListSection(
-                            title = "Cannot import",
-                            values = plan.warnings.ifEmpty { listOf("Bundle schema is not compatible with this build.") },
+                            title = stringResource(R.string.import_incompatible),
+                            values = plan.warnings.ifEmpty { listOf(stringResource(R.string.import_incompatible_body)) },
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
@@ -77,7 +79,7 @@ internal fun OpenTaskerBundleReviewDialog(
                 if (capabilityRequirements.isNotEmpty()) {
                     item {
                         TaskerImportListSection(
-                            title = "Capability review",
+                            title = stringResource(R.string.import_capability_review),
                             values = capabilityRequirements.map {
                                 "${it.actionId}: ${it.level.name.lowercase().replace('_', ' ')} - ${it.reason}"
                             },
@@ -88,7 +90,7 @@ internal fun OpenTaskerBundleReviewDialog(
                 if (reviewWarnings.isNotEmpty()) {
                     item {
                         TaskerImportListSection(
-                            title = "Import warnings",
+                            title = stringResource(R.string.import_warnings),
                             values = reviewWarnings,
                             color = if (plan.canImport) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
                         )
@@ -101,12 +103,12 @@ internal fun OpenTaskerBundleReviewDialog(
                 enabled = plan.canImport && !busy,
                 onClick = onConfirm,
             ) {
-                Text(if (busy) "Importing..." else "Import Disabled")
+                Text(if (busy) stringResource(R.string.status_importing) else stringResource(R.string.import_disabled))
             }
         },
         dismissButton = {
             TextButton(enabled = !busy, onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.action_cancel))
             }
         },
     )
@@ -123,7 +125,7 @@ internal fun TaskerImportReviewDialog(
     val migrationWarnings = (preview.warnings + preview.lossyWarnings).distinct()
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text("Review Tasker import") },
+        title = { Text(stringResource(R.string.dialog_review_tasker)) },
         text = {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -133,35 +135,35 @@ internal fun TaskerImportReviewDialog(
             ) {
                 item {
                     Text(
-                        "Imported profiles will be created disabled so actions, contexts, and permissions can be reviewed before use.",
+                        stringResource(R.string.import_disabled_notice),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        SummaryMetric("${preview.importTaskCount}", "Tasks", Modifier.weight(1f))
-                        SummaryMetric("${preview.importProfileCount}", "Profiles", Modifier.weight(1f))
-                        SummaryMetric("${preview.importVariableCount}", "Variables", Modifier.weight(1f))
+                        SummaryMetric("${preview.importTaskCount}", stringResource(R.string.import_count_tasks), Modifier.weight(1f))
+                        SummaryMetric("${preview.importProfileCount}", stringResource(R.string.import_count_profiles), Modifier.weight(1f))
+                        SummaryMetric("${preview.importVariableCount}", stringResource(R.string.import_count_variables), Modifier.weight(1f))
                     }
                 }
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        SummaryMetric("${preview.sourceTaskCount}", "Src tasks", Modifier.weight(1f))
-                        SummaryMetric("${preview.sourceProfileCount}", "Src profiles", Modifier.weight(1f))
-                        SummaryMetric("${preview.sourceSceneCount}", "Scenes", Modifier.weight(1f))
+                        SummaryMetric("${preview.sourceTaskCount}", stringResource(R.string.import_count_src_tasks), Modifier.weight(1f))
+                        SummaryMetric("${preview.sourceProfileCount}", stringResource(R.string.import_count_src_profiles), Modifier.weight(1f))
+                        SummaryMetric("${preview.sourceSceneCount}", stringResource(R.string.import_count_scenes), Modifier.weight(1f))
                     }
                 }
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatusPill("${preview.mappedActionCount} mapped", MaterialTheme.colorScheme.tertiary)
-                        StatusPill("${preview.unsupportedActionCount} unsupported", MaterialTheme.colorScheme.error)
+                        StatusPill("${preview.mappedActionCount} ${stringResource(R.string.import_mapped)}", MaterialTheme.colorScheme.tertiary)
+                        StatusPill("${preview.unsupportedActionCount} ${stringResource(R.string.import_unsupported)}", MaterialTheme.colorScheme.error)
                     }
                 }
                 if (preview.capabilityWarnings.isNotEmpty()) {
                     item {
                         TaskerImportListSection(
-                            title = "Capability review",
+                            title = stringResource(R.string.import_capability_review),
                             values = preview.capabilityWarnings,
                             color = MaterialTheme.colorScheme.primary,
                         )
@@ -170,7 +172,7 @@ internal fun TaskerImportReviewDialog(
                 if (migrationWarnings.isNotEmpty()) {
                     item {
                         TaskerImportListSection(
-                            title = "Migration warnings",
+                            title = stringResource(R.string.import_migration_warnings),
                             values = migrationWarnings,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -179,7 +181,7 @@ internal fun TaskerImportReviewDialog(
                 if (state.report.unsupportedActions.isNotEmpty()) {
                     item {
                         TaskerImportListSection(
-                            title = "Unsupported Tasker actions",
+                            title = stringResource(R.string.import_unsupported_actions),
                             values = state.report.unsupportedActions.map {
                                 "${it.taskName} step ${it.actionIndex + 1}: code ${it.taskerCode}"
                             },
@@ -190,7 +192,7 @@ internal fun TaskerImportReviewDialog(
                 if (state.report.mappedActions.isNotEmpty()) {
                     item {
                         TaskerImportListSection(
-                            title = "Mapped actions",
+                            title = stringResource(R.string.import_mapped_actions),
                             values = state.report.mappedActions.map {
                                 "${it.taskName}: ${it.taskerCode} -> ${it.openTaskerActionId}"
                             },
@@ -205,12 +207,12 @@ internal fun TaskerImportReviewDialog(
                 enabled = preview.canImport && !busy,
                 onClick = onConfirm,
             ) {
-                Text(if (busy) "Importing..." else "Import for Review")
+                Text(if (busy) stringResource(R.string.status_importing) else stringResource(R.string.import_for_review))
             }
         },
         dismissButton = {
             TextButton(enabled = !busy, onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.action_cancel))
             }
         },
     )

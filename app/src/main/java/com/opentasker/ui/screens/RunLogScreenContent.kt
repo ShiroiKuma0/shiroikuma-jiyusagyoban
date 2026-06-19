@@ -40,8 +40,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.opentasker.app.R
 import com.opentasker.core.engine.ActionTraceStatus
 import com.opentasker.core.engine.RunLogActionDiagnostic
 import com.opentasker.core.engine.RunLogOutcome
@@ -84,8 +86,8 @@ internal fun RunLogScreenContent(
         if (logs.isEmpty()) {
             item {
                 InlineNotice(
-                    title = "No execution history yet",
-                    body = "Run log entries appear here when enabled profiles execute tasks. Current retention: ${retentionPolicy.displayLabel()}.",
+                    title = stringResource(R.string.empty_run_log_title),
+                    body = stringResource(R.string.empty_run_log_body),
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
@@ -118,8 +120,8 @@ internal fun RunLogScreenContent(
         if (logs.isNotEmpty() && filteredLogs.isEmpty()) {
             item {
                 InlineNotice(
-                    title = "No matching runs",
-                    body = "Adjust the status filter or search text to review more execution history.",
+                    title = stringResource(R.string.empty_run_log_search_title),
+                    body = stringResource(R.string.empty_run_log_search_body),
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
@@ -143,9 +145,9 @@ private fun RunLogRetentionCard(
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Retention", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.run_log_retention_title), style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Stored run history is pruned in the background. The Log tab loads the newest 100 entries for fast review.",
+                    stringResource(R.string.run_log_retention_body),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -189,7 +191,7 @@ private fun RunLogRetentionCard(
                                 if (selected) {
                                     Icon(
                                         Icons.Filled.CheckCircle,
-                                        contentDescription = "Selected",
+                                        contentDescription = stringResource(R.string.label_selected),
                                         modifier = Modifier.size(16.dp),
                                     )
                                 } else {
@@ -237,9 +239,9 @@ private fun RunLogFilterCard(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("Find runs", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.run_log_find_runs), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "$visibleCount of $totalCount shown",
+                        stringResource(R.string.run_log_shown_count, visibleCount, totalCount),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -252,14 +254,14 @@ private fun RunLogFilterCard(
                             onQueryChange("")
                         },
                     ) {
-                        Text("Clear")
+                        Text(stringResource(R.string.action_clear))
                     }
                 }
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 item {
                     RunLogFilterChip(
-                        label = "Any task",
+                        label = stringResource(R.string.run_log_any_task),
                         selected = selectedTaskId == null,
                         onClick = { onTaskFilterChange(null) },
                     )
@@ -284,8 +286,8 @@ private fun RunLogFilterCard(
             OutlinedTextField(
                 value = query,
                 onValueChange = onQueryChange,
-                label = { Text("Search task or message") },
-                placeholder = { Text("permission, WiFi, task name") },
+                label = { Text(stringResource(R.string.run_log_search_label)) },
+                placeholder = { Text(stringResource(R.string.run_log_search_hint)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -342,9 +344,9 @@ private fun RunLogSummaryCard(logs: List<RunLogEntry>, onShareDiagnostic: () -> 
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f)) {
-                    Text("Execution history", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.title_execution_history), style = MaterialTheme.typography.titleLarge)
                     Text(
-                        "Recent runs with duration and failure details.",
+                        stringResource(R.string.run_log_history_body),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -363,10 +365,10 @@ private fun RunLogSummaryCard(logs: List<RunLogEntry>, onShareDiagnostic: () -> 
                 )
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                item { SummaryMetric("${logs.size}", "Entries", Modifier.width(104.dp)) }
-                item { SummaryMetric("${outcomes.count { it == RunLogOutcome.Succeeded }}", "Succeeded", Modifier.width(104.dp)) }
-                item { SummaryMetric("$failures", "Failed", Modifier.width(104.dp)) }
-                item { SummaryMetric("$skipped", "Skipped", Modifier.width(104.dp)) }
+                item { SummaryMetric("${logs.size}", stringResource(R.string.label_entries), Modifier.width(104.dp)) }
+                item { SummaryMetric("${outcomes.count { it == RunLogOutcome.Succeeded }}", stringResource(R.string.status_succeeded), Modifier.width(104.dp)) }
+                item { SummaryMetric("$failures", stringResource(R.string.status_failed), Modifier.width(104.dp)) }
+                item { SummaryMetric("$skipped", stringResource(R.string.status_skipped), Modifier.width(104.dp)) }
             }
             latest?.let {
                 Text(
@@ -379,7 +381,7 @@ private fun RunLogSummaryCard(logs: List<RunLogEntry>, onShareDiagnostic: () -> 
                 onClick = onShareDiagnostic,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Share diagnostic report")
+                Text(stringResource(R.string.run_log_share_diagnostic))
             }
         }
     }
@@ -436,9 +438,9 @@ private fun RunLogCard(entry: RunLogEntry) {
                         RunLogOutcome.Skipped -> Icons.Filled.Info
                     },
                     contentDescription = when (outcome) {
-                        RunLogOutcome.Succeeded -> "Succeeded"
-                        RunLogOutcome.Failed -> "Failed"
-                        RunLogOutcome.Skipped -> "Skipped"
+                        RunLogOutcome.Succeeded -> stringResource(R.string.status_succeeded)
+                        RunLogOutcome.Failed -> stringResource(R.string.status_failed)
+                        RunLogOutcome.Skipped -> stringResource(R.string.status_skipped)
                     },
                     tint = accent,
                     modifier = Modifier.size(22.dp),
@@ -448,7 +450,7 @@ private fun RunLogCard(entry: RunLogEntry) {
                     Text(time, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     sourceText?.let { source ->
                         Text(
-                            "Source: $source",
+                            stringResource(R.string.label_source, source),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -482,7 +484,7 @@ private fun RunLogCard(entry: RunLogEntry) {
                         }
                         if (diagnostics.traces.size > 4) {
                             Text(
-                                "${diagnostics.traces.size - 4} more action(s)",
+                                stringResource(R.string.run_log_more_actions, diagnostics.traces.size - 4),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

@@ -192,3 +192,14 @@ MIT — see [LICENSE](LICENSE).
 ## Contributing
 
 Issues and pull requests welcome. See [ROADMAP.md](ROADMAP.md) for planned features.
+
+### Translations
+
+OpenTasker supports localization. String resources live in `app/src/main/res/values/strings.xml` (English default). To contribute a translation:
+
+1. Copy `app/src/main/res/values/strings.xml` to `app/src/main/res/values-<locale>/strings.xml`
+2. Translate only the string values (not the `name` attributes)
+3. Omit strings that are identical to English — Android falls back automatically
+4. Submit a PR with your locale directory
+
+Skeleton directories exist for: `ar`, `de`, `es`, `fr`, `hi`, `it`, `ja`, `ko`, `pl`, `pt-rBR`, `ru`, `tr`, `zh-rCN`.

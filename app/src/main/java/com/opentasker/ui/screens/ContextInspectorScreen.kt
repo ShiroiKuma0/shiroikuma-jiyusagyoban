@@ -39,9 +39,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.opentasker.app.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -197,7 +199,7 @@ fun ContextInspectorScreen(
         }
         item {
             Text(
-                "Context sources",
+                stringResource(R.string.inspector_sources_title),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -207,7 +209,7 @@ fun ContextInspectorScreen(
         }
         item {
             Text(
-                "Profile match state",
+                stringResource(R.string.inspector_match_title),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -215,7 +217,7 @@ fun ContextInspectorScreen(
         if (snapshot.profiles.isEmpty()) {
             item {
                 InspectorNotice(
-                    title = "No profiles",
+                    title = stringResource(R.string.empty_profiles_inspector),
                     body = "Create a profile before reviewing match explanations.",
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -252,9 +254,9 @@ private fun ContextInspectorSummaryCard(
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f)) {
-                    Text("Context inspector", style = MaterialTheme.typography.headlineSmall)
+                    Text(stringResource(R.string.title_context_inspector), style = MaterialTheme.typography.headlineSmall)
                     Text(
-                        "Live source values and profile match explanations.",
+                        stringResource(R.string.inspector_body),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -272,7 +274,7 @@ private fun ContextInspectorSummaryCard(
             OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.Refresh, contentDescription = "Refresh", modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Refresh Status")
+                Text(stringResource(R.string.inspector_refresh))
             }
         }
     }
@@ -300,8 +302,10 @@ private fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
                 Icon(sourceStatusIcon(source.status), contentDescription = source.status.label, tint = color, modifier = Modifier.size(22.dp))
                 Column(Modifier.weight(1f)) {
                     Text(source.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    val lastUpdateLabel = stringResource(R.string.inspector_last_update)
+                    val noValueLabel = stringResource(R.string.inspector_no_value)
                     Text(
-                        observation?.let { "Last update ${formatRelativeTime(it.observedAtMs, nowMs)}" } ?: "No value observed yet",
+                        observation?.let { "$lastUpdateLabel ${formatRelativeTime(it.observedAtMs, nowMs)}" } ?: noValueLabel,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -344,7 +348,7 @@ private fun ProfileInspectorCard(profile: ProfileInspection, nowMs: Long) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Icon(
                     if (profile.matching) Icons.Filled.CheckCircle else Icons.Filled.Info,
-                    contentDescription = if (profile.matching) "Matching" else "Not matching",
+                    contentDescription = if (profile.matching) stringResource(R.string.status_matching) else "Not matching",
                     tint = color,
                     modifier = Modifier.size(22.dp),
                 )
@@ -354,17 +358,17 @@ private fun ProfileInspectorCard(profile: ProfileInspection, nowMs: Long) {
                 }
                 InspectorStatusPill(
                     label = when {
-                        !profile.enabled -> "Disabled"
-                        profile.matching -> "Matching"
-                        else -> "Blocked"
+                        !profile.enabled -> stringResource(R.string.status_disabled)
+                        profile.matching -> stringResource(R.string.status_matching)
+                        else -> stringResource(R.string.status_blocked)
                     },
                     color = color,
                 )
             }
             if (profile.contexts.isEmpty()) {
                 InspectorNotice(
-                    title = "No contexts",
-                    body = "This profile cannot match until at least one context is attached.",
+                    title = stringResource(R.string.inspector_no_contexts),
+                    body = stringResource(R.string.inspector_no_contexts_body),
                     color = MaterialTheme.colorScheme.error,
                 )
             } else {

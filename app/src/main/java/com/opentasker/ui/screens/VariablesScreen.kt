@@ -37,8 +37,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.opentasker.app.R
 import com.opentasker.core.model.Variable
 import com.opentasker.ui.theme.DesignSystem
 
@@ -85,12 +87,12 @@ fun VariablesScreen(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                label = { Text("Search variables") },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search") },
+                label = { Text(stringResource(R.string.variables_search_label)) },
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.variables_search_label)) },
                 trailingIcon = if (searchQuery.isNotBlank()) {
                     {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Filled.Clear, contentDescription = "Clear variable search")
+                            Icon(Icons.Filled.Clear, contentDescription = stringResource(R.string.variables_search_clear))
                         }
                     }
                 } else {
@@ -104,11 +106,11 @@ fun VariablesScreen(
         if (filtered.isEmpty()) {
             item {
                 VariableEmptyState(
-                    title = if (variables.isEmpty()) "No global variables yet" else "No matching variables",
+                    title = if (variables.isEmpty()) stringResource(R.string.empty_variables_title) else stringResource(R.string.empty_variables_search),
                     body = if (variables.isEmpty()) {
-                        "Global variables appear here after a task saves shared values. Sensitive names are masked automatically."
+                        stringResource(R.string.empty_variables_body)
                     } else {
-                        "Clear search to review all saved variables."
+                        stringResource(R.string.empty_variables_search_body)
                     },
                 )
             }
@@ -128,19 +130,20 @@ fun VariablesScreen(
     }
 
     pendingDeleteName?.let { name ->
+        val deletedMsg = stringResource(R.string.variables_deleted, name)
         AlertDialog(
             onDismissRequest = { pendingDeleteName = null },
             icon = {
                 Icon(
                     Icons.Filled.Delete,
-                    contentDescription = "Delete variable",
+                    contentDescription = stringResource(R.string.action_delete),
                     tint = MaterialTheme.colorScheme.error,
                 )
             },
-            title = { Text("Delete %$name?") },
+            title = { Text(stringResource(R.string.dialog_delete_variable, name)) },
             text = {
                 Text(
-                    "This removes the saved global variable value. Tasks that reference it may fall back to an empty value.",
+                    stringResource(R.string.variables_delete_body),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },
@@ -150,26 +153,27 @@ fun VariablesScreen(
                         onDelete(name)
                         pendingDeleteName = null
                         if (editTargetName == name) editTargetName = null
-                        onMessage("Deleted $name")
+                        onMessage(deletedMsg)
                     },
                 ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDeleteName = null }) { Text("Cancel") }
+                TextButton(onClick = { pendingDeleteName = null }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
 
     editTarget?.let { target ->
+        val updatedMsg = stringResource(R.string.variables_updated, target.name)
         EditVariableDialog(
             variable = target,
             onDismiss = { editTargetName = null },
             onSave = { newValue ->
                 onUpdate(target.name, newValue)
                 editTargetName = null
-                onMessage("Updated ${target.name}")
+                onMessage(updatedMsg)
             },
         )
     }
@@ -190,9 +194,9 @@ private fun VariableSummaryCard(
         Column(Modifier.padding(DesignSystem.Screen.heroCardPadding), verticalArrangement = Arrangement.spacedBy(DesignSystem.Screen.sectionGap)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f)) {
-                    Text("Variable vault", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.title_variable_vault), style = MaterialTheme.typography.titleLarge)
                     Text(
-                        "Global values used by tasks, templates, and runtime expressions.",
+                        stringResource(R.string.empty_variables_body),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -204,7 +208,7 @@ private fun VariableSummaryCard(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 VariableMetric("$totalCount", "Saved", Modifier.weight(1f))
-                VariableMetric("$sensitiveCount", "Masked", Modifier.weight(1f))
+                VariableMetric("$sensitiveCount", stringResource(R.string.label_masked), Modifier.weight(1f))
             }
         }
     }
@@ -282,20 +286,20 @@ private fun VariableRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = if (sensitive) "Masked sensitive value" else variable.value,
+                    text = if (sensitive) stringResource(R.string.variables_masked_value) else variable.value,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (sensitive) {
-                    VariablePill("Hidden", MaterialTheme.colorScheme.secondary)
+                    VariablePill(stringResource(R.string.label_hidden), MaterialTheme.colorScheme.secondary)
                 }
             }
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Filled.Delete,
-                    contentDescription = "Delete ${variable.name}",
+                    contentDescription = stringResource(R.string.action_delete),
                     tint = MaterialTheme.colorScheme.error,
                 )
             }
@@ -336,15 +340,15 @@ private fun EditVariableDialog(
             OutlinedTextField(
                 value = value,
                 onValueChange = { value = it },
-                label = { Text("Value for %${variable.name}") },
+                label = { Text(stringResource(R.string.variables_value_label, variable.name)) },
                 modifier = Modifier.fillMaxWidth(),
             )
         },
         confirmButton = {
-            TextButton(onClick = { onSave(value) }) { Text("Save") }
+            TextButton(onClick = { onSave(value) }) { Text(stringResource(R.string.action_save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 }
