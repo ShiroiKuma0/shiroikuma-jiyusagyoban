@@ -2,6 +2,7 @@ package com.opentasker.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -29,12 +31,18 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.storage.ItemGroupEntity
@@ -112,6 +120,7 @@ fun <T> LazyListScope.groupedItems(
     items: List<T>,
     keyOf: (T) -> String,
     ops: GroupOps,
+    drag: GroupDragState,
     onMoveItem: (String) -> Unit,
     onMoveGroup: (ItemGroupEntity) -> Unit,
     itemContent: @Composable (T) -> Unit,
@@ -124,21 +133,52 @@ fun <T> LazyListScope.groupedItems(
                     group = row.group,
                     memberCount = row.memberCount,
                     depth = row.depth,
+                    highlighted = drag.targetGroupId() == row.group.id,
                     onToggleExpanded = { ops.toggleGroup(row.group) },
                     onRename = { ops.renameGroup(row.group, it) },
                     onDelete = { ops.deleteGroup(row.group) },
                     onMoveInto = { onMoveGroup(row.group) },
                     onMoveOut = { ops.setGroupParent(row.group, null) },
                     onAddSubgroup = { ops.createSubgroup(row.group, it) },
+                    modifier = Modifier.onGloballyPositioned {
+                        val b = it.boundsInWindow()
+                        drag.headerBounds[row.group.id] = b.top..b.bottom
+                    },
                 )
             }
             is GroupRow.Member -> item(key = "itm:${keyOf(row.item)}") {
                 val key = keyOf(row.item)
+                val isDragging = drag.draggingKey == key
                 Row(
-                    modifier = Modifier.padding(start = (row.depth * GROUP_INDENT_DP).dp),
+                    modifier = Modifier
+                        .padding(start = (row.depth * GROUP_INDENT_DP).dp)
+                        .graphicsLayer {
+                            if (isDragging) {
+                                translationY = drag.offsetY
+                                shadowElevation = 12f
+                                alpha = 0.95f
+                            }
+                        },
                     verticalAlignment = Alignment.Top,
                 ) {
                     Box(Modifier.weight(1f)) { itemContent(row.item) }
+                    // Drag handle: press and drag onto a group header to file the item there. A dedicated
+                    // handle avoids clashing with the card's own long-press (multi-select).
+                    Icon(
+                        Icons.Filled.DragIndicator,
+                        contentDescription = "Drag into a group",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .onGloballyPositioned { drag.recordRowTop(key, it.positionInWindow().y) }
+                            .pointerInput(key) {
+                                detectDragGestures(
+                                    onDragStart = { offset -> drag.start(key, offset.y) },
+                                    onDrag = { change, amount -> change.consume(); drag.move(amount.y) },
+                                    onDragEnd = { drag.end { target -> if (target != null) ops.setItemGroup(key, target) } },
+                                    onDragCancel = { drag.cancel() },
+                                )
+                            },
+                    )
                     var menu by remember { mutableStateOf(false) }
                     IconButton(onClick = { menu = true }) {
                         Icon(Icons.Filled.MoreVert, contentDescription = "Group")
@@ -167,6 +207,7 @@ fun GroupHeaderRow(
     group: ItemGroupEntity,
     memberCount: Int,
     depth: Int,
+    highlighted: Boolean = false,
     onToggleExpanded: () -> Unit,
     onRename: (String) -> Unit,
     onDelete: () -> Unit,
@@ -183,7 +224,7 @@ fun GroupHeaderRow(
             .padding(start = (depth * GROUP_INDENT_DP).dp)
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = if (highlighted) 0.42f else 0.16f))
             .clickable { onToggleExpanded() }
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -277,6 +318,33 @@ class GroupMoveHost {
 
 @Composable
 fun rememberGroupMoveHost(): GroupMoveHost = remember { GroupMoveHost() }
+
+/**
+ * Drag-to-file state for one grouped list: the lifted item's key, its live drag offset, and the window
+ * bounds of each group header (the drop targets). Long-press a member to lift it; drop over a header to
+ * file it there; drop elsewhere cancels (the ⋮ menu remains the way to un-group).
+ */
+class GroupDragState {
+    var draggingKey by mutableStateOf<String?>(null)
+        private set
+    var offsetY by mutableStateOf(0f)
+        private set
+    private var pointerY by mutableStateOf(0f)
+    val headerBounds = mutableStateMapOf<Long, ClosedFloatingPointRange<Float>>()
+    private val rowTop = mutableStateMapOf<String, Float>()
+
+    fun recordRowTop(key: String, top: Float) { rowTop[key] = top }
+    fun start(key: String, localY: Float) { draggingKey = key; pointerY = (rowTop[key] ?: 0f) + localY; offsetY = 0f }
+    fun move(dy: Float) { offsetY += dy; pointerY += dy }
+    fun targetGroupId(): Long? =
+        if (draggingKey == null) null else headerBounds.entries.firstOrNull { pointerY in it.value }?.key
+    fun end(drop: (target: Long?) -> Unit) { drop(targetGroupId()); reset() }
+    fun cancel() = reset()
+    private fun reset() { draggingKey = null; offsetY = 0f }
+}
+
+@Composable
+fun rememberGroupDragState(): GroupDragState = remember { GroupDragState() }
 
 /** Renders the move-into-group pickers for [host] (an item picker + a group-nesting picker). Place after the list. */
 @Composable

@@ -67,6 +67,7 @@ import androidx.compose.ui.layout.ContentScale
 import com.opentasker.ui.components.GroupMoveDialogs
 import com.opentasker.ui.components.GroupOps
 import com.opentasker.ui.components.groupedItems
+import com.opentasker.ui.components.rememberGroupDragState
 import com.opentasker.ui.components.rememberGroupMoveHost
 import com.opentasker.ui.components.ItemNoteSection
 import com.opentasker.ui.components.SelectionBar
@@ -129,6 +130,7 @@ fun WidgetTemplatesScreen(
         }
 
         val moveHost = rememberGroupMoveHost()
+        val dragState = rememberGroupDragState()
         val templateRow: @Composable (WidgetTemplate) -> Unit = { template ->
             TemplateRow(
                 template = template,
@@ -148,7 +150,7 @@ fun WidgetTemplatesScreen(
                 items(templates, key = { it.name }) { template -> templateRow(template) }
             } else {
                 groupedItems(
-                    templates, { it.name }, groupOps,
+                    templates, { it.name }, groupOps, dragState,
                     onMoveItem = { moveHost.movingItemKey = it },
                     onMoveGroup = { moveHost.movingGroup = it },
                 ) { template -> templateRow(template) }

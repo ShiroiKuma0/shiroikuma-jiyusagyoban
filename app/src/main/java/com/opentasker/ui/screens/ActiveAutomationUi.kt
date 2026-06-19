@@ -51,6 +51,7 @@ import com.opentasker.ui.components.GroupOps
 import com.opentasker.ui.components.GroupPickerDialog
 import com.opentasker.ui.components.descendantGroupIds
 import com.opentasker.ui.components.groupedItems
+import com.opentasker.ui.components.rememberGroupDragState
 import com.opentasker.ui.components.rememberGroupMoveHost
 import com.opentasker.ui.components.ItemNoteSection
 import com.opentasker.ui.components.ReorderableRow
@@ -2354,6 +2355,7 @@ private fun ProfilesScreen(
             )
         }
         val moveHost = rememberGroupMoveHost()
+        val dragState = rememberGroupDragState()
         val profileCard: @Composable (Profile) -> Unit = { profile ->
             val enterTaskName = tasks.firstOrNull { it.id == profile.enterTaskId }?.name ?: "Missing task #${profile.enterTaskId}"
             ProfileCard(
@@ -2389,7 +2391,7 @@ private fun ProfilesScreen(
                 }
             } else {
                 groupedItems(
-                    profiles, { it.id.toString() }, groupOps,
+                    profiles, { it.id.toString() }, groupOps, dragState,
                     onMoveItem = { moveHost.movingItemKey = it },
                     onMoveGroup = { moveHost.movingGroup = it },
                 ) { profile -> profileCard(profile) }
@@ -2713,6 +2715,7 @@ private fun TasksScreen(
         }
         var pickerForKey by remember { mutableStateOf<String?>(null) }
         var movingGroup by remember { mutableStateOf<ItemGroupEntity?>(null) }
+        val dragState = rememberGroupDragState()
         val taskCard: @Composable (Task) -> Unit = { task ->
             TaskCard(
                 task = task,
@@ -2753,7 +2756,7 @@ private fun TasksScreen(
                 }
             } else {
                 groupedItems(
-                    tasks, { it.id.toString() }, groupOps,
+                    tasks, { it.id.toString() }, groupOps, dragState,
                     onMoveItem = { pickerForKey = it },
                     onMoveGroup = { movingGroup = it },
                 ) { task -> taskCard(task) }

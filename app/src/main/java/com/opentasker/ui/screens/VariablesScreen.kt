@@ -41,6 +41,7 @@ import com.opentasker.core.model.Variable
 import com.opentasker.ui.components.GroupMoveDialogs
 import com.opentasker.ui.components.GroupOps
 import com.opentasker.ui.components.groupedItems
+import com.opentasker.ui.components.rememberGroupDragState
 import com.opentasker.ui.components.rememberGroupMoveHost
 import com.opentasker.ui.components.ItemNoteSection
 import com.opentasker.ui.components.SelectionBar
@@ -110,6 +111,7 @@ fun VariablesScreen(
         }
 
         val moveHost = rememberGroupMoveHost()
+        val dragState = rememberGroupDragState()
         val variableRow: @Composable (Variable) -> Unit = { variable ->
             val key = variableKey(variable)
             VariableRow(
@@ -129,7 +131,7 @@ fun VariablesScreen(
                 items(filtered, key = { variableKey(it) }) { variable -> variableRow(variable) }
             } else {
                 groupedItems(
-                    filtered, { variableKey(it) }, groupOps,
+                    filtered, { variableKey(it) }, groupOps, dragState,
                     onMoveItem = { moveHost.movingItemKey = it },
                     onMoveGroup = { moveHost.movingGroup = it },
                 ) { variable -> variableRow(variable) }

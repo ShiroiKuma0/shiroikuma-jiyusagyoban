@@ -29,6 +29,7 @@ import androidx.compose.material3.Checkbox
 import com.opentasker.ui.components.GroupMoveDialogs
 import com.opentasker.ui.components.GroupOps
 import com.opentasker.ui.components.groupedItems
+import com.opentasker.ui.components.rememberGroupDragState
 import com.opentasker.ui.components.rememberGroupMoveHost
 import com.opentasker.ui.components.ItemNoteSection
 import com.opentasker.ui.components.ReorderableRow
@@ -227,6 +228,7 @@ fun SceneLibraryScreen(
             )
         }
         val moveHost = rememberGroupMoveHost()
+        val dragState = rememberGroupDragState()
         val sceneCard: @Composable (Scene) -> Unit = { scene ->
                     SceneCard(
                         scene = scene,
@@ -296,7 +298,7 @@ fun SceneLibraryScreen(
                 }
             } else {
                 groupedItems(
-                    sortedScenes, { it.id.toString() }, groupOps,
+                    sortedScenes, { it.id.toString() }, groupOps, dragState,
                     onMoveItem = { moveHost.movingItemKey = it },
                     onMoveGroup = { moveHost.movingGroup = it },
                 ) { scene -> sceneCard(scene) }
