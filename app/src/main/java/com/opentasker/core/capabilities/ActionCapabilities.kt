@@ -50,9 +50,9 @@ object ActionCapabilityRegistry {
         "screen.off" to elevatedUnsupported("screen.off", "Screen-off requires privileged power management access."),
         "wake" to elevatedUnsupported("wake", "Wake requires a foreground activity or privileged wake flow."),
         TermuxScriptBackend.ACTION_ID to ActionCapability(
-            CapabilityLevel.Unsupported,
+            CapabilityLevel.RequiresSetup,
             TermuxScriptBackend.hintForAction(TermuxScriptBackend.ACTION_ID)?.message
-                ?: "Termux script backend is not active.",
+                ?: "Termux script dispatch ready when Termux and Termux:Tasker are installed.",
         ),
         "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported OpenTasker action."),
     )

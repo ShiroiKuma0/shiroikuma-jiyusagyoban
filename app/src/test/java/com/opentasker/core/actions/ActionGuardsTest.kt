@@ -424,8 +424,8 @@ class ActionGuardsTest {
     fun termuxScriptFailsClosed() = runBlocking {
         val action = TermuxScriptAction()
         val result = action.run(ctx(), mapOf("executable" to "/bin/sh"))
-        assertTrue("Termux script should fail closed", result is ActionResult.Failure)
-        assertTrue((result as ActionResult.Failure).message.contains("not implemented"))
+        assertTrue("Termux script should fail closed without Termux installed", result is ActionResult.Failure)
+        assertTrue((result as ActionResult.Failure).message.contains("not ready"))
     }
 
     // --- VolumeAction guards ---
