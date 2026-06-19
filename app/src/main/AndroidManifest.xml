@@ -135,6 +135,15 @@
         </receiver>
 
         <service
+            android:name="com.opentasker.core.scenes.SceneOverlayService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Scene overlay — displays user-defined floating UI panels" />
+        </service>
+
+        <service
             android:name="com.opentasker.core.contexts.QuickSettingsTileService"
             android:exported="true"
             android:icon="@android:drawable/ic_menu_compass"
