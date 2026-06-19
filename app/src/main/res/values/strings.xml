@@ -17,7 +17,7 @@
     <string name="nav_scenes">Scenes</string>
     <string name="nav_inspector">Inspector</string>
 
-    <!-- Common dialog buttons -->
+    <!-- Common actions -->
     <string name="action_create">Create</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_save">Save</string>
@@ -25,6 +25,101 @@
     <string name="action_dismiss">Dismiss</string>
     <string name="action_import">Import</string>
     <string name="action_export">Export</string>
+    <string name="action_close">Close</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_run">Run</string>
+    <string name="action_pin">Pin</string>
+    <string name="action_clear">Clear</string>
+    <string name="action_browse">Browse</string>
+    <string name="action_working">Working…</string>
+
+    <!-- Common labels -->
+    <string name="label_all">All</string>
+    <string name="label_selected">Selected</string>
+    <string name="label_masked">Masked</string>
+    <string name="label_hidden">Hidden</string>
+    <string name="label_entries">Entries</string>
+    <string name="label_source">Source: %1$s</string>
+
+    <!-- Status labels -->
+    <string name="status_ready">Ready</string>
+    <string name="status_disabled">Disabled</string>
+    <string name="status_matching">Matching</string>
+    <string name="status_blocked">Blocked</string>
+    <string name="status_succeeded">Succeeded</string>
+    <string name="status_failed">Failed</string>
+    <string name="status_skipped">Skipped</string>
+    <string name="status_detected">Detected</string>
+    <string name="status_optional">Optional</string>
+    <string name="status_needs_setup">Needs setup</string>
+    <string name="status_granted">Granted</string>
+    <string name="status_required">Required</string>
+    <string name="status_pending">%1$d pending</string>
+    <string name="status_overlay_ready">Overlay ready</string>
+    <string name="status_importing">Importing…</string>
+
+    <!-- Theme options -->
+    <string name="theme_system">System</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_high_contrast">High contrast</string>
+
+    <!-- Screen titles -->
+    <string name="title_automation_workspace">Automation workspace</string>
+    <string name="title_task_library">Task library</string>
+    <string name="title_variable_vault">Variable vault</string>
+    <string name="title_scene_library">Scene library</string>
+    <string name="title_context_inspector">Context inspector</string>
+    <string name="title_setup_checklist">Setup checklist</string>
+    <string name="title_execution_history">Execution history</string>
+    <string name="title_starter_templates">Starter templates</string>
+
+    <!-- Dialog titles -->
+    <string name="dialog_create_task">Create Task</string>
+    <string name="dialog_edit_task">Edit Task</string>
+    <string name="dialog_create_profile">Create Profile</string>
+    <string name="dialog_edit_profile">Edit Profile</string>
+    <string name="dialog_add_action">Add action</string>
+    <string name="dialog_add_context">Add context</string>
+    <string name="dialog_delete_variable">Delete %%%1$s?</string>
+    <string name="dialog_review_bundle">Review OpenTasker bundle</string>
+    <string name="dialog_review_tasker">Review Tasker import</string>
+
+    <!-- Profile editor -->
+    <string name="profile_name_label">Profile name</string>
+    <string name="profile_name_hint">Weekday work mode</string>
+    <string name="profile_name_helper">Profiles read best when named after the situation they detect.</string>
+    <string name="profile_group_label">Group</string>
+    <string name="profile_group_hint">Work, Home, Travel</string>
+    <string name="profile_group_helper">Optional. Groups profiles in the list for easier browsing.</string>
+    <string name="profile_enable_after_save">Enable after saving</string>
+    <string name="profile_enter_task">Enter task</string>
+    <string name="profile_cooldown_label">Cooldown seconds</string>
+    <string name="profile_cooldown_helper">Minimum seconds between triggers. Default is 60.</string>
+    <string name="profile_retrigger_label">Re-trigger behavior</string>
+    <string name="profile_new">New profile</string>
+    <string name="profile_delete">Delete Profile</string>
+    <string name="profile_add_context">Add Context</string>
+
+    <!-- Task editor -->
+    <string name="task_name_label">Task name</string>
+    <string name="task_name_hint">Morning focus mode</string>
+    <string name="task_name_helper">Use a clear verb phrase so you know what the task does from the list.</string>
+    <string name="task_priority_label">Priority</string>
+    <string name="task_priority_helper">Enter a value from 0 to 10. Higher priority tasks run first when multiple trigger at once.</string>
+    <string name="task_new">New task</string>
+    <string name="task_delete">Delete Task</string>
+    <string name="task_add_action">Add Action</string>
+
+    <!-- Action editor -->
+    <string name="action_label_field">Action label</string>
+    <string name="action_label_hint">Shown in task steps and run log entries.</string>
+
+    <!-- Context editor -->
+    <string name="context_invert_match">Invert match</string>
+    <string name="context_day_schedule">Day schedule</string>
+    <string name="context_days_label">Days *</string>
+    <string name="context_days_hint">weekdays, weekends, MON-FRI</string>
 
     <!-- Setup permissions -->
     <string name="setup_title">Setup</string>
@@ -38,6 +133,21 @@
     <string name="setup_usage_body">Needed for app-open triggers. Without it, profile contexts that watch for foreground apps will not fire.</string>
     <string name="setup_local_network_title">Local network access</string>
     <string name="setup_local_network_body">Android 17+ requires this permission for any LAN device communication (HTTP, Ping, Wake-on-LAN, MQTT, mDNS). Without it, network actions targeting local addresses will fail.</string>
+    <string name="setup_intro">OpenTasker can run with missing access but some features may not work.</string>
+    <string name="setup_pending_required">Pending required items must be completed before automations will trigger reliably.</string>
+    <string name="setup_review_settings">Review app settings</string>
+
+    <!-- Setup - Theme -->
+    <string name="setup_theme_label">Theme</string>
+    <string name="setup_theme_helper">Choose the display mode for OpenTasker.</string>
+
+    <!-- Setup - Backup -->
+    <string name="setup_backup_label">Backup and restore</string>
+    <string name="setup_backup_helper">Create a local database snapshot or import/export backups for device transfers.</string>
+    <string name="setup_backup_create">Create Local Backup</string>
+    <string name="setup_backup_restore_staged">Restore staged</string>
+    <string name="setup_backup_available">Backup available</string>
+    <string name="setup_backup_none">No backup yet</string>
 
     <!-- Empty states -->
     <string name="empty_profiles_title">No profiles yet</string>
@@ -46,4 +156,86 @@
     <string name="empty_tasks_body">Tasks contain the actions your automations will execute.</string>
     <string name="empty_run_log_title">No run log entries</string>
     <string name="empty_run_log_body">Entries appear here after profiles trigger task execution.</string>
+    <string name="empty_variables_title">No global variables yet</string>
+    <string name="empty_variables_body">Global variables appear here after tasks store values with the var.set or var.persist action.</string>
+    <string name="empty_variables_search">No matching variables</string>
+    <string name="empty_variables_search_body">Clear search to review all saved variables.</string>
+    <string name="empty_scenes_title">No scenes yet</string>
+    <string name="empty_scenes_body">Create an overlay panel to display status or controls on top of other apps.</string>
+    <string name="empty_profiles_inspector">No profiles</string>
+    <string name="empty_run_log_search_title">No matching runs</string>
+    <string name="empty_run_log_search_body">Adjust the status filter or search query to find entries.</string>
+
+    <!-- Run log -->
+    <string name="run_log_retention_title">Retention</string>
+    <string name="run_log_retention_body">Stored run history is pruned automatically. Entries older than 30 days are removed by periodic cleanup.</string>
+    <string name="run_log_find_runs">Find runs</string>
+    <string name="run_log_shown_count">%1$d of %2$d shown</string>
+    <string name="run_log_history_body">Recent runs with duration, status, and action-level traces.</string>
+    <string name="run_log_any_task">Any task</string>
+    <string name="run_log_search_label">Search task or message</string>
+    <string name="run_log_search_hint">permission, WiFi, task name</string>
+    <string name="run_log_share_diagnostic">Share diagnostic report</string>
+    <string name="run_log_more_actions">+%1$d more action(s)</string>
+
+    <!-- Variables screen -->
+    <string name="variables_search_label">Search variables</string>
+    <string name="variables_search_clear">Clear variable search</string>
+    <string name="variables_delete_body">This removes the saved global variable. Tasks that reference it will use fallback/default values.</string>
+    <string name="variables_deleted">Deleted %1$s</string>
+    <string name="variables_updated">Updated %1$s</string>
+    <string name="variables_masked_value">Masked sensitive value</string>
+    <string name="variables_value_label">Value for %%%1$s</string>
+
+    <!-- Scenes screen -->
+    <string name="scenes_create">Create Scene</string>
+    <string name="scenes_delete">Delete scene</string>
+
+    <!-- Inspector -->
+    <string name="inspector_sources_title">Context sources</string>
+    <string name="inspector_match_title">Profile match state</string>
+    <string name="inspector_body">Live source values and profile match explanations for debugging automation state.</string>
+    <string name="inspector_refresh">Refresh Status</string>
+    <string name="inspector_last_update">Last update</string>
+    <string name="inspector_no_value">No value observed yet</string>
+    <string name="inspector_no_contexts">No contexts</string>
+    <string name="inspector_no_contexts_body">This profile cannot match because it has no context entries configured.</string>
+
+    <!-- Import -->
+    <string name="import_disabled_notice">Imported profiles will be created disabled for review.</string>
+    <string name="import_schema_info">Schema %1$d</string>
+    <string name="import_incompatible">Cannot import</string>
+    <string name="import_incompatible_body">Bundle schema is not compatible with this version of OpenTasker.</string>
+    <string name="import_capability_review">Capability review</string>
+    <string name="import_warnings">Import warnings</string>
+    <string name="import_migration_warnings">Migration warnings</string>
+    <string name="import_unsupported_actions">Unsupported Tasker actions</string>
+    <string name="import_mapped_actions">Mapped actions</string>
+    <string name="import_for_review">Import for Review</string>
+    <string name="import_disabled">Import Disabled</string>
+    <string name="import_tasker">Import Tasker</string>
+    <string name="import_reading_xml">Reading XML</string>
+    <string name="import_reading_json">Reading JSON</string>
+    <string name="import_export_json">Export JSON</string>
+    <string name="import_import_json">Import JSON</string>
+    <string name="import_opentasker_bundle">OpenTasker bundle</string>
+    <string name="import_count_tasks">Tasks</string>
+    <string name="import_count_profiles">Profiles</string>
+    <string name="import_count_variables">Variables</string>
+    <string name="import_count_scenes">Scenes</string>
+    <string name="import_count_setup_notes">Setup notes</string>
+    <string name="import_count_warnings">Warnings</string>
+    <string name="import_count_src_tasks">Src tasks</string>
+    <string name="import_count_src_profiles">Src profiles</string>
+    <string name="import_mapped">mapped</string>
+    <string name="import_unsupported">unsupported</string>
+
+    <!-- Workspace -->
+    <string name="workspace_review_readiness">Review readiness before enabling profiles. Tap Setup for permission details.</string>
+    <string name="workspace_task_library_body">Build reusable action sequences for your automations.</string>
+    <string name="workspace_templates">Templates</string>
+
+    <!-- Flow -->
+    <string name="flow_empty_title">No automation flow</string>
+    <string name="flow_empty_body">Create profiles and tasks to see their connections here.</string>
 </resources>

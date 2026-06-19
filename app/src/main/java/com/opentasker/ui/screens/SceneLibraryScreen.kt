@@ -63,10 +63,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.opentasker.app.R
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
 import com.opentasker.core.model.SceneElementType
@@ -284,9 +286,9 @@ private fun SceneEmptyState(
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp),
                 )
-                Text("No scenes yet", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.empty_scenes_title), style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "Create an overlay panel, then add buttons, text, sliders, or image placeholders with task bindings.",
+                    stringResource(R.string.empty_scenes_body),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -296,9 +298,9 @@ private fun SceneEmptyState(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                 ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Create scene")
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.scenes_create))
                     Spacer(Modifier.width(6.dp))
-                    Text("Create Scene")
+                    Text(stringResource(R.string.scenes_create))
                 }
             }
         }
@@ -327,7 +329,7 @@ private fun SceneOverviewCard(
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f)) {
-                    Text("Scene library", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.title_scene_library), style = MaterialTheme.typography.titleLarge)
                     Text(
                         "${scenes.sumOf { it.elements.size }} element${plural(scenes.sumOf { it.elements.size })} across ${scenes.size} scene${plural(scenes.size)}",
                         style = MaterialTheme.typography.bodyMedium,
@@ -335,7 +337,7 @@ private fun SceneOverviewCard(
                     )
                 }
                 SceneStatusPill(
-                    label = if (overlayReady) "Overlay ready" else "Setup needed",
+                    label = if (overlayReady) stringResource(R.string.status_overlay_ready) else stringResource(R.string.status_needs_setup),
                     color = if (overlayReady) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
                 )
             }
@@ -345,9 +347,9 @@ private fun SceneOverviewCard(
                 SceneMetric("$errorCount", "Errors", Modifier.weight(1f))
             }
             Button(onClick = onCreateScene, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                Icon(Icons.Filled.Add, contentDescription = "Add scene")
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.scenes_create))
                 Spacer(Modifier.width(6.dp))
-                Text("Create Scene")
+                Text(stringResource(R.string.scenes_create))
             }
         }
     }
@@ -383,7 +385,7 @@ private fun SceneCard(
                     )
                 }
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete scene", tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.scenes_delete), tint = MaterialTheme.colorScheme.error)
                 }
             }
 
@@ -691,7 +693,7 @@ private fun SceneElementDeleteDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 }
@@ -865,7 +867,7 @@ private fun SceneElementEditorDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 }
@@ -1050,11 +1052,11 @@ private fun SceneEditorDialog(
                 enabled = canSave,
                 onClick = { onSave(name.trim(), parsedWidth ?: 320, parsedHeight ?: 240) },
             ) {
-                Text("Create")
+                Text(stringResource(R.string.action_create))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 }
