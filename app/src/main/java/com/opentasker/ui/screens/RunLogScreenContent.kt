@@ -2,6 +2,7 @@ package com.opentasker.ui.screens
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -28,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
@@ -48,6 +51,8 @@ import com.opentasker.core.engine.ActionTraceStatus
 import com.opentasker.core.engine.RunLogActionDiagnostic
 import com.opentasker.core.engine.RunLogOutcome
 import com.opentasker.core.engine.RunLogSource
+import com.opentasker.core.engine.RunLogTemplateDiagnostic
+import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.core.engine.outcome
 import com.opentasker.core.engine.toRunLogDiagnostics
 import com.opentasker.core.model.RunLogEntry
@@ -549,33 +554,95 @@ private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
             }
             if (trace.templateExpressions.isNotEmpty()) {
                 Spacer(Modifier.height(4.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    trace.templateExpressions.take(3).forEach { expression ->
+                ExpressionDebugger(trace.templateExpressions)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExpressionDebugger(expressions: List<RunLogTemplateDiagnostic>) {
+    var expanded by remember { mutableStateOf(false) }
+    val visibleExpressions = if (expanded) expressions else expressions.take(3)
+    val hasWarnings = expressions.any { it.warning != null }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = if (hasWarnings) {
+            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.12f)
+        } else {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.10f)
+        },
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
+        border = BorderStroke(
+            1.dp,
+            if (hasWarnings) MaterialTheme.colorScheme.error.copy(alpha = 0.20f)
+            else MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    "${expressions.size} expression${plural(expressions.size)}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    if (expanded) "collapse" else "expand",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            visibleExpressions.forEach { expr ->
+                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
-                            "${expression.argName}: ${expression.expression} -> ${expression.value} (${expression.source})",
+                            expr.argName,
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.colorScheme.primary,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
                         )
-                        expression.warning?.let { warning ->
-                            Text(
-                                warning,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.error,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                    if (trace.templateExpressions.size > 3) {
                         Text(
-                            "${trace.templateExpressions.size - 3} more template expression(s)",
+                            expr.source,
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            maxLines = 1,
+                        )
+                    }
+                    Text(
+                        "${expr.expression}  →  ${expr.value}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = if (expanded) 4 else 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    expr.warning?.let { warning ->
+                        Text(
+                            warning,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
+            }
+            if (!expanded && expressions.size > 3) {
+                Text(
+                    "${expressions.size - 3} more",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

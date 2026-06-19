@@ -154,7 +154,8 @@ internal object NotificationChannels {
  * Variable set action.
  *
  * Args:
- *   - "name": variable name
+ *   - "name": variable name, or a dotted/bracketed path for nested JSON writes
+ *     (e.g. "config.theme", "items[0]", "Config.user.name")
  *   - "value": new value (supports %expansion)
  */
 class SetVariableAction : Action {
@@ -164,8 +165,15 @@ class SetVariableAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val name = args["name"] ?: return ActionResult.Failure("missing name")
         val value = args["value"] ?: ""
-        ctx.variables.set(name, value)
-        ctx.logger("Set \$$name = $value")
+        if (name.contains('.') || name.contains('[')) {
+            if (!ctx.variables.setAtPath(name, value)) {
+                return ActionResult.Failure("invalid path: $name")
+            }
+            ctx.logger("Set path \$$name = $value")
+        } else {
+            ctx.variables.set(name, value)
+            ctx.logger("Set \$$name = $value")
+        }
         return ActionResult.Success
     }
 }
