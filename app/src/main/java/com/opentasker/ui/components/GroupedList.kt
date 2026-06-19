@@ -47,14 +47,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.storage.ItemGroupEntity
 
-/** A rendered row in a grouped list: a group header or a member item, each carrying its nesting depth. */
+/** A rendered row in a grouped list: a group header, the "Ungrouped" drop zone, or a member item. */
 sealed interface GroupRow<out T> {
     data class Header(val group: ItemGroupEntity, val memberCount: Int, val depth: Int) : GroupRow<Nothing>
+    data class UngroupedHeader(val memberCount: Int) : GroupRow<Nothing>
     data class Member<T>(val item: T, val depth: Int) : GroupRow<T>
 }
 
 /** Indent (dp) added per nesting level, so deeper groups/items step further right. */
 const val GROUP_INDENT_DP = 56
+
+/** Sentinel "groupId" for the Ungrouped drop zone — means remove from group (real ids are >= 1). */
+const val UNGROUP_TARGET = 0L
 
 /** The set of group ids nested (at any depth) under [groupId] — used to forbid nesting a group into itself. */
 fun descendantGroupIds(groupId: Long, groups: List<ItemGroupEntity>): Set<Long> {
@@ -76,6 +80,7 @@ fun <T> buildGroupRows(
     keyOf: (T) -> String,
     groups: List<ItemGroupEntity>,
     groupIdOf: (String) -> Long?,
+    dragActive: Boolean = false,
 ): List<GroupRow<T>> {
     val liveIds = groups.mapTo(mutableSetOf()) { it.id }
     val itemsByGroup = items.groupBy { groupIdOf(keyOf(it)).takeIf { id -> id in liveIds } }
@@ -93,7 +98,12 @@ fun <T> buildGroupRows(
         }
     }
     childrenByParent[null].orEmpty().sortedBy { it.position }.forEach { emit(it, 0) }
-    itemsByGroup[null].orEmpty().forEach { rows += GroupRow.Member(it, 0) }
+    val ungrouped = itemsByGroup[null].orEmpty()
+    // A drop-to-ungroup zone: shown when groups exist and there are loose items, or while dragging.
+    if (groups.isNotEmpty() && (ungrouped.isNotEmpty() || dragActive)) {
+        rows += GroupRow.UngroupedHeader(ungrouped.size)
+    }
+    ungrouped.forEach { rows += GroupRow.Member(it, 0) }
     return rows
 }
 
@@ -125,9 +135,19 @@ fun <T> LazyListScope.groupedItems(
     onMoveGroup: (ItemGroupEntity) -> Unit,
     itemContent: @Composable (T) -> Unit,
 ) {
-    val rows = buildGroupRows(items, keyOf, ops.groups, ops.groupIdOf)
+    val rows = buildGroupRows(items, keyOf, ops.groups, ops.groupIdOf, dragActive = drag.draggingKey != null)
     rows.forEach { row ->
         when (row) {
+            is GroupRow.UngroupedHeader -> item(key = "ungrouped") {
+                UngroupedDropZone(
+                    memberCount = row.memberCount,
+                    highlighted = drag.targetGroupId() == UNGROUP_TARGET,
+                    modifier = Modifier.onGloballyPositioned {
+                        val b = it.boundsInWindow()
+                        drag.headerBounds[UNGROUP_TARGET] = b.top..b.bottom
+                    },
+                )
+            }
             is GroupRow.Header -> item(key = "grp:${row.group.id}") {
                 GroupHeaderRow(
                     group = row.group,
@@ -174,7 +194,15 @@ fun <T> LazyListScope.groupedItems(
                                 detectDragGestures(
                                     onDragStart = { offset -> drag.start(key, offset.y) },
                                     onDrag = { change, amount -> change.consume(); drag.move(amount.y) },
-                                    onDragEnd = { drag.end { target -> if (target != null) ops.setItemGroup(key, target) } },
+                                    onDragEnd = {
+                                        drag.end { target ->
+                                            when (target) {
+                                                null -> Unit
+                                                UNGROUP_TARGET -> ops.setItemGroup(key, null)
+                                                else -> ops.setItemGroup(key, target)
+                                            }
+                                        }
+                                    },
                                     onDragCancel = { drag.cancel() },
                                 )
                             },
@@ -365,6 +393,37 @@ fun GroupMoveDialogs(ops: GroupOps, host: GroupMoveHost) {
             onCreate = null,
             onDismiss = { host.movingGroup = null },
         )
+    }
+}
+
+/** Drop target that removes a dragged item from its group (back to top level). */
+@Composable
+fun UngroupedDropZone(memberCount: Int, highlighted: Boolean, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (highlighted) MaterialTheme.colorScheme.primary.copy(alpha = 0.42f)
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+            )
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            if (highlighted) "Drop here to remove from group" else "Ungrouped",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        if (memberCount > 0) {
+            Text(
+                "$memberCount",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
