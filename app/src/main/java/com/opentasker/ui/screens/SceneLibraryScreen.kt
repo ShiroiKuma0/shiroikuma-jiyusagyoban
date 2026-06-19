@@ -397,6 +397,11 @@ private fun SceneCard(
                         onMoveElement(index, element.copy(xDp = xDp, yDp = yDp))
                     }
                 },
+                onResizeElement = { index, widthDp, heightDp ->
+                    scene.elements.getOrNull(index)?.let { element ->
+                        onMoveElement(index, element.copy(widthDp = widthDp, heightDp = heightDp))
+                    }
+                },
             )
 
             OutlinedButton(onClick = onAddElement, modifier = Modifier.fillMaxWidth()) {
@@ -438,6 +443,7 @@ private fun SceneCard(
 private fun ScenePreviewBox(
     scene: Scene,
     onMoveElement: (Int, Int, Int) -> Unit,
+    onResizeElement: (Int, Int, Int) -> Unit = { _, _, _ -> },
 ) {
     Surface(
         modifier = Modifier
@@ -479,6 +485,7 @@ private fun ScenePreviewBox(
                                     canvasWidth = canvasWidth,
                                     canvasHeight = canvasHeight,
                                     onMoveElement = onMoveElement,
+                                    onResizeElement = onResizeElement,
                                 )
                             }
                         }
@@ -497,11 +504,14 @@ private fun SceneCanvasElement(
     canvasWidth: Float,
     canvasHeight: Float,
     onMoveElement: (Int, Int, Int) -> Unit,
+    onResizeElement: (Int, Int, Int) -> Unit = { _, _, _ -> },
 ) {
     val element = projection.element
     val density = LocalDensity.current
     var dragX by remember(scene.id, element.id, projection.x, projection.y) { mutableFloatStateOf(0f) }
     var dragY by remember(scene.id, element.id, projection.x, projection.y) { mutableFloatStateOf(0f) }
+    var resizeDx by remember(scene.id, element.id, projection.width, projection.height) { mutableFloatStateOf(0f) }
+    var resizeDy by remember(scene.id, element.id, projection.width, projection.height) { mutableFloatStateOf(0f) }
     val color = when (element.type) {
         SceneElementType.BUTTON -> MaterialTheme.colorScheme.primary
         SceneElementType.TEXT -> MaterialTheme.colorScheme.tertiary
@@ -509,7 +519,9 @@ private fun SceneCanvasElement(
         SceneElementType.IMAGE -> MaterialTheme.colorScheme.error
         else -> MaterialTheme.colorScheme.primary
     }
-    Surface(
+    val currentWidth = (projection.width + resizeDx).coerceAtLeast(12f)
+    val currentHeight = (projection.height + resizeDy).coerceAtLeast(12f)
+    Box(
         modifier = Modifier
             .offset {
                 with(density) {
@@ -519,51 +531,83 @@ private fun SceneCanvasElement(
                     )
                 }
             }
-            .size(
-                width = projection.width.coerceAtLeast(12f).dp,
-                height = projection.height.coerceAtLeast(12f).dp,
-            )
-            .pointerInput(scene.id, element.id, projection.x, projection.y, canvasWidth, canvasHeight, density.density) {
-                detectDragGestures(
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        dragX += dragAmount.x / density.density
-                        dragY += dragAmount.y / density.density
-                    },
-                    onDragEnd = {
-                        val (xDp, yDp) = SceneCanvasProjector.scenePositionForCanvasOffset(
-                            scene = scene,
-                            element = element,
-                            canvasX = projection.x + dragX,
-                            canvasY = projection.y + dragY,
-                            canvasWidth = canvasWidth,
-                            canvasHeight = canvasHeight,
-                        )
-                        dragX = 0f
-                        dragY = 0f
-                        onMoveElement(index, xDp, yDp)
-                    },
-                    onDragCancel = {
-                        dragX = 0f
-                        dragY = 0f
-                    },
-                )
-            },
-        color = color.copy(alpha = 0.14f),
-        shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.52f)),
+            .size(width = currentWidth.dp, height = currentHeight.dp),
     ) {
-        Box(Modifier.fillMaxSize().padding(4.dp), contentAlignment = Alignment.Center) {
-            Text(
-                text = sceneElementSummary(element) ?: sceneElementTypeLabel(element.type),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(scene.id, element.id, projection.x, projection.y, canvasWidth, canvasHeight, density.density) {
+                    detectDragGestures(
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            dragX += dragAmount.x / density.density
+                            dragY += dragAmount.y / density.density
+                        },
+                        onDragEnd = {
+                            val (xDp, yDp) = SceneCanvasProjector.scenePositionForCanvasOffset(
+                                scene = scene,
+                                element = element,
+                                canvasX = projection.x + dragX,
+                                canvasY = projection.y + dragY,
+                                canvasWidth = canvasWidth,
+                                canvasHeight = canvasHeight,
+                            )
+                            dragX = 0f
+                            dragY = 0f
+                            onMoveElement(index, xDp, yDp)
+                        },
+                        onDragCancel = {
+                            dragX = 0f
+                            dragY = 0f
+                        },
+                    )
+                },
+            color = color.copy(alpha = 0.14f),
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(1.dp, color.copy(alpha = 0.52f)),
+        ) {
+            Box(Modifier.fillMaxSize().padding(4.dp), contentAlignment = Alignment.Center) {
+                Text(
+                    text = sceneElementSummary(element) ?: sceneElementTypeLabel(element.type),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .size(14.dp)
+                .pointerInput(scene.id, element.id, projection.width, projection.height, canvasWidth, canvasHeight, density.density) {
+                    detectDragGestures(
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            resizeDx += dragAmount.x / density.density
+                            resizeDy += dragAmount.y / density.density
+                        },
+                        onDragEnd = {
+                            val scale = scene.widthDp / canvasWidth
+                            val newW = ((element.widthDp + (resizeDx * scale).toInt()).coerceIn(MIN_ELEMENT_SIZE, scene.widthDp))
+                            val newH = ((element.heightDp + (resizeDy * scale).toInt()).coerceIn(MIN_ELEMENT_SIZE, scene.heightDp))
+                            resizeDx = 0f
+                            resizeDy = 0f
+                            onResizeElement(index, newW, newH)
+                        },
+                        onDragCancel = {
+                            resizeDx = 0f
+                            resizeDy = 0f
+                        },
+                    )
+                },
+            color = color.copy(alpha = 0.62f),
+            shape = RoundedCornerShape(4.dp),
+        ) {}
     }
 }
+
+private const val MIN_ELEMENT_SIZE = 8
 
 @Composable
 private fun SceneElementRow(
