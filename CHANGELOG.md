@@ -31,6 +31,7 @@ Hardening, test coverage, and expression engine improvements.
 - **Safety**: made downloads write to a temporary file and replace the destination only after a complete bounded copy succeeds.
 - **Performance**: reduced scene-canvas drag recomposition overhead by using primitive float state and lambda offsets.
 - **UX**: polished first-run onboarding, labeled create actions, the widget task picker, and the home-screen widget treatment so setup and secondary flows feel more guided and intentional.
+- **Reliability**: made widget and launcher-shortcut task runs close with clear feedback even when task execution throws, avoiding stranded translucent runner activities.
 - **Cleanup**: removed duplicate `ArrayStore.joinWith` method (identical to `join`).
 
 ## v0.2.72 - 2026-06-16

@@ -39,4 +39,13 @@ class TaskWidgetConfigPolishSourceTest {
         assertTrue("Widget background should have rounded corners", background.contains("android:radius=\"16dp\""))
         assertTrue("Widget colors should be centralized in resources", colors.contains("widget_primary"))
     }
+
+    @Test
+    fun widgetAndShortcutRunnerFinishesAfterExecutionErrors() {
+        val source = sourceRoot.resolve("com/opentasker/widget/TaskRunActivity.kt").readText()
+
+        assertTrue("Runner should route all outcomes through a finish helper", source.contains("finishWithMessage"))
+        assertTrue("Runner should catch task execution failures", source.contains("catch (e: Exception)"))
+        assertTrue("Runner should log task execution failures", source.contains("Task run failed"))
+    }
 }
