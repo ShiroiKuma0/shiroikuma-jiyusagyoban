@@ -1,9 +1,13 @@
 package com.opentasker.core.actions
 
 import android.Manifest
+import android.app.usage.UsageEvents
+import android.app.usage.UsageStatsManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.telephony.SmsManager
 import androidx.core.content.ContextCompat
 import com.opentasker.app.BuildConfig
@@ -73,6 +77,85 @@ class GoHomeAction : Action {
         ctx.logger("Go to home")
         return ActionResult.Success
     }
+}
+
+/**
+ * Switch to the previous / next app — like the system quick-switch. Builds an MRU list of recently
+ * foregrounded apps from UsageStats and steps a cursor through a stable snapshot: "previous" goes to an
+ * older app, "next" comes back toward the current one. The snapshot is retaken whenever the foreground
+ * is an app we didn't launch (i.e. the user switched apps themselves), so cycling stays coherent. Needs
+ * Usage access; "previous" is the common alt-tab-to-last-app.
+ */
+internal object RecentAppsSwitcher {
+    private var snapshot: List<String> = emptyList()
+    private var pos: Int = 0
+    private var lastLaunched: String? = null
+
+    @Synchronized
+    fun navigate(context: Context, forward: Boolean): Boolean {
+        val mru = recentPackages(context)
+        if (mru.size < 2) return false
+        // Re-snapshot when the foreground app isn't the one we last launched (the user switched apps).
+        if (snapshot.size < 2 || mru.firstOrNull() != lastLaunched) {
+            snapshot = mru
+            pos = 0
+        }
+        pos = (if (forward) pos - 1 else pos + 1).coerceIn(0, snapshot.size - 1)
+        val target = snapshot.getOrNull(pos) ?: return false
+        val intent = context.packageManager.getLaunchIntentForPackage(target)?.apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        } ?: return false
+        return runCatching { context.startActivity(intent); lastLaunched = target; true }.getOrDefault(false)
+    }
+
+    private fun recentPackages(context: Context): List<String> {
+        val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager ?: return emptyList()
+        val now = System.currentTimeMillis()
+        val events = runCatching { usm.queryEvents(now - 60 * 60 * 1000L, now) }.getOrNull() ?: return emptyList()
+        val ev = UsageEvents.Event()
+        val ordered = ArrayList<Pair<String, Long>>()
+        while (events.hasNextEvent()) {
+            events.getNextEvent(ev)
+            val t = ev.eventType
+            @Suppress("DEPRECATION")
+            val fg = t == UsageEvents.Event.MOVE_TO_FOREGROUND ||
+                (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && t == UsageEvents.Event.ACTIVITY_RESUMED)
+            if (fg) ordered += ev.packageName.orEmpty() to ev.timeStamp
+        }
+        val self = context.packageName
+        val launcher = launcherPackage(context)
+        // Most-recent-first, deduped, excluding ourselves / the launcher / system UI.
+        return ordered.asReversed().asSequence()
+            .map { it.first }
+            .filter { it.isNotEmpty() && it != self && it != launcher && it != "com.android.systemui" }
+            .distinct()
+            .toList()
+    }
+
+    private fun launcherPackage(context: Context): String? = runCatching {
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        context.packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName
+    }.getOrNull()
+}
+
+/** `Previous app` — switch to the most recent app before the current one (alt-tab to last app). */
+class PreviousAppAction : Action {
+    override val id = "app.previous"
+    override val category = ActionCategory.APP
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult =
+        if (RecentAppsSwitcher.navigate(ctx.app, forward = false)) {
+            ctx.logger("Previous app"); ActionResult.Success
+        } else ActionResult.Failure("No previous app (needs Usage access; open a couple of apps first)")
+}
+
+/** `Next app` — step forward through the recent-apps cycle. */
+class NextAppAction : Action {
+    override val id = "app.next"
+    override val category = ActionCategory.APP
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult =
+        if (RecentAppsSwitcher.navigate(ctx.app, forward = true)) {
+            ctx.logger("Next app"); ActionResult.Success
+        } else ActionResult.Failure("No next app (needs Usage access)")
 }
 
 /**

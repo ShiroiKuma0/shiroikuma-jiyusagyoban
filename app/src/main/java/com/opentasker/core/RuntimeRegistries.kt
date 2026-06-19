@@ -12,6 +12,8 @@ import com.opentasker.core.actions.HttpGetAction
 import com.opentasker.core.actions.HttpPostAction
 import com.opentasker.core.actions.KillAppAction
 import com.opentasker.core.actions.LaunchAppAction
+import com.opentasker.core.actions.NextAppAction
+import com.opentasker.core.actions.PreviousAppAction
 import com.opentasker.core.actions.LaunchIntentAction
 import com.opentasker.core.actions.LocalePluginConditionQueryAction
 import com.opentasker.core.actions.LocalePluginSettingAction
@@ -142,6 +144,8 @@ private fun registerBuiltInActions() {
         LocalePluginConditionQueryAction(),
         KillAppAction(),
         GoHomeAction(),
+        PreviousAppAction(),
+        NextAppAction(),
         OpenUrlAction(),
         SendSmsAction(),
         ScreenshotAction(),

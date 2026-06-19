@@ -1123,6 +1123,26 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "app.previous",
+            name = "Previous App",
+            description = "Switch to the most recent app before this one (alt-tab). Needs Usage access.",
+            category = "App",
+            fields = emptyList()
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "app.next",
+            name = "Next App",
+            description = "Step forward through the recent-apps cycle. Needs Usage access.",
+            category = "App",
+            fields = emptyList()
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "url.open",
             name = "Open URL",
             description = "Open a URL in the browser",
