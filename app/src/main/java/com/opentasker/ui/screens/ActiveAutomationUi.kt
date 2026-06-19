@@ -91,6 +91,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.opentasker.ui.theme.DesignSystem
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -1027,7 +1028,7 @@ fun ActiveAutomationUi(
                             showCreateProfileDialog = true
                         }
                     },
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(DesignSystem.Radii.lg),
                     icon = {
                         Icon(
                             Icons.Filled.Add,
@@ -1039,7 +1040,7 @@ fun ActiveAutomationUi(
 
                 OpenTaskerScreen.Tasks -> ExtendedFloatingActionButton(
                     onClick = { showCreateTaskDialog = true },
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(DesignSystem.Radii.lg),
                     icon = { Icon(Icons.Filled.Add, contentDescription = "Create task icon") },
                     text = { Text("New task") },
                 )
@@ -1506,7 +1507,7 @@ private fun ProfilesScreen(
             .fillMaxSize()
             .padding(contentPadding),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
     ) {
         item {
             WorkspaceSummaryCard(
@@ -1540,12 +1541,12 @@ private fun ProfilesScreen(
                     { IconButton(onClick = { profileSearchQuery = "" }) { Icon(Icons.Default.Clear, contentDescription = "Clear search") } }
                 } else null,
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(DesignSystem.Radii.lg),
             )
         }
         if (groups.isNotEmpty()) {
             item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
                     item {
                         FilterChip(
                             selected = selectedGroup == null,
@@ -1654,7 +1655,7 @@ private fun WorkspaceSummaryCard(
             modifier = Modifier.padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
                 Column(Modifier.weight(1f)) {
                     Text("Automation workspace", style = MaterialTheme.typography.titleLarge)
                     Text(
@@ -1668,7 +1669,7 @@ private fun WorkspaceSummaryCard(
                     color = if (enabledProfiles > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 SummaryMetric("${profiles.size}", "Profiles", Modifier.weight(1f))
                 SummaryMetric("$configuredContexts", "Contexts", Modifier.weight(1f))
                 SummaryMetric("$totalActions", "Actions", Modifier.weight(1f))
@@ -1680,7 +1681,7 @@ private fun WorkspaceSummaryCard(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(onClick = onBrowseTemplates, modifier = Modifier.weight(1f)) {
                     Text("Templates")
                 }
@@ -1692,7 +1693,7 @@ private fun WorkspaceSummaryCard(
                     Text(if (taskerImportBusy) "Reading XML" else "Import Tasker")
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(
                     onClick = onExportOpenTaskerBundle,
                     enabled = !openTaskerBundleBusy,
@@ -1724,7 +1725,7 @@ private fun TaskLibrarySummaryCard(tasks: List<Task>, onCreateTask: () -> Unit) 
         shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
                 Column(Modifier.weight(1f)) {
                     Text("Task library", style = MaterialTheme.typography.titleLarge)
                     Text(
@@ -1739,7 +1740,7 @@ private fun TaskLibrarySummaryCard(tasks: List<Task>, onCreateTask: () -> Unit) 
                     Text("Task")
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 SummaryMetric("${tasks.size}", "Tasks", Modifier.weight(1f))
                 SummaryMetric("$totalActions", "Actions", Modifier.weight(1f))
                 SummaryMetric("$emptyTasks", "Need actions", Modifier.weight(1f))
@@ -1753,7 +1754,7 @@ internal fun SummaryMetric(value: String, label: String, modifier: Modifier = Mo
     Surface(
         modifier = modifier,
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
     ) {
         Column(
@@ -1794,7 +1795,7 @@ internal fun InlineNotice(title: String, body: String, color: Color) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = color.copy(alpha = 0.12f),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
         border = BorderStroke(1.dp, color.copy(alpha = 0.26f)),
     ) {
         Row(
@@ -1841,7 +1842,7 @@ private fun TemplatePromptCard(onBrowseTemplates: () -> Unit) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
         ) {
             Column(Modifier.weight(1f)) {
                 Text("Templates", style = MaterialTheme.typography.titleMedium)
@@ -1882,7 +1883,7 @@ private fun ProfileCard(
         ),
         shape = RoundedCornerShape(16.dp),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(profile.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -1890,7 +1891,7 @@ private fun ProfileCard(
                 }
                 Switch(checked = profile.enabled, onCheckedChange = onToggle)
             }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 item {
                     StatusPill(
                         label = if (profile.enabled) "Enabled" else "Paused",
@@ -1919,7 +1920,7 @@ private fun ProfileCard(
                     )
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Filled.Edit, contentDescription = "Edit profile")
                     Spacer(Modifier.width(6.dp))
@@ -1975,7 +1976,7 @@ private fun TasksScreen(
             .fillMaxSize()
             .padding(contentPadding),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
     ) {
         item {
             TaskLibrarySummaryCard(tasks = tasks, onCreateTask = onCreateTask)
@@ -1996,7 +1997,7 @@ private fun TasksScreen(
                     { IconButton(onClick = { taskSearchQuery = "" }) { Icon(Icons.Default.Clear, contentDescription = "Clear search") } }
                 } else null,
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(DesignSystem.Radii.lg),
             )
         }
         if (filteredTasks.isEmpty()) {
@@ -2042,7 +2043,7 @@ private fun TaskCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
         shape = RoundedCornerShape(16.dp),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(task.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -2053,7 +2054,7 @@ private fun TaskCard(
                     )
                 }
             }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 item { StatusPill("${task.actions.size} action${plural(task.actions.size)}", MaterialTheme.colorScheme.primary) }
                 item { StatusPill("Priority ${task.priority}", MaterialTheme.colorScheme.secondary) }
                 item { StatusPill(task.collisionMode.name.lowercase().replace('_', ' '), MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -2074,7 +2075,7 @@ private fun TaskCard(
                     )
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Filled.Edit, contentDescription = "Edit task")
                     Spacer(Modifier.width(6.dp))
@@ -2086,7 +2087,7 @@ private fun TaskCard(
                     Text("Add Action")
                 }
             }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 item {
                     OutlinedButton(onClick = onRun) {
                         Icon(Icons.Filled.PlayArrow, contentDescription = "Run task")
@@ -2124,14 +2125,14 @@ private fun ActionRow(
     val capability = ActionCapabilityRegistry.get(action.type)
     Surface(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
         modifier = Modifier.fillMaxWidth(),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
         ) {
             StatusPill("#${index + 1}", MaterialTheme.colorScheme.secondary)
             Column(Modifier.weight(1f)) {
@@ -2169,14 +2170,14 @@ private fun ContextRow(
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
         modifier = Modifier.fillMaxWidth(),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
         ) {
             Column(Modifier.weight(1f)) {
                 Text(context.type.name.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleSmall)
@@ -2262,7 +2263,7 @@ private fun EmptyState(
                 enabled = actionEnabled,
                 modifier = actionWidth
                     .heightIn(min = 48.dp),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(DesignSystem.Radii.lg),
             ) {
                 Text(actionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
             }
@@ -2276,7 +2277,7 @@ private fun EmptyState(
             Spacer(Modifier.height(8.dp))
             Row(
                 modifier = actionWidth,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
             ) {
                 OutlinedButton(
                     onClick = onSecondaryAction,
@@ -2284,7 +2285,7 @@ private fun EmptyState(
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 48.dp),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(DesignSystem.Radii.lg),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                 ) {
                     Text(secondaryActionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
@@ -2295,7 +2296,7 @@ private fun EmptyState(
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 48.dp),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(DesignSystem.Radii.lg),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                 ) {
                     Text(tertiaryActionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
@@ -2308,7 +2309,7 @@ private fun EmptyState(
                 enabled = secondaryActionEnabled,
                 modifier = actionWidth
                     .heightIn(min = 48.dp),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(DesignSystem.Radii.lg),
             ) {
                 Text(secondaryActionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
             }
@@ -2319,7 +2320,7 @@ private fun EmptyState(
                 enabled = tertiaryActionEnabled,
                 modifier = actionWidth
                     .heightIn(min = 48.dp),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(DesignSystem.Radii.lg),
             ) {
                 Text(tertiaryActionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
             }
@@ -2359,7 +2360,7 @@ private fun DeleteConfirmationDialog(
                 Text(target.body, style = MaterialTheme.typography.bodyMedium)
                 Surface(
                     color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.24f),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(DesignSystem.Radii.lg),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.24f)),
                 ) {
                     Text(
@@ -2421,7 +2422,7 @@ private fun TemplatePickerDialog(
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
                             ) {
                                 Text(template.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                                 StatusPill(
@@ -2461,14 +2462,14 @@ private fun TemplateSlotDialog(
         text = {
             LazyColumn(
                 modifier = Modifier.heightIn(max = 420.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
             ) {
                 item {
                     Text(template.summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(8.dp))
                     Surface(
                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(DesignSystem.Radii.lg),
                     ) {
                         Text(
                             "Profiles created from templates start disabled so you can review permissions, actions, and contexts before enabling.",
@@ -2516,7 +2517,7 @@ private fun TaskEditorDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (task == null) "Create Task" else "Edit Task") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -2568,7 +2569,7 @@ private fun ProfileEditorDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (profile == null) "Create Profile" else "Edit Profile") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -2589,7 +2590,7 @@ private fun ProfileEditorDialog(
                 )
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(DesignSystem.Radii.lg),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2667,7 +2668,7 @@ private fun SelectableOption(
     OutlinedButton(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.36f) else Color.Transparent,
             contentColor = MaterialTheme.colorScheme.onSurface,
@@ -2711,7 +2712,7 @@ private fun ActionPickerDialog(
         text = {
             LazyColumn(
                 modifier = Modifier.heightIn(max = 420.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
             ) {
                 actionGroups.forEach { (category, actions) ->
                     item(key = "category-$category") {
@@ -2738,11 +2739,11 @@ private fun ActionPickerDialog(
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)),
                             shape = RoundedCornerShape(14.dp),
                         ) {
-                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
                                 ) {
                                     Text(metadata.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                                     if (capability.level != CapabilityLevel.Supported) {
@@ -2813,7 +2814,7 @@ private fun ActionConfigDialog(
         text = {
             LazyColumn(
                 modifier = Modifier.heightIn(max = 420.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
             ) {
                 item {
                     Text(state.metadata.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -2825,7 +2826,7 @@ private fun ActionConfigDialog(
                             } else {
                                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
                             },
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(DesignSystem.Radii.lg),
                         ) {
                             Text(
                                 capability.reason,
@@ -2885,7 +2886,7 @@ private fun ActionFieldInput(field: ActionField, value: String, onChange: (Strin
             val checked = value.toBoolean()
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(DesignSystem.Radii.lg),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2955,7 +2956,7 @@ private fun DayScheduleInput(value: String, onChange: (String) -> Unit) {
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Day schedule", style = MaterialTheme.typography.labelLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
             DayPresetButton(
                 label = "Daily",
                 selected = selected == allDays,
@@ -2979,7 +2980,7 @@ private fun DayScheduleInput(value: String, onChange: (String) -> Unit) {
             listOf("MON", "TUE", "WED"),
             listOf("THU", "FRI", "SAT", "SUN"),
         ).forEach { rowDays ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 rowDays.forEach { day ->
                     DayPresetButton(
                         label = day,
@@ -3044,7 +3045,7 @@ private fun ContextTypePickerDialog(onDismiss: () -> Unit, onSelect: (ContextTyp
         onDismissRequest = onDismiss,
         title = { Text("Add context") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
                 ContextType.entries.forEach { type ->
                     Card(
                         onClick = { onSelect(type) },
@@ -3053,7 +3054,7 @@ private fun ContextTypePickerDialog(onDismiss: () -> Unit, onSelect: (ContextTyp
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)),
                         shape = RoundedCornerShape(14.dp),
                     ) {
-                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs)) {
                             Text(type.name.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleSmall)
                             Text(contextDescription(type), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -3094,14 +3095,14 @@ private fun ContextConfigDialog(
         text = {
             LazyColumn(
                 modifier = Modifier.heightIn(max = 420.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
             ) {
                 item {
                     Text(contextDescription(state.type), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(12.dp))
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(DesignSystem.Radii.lg),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -3279,14 +3280,14 @@ private fun NfcWriteHelperCard(
 
     Surface(
         color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.32f),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
     ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
             ) {
                 Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.secondary)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -3313,9 +3314,9 @@ private fun EventPresetRow(
     presets: List<EventContextPreset>,
     onApply: (EventContextPreset) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
         Text("Presets", style = MaterialTheme.typography.labelLarge)
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
             items(presets, key = { it.id }) { preset ->
                 OutlinedButton(onClick = { onApply(preset) }) {
                     Text(preset.label)

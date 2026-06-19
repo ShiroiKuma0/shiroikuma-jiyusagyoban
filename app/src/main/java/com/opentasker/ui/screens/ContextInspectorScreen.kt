@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.opentasker.app.R
+import com.opentasker.ui.theme.DesignSystem
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -187,7 +188,7 @@ fun ContextInspectorScreen(
             .fillMaxSize()
             .padding(contentPadding),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
     ) {
         item {
             ContextInspectorSummaryCard(snapshot = snapshot, onRefresh = viewModel::refresh)
@@ -252,7 +253,7 @@ private fun ContextInspectorSummaryCard(
         shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.title_context_inspector), style = MaterialTheme.typography.headlineSmall)
                     Text(
@@ -266,7 +267,7 @@ private fun ContextInspectorSummaryCard(
                     color = healthColor,
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 InspectorMetric("$activeSources", "Active sources", Modifier.weight(1f))
                 InspectorMetric("$matchingProfiles", "Matching", Modifier.weight(1f))
                 InspectorMetric("$enabledProfiles", "Enabled", Modifier.weight(1f))
@@ -297,8 +298,8 @@ private fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
         border = BorderStroke(1.dp, color.copy(alpha = 0.28f)),
         shape = RoundedCornerShape(16.dp),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
                 Icon(sourceStatusIcon(source.status), contentDescription = source.status.label, tint = color, modifier = Modifier.size(22.dp))
                 Column(Modifier.weight(1f)) {
                     Text(source.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -344,8 +345,8 @@ private fun ProfileInspectorCard(profile: ProfileInspection, nowMs: Long) {
         border = BorderStroke(1.dp, color.copy(alpha = 0.28f)),
         shape = RoundedCornerShape(16.dp),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
                 Icon(
                     if (profile.matching) Icons.Filled.CheckCircle else Icons.Filled.Info,
                     contentDescription = if (profile.matching) stringResource(R.string.status_matching) else "Not matching",
@@ -389,11 +390,11 @@ private fun ContextCheckRow(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
         border = BorderStroke(1.dp, color.copy(alpha = 0.20f)),
     ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
                 InspectorStatusPill("#${check.index + 1}", MaterialTheme.colorScheme.secondary)
                 Column(Modifier.weight(1f)) {
                     Text(
@@ -430,7 +431,7 @@ private fun ContextMetadataBlock(event: ContextEventObservation, nowMs: Long) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -463,7 +464,7 @@ private fun InspectorMetric(value: String, label: String, modifier: Modifier = M
     Surface(
         modifier = modifier,
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -500,7 +501,7 @@ private fun OemRiskNotice(oem: OemBatteryGuidance.Guidance) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = color.copy(alpha = 0.12f),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
         border = BorderStroke(1.dp, color.copy(alpha = 0.26f)),
     ) {
         Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -526,7 +527,7 @@ private fun InspectorNotice(title: String, body: String, color: Color) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = color.copy(alpha = 0.12f),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
         border = BorderStroke(1.dp, color.copy(alpha = 0.26f)),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -555,7 +556,7 @@ private fun InspectorEmptyState(contentPadding: PaddingValues) {
             Column(
                 modifier = Modifier.padding(18.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
             ) {
                 Icon(
                     Icons.Filled.Info,
