@@ -52,6 +52,50 @@ class DatabaseBackupManager(
         }
     }
 
+    suspend fun exportEncryptedBackup(backupFile: File, destination: Uri, passphrase: CharArray): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val managedBackup = requireManagedBackupFile(backupFile)
+                val output = context.contentResolver.openOutputStream(destination)
+                    ?: throw IOException("Could not open export destination")
+                managedBackup.inputStream().use { input ->
+                    output.use { stream ->
+                        BackupEncryption.encrypt(input, stream, passphrase)
+                    }
+                }
+                AppLogger.info(tag, "Encrypted backup exported to $destination")
+            }.onFailure { error ->
+                AppLogger.error(tag, "Encrypted export failed: ${error.message}", error)
+            }
+        }
+
+    suspend fun stageEncryptedRestore(uri: Uri, passphrase: CharArray): Result<File> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val input = context.contentResolver.openInputStream(uri)
+                    ?: throw IOException("Could not open encrypted backup file")
+                val temp = File(backupDir, "decrypt_staging.db")
+                try {
+                    input.use { encrypted ->
+                        FileOutputStream(temp).use { plainOut ->
+                            BackupEncryption.decrypt(encrypted, plainOut, passphrase)
+                        }
+                    }
+                } catch (error: Exception) {
+                    temp.delete()
+                    throw error
+                }
+                validateDatabaseFile(temp)
+                val pending = pendingRestoreFile(context, databaseName)
+                temp.copyTo(pending, overwrite = true)
+                temp.delete()
+                AppLogger.warn(tag, "Encrypted restore staged; restart OpenTasker to apply it")
+                pending
+            }.onFailure { error ->
+                AppLogger.error(tag, "Encrypted restore failed: ${error.message}", error)
+            }
+        }
+
     suspend fun exportBackup(backupFile: File, destination: Uri): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             val managedBackup = requireManagedBackupFile(backupFile)
@@ -216,7 +260,8 @@ class DatabaseBackupManager(
 
         private fun backupDir(context: Context): File = File(context.filesDir, "backups")
 
-        private const val MAX_BACKUP_IMPORT_BYTES = 104_857_600L
+        internal const val MAX_BACKUP_BYTES = 104_857_600L
+        private const val MAX_BACKUP_IMPORT_BYTES = MAX_BACKUP_BYTES
 
         private fun timestamp(): String =
             SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
