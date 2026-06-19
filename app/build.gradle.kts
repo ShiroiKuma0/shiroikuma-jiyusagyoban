@@ -136,6 +136,8 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.re2j)
+    implementation(libs.shizuku.api)
+    implementation(libs.shizuku.provider)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.runner)
