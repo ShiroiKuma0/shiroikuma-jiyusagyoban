@@ -1,6 +1,6 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.73-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.74-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.3.21-7f52ff.svg)](https://kotlinlang.org)
@@ -172,16 +172,11 @@ All dependency versions are centralized in `gradle/libs.versions.toml`.
 
 See [ROADMAP.md](ROADMAP.md) for the full backlog. Key remaining work:
 
+- Scene multi-select layout edits, alignment guides, and overlay launch
+- Visual flow editor authoring (drag/drop, branch visualization, persist edits)
 - Broad device-verified background geofence reliability evidence
 - Target SDK 36 platform readiness pass (FGS, predictive back, large-screen QA)
 - Macrobenchmark and Baseline Profile for cold-start performance
-- Scene resize handles, multi-select layout edits, and overlay launch
-- Visual flow editor authoring (drag/drop, branch visualization)
-- Shizuku elevated execution backend
-- Termux real script dispatch
-- i18n/l10n bootstrap
-- Health Connect polling trigger (wellness)
-- Variable expression engine v3 (writeable nested paths, debugger view)
 
 ---
 
