@@ -18,6 +18,12 @@ object TermuxScriptBackend {
             taskerPluginInstalled = isPackageInstalled(context, TERMUX_TASKER_PACKAGE),
         )
 
+    fun isDispatchReady(context: Context): Boolean {
+        val status = inspect(context)
+        if (!status.bridgeInstalled) return false
+        return context.checkSelfPermission(RUN_COMMAND_PERMISSION) == PackageManager.PERMISSION_GRANTED
+    }
+
     fun statusFor(termuxInstalled: Boolean, taskerPluginInstalled: Boolean): TermuxScriptStatus {
         val state = when {
             !termuxInstalled -> TermuxScriptState.TermuxMissing
@@ -27,7 +33,7 @@ object TermuxScriptBackend {
         val summary = when (state) {
             TermuxScriptState.TermuxMissing -> "Termux is not installed."
             TermuxScriptState.TaskerPluginMissing -> "Termux is installed, but Termux:Tasker is not installed."
-            TermuxScriptState.PluginInstalled -> "Termux and Termux:Tasker are installed. OpenTasker has not enabled script dispatch yet."
+            TermuxScriptState.PluginInstalled -> "Termux and Termux:Tasker are installed. Script dispatch is ready."
         }
         return TermuxScriptStatus(
             state = state,
@@ -39,7 +45,7 @@ object TermuxScriptBackend {
         if (actionId == ACTION_ID) {
             TermuxScriptHint(
                 actionId = actionId,
-                message = "Candidate for optional Termux:Tasker support; blocked until script dispatch, permission handling, output capture, and run-log auditing are implemented.",
+                message = "Requires Termux and Termux:Tasker with RUN_COMMAND permission.",
             )
         } else {
             null

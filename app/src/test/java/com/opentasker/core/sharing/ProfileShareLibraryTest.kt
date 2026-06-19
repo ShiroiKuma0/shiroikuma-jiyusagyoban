@@ -33,6 +33,7 @@ class ProfileShareLibraryTest {
                     actions = listOf(
                         ActionSpec(type = "notify.show"),
                         ActionSpec(type = "script.termux.run"),
+                        ActionSpec(type = "reboot"),
                         ActionSpec(type = "log"),
                     ),
                 )
@@ -53,7 +54,7 @@ class ProfileShareLibraryTest {
         assertEquals("nfc-checkin", manifest.slug)
         assertEquals(1, manifest.profileCount)
         assertEquals(1, manifest.taskCount)
-        assertEquals(3, manifest.actionCount)
+        assertEquals(4, manifest.actionCount)
         assertEquals(1, manifest.contextCount)
         assertEquals(1, manifest.screenshotCount)
         assertEquals(ShareTrustLevel.CommunityUnverified, manifest.trustLevel)
@@ -61,8 +62,9 @@ class ProfileShareLibraryTest {
 
         val requirements = manifest.capabilityRequirements.associateBy { it.actionId }
         assertEquals(CapabilityLevel.RequiresSetup, requirements.getValue("notify.show").level)
-        assertEquals(CapabilityLevel.Unsupported, requirements.getValue("script.termux.run").level)
-        assertTrue(manifest.findings.any { it.message.contains("script.termux.run") && it.severity == ShareFindingSeverity.Blocker })
+        assertEquals(CapabilityLevel.RequiresSetup, requirements.getValue("script.termux.run").level)
+        assertEquals(CapabilityLevel.Unsupported, requirements.getValue("reboot").level)
+        assertTrue(manifest.findings.any { it.message.contains("reboot") && it.severity == ShareFindingSeverity.Blocker })
     }
 
     @Test
