@@ -59,9 +59,14 @@ class AutomationTargetReceiver : BroadcastReceiver() {
                     else -> failure("Unsupported action: ${intent.action}")
                 }
             }.getOrElse { failure(it.message ?: "Automation target request failed") }
-            pending.setResultCode(response.resultCode)
-            pending.setResultExtras(response.extras)
-            pending.finish()
+            try {
+                pending.setResultCode(response.resultCode)
+                pending.setResultExtras(response.extras)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to publish automation target result", e)
+            } finally {
+                pending.finish()
+            }
         }
     }
 

@@ -71,6 +71,17 @@ class AutomationTargetContractTest {
         )
     }
 
+    @Test
+    fun automationTargetReceiverAlwaysFinishesPendingResult() {
+        val source = listOf(
+            File("src/main/java/com/opentasker/core/external/AutomationTargetReceiver.kt"),
+            File("app/src/main/java/com/opentasker/core/external/AutomationTargetReceiver.kt"),
+        ).first { it.exists() }.readText()
+
+        assertTrue("goAsync result cleanup should be protected by finally", source.contains("finally"))
+        assertTrue("pending result should always finish", source.contains("pending.finish()"))
+    }
+
     private fun loadMainManifest() =
         DocumentBuilderFactory.newInstance()
             .newDocumentBuilder()
