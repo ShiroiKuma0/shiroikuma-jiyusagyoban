@@ -372,6 +372,23 @@ class ActionGuardsTest {
         assertEquals("missing path", (result as ActionResult.Failure).message)
     }
 
+    @Test
+    fun writeFileRejectsOversizedContentBeforeCreatingFile() = runBlocking {
+        val filesDir = Files.createTempDirectory("opentasker-file-write-limit").toFile()
+        try {
+            val result = WriteFileAction().run(
+                ctx(filesDir),
+                mapOf("path" to "big.txt", "text" to "x".repeat(1_048_577)),
+            )
+
+            assertTrue("oversized write should fail", result is ActionResult.Failure)
+            assertTrue((result as ActionResult.Failure).message.contains("write limit"))
+            assertTrue(!File(filesDir, "user_files/big.txt").exists())
+        } finally {
+            filesDir.deleteRecursively()
+        }
+    }
+
     // --- PlaySoundAction guards ---
 
     @Test
@@ -481,6 +498,28 @@ class ActionGuardsTest {
         val result = action.run(ctx(), emptyMap())
         assertTrue("missing path should fail", result is ActionResult.Failure)
         assertEquals("missing path", (result as ActionResult.Failure).message)
+    }
+
+    @Test
+    fun appendFileRejectsGrowthBeyondLimitAndPreservesContent() = runBlocking {
+        val filesDir = Files.createTempDirectory("opentasker-file-append-limit").toFile()
+        try {
+            val file = File(filesDir, "user_files/log.txt").apply {
+                parentFile?.mkdirs()
+                writeText("x".repeat(1_048_575))
+            }
+
+            val result = AppendFileAction().run(
+                ctx(filesDir),
+                mapOf("path" to "log.txt", "text" to "yy"),
+            )
+
+            assertTrue("oversized append should fail", result is ActionResult.Failure)
+            assertTrue((result as ActionResult.Failure).message.contains("file limit"))
+            assertEquals(1_048_575, file.length())
+        } finally {
+            filesDir.deleteRecursively()
+        }
     }
 
     @Test

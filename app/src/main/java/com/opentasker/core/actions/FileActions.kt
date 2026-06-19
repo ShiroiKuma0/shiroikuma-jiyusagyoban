@@ -56,6 +56,10 @@ class WriteFileAction : Action {
         val text = args["text"] ?: args["content"] ?: ""
         return try {
             val file = safeUserFile(ctx, path) ?: return ActionResult.Failure("path is outside OpenTasker files")
+            val bytes = text.toByteArray(Charsets.UTF_8).size
+            if (bytes > MAX_FILE_BYTES) {
+                return ActionResult.Failure("content exceeds ${MAX_FILE_BYTES / 1024 / 1024} MB write limit ($bytes bytes)")
+            }
             file.parentFile?.mkdirs()
             file.writeText(text)
             ctx.logger("Write ${file.name}")
@@ -82,6 +86,14 @@ class AppendFileAction : Action {
         val text = args["text"] ?: args["content"] ?: ""
         return try {
             val file = safeUserFile(ctx, path) ?: return ActionResult.Failure("path is outside OpenTasker files")
+            val bytes = text.toByteArray(Charsets.UTF_8).size
+            if (bytes > MAX_FILE_BYTES) {
+                return ActionResult.Failure("append content exceeds ${MAX_FILE_BYTES / 1024 / 1024} MB write limit ($bytes bytes)")
+            }
+            val projectedSize = file.takeIf { it.exists() }?.length().orZero() + bytes
+            if (projectedSize > MAX_FILE_BYTES) {
+                return ActionResult.Failure("append would exceed ${MAX_FILE_BYTES / 1024 / 1024} MB file limit ($projectedSize bytes)")
+            }
             file.parentFile?.mkdirs()
             file.appendText(text)
             ctx.logger("Append to ${file.name}")
@@ -174,4 +186,7 @@ private fun safeUserFile(ctx: ActionContext, path: String, mustExist: Boolean = 
     return requested
 }
 
+private fun Long?.orZero(): Long = this ?: 0L
+
 private const val MAX_LIST_PATTERN_CHARS = 128
+private const val MAX_FILE_BYTES = 1_048_576L
