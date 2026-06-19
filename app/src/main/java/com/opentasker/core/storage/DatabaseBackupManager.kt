@@ -8,6 +8,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -122,10 +123,15 @@ class DatabaseBackupManager(
     private fun stageRestoreFromInput(input: InputStream): File {
         val pending = pendingRestoreFile(context, databaseName)
         val temp = File(backupDir, "${pending.name}.tmp")
-        input.use { source ->
-            FileOutputStream(temp).use { output ->
-                source.copyTo(output)
+        try {
+            input.use { source ->
+                FileOutputStream(temp).use { output ->
+                    source.copyBoundedTo(output, MAX_BACKUP_IMPORT_BYTES)
+                }
             }
+        } catch (error: Exception) {
+            temp.delete()
+            throw error
         }
         if (temp.length() == 0L) {
             temp.delete()
@@ -209,6 +215,8 @@ class DatabaseBackupManager(
             File(backupDir(context).apply { mkdirs() }, "${databaseName.removeSuffix(".db")}_restore_pending.db")
 
         private fun backupDir(context: Context): File = File(context.filesDir, "backups")
+
+        private const val MAX_BACKUP_IMPORT_BYTES = 104_857_600L
 
         private fun timestamp(): String =
             SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
@@ -319,4 +327,19 @@ sealed interface PendingRestoreApplyResult {
     data object NoPending : PendingRestoreApplyResult
     data class Applied(val databaseFile: File, val previousBackup: File?) : PendingRestoreApplyResult
     data class Failed(val exception: Exception, val failedBackup: File?) : PendingRestoreApplyResult
+}
+
+internal fun InputStream.copyBoundedTo(output: OutputStream, maxBytes: Long): Long {
+    require(maxBytes > 0) { "maxBytes must be positive" }
+    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+    var copied = 0L
+    while (true) {
+        val count = read(buffer)
+        if (count < 0) return copied
+        copied += count
+        if (copied > maxBytes) {
+            throw IOException("Backup file exceeds ${maxBytes / 1024 / 1024} MB import limit")
+        }
+        output.write(buffer, 0, count)
+    }
 }
