@@ -224,7 +224,21 @@ fun PermissionOnboardingScreen(
                 onRunAction = {
                     when (val action = item.action) {
                         PermissionAction.None -> onMessage("${item.title} is already ready.")
-                        is PermissionAction.RuntimePermission -> permissionLauncher.launch(action.permission)
+                        is PermissionAction.RuntimePermission ->
+                            // Not yet granted → ask. Already granted → open this app's details page so it
+                            // can be toggled off (re-requesting a granted runtime permission does nothing).
+                            if (item.granted) {
+                                openSettingsIntent(
+                                    context,
+                                    Intent(
+                                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        Uri.fromParts("package", context.packageName, null),
+                                    ),
+                                    onMessage,
+                                )
+                            } else {
+                                permissionLauncher.launch(action.permission)
+                            }
                         is PermissionAction.SettingsIntent -> openSettingsIntent(context, action.intent, onMessage)
                         is PermissionAction.OemSettings -> openOemSettings(context, action, onMessage)
                     }
@@ -384,9 +398,10 @@ private fun PermissionSetupCard(
                 OutlinedButton(onClick = onRunAction, modifier = Modifier.fillMaxWidth()) {
                     Text(item.actionLabel)
                 }
-            } else if (item.action is PermissionAction.SettingsIntent && item.title == "App visibility") {
+            } else if (item.action !is PermissionAction.None) {
+                // Granted: keep a link to the relevant Settings page so it can be reviewed / toggled off.
                 OutlinedButton(onClick = onRunAction, modifier = Modifier.fillMaxWidth()) {
-                    Text("Review app settings")
+                    Text("Open settings")
                 }
             }
         }
