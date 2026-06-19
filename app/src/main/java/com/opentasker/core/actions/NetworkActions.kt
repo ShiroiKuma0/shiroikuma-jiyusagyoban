@@ -38,7 +38,7 @@ class HttpGetAction : Action {
         return try {
             val parsedUrl = URL(url)
             enforceHttpPolicy(parsedUrl, args)?.let { return it }
-            if (parsedUrl.protocol == "http") checkLocalNetworkPermission(ctx)?.let { return it }
+            if (urlTargetsLocalNetwork(parsedUrl)) checkLocalNetworkPermission(ctx)?.let { return it }
             val connection = parsedUrl.openConnection() as HttpURLConnection
             try {
                 val response = connection.apply {
@@ -79,7 +79,7 @@ class HttpPostAction : Action {
         return try {
             val parsedUrl = URL(url)
             enforceHttpPolicy(parsedUrl, args)?.let { return it }
-            if (parsedUrl.protocol == "http") checkLocalNetworkPermission(ctx)?.let { return it }
+            if (urlTargetsLocalNetwork(parsedUrl)) checkLocalNetworkPermission(ctx)?.let { return it }
             val payload = data.toByteArray(Charsets.UTF_8)
             if (payload.size > MAX_REQUEST_BODY_BYTES) {
                 return ActionResult.Failure(
@@ -165,7 +165,7 @@ class DownloadAction : Action {
         return try {
             val parsedUrl = URL(url)
             enforceHttpPolicy(parsedUrl, args)?.let { return it }
-            if (parsedUrl.protocol == "http") checkLocalNetworkPermission(ctx)?.let { return it }
+            if (urlTargetsLocalNetwork(parsedUrl)) checkLocalNetworkPermission(ctx)?.let { return it }
             val destination = safeDownloadFile(ctx, path)
                 ?: return ActionResult.Failure("path is outside OpenTasker downloads")
             destination.parentFile?.mkdirs()
@@ -333,6 +333,12 @@ private fun enforceHttpPolicy(url: URL, args: Map<String, String>): ActionResult
         )
     }
     return null
+}
+
+internal fun urlTargetsLocalNetwork(url: URL): Boolean {
+    if (url.protocol != "http" && url.protocol != "https") return false
+    val addr = runCatching { InetAddress.getByName(url.host) }.getOrNull() ?: return false
+    return addr.isSiteLocalAddress || addr.isLoopbackAddress || addr.isLinkLocalAddress
 }
 
 internal fun checkLocalNetworkPermission(ctx: ActionContext): ActionResult? {

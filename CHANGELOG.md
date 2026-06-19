@@ -5,6 +5,7 @@
 Hardening, test coverage, and expression engine improvements.
 
 - **Security**: applied Android 17+ `ACCESS_LOCAL_NETWORK` permission guard to Ping and Wake-on-LAN actions; all LAN socket actions now enforce the same gate.
+- **Security**: extended the Android 17+ local-network guard to HTTPS requests targeting private, loopback, or link-local hosts so URL-backed LAN actions cannot bypass Setup permission state.
 - **Reliability**: added Room schema v5 drift gate — CI now fails if any schema version file is missing; added migration tests for 2→3, 4→5, and full 1→5 path.
 - **Supply chain**: enabled Gradle dependency verification with SHA-256 checksums for all resolved artifacts.
 - **Feature**: added `var.persist` action to promote local variables to global scope across task invocations.
