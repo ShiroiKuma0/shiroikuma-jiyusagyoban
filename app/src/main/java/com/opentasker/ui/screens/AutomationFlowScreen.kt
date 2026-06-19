@@ -1,7 +1,10 @@
 package com.opentasker.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -23,7 +27,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.SubdirectoryArrowRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -33,10 +39,16 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -275,40 +287,87 @@ private fun FlowCanvasOverview(
     profileNode: AutomationFlowNode,
     onNodeTargetSelected: (AutomationFlowTarget) -> Unit,
 ) {
-    val scrollState = rememberScrollState()
-    Column(
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+
+    @Suppress("DEPRECATION")
+    val transformState = rememberTransformableState { zoomChange, panChange, _ ->
+        scale = (scale * zoomChange).coerceIn(0.5f, 2.5f)
+        offsetX += panChange.x
+        offsetY += panChange.y
+    }
+
+    val edgeColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.60f)
+    val lanes = buildList {
+        if (graph.contextNodes.isNotEmpty()) add(FlowLaneData("Contexts", graph.contextNodes))
+        add(FlowLaneData("Profile", listOf(profileNode)))
+        graph.enterTaskNode?.let { add(FlowLaneData("Enter", listOf(it) + graph.actionNodesFor(it.id))) }
+        graph.exitTaskNode?.let { add(FlowLaneData("Exit", listOf(it) + graph.actionNodesFor(it.id))) }
+    }
+
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .horizontalScroll(scrollState)
-            .padding(vertical = 2.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .height(200.dp)
+            .clipToBounds()
+            .transformable(transformState),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.42f),
+        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.lg),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)),
     ) {
-        FlowCanvasLane(
-            label = "Contexts",
-            nodes = graph.contextNodes,
-            onNodeTargetSelected = onNodeTargetSelected,
-        )
-        FlowCanvasLane(
-            label = "Profile",
-            nodes = listOf(profileNode),
-            onNodeTargetSelected = onNodeTargetSelected,
-        )
-        graph.enterTaskNode?.let { taskNode ->
-            FlowCanvasLane(
-                label = "Enter",
-                nodes = listOf(taskNode) + graph.actionNodesFor(taskNode.id),
-                onNodeTargetSelected = onNodeTargetSelected,
-            )
-        }
-        graph.exitTaskNode?.let { taskNode ->
-            FlowCanvasLane(
-                label = "Exit",
-                nodes = listOf(taskNode) + graph.actionNodesFor(taskNode.id),
-                onNodeTargetSelected = onNodeTargetSelected,
-            )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(
+                    scaleX = scale,
+                    scaleY = scale,
+                    translationX = offsetX,
+                    translationY = offsetY,
+                ),
+        ) {
+            Canvas(Modifier.fillMaxSize()) {
+                val laneHeight = size.height / lanes.size.coerceAtLeast(1)
+                val labelWidth = 72f
+                for (laneIdx in 0 until lanes.size - 1) {
+                    val fromY = laneHeight * laneIdx + laneHeight / 2
+                    val toY = laneHeight * (laneIdx + 1) + laneHeight / 2
+                    val midX = labelWidth + 40f
+                    drawLine(edgeColor, Offset(midX, fromY), Offset(midX, toY), strokeWidth = 2f)
+                    drawCircle(edgeColor, 3f, Offset(midX, toY))
+                }
+                lanes.forEachIndexed { laneIdx, lane ->
+                    val y = laneHeight * laneIdx + laneHeight / 2
+                    val nodeWidth = (size.width - labelWidth - 16f) / lane.nodes.size.coerceAtLeast(1)
+                    for (nodeIdx in 0 until lane.nodes.size - 1) {
+                        val fromX = labelWidth + nodeWidth * nodeIdx + nodeWidth / 2
+                        val toX = labelWidth + nodeWidth * (nodeIdx + 1) + nodeWidth / 2
+                        drawLine(edgeColor, Offset(fromX, y), Offset(toX, y), strokeWidth = 1.5f)
+                        drawCircle(edgeColor, 2.5f, Offset(toX, y))
+                    }
+                }
+            }
+
+            Column(
+                modifier = Modifier.fillMaxSize().padding(4.dp),
+                verticalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                lanes.forEach { lane ->
+                    FlowCanvasLane(
+                        label = lane.label,
+                        nodes = lane.nodes,
+                        onNodeTargetSelected = onNodeTargetSelected,
+                    )
+                }
+            }
         }
     }
 }
+
+private data class FlowLaneData(
+    val label: String,
+    val nodes: List<AutomationFlowNode>,
+)
 
 @Composable
 private fun FlowCanvasLane(
@@ -444,11 +503,39 @@ private fun FlowNodeView(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            if (node.detail?.contains("sub-task") == true) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.SubdirectoryArrowRight,
+                        contentDescription = "Sub-task reference",
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.secondary,
+                    )
+                    FlowStatusPill(
+                        label = "Subflow",
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+            }
             node.condition?.let { condition ->
-                FlowStatusPill(
-                    label = "Conditional",
-                    color = MaterialTheme.colorScheme.tertiary,
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.CallSplit,
+                        contentDescription = "Branch condition",
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.tertiary,
+                    )
+                    FlowStatusPill(
+                        label = "Branch",
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
                 Text(
                     "if $condition",
                     style = MaterialTheme.typography.labelSmall,
