@@ -2,8 +2,8 @@ package com.opentasker.app
 
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
+import com.opentasker.core.logging.AppLogger
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -26,7 +26,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        Log.d("MainActivity", "Initializing OpenTasker")
         
         setContent {
             val themeMode by ThemePreference.observe(this).collectAsState(initial = ThemeMode.System)
@@ -59,11 +58,11 @@ class MainActivity : ComponentActivity() {
         if (intent == null) return
         val writeResult = NfcTagWriteSession.writeFromIntent(intent)
         if (writeResult != null) {
-            Log.d("MainActivity", writeResult.message)
+            AppLogger.debug("MainActivity", writeResult.message)
             return
         }
         if (NfcContextEvents.publishFromIntent(intent)) {
-            Log.d("MainActivity", "NFC tag event accepted")
+            AppLogger.debug("MainActivity", "NFC tag event accepted")
         }
     }
 
@@ -71,7 +70,7 @@ class MainActivity : ComponentActivity() {
         runCatching {
             ContextCompat.startForegroundService(this, Intent(this, AutomationService::class.java))
         }.onFailure { error ->
-            Log.e("MainActivity", "Failed to start OpenTasker automation service", error)
+            AppLogger.error("MainActivity", "Failed to start OpenTasker automation service", error)
         }
     }
 }
