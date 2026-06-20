@@ -132,6 +132,17 @@ object ContextMatchEvaluator {
             if (actualPackage !in packageAllowlist) return false
         }
 
+        // Device-orientation trigger: optionally narrow to specific quadrant(s) (portrait / landscape /
+        // reverse-portrait / reverse-landscape). Omit to fire on any orientation change.
+        val expectedOrientations = firstConfig(spec, "orientation", "orientations")
+            .splitCsv()
+            .map { it.lowercase(Locale.US) }
+            .toSet()
+        if (expectedOrientations.isNotEmpty()) {
+            val actualOrientation = event.metadata["orientation"].orEmpty().lowercase(Locale.US)
+            if (actualOrientation !in expectedOrientations) return false
+        }
+
         // Broadcast (Intent Received) trigger: narrow by the intent action(s). Case-sensitive.
         val configuredActions = firstConfig(spec, "action", "actions")
             .splitCsv()

@@ -19,6 +19,7 @@ import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.automation.app.AppUsageMonitor
 import com.opentasker.automation.network.ConnectivityMonitor
 import com.opentasker.automation.network.WiFiNetworkMonitor
+import com.opentasker.automation.sensor.OrientationDetector
 import com.opentasker.automation.sensor.ShakeDetector
 import com.opentasker.automation.scheduler.TimeEventScheduler
 import com.opentasker.core.contexts.BluetoothContextEvents
@@ -61,6 +62,7 @@ class AutomationService : Service() {
     private val connectivityMonitor by lazy { ConnectivityMonitor(this) }
     private val appUsageMonitor by lazy { AppUsageMonitor(this) }
     private val shakeDetector by lazy { ShakeDetector(this) }
+    private val orientationDetector by lazy { OrientationDetector(this) }
     private val runLogRetentionSettings by lazy { RunLogRetentionSettings(this) }
     
     private val cooldownStore by lazy { CooldownStore(this) }
@@ -81,6 +83,7 @@ class AutomationService : Service() {
         connectivityMonitor.start()
         appUsageMonitor.start(scope)
         shakeDetector.start()
+        orientationDetector.start()
         registerReceiver(PackageContextEvents.receiver, PackageContextEvents.intentFilter(), RECEIVER_NOT_EXPORTED)
         registerReceiver(BluetoothContextEvents.receiver, BluetoothContextEvents.intentFilter(), RECEIVER_NOT_EXPORTED)
         CameraMicContextEvents.start(this)
@@ -119,6 +122,7 @@ class AutomationService : Service() {
         connectivityMonitor.stop()
         appUsageMonitor.stop()
         shakeDetector.stop()
+        orientationDetector.stop()
         runCatching { unregisterReceiver(PackageContextEvents.receiver) }
         runCatching { unregisterReceiver(BluetoothContextEvents.receiver) }
         CameraMicContextEvents.stop(this)

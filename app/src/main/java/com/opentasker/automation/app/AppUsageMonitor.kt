@@ -6,6 +6,7 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import com.opentasker.core.contexts.AppForegroundChangedContextEvents
 import com.opentasker.core.contexts.ApplicationContextEvents
 import com.opentasker.core.permissions.UsageAccess
 import kotlinx.coroutines.CoroutineScope
@@ -57,6 +58,7 @@ class AppUsageMonitor(
         if (currentPackage == previousPackage) return
 
         ApplicationContextEvents.publishForeground(currentPackage)
+        AppForegroundChangedContextEvents.publish(currentPackage)
         lastForegroundPackage = currentPackage
         Log.d(TAG, "Foreground app changed: $previousPackage -> $currentPackage")
     }
