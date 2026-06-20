@@ -9,6 +9,7 @@ import androidx.room.Query
 import androidx.room.Update
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ContextSpec
@@ -28,7 +29,7 @@ data class ProfileEntity(
     fun toDomain(): Profile {
         val result = toDomainDecodeResult()
         result.issue?.let { issue ->
-            android.util.Log.e("ProfileDao", "Failed to deserialize profile $id: ${issue.message}")
+            AppLogger.error("ProfileDao", "Failed to deserialize profile $id: ${issue.message}")
         }
         return result.value
     }
