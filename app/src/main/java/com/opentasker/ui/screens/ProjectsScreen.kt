@@ -77,6 +77,7 @@ fun ProjectSwitcher(
     projects: List<Project>,
     onSelect: (ProjectFilter) -> Unit,
     onManage: () -> Unit,
+    onExportEverything: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val label = when (filter) {
@@ -115,6 +116,11 @@ fun ProjectSwitcher(
                 )
             }
             HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text("Export everything…") },
+                leadingIcon = { Icon(Icons.Filled.Upload, contentDescription = null) },
+                onClick = { onExportEverything(); expanded = false },
+            )
             DropdownMenuItem(
                 text = { Text("Manage projects…") },
                 leadingIcon = { Icon(Icons.Filled.Settings, contentDescription = null) },

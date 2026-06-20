@@ -257,8 +257,11 @@ private val DATABASE_BACKUP_MIME_TYPES = arrayOf(
 private fun databaseBackupExportName(): String =
     "opentasker_backup_${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())}.db"
 
-private fun openTaskerBundleExportName(): String =
-    "opentasker_bundle_${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())}.json"
+/** A filesystem-safe timestamp (yyyy-MM-dd_HH-mm-ss) shared by every export's default filename. */
+private fun exportStamp(): String = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
+
+/** The full-workspace ("Export everything") default filename: the app label + the timestamp. */
+private fun openTaskerBundleExportName(): String = "白い熊 自由作業盤.${exportStamp()}.json"
 
 private enum class OpenTaskerScreen(val label: String) {
     Profiles("Profiles"),
@@ -309,8 +312,11 @@ private data class ExportRequest(
     val includeVariables: Boolean = false,
 )
 
-private fun exportFileName(label: String): String =
-    label.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_').ifEmpty { "export" } + ".json"
+/** Per-export default filename: the item/category name kept readable (illegal chars stripped) + the stamp. */
+private fun exportFileName(label: String): String {
+    val clean = label.replace(Regex("[\\\\/:*?\"<>|\\u0000-\\u001f]"), "_").trim().ifEmpty { "export" }
+    return "$clean.${exportStamp()}.json"
+}
 
 /**
  * Drives the top-bar expand/collapse-all toggle for a list tab: returns (anyExpanded, onToggle) where
@@ -1487,6 +1493,7 @@ fun ActiveAutomationUi(
                         projects = projects,
                         onSelect = { viewModel.selectProject(it) },
                         onManage = { showProjectManagement = true },
+                        onExportEverything = { openTaskerBundleExportLauncher.launch(openTaskerBundleExportName()) },
                     )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -1537,7 +1544,7 @@ fun ActiveAutomationUi(
                     TabAction("Export profiles…", Icons.Filled.Upload) {
                         exportRequest = ExportRequest(
                             name = "All profiles (${visibleProfiles.size})",
-                            fileName = "profiles.json",
+                            fileName = exportFileName("profiles"),
                             profileIds = visibleProfiles.map { it.id }.toSet(),
                         )
                     },
@@ -1551,7 +1558,7 @@ fun ActiveAutomationUi(
                     TabAction("Export tasks…", Icons.Filled.Upload) {
                         exportRequest = ExportRequest(
                             name = "All tasks (${visibleTasks.size})",
-                            fileName = "tasks.json",
+                            fileName = exportFileName("tasks"),
                             taskIds = visibleTasks.map { it.id }.toSet(),
                         )
                     },
@@ -1564,7 +1571,7 @@ fun ActiveAutomationUi(
                     TabAction("Export scenes…", Icons.Filled.Upload) {
                         exportRequest = ExportRequest(
                             name = "All scenes (${visibleScenes.size})",
-                            fileName = "scenes.json",
+                            fileName = exportFileName("scenes"),
                             sceneIds = visibleScenes.map { it.id }.toSet(),
                         )
                     },
@@ -1577,7 +1584,7 @@ fun ActiveAutomationUi(
                     TabAction("Export templates…", Icons.Filled.Upload) {
                         exportRequest = ExportRequest(
                             name = "All widget templates (${widgetTemplates.size})",
-                            fileName = "widget_templates.json",
+                            fileName = exportFileName("widget templates"),
                             templateNames = widgetTemplates.map { it.name }.toSet(),
                         )
                     },
@@ -1590,7 +1597,7 @@ fun ActiveAutomationUi(
                     TabAction("Export variables…", Icons.Filled.Upload) {
                         exportRequest = ExportRequest(
                             name = "All variables (${globalVariables.size})",
-                            fileName = "variables.json",
+                            fileName = exportFileName("variables"),
                             variableKeys = globalVariables.map { variableKey(it) }.toSet(),
                         )
                     },
