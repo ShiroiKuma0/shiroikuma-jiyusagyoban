@@ -780,6 +780,13 @@ fun ActiveAutomationUi(
     var profileDialogId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var showCreateProfileDialog by rememberSaveable { mutableStateOf(false) }
     var showTemplateDialog by rememberSaveable { mutableStateOf(false) }
+    val onboardingCompleted by OnboardingPreference.hasCompleted(context).collectAsState(initial = true)
+    LaunchedEffect(onboardingCompleted) {
+        if (!onboardingCompleted) {
+            showTemplateDialog = true
+            OnboardingPreference.markCompleted(context)
+        }
+    }
     var selectedTemplateId by rememberSaveable { mutableStateOf<String?>(null) }
     var actionPickerTaskId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var actionEditTaskId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
