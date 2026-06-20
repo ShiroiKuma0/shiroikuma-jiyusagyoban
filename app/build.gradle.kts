@@ -140,6 +140,7 @@ dependencies {
     implementation(libs.shizuku.provider)
 
     testImplementation(libs.junit)
+    testImplementation("androidx.work:work-testing:2.11.2")
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.room.testing)
