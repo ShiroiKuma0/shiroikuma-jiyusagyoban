@@ -1,13 +1,13 @@
 package com.opentasker.core.engine
 
 import android.content.Context
-import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.minimumTimestamp
 import java.util.concurrent.TimeUnit
@@ -27,11 +27,11 @@ class RunLogPruneWorker(
                 minimumTimestamp = policy.minimumTimestamp(now),
             )
             if (deleted > 0) {
-                Log.i(TAG, "Periodic prune removed $deleted old run log entries")
+                AppLogger.info(TAG, "Periodic prune removed $deleted old run log entries")
             }
             Result.success()
         } catch (e: Exception) {
-            Log.e(TAG, "Periodic run-log prune failed", e)
+            AppLogger.error(TAG, "Periodic run-log prune failed", e)
             Result.retry()
         }
     }
