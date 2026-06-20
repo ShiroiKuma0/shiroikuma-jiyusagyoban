@@ -14,6 +14,7 @@ lifecycle = "2.10.0"
 navigationCompose = "2.9.8"
 room = "2.8.4"
 re2j = "1.8"
+collectionsImmutable = "0.3.8"
 serializationJson = "1.11.0"
 shizuku = "13.1.5"
 work = "2.11.2"
@@ -38,6 +39,7 @@ androidx-room-testing = { module = "androidx.room:room-testing", version.ref = "
 androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidxTestJunit" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }
 junit = { module = "junit:junit", version.ref = "junit" }
+kotlinx-collections-immutable = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "collectionsImmutable" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serializationJson" }
