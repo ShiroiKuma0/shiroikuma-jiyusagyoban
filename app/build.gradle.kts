@@ -30,13 +30,13 @@ val hasReleaseSigning = listOf(
 
 android {
     namespace = "com.opentasker.app"
-    compileSdk = 36
+    compileSdk = 37
     buildToolsVersion = "36.0.0"
 
     defaultConfig {
         applicationId = "com.opentasker.app"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = appVersionCode
         versionName = appVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
