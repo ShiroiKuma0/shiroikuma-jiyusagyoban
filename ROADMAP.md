@@ -1,7 +1,7 @@
 # OpenTasker Roadmap
 
-**Current app version:** 0.2.72
-**Last updated:** 2026-06-17
+**Current app version:** 0.2.75
+**Last updated:** 2026-06-19
 
 Items are organized by tier and priority. Completed items are deleted, not checked off. See CHANGELOG.md for shipped work.
 
@@ -20,174 +20,152 @@ Items are organized by tier and priority. Completed items are deleted, not check
 
 ---
 
-## Now (v0.3.0 beta gate)
+## Research-Driven Additions
 
-### N1 - Target SDK 36 / foreground-service platform readiness
+### P0 -- Root-cause fixes and platform compliance
 
-Compile SDK and target SDK are 36 and API-36 smoke evidence exists, but the explicit foreground-service behavior matrix, Play `specialUse` declaration evidence, background-start denial evidence, and large-screen/predictive-back/intent-hardening rehearsal remain incomplete. Needs on-device testing with API 35/36 emulators or physical devices.
+- [ ] P0 -- Centralize all logging through AppLogger
+  Why: 17 `android.util.Log` calls in 5 files bypass the diagnostic export redaction pipeline, making crash/issue reports incomplete.
+  Evidence: Grep of source — `AutomationService.kt` (10), `TimeEventReceiver.kt` (4), `ProfileDao.kt` (1), `TaskDao.kt` (1), `SceneDao.kt` (1).
+  Touches: `AutomationService.kt`, `TimeEventReceiver.kt`, `ProfileDao.kt`, `TaskDao.kt`, `SceneDao.kt`, `AppLogger.kt`
+  Acceptance: Zero `android.util.Log` calls remain in `app/src/main`; lint or grep gate in CI prevents reintroduction.
+  Complexity: S
 
-- Audit all FGS callsites from `MainActivity` and `BootReceiver`
-- Prepare Play `specialUse|location` declaration/demo evidence
-- Add regression evidence for boot-start, app-launch start, background-start denial
-- Harden `BootReceiver` to match `MainActivity`'s guarded startup
-- Rehearse Android 16 target behavior (large-screen, predictive back, intent hardening)
-- Update Setup/Inspector to show platform-blocked profile families
+- [ ] P0 -- Implement FGS onTimeout() callback
+  Why: Android 16 enforces 6-hour timeout for dataSync/mediaProcessing FGS types. AutomationService uses `specialUse|location` but has no `onTimeout()` safety net — if platform behavior changes, the service will ANR.
+  Evidence: Android 16 FGS timeout docs (`developer.android.com/develop/background-work/services/fgs/timeout`); `AutomationService.kt` lacks `onTimeout()` override.
+  Touches: `AutomationService.kt`
+  Acceptance: `onTimeout()` override logs the event, persists a diagnostic entry, and calls `stopSelf()` cleanly; unit test covers the callback path.
+  Complexity: S
 
-**Blocked on:** device testing (API 35/36 emulators or physical devices)
+- [ ] P0 -- Add Compose UI test infrastructure
+  Why: Zero UI tests exist for 8+ Compose screen files totaling ~7000 lines. `ActiveAutomationUi.kt` alone is 3347 lines. No `compose-ui-test-junit4` dependency. UI regressions are invisible to CI.
+  Evidence: No `ui-test` dependency in `app/build.gradle.kts`; no test files matching `*UiTest*` or `*ScreenTest*` in `app/src/androidTest`.
+  Touches: `app/build.gradle.kts` (add compose-ui-test deps), new `app/src/androidTest/` test files for profiles, tasks, and run-log screens.
+  Acceptance: At least 3 Compose UI tests covering profile list rendering, task creation dialog, and run-log filtering; CI runs them on `testDebugUnitTest`.
+  Complexity: M
 
-### N2 - Background geofence durability evidence
+- [ ] P0 -- Android 17 (API 37) target readiness pass
+  Why: Android 17 is stable (June 2026). ACCESS_LOCAL_NETWORK becomes a runtime permission requiring user grant. Background audio requires FGS with while-in-use capabilities. Certificate transparency on by default. Large-screen orientation opt-out removed (was temporary in API 36).
+  Evidence: Android 17 behavior change docs (`developer.android.com/about/versions/17/behavior-changes-17`, `/behavior-changes-all`); `PermissionOnboardingScreen.kt` already shows the permission but runtime request flow may be incomplete.
+  Touches: `PermissionOnboardingScreen.kt`, `NetworkActions.kt`, `MediaActions.kt`, `SettingsActions.kt`, `AndroidManifest.xml`, `network_security_config.xml`
+  Acceptance: App targets API 37; ACCESS_LOCAL_NETWORK is requested at runtime before LAN actions; media actions check FGS WIU state; CT opt-out evaluated; layout tested on sw600dp+.
+  Complexity: L
 
-Single-device API-36 evidence captured (v0.2.46-v0.2.48). No multi-device, multi-provider, or multi-OEM data.
+### P1 -- Trust, reliability, and maintainability
 
-- Test across Samsung One UI, Pixel stock, and a third OEM
-- GPS-only, network-only, and combined provider modes
-- Doze deep-idle and rare-bucket transitions
-- Post-reboot persisted-dwell verification
-- OEM battery-killer audit and evidence matrix
+- [ ] P1 -- Harden ProGuard/R8 rules for Shizuku, RE2J, and Room
+  Why: Current rules only keep model classes, kotlinx-serialization, and manifest entries. Shizuku AIDL stubs, RE2J pattern internals, and Room-generated DAO implementations may be stripped in release builds.
+  Evidence: `app/proguard-rules.pro` is 7 lines; Shizuku API uses reflection for IPC; RE2J uses `sun.misc.Unsafe` fallbacks.
+  Touches: `app/proguard-rules.pro`
+  Acceptance: Release APK passes full test suite; Shizuku shell execution, RE2J regex evaluation, and Room queries verified in release build.
+  Complexity: S
 
-**Blocked on:** 3+ physical devices with different OEMs
+- [ ] P1 -- Expand instrumented test coverage
+  Why: 4 instrumented tests (498 LOC) for a 23k LOC app. Critical paths untested on-device: Room DAO query correctness with real SQLite, backup encrypt/decrypt round-trip, bundle import/export round-trip with ID remapping.
+  Evidence: `app/src/androidTest/` contains only `DatabaseBackupManagerInstrumentedTest.kt`, `DatabaseMigrationInstrumentedTest.kt`, `RunLogDaoInstrumentedTest.kt`, `OpenTaskerBundleRepositoryInstrumentedTest.kt`.
+  Touches: New files in `app/src/androidTest/`
+  Acceptance: At least 8 instrumented tests covering DAO queries (profile/task/variable CRUD), backup encrypt-decrypt round-trip, and import-export-reimport identity.
+  Complexity: M
 
-### N5 - Macrobenchmark + Baseline Profile
+- [ ] P1 -- Add WorkManager test artifact
+  Why: `RunLogPruneWorker` uses WorkManager but `work-testing` is not a dependency; the worker's retention logic is untested in the WorkManager lifecycle.
+  Evidence: `app/build.gradle.kts` has no `work-testing` dependency; `RunLogPruneWorker` has no corresponding test.
+  Touches: `app/build.gradle.kts`, new `RunLogPruneWorkerTest.kt`
+  Acceptance: `TestWorkerBuilder` test verifies retention cutoff logic and pruning behavior.
+  Complexity: S
 
-Not started. Add an `app:benchmark` module for cold start, service start latency, and Profiles tab time-to-first-frame. Ship a Baseline Profile in the release artifact.
+- [ ] P1 -- Decompose ActiveAutomationUi.kt further
+  Why: 3347 lines after initial split. Profile editor, task editor, action editor, and context editor still share one file. High regression risk for UI polish and i18n work.
+  Evidence: `wc -l` on the file; `ActiveAutomationModuleSplitTest.kt` guards the boundary but the file is still 3x the size of the next-largest screen.
+  Touches: `ActiveAutomationUi.kt`, new files for profile editor, task editor, action editor, context editor composables.
+  Acceptance: `ActiveAutomationUi.kt` under 1500 lines; extracted composables each under 800 lines; existing split-guard test updated; no UI regression.
+  Complexity: L
 
-**Blocked on:** connected device for benchmark measurement
+### P2 -- Quick wins, parity, and integrations
 
-### N9 - Documentation truth pass
+- [ ] P2 -- Weblate integration for community translations
+  Why: 13 locale skeletons exist but are completely empty. Manual PR workflow for translations creates friction. Weblate (hosted.weblate.org, GPL-3.0) is the F-Droid ecosystem standard and integrates with Git natively.
+  Evidence: `app/src/main/res/values-de/strings.xml` (and 12 others) are empty `<resources>` stubs. README documents PR-based translation workflow.
+  Touches: Weblate project setup (external), `.weblate` config, README translation section update.
+  Acceptance: Weblate project connected to repo; translators can submit translations via web UI; merged translations arrive as Git commits.
+  Complexity: S
 
-README and UX polish docs synced for v0.2.72. F-Droid readiness docs refreshed locally. ARCHITECTURE.md and IMPROVEMENT_PLAN.md are current. Remaining: sync any version strings missed in non-tracked docs.
+- [ ] P2 -- Add kotlinx-collections-immutable for Compose stability
+  Why: StateFlow emissions with mutable `List<Profile>`, `List<Task>`, etc. cause unnecessary recompositions even with strong skipping mode. `kotlinx-collections-immutable` provides stable collection types the Compose compiler can skip.
+  Evidence: No `kotlinx-collections-immutable` in `libs.versions.toml`; Compose strong skipping treats rebuilt List instances as changed.
+  Touches: `gradle/libs.versions.toml`, `app/build.gradle.kts`, ViewModel state classes emitting lists.
+  Acceptance: Compose compiler metrics show list-bearing composables as skippable; no recomposition regressions.
+  Complexity: S
 
-### N10 - Target-SDK-36 adaptive layout and intent hardening rehearsal
+- [ ] P2 -- Enable Compose compiler metrics CI gate
+  Why: No visibility into which composables are skippable/restartable or which parameters are unstable. Stability issues cause silent performance degradation.
+  Evidence: `-P android.enableComposeCompilerMetrics` not set in CI; no stability reports generated.
+  Touches: `.github/workflows/build.yml`, Compose compiler configuration.
+  Acceptance: CI generates and archives Compose stability report; known-unstable composables documented.
+  Complexity: S
 
-App compiles and targets SDK 36 with monochrome launcher icon. No explicit large-screen test matrix, predictive-back run, or intent-redirection audit is tracked yet.
+- [ ] P2 -- Home Assistant webhook protocol integration
+  Why: HA is the dominant open-source home automation platform. Tasker requires a separate third-party plugin. Implementing the HA mobile_app webhook protocol directly (register, expose sensors, accept notification commands) is a major differentiator.
+  Evidence: HA companion app webhook protocol documented (`companion.home-assistant.io`); Tasker needs "Home Assistant Plug-In for Tasker" (third-party); no FOSS automation app integrates natively.
+  Touches: New `core/integrations/HomeAssistantWebhook.kt`, `PermissionOnboardingScreen.kt` (HA setup), action metadata.
+  Acceptance: OpenTasker registers as a mobile_app with a local HA instance; battery, connectivity, and location exposed as HA entities; HA notification commands trigger OpenTasker tasks.
+  Complexity: L
 
-- Large screens and desktop/windowing at `sw600dp`
-- Predictive back in gesture and 3-button modes
-- Intent-redirection hardening for Tasker/Locale/NFC/external intents
-- Fixed-rate scheduling semantics for polling loops
+- [ ] P2 -- Guided first-automation onboarding
+  Why: Steep learning curve is the #1 complaint about Tasker and the main barrier for MacroDroid growth. OpenTasker's template system exists but isn't the first thing users see.
+  Evidence: Tasker and MacroDroid user feedback; MacroDroid's template-first home screen; Samsung Routines' natural-language creation success.
+  Touches: `MainActivity.kt` (first-launch detection), new onboarding composable, `ProfileTemplates.kt` (surface as primary CTA).
+  Acceptance: First launch shows a 3-step guided creation flow; template browsing is the primary CTA on the home screen; dismiss state persisted.
+  Complexity: M
 
-**Blocked on:** phone, foldable/tablet emulator, and desktop/freeform device runs
+- [ ] P2 -- Permission denial path test coverage
+  Why: Automation apps request many permissions; rarely tested what happens when each is denied. Current tests assume granted state.
+  Evidence: UX research finding; `PermissionOnboardingScreen.kt` handles display but action-level denial paths (notification, location, Bluetooth, usage stats) are not systematically tested.
+  Touches: New test files for action guard denial paths.
+  Acceptance: Every permission-gated action has a test verifying the failure message when permission is denied.
+  Complexity: S
 
----
+### P3 -- Nice-to-have and evaluation
 
-## Next (post-v0.3 beta, v0.3.x -> v0.4)
+- [ ] P3 -- Evaluate Glance for widget rewrite
+  Why: Current widget uses XML layout (`widget_task.xml`). Glance 1.2.0-rc01 provides Compose-based widgets with unit testing (`runGlanceAppWidgetUnitTest`), IDE preview, and alpha/tinting APIs.
+  Evidence: `app/src/main/res/layout/widget_task.xml` is XML-based; `TaskWidgetProvider.kt` uses RemoteViews; Glance `1.2.0-rc01` on `developer.android.com/jetpack/androidx/releases/glance`.
+  Touches: Evaluation spike only; no production code changes.
+  Acceptance: Written evaluation with APK size impact, API surface comparison, and migration effort estimate.
+  Complexity: S
 
-### X1 - Scene editor finishing pass
+- [ ] P3 -- Evaluate Navigation3 migration
+  Why: Navigation Compose 2.9.8 (Nav2) is current. Navigation3 (`androidx.navigation3` v1.2.0-alpha03) is the Compose-first successor with type-safe metadata DSL, scene strategies, overlay scenes, and adaptive layout integration.
+  Evidence: `libs.versions.toml` uses `navigationCompose = "2.9.8"`; Navigation3 releases at `developer.android.com/jetpack/androidx/releases/navigation3`.
+  Touches: Evaluation spike only; no production code changes.
+  Acceptance: Written evaluation with migration scope, breaking changes, and recommended timing.
+  Complexity: S
 
-Element creation/editing, drag-to-move, scaled previews, and nudge controls shipped. Remaining: resize handles, multi-select layout edits, alignment guides, and overlay launch via `SYSTEM_ALERT_WINDOW`.
+- [ ] P3 -- Calendar CRUD actions
+  Why: Tasker 6.5 added 7 calendar actions (get/edit events, reminders, attendees). Samsung Routines added full calendar CRUD. OpenTasker reads calendar events (`CalendarSunContextEvents.kt`) but cannot create, update, or delete them.
+  Evidence: Tasker v6.5 changelog; Samsung One UI 8 changelog; `CalendarSunContextEvents.kt` is read-only.
+  Touches: New `CalendarActions.kt` with create/update/delete event actions, `ActionMetadata.kt` entries, `RuntimeRegistries.kt` registration.
+  Acceptance: Actions to create, update, and delete calendar events with title, time, duration, and calendar ID arguments; read-only CalendarProvider access upgraded to read-write with permission gating.
+  Complexity: M
 
-### X2 - Visual flow editor authoring
+- [ ] P3 -- Evaluate AlarmManager OnAlarmListener (API 37)
+  Why: Android 17 adds `setExactAndAllowWhileIdle` overload accepting `OnAlarmListener` instead of `PendingIntent`. Does not require `SCHEDULE_EXACT_ALARM` permission. Could simplify time trigger scheduling.
+  Evidence: Android 17 features docs; `TimeEventScheduler.kt` currently uses PendingIntent-based alarms with exact/inexact fallback.
+  Touches: Evaluation spike; `TimeEventScheduler.kt` if adopted.
+  Acceptance: Written evaluation comparing listener-based vs PendingIntent alarms for reliability, Doze behavior, and permission UX.
+  Complexity: S
 
-Read-only flow graph with node deep links and lane overview shipped. Remaining: canvas-side authoring (drag from palette, edge routing, branch/subflow markers, pinch-zoom/pan, persist edits).
-
-### X3 - Shizuku elevated backend
-
-Readiness/detection only (v0.2.26). Add opt-in Shizuku integration with permission request, isolated `ShizukuShellRunner`, elevated command allowlist, action-level capability flag, run-log audit, and kill-switch.
-
-### X4 - Termux scripting dispatch
-
-Readiness/detection only (v0.2.27). Add `RUN_COMMAND` request flow, per-script allowlist with hash pinning, stdout/stderr/exit-code capture, output-to-variable mapping, and dispatch frequency cap.
-
-### X5 - Health Connect polling trigger
-
-Not started. Add read-only polling/sync trigger via WorkManager (15 min - 24 h), firing events for sleep, heart rate, steps, and exercise. Opt-in with background-read permission handling and 30-day history limits. F-Droid track must not ship the dependency by default.
-
-### X6 - Variable expression engine v3
-
-Template engine v2 shipped (bounded `{{ }}`, arrays, JSON paths, functions, traces). Remaining: writeable nested array/JSON paths, Run-Log expression debugger view, and `var.persist` action for explicit global scope.
-
-### X7 - Profile sharing publish channel
-
-Manifest and Discussions submission text shipped. Sharing preview UI shipped. Remaining: curated GitHub-Discussions-backed feed, detached-signature verified templates, and screenshot attachments.
-
-### X8 - Dependency/release governance
-
-Dependency stack is current (Gradle 9.4.1, AGP 9.2.1, Kotlin 2.3.21, Room 2.8.4). Hilt/Dagger removed. Gson removed (kotlinx-serialization only). Room 3 and AGP 10 remain monitored future migrations. Compose BOM 2026.05.00 evaluation is pending.
-
-### X9 - i18n/l10n bootstrap
-
-Not started. Move user-facing strings to `strings.xml`, set up `values-<locale>` skeleton, document contributor translation workflow.
-
-### RD4 - Compose BOM 2026.05.00 evaluation
-
-Current BOM is 2026.04.01. Evaluate 2026.05.00 with compile, test, F-Droid, and device smoke gates. Includes testing v2 API migration (StandardTestDispatcher).
-
-### RD7 - Encrypted database backup/restore
-
-`DatabaseBackupManager.kt` exists without encryption. Add encrypted backup/restore using a user-supplied passphrase or device-bound key, `.otbackup` file format, and schema compatibility validation.
+- [ ] P3 -- Accessibility Service rule-based UI automation
+  Why: Google Play explicitly allows "deterministic/rule-based automation" via Accessibility Service. Tasker (AutoInput), AutoJs6, and MacroDroid all offer UI automation. OpenTasker has no UI automation capability.
+  Evidence: Google Play Permission Declaration Form policy (allows "if trigger X, perform action Y" with human-defined scripts); F-Droid has no restrictions; `PermissionOnboardingScreen.kt` does not include accessibility service.
+  Touches: New `AccessibilityAutomationService.kt`, new UI tap/swipe/read actions, `ActionMetadata.kt`, manifest declaration.
+  Acceptance: Rule-based tap, swipe, and text-read actions that work with TalkBack-compatible semantics; modular opt-in (app works without it); Play Store declaration form prepared.
+  Complexity: XL
 
 ---
 
 ## Backlog
-
-### P2 - Medium value
-
-- **Screen-reader / TalkBack accessibility pass** — `contentDescription` coverage is complete, but a full TalkBack sweep and accessibility-checks instrumentation gate are needed. *Blocked on device.*
-- **Broaden unit tests for action implementations** — HTTP/WoL/URL/wait/ping guards covered. File read cap, download byte bounds, settings/media/app honest-failure paths, and notification-channel guards still need focused coverage.
-- **WorkManager retention coverage** — `RunLogPruneWorker` is wired and runs every 6 hours. Remaining: worker-level test coverage and a deliberate service re-arm policy decision.
-- **Work-profile and Private Space audit** — app-open contexts and package events are current-profile only; work/private profile apps may be silently missed.
-
-### P3 - Nice-to-have
-
-- **strings.xml centralization** — only ~5 entries; most UI copy is inline Compose text. Extract stable labels, titles, permission copy, and error messages.
-- **DesignSystem token adoption** — `DesignSystem.kt` defines spacing/radius/elevation scales but UI hardcodes dp values throughout.
-- **Tasker XML export** — import-only today; add round-trip export for the mappable action subset.
-- **UnifiedPush `event=push` trigger (RD32)** — FOSS push via ntfy/UnifiedPush connector for remote triggering without Google services or polling.
-- **MQTT publish action (RD34)** — outbound-only `mqtt.publish` for Home Assistant/Node-RED integration. Needs library decision spike (Paho vs HiveMQ).
-- **Locale/Tasker plugin target bridge (RD37)** — expose OpenTasker as a Locale-compatible plugin target so Tasker/MacroDroid can invoke approved tasks.
-- **Mobile hotspot toggle** — privileged action via Shizuku allowlist. *Depends on X3.*
-
----
-
-## Research-Driven Additions
-
-### P0
-
-- [ ] P0 — Track Room schema v5 and add a migration drift gate
-  Why: Room is the persistence boundary for user automations, and the current schema version 5 export exists only as an untracked file while migration tests do not cover every adjacent path.
-  Evidence: `app/src/main/java/com/opentasker/core/storage/AppDatabase.kt`, `app/schemas/com.opentasker.core.storage.AppDatabase/5.json`, `app/src/androidTest/java/com/opentasker/core/storage/DatabaseMigrationInstrumentedTest.kt`, Room release docs.
-  Touches: `app/schemas/com.opentasker.core.storage.AppDatabase/`, `app/src/androidTest/java/com/opentasker/core/storage/DatabaseMigrationInstrumentedTest.kt`, CI/build verification.
-  Acceptance: CI fails when the current Room schema is missing or untracked; migration tests validate every adjacent migration and a full 1 -> current path.
-  Complexity: M
-
-- [ ] P0 — Apply Android 17 local-network permission checks to every LAN socket action
-  Why: Setup presents `ACCESS_LOCAL_NETWORK` as required for LAN communication, but only HTTP/Download paths enforce it; Ping and Wake-on-LAN can drift from Android 17 policy.
-  Evidence: `app/src/main/AndroidManifest.xml`, `app/src/main/java/com/opentasker/ui/screens/PermissionOnboardingScreen.kt`, `app/src/main/java/com/opentasker/core/actions/NetworkActions.kt`, Android local-network permission docs.
-  Touches: `app/src/main/java/com/opentasker/core/actions/NetworkActions.kt`, action metadata/help text, `app/src/test/java/com/opentasker/core/actions/ActionGuardsTest.kt`.
-  Acceptance: API 37 guard behavior covers HTTP, Download, Ping to private/link-local hosts, and Wake-on-LAN; setup copy and action failure messages agree; tests simulate missing permission.
-  Complexity: S
-
-### P1
-
-- [ ] P1 — Enable Gradle dependency verification and dependency-update governance
-  Why: GitHub Actions are pinned, but Gradle artifacts are still trusted without checksum/signature metadata or an explicit update policy.
-  Evidence: `gradle/libs.versions.toml`, absence of `gradle/verification-metadata.xml`, Gradle dependency verification docs, Android dependency verification docs.
-  Touches: `gradle/verification-metadata.xml`, optional keyring metadata, dependency update workflow or manual upgrade recipe, CI.
-  Acceptance: CI builds with Gradle dependency verification enabled; dependency upgrades include a documented metadata refresh path; mutable workflow-action pins remain forbidden.
-  Complexity: M
-
-- [ ] P1 — Add current F-Droid build and reproducibility evidence to the release gate
-  Why: Version metadata gates exist, but release readiness still depends on stale local build evidence rather than a fresh fdroidserver or reproducibility result for the current version.
-  Evidence: `tools/verify-fdroid-release.ps1`, `fdroid/metadata/com.opentasker.app.yml`, `docs/FDROID_READINESS.md`, F-Droid reproducible-build and submission docs.
-  Touches: `tools/verify-fdroid-release.ps1`, release checklist/gate, F-Droid evidence capture.
-  Acceptance: the release gate produces current-version fdroidserver build evidence or a documented blocker; stale version evidence is detected before release.
-  Complexity: M
-
-### P2
-
-- [ ] P2 — Build a Locale plugin compatibility matrix harness
-  Why: Locale compatibility is central to automation ecosystem trust, but current validation is manual and depends on whichever plugin is installed.
-  Evidence: `docs/LOCALE_PLUGIN_HOST.md`, `tools/validate-locale-plugin.ps1`, Locale developer docs, openHAB Android Tasker integration, ntfy Tasker/intent integration request.
-  Touches: Locale host validation tooling, test fixture plugin or scripted emulator fixture, plugin result evidence output.
-  Acceptance: a synthetic setting/condition plugin validates discovery, config parsing, fire/query/request-query flows, redacted bundle logging, and pass/fail reporting; at least three representative real plugins can be recorded when available.
-  Complexity: M
-
-- [ ] P2 — Split ActiveAutomationUi into workflow-owned modules
-  Why: The largest Compose file owns unrelated profiles, tasks, run logs, imports, dialogs, and navigation state, making future polish and accessibility work riskier than necessary.
-  Evidence: `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationUi.kt`, `app/src/main/java/com/opentasker/ui/DesignSystem.kt`, RESEARCH.md architecture assessment.
-  Touches: profile/task/run-log/import/export UI modules, ViewModel state boundaries, UI smoke tests.
-  Acceptance: no single screen file owns unrelated profile, task, run-log, import/export, and dialog code; existing empty/loading/error states remain visible; smoke tests or source tests cover the split.
-  Complexity: L
 
 ---
 
@@ -198,7 +176,7 @@ Current BOM is 2026.04.01. Evaluate 2026.05.00 with compile, test, F-Droid, and 
 | HTTP webhook receiver (RD10) | n8n/Node-RED/HA interop without cloud | Local HTTP server security surface, FGS/battery constraints |
 | Natural-language profile creation | Reduces learning curve beyond templates | Needs privacy-preserving on-device architecture |
 | Wear OS companion | Wrist triggers and quick-run tiles | Smaller audience; phone reliability comes first |
-| Encrypted backup/sync | Smooth device migration without cloud trust | Requires key management design |
+| Encrypted backup sync | Smooth device migration without cloud trust | Encrypted backup shipped; cloud sync requires key management design |
 | App Factory / standalone APK export | Tasker differentiator for power users | Huge build/signing/security surface |
 | Multi-device/collaboration | Family/shared automations | Contradicts on-device simplicity unless tightly bounded |
 | IFTTT migration | Subscription backlash creates demand | IFTTT formats/API access may be unstable |
