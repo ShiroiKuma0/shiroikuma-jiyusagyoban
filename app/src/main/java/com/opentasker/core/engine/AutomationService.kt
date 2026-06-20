@@ -21,6 +21,7 @@ import com.opentasker.automation.network.ConnectivityMonitor
 import com.opentasker.automation.network.WiFiNetworkMonitor
 import com.opentasker.automation.sensor.ShakeDetector
 import com.opentasker.automation.scheduler.TimeEventScheduler
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.contexts.BluetoothContextEvents
 import com.opentasker.core.contexts.BootContextEvents
 import com.opentasker.core.contexts.CameraMicContextEvents
@@ -108,6 +109,24 @@ class AutomationService : Service() {
         return START_STICKY
     }
 
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        AppLogger.warn(TAG, "Foreground service timeout (startId=$startId, fgsType=$fgsType); stopping cleanly")
+        scope.launch {
+            val entry = com.opentasker.core.storage.RunLogEntity(
+                taskId = 0,
+                taskName = "AutomationService",
+                timestamp = System.currentTimeMillis(),
+                durationMs = 0,
+                success = false,
+                message = "Service stopped by system foreground-service timeout",
+                source = "system",
+                sourceLabel = "FGS timeout",
+            )
+            runCatching { db.runLogDao().insert(entry) }
+        }
+        stopSelf(startId)
+    }
+
     override fun onDestroy() {
         val matcherJobSnapshot = matcherJobs.values.toList()
         val taskJobSnapshot = profileTaskJobs.values.toList()
@@ -159,13 +178,13 @@ class AutomationService : Service() {
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
-                            android.util.Log.e("OpenTasker", "Failed handling state change for ${domain.name}", e)
+                            AppLogger.error(TAG, "Failed handling state change for ${domain.name}", e)
                         }
                     }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    android.util.Log.e("OpenTasker", "Profile matcher stopped for ${domain.name}", e)
+                    AppLogger.error(TAG, "Profile matcher stopped for ${domain.name}", e)
                 }
             }
             
@@ -196,7 +215,7 @@ class AutomationService : Service() {
         
         val task = db.taskDao().getById(profile.enterTaskId)
         if (task == null) {
-            android.util.Log.w("OpenTasker", "Enter task ${profile.enterTaskId} not found for profile ${profile.name}")
+            AppLogger.warn(TAG, "Enter task ${profile.enterTaskId} not found for profile ${profile.name}")
             return
         }
         val domain = task.toDomain()
@@ -207,7 +226,7 @@ class AutomationService : Service() {
         if (profile.exitTaskId == null || profile.exitTaskId <= 0) return
         val task = db.taskDao().getById(profile.exitTaskId)
         if (task == null) {
-            android.util.Log.w("OpenTasker", "Exit task ${profile.exitTaskId} not found for profile ${profile.name}")
+            AppLogger.warn(TAG, "Exit task ${profile.exitTaskId} not found for profile ${profile.name}")
             return
         }
         val domain = task.toDomain()
@@ -221,7 +240,7 @@ class AutomationService : Service() {
         when (profile.automationMode) {
             AutomationMode.SINGLE -> {
                 if (profileTaskJobs[profile.id]?.isActive == true) {
-                    android.util.Log.i("OpenTasker", "Profile ${profile.id} already running; SINGLE mode skipped retrigger")
+                    AppLogger.info(TAG, "Profile ${profile.id} already running; SINGLE mode skipped retrigger")
                     logProfileSkippedRun(profile, task, "Profile is already running in SINGLE mode.")
                     return
                 }
@@ -253,13 +272,13 @@ class AutomationService : Service() {
                     synchronized(queuedProfileTasks) {
                         val queue = queuedProfileTasks.getOrPut(profile.id) { ArrayDeque() }
                         if (queue.size >= MAX_QUEUED_TASKS) {
-                            android.util.Log.w("OpenTasker", "Profile ${profile.id} queue full ($MAX_QUEUED_TASKS), dropping retrigger")
+                            AppLogger.warn(TAG, "Profile ${profile.id} queue full ($MAX_QUEUED_TASKS), dropping retrigger")
                             logProfileSkippedRun(profile, task, "Task queue is full ($MAX_QUEUED_TASKS pending).")
                             return
                         }
                         queue.add(task)
                     }
-                    android.util.Log.i("OpenTasker", "Profile ${profile.id} queued retrigger")
+                    AppLogger.info(TAG, "Profile ${profile.id} queued retrigger")
                     return
                 }
                 profileTaskJobs[profile.id] = launchQueuedTasks(profile, task)
@@ -361,11 +380,11 @@ class AutomationService : Service() {
             .onSuccess { deleted ->
                 lastRunLogPruneAt = now
                 if (deleted > 0) {
-                    android.util.Log.i("OpenTasker", "Pruned $deleted old run log entries")
+                    AppLogger.info(TAG, "Pruned $deleted old run log entries")
                 }
             }
             .onFailure { error ->
-                android.util.Log.e("OpenTasker", "Failed to prune run logs", error)
+                AppLogger.error(TAG, "Failed to prune run logs", error)
             }
     }
 
@@ -374,7 +393,7 @@ class AutomationService : Service() {
         synchronized(profileCooldowns) {
             val cooldownUntil = profileCooldowns[profileId] ?: 0
             if (now < cooldownUntil) {
-                android.util.Log.i("OpenTasker", "Profile $profileId on cooldown, skipping")
+                AppLogger.info(TAG, "Profile $profileId on cooldown, skipping")
                 return CooldownReservation(accepted = false, remainingMs = cooldownUntil - now)
             }
             if (cooldownSec > 0) {
@@ -449,6 +468,7 @@ class AutomationService : Service() {
         ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
     companion object {
+        private const val TAG = "AutomationService"
         const val ACTION_BOOT_COMPLETED_TRIGGER = "com.opentasker.action.BOOT_COMPLETED_TRIGGER"
         private const val CHANNEL = "opentasker.engine"
         private const val NOTIF_ID = 1001
