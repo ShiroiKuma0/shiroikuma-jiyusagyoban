@@ -34,7 +34,7 @@ jobs:
               -dname "CN=Android Debug,O=Android,C=US"
           fi
       - name: Test, lint, and build
-        run: chmod +x ./gradlew && ./gradlew :app:verifyRoomSchema :app:lintDebug :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease :app:verifyFdroidReadiness :app:verifyFdroidMetadata --console=plain
+        run: chmod +x ./gradlew && ./gradlew :app:verifyRoomSchema :app:lintDebug :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease :app:verifyFdroidReadiness :app:verifyFdroidMetadata -Pandroid.enableComposeCompilerMetrics=true -Pandroid.enableComposeCompilerReports=true --console=plain
       - name: F-Droid profile build
         run: ./gradlew -PopenTaskerDistribution=fdroid :app:assembleRelease :app:verifyFdroidReadiness :app:verifyFdroidMetadata --console=plain
       - name: Play manifest policy
@@ -45,4 +45,11 @@ jobs:
         with:
           name: lint-results
           path: app/build/reports/lint-results-debug.html
+          retention-days: 14
+      - name: Upload Compose compiler reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: compose-compiler-reports
+          path: app/build/compose_compiler/
           retention-days: 14
