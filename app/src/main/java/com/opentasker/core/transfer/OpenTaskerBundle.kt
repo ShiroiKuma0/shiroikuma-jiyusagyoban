@@ -83,11 +83,12 @@ data class BundleSortConfig(
     val profiles: SortMethod = SortMethod.ALPHABETICAL,
     val tasks: SortMethod = SortMethod.ALPHABETICAL,
     val scenes: SortMethod = SortMethod.ALPHABETICAL,
+    val projects: SortMethod = SortMethod.MANUAL,
 ) {
-    fun toPrefs(): SortPrefs = SortPrefs(profiles = profiles, tasks = tasks, scenes = scenes)
+    fun toPrefs(): SortPrefs = SortPrefs(profiles = profiles, tasks = tasks, scenes = scenes, projects = projects)
 
     companion object {
-        fun from(prefs: SortPrefs) = BundleSortConfig(prefs.profiles, prefs.tasks, prefs.scenes)
+        fun from(prefs: SortPrefs) = BundleSortConfig(prefs.profiles, prefs.tasks, prefs.scenes, prefs.projects)
     }
 }
 

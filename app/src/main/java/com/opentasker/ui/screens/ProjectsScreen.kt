@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
@@ -57,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.model.Project
 import com.opentasker.core.model.ProjectFilter
+import com.opentasker.core.storage.SortMethod
 
 /** Color presets offered when creating/editing a project (plus "no color"). */
 private val PROJECT_COLOR_PRESETS = listOf(
@@ -137,6 +139,8 @@ private fun FilterItem(label: String, selected: Boolean, onClick: () -> Unit) {
 fun ProjectsManagementScreen(
     projects: List<Project>,
     memberCount: (Long) -> Int,
+    sortMethod: SortMethod,
+    onToggleSort: () -> Unit,
     onBack: () -> Unit,
     onCreate: (String, Int?) -> Unit,
     onUpdate: (Project) -> Unit,
@@ -145,6 +149,7 @@ fun ProjectsManagementScreen(
     onMoveDown: (Project) -> Unit,
     onExportProject: (Project) -> Unit,
 ) {
+    val manual = sortMethod == SortMethod.MANUAL
     BackHandler(onBack = onBack)
     var editing by remember { mutableStateOf<Project?>(null) }
     var creating by remember { mutableStateOf(false) }
@@ -161,6 +166,10 @@ fun ProjectsManagementScreen(
                     }
                 },
                 actions = {
+                    TextButton(onClick = onToggleSort) {
+                        Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = null)
+                        Text(if (manual) "Manual" else "A–Z", modifier = Modifier.padding(start = 4.dp))
+                    }
                     TextButton(onClick = { creating = true }) {
                         Icon(Icons.Filled.Add, contentDescription = null)
                         Text("New", modifier = Modifier.padding(start = 4.dp))
@@ -193,6 +202,7 @@ fun ProjectsManagementScreen(
                     ProjectManagementRow(
                         project = project,
                         members = memberCount(project.id),
+                        reorderable = manual,
                         isFirst = isFirst,
                         isLast = isLast,
                         onMoveUp = { onMoveUp(project) },
@@ -238,6 +248,7 @@ fun ProjectsManagementScreen(
 private fun ProjectManagementRow(
     project: Project,
     members: Int,
+    reorderable: Boolean,
     isFirst: Boolean,
     isLast: Boolean,
     onMoveUp: () -> Unit,
@@ -263,11 +274,13 @@ private fun ProjectManagementRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        IconButton(onClick = onMoveUp, enabled = !isFirst) {
-            Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up")
-        }
-        IconButton(onClick = onMoveDown, enabled = !isLast) {
-            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down")
+        if (reorderable) {
+            IconButton(onClick = onMoveUp, enabled = !isFirst) {
+                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up")
+            }
+            IconButton(onClick = onMoveDown, enabled = !isLast) {
+                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down")
+            }
         }
         IconButton(onClick = onExport) { Icon(Icons.Filled.Upload, contentDescription = "Export project") }
         IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = "Edit") }

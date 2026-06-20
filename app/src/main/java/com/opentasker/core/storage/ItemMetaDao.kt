@@ -62,5 +62,6 @@ interface ItemGroupDao {
     @Query("SELECT * FROM item_groups") fun getAllAsFlow(): Flow<List<ItemGroupEntity>>
     @Upsert suspend fun upsert(group: ItemGroupEntity): Long
     @Query("DELETE FROM item_groups WHERE id = :id") suspend fun delete(id: Long)
+    @Query("DELETE FROM item_groups WHERE projectId = :projectId") suspend fun deleteForProject(projectId: Long)
     @Query("UPDATE item_groups SET parentGroupId = NULL WHERE parentGroupId = :parentId") suspend fun orphanChildren(parentId: Long)
 }

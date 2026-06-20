@@ -400,10 +400,11 @@ class ActiveAutomationViewModel(
             if (sort.scenes == SortMethod.ALPHABETICAL) items.sortedBy { it.name.lowercase() } else items.sortedBy { it.position }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val projects: StateFlow<List<Project>> = db.projectDao()
-        .getAllAsFlow()
-        .map { entities -> entities.map { it.toDomain() } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val projects: StateFlow<List<Project>> =
+        combine(db.projectDao().getAllAsFlow(), ListSortStore.state) { entities, sort ->
+            val items = entities.map { it.toDomain() }
+            if (sort.projects == SortMethod.ALPHABETICAL) items.sortedBy { it.name.lowercase() } else items.sortedBy { it.sortOrder }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val projectSelectionStore = ProjectSelectionStore(appContext)
     var projectFilter by mutableStateOf<ProjectFilter>(projectSelectionStore.load())
@@ -486,6 +487,15 @@ class ActiveAutomationViewModel(
     init {
         viewModelScope.launch {
             runCatching { pruneRunLogs(runLogRetentionPolicy) }
+        }
+        viewModelScope.launch {
+            // One-time sweep: drop foldable groups orphaned by a project deleted before groups cascaded.
+            runCatching {
+                val liveProjects = db.projectDao().getAll().mapTo(mutableSetOf()) { it.id }
+                db.itemGroupDao().getAll()
+                    .filter { it.projectId != null && it.projectId !in liveProjects }
+                    .forEach { db.itemGroupDao().delete(it.id) }
+            }
         }
     }
 
@@ -617,14 +627,17 @@ class ActiveAutomationViewModel(
             val taskRows = db.taskDao().getAll().filter { it.projectId == pid }
             val sceneRows = db.sceneDao().getAll().filter { it.projectId == pid }
             if (deleteItems) {
-                profileRows.forEach { db.profileDao().delete(it) }
-                taskRows.forEach { db.taskDao().delete(it) }
-                sceneRows.forEach { db.sceneDao().delete(it) }
+                profileRows.forEach { db.profileDao().delete(it); db.itemMetaDao().delete("profiles", it.id.toString()) }
+                taskRows.forEach { db.taskDao().delete(it); db.itemMetaDao().delete("tasks", it.id.toString()) }
+                sceneRows.forEach { db.sceneDao().delete(it); db.itemMetaDao().delete("scenes", it.id.toString()) }
             } else {
                 profileRows.forEach { db.profileDao().update(it.copy(projectId = null)) }
                 taskRows.forEach { db.taskDao().update(it.copy(projectId = null)) }
                 sceneRows.forEach { db.sceneDao().update(it.copy(projectId = null)) }
             }
+            // The project's foldable groups are project-scoped — delete them with the project so they don't
+            // orphan. (Reassigned items keep their notes; a now-dangling groupId just reads as ungrouped.)
+            db.itemGroupDao().deleteForProject(pid)
             db.projectDao().delete(project.toEntity())
         }
         if ((projectFilter as? ProjectFilter.Of)?.projectId == pid) {
@@ -1340,6 +1353,13 @@ fun ActiveAutomationUi(
                 profiles.count { it.projectId == pid } +
                     tasks.count { it.projectId == pid } +
                     scenes.count { it.projectId == pid }
+            },
+            sortMethod = sortPrefs.projects,
+            onToggleSort = {
+                ListSortStore.set(
+                    SortTab.PROJECTS,
+                    if (sortPrefs.projects == SortMethod.MANUAL) SortMethod.ALPHABETICAL else SortMethod.MANUAL,
+                )
             },
             onBack = { showProjectManagement = false },
             onCreate = { name, color -> viewModel.createProject(name, color) },
@@ -2843,6 +2863,12 @@ private fun TaskCard(
             ) {
                 if (selectionActive) {
                     SelectionCheck(selected)
+                } else if (!expanded) {
+                    // Run from the collapsed row — pinned to the far left, away from the fold chevron on the
+                    // right, so a run tap can't be mistaken for a fold tap.
+                    IconButton(onClick = onRun) {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = "Run task", tint = MaterialTheme.colorScheme.primary)
+                    }
                 }
                 Column(Modifier.weight(1f)) {
                     Text(task.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)

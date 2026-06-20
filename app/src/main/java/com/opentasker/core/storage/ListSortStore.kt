@@ -13,23 +13,27 @@ import kotlinx.serialization.Serializable
 enum class SortMethod { ALPHABETICAL, MANUAL }
 
 /** The orderable tabs that carry their own sort method. */
-enum class SortTab { PROFILES, TASKS, SCENES }
+enum class SortTab { PROFILES, TASKS, SCENES, PROJECTS }
 
 data class SortPrefs(
     val profiles: SortMethod = SortMethod.ALPHABETICAL,
     val tasks: SortMethod = SortMethod.ALPHABETICAL,
     val scenes: SortMethod = SortMethod.ALPHABETICAL,
+    // Projects default to MANUAL: the switcher has long ordered by sortOrder, so keep that order.
+    val projects: SortMethod = SortMethod.MANUAL,
 ) {
     fun of(tab: SortTab): SortMethod = when (tab) {
         SortTab.PROFILES -> profiles
         SortTab.TASKS -> tasks
         SortTab.SCENES -> scenes
+        SortTab.PROJECTS -> projects
     }
 
     fun with(tab: SortTab, method: SortMethod): SortPrefs = when (tab) {
         SortTab.PROFILES -> copy(profiles = method)
         SortTab.TASKS -> copy(tasks = method)
         SortTab.SCENES -> copy(scenes = method)
+        SortTab.PROJECTS -> copy(projects = method)
     }
 }
 
@@ -43,6 +47,7 @@ object ListSortStore {
     private const val K_PROFILES = "profiles"
     private const val K_TASKS = "tasks"
     private const val K_SCENES = "scenes"
+    private const val K_PROJECTS = "projects"
 
     private lateinit var prefs: SharedPreferences
     private val _state = MutableStateFlow(SortPrefs())
@@ -64,6 +69,7 @@ object ListSortStore {
                 putString(K_PROFILES, next.profiles.name)
                 putString(K_TASKS, next.tasks.name)
                 putString(K_SCENES, next.scenes.name)
+                putString(K_PROJECTS, next.projects.name)
             }
         }
         _state.value = next
@@ -73,9 +79,10 @@ object ListSortStore {
         profiles = readMethod(K_PROFILES),
         tasks = readMethod(K_TASKS),
         scenes = readMethod(K_SCENES),
+        projects = readMethod(K_PROJECTS, SortMethod.MANUAL),
     )
 
-    private fun readMethod(key: String): SortMethod =
-        runCatching { SortMethod.valueOf(prefs.getString(key, null) ?: return SortMethod.ALPHABETICAL) }
-            .getOrDefault(SortMethod.ALPHABETICAL)
+    private fun readMethod(key: String, default: SortMethod = SortMethod.ALPHABETICAL): SortMethod =
+        runCatching { SortMethod.valueOf(prefs.getString(key, null) ?: return default) }
+            .getOrDefault(default)
 }
