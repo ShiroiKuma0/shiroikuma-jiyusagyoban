@@ -34,13 +34,16 @@ import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
+import com.opentasker.core.storage.AutoStartSettings
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.minimumTimestamp
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.drop
@@ -57,7 +60,10 @@ import java.util.Collections
  * automation engine to evaluate triggers reliably.
  */
 class AutomationService : Service() {
-    private val job = Job()
+    // SupervisorJob: a failing child coroutine (a matcher, the reload collector, a prune) must NOT cancel
+    // the parent and take down every engine coroutine with it — that froze the clock while the process
+    // stayed alive. Children now fail in isolation; the heartbeat re-arms anything that does die.
+    private val job = SupervisorJob()
     private val scope = CoroutineScope(Dispatchers.Main + job)
     private val db by lazy { OpenTaskerApp_NoHilt.db }
     private val timeEventScheduler by lazy { TimeEventScheduler(this) }
@@ -76,6 +82,7 @@ class AutomationService : Service() {
     private val queuedProfileTasks = Collections.synchronizedMap(mutableMapOf<Long, ArrayDeque<Task>>())
     private var lastRunLogPruneAt = 0L
     private var wakeLock: PowerManager.WakeLock? = null
+    private var autoStartDone = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -101,14 +108,29 @@ class AutomationService : Service() {
             db.profileDao().getAllAsFlow().drop(1).collect { reloadProfiles() }
         }
         isRunning = true
+        EngineHeartbeat.markEngineStart()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val bootCompletedTrigger = intent?.action == ACTION_BOOT_COMPLETED_TRIGGER
+        val rearm = intent?.action == ACTION_REARM
         scope.launch {
-            reloadProfiles()
-            if (bootCompletedTrigger) {
-                BootContextEvents.publishBootCompleted()
+            if (rearm) {
+                // The per-minute alarm found the tick stale (engine coroutines died while the process
+                // lived). Re-arm the matchers, which relaunches the tick loop.
+                if (EngineHeartbeat.isStale()) {
+                    EngineHeartbeat.markRearm()
+                    reloadProfiles()
+                }
+            } else {
+                reloadProfiles()
+                if (!autoStartDone) {
+                    autoStartDone = true
+                    runAutoStartTasks()
+                }
+                if (bootCompletedTrigger) {
+                    BootContextEvents.publishBootCompleted()
+                }
             }
         }
         return START_STICKY
@@ -392,6 +414,18 @@ class AutomationService : Service() {
         return if (seconds == 1L) "1 second" else "$seconds seconds"
     }
 
+    /** Run the user's configured auto-start tasks once per process (after a fresh start / resurrect),
+     *  so overlays and state come back without manually running the master "起動" task. */
+    private fun runAutoStartTasks() {
+        scope.launch {
+            delay(2_000) // let the engine + context sources settle before re-establishing state
+            for (id in AutoStartSettings.taskIds(this@AutomationService)) {
+                val task = db.taskDao().getById(id)?.toDomain() ?: continue
+                runCatching { executeAndLogTask(this@AutomationService, db, task, source = "Auto-start") }
+            }
+        }
+    }
+
     @SuppressLint("WakelockTimeout")
     private fun acquireWakeLock() {
         // EMUI freezes/reaps even a foreground service under Doze/standby, which tears down overlays
@@ -464,6 +498,7 @@ class AutomationService : Service() {
 
     companion object {
         const val ACTION_BOOT_COMPLETED_TRIGGER = "com.opentasker.action.BOOT_COMPLETED_TRIGGER"
+        const val ACTION_REARM = "com.opentasker.action.ENGINE_REARM"
         private const val CHANNEL = "opentasker.engine"
         private const val NOTIF_ID = 1001
         private const val MAX_QUEUED_TASKS = 50
@@ -477,6 +512,14 @@ class AutomationService : Service() {
         /** (Re)start the foreground engine service. Safe to call when it is already running. */
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, AutomationService::class.java))
+        }
+
+        /** Ask a running engine to re-arm its matchers — used by the heartbeat when the tick went stale. */
+        fun rearm(context: Context) {
+            ContextCompat.startForegroundService(
+                context,
+                Intent(context, AutomationService::class.java).setAction(ACTION_REARM),
+            )
         }
         private val RUN_LOG_PRUNE_INTERVAL_MS = TimeUnit.HOURS.toMillis(1)
     }

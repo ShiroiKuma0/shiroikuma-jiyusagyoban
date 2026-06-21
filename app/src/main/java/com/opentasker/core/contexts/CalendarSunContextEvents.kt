@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.CalendarContract
 import androidx.core.content.ContextCompat
+import com.opentasker.core.engine.EngineHeartbeat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
@@ -27,6 +28,7 @@ object CalendarSunContextEvents {
                     lastMinute = minute
                     buildCalendarEvent(app, now).forEach { trySend(it) }
                     trySend(buildSunTick(now))
+                    EngineHeartbeat.markTick(now)
                 }
                 delay(1_000)
             }

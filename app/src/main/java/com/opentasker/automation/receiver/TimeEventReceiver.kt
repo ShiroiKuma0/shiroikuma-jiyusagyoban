@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.opentasker.automation.scheduler.TimeEventScheduler
 import com.opentasker.core.engine.AutomationService
+import com.opentasker.core.engine.EngineHeartbeat
 import com.opentasker.core.scheduling.ExactAlarmSupport
 
 /**
@@ -18,9 +19,15 @@ class TimeEventReceiver : BroadcastReceiver() {
             TimeEventScheduler.ACTION_TIME_TICK,
             Intent.ACTION_TIME_TICK -> {
                 try {
-                    // This exact alarm fires through Doze. Use it to resurrect the engine if EMUI reaped the
-                    // process, so the per-minute clock pulse and overlays return without a manual 71 restart.
-                    if (!AutomationService.isRunning) AutomationService.start(context)
+                    // This exact alarm fires through Doze. If EMUI reaped the process, resurrect the service;
+                    // if the process lives but the engine's tick went stale (its coroutines died), re-arm it.
+                    when {
+                        !AutomationService.isRunning -> {
+                            EngineHeartbeat.markResurrect()
+                            AutomationService.start(context)
+                        }
+                        EngineHeartbeat.isStale() -> AutomationService.rearm(context)
+                    }
                 } catch (e: Exception) {
                     android.util.Log.e(TAG, "Error processing time event", e)
                 } finally {
