@@ -15,9 +15,15 @@ object AppForegroundChangedContextEvents {
     private val changes = MutableSharedFlow<ContextEvent>(extraBufferCapacity = 16)
     val events: SharedFlow<ContextEvent> = changes.asSharedFlow()
 
+    @Volatile
+    private var lastPublished: String? = null
+
     fun publish(packageName: String) {
         val pkg = packageName.trim()
-        if (pkg.isBlank()) return
+        // Skip blanks and consecutive repeats — both the accessibility service and the UsageStats poll
+        // feed this, so dedup here keeps a single switch from firing the trigger twice.
+        if (pkg.isBlank() || pkg == lastPublished) return
+        lastPublished = pkg
         PersistentGlobalScope.set(0L, "APP_PACKAGE", pkg)
         changes.tryEmit(
             ContextEvent(

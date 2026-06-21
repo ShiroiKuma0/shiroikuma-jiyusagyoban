@@ -5,6 +5,7 @@ import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityWindowInfo
 import android.view.inputmethod.InputMethodManager
+import com.opentasker.core.contexts.AppForegroundChangedContextEvents
 
 /**
  * Minimal accessibility service. We use it only for [performGlobalAction] (Back, Recents, the
@@ -41,11 +42,16 @@ class ShiroiKumaAccessibilityService : AccessibilityService() {
         if (type == null && isIme(pkg)) return
         val isApp = launchable.getOrPut(pkg) { packageManager.getLaunchIntentForPackage(pkg) != null }
         if (!isApp) return
+        val changed: Boolean
         synchronized(mru) {
+            changed = mru.firstOrNull() != pkg
             mru.remove(pkg)
             mru.add(0, pkg)
             while (mru.size > MRU_CAP) mru.removeAt(mru.lastIndex)
         }
+        // Feed the app_foreground EVENT trigger (sets %APP_PACKAGE). Accessibility is reliable on EMUI
+        // where UsageStats yields nothing; publish() dedups so the UsageStats poll can't double-fire.
+        if (changed) AppForegroundChangedContextEvents.publish(pkg)
     }
 
     private fun isIme(pkg: String): Boolean = imeCache.getOrPut(pkg) {
