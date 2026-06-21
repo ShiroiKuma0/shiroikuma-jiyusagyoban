@@ -6,8 +6,19 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.engine.variables.expandAgainstGlobals
+import com.opentasker.core.model.Scene
 import com.opentasker.scenes.SceneActivity
 import com.opentasker.scenes.SceneOverlayManager
+
+/** Expand %vars in the scene's element configs (text / labels / colors) and its panel colors against
+ *  the persisted globals, so an overlay can be variable-driven — e.g. the notification-blink edge color
+ *  set just before showing. Re-evaluated on every show, so re-showing picks up the current values. */
+private fun Scene.withGlobalsExpanded(): Scene = copy(
+    bgColor = bgColor?.let { expandAgainstGlobals(it) },
+    borderColor = borderColor?.let { expandAgainstGlobals(it) },
+    elements = elements.map { e -> e.copy(config = e.config.mapValues { (_, v) -> expandAgainstGlobals(v) }) },
+)
 
 /**
  * `Show Scene` — display a scene (by name or id). With the "Display over other apps" permission it
@@ -25,7 +36,7 @@ class ShowSceneAction : Action {
         val entity = ref.toLongOrNull()?.let { dao.getById(it) }
             ?: dao.getAll().firstOrNull { it.toDomain().name.equals(ref, ignoreCase = true) }
             ?: return ActionResult.Failure("scene not found: \"$ref\"")
-        val scene = entity.toDomain()
+        val scene = entity.toDomain().withGlobalsExpanded()
         // Resolution for the presentation flags: an explicit arg wins; otherwise fall back to the
         // scene's own remembered default (set in the editor).
         fun boolArg(key: String): Boolean? = args[key]?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
