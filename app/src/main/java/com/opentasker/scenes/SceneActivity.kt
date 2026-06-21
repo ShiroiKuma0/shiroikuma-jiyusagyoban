@@ -650,8 +650,13 @@ internal fun SceneElementView(
                         // static brightening on top keeps "charging" unmistakable even on a 3 dp bar.
                         var sweep by remember { mutableStateOf(0f) }
                         LaunchedEffect(Unit) {
+                            // Ping-pong: sweep left→right, then right→left, and back — instead of
+                            // snapping to the left edge each pass.
+                            var dir = 1f
                             while (true) {
-                                sweep = if (sweep >= 1f) 0f else sweep + 0.012f
+                                sweep += dir * 0.012f
+                                if (sweep >= 1f) { sweep = 1f; dir = -1f }
+                                else if (sweep <= 0f) { sweep = 0f; dir = 1f }
                                 delay(16L)
                             }
                         }
