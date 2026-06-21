@@ -417,27 +417,42 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             fun remapProjectId(projectId: Long?): Long? = projectId?.let { projectIdMap[it] }
 
             // Resolve incoming-vs-existing name clashes per [itemConflictStrategy] before inserting:
-            // OVERWRITE_DELETE removes the existing same-name rows; OVERWRITE_BACKUP renames them to
-            // ".bak" (freeing the original name); RENAME leaves them (the incoming gets uniquified).
+            // OVERWRITE_DELETE updates the existing same-name task IN PLACE (keeps its db id, so a
+            // profile's enterTaskId / a scene's tapTaskId that points at it stays linked — a task-only
+            // re-import no longer strands them as "Missing task"); OVERWRITE_BACKUP renames the existing
+            // to ".bak" (freeing the name); RENAME leaves it (the incoming gets uniquified).
             val incomingTaskNames = bundle.tasks.mapTo(mutableSetOf()) { it.name.lowercase() }
-            db.taskDao().getAll().filter { it.name.lowercase() in incomingTaskNames }.forEach { existing ->
-                when (itemConflictStrategy) {
-                    ItemConflictStrategy.OVERWRITE_DELETE -> db.taskDao().delete(existing)
-                    ItemConflictStrategy.OVERWRITE_BACKUP -> db.taskDao().update(existing.copy(name = backupName(existing.name)))
-                    ItemConflictStrategy.RENAME -> Unit
+            val reusableTaskIds = mutableMapOf<String, Long>()
+            db.taskDao().getAll().filter { it.name.lowercase() in incomingTaskNames }
+                .groupBy { it.name.lowercase() }
+                .forEach { (name, existing) ->
+                    when (itemConflictStrategy) {
+                        ItemConflictStrategy.OVERWRITE_DELETE -> {
+                            reusableTaskIds[name] = existing.first().id            // keep one row's id to overwrite in place
+                            existing.drop(1).forEach { db.taskDao().delete(it) }  // collapse any same-name duplicates
+                        }
+                        ItemConflictStrategy.OVERWRITE_BACKUP -> existing.forEach { db.taskDao().update(it.copy(name = backupName(it.name))) }
+                        ItemConflictStrategy.RENAME -> Unit
+                    }
                 }
-            }
 
             val takenTaskNames = db.taskDao().getAll().mapTo(mutableSetOf()) { it.name.lowercase() }
             val taskIdMap = mutableMapOf<Long, Long>()
             val profileIdMap = mutableMapOf<Long, Long>()
             val sceneIdMap = mutableMapOf<Long, Long>()
             bundle.tasks.sortedWith(compareBy<Task> { it.name.lowercase() }.thenBy { it.id }).forEach { task ->
-                val newName = uniqueName(task.name, takenTaskNames)
                 val pid = remapProjectId(task.projectId)
-                val newId = db.taskDao().insert(task.copy(id = 0, name = newName, projectId = pid).toEntity())
-                takenTaskNames += newName.lowercase()
-                taskIdMap[task.id] = newId
+                val reuseId = reusableTaskIds.remove(task.name.lowercase())
+                val resolvedId = if (reuseId != null) {
+                    db.taskDao().update(task.copy(id = reuseId, projectId = pid).toEntity())  // in-place: same id, new actions
+                    reuseId
+                } else {
+                    val newName = uniqueName(task.name, takenTaskNames)
+                    val newId = db.taskDao().insert(task.copy(id = 0, name = newName, projectId = pid).toEntity())
+                    takenTaskNames += newName.lowercase()
+                    newId
+                }
+                taskIdMap[task.id] = resolvedId
                 targetProjectIds += pid
                 insertedTasks++
             }
