@@ -93,6 +93,18 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "notify.dismiss",
+            name = "Dismiss App Notifications",
+            description = "Cancel another app's notifications by package (needs notification access)",
+            category = "Notification",
+            fields = listOf(
+                ActionField("package", "Package", required = true, hint = "App package to dismiss notifications from"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "var.set",
             name = "Set Variable",
             description = "Set a variable to a new value",

@@ -3,6 +3,7 @@ package com.opentasker.core.actions
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import com.opentasker.core.contexts.NotificationTriggerService
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -146,6 +147,22 @@ class NotifyCancelAction : Action {
             }
             else -> ActionResult.Failure("Specify at least one of 'tag' or 'id' to cancel")
         }
+    }
+}
+
+/** Dismiss every clearable notification from another app, by package — needs notification access. */
+class NotifyDismissAction : Action {
+    override val id = "notify.dismiss"
+    override val category = ActionCategory.NOTIFICATION
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val pkg = args["package"]?.trim().orEmpty()
+        if (pkg.isEmpty()) return ActionResult.Failure("Specify 'package' to dismiss notifications from")
+        val listener = NotificationTriggerService.instance
+            ?: return ActionResult.Failure("Notification access not granted (listener not connected)")
+        val n = listener.dismissPackage(pkg)
+        ctx.logger("Dismissed $n notification(s) from $pkg")
+        return ActionResult.Success
     }
 }
 

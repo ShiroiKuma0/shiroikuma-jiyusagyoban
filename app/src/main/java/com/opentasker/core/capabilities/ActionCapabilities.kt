@@ -25,6 +25,7 @@ object ActionCapabilityRegistry {
     private val capabilities = mapOf(
         "notify.show" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires notification permission on Android 13+."),
         "notify.cancel" to ActionCapability(CapabilityLevel.RequiresSetup, "Cancels a posted notification by tag and/or ID. Requires notification permission on Android 13+."),
+        "notify.dismiss" to ActionCapability(CapabilityLevel.RequiresSetup, "Cancels another app's notifications by package. Requires notification-access (listener) permission."),
         "plugin.locale.fire" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires an installed Locale-compatible plugin; requests are dispatched only to an explicit package."),
         "plugin.locale.query" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires an installed Locale-compatible condition plugin; queries are explicit ordered broadcasts with timeout handling."),
         "wifi.toggle" to shizukuCapability("WiFi toggle on Android 10+"),

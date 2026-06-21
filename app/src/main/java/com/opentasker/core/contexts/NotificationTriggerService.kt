@@ -6,6 +6,32 @@ import android.service.notification.StatusBarNotification
 import android.util.Log
 
 class NotificationTriggerService : NotificationListenerService() {
+    override fun onListenerConnected() {
+        instance = this
+    }
+
+    override fun onListenerDisconnected() {
+        if (instance === this) instance = null
+    }
+
+    override fun onDestroy() {
+        if (instance === this) instance = null
+        super.onDestroy()
+    }
+
+    /** Cancel every clearable active notification from [pkg]. Used by the notify.dismiss action so
+     *  entering an app removes its notification (the 通知明滅 edge-light off-trigger). Returns the count. */
+    fun dismissPackage(pkg: String): Int {
+        val active = runCatching { activeNotifications }.getOrNull() ?: return 0
+        var n = 0
+        for (sbn in active) {
+            if (sbn.packageName == pkg && sbn.isClearable) {
+                runCatching { cancelNotification(sbn.key) }.onSuccess { n++ }
+            }
+        }
+        return n
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         sbn ?: return
         val extras = sbn.notification.extras
@@ -27,5 +53,10 @@ class NotificationTriggerService : NotificationListenerService() {
 
     companion object {
         private const val TAG = "NotificationTrigger"
+
+        /** The connected listener instance, or null if the service isn't bound (no notification access). */
+        @Volatile
+        var instance: NotificationTriggerService? = null
+            private set
     }
 }
