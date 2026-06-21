@@ -83,6 +83,24 @@ class NotifyAction : Action {
             builder.addAction(0, label, pi)
         }
 
+        // Body tap (contentIntent) runs a task — clickable in the collapsed view too, unlike action
+        // buttons which only show when the notification is expanded.
+        args["tap_task"]?.takeIf { it.isNotBlank() }?.let { taskName ->
+            val req = (notifId.hashCode() * 31 + 99) and 0x7FFFFFFF
+            val tapIntent = Intent(ctx.app, NotificationActionReceiver::class.java).apply {
+                action = NotificationActionReceiver.ACTION_NOTIFICATION_BUTTON
+                putExtra(NotificationActionReceiver.EXTRA_TASK_NAME, taskName)
+                putExtra(NotificationActionReceiver.EXTRA_BUTTON_LABEL, title)
+                putExtra("_req", req)
+            }
+            builder.setContentIntent(
+                PendingIntent.getBroadcast(
+                    ctx.app, req, tapIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                ),
+            )
+        }
+
         val notification = builder.build()
 
         return try {
