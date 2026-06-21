@@ -1,17 +1,20 @@
 package com.opentasker.core.engine
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.location.LocationManager
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.opentasker.app.MainActivity
@@ -72,12 +75,14 @@ class AutomationService : Service() {
     private val profileTaskJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>())
     private val queuedProfileTasks = Collections.synchronizedMap(mutableMapOf<Long, ArrayDeque<Task>>())
     private var lastRunLogPruneAt = 0L
+    private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         startForegroundCompat()
+        acquireWakeLock()
         timeEventScheduler.scheduleNextMinute()
         wifiNetworkMonitor.start()
         connectivityMonitor.start()
@@ -95,6 +100,7 @@ class AutomationService : Service() {
         scope.launch {
             db.profileDao().getAllAsFlow().drop(1).collect { reloadProfiles() }
         }
+        isRunning = true
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -127,6 +133,8 @@ class AutomationService : Service() {
         runCatching { unregisterReceiver(BluetoothContextEvents.receiver) }
         CameraMicContextEvents.stop(this)
         BroadcastContextEvents.stop(this)
+        releaseWakeLock()
+        isRunning = false
         job.cancel()
         super.onDestroy()
     }
@@ -384,6 +392,25 @@ class AutomationService : Service() {
         return if (seconds == 1L) "1 second" else "$seconds seconds"
     }
 
+    @SuppressLint("WakelockTimeout")
+    private fun acquireWakeLock() {
+        // EMUI freezes/reaps even a foreground service under Doze/standby, which tears down overlays
+        // (the battery line) and stalls the per-minute clock pulse. A held partial wakelock keeps the
+        // process running so triggers and widget refreshes keep firing with the screen off.
+        runCatching {
+            val pm = getSystemService(PowerManager::class.java)
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG).apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+        }
+    }
+
+    private fun releaseWakeLock() {
+        runCatching { wakeLock?.takeIf { it.isHeld }?.release() }
+        wakeLock = null
+    }
+
     private fun startForegroundCompat() {
         val nm = getSystemService(NotificationManager::class.java)
         val channel = NotificationChannel(CHANNEL, "白い熊 自由作業盤 engine", NotificationManager.IMPORTANCE_MIN)
@@ -440,6 +467,17 @@ class AutomationService : Service() {
         private const val CHANNEL = "opentasker.engine"
         private const val NOTIF_ID = 1001
         private const val MAX_QUEUED_TASKS = 50
+        private const val WAKELOCK_TAG = "shiroikuma_jiyusagyoban:engine"
+
+        /** True while the engine service is alive in this process — lets the per-minute tick resurrect it if EMUI reaped it. */
+        @Volatile
+        var isRunning = false
+            private set
+
+        /** (Re)start the foreground engine service. Safe to call when it is already running. */
+        fun start(context: Context) {
+            ContextCompat.startForegroundService(context, Intent(context, AutomationService::class.java))
+        }
         private val RUN_LOG_PRUNE_INTERVAL_MS = TimeUnit.HOURS.toMillis(1)
     }
 }
