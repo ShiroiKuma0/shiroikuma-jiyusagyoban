@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -148,6 +149,7 @@ fun ProjectsManagementScreen(
     sortMethod: SortMethod,
     onToggleSort: () -> Unit,
     onBack: () -> Unit,
+    onImport: () -> Unit,
     onCreate: (String, Int?) -> Unit,
     onUpdate: (Project) -> Unit,
     onDelete: (Project, Boolean) -> Unit,
@@ -179,6 +181,10 @@ fun ProjectsManagementScreen(
                     TextButton(onClick = { creating = true }) {
                         Icon(Icons.Filled.Add, contentDescription = null)
                         Text("New", modifier = Modifier.padding(start = 4.dp))
+                    }
+                    TextButton(onClick = onImport) {
+                        Icon(Icons.Filled.Download, contentDescription = null)
+                        Text("Import", modifier = Modifier.padding(start = 4.dp))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

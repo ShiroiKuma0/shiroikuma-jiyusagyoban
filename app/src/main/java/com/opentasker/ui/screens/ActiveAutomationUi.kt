@@ -91,6 +91,7 @@ import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Settings
@@ -264,6 +265,7 @@ private fun exportStamp(): String = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Loca
 private fun openTaskerBundleExportName(): String = "白い熊 自由作業盤.${exportStamp()}.json"
 
 private enum class OpenTaskerScreen(val label: String) {
+    Monitor("Monitor"),
     Profiles("Profiles"),
     Tasks("Tasks"),
     Vars("Vars"),
@@ -1334,6 +1336,7 @@ fun ActiveAutomationUi(
     }
 
     val headerDetail = when (screen) {
+        OpenTaskerScreen.Monitor -> "Engine liveness & history"
         // Counts mirror the *visible* (project-filtered) list so the header never disagrees with what's shown.
         OpenTaskerScreen.Profiles -> "${visibleProfiles.count { it.enabled }} enabled - ${visibleProfiles.size} total"
         OpenTaskerScreen.Tasks -> "${visibleTasks.sumOf { it.actions.size }} actions - ${visibleTasks.size} tasks"
@@ -1368,6 +1371,10 @@ fun ActiveAutomationUi(
                 )
             },
             onBack = { showProjectManagement = false },
+            onImport = {
+                showProjectManagement = false
+                openTaskerBundleImportLauncher.launch(OPEN_TASKER_BUNDLE_MIME_TYPES)
+            },
             onCreate = { name, color -> viewModel.createProject(name, color) },
             onUpdate = { viewModel.updateProject(it) },
             onDelete = { project, deleteItems -> viewModel.deleteProject(project, deleteItems) },
@@ -1603,6 +1610,7 @@ fun ActiveAutomationUi(
                     },
                 )
 
+                OpenTaskerScreen.Monitor,
                 OpenTaskerScreen.Flow,
                 OpenTaskerScreen.Inspector,
                 OpenTaskerScreen.Setup,
@@ -1631,6 +1639,7 @@ fun ActiveAutomationUi(
                         OpenTaskerScreen.entries.forEach { destination ->
                             val selected = screen == destination
                             val icon = when (destination) {
+                                OpenTaskerScreen.Monitor -> Icons.Filled.MonitorHeart
                                 OpenTaskerScreen.Profiles -> Icons.Filled.CheckCircle
                                 OpenTaskerScreen.Tasks -> Icons.Filled.Edit
                                 OpenTaskerScreen.Vars -> Icons.Filled.Menu
@@ -1909,6 +1918,16 @@ fun ActiveAutomationUi(
                 tasks = tasks,
                 retentionPolicy = runLogRetentionPolicy,
                 onRetentionPolicyChange = viewModel::updateRunLogRetention,
+                contentPadding = innerPadding,
+            )
+
+            OpenTaskerScreen.Monitor -> MonitorScreen(
+                profiles = profiles,
+                tasks = tasks,
+                projects = projects,
+                lastFired = runLogs.filter { it.sourceLabel != null }
+                    .groupBy { it.sourceLabel!! }
+                    .mapValues { (_, rows) -> rows.maxOf { it.timestamp } },
                 contentPadding = innerPadding,
             )
         }

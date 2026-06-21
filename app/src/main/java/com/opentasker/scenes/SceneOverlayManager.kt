@@ -48,7 +48,11 @@ object SceneOverlayManager {
     private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val main = Handler(Looper.getMainLooper())
     private val active = LinkedHashMap<Long, Overlay>()
+    private val shownNames = LinkedHashMap<Long, String>() // sceneId -> name, for the monitor view
     private var appContext: Context? = null
+
+    /** Names of the scenes currently displayed as overlays — what's actually on screen right now. */
+    fun shownSceneNames(): List<String> = ArrayList(shownNames.values)
 
     private class Overlay(
         val view: ComposeView,
@@ -288,6 +292,7 @@ object SceneOverlayManager {
                     owner.onResume()
                     val overlay = Overlay(composeView, owner, params, wm, fullscreen, heightFraction, widthFraction, timeoutMs)
                     active[scene.id] = overlay
+                    shownNames[scene.id] = scene.name
                     if (fullscreen || heightFraction > 0f || widthFraction > 0f) ensureDisplayListener(app)
                     // Exclude the strip's whole area from the system edge gestures (back swipe, and on
                     // devices that honour it the bottom home/recents swipe) so the slide reaches the
@@ -329,6 +334,7 @@ object SceneOverlayManager {
     }
 
     private fun remove(sceneId: Long) {
+        shownNames.remove(sceneId)
         val overlay = active.remove(sceneId) ?: return
         runCatching { overlay.wm.removeView(overlay.view) }
         overlay.owner.onDestroy()
