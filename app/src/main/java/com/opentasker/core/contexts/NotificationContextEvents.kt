@@ -1,5 +1,6 @@
 package com.opentasker.core.contexts
 
+import com.opentasker.core.engine.variables.PersistentGlobalScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -16,7 +17,15 @@ object NotificationContextEvents {
         packageName: String,
         title: CharSequence?,
         body: CharSequence?,
-    ): Boolean = notifications.tryEmit(buildEvent(packageName, title, body))
+    ): Boolean {
+        // Expose the latest notification's fields as super-globals so an enter task can read them
+        // (e.g. pick the edge-blink colour by %NOTIF_PACKAGE), mirroring %APP_PACKAGE.
+        val pkg = packageName.trim()
+        PersistentGlobalScope.set(0L, "NOTIF_PACKAGE", pkg)
+        PersistentGlobalScope.set(0L, "NOTIF_TITLE", sanitizeText(title))
+        PersistentGlobalScope.set(0L, "NOTIF_BODY", sanitizeText(body))
+        return notifications.tryEmit(buildEvent(pkg, title, body))
+    }
 
     fun buildEvent(
         packageName: String,
