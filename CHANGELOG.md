@@ -3,6 +3,56 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.68+107 — 2026-06-21
+
+The **通知明滅 notification edge-light** port, a **self-healing always-on engine** with a live **Monitor tab**, new **notification / broadcast / orientation / app-foreground triggers**, the **music edge-light** & a full **edge-gesture** system, **item grouping** across every tab, and reliability fixes for OEM battery management.
+
+### 通知明滅 — notification edge-lights (new project port)
+- A notification from a configured app **frames the whole screen in that app's colour** as a permanent edge light; several lit apps share **one frame that cycles** through their colours and titles (~2 s each). Built entirely from tasks + a full-screen tap-through WebView scene, with per-app colours and an `%TSUCHI_*` slot model rebuilt into the cycle list.
+- **Three off-paths:** a persistent **“all-off”** control notification (tap → clear every light, keep the apps' own notifications); and **entering an app** (via its notification or the launcher) → that app's light off and its notification dismissed, while the others keep glowing. Ongoing/persistent notifications never light; a notification arriving while you're already in the app doesn't light it; per-app gates (e.g. blink only on missed calls).
+
+### Triggers (new)
+- **Notification trigger** — an `EVENT` context (`event=notification`, optional `package` allowlist) fires a profile when a matching app posts a notification.
+- **Broadcast (Intent Received) trigger** (`7c7c343`) — fire on any system/app broadcast action, with **typed intent extras** parsed into variables; profiles now **reload live** as you edit them.
+- **Device-orientation trigger** (`8060ddc`) — an `EVENT` source for portrait / landscape / reverse changes, exposed as `%DEVICE_ORIENTATION`; orientation is named by the **on-screen** orientation, not the device-natural angle (`4e17243`), fixing foldables.
+- **App-to-foreground trigger** (`8060ddc`) — fires when an app comes to the foreground (`%APP_PACKAGE`), fed from the accessibility service so it works where OEM UsageStats is dead (`3bcec99`). Powers the **Previous/Next App** switcher (`bd45920`, `9037117`).
+
+### Notifications
+- **`%NOTIF_*` super-globals** (`8bc12c7`) — a posting notification's package, title and body, plus its **ongoing flag** (`%NOTIF_ONGOING`, `4001fb3`), exposed for tasks to read.
+- **Per-invocation event vars** (`3a3715e`) — each event now carries its own `%NOTIF_*` snapshot, threaded through the matcher and the **task queue** to the fired task and injected as locals that shadow the shared globals, so a **burst from different apps never mixes up** colours/titles under a QUEUED profile.
+- **`notify.show tap_task`** (`c7737de`) — run a task when a notification body is tapped (works while collapsed).
+- **Dismiss Notifications** (`notify.dismiss`, `7e3ead6`) — cancel another app's clearable notifications **by package**, via the notification-listener service.
+- **`scene.show` expands `%vars`** in element configs at show time (`23f4611`) — so an overlay reflects live globals (the edge-light colour/title).
+
+### Engine & reliability
+- **Survives OEM battery management** (`d695587`) — the foreground service holds a partial **wakelock** and a Doze-proof **minute alarm resurrects** it if the process is reaped.
+- **Survives coroutine death** (`d181881`) — the engine scope uses a `SupervisorJob` so one failed trigger can't cascade and freeze the rest; a **heartbeat** stamps the per-minute tick and **re-arms** the engine within ~2.5 min if it ever stalls.
+- **Auto-run on start** (`d181881`) — pick tasks (e.g. a master “start everything”) to run automatically on every fresh engine start, so overlays/state return after an app update or reboot without manual intervention.
+
+### Monitor tab (new)
+- A left-most **Monitor** tab (`fff63ed`) showing engine status / uptime / seconds-since-last-tick, the **overlays actually on screen**, each enabled profile's **real activity** (a trigger firing ≠ its overlay being drawn), and a **history** of every start / re-arm / resurrect — refreshing every second.
+- The **“Run on start”** picker (`fff63ed`, `5921666`) — a bordered dialog that groups tasks by project, folds per project, and keeps each project's **manual task order**; every monitor section folds.
+
+### Scenes & edge overlays
+- **Music edge-light** (`ec036a2`) — a WebView scene element, a full-screen overlay mode, edge HUDs and custom fonts.
+- **Edge-gesture system** — fraction-height edge strips and invisible swipe-only sliders (`291f8f4`); a full edge-bar gesture set with **per-third placement** (`a01678d`); **short/long swipe** + a bottom edge bar, headings honouring fonts (`21959fd`); a **bottom edge bar via an accessibility overlay** that captures the flush gesture-nav area (`ebde11f`); edge-swipe **direction detection** + task-id remap on import (`eb4d91b`).
+- **Live sliders, edge-centred panels, tap-outside-close, drag-to-keep-alive** (`45512c4`); a **font picker** in element style (`956db2b`).
+- **Battery line charge sweep** now **ping-pongs** (left↔right) instead of snapping back (`d0831ae`).
+
+### Actions
+- **Take Screenshot** (`nav.screenshot`, `a2a489d`) — system screenshot via accessibility.
+- **Previous App / Next App** (`bd45920`) — switch using the accessibility foreground history.
+- **Percent volume / brightness** + **editable dropdown** fields (`446a5da`).
+- **Hybrid Back / Recents** (`1380db3`) — accessibility first, Shizuku fallback, with an accessibility-setup row.
+
+### Items, grouping & navigation
+- **Grouping on all five tabs** (`c2fcbaa`) with direct **New group / New subgroup**, **nested subgroups** and **foldable per-item notes** (`a5431af`); **drag** rows into groups (`acce065`) or **out** to an *Ungrouped* zone (`e1257d9`); a new group **inherits the item's project** (`326e873`).
+- **Project sort toggle, group-delete cascade, collapsed-task quick-run** (`901ee01`); fixed folded-nav covering the screen, **last-tab memory**, and **swipe between tabs** (`e30a42a`); a **Settings link stays** on already-granted permissions (`a68f269`).
+
+### Import / export
+- **Overwrite-in-place** (`b0d69cb`) — re-importing a task keeps its id, so profiles and scenes stay linked (no more “Missing task”).
+- **Export everything** from the project menu + **timestamped** default filenames (`1340cde`).
+
 ## 0.2.68+16 — 2026-06-17
 
 A **battery line** (電池線): a thin bar over the status bar showing charge, built from a new scene element and a full-width overlay mode.

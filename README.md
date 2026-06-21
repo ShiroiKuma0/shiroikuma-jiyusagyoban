@@ -9,17 +9,20 @@
 **A FOSS, Tasker-style Android automation app — privacy-respecting, no accounts, no cloud.**
 
 A fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with **major additions**:
-**Scenes** (a floating-overlay UI builder), a **home-screen widget engine** with a template library
-and a fully app-driven **kanji clock**, a generic **Send Intent** action to drive other apps, a
+**Scenes** (a floating-overlay UI builder with system-wide edge bars & gesture strips),
+**notification edge-lights** that frame the screen in an app's colour, an **always-on engine** with a
+live **Monitor tab** and self-healing, a **home-screen widget engine** with a template library and a
+fully app-driven **kanji clock**, a generic **Send Intent** action to drive other apps, a
 **~100-action catalogue** (variables & arrays, date/time, dialogs, accessibility gestures, and a
-**Shizuku-powered elevated tier**), **named task parameters & returns**, **Projects** with
-**persistent project-scoped variables**, name search & multi-select on every list, and a
-fully-customisable **black-and-yellow theme**.
+**Shizuku-powered elevated tier**), **named task parameters & returns**, new **notification /
+broadcast / orientation / app-foreground triggers**, **Projects** with **persistent project-scoped
+variables**, name search, grouping & multi-select on every list, and a fully-customisable
+**black-and-yellow theme**.
 
 Installs **side-by-side** with upstream OpenTasker — package `shiroikuma.jiyusagyoban`, label
 **白い熊 自由作業盤**.
 
-**📥 Latest release: [`0.2.68+16`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.68+107`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 </div>
 
@@ -49,7 +52,10 @@ modal vs tap-through HUD, auto-dismiss timeout, dismiss-on-outside — or per-sc
 it on a **live canvas** with drag-to-move, **drag-to-resize**, a live styling preview, and
 **duplicate / z-order**. A scene can also show as a **full-width bar over the status bar** — the basis
 for the **battery line** (電池線): a thin top-edge bar whose length tracks the battery, colours by
-level, and shows a red sweeping glow while charging.
+level, and shows a red sweeping glow (back and forth) while charging. Scenes also live at the screen
+**edges as gesture strips** — per-third edge bars, short/long swipe detection, invisible swipe-only
+sliders, and a bottom bar that captures the flush gesture-nav area via an accessibility overlay — and as
+a **music edge-light** (音楽端灯) that pulses the screen edge from a WebView element.
 
 ---
 
@@ -75,6 +81,37 @@ no-permission **Get Device State** action exposes battery / charging / WiFi / ai
 **Airplane** and **Battery** (the percent rendered as 八割三分 / 全, with a charging line) show as
 kanji — and tapping the WiFi or Airplane widget **toggles it through Shizuku**, flipping the kanji
 instantly with a haptic tap and a black-and-yellow confirmation.
+
+---
+
+## 🔔 Notification edge-lights (通知明滅)
+
+When a notification arrives from an app you care about, 白い熊 自由作業盤 **frames the whole screen in
+that app's colour** — a permanent edge light that stays lit until you deal with it. When several apps
+are lit at once, one frame **cycles through their colours and titles**. Three ways to clear a light,
+all built from tasks: tap a persistent **“all-off”** notification to clear every light at once; or
+**open an app** (from its notification or the launcher) to drop just its light and dismiss its
+notification, while the others keep glowing. It's a full port of a Tasker edge-light project, powered by
+new **notification triggers** — the posting app, title, body and ongoing flag land in `%NOTIF_*`, each
+queued notification keeps **its own snapshot** (so a burst from different apps never mixes up colours),
+a tap on a notification can **run a task**, and a new **Dismiss Notifications** action clears another
+app's notifications by package.
+
+---
+
+## 🩺 An always-on engine — Monitor & self-healing
+
+The automation engine is built to **stay alive** under aggressive OEM battery management. It holds a
+wakelock, **resurrects itself** from a Doze-proof minute alarm, and — after the discovery that a single
+failed coroutine could silently freeze everything — isolates failures so one dying trigger can't take
+the rest down, with a **heartbeat that re-arms** the engine within ~2.5 minutes if its tick ever stalls.
+A new left-most **Monitor tab** shows it all at a glance: engine status and uptime, what's actually
+drawn on screen, each profile's real activity (a trigger *firing* isn't the same as its overlay being
+*up*), and a history of every restart / re-arm. From the same tab, pick tasks to **run automatically on
+every start** — set your master “start everything” task and your overlays come back on their own after
+an app update or reboot. The trigger set grew too: **notifications**, **broadcasts** (Intent Received,
+with typed extras), **device orientation** and **app-to-foreground** now drive profiles, and profiles
+**reload live** as you edit them.
 
 ---
 
@@ -125,11 +162,13 @@ case-insensitive **name search**.
 
 ---
 
-## ↕ Per-tab sorting — Alphabetical or Manual
+## ↕ Sorting, grouping & notes
 
-Each tab (Profiles / Tasks / Scenes) has its own sort toggle. **Alphabetical** sorts by name;
-**Manual** lets you **long-press-drag** a card into any position. The choice and the manual order are
-saved, and they **round-trip through export/import**.
+Each list tab has its own sort toggle — **Alphabetical** by name, or **Manual** to
+**long-press-drag** a card into any position — and the choice and order **round-trip through
+export/import**. Items on all five tabs can be organised into **groups and nested subgroups** (drag a
+row in, or out to an *Ungrouped* zone), and each item carries a **foldable note**. Cards **fold to a
+name**, and a collapsed card can be **run with one tap**.
 
 ---
 
