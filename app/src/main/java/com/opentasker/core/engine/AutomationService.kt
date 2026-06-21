@@ -79,7 +79,10 @@ class AutomationService : Service() {
     private val profileCooldowns = Collections.synchronizedMap(mutableMapOf<Long, Long>()) // profileId -> cooldownUntilMs
     private val matcherJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>()) // Track jobs for cleanup
     private val profileTaskJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>())
-    private val queuedProfileTasks = Collections.synchronizedMap(mutableMapOf<Long, ArrayDeque<Task>>())
+    // Each queued run carries its own event snapshot, so a burst of different-source events (e.g.
+    // notifications from different apps) each runs with ITS values, not the latest one's.
+    private data class QueuedRun(val task: Task, val eventVars: Map<String, String>)
+    private val queuedProfileTasks = Collections.synchronizedMap(mutableMapOf<Long, ArrayDeque<QueuedRun>>())
     private var lastRunLogPruneAt = 0L
     private var wakeLock: PowerManager.WakeLock? = null
     private var autoStartDone = false
@@ -187,7 +190,7 @@ class AutomationService : Service() {
                     matcher.stateChanges().collect { change ->
                         try {
                             when (change) {
-                                is ProfileStateChange.Activated -> onProfileActivated(domain)
+                                is ProfileStateChange.Activated -> onProfileActivated(domain, change.vars)
                                 is ProfileStateChange.Deactivated -> onProfileDeactivated(domain)
                             }
                         } catch (e: CancellationException) {
@@ -208,16 +211,16 @@ class AutomationService : Service() {
         }
     }
 
-    private suspend fun onProfileActivated(profile: com.opentasker.core.model.Profile) {
+    private suspend fun onProfileActivated(profile: com.opentasker.core.model.Profile, eventVars: Map<String, String>) {
         if (profile.enterTaskId <= 0) return
-        
+
         val task = db.taskDao().getById(profile.enterTaskId)
         if (task == null) {
             android.util.Log.w("OpenTasker", "Enter task ${profile.enterTaskId} not found for profile ${profile.name}")
             return
         }
         val domain = task.toDomain()
-        dispatchTask(profile, domain)
+        dispatchTask(profile, domain, eventVars)
     }
 
     private suspend fun onProfileDeactivated(profile: com.opentasker.core.model.Profile) {
@@ -228,12 +231,13 @@ class AutomationService : Service() {
             return
         }
         val domain = task.toDomain()
-        dispatchTask(profile, domain)
+        dispatchTask(profile, domain, emptyMap())
     }
 
     private fun dispatchTask(
         profile: Profile,
         task: Task,
+        eventVars: Map<String, String>,
     ) {
         when (profile.automationMode) {
             AutomationMode.SINGLE -> {
@@ -247,7 +251,7 @@ class AutomationService : Service() {
                     logCooldownSkip(profile, task, reservation.remainingMs)
                     return
                 }
-                profileTaskJobs[profile.id] = launchTrackedTask(profile, task)
+                profileTaskJobs[profile.id] = launchTrackedTask(profile, task, eventVars)
             }
 
             AutomationMode.RESTART -> {
@@ -257,7 +261,7 @@ class AutomationService : Service() {
                     return
                 }
                 profileTaskJobs[profile.id]?.cancel()
-                profileTaskJobs[profile.id] = launchTrackedTask(profile, task)
+                profileTaskJobs[profile.id] = launchTrackedTask(profile, task, eventVars)
             }
 
             AutomationMode.QUEUED -> {
@@ -274,12 +278,12 @@ class AutomationService : Service() {
                             logProfileSkippedRun(profile, task, "Task queue is full ($MAX_QUEUED_TASKS pending).")
                             return
                         }
-                        queue.add(task)
+                        queue.add(QueuedRun(task, eventVars))
                     }
                     android.util.Log.i("OpenTasker", "Profile ${profile.id} queued retrigger")
                     return
                 }
-                profileTaskJobs[profile.id] = launchQueuedTasks(profile, task)
+                profileTaskJobs[profile.id] = launchQueuedTasks(profile, task, eventVars)
             }
 
             AutomationMode.PARALLEL -> {
@@ -288,16 +292,16 @@ class AutomationService : Service() {
                     logCooldownSkip(profile, task, reservation.remainingMs)
                     return
                 }
-                scope.launch { runTask(task, profile) }
+                scope.launch { runTask(task, profile, eventVars) }
             }
         }
     }
 
-    private fun launchTrackedTask(profile: Profile, task: Task): Job =
+    private fun launchTrackedTask(profile: Profile, task: Task, eventVars: Map<String, String>): Job =
         scope.launch(start = CoroutineStart.DEFAULT) {
             val thisJob = currentCoroutineContext()[Job]
             try {
-                runTask(task, profile)
+                runTask(task, profile, eventVars)
             } finally {
                 synchronized(profileTaskJobs) {
                     if (profileTaskJobs[profile.id] == thisJob) {
@@ -307,14 +311,15 @@ class AutomationService : Service() {
             }
         }
 
-    private fun launchQueuedTasks(profile: Profile, firstTask: Task): Job =
+    private fun launchQueuedTasks(profile: Profile, firstTask: Task, firstEventVars: Map<String, String>): Job =
         scope.launch(start = CoroutineStart.DEFAULT) {
             val thisJob = currentCoroutineContext()[Job]
-            var nextTask: Task? = firstTask
+            var nextRun: QueuedRun? = QueuedRun(firstTask, firstEventVars)
             try {
-                while (isActive && nextTask != null) {
-                    runTask(requireNotNull(nextTask), profile)
-                    nextTask = synchronized(queuedProfileTasks) {
+                while (isActive && nextRun != null) {
+                    val run = requireNotNull(nextRun)
+                    runTask(run.task, profile, run.eventVars)
+                    nextRun = synchronized(queuedProfileTasks) {
                         queuedProfileTasks[profile.id]?.poll()?.also {
                             if (queuedProfileTasks[profile.id]?.isEmpty() == true) {
                                 queuedProfileTasks.remove(profile.id)
@@ -334,6 +339,7 @@ class AutomationService : Service() {
     private suspend fun runTask(
         task: Task,
         profile: Profile,
+        eventVars: Map<String, String> = emptyMap(),
     ) {
         val result = executeAndLogTask(
             appContext = this,
@@ -341,6 +347,7 @@ class AutomationService : Service() {
             task = task,
             source = "Profile: ${profile.name}",
             metadata = profileRunMetadata(profile),
+            eventLocals = eventVars,
         )
         if (result.logInserted) {
             pruneRunLogs(force = false)

@@ -45,6 +45,14 @@ object NotificationContextEvents {
             "body" to sanitizeText(body),
             "ongoing" to ongoing.toString(),
         ),
+        // Per-invocation snapshot under the SAME names as the published super-globals, so a queued
+        // task (e.g. 通知明滅 in QUEUED mode) reads THIS notification's values, not a later one's.
+        vars = mapOf(
+            "NOTIF_PACKAGE" to packageName.trim(),
+            "NOTIF_TITLE" to sanitizeText(title),
+            "NOTIF_BODY" to sanitizeText(body),
+            "NOTIF_ONGOING" to ongoing.toString(),
+        ),
     )
 
     fun sanitizeText(value: CharSequence?): String =

@@ -73,6 +73,15 @@ class VariableStore private constructor(
         }
     }
 
+    /**
+     * Force a value into the task-local scope regardless of the name's casing. Used to inject an
+     * event's own snapshot (e.g. a notification's `%NOTIF_*`) for this one invocation, so a queued
+     * task reads ITS event's values — [get] checks locals first, shadowing the shared super-global.
+     */
+    fun setLocal(name: String, value: String) {
+        synchronized(localStack) { (localStack.lastOrNull() ?: baseScope)[name] = value }
+    }
+
     fun get(name: String): String? {
         synchronized(localStack) {
             for (i in localStack.indices.reversed()) {
