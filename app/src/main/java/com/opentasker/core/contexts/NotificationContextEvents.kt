@@ -17,20 +17,24 @@ object NotificationContextEvents {
         packageName: String,
         title: CharSequence?,
         body: CharSequence?,
+        ongoing: Boolean = false,
     ): Boolean {
         // Expose the latest notification's fields as super-globals so an enter task can read them
-        // (e.g. pick the edge-blink colour by %NOTIF_PACKAGE), mirroring %APP_PACKAGE.
+        // (e.g. pick the edge-blink colour by %NOTIF_PACKAGE, skip ongoing ones via %NOTIF_ONGOING),
+        // mirroring %APP_PACKAGE.
         val pkg = packageName.trim()
         PersistentGlobalScope.set(0L, "NOTIF_PACKAGE", pkg)
         PersistentGlobalScope.set(0L, "NOTIF_TITLE", sanitizeText(title))
         PersistentGlobalScope.set(0L, "NOTIF_BODY", sanitizeText(body))
-        return notifications.tryEmit(buildEvent(pkg, title, body))
+        PersistentGlobalScope.set(0L, "NOTIF_ONGOING", ongoing.toString())
+        return notifications.tryEmit(buildEvent(pkg, title, body, ongoing))
     }
 
     fun buildEvent(
         packageName: String,
         title: CharSequence?,
         body: CharSequence?,
+        ongoing: Boolean = false,
     ): ContextEvent = ContextEvent(
         type = "event",
         matched = true,
@@ -39,6 +43,7 @@ object NotificationContextEvents {
             "package" to packageName.trim(),
             "title" to sanitizeText(title),
             "body" to sanitizeText(body),
+            "ongoing" to ongoing.toString(),
         ),
     )
 

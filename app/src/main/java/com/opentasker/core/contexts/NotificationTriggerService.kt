@@ -17,6 +17,7 @@ class NotificationTriggerService : NotificationListenerService() {
             packageName = sbn.packageName.orEmpty(),
             title = title,
             body = body,
+            ongoing = sbn.isOngoing,
         )
         Log.d(
             TAG,
