@@ -1,61 +1,122 @@
 package com.opentasker.ui.screens
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Slider
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.opentasker.ui.components.GroupMoveDialogs
+import com.opentasker.ui.components.GroupOps
+import com.opentasker.ui.components.GroupPickerDialog
+import com.opentasker.ui.components.descendantGroupIds
+import com.opentasker.ui.components.groupedItems
+import com.opentasker.ui.components.rememberGroupDragState
+import com.opentasker.ui.components.rememberGroupMoveHost
+import com.opentasker.ui.components.ItemNoteSection
+import com.opentasker.ui.components.ReorderableRow
+import com.opentasker.ui.components.ConfirmDeleteSelected
+import com.opentasker.ui.components.RgbaColorPickerDialog
+import com.opentasker.ui.components.SelectionBar
+import com.opentasker.ui.components.SelectionCheck
+import com.opentasker.ui.components.TabAction
+import com.opentasker.ui.components.TabActionsFab
+import com.opentasker.ui.components.selectableItem
+import com.opentasker.ui.components.rememberListReorderState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.DragIndicator
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.SortByAlpha
+import androidx.compose.material.icons.filled.FormatListNumbered
+import androidx.compose.material.icons.filled.UnfoldLess
+import androidx.compose.material.icons.filled.UnfoldMore
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -71,26 +132,35 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.opentasker.ui.theme.DesignSystem
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -98,13 +168,21 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.withTransaction
 import com.opentasker.app.BuildConfig
+import com.opentasker.ui.theme.ThemeStore
+import kotlin.math.roundToInt
 import com.opentasker.core.actions.ActionField
 import com.opentasker.core.diagnostics.DiagnosticExport
 import com.opentasker.core.actions.ActionMetadata
 import com.opentasker.core.actions.ActionMetadataRegistry
+import com.opentasker.core.actions.RETURN_VALUES_ACTION_ID
+import com.opentasker.core.actions.RETURN_VALUE_PREFIX
+import com.opentasker.core.engine.SUB_TASK_ACTION_ID
+import com.opentasker.core.engine.SUB_TASK_PARAM_PREFIX
 import com.opentasker.core.actions.FieldType
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
+import com.opentasker.core.capabilities.CapabilityRequirement
+import com.opentasker.core.capabilities.CapabilityState
 import com.opentasker.core.contexts.CalendarSunEventPresets
 import com.opentasker.core.contexts.DaySchedule
 import com.opentasker.core.contexts.EventContextPreset
@@ -112,6 +190,13 @@ import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.contexts.contextConfigSummary
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.widget.TaskShortcutHelper
+import com.opentasker.widget.WidgetEditor
+import com.opentasker.core.engine.ActionTraceStatus
+import com.opentasker.core.engine.RunLogActionDiagnostic
+import com.opentasker.core.engine.RunLogOutcome
+import com.opentasker.core.engine.outcome
+import com.opentasker.core.engine.RunLogSource
+import com.opentasker.core.engine.toRunLogDiagnostics
 import com.opentasker.core.flow.AutomationFlowTarget
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.model.ActionSpec
@@ -119,6 +204,8 @@ import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.Project
+import com.opentasker.core.model.ProjectFilter
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
@@ -126,17 +213,27 @@ import com.opentasker.core.model.Variable
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.EditHistoryDao
+import com.opentasker.core.storage.ItemGroupEntity
+import com.opentasker.core.storage.ItemMetaEntity
 import com.opentasker.core.storage.EditHistoryEntity
 import com.opentasker.core.storage.VariableEntity
 import com.opentasker.core.storage.RunLogRetentionPolicy
+import com.opentasker.core.storage.ProjectSelectionStore
+import com.opentasker.core.storage.ListSortStore
+import com.opentasker.core.storage.RunLogSeenStore
+import com.opentasker.core.storage.SortMethod
+import com.opentasker.core.storage.SortTab
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.StorageDecodeIssue
 import com.opentasker.core.storage.minimumTimestamp
 import com.opentasker.core.storage.normalized
 import com.opentasker.core.storage.toEntity
 import com.opentasker.core.transfer.BundleImportPlan
+import com.opentasker.core.transfer.BundleImportReport
 import com.opentasker.core.transfer.OpenTaskerBundle
 import com.opentasker.core.transfer.OpenTaskerBundleCodec
+import com.opentasker.core.transfer.ItemConflictStrategy
+import com.opentasker.core.transfer.ProjectConflictStrategy
 import com.opentasker.core.transfer.OpenTaskerBundleRepository
 import com.opentasker.core.transfer.TaskerImportPlanner
 import com.opentasker.core.transfer.TaskerImportPreview
@@ -150,11 +247,10 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -175,49 +271,28 @@ private val DATABASE_BACKUP_MIME_TYPES = arrayOf(
     "application/vnd.sqlite3",
     "*/*",
 )
-private const val NO_DIALOG_ENTITY_ID = 0L
-private const val NO_DIALOG_INDEX = -1
-private const val DELETE_TARGET_PROFILE = "profile"
-private const val DELETE_TARGET_TASK = "task"
-private const val DELETE_TARGET_SCENE = "scene"
-private const val DELETE_TARGET_ACTION = "action"
-private const val DELETE_TARGET_CONTEXT = "context"
 
 private fun databaseBackupExportName(): String =
     "opentasker_backup_${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())}.db"
 
-private fun openTaskerBundleExportName(): String =
-    "opentasker_bundle_${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())}.json"
+/** A filesystem-safe timestamp (yyyy-MM-dd_HH-mm-ss) shared by every export's default filename. */
+private fun exportStamp(): String = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
+
+/** The full-workspace ("Export everything") default filename: the app label + the timestamp. */
+private fun openTaskerBundleExportName(): String = "白い熊 自由作業盤.${exportStamp()}.json"
 
 private enum class OpenTaskerScreen(val label: String) {
+    Monitor("Monitor"),
     Profiles("Profiles"),
     Tasks("Tasks"),
-    Vars("Variables"),
+    Vars("Vars"),
     Flow("Flow"),
     Scenes("Scenes"),
-    Inspector("Inspector"),
+    Widgets("Widgets"),
+    Inspector("Inspect"),
     Setup("Setup"),
-    RunLog("Run Log"),
-}
-
-private val primaryNavigationScreens = listOf(
-    OpenTaskerScreen.Profiles,
-    OpenTaskerScreen.Tasks,
-    OpenTaskerScreen.Setup,
-    OpenTaskerScreen.RunLog,
-)
-
-private val secondaryNavigationScreens = OpenTaskerScreen.entries.filterNot { it in primaryNavigationScreens }
-
-private fun OpenTaskerScreen.icon(): ImageVector = when (this) {
-    OpenTaskerScreen.Profiles -> Icons.Filled.CheckCircle
-    OpenTaskerScreen.Tasks -> Icons.Filled.Edit
-    OpenTaskerScreen.Vars -> Icons.Filled.Menu
-    OpenTaskerScreen.Flow -> Icons.Filled.Info
-    OpenTaskerScreen.Scenes -> Icons.Filled.Edit
-    OpenTaskerScreen.Inspector -> Icons.Filled.Info
-    OpenTaskerScreen.Setup -> Icons.Filled.Settings
-    OpenTaskerScreen.RunLog -> Icons.Filled.Info
+    RunLog("Log"),
+    Help("Help"),
 }
 
 private data class ActionEditState(
@@ -243,6 +318,49 @@ internal data class OpenTaskerBundleReviewState(
     val bundle: OpenTaskerBundle,
     val plan: BundleImportPlan,
 )
+
+/** A pending selective export: exactly these items, plus the include-variables choice. */
+private data class ExportRequest(
+    val name: String,
+    val fileName: String,
+    val profileIds: Set<Long> = emptySet(),
+    val taskIds: Set<Long> = emptySet(),
+    val sceneIds: Set<Long> = emptySet(),
+    val templateNames: Set<String> = emptySet(),
+    val variableKeys: Set<String> = emptySet(),
+    val includeVariables: Boolean = false,
+)
+
+/** Per-export default filename: the item/category name kept readable (illegal chars stripped) + the stamp. */
+private fun exportFileName(label: String): String {
+    val clean = label.replace(Regex("[\\\\/:*?\"<>|\\u0000-\\u001f]"), "_").trim().ifEmpty { "export" }
+    return "$clean.${exportStamp()}.json"
+}
+
+/**
+ * Drives the top-bar expand/collapse-all toggle for a list tab: returns (anyExpanded, onToggle) where
+ * onToggle collapses everything if any card is open, otherwise expands every visible card.
+ */
+private fun <K> expandAllControl(map: SnapshotStateMap<K, Boolean>, keys: List<K>): Pair<Boolean, () -> Unit> {
+    val anyExpanded = keys.any { map[it] == true }
+    return anyExpanded to { keys.forEach { map[it] = !anyExpanded } }
+}
+
+private sealed interface MoveTarget {
+    val currentProjectId: Long?
+
+    data class ProfileMove(val profile: Profile) : MoveTarget {
+        override val currentProjectId get() = profile.projectId
+    }
+
+    data class TaskMove(val task: Task) : MoveTarget {
+        override val currentProjectId get() = task.projectId
+    }
+
+    data class SceneMove(val scene: Scene) : MoveTarget {
+        override val currentProjectId get() = scene.projectId
+    }
+}
 
 private sealed interface DeleteTarget {
     val title: String
@@ -289,78 +407,131 @@ class ActiveAutomationViewModel(
     private val runLogRetentionSettings = RunLogRetentionSettings(appContext)
     private val databaseBackupManager = DatabaseBackupManager(appContext, db)
 
-    private val profileDecodeResults = db.profileDao()
-        .getAllAsFlow()
-        .map { entities -> entities.map { it.toDomainDecodeResult() } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val profiles: StateFlow<List<Profile>> =
+        combine(db.profileDao().getAllAsFlow(), ListSortStore.state) { entities, sort ->
+            val items = entities.map { it.toDomain() }
+            if (sort.profiles == SortMethod.ALPHABETICAL) items.sortedBy { it.name.lowercase() } else items.sortedBy { it.position }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    private val taskDecodeResults = db.taskDao()
-        .getAllAsFlow()
-        .map { entities -> entities.map { it.toDomainDecodeResult() } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val tasks: StateFlow<List<Task>> =
+        combine(db.taskDao().getAllAsFlow(), ListSortStore.state) { entities, sort ->
+            val items = entities.map { it.toDomain() }
+            if (sort.tasks == SortMethod.ALPHABETICAL) items.sortedBy { it.name.lowercase() } else items.sortedBy { it.position }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val profiles: StateFlow<ImmutableList<Profile>> = profileDecodeResults
-        .map { results -> results.map { it.value }.sortedBy { it.name.lowercase() }.toImmutableList() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
+    val scenes: StateFlow<List<Scene>> =
+        combine(db.sceneDao().getAllAsFlow(), ListSortStore.state) { entities, sort ->
+            val items = entities.map { it.toDomain() }
+            if (sort.scenes == SortMethod.ALPHABETICAL) items.sortedBy { it.name.lowercase() } else items.sortedBy { it.position }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val tasks: StateFlow<ImmutableList<Task>> = taskDecodeResults
-        .map { results -> results.map { it.value }.sortedBy { it.name.lowercase() }.toImmutableList() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
+    val projects: StateFlow<List<Project>> =
+        combine(db.projectDao().getAllAsFlow(), ListSortStore.state) { entities, sort ->
+            val items = entities.map { it.toDomain() }
+            if (sort.projects == SortMethod.ALPHABETICAL) items.sortedBy { it.name.lowercase() } else items.sortedBy { it.sortOrder }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val storageDecodeIssues: StateFlow<ImmutableList<StorageDecodeIssue>> = combine(
-        profileDecodeResults,
-        taskDecodeResults,
-    ) { profileResults, taskResults ->
-        (profileResults.mapNotNull { it.issue } + taskResults.mapNotNull { it.issue })
-            .sortedWith(compareBy<StorageDecodeIssue> { it.recordType.label }.thenBy { it.recordName.lowercase() })
-            .toImmutableList()
-    }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
+    private val projectSelectionStore = ProjectSelectionStore(appContext)
+    var projectFilter by mutableStateOf<ProjectFilter>(projectSelectionStore.load())
+        private set
 
-    val scenes: StateFlow<ImmutableList<Scene>> = db.sceneDao()
-        .getAllAsFlow()
-        .map { entities -> entities.map { it.toDomain() }.sortedBy { it.name.lowercase() }.toImmutableList() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
-
-    val runLogs: StateFlow<ImmutableList<RunLogEntry>> = db.runLogDao()
+    val runLogs: StateFlow<List<RunLogEntry>> = db.runLogDao()
         .getRecentFlow()
-        .map { entities -> entities.map { it.toDomain() }.toImmutableList() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
+        .map { entities -> entities.map { it.toDomain() } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val globalVariables: StateFlow<ImmutableList<Variable>> = db.variableDao()
-        .getAllGlobalAsFlow()
-        .map { entities -> entities.map { it.toDomain() }.toImmutableList() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
+    val globalVariables: StateFlow<List<Variable>> = db.variableDao()
+        .getAllAsFlow()
+        .map { entities -> entities.map { it.toDomain() } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // Foldable groups + per-item membership/notes (shared across all list tabs).
+    val itemGroups: StateFlow<List<ItemGroupEntity>> = db.itemGroupDao().getAllAsFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val itemMeta: StateFlow<List<ItemMetaEntity>> = db.itemMetaDao().getAllAsFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun createGroup(tab: String, projectId: Long?, name: String, parentId: Long? = null) = viewModelScope.launch {
+        val pos = db.itemGroupDao().getForTab(tab).size
+        db.itemGroupDao().upsert(
+            ItemGroupEntity(projectId = projectId, tab = tab, name = name.trim(), position = pos, parentGroupId = parentId),
+        )
+    }
+    fun renameGroup(group: ItemGroupEntity, name: String) = viewModelScope.launch {
+        db.itemGroupDao().upsert(group.copy(name = name.trim()))
+    }
+    fun deleteGroup(group: ItemGroupEntity) = viewModelScope.launch {
+        db.itemMetaDao().clearGroup(group.tab, group.id) // orphan its members back to top level
+        db.itemGroupDao().orphanChildren(group.id)       // its sub-groups float up to top level
+        db.itemGroupDao().delete(group.id)
+    }
+    fun toggleGroupExpanded(group: ItemGroupEntity) = viewModelScope.launch {
+        db.itemGroupDao().upsert(group.copy(expanded = !group.expanded))
+    }
+    fun setGroupParent(group: ItemGroupEntity, parentId: Long?) = viewModelScope.launch {
+        db.itemGroupDao().upsert(group.copy(parentGroupId = parentId))
+    }
+    fun setItemGroup(tab: String, itemKey: String, groupId: Long?) = viewModelScope.launch {
+        val cur = db.itemMetaDao().get(tab, itemKey) ?: ItemMetaEntity(tab = tab, itemKey = itemKey)
+        db.itemMetaDao().upsert(cur.copy(groupId = groupId))
+    }
+    fun moveItemToNewGroup(tab: String, projectId: Long?, name: String, itemKey: String) = viewModelScope.launch {
+        val pos = db.itemGroupDao().getForTab(tab).size
+        val gid = db.itemGroupDao().upsert(ItemGroupEntity(projectId = projectId, tab = tab, name = name.trim(), position = pos))
+        val cur = db.itemMetaDao().get(tab, itemKey) ?: ItemMetaEntity(tab = tab, itemKey = itemKey)
+        db.itemMetaDao().upsert(cur.copy(groupId = gid))
+    }
 
     private val events = Channel<String>(Channel.BUFFERED)
     val messages = events.receiveAsFlow()
 
-    private val _runLogRetentionPolicy = MutableStateFlow(runLogRetentionSettings.load())
-    val runLogRetentionPolicy: StateFlow<RunLogRetentionPolicy> = _runLogRetentionPolicy.asStateFlow()
+    var runLogRetentionPolicy by mutableStateOf(runLogRetentionSettings.load())
+        private set
 
-    private val _backupSetupState = MutableStateFlow(loadBackupSetupState(busy = false))
-    val backupSetupState: StateFlow<BackupSetupState> = _backupSetupState.asStateFlow()
+    var backupSetupState by mutableStateOf(loadBackupSetupState(busy = false))
+        private set
 
-    private val _taskerImportReview = MutableStateFlow<TaskerImportReviewState?>(null)
-    internal val taskerImportReview: StateFlow<TaskerImportReviewState?> = _taskerImportReview.asStateFlow()
+    internal var taskerImportReview by mutableStateOf<TaskerImportReviewState?>(null)
+        private set
 
-    private val _taskerImportBusy = MutableStateFlow(false)
-    val taskerImportBusy: StateFlow<Boolean> = _taskerImportBusy.asStateFlow()
+    var taskerImportBusy by mutableStateOf(false)
+        private set
 
-    private val _openTaskerBundleReview = MutableStateFlow<OpenTaskerBundleReviewState?>(null)
-    internal val openTaskerBundleReview: StateFlow<OpenTaskerBundleReviewState?> = _openTaskerBundleReview.asStateFlow()
+    internal var openTaskerBundleReview by mutableStateOf<OpenTaskerBundleReviewState?>(null)
+        private set
 
-    private val _openTaskerBundleBusy = MutableStateFlow(false)
-    val openTaskerBundleBusy: StateFlow<Boolean> = _openTaskerBundleBusy.asStateFlow()
+    // Set after a successful import so the UI can show a persistent result dialog (counts + project).
+    internal var openTaskerImportResult by mutableStateOf<BundleImportReport?>(null)
+        private set
+
+    fun clearImportResult() { openTaskerImportResult = null }
+
+    var openTaskerBundleBusy by mutableStateOf(false)
+        private set
 
     init {
         viewModelScope.launch {
-            runCatching { pruneRunLogs(_runLogRetentionPolicy.value) }
+            runCatching { pruneRunLogs(runLogRetentionPolicy) }
+        }
+        viewModelScope.launch {
+            // One-time sweep: drop foldable groups orphaned by a project deleted before groups cascaded.
+            runCatching {
+                val liveProjects = db.projectDao().getAll().mapTo(mutableSetOf()) { it.id }
+                db.itemGroupDao().getAll()
+                    .filter { it.projectId != null && it.projectId !in liveProjects }
+                    .forEach { db.itemGroupDao().delete(it.id) }
+            }
         }
     }
 
-    fun createTask(name: String, priority: Int) = launchWithMessage("Task created") {
-        db.taskDao().insert(Task(name = name.trim(), priority = priority.coerceIn(0, 10)).toEntity())
+    fun createTask(name: String, priority: Int, projectId: Long? = null) = launchWithMessage("Task created") {
+        db.taskDao().insert(Task(name = name.trim(), priority = priority.coerceIn(0, 10), projectId = projectId, position = db.taskDao().nextPosition()).toEntity())
+    }
+
+    /** Persist a manual reorder of the visible (filtered) tasks by reusing their own position slots. */
+    fun reorderTasks(orderedVisible: List<Task>) = viewModelScope.launch {
+        val slots = orderedVisible.map { it.position }.sorted()
+        orderedVisible.forEachIndexed { index, task -> db.taskDao().setPosition(task.id, slots[index]) }
     }
 
     fun updateTask(task: Task, message: String = "Task updated") = launchWithMessage(message) {
@@ -394,14 +565,54 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun createScene(name: String, widthDp: Int, heightDp: Int) = launchWithMessage("Scene created") {
+    /** Delete several tasks at once, skipping any still referenced by a profile (same guard as [deleteTask]). */
+    fun deleteTasks(tasks: List<Task>) {
+        if (tasks.isEmpty()) return
+        viewModelScope.launch {
+            runCatching {
+                val usedIds = db.profileDao().getAll().map { it.toDomain() }
+                    .flatMap { listOfNotNull(it.enterTaskId, it.exitTaskId) }.toSet()
+                val (used, free) = tasks.partition { it.id in usedIds }
+                free.forEach { db.taskDao().delete(it.toEntity()) }
+                buildString {
+                    append("Deleted ${free.size} task(s)")
+                    if (used.isNotEmpty()) append("; skipped ${used.size} used by a profile")
+                }
+            }
+                .onSuccess { events.send(it) }
+                .onFailure { events.send("Error: ${it.message ?: "Delete failed"}") }
+        }
+    }
+
+    fun createScene(
+        name: String, widthDp: Int, heightDp: Int, projectId: Long? = null,
+        bgColor: String? = null, cornerRadiusDp: Int = 16, scrimAlpha: Int = 55,
+        borderColor: String? = null, borderWidth: Int = 0,
+        defaultPosition: String = "center", defaultModal: Boolean = true, defaultDismissOnOutside: Boolean = true,
+    ) = launchWithMessage("Scene created") {
         db.sceneDao().insert(
             Scene(
                 name = name.trim(),
                 widthDp = widthDp.coerceIn(120, 1440),
                 heightDp = heightDp.coerceIn(80, 2560),
+                projectId = projectId,
+                position = db.sceneDao().nextPosition(),
+                bgColor = bgColor,
+                cornerRadiusDp = cornerRadiusDp,
+                scrimAlpha = scrimAlpha,
+                borderColor = borderColor,
+                borderWidth = borderWidth,
+                defaultPosition = defaultPosition,
+                defaultModal = defaultModal,
+                defaultDismissOnOutside = defaultDismissOnOutside,
             ).toEntity()
         )
+    }
+
+    /** Persist a manual reorder of the visible (filtered) scenes by reusing their own position slots. */
+    fun reorderScenes(orderedVisible: List<Scene>) = viewModelScope.launch {
+        val slots = orderedVisible.map { it.position }.sorted()
+        orderedVisible.forEachIndexed { index, scene -> db.sceneDao().setPosition(scene.id, slots[index]) }
     }
 
     fun updateScene(scene: Scene, message: String = "Scene updated") = launchWithMessage(message) {
@@ -412,7 +623,104 @@ class ActiveAutomationViewModel(
         db.sceneDao().delete(scene.toEntity())
     }
 
-    fun createProfile(name: String, enabled: Boolean, enterTaskId: Long, cooldownSec: Int, automationMode: AutomationMode, group: String? = null) =
+    fun deleteScenes(scenes: List<Scene>) = launchWithMessage("Deleted ${scenes.size} scene(s)") {
+        scenes.forEach { db.sceneDao().delete(it.toEntity()) }
+    }
+
+    // ---- Projects (organizational; the engine ignores projectId) ----
+
+    fun selectProject(filter: ProjectFilter) {
+        projectSelectionStore.save(filter)
+        projectFilter = filter
+    }
+
+    fun createProject(name: String, color: Int?) = launchWithMessage("Project created") {
+        val nextOrder = (db.projectDao().getAll().maxOfOrNull { it.sortOrder } ?: -1) + 1
+        db.projectDao().insert(Project(name = name.trim(), color = color, sortOrder = nextOrder).toEntity())
+    }
+
+    fun updateProject(project: Project) = launchWithMessage("Project updated") {
+        db.projectDao().update(project.toEntity())
+    }
+
+    fun deleteProject(project: Project, deleteItems: Boolean) = launchWithMessage(
+        if (deleteItems) "Project and its items deleted" else "Project deleted; items moved to Unfiled"
+    ) {
+        val pid = project.id
+        db.withTransaction {
+            val profileRows = db.profileDao().getAll().filter { it.projectId == pid }
+            val taskRows = db.taskDao().getAll().filter { it.projectId == pid }
+            val sceneRows = db.sceneDao().getAll().filter { it.projectId == pid }
+            if (deleteItems) {
+                profileRows.forEach { db.profileDao().delete(it); db.itemMetaDao().delete("profiles", it.id.toString()) }
+                taskRows.forEach { db.taskDao().delete(it); db.itemMetaDao().delete("tasks", it.id.toString()) }
+                sceneRows.forEach { db.sceneDao().delete(it); db.itemMetaDao().delete("scenes", it.id.toString()) }
+            } else {
+                profileRows.forEach { db.profileDao().update(it.copy(projectId = null)) }
+                taskRows.forEach { db.taskDao().update(it.copy(projectId = null)) }
+                sceneRows.forEach { db.sceneDao().update(it.copy(projectId = null)) }
+            }
+            // The project's foldable groups are project-scoped — delete them with the project so they don't
+            // orphan. (Reassigned items keep their notes; a now-dangling groupId just reads as ungrouped.)
+            db.itemGroupDao().deleteForProject(pid)
+            db.projectDao().delete(project.toEntity())
+        }
+        if ((projectFilter as? ProjectFilter.Of)?.projectId == pid) {
+            selectProject(ProjectFilter.All)
+        }
+    }
+
+    /** Reorder by reassigning contiguous sortOrder so the moved project shifts one slot. */
+    fun moveProject(project: Project, up: Boolean) = launchWithMessage("Project reordered") {
+        val ordered = db.projectDao().getAll()
+            .sortedWith(compareBy({ it.sortOrder }, { it.name.lowercase() }))
+            .toMutableList()
+        val index = ordered.indexOfFirst { it.id == project.id }
+        val target = if (up) index - 1 else index + 1
+        if (index < 0 || target !in ordered.indices) return@launchWithMessage
+        ordered.add(target, ordered.removeAt(index))
+        db.withTransaction {
+            ordered.forEachIndexed { position, row ->
+                if (row.sortOrder != position) db.projectDao().update(row.copy(sortOrder = position))
+            }
+        }
+    }
+
+    fun moveProfileToProject(profile: Profile, projectId: Long?) = launchWithMessage("Profile moved") {
+        db.profileDao().update(profile.copy(projectId = projectId).toEntity())
+    }
+
+    fun moveTaskToProject(task: Task, projectId: Long?) = launchWithMessage("Task moved") {
+        db.taskDao().update(task.copy(projectId = projectId).toEntity())
+    }
+
+    fun moveSceneToProject(scene: Scene, projectId: Long?) = launchWithMessage("Scene moved") {
+        db.sceneDao().update(scene.copy(projectId = projectId).toEntity())
+    }
+
+    fun moveProfilesToProject(items: List<Profile>, projectId: Long?) =
+        launchWithMessage("${items.size} profile${plural(items.size)} moved") {
+            items.forEach { db.profileDao().update(it.copy(projectId = projectId).toEntity()) }
+        }
+
+    fun moveTasksToProject(items: List<Task>, projectId: Long?) =
+        launchWithMessage("${items.size} task${plural(items.size)} moved") {
+            items.forEach { db.taskDao().update(it.copy(projectId = projectId).toEntity()) }
+        }
+
+    fun moveScenesToProject(items: List<Scene>, projectId: Long?) =
+        launchWithMessage("${items.size} scene${plural(items.size)} moved") {
+            items.forEach { db.sceneDao().update(it.copy(projectId = projectId).toEntity()) }
+        }
+
+    /** Stamp enterTaskName/exitTaskName from the current task ids so the profile's link is name-bound
+     *  (survives re-imports that re-id the task). Keeps an existing name if the id no longer resolves. */
+    private suspend fun Profile.withTaskNames(): Profile = copy(
+        enterTaskName = (enterTaskId.takeIf { it > 0 }?.let { db.taskDao().getById(it)?.name }) ?: enterTaskName,
+        exitTaskName = (exitTaskId?.takeIf { it > 0 }?.let { db.taskDao().getById(it)?.name }) ?: exitTaskName,
+    )
+
+    fun createProfile(name: String, enabled: Boolean, enterTaskId: Long, cooldownSec: Int, automationMode: AutomationMode, projectId: Long? = null) =
         launchWithMessage("Profile created") {
             db.profileDao().insert(
                 Profile(
@@ -421,10 +729,17 @@ class ActiveAutomationViewModel(
                     enterTaskId = enterTaskId,
                     cooldownSec = cooldownSec.coerceAtLeast(0),
                     automationMode = automationMode,
-                    group = group,
-                ).toEntity()
+                    projectId = projectId,
+                    position = db.profileDao().nextPosition(),
+                ).withTaskNames().toEntity()
             )
         }
+
+    /** Persist a manual reorder of the visible (filtered) profiles by reusing their own position slots. */
+    fun reorderProfiles(orderedVisible: List<Profile>) = viewModelScope.launch {
+        val slots = orderedVisible.map { it.position }.sorted()
+        orderedVisible.forEachIndexed { index, profile -> db.profileDao().setPosition(profile.id, slots[index]) }
+    }
 
     fun updateProfile(profile: Profile, message: String = "Profile updated") =
         launchWithMessage(message) {
@@ -444,7 +759,7 @@ class ActiveAutomationViewModel(
             if (previous != null && previous.contexts != profile.contexts) {
                 locationDwellStateStore.clearProfile(profile.id)
             }
-            db.profileDao().update(profile.toEntity())
+            db.profileDao().update(profile.withTaskNames().toEntity())
         }
 
     fun deleteProfile(profile: Profile) = launchWithMessage("Profile deleted") {
@@ -452,19 +767,26 @@ class ActiveAutomationViewModel(
         locationDwellStateStore.clearProfile(profile.id)
     }
 
+    fun deleteProfiles(profiles: List<Profile>) = launchWithMessage("Deleted ${profiles.size} profile(s)") {
+        profiles.forEach {
+            db.profileDao().delete(it.toEntity())
+            locationDwellStateStore.clearProfile(it.id)
+        }
+    }
+
     fun installProfileTemplate(template: ProfileTemplate, slotValues: Map<String, String>) =
         launchWithMessage("Template installed as a disabled profile") {
             val applied = template.instantiate(slotValues)
             db.withTransaction {
                 val taskId = db.taskDao().insert(applied.task.toEntity())
-                db.profileDao().insert(applied.profile.copy(enterTaskId = taskId).toEntity())
+                db.profileDao().insert(applied.profile.copy(enterTaskId = taskId).withTaskNames().toEntity())
             }
         }
 
     fun previewTaskerXml(uri: Uri, appVersion: String) {
         viewModelScope.launch {
-            if (_taskerImportBusy.value) return@launch
-            _taskerImportBusy.value = true
+            if (taskerImportBusy) return@launch
+            taskerImportBusy = true
             runCatching {
                 withContext(Dispatchers.IO) {
                     val rawXml = readBoundedTaskerXml(appContext, uri)
@@ -473,51 +795,48 @@ class ActiveAutomationViewModel(
                 }
             }
                 .onSuccess {
-                    _taskerImportReview.value = it
+                    taskerImportReview = it
                     events.send("Tasker XML ready for review")
                 }
                 .onFailure { events.send("Error: ${it.message ?: "Tasker XML import preview failed"}") }
-            _taskerImportBusy.value = false
+            taskerImportBusy = false
         }
     }
 
     fun clearTaskerImportReview() {
-        if (!_taskerImportBusy.value) {
-            _taskerImportReview.value = null
+        if (!taskerImportBusy) {
+            taskerImportReview = null
         }
     }
 
     fun confirmTaskerImport(report: TaskerXmlImportReport) {
         viewModelScope.launch {
-            if (_taskerImportBusy.value) return@launch
-            _taskerImportBusy.value = true
+            if (taskerImportBusy) return@launch
+            taskerImportBusy = true
             runCatching {
                 withContext(Dispatchers.IO) {
                     bundleRepository.importBundle(TaskerImportPlanner.confirmedBundle(report))
                 }
             }
                 .onSuccess { importReport ->
-                    _taskerImportReview.value = null
-                    events.send(
-                        "Imported ${importReport.insertedTasks} task${plural(importReport.insertedTasks)}, " +
-                            "${importReport.insertedProfiles} disabled profile${plural(importReport.insertedProfiles)}"
-                    )
+                    taskerImportReview = null
+                    openTaskerImportResult = importReport
                 }
                 .onFailure { events.send("Error: ${it.message ?: "Tasker XML import failed"}") }
-            _taskerImportBusy.value = false
+            taskerImportBusy = false
         }
     }
 
     fun exportOpenTaskerBundle(uri: Uri, appVersion: String) {
         viewModelScope.launch {
-            if (_openTaskerBundleBusy.value) return@launch
-            _openTaskerBundleBusy.value = true
+            if (openTaskerBundleBusy) return@launch
+            openTaskerBundleBusy = true
             runCatching {
                 withContext(Dispatchers.IO) {
                     val bundle = bundleRepository.exportBundle(
                         appVersion = appVersion,
-                        name = "OpenTasker Workspace Export",
-                        description = "Profiles, tasks, variables, and scenes exported from OpenTasker.",
+                        name = "白い熊 自由作業盤 Workspace Export",
+                        description = "Profiles, tasks, variables, and scenes exported from 白い熊 自由作業盤.",
                     )
                     val encoded = OpenTaskerBundleCodec.encode(bundle)
                     val stream = appContext.contentResolver.openOutputStream(uri)
@@ -533,15 +852,63 @@ class ActiveAutomationViewModel(
                             "${bundle.scenes.size} scene${plural(bundle.scenes.size)}"
                     )
                 }
-                .onFailure { events.send("Error: ${it.message ?: "OpenTasker bundle export failed"}") }
-            _openTaskerBundleBusy.value = false
+                .onFailure { events.send("Error: ${it.message ?: "白い熊 自由作業盤 bundle export failed"}") }
+            openTaskerBundleBusy = false
+        }
+    }
+
+    fun exportSelectionBundle(
+        uri: Uri,
+        appVersion: String,
+        profileIds: Set<Long>,
+        taskIds: Set<Long>,
+        sceneIds: Set<Long>,
+        includeVariables: Boolean,
+        name: String,
+        templateNames: Set<String> = emptySet(),
+        variableKeys: Set<String> = emptySet(),
+    ) {
+        viewModelScope.launch {
+            if (openTaskerBundleBusy) return@launch
+            openTaskerBundleBusy = true
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val bundle = bundleRepository.exportSelection(
+                        appVersion = appVersion,
+                        profileIds = profileIds,
+                        taskIds = taskIds,
+                        sceneIds = sceneIds,
+                        includeVariables = includeVariables,
+                        name = name,
+                        templateNames = templateNames,
+                        variableKeys = variableKeys,
+                    )
+                    val encoded = OpenTaskerBundleCodec.encode(bundle)
+                    val stream = appContext.contentResolver.openOutputStream(uri)
+                        ?: error("Unable to open export destination")
+                    stream.bufferedWriter(Charsets.UTF_8).use { writer -> writer.write(encoded) }
+                    bundle
+                }
+            }
+                .onSuccess { bundle ->
+                    val parts = buildList {
+                        if (bundle.profiles.isNotEmpty()) add("${bundle.profiles.size} profile${plural(bundle.profiles.size)}")
+                        if (bundle.tasks.isNotEmpty()) add("${bundle.tasks.size} task${plural(bundle.tasks.size)}")
+                        if (bundle.scenes.isNotEmpty()) add("${bundle.scenes.size} scene${plural(bundle.scenes.size)}")
+                        if (bundle.variables.isNotEmpty()) add("${bundle.variables.size} variable${plural(bundle.variables.size)}")
+                        if (bundle.templates.isNotEmpty()) add("${bundle.templates.size} template${plural(bundle.templates.size)}")
+                    }
+                    events.send("Exported ${parts.joinToString().ifEmpty { "nothing" }}")
+                }
+                .onFailure { events.send("Error: ${it.message ?: "Export failed"}") }
+            openTaskerBundleBusy = false
         }
     }
 
     fun previewOpenTaskerBundle(uri: Uri) {
         viewModelScope.launch {
-            if (_openTaskerBundleBusy.value) return@launch
-            _openTaskerBundleBusy.value = true
+            if (openTaskerBundleBusy) return@launch
+            openTaskerBundleBusy = true
             runCatching {
                 withContext(Dispatchers.IO) {
                     val rawJson = readBoundedOpenTaskerBundle(appContext, uri)
@@ -550,39 +917,39 @@ class ActiveAutomationViewModel(
                 }
             }
                 .onSuccess {
-                    _openTaskerBundleReview.value = it
-                    events.send("OpenTasker bundle ready for review")
+                    openTaskerBundleReview = it
+                    events.send("白い熊 自由作業盤 bundle ready for review")
                 }
-                .onFailure { events.send("Error: ${it.message ?: "OpenTasker bundle preview failed"}") }
-            _openTaskerBundleBusy.value = false
+                .onFailure { events.send("Error: ${it.message ?: "白い熊 自由作業盤 bundle preview failed"}") }
+            openTaskerBundleBusy = false
         }
     }
 
     fun clearOpenTaskerBundleReview() {
-        if (!_openTaskerBundleBusy.value) {
-            _openTaskerBundleReview.value = null
+        if (!openTaskerBundleBusy) {
+            openTaskerBundleReview = null
         }
     }
 
-    fun confirmOpenTaskerBundleImport(bundle: OpenTaskerBundle) {
+    fun confirmOpenTaskerBundleImport(
+        bundle: OpenTaskerBundle,
+        projectConflictStrategy: ProjectConflictStrategy = ProjectConflictStrategy.MERGE,
+        itemConflictStrategy: ItemConflictStrategy = ItemConflictStrategy.RENAME,
+    ) {
         viewModelScope.launch {
-            if (_openTaskerBundleBusy.value) return@launch
-            _openTaskerBundleBusy.value = true
+            if (openTaskerBundleBusy) return@launch
+            openTaskerBundleBusy = true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    bundleRepository.importBundle(bundle)
+                    bundleRepository.importBundle(bundle, projectConflictStrategy, itemConflictStrategy)
                 }
             }
                 .onSuccess { importReport ->
-                    _openTaskerBundleReview.value = null
-                    events.send(
-                        "Imported ${importReport.insertedTasks} task${plural(importReport.insertedTasks)}, " +
-                            "${importReport.insertedProfiles} disabled profile${plural(importReport.insertedProfiles)}, " +
-                            "${importReport.insertedScenes} scene${plural(importReport.insertedScenes)}"
-                    )
+                    openTaskerBundleReview = null
+                    openTaskerImportResult = importReport
                 }
-                .onFailure { events.send("Error: ${it.message ?: "OpenTasker bundle import failed"}") }
-            _openTaskerBundleBusy.value = false
+                .onFailure { events.send("Error: ${it.message ?: "白い熊 自由作業盤 bundle import failed"}") }
+            openTaskerBundleBusy = false
         }
     }
 
@@ -591,7 +958,7 @@ class ActiveAutomationViewModel(
             val normalized = policy.normalized()
             runCatching {
                 runLogRetentionSettings.save(normalized)
-                _runLogRetentionPolicy.value = normalized
+                runLogRetentionPolicy = normalized
                 pruneRunLogs(normalized)
             }
                 .onSuccess { deleted ->
@@ -656,14 +1023,14 @@ class ActiveAutomationViewModel(
         viewModelScope.launch {
             setBackupBusy(true)
             databaseBackupManager.stageRestore(uri)
-                .onSuccess { events.send("Backup imported. Restart OpenTasker to apply the restore.") }
+                .onSuccess { events.send("Backup imported. Restart 白い熊 自由作業盤 to apply the restore.") }
                 .onFailure { events.send("Error: ${it.message ?: "Database backup import failed"}") }
             setBackupBusy(false)
         }
     }
 
     private fun setBackupBusy(busy: Boolean) {
-        _backupSetupState.value = loadBackupSetupState(busy)
+        backupSetupState = loadBackupSetupState(busy)
     }
 
     private fun loadBackupSetupState(busy: Boolean): BackupSetupState =
@@ -721,16 +1088,14 @@ class ActiveAutomationViewModel(
         db.editHistoryDao().deleteFor(EditHistoryDao.TYPE_PROFILE, profileId)
     }
 
-    fun updateVariable(name: String, value: String) {
-        viewModelScope.launch {
-            db.variableDao().insert(VariableEntity(name, value, isGlobal = true))
-        }
+    // Route Vars-screen edits through the cache (single source of truth) so it write-throughs to the
+    // DB and the running engine sees them immediately; projectId 0 = super-global, >0 = project-global.
+    fun updateVariable(projectId: Long, name: String, value: String) {
+        com.opentasker.core.engine.variables.PersistentGlobalScope.set(projectId, name, value)
     }
 
-    fun deleteVariable(name: String) {
-        viewModelScope.launch {
-            db.variableDao().delete(VariableEntity(name, "", isGlobal = true))
-        }
+    fun deleteVariable(projectId: Long, name: String) {
+        com.opentasker.core.engine.variables.PersistentGlobalScope.unset(projectId, name)
     }
 
     private fun launchWithMessage(successMessage: String, block: suspend () -> Unit) {
@@ -766,43 +1131,152 @@ fun ActiveAutomationUi(
     val profiles by viewModel.profiles.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
     val scenes by viewModel.scenes.collectAsState()
+    val projects by viewModel.projects.collectAsState()
+    val projectFilter = viewModel.projectFilter
+    val currentProjectId = (projectFilter as? ProjectFilter.Of)?.projectId
+    val itemGroups by viewModel.itemGroups.collectAsState()
+    val itemMeta by viewModel.itemMeta.collectAsState()
+    fun groupOpsFor(tab: String, scoped: Boolean = true) = GroupOps(
+        // Project-scoped tabs show their groups under the SAME project filter as their items (so they
+        // appear whenever their members do, incl. "All"); unscoped tabs (widgets are global) show all.
+        groups = itemGroups.filter {
+            it.tab == tab && (!scoped || when (val f = projectFilter) {
+                is ProjectFilter.All -> true
+                is ProjectFilter.Unfiled -> it.projectId == null
+                is ProjectFilter.Of -> it.projectId == f.projectId
+            })
+        }.sortedBy { it.position },
+        groupIdOf = { key -> itemMeta.firstOrNull { it.tab == tab && it.itemKey == key }?.groupId },
+        projectId = if (scoped) currentProjectId else null,
+        setItemGroup = { key, gid -> viewModel.setItemGroup(tab, key, gid) },
+        createGroupForItem = { key, name ->
+            // Put the new group in the same project as the item, so it stays visible alongside it (even
+            // when created from the "All" filter). Fall back to the current filter / unscoped null.
+            val pid = when (tab) {
+                "tasks" -> tasks.firstOrNull { it.id.toString() == key }?.projectId
+                "profiles" -> profiles.firstOrNull { it.id.toString() == key }?.projectId
+                "scenes" -> scenes.firstOrNull { it.id.toString() == key }?.projectId
+                else -> null
+            } ?: if (scoped) currentProjectId else null
+            viewModel.moveItemToNewGroup(tab, pid, name, key)
+        },
+        createSubgroup = { parent, name -> viewModel.createGroup(parent.tab, parent.projectId, name, parent.id) },
+        setGroupParent = { g, pid -> viewModel.setGroupParent(g, pid) },
+        toggleGroup = { viewModel.toggleGroupExpanded(it) },
+        renameGroup = { g, n -> viewModel.renameGroup(g, n) },
+        deleteGroup = { viewModel.deleteGroup(it) },
+    )
+    // Name search for the list tabs (Profiles/Tasks/Scenes/Vars/Widgets): a case-insensitive filter
+    // folded into the visible lists below, so the header count, expand-all and selection all track it.
+    // Reset whenever the tab changes (see the LaunchedEffect after `screen`).
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val nameQuery = searchQuery.trim()
+    fun matchesSearch(name: String) = nameQuery.isEmpty() || name.contains(nameQuery, ignoreCase = true)
+    val visibleProfiles = when (projectFilter) {
+        ProjectFilter.All -> profiles
+        ProjectFilter.Unfiled -> profiles.filter { it.projectId == null }
+        is ProjectFilter.Of -> profiles.filter { it.projectId == projectFilter.projectId }
+    }.filter { matchesSearch(it.name) }
+    val visibleTasks = when (projectFilter) {
+        ProjectFilter.All -> tasks
+        ProjectFilter.Unfiled -> tasks.filter { it.projectId == null }
+        is ProjectFilter.Of -> tasks.filter { it.projectId == projectFilter.projectId }
+    }.filter { matchesSearch(it.name) }
+    val visibleScenes = when (projectFilter) {
+        ProjectFilter.All -> scenes
+        ProjectFilter.Unfiled -> scenes.filter { it.projectId == null }
+        is ProjectFilter.Of -> scenes.filter { it.projectId == projectFilter.projectId }
+    }.filter { matchesSearch(it.name) }
     val runLogs by viewModel.runLogs.collectAsState()
+    // Unread-failure dot on the Log nav icon: runLogs are timestamp-DESC, so the first failure is the
+    // newest; the dot shows while it's newer than what 白い熊 last saw (cleared on opening the Log tab).
+    val lastSeenFailureTs by RunLogSeenStore.state.collectAsState()
+    val newestFailureTs = remember(runLogs) { runLogs.firstOrNull { !it.success }?.timestamp ?: 0L }
+    val showLogBadge = newestFailureTs > lastSeenFailureTs
     val globalVariables by viewModel.globalVariables.collectAsState()
-    val runLogRetentionPolicy by viewModel.runLogRetentionPolicy.collectAsState()
-    val backupSetupState by viewModel.backupSetupState.collectAsState()
-    val storageDecodeIssues by viewModel.storageDecodeIssues.collectAsState()
+    // Vars tab honours the project filter: super-globals (projectId 0) are always shown; a selected
+    // project adds its own project-globals. (Variables are stored with projectId 0 or a project id.)
+    val visibleVariables = when (val f = projectFilter) {
+        ProjectFilter.All -> globalVariables
+        ProjectFilter.Unfiled -> globalVariables.filter { it.projectId == 0L }
+        is ProjectFilter.Of -> globalVariables.filter { it.projectId == 0L || it.projectId == f.projectId }
+    }.filter { matchesSearch(it.name) }
+    val allWidgetTemplates by com.opentasker.widget.TemplateStore.state.collectAsState()
+    val widgetTemplates = allWidgetTemplates.filter { matchesSearch(it.name) }
+    val runLogRetentionPolicy = viewModel.runLogRetentionPolicy
+    val backupSetupState = viewModel.backupSetupState
+    val themePrefs by ThemeStore.state.collectAsState()
+    val sortPrefs by ListSortStore.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    var screenOrdinal by rememberSaveable { mutableIntStateOf(0) }
-    val screen = OpenTaskerScreen.entries.getOrElse(screenOrdinal) { OpenTaskerScreen.Profiles }
-    var taskDialogId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
-    var showCreateTaskDialog by rememberSaveable { mutableStateOf(false) }
-    var profileDialogId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
-    var showCreateProfileDialog by rememberSaveable { mutableStateOf(false) }
-    var showTemplateDialog by rememberSaveable { mutableStateOf(false) }
-    val onboardingCompleted by OnboardingPreference.hasCompleted(context).collectAsState(initial = true)
-    LaunchedEffect(onboardingCompleted) {
-        if (!onboardingCompleted) {
-            showTemplateDialog = true
-            OnboardingPreference.markCompleted(context)
-        }
+    // Remember the last tab across restarts (the app otherwise always reopens on Profiles).
+    val uiStatePrefs = remember { context.getSharedPreferences("ui_state", android.content.Context.MODE_PRIVATE) }
+    var screen by remember {
+        mutableStateOf(
+            runCatching { OpenTaskerScreen.valueOf(uiStatePrefs.getString("last_tab", "") ?: "") }
+                .getOrDefault(OpenTaskerScreen.Profiles),
+        )
     }
-    var selectedTemplateId by rememberSaveable { mutableStateOf<String?>(null) }
-    var actionPickerTaskId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
-    var actionEditTaskId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
-    var actionEditActionId by rememberSaveable { mutableStateOf<String?>(null) }
-    var actionEditIndex by rememberSaveable { mutableIntStateOf(NO_DIALOG_INDEX) }
-    var contextPickerProfileId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
-    var contextEditProfileId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
-    var contextEditTypeName by rememberSaveable { mutableStateOf<String?>(null) }
-    var contextEditIndex by rememberSaveable { mutableIntStateOf(NO_DIALOG_INDEX) }
-    var pendingDeleteKind by rememberSaveable { mutableStateOf<String?>(null) }
-    var pendingDeleteOwnerId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
-    var pendingDeleteIndex by rememberSaveable { mutableIntStateOf(NO_DIALOG_INDEX) }
-    val taskerImportReview by viewModel.taskerImportReview.collectAsState()
-    val taskerImportBusy by viewModel.taskerImportBusy.collectAsState()
-    val openTaskerBundleReview by viewModel.openTaskerBundleReview.collectAsState()
-    val openTaskerBundleBusy by viewModel.openTaskerBundleBusy.collectAsState()
+    // Clear the name search when switching tabs so each list starts unfiltered; persist the tab choice.
+    LaunchedEffect(screen) {
+        searchQuery = ""
+        uiStatePrefs.edit().putString("last_tab", screen.name).apply()
+    }
+    var showUiCustomization by remember { mutableStateOf(false) }
+    var showProjectManagement by remember { mutableStateOf(false) }
+    var showTaskLibrary by remember { mutableStateOf(false) }
+    var moveTarget by remember { mutableStateOf<MoveTarget?>(null) }
+    // Bulk "move to project" for the active tab's multi-selection (Profiles/Tasks/Scenes only).
+    var bulkMoveTab by remember { mutableStateOf<OpenTaskerScreen?>(null) }
+    var exportRequest by remember { mutableStateOf<ExportRequest?>(null) }
+    var pendingExportWrite by remember { mutableStateOf<ExportRequest?>(null) }
+    var importConflict by remember { mutableStateOf<OpenTaskerBundle?>(null) }
+    // A bundle waiting for the item-name-conflict choice (rename / overwrite+delete / overwrite+backup),
+    // plus the project strategy already chosen (or default) before this step.
+    var importItemConflict by remember { mutableStateOf<OpenTaskerBundle?>(null) }
+    var pendingProjectStrategy by remember { mutableStateOf(ProjectConflictStrategy.MERGE) }
+    // Fold state hoisted to the root so it survives full-screen overlays (e.g. the action picker) and
+    // so the top-bar expand/collapse-all can drive whichever list tab is showing. Default = collapsed.
+    val expandedTasks = remember { mutableStateMapOf<Long, Boolean>() }
+    val expandedActions = remember { mutableStateMapOf<String, Boolean>() }
+    val expandedProfiles = remember { mutableStateMapOf<Long, Boolean>() }
+    val expandedScenes = remember { mutableStateMapOf<Long, Boolean>() }
+    val expandedTemplates = remember { mutableStateMapOf<String, Boolean>() }
+    val expandedVars = remember { mutableStateMapOf<String, Boolean>() }
+    // Help sections start collapsed; hoisted so the open/closed state survives leaving the tab.
+    val expandedHelpSections = remember { mutableStateMapOf<String, Boolean>() }
+    var taskDialog by remember { mutableStateOf<Task?>(null) }
+    var showCreateTaskDialog by remember { mutableStateOf(false) }
+    var profileDialog by remember { mutableStateOf<Profile?>(null) }
+    var showCreateProfileDialog by remember { mutableStateOf(false) }
+    var showTemplateDialog by remember { mutableStateOf(false) }
+    var selectedTemplate by remember { mutableStateOf<ProfileTemplate?>(null) }
+    var actionPickerTask by remember { mutableStateOf<Task?>(null) }
+    var actionEdit by remember { mutableStateOf<ActionEditState?>(null) }
+    var contextPickerProfile by remember { mutableStateOf<Profile?>(null) }
+    var contextEdit by remember { mutableStateOf<ContextEditState?>(null) }
+    var pendingDelete by remember { mutableStateOf<DeleteTarget?>(null) }
+    // Multi-select per tab: long-press an item to start, tap others to add/remove, then delete.
+    var selectedTaskIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var confirmDeleteSelectedTasks by remember { mutableStateOf(false) }
+    var selectedProfileIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var confirmDeleteSelectedProfiles by remember { mutableStateOf(false) }
+    var selectedSceneIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var confirmDeleteSelectedScenes by remember { mutableStateOf(false) }
+    var selectedTemplateNames by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var confirmDeleteSelectedTemplates by remember { mutableStateOf(false) }
+    var selectedVarKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var confirmDeleteSelectedVars by remember { mutableStateOf(false) }
+    // The "+" menu on the Scenes/Widgets tabs lives outside those screens; bumping a signal triggers
+    // each screen's own create dialog. Vars has no in-screen create, so its dialog lives here.
+    var sceneCreateSignal by remember { mutableIntStateOf(0) }
+    var widgetCreateSignal by remember { mutableIntStateOf(0) }
+    var showNewVarDialog by remember { mutableStateOf(false) }
+    var newGroupTab by remember { mutableStateOf<String?>(null) } // tab a "+ New group" was tapped on
+    val taskerImportReview = viewModel.taskerImportReview
+    val taskerImportBusy = viewModel.taskerImportBusy
+    val openTaskerBundleReview = viewModel.openTaskerBundleReview
+    val openTaskerBundleBusy = viewModel.openTaskerBundleBusy
     val taskerXmlLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.previewTaskerXml(it, BuildConfig.VERSION_NAME) }
     }
@@ -814,6 +1288,25 @@ fun ActiveAutomationUi(
     val openTaskerBundleImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.previewOpenTaskerBundle(it) }
     }
+    val selectiveExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        val req = pendingExportWrite
+        pendingExportWrite = null
+        if (uri != null && req != null) {
+            viewModel.exportSelectionBundle(
+                uri = uri,
+                appVersion = BuildConfig.VERSION_NAME,
+                profileIds = req.profileIds,
+                taskIds = req.taskIds,
+                sceneIds = req.sceneIds,
+                includeVariables = req.includeVariables,
+                name = req.name,
+                templateNames = req.templateNames,
+                variableKeys = req.variableKeys,
+            )
+        }
+    }
     val databaseBackupExportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri ->
@@ -822,135 +1315,13 @@ fun ActiveAutomationUi(
     val databaseBackupImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.importDatabaseBackup(it) }
     }
-    val taskDialog = taskDialogId.takeIf { it != NO_DIALOG_ENTITY_ID }
-        ?.let { taskId -> tasks.firstOrNull { it.id == taskId } }
-    val profileDialog = profileDialogId.takeIf { it != NO_DIALOG_ENTITY_ID }
-        ?.let { profileId -> profiles.firstOrNull { it.id == profileId } }
-    val selectedTemplate = selectedTemplateId
-        ?.let { templateId -> ProfileTemplateCatalog.all.firstOrNull { it.id == templateId } }
-    val actionPickerTask = actionPickerTaskId.takeIf { it != NO_DIALOG_ENTITY_ID }
-        ?.let { taskId -> tasks.firstOrNull { it.id == taskId } }
-    val actionEdit = actionEditTaskId.takeIf { it != NO_DIALOG_ENTITY_ID }?.let { taskId ->
-        val task = tasks.firstOrNull { it.id == taskId } ?: return@let null
-        val actionId = actionEditActionId ?: return@let null
-        val metadata = ActionMetadataRegistry.get(actionId) ?: return@let null
-        val index = actionEditIndex.takeIf { it != NO_DIALOG_INDEX }
-        val existing = index?.let { task.actions.getOrNull(it) }?.takeIf { it.type == actionId }
-        if (index != null && existing == null) {
-            null
-        } else {
-            ActionEditState(task = task, metadata = metadata, index = index, existing = existing)
-        }
-    }
-    val contextPickerProfile = contextPickerProfileId.takeIf { it != NO_DIALOG_ENTITY_ID }
-        ?.let { profileId -> profiles.firstOrNull { it.id == profileId } }
-    val contextEdit = contextEditProfileId.takeIf { it != NO_DIALOG_ENTITY_ID }?.let { profileId ->
-        val profile = profiles.firstOrNull { it.id == profileId } ?: return@let null
-        val type = contextEditTypeName
-            ?.let { typeName -> runCatching { ContextType.valueOf(typeName) }.getOrNull() }
-            ?: return@let null
-        val index = contextEditIndex.takeIf { it != NO_DIALOG_INDEX }
-        val existing = index?.let { profile.contexts.getOrNull(it) }?.takeIf { it.type == type }
-        if (index != null && existing == null) {
-            null
-        } else {
-            ContextEditState(profile = profile, type = type, index = index, existing = existing)
-        }
-    }
-    val pendingDelete = when (pendingDeleteKind) {
-        DELETE_TARGET_PROFILE -> profiles.firstOrNull { it.id == pendingDeleteOwnerId }
-            ?.let { DeleteTarget.ProfileTarget(it) }
-        DELETE_TARGET_TASK -> tasks.firstOrNull { it.id == pendingDeleteOwnerId }
-            ?.let { DeleteTarget.TaskTarget(it) }
-        DELETE_TARGET_SCENE -> scenes.firstOrNull { it.id == pendingDeleteOwnerId }
-            ?.let { DeleteTarget.SceneTarget(it) }
-        DELETE_TARGET_ACTION -> tasks.firstOrNull { it.id == pendingDeleteOwnerId }
-            ?.let { task -> task.actions.getOrNull(pendingDeleteIndex)?.let { DeleteTarget.ActionTarget(task, pendingDeleteIndex, it) } }
-        DELETE_TARGET_CONTEXT -> profiles.firstOrNull { it.id == pendingDeleteOwnerId }
-            ?.let { profile -> profile.contexts.getOrNull(pendingDeleteIndex)?.let { DeleteTarget.ContextTarget(profile, pendingDeleteIndex, it) } }
-        else -> null
-    }
-    fun clearPendingDelete() {
-        pendingDeleteKind = null
-        pendingDeleteOwnerId = NO_DIALOG_ENTITY_ID
-        pendingDeleteIndex = NO_DIALOG_INDEX
-    }
-    fun openTaskDialog(task: Task) {
-        taskDialogId = task.id
-    }
-    fun clearTaskDialog() {
-        taskDialogId = NO_DIALOG_ENTITY_ID
-    }
-    fun openProfileDialog(profile: Profile) {
-        profileDialogId = profile.id
-    }
-    fun clearProfileDialog() {
-        profileDialogId = NO_DIALOG_ENTITY_ID
-    }
-    fun openActionPicker(task: Task) {
-        actionPickerTaskId = task.id
-    }
-    fun clearActionPicker() {
-        actionPickerTaskId = NO_DIALOG_ENTITY_ID
-    }
-    fun openActionEdit(task: Task, metadata: ActionMetadata, index: Int? = null) {
-        actionEditTaskId = task.id
-        actionEditActionId = metadata.id
-        actionEditIndex = index ?: NO_DIALOG_INDEX
-    }
-    fun clearActionEdit() {
-        actionEditTaskId = NO_DIALOG_ENTITY_ID
-        actionEditActionId = null
-        actionEditIndex = NO_DIALOG_INDEX
-    }
-    fun openContextPicker(profile: Profile) {
-        contextPickerProfileId = profile.id
-    }
-    fun clearContextPicker() {
-        contextPickerProfileId = NO_DIALOG_ENTITY_ID
-    }
-    fun openContextEdit(profile: Profile, type: ContextType, index: Int? = null) {
-        contextEditProfileId = profile.id
-        contextEditTypeName = type.name
-        contextEditIndex = index ?: NO_DIALOG_INDEX
-    }
-    fun clearContextEdit() {
-        contextEditProfileId = NO_DIALOG_ENTITY_ID
-        contextEditTypeName = null
-        contextEditIndex = NO_DIALOG_INDEX
-    }
-    fun openDeleteProfile(profile: Profile) {
-        pendingDeleteKind = DELETE_TARGET_PROFILE
-        pendingDeleteOwnerId = profile.id
-        pendingDeleteIndex = NO_DIALOG_INDEX
-    }
-    fun openDeleteTask(task: Task) {
-        pendingDeleteKind = DELETE_TARGET_TASK
-        pendingDeleteOwnerId = task.id
-        pendingDeleteIndex = NO_DIALOG_INDEX
-    }
-    fun openDeleteScene(scene: Scene) {
-        pendingDeleteKind = DELETE_TARGET_SCENE
-        pendingDeleteOwnerId = scene.id
-        pendingDeleteIndex = NO_DIALOG_INDEX
-    }
-    fun openDeleteAction(task: Task, index: Int) {
-        pendingDeleteKind = DELETE_TARGET_ACTION
-        pendingDeleteOwnerId = task.id
-        pendingDeleteIndex = index
-    }
-    fun openDeleteContext(profile: Profile, index: Int) {
-        pendingDeleteKind = DELETE_TARGET_CONTEXT
-        pendingDeleteOwnerId = profile.id
-        pendingDeleteIndex = index
-    }
     val openFlowTarget: (AutomationFlowTarget) -> Unit = { target ->
         var opened = true
         when (target) {
             is AutomationFlowTarget.Profile -> {
                 profiles.firstOrNull { it.id == target.profileId }?.let { profile ->
-                    screenOrdinal = OpenTaskerScreen.Profiles.ordinal
-                    openProfileDialog(profile)
+                    screen = OpenTaskerScreen.Profiles
+                    profileDialog = profile
                 } ?: run { opened = false }
             }
 
@@ -958,8 +1329,8 @@ fun ActiveAutomationUi(
                 val profile = profiles.firstOrNull { it.id == target.profileId }
                 val contextSpec = profile?.contexts?.getOrNull(target.index)
                 if (profile != null && contextSpec != null) {
-                    screenOrdinal = OpenTaskerScreen.Profiles.ordinal
-                    openContextEdit(profile, contextSpec.type, target.index)
+                    screen = OpenTaskerScreen.Profiles
+                    contextEdit = ContextEditState(profile, contextSpec.type, target.index, contextSpec)
                 } else {
                     opened = false
                 }
@@ -967,8 +1338,8 @@ fun ActiveAutomationUi(
 
             is AutomationFlowTarget.Task -> {
                 tasks.firstOrNull { it.id == target.taskId }?.let { task ->
-                    screenOrdinal = OpenTaskerScreen.Tasks.ordinal
-                    openTaskDialog(task)
+                    screen = OpenTaskerScreen.Tasks
+                    taskDialog = task
                 } ?: run { opened = false }
             }
 
@@ -977,8 +1348,8 @@ fun ActiveAutomationUi(
                 val action = task?.actions?.getOrNull(target.index)
                 val metadata = action?.let { ActionMetadataRegistry.get(it.type) }
                 if (task != null && action != null && metadata != null) {
-                    screenOrdinal = OpenTaskerScreen.Tasks.ordinal
-                    openActionEdit(task, metadata, target.index)
+                    screen = OpenTaskerScreen.Tasks
+                    actionEdit = ActionEditState(task, metadata, target.index, action)
                 } else {
                     opened = false
                 }
@@ -992,29 +1363,127 @@ fun ActiveAutomationUi(
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
+    // Switching tabs clears any in-progress multi-selection.
+    LaunchedEffect(screen) {
+        selectedTaskIds = emptySet()
+        selectedProfileIds = emptySet()
+        selectedSceneIds = emptySet()
+        selectedTemplateNames = emptySet()
+        selectedVarKeys = emptySet()
+    }
+    // Opening the Log tab marks all current failures as seen (clears the nav dot).
+    LaunchedEffect(screen, newestFailureTs) {
+        if (screen == OpenTaskerScreen.RunLog) RunLogSeenStore.markSeen(newestFailureTs)
+    }
 
-    var showMoreDestinations by rememberSaveable { mutableStateOf(false) }
     val headerDetail = when (screen) {
-        OpenTaskerScreen.Profiles -> "${profiles.count { it.enabled }} enabled - ${profiles.size} total"
-        OpenTaskerScreen.Tasks -> "${tasks.sumOf { it.actions.size }} actions - ${tasks.size} tasks"
-        OpenTaskerScreen.Vars -> "${globalVariables.size} global variables"
+        OpenTaskerScreen.Monitor -> "Engine liveness & history"
+        // Counts mirror the *visible* (project-filtered) list so the header never disagrees with what's shown.
+        OpenTaskerScreen.Profiles -> "${visibleProfiles.count { it.enabled }} enabled - ${visibleProfiles.size} total"
+        OpenTaskerScreen.Tasks -> "${visibleTasks.sumOf { it.actions.size }} actions - ${visibleTasks.size} tasks"
+        OpenTaskerScreen.Vars -> "${visibleVariables.size} variables"
         OpenTaskerScreen.Flow -> "${profiles.size} profiles - ${tasks.size} tasks"
-        OpenTaskerScreen.Scenes -> "${scenes.sumOf { it.elements.size }} elements - ${scenes.size} scenes"
+        OpenTaskerScreen.Scenes -> "${visibleScenes.sumOf { it.elements.size }} elements - ${visibleScenes.size} scenes"
+        OpenTaskerScreen.Widgets -> "${widgetTemplates.size} widget templates"
         OpenTaskerScreen.Inspector -> "Live context health"
         OpenTaskerScreen.Setup -> "Permission and reliability checks"
         OpenTaskerScreen.RunLog -> "${runLogs.size} recent entries"
+        OpenTaskerScreen.Help -> "Schema & action reference"
+    }
+
+    if (showUiCustomization) {
+        UiCustomizationScreen(onBack = { showUiCustomization = false })
+        return
+    }
+
+    if (showProjectManagement) {
+        ProjectsManagementScreen(
+            projects = projects,
+            memberCount = { pid ->
+                profiles.count { it.projectId == pid } +
+                    tasks.count { it.projectId == pid } +
+                    scenes.count { it.projectId == pid }
+            },
+            sortMethod = sortPrefs.projects,
+            onToggleSort = {
+                ListSortStore.set(
+                    SortTab.PROJECTS,
+                    if (sortPrefs.projects == SortMethod.MANUAL) SortMethod.ALPHABETICAL else SortMethod.MANUAL,
+                )
+            },
+            onBack = { showProjectManagement = false },
+            onImport = {
+                showProjectManagement = false
+                openTaskerBundleImportLauncher.launch(OPEN_TASKER_BUNDLE_MIME_TYPES)
+            },
+            onCreate = { name, color -> viewModel.createProject(name, color) },
+            onUpdate = { viewModel.updateProject(it) },
+            onDelete = { project, deleteItems -> viewModel.deleteProject(project, deleteItems) },
+            onMoveUp = { viewModel.moveProject(it, up = true) },
+            onMoveDown = { viewModel.moveProject(it, up = false) },
+            onExportProject = { project ->
+                showProjectManagement = false
+                exportRequest = ExportRequest(
+                    name = "Project: ${project.name}",
+                    fileName = exportFileName(project.name),
+                    profileIds = profiles.filter { it.projectId == project.id }.map { it.id }.toSet(),
+                    taskIds = tasks.filter { it.projectId == project.id }.map { it.id }.toSet(),
+                    sceneIds = scenes.filter { it.projectId == project.id }.map { it.id }.toSet(),
+                )
+            },
+        )
+        return
+    }
+
+    val pickerTask = actionPickerTask
+    if (pickerTask != null && themePrefs.advancedActionPicker) {
+        AdvancedActionPickerScreen(
+            onDismiss = { actionPickerTask = null },
+            onSelect = { metadata ->
+                actionPickerTask = null
+                actionEdit = ActionEditState(pickerTask, metadata)
+            },
+        )
+        return
     }
 
     Scaffold(
-        modifier = modifier
-            .fillMaxSize()
-            .imePadding(),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        modifier = modifier.fillMaxSize(),
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                // Fully custom flash: fill + border live on the SAME Surface node so the box is
+                // opaque (the default Snackbar overload inserts padding between the border and the
+                // fill, leaving a see-through ring). All attributes are theme-configurable.
+                val flashShape = RoundedCornerShape(themePrefs.flashCornerRadiusDp.dp)
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Surface(
+                        shape = flashShape,
+                        color = Color(themePrefs.flashBackground),
+                        contentColor = Color(themePrefs.flashText),
+                        border = if (themePrefs.flashBorderWidthDp > 0) {
+                            BorderStroke(themePrefs.flashBorderWidthDp.dp, Color(themePrefs.flashBorder))
+                        } else null,
+                    ) {
+                        Text(
+                            text = data.visuals.message,
+                            color = Color(themePrefs.flashText),
+                            fontSize = themePrefs.flashTextSizeSp.sp,
+                            fontWeight = FontWeight(themePrefs.flashFontWeight),
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                        )
+                    }
+                }
+            }
+        },
         topBar = {
+          Column(Modifier.background(MaterialTheme.colorScheme.background)) {
             TopAppBar(
                 title = {
                     Column {
-                        Text("OpenTasker", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("白い熊 自由作業盤", maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
                             "${screen.label} - $headerDetail",
                             style = MaterialTheme.typography.labelMedium,
@@ -1024,140 +1493,362 @@ fun ActiveAutomationUi(
                         )
                     }
                 },
+                actions = {
+                    if (screen == OpenTaskerScreen.Tasks) {
+                        IconButton(onClick = { showTaskLibrary = true }) {
+                            Icon(Icons.Filled.Info, contentDescription = "Task library")
+                        }
+                    }
+                    // Expand / collapse every card on the current list tab (handy with many items).
+                    val expandAll: Pair<Boolean, () -> Unit>? = when (screen) {
+                        OpenTaskerScreen.Profiles -> expandAllControl(expandedProfiles, visibleProfiles.map { it.id })
+                        OpenTaskerScreen.Tasks -> expandAllControl(expandedTasks, visibleTasks.map { it.id })
+                        OpenTaskerScreen.Scenes -> expandAllControl(expandedScenes, visibleScenes.map { it.id })
+                        OpenTaskerScreen.Widgets -> expandAllControl(expandedTemplates, widgetTemplates.map { it.name })
+                        OpenTaskerScreen.Vars -> expandAllControl(expandedVars, visibleVariables.map { variableKey(it) })
+                        else -> null
+                    }
+                    if (expandAll != null) {
+                        IconButton(onClick = expandAll.second) {
+                            Icon(
+                                if (expandAll.first) Icons.Filled.UnfoldLess else Icons.Filled.UnfoldMore,
+                                contentDescription = if (expandAll.first) "Collapse all" else "Expand all",
+                            )
+                        }
+                    }
+                    val sortTab = when (screen) {
+                        OpenTaskerScreen.Profiles -> SortTab.PROFILES
+                        OpenTaskerScreen.Tasks -> SortTab.TASKS
+                        OpenTaskerScreen.Scenes -> SortTab.SCENES
+                        else -> null
+                    }
+                    if (sortTab != null) {
+                        val method = sortPrefs.of(sortTab)
+                        val alpha = method == SortMethod.ALPHABETICAL
+                        IconButton(onClick = {
+                            ListSortStore.set(sortTab, if (alpha) SortMethod.MANUAL else SortMethod.ALPHABETICAL)
+                        }) {
+                            Icon(
+                                if (alpha) Icons.Filled.SortByAlpha else Icons.Filled.FormatListNumbered,
+                                contentDescription = if (alpha) "Sorting: alphabetical (tap for manual)" else "Sorting: manual (tap for alphabetical)",
+                            )
+                        }
+                    }
+                    // Project selector is shown on every tab so the top bar is uniform. It always sets
+                    // the active project (where new items land); on non-project tabs it doesn't filter.
+                    ProjectSwitcher(
+                        filter = projectFilter,
+                        projects = projects,
+                        onSelect = { viewModel.selectProject(it) },
+                        onManage = { showProjectManagement = true },
+                        onExportEverything = { openTaskerBundleExportLauncher.launch(openTaskerBundleExportName()) },
+                    )
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
+                    containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.background,
                 ),
             )
+            // Pinned name-search bar, uniform across the list tabs.
+            if (screen == OpenTaskerScreen.Profiles || screen == OpenTaskerScreen.Tasks ||
+                screen == OpenTaskerScreen.Scenes || screen == OpenTaskerScreen.Vars ||
+                screen == OpenTaskerScreen.Widgets
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .padding(bottom = 8.dp),
+                    placeholder = { Text("Search ${screen.label.lowercase()}…") },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    trailingIcon = if (searchQuery.isNotEmpty()) {
+                        { IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Filled.Clear, contentDescription = "Clear search") } }
+                    } else null,
+                    singleLine = true,
+                )
+            }
+          }
         },
         floatingActionButton = {
-            when (screen) {
-                OpenTaskerScreen.Profiles -> ExtendedFloatingActionButton(
-                    onClick = {
-                        if (tasks.isEmpty()) {
-                            showCreateTaskDialog = true
-                        } else {
-                            showCreateProfileDialog = true
-                        }
+            // Uniform per-tab "+" menu: New <item> / Import JSON / Import Tasker (where it applies) /
+            // Export. Every import routes through the one unified bundle flow; export reuses ExportRequest.
+            val importJson = TabAction("Import JSON…", Icons.Filled.Download) {
+                openTaskerBundleImportLauncher.launch(OPEN_TASKER_BUNDLE_MIME_TYPES)
+            }
+            val importTasker = TabAction("Import Tasker XML…", Icons.Filled.SwapHoriz) {
+                taskerXmlLauncher.launch(TASKER_XML_MIME_TYPES)
+            }
+            val actions: List<TabAction> = when (screen) {
+                OpenTaskerScreen.Profiles -> listOf(
+                    TabAction(if (tasks.isEmpty()) "New profile (needs a task)" else "New profile", Icons.Filled.Add) {
+                        if (tasks.isEmpty()) showCreateTaskDialog = true else showCreateProfileDialog = true
                     },
-                    shape = RoundedCornerShape(DesignSystem.Radii.lg),
-                    icon = {
-                        Icon(
-                            Icons.Filled.Add,
-                            contentDescription = if (tasks.isEmpty()) "Create task icon" else "Create profile icon",
+                    TabAction("From template…", Icons.Filled.Dashboard) { showTemplateDialog = true },
+                    TabAction("New group", Icons.Filled.CreateNewFolder) { newGroupTab = "profiles" },
+                    importJson,
+                    importTasker,
+                    TabAction("Export profiles…", Icons.Filled.Upload) {
+                        exportRequest = ExportRequest(
+                            name = "All profiles (${visibleProfiles.size})",
+                            fileName = exportFileName("profiles"),
+                            profileIds = visibleProfiles.map { it.id }.toSet(),
                         )
                     },
-                    text = { Text(if (tasks.isEmpty()) "New task" else "New profile") },
                 )
 
-                OpenTaskerScreen.Tasks -> ExtendedFloatingActionButton(
-                    onClick = { showCreateTaskDialog = true },
-                    shape = RoundedCornerShape(DesignSystem.Radii.lg),
-                    icon = { Icon(Icons.Filled.Add, contentDescription = "Create task icon") },
-                    text = { Text("New task") },
+                OpenTaskerScreen.Tasks -> listOf(
+                    TabAction("New task", Icons.Filled.Add) { showCreateTaskDialog = true },
+                    TabAction("New group", Icons.Filled.CreateNewFolder) { newGroupTab = "tasks" },
+                    importJson,
+                    importTasker,
+                    TabAction("Export tasks…", Icons.Filled.Upload) {
+                        exportRequest = ExportRequest(
+                            name = "All tasks (${visibleTasks.size})",
+                            fileName = exportFileName("tasks"),
+                            taskIds = visibleTasks.map { it.id }.toSet(),
+                        )
+                    },
                 )
 
-                OpenTaskerScreen.Vars,
+                OpenTaskerScreen.Scenes -> listOf(
+                    TabAction("New scene", Icons.Filled.Add) { sceneCreateSignal++ },
+                    TabAction("New group", Icons.Filled.CreateNewFolder) { newGroupTab = "scenes" },
+                    importJson,
+                    TabAction("Export scenes…", Icons.Filled.Upload) {
+                        exportRequest = ExportRequest(
+                            name = "All scenes (${visibleScenes.size})",
+                            fileName = exportFileName("scenes"),
+                            sceneIds = visibleScenes.map { it.id }.toSet(),
+                        )
+                    },
+                )
+
+                OpenTaskerScreen.Widgets -> listOf(
+                    TabAction("New widget template", Icons.Filled.Add) { widgetCreateSignal++ },
+                    TabAction("New group", Icons.Filled.CreateNewFolder) { newGroupTab = "widgets" },
+                    importJson,
+                    TabAction("Export templates…", Icons.Filled.Upload) {
+                        exportRequest = ExportRequest(
+                            name = "All widget templates (${widgetTemplates.size})",
+                            fileName = exportFileName("widget templates"),
+                            templateNames = widgetTemplates.map { it.name }.toSet(),
+                        )
+                    },
+                )
+
+                OpenTaskerScreen.Vars -> listOf(
+                    TabAction("New variable…", Icons.Filled.Add) { showNewVarDialog = true },
+                    TabAction("New group", Icons.Filled.CreateNewFolder) { newGroupTab = "vars" },
+                    importJson,
+                    TabAction("Export variables…", Icons.Filled.Upload) {
+                        exportRequest = ExportRequest(
+                            name = "All variables (${globalVariables.size})",
+                            fileName = exportFileName("variables"),
+                            variableKeys = globalVariables.map { variableKey(it) }.toSet(),
+                        )
+                    },
+                )
+
+                OpenTaskerScreen.Monitor,
                 OpenTaskerScreen.Flow,
-                OpenTaskerScreen.Scenes,
                 OpenTaskerScreen.Inspector,
                 OpenTaskerScreen.Setup,
-                OpenTaskerScreen.RunLog -> Unit
+                OpenTaskerScreen.RunLog,
+                OpenTaskerScreen.Help -> emptyList()
             }
+            TabActionsFab(actions)
         },
         bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-                tonalElevation = 0.dp,
-            ) {
-                primaryNavigationScreens.forEach { destination ->
-                    OpenTaskerNavigationItem(
-                        selected = screen == destination,
-                        onClick = {
-                            screenOrdinal = destination.ordinal
-                            showMoreDestinations = false
-                        },
-                        icon = destination.icon(),
-                        label = destination.label,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                Box(Modifier.weight(1f)) {
-                    OpenTaskerNavigationItem(
-                        selected = screen in secondaryNavigationScreens,
-                        onClick = { showMoreDestinations = true },
-                        icon = Icons.Filled.Menu,
-                        label = "More",
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    DropdownMenu(
-                        expanded = showMoreDestinations,
-                        onDismissRequest = { showMoreDestinations = false },
-                        modifier = Modifier.align(Alignment.TopEnd),
+            Column(Modifier.background(MaterialTheme.colorScheme.background)) {
+                HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.primary)
+                // The bar carries 10 tabs, which crowd a narrow screen, so it scrolls horizontally; a
+                // fade + chevron at each edge signals when there's more beyond it.
+                val navScroll = rememberScrollState()
+                val primary = MaterialTheme.colorScheme.primary
+                val background = MaterialTheme.colorScheme.background
+                Box(Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .horizontalScroll(navScroll)
+                            .navigationBarsPadding()
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        secondaryNavigationScreens.forEach { destination ->
-                            DropdownMenuItem(
-                                text = { Text(destination.label) },
-                                leadingIcon = { Icon(destination.icon(), contentDescription = destination.label) },
-                                onClick = {
-                                    screenOrdinal = destination.ordinal
-                                    showMoreDestinations = false
-                                },
-                            )
+                        OpenTaskerScreen.entries.forEach { destination ->
+                            val selected = screen == destination
+                            val icon = when (destination) {
+                                OpenTaskerScreen.Monitor -> Icons.Filled.MonitorHeart
+                                OpenTaskerScreen.Profiles -> Icons.Filled.CheckCircle
+                                OpenTaskerScreen.Tasks -> Icons.Filled.Edit
+                                OpenTaskerScreen.Vars -> Icons.Filled.Menu
+                                OpenTaskerScreen.Flow -> Icons.Filled.Info
+                                OpenTaskerScreen.Scenes -> Icons.Filled.Edit
+                                OpenTaskerScreen.Widgets -> Icons.Filled.Menu
+                                OpenTaskerScreen.Inspector -> Icons.Filled.Info
+                                OpenTaskerScreen.Setup -> Icons.Filled.Settings
+                                OpenTaskerScreen.RunLog -> Icons.Filled.Info
+                                OpenTaskerScreen.Help -> Icons.Filled.Info
+                            }
+                            val tapModifier = if (destination == OpenTaskerScreen.Setup) {
+                                // Long-press the Setup cog jumps straight to the UI page; tap selects it.
+                                Modifier.pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onTap = { screen = OpenTaskerScreen.Setup },
+                                        onLongPress = { showUiCustomization = true },
+                                    )
+                                }
+                            } else {
+                                Modifier.clickable { screen = destination }
+                            }
+                            Column(
+                                modifier = Modifier
+                                    .widthIn(min = 68.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .then(tapModifier)
+                                    .background(if (selected) primary.copy(alpha = 0.16f) else Color.Transparent)
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(2.dp),
+                            ) {
+                                if (destination == OpenTaskerScreen.RunLog && showLogBadge) {
+                                    BadgedBox(badge = { Badge() }) { Icon(icon, contentDescription = null, tint = primary) }
+                                } else {
+                                    Icon(icon, contentDescription = null, tint = primary)
+                                }
+                                Text(
+                                    destination.label,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = primary,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
+                    // Edge fades + chevrons — only when there's scrollable content past that edge.
+                    // Each sits in a matchParentSize box so it tracks the ROW's height; using
+                    // fillMaxHeight directly would inflate to the Scaffold's loose max (the whole screen),
+                    // which on a narrow/folded screen (where the bar overflows) covered the entire UI.
+                    if (navScroll.canScrollBackward) {
+                        Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterStart) {
+                            Box(
+                                Modifier.fillMaxHeight().width(28.dp)
+                                    .background(Brush.horizontalGradient(listOf(background, Color.Transparent))),
+                                contentAlignment = Alignment.CenterStart,
+                            ) {
+                                Icon(Icons.Filled.ChevronLeft, contentDescription = null, tint = primary)
+                            }
+                        }
+                    }
+                    if (navScroll.canScrollForward) {
+                        Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
+                            Box(
+                                Modifier.fillMaxHeight().width(28.dp)
+                                    .background(Brush.horizontalGradient(listOf(Color.Transparent, background))),
+                                contentAlignment = Alignment.CenterEnd,
+                            ) {
+                                Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = primary)
+                            }
                         }
                     }
                 }
             }
         },
     ) { innerPadding ->
+        // A horizontal swipe across the page switches to the previous / next tab (pager-like). Vertical
+        // list scrolling is a different axis, so it isn't disturbed.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    val threshold = 64.dp.toPx()
+                    var total = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { total = 0f },
+                        onHorizontalDrag = { _, d -> total += d },
+                        onDragEnd = {
+                            val e = OpenTaskerScreen.entries
+                            val i = screen.ordinal
+                            if (total <= -threshold) screen = e[(i + 1) % e.size]
+                            else if (total >= threshold) screen = e[(i - 1 + e.size) % e.size]
+                        },
+                    )
+                },
+        ) {
         when (screen) {
             OpenTaskerScreen.Profiles -> ProfilesScreen(
-                profiles = profiles,
+                profiles = visibleProfiles,
                 tasks = tasks,
-                runLogs = runLogs,
-                storageDecodeIssues = storageDecodeIssues,
+                expandedProfiles = expandedProfiles,
                 onCreateTaskFirst = {
-                    screenOrdinal = OpenTaskerScreen.Tasks.ordinal
+                    screen = OpenTaskerScreen.Tasks
                     showCreateTaskDialog = true
                 },
                 onCreateProfile = { showCreateProfileDialog = true },
-                onBrowseTemplates = { showTemplateDialog = true },
-                onExportOpenTaskerBundle = { openTaskerBundleExportLauncher.launch(openTaskerBundleExportName()) },
-                onImportOpenTaskerBundle = { openTaskerBundleImportLauncher.launch(OPEN_TASKER_BUNDLE_MIME_TYPES) },
-                openTaskerBundleBusy = openTaskerBundleBusy,
-                onImportTaskerXml = { taskerXmlLauncher.launch(TASKER_XML_MIME_TYPES) },
-                taskerImportBusy = taskerImportBusy,
-                onEditProfile = { openProfileDialog(it) },
-                onDeleteProfile = { openDeleteProfile(it) },
+                onEditProfile = { profileDialog = it },
+                onDeleteProfile = { pendingDelete = DeleteTarget.ProfileTarget(it) },
                 onToggleProfile = { profile, enabled ->
                     viewModel.updateProfile(profile.copy(enabled = enabled), "Profile ${if (enabled) "enabled" else "disabled"}")
                 },
-                onAddContext = { openContextPicker(it) },
+                onAddContext = { contextPickerProfile = it },
                 onEditContext = { profile, index, context ->
-                    openContextEdit(profile, context.type, index)
+                    contextEdit = ContextEditState(profile, context.type, index, context)
                 },
                 onDeleteContext = { profile, index ->
-                    if (profile.contexts.getOrNull(index) != null) openDeleteContext(profile, index)
+                    profile.contexts.getOrNull(index)?.let { context ->
+                        pendingDelete = DeleteTarget.ContextTarget(profile, index, context)
+                    }
                 },
+                onMoveProfile = { moveTarget = MoveTarget.ProfileMove(it) },
+                onExportProfile = { exportRequest = ExportRequest(name = "Profile: ${it.name}", fileName = exportFileName(it.name), profileIds = setOf(it.id)) },
+                manualSort = sortPrefs.profiles == SortMethod.MANUAL,
+                onReorder = { viewModel.reorderProfiles(it) },
+                selectedIds = selectedProfileIds,
+                onLongPressProfile = { selectedProfileIds = selectedProfileIds + it.id },
+                onToggleSelectProfile = { selectedProfileIds = if (it.id in selectedProfileIds) selectedProfileIds - it.id else selectedProfileIds + it.id },
+                onSelectAllProfiles = { selectedProfileIds = visibleProfiles.map { it.id }.toSet() },
+                onClearProfileSelection = { selectedProfileIds = emptySet() },
+                onDeleteSelectedProfiles = { confirmDeleteSelectedProfiles = true },
+                onMoveSelectedToProject = { bulkMoveTab = OpenTaskerScreen.Profiles },
+                groupOps = groupOpsFor("profiles"),
                 contentPadding = innerPadding,
             )
 
             OpenTaskerScreen.Tasks -> TasksScreen(
-                tasks = tasks,
-                storageDecodeIssues = storageDecodeIssues,
+                tasks = visibleTasks,
+                expandedTasks = expandedTasks,
+                expandedActions = expandedActions,
                 onCreateTask = { showCreateTaskDialog = true },
-                onEditTask = { openTaskDialog(it) },
-                onDeleteTask = { openDeleteTask(it) },
+                onEditTask = { taskDialog = it },
+                onDeleteTask = { pendingDelete = DeleteTarget.TaskTarget(it) },
                 onRunTask = { viewModel.runTaskNow(it) },
                 onPinTask = { viewModel.pinTaskShortcut(it) },
-                onAddAction = { openActionPicker(it) },
+                onAddAction = { actionPickerTask = it },
                 onEditAction = { task, index, action ->
                     ActionMetadataRegistry.get(action.type)?.let { metadata ->
-                        openActionEdit(task, metadata, index)
+                        actionEdit = ActionEditState(task, metadata, index, action)
                     }
                 },
                 onDeleteAction = { task, index ->
-                    if (task.actions.getOrNull(index) != null) openDeleteAction(task, index)
+                    task.actions.getOrNull(index)?.let { action ->
+                        pendingDelete = DeleteTarget.ActionTarget(task, index, action)
+                    }
                 },
+                onMoveTask = { moveTarget = MoveTarget.TaskMove(it) },
+                onExportTask = { exportRequest = ExportRequest(name = "Task: ${it.name}", fileName = exportFileName(it.name), taskIds = setOf(it.id)) },
+                onReorderAction = { task, newOrder -> viewModel.updateTask(task.copy(actions = newOrder), "Actions reordered") },
+                manualSort = sortPrefs.tasks == SortMethod.MANUAL,
+                onReorder = { viewModel.reorderTasks(it) },
+                selectedIds = selectedTaskIds,
+                onLongPressTask = { selectedTaskIds = selectedTaskIds + it.id },
+                onToggleSelectTask = { selectedTaskIds = if (it.id in selectedTaskIds) selectedTaskIds - it.id else selectedTaskIds + it.id },
+                onSelectAllTasks = { selectedTaskIds = visibleTasks.map { it.id }.toSet() },
+                onClearTaskSelection = { selectedTaskIds = emptySet() },
+                onDeleteSelectedTasks = { confirmDeleteSelectedTasks = true },
+                onMoveSelectedToProject = { bulkMoveTab = OpenTaskerScreen.Tasks },
+                groupOps = groupOpsFor("tasks"),
                 contentPadding = innerPadding,
             )
 
@@ -1169,8 +1860,8 @@ fun ActiveAutomationUi(
                 onAddContext = { profileId ->
                     val profile = profiles.firstOrNull { it.id == profileId }
                     if (profile != null) {
-                        screenOrdinal = OpenTaskerScreen.Profiles.ordinal
-                        openContextPicker(profile)
+                        screen = OpenTaskerScreen.Profiles
+                        contextPickerProfile = profile
                     } else {
                         scope.launch { snackbarHostState.showSnackbar("Flow target no longer exists") }
                     }
@@ -1178,8 +1869,8 @@ fun ActiveAutomationUi(
                 onAddAction = { taskId ->
                     val task = tasks.firstOrNull { it.id == taskId }
                     if (task != null) {
-                        screenOrdinal = OpenTaskerScreen.Tasks.ordinal
-                        openActionPicker(task)
+                        screen = OpenTaskerScreen.Tasks
+                        actionPickerTask = task
                     } else {
                         scope.launch { snackbarHostState.showSnackbar("Flow target no longer exists") }
                     }
@@ -1187,32 +1878,81 @@ fun ActiveAutomationUi(
             )
 
             OpenTaskerScreen.Vars -> VariablesScreen(
-                variables = globalVariables,
+                variables = visibleVariables,
                 contentPadding = innerPadding,
                 onUpdate = viewModel::updateVariable,
                 onDelete = viewModel::deleteVariable,
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
+                expandedVars = expandedVars,
+                selectedKeys = selectedVarKeys,
+                onLongPressVar = { selectedVarKeys = selectedVarKeys + variableKey(it) },
+                onToggleSelectVar = { val k = variableKey(it); selectedVarKeys = if (k in selectedVarKeys) selectedVarKeys - k else selectedVarKeys + k },
+                onSelectAllVars = { selectedVarKeys = visibleVariables.map { variableKey(it) }.toSet() },
+                onClearVarSelection = { selectedVarKeys = emptySet() },
+                onDeleteSelectedVars = { confirmDeleteSelectedVars = true },
+                groupOps = groupOpsFor("vars"),
             )
 
             OpenTaskerScreen.Scenes -> SceneLibraryScreen(
-                scenes = scenes,
+                scenes = visibleScenes,
                 tasks = tasks,
-                onCreateScene = viewModel::createScene,
+                onCreateScene = { name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside ->
+                    viewModel.createScene(name, widthDp, heightDp, currentProjectId, bgColor, corner, scrim, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside)
+                },
                 onUpdateScene = viewModel::updateScene,
-                onDeleteScene = { openDeleteScene(it) },
+                onDeleteScene = { pendingDelete = DeleteTarget.SceneTarget(it) },
+                onMoveScene = { moveTarget = MoveTarget.SceneMove(it) },
+                onExportScene = { exportRequest = ExportRequest(name = "Scene: ${it.name}", fileName = exportFileName(it.name), sceneIds = setOf(it.id)) },
+                manualSort = sortPrefs.scenes == SortMethod.MANUAL,
+                onReorder = { viewModel.reorderScenes(it) },
+                selectedIds = selectedSceneIds,
+                onLongPressScene = { selectedSceneIds = selectedSceneIds + it.id },
+                onToggleSelectScene = { selectedSceneIds = if (it.id in selectedSceneIds) selectedSceneIds - it.id else selectedSceneIds + it.id },
+                onSelectAllScenes = { selectedSceneIds = visibleScenes.map { it.id }.toSet() },
+                onClearSceneSelection = { selectedSceneIds = emptySet() },
+                onDeleteSelectedScenes = { confirmDeleteSelectedScenes = true },
+                onMoveSelectedToProject = { bulkMoveTab = OpenTaskerScreen.Scenes },
+                createSignal = sceneCreateSignal,
+                hiddenByFilter = scenes.size - visibleScenes.size,
+                expandedScenes = expandedScenes,
+                groupOps = groupOpsFor("scenes"),
+                contentPadding = innerPadding,
+            )
+
+            OpenTaskerScreen.Widgets -> WidgetTemplatesScreen(
+                templates = widgetTemplates,
+                onSave = { name, layout -> com.opentasker.widget.TemplateStore.put(name, layout) },
+                onDelete = { com.opentasker.widget.TemplateStore.delete(it) },
+                onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
+                createSignal = widgetCreateSignal,
+                expandedTemplates = expandedTemplates,
+                selectedNames = selectedTemplateNames,
+                onLongPressTemplate = { selectedTemplateNames = selectedTemplateNames + it.name },
+                onToggleSelectTemplate = { selectedTemplateNames = if (it.name in selectedTemplateNames) selectedTemplateNames - it.name else selectedTemplateNames + it.name },
+                onSelectAllTemplates = { selectedTemplateNames = widgetTemplates.map { it.name }.toSet() },
+                onClearTemplateSelection = { selectedTemplateNames = emptySet() },
+                onDeleteSelectedTemplates = { confirmDeleteSelectedTemplates = true },
+                groupOps = groupOpsFor("widgets", scoped = false),
                 contentPadding = innerPadding,
             )
 
             OpenTaskerScreen.Setup -> PermissionOnboardingScreen(
                 contentPadding = innerPadding,
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
+                onOpenUiCustomization = { showUiCustomization = true },
                 backupState = backupSetupState,
                 onCreateBackup = viewModel::createDatabaseBackup,
                 onExportBackup = { databaseBackupExportLauncher.launch(databaseBackupExportName()) },
                 onImportBackup = { databaseBackupImportLauncher.launch(DATABASE_BACKUP_MIME_TYPES) },
+                onExportWorkspace = { openTaskerBundleExportLauncher.launch(openTaskerBundleExportName()) },
             )
 
             OpenTaskerScreen.Inspector -> ContextInspectorScreen(db = db, contentPadding = innerPadding)
+
+            OpenTaskerScreen.Help -> HelpDocumentationScreen(
+                contentPadding = innerPadding,
+                expandedSections = expandedHelpSections,
+            )
 
             OpenTaskerScreen.RunLog -> RunLogScreenContent(
                 logs = runLogs,
@@ -1222,13 +1962,189 @@ fun ActiveAutomationUi(
                 onShareDiagnostic = viewModel::shareDiagnosticReport,
                 contentPadding = innerPadding,
             )
+
+            OpenTaskerScreen.Monitor -> MonitorScreen(
+                profiles = profiles,
+                tasks = tasks,
+                projects = projects,
+                lastFired = runLogs.filter { it.sourceLabel != null }
+                    .groupBy { it.sourceLabel!! }
+                    .mapValues { (_, rows) -> rows.maxOf { it.timestamp } },
+                runLogs = runLogs,
+                contentPadding = innerPadding,
+            )
         }
+        }
+    }
+
+    moveTarget?.let { target ->
+        ProjectPickerDialog(
+            title = "Move to project",
+            projects = projects,
+            currentProjectId = target.currentProjectId,
+            onPick = { projectId ->
+                when (target) {
+                    is MoveTarget.ProfileMove -> viewModel.moveProfileToProject(target.profile, projectId)
+                    is MoveTarget.TaskMove -> viewModel.moveTaskToProject(target.task, projectId)
+                    is MoveTarget.SceneMove -> viewModel.moveSceneToProject(target.scene, projectId)
+                }
+                moveTarget = null
+            },
+            onDismiss = { moveTarget = null },
+        )
+    }
+
+    bulkMoveTab?.let { tab ->
+        val noun = when (tab) {
+            OpenTaskerScreen.Profiles -> "profile"
+            OpenTaskerScreen.Tasks -> "task"
+            else -> "scene"
+        }
+        val count = when (tab) {
+            OpenTaskerScreen.Profiles -> selectedProfileIds.size
+            OpenTaskerScreen.Tasks -> selectedTaskIds.size
+            else -> selectedSceneIds.size
+        }
+        ProjectPickerDialog(
+            title = "Move $count $noun${if (count == 1) "" else "s"} to project",
+            projects = projects,
+            currentProjectId = null,
+            onPick = { projectId ->
+                when (tab) {
+                    OpenTaskerScreen.Profiles -> {
+                        viewModel.moveProfilesToProject(visibleProfiles.filter { it.id in selectedProfileIds }, projectId)
+                        selectedProfileIds = emptySet()
+                    }
+                    OpenTaskerScreen.Tasks -> {
+                        viewModel.moveTasksToProject(visibleTasks.filter { it.id in selectedTaskIds }, projectId)
+                        selectedTaskIds = emptySet()
+                    }
+                    else -> {
+                        viewModel.moveScenesToProject(visibleScenes.filter { it.id in selectedSceneIds }, projectId)
+                        selectedSceneIds = emptySet()
+                    }
+                }
+                bulkMoveTab = null
+            },
+            onDismiss = { bulkMoveTab = null },
+        )
+    }
+
+    exportRequest?.let { req ->
+        ExportOptionsDialog(
+            request = req,
+            onDismiss = { exportRequest = null },
+            onExport = { includeVars ->
+                val resolved = req.copy(includeVariables = includeVars)
+                exportRequest = null
+                pendingExportWrite = resolved
+                selectiveExportLauncher.launch(resolved.fileName)
+            },
+        )
+    }
+
+    if (showNewVarDialog) {
+        NewVariableDialog(
+            existingKeys = globalVariables.map { variableKey(it) }.toSet(),
+            onDismiss = { showNewVarDialog = false },
+            onConfirm = { name, value ->
+                viewModel.updateVariable(0L, name, value)
+                showNewVarDialog = false
+            },
+        )
+    }
+
+    newGroupTab?.let { tab ->
+        var name by remember(tab) { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { newGroupTab = null },
+            title = { Text("New group") },
+            text = {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    placeholder = { Text("Group name") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (name.isNotBlank()) {
+                        viewModel.createGroup(tab, if (tab == "widgets") null else currentProjectId, name)
+                    }
+                    newGroupTab = null
+                }) { Text("Create") }
+            },
+            dismissButton = { TextButton(onClick = { newGroupTab = null }) { Text("Cancel") } },
+        )
+    }
+
+    if (confirmDeleteSelectedTasks) {
+        val count = selectedTaskIds.size
+        AlertDialog(
+            modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+            onDismissRequest = { confirmDeleteSelectedTasks = false },
+            title = { Text("Delete $count task${if (count == 1) "" else "s"}?") },
+            text = { Text("This permanently removes the selected tasks. Any still used by a profile are skipped.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteTasks(visibleTasks.filter { it.id in selectedTaskIds })
+                    selectedTaskIds = emptySet()
+                    confirmDeleteSelectedTasks = false
+                }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDeleteSelectedTasks = false }) { Text("Cancel") } },
+        )
+    }
+
+    if (confirmDeleteSelectedProfiles) {
+        ConfirmDeleteSelected(
+            count = selectedProfileIds.size, noun = "profile",
+            onConfirm = {
+                viewModel.deleteProfiles(visibleProfiles.filter { it.id in selectedProfileIds })
+                selectedProfileIds = emptySet(); confirmDeleteSelectedProfiles = false
+            },
+            onDismiss = { confirmDeleteSelectedProfiles = false },
+        )
+    }
+
+    if (confirmDeleteSelectedScenes) {
+        ConfirmDeleteSelected(
+            count = selectedSceneIds.size, noun = "scene",
+            onConfirm = {
+                viewModel.deleteScenes(visibleScenes.filter { it.id in selectedSceneIds })
+                selectedSceneIds = emptySet(); confirmDeleteSelectedScenes = false
+            },
+            onDismiss = { confirmDeleteSelectedScenes = false },
+        )
+    }
+
+    if (confirmDeleteSelectedTemplates) {
+        ConfirmDeleteSelected(
+            count = selectedTemplateNames.size, noun = "template",
+            onConfirm = {
+                selectedTemplateNames.forEach { com.opentasker.widget.TemplateStore.delete(it) }
+                selectedTemplateNames = emptySet(); confirmDeleteSelectedTemplates = false
+            },
+            onDismiss = { confirmDeleteSelectedTemplates = false },
+        )
+    }
+
+    if (confirmDeleteSelectedVars) {
+        ConfirmDeleteSelected(
+            count = selectedVarKeys.size, noun = "variable",
+            onConfirm = {
+                globalVariables.filter { variableKey(it) in selectedVarKeys }.forEach { viewModel.deleteVariable(it.projectId, it.name) }
+                selectedVarKeys = emptySet(); confirmDeleteSelectedVars = false
+            },
+            onDismiss = { confirmDeleteSelectedVars = false },
+        )
     }
 
     pendingDelete?.let { target ->
         DeleteConfirmationDialog(
             target = target,
-            onDismiss = { clearPendingDelete() },
+            onDismiss = { pendingDelete = null },
             onConfirm = {
                 when (target) {
                     is DeleteTarget.ProfileTarget -> viewModel.deleteProfile(target.profile)
@@ -1243,7 +2159,7 @@ fun ActiveAutomationUi(
                         "Context removed",
                     )
                 }
-                clearPendingDelete()
+                pendingDelete = null
             },
         )
     }
@@ -1257,13 +2173,87 @@ fun ActiveAutomationUi(
         )
     }
 
+    // Names of incoming items that clash with existing ones (so we can warn before overwriting).
+    val itemCollisions: (OpenTaskerBundle) -> List<String> = { b ->
+        val taskNames = tasks.mapTo(HashSet()) { it.name.lowercase() }
+        val profileNames = profiles.mapTo(HashSet()) { it.name.lowercase() }
+        val sceneNames = scenes.mapTo(HashSet()) { it.name.lowercase() }
+        val templateNames = allWidgetTemplates.mapTo(HashSet()) { it.name.lowercase() }
+        buildList {
+            b.tasks.filter { it.name.lowercase() in taskNames }.forEach { add("Task “${it.name}”") }
+            b.profiles.filter { it.name.lowercase() in profileNames }.forEach { add("Profile “${it.name}”") }
+            b.scenes.filter { it.name.lowercase() in sceneNames }.forEach { add("Scene “${it.name}”") }
+            b.templates.filter { it.name.lowercase() in templateNames }.forEach { add("Widget template “${it.name}”") }
+        }
+    }
+    // After the project choice, ask the item-conflict question if any names clash; else import directly.
+    val startBundleImport: (OpenTaskerBundle, ProjectConflictStrategy) -> Unit = { b, projStrat ->
+        if (itemCollisions(b).isNotEmpty()) {
+            pendingProjectStrategy = projStrat
+            importItemConflict = b
+        } else {
+            viewModel.confirmOpenTaskerBundleImport(b, projStrat, ItemConflictStrategy.RENAME)
+        }
+    }
+
     openTaskerBundleReview?.let { state ->
         OpenTaskerBundleReviewDialog(
             state = state,
             busy = openTaskerBundleBusy,
             onDismiss = viewModel::clearOpenTaskerBundleReview,
-            onConfirm = { viewModel.confirmOpenTaskerBundleImport(state.bundle) },
+            onConfirm = {
+                val hasProjectCollision = state.bundle.projects.any { incoming ->
+                    projects.any { it.name.equals(incoming.name, ignoreCase = true) }
+                }
+                viewModel.clearOpenTaskerBundleReview()
+                if (hasProjectCollision) {
+                    importConflict = state.bundle
+                } else {
+                    startBundleImport(state.bundle, ProjectConflictStrategy.RENAME)
+                }
+            },
         )
+    }
+
+    importConflict?.let { bundle ->
+        val conflictingNames = bundle.projects
+            .filter { incoming -> projects.any { it.name.equals(incoming.name, ignoreCase = true) } }
+            .map { it.name }
+        ImportProjectConflictDialog(
+            conflictingNames = conflictingNames,
+            onOverwrite = {
+                importConflict = null
+                startBundleImport(bundle, ProjectConflictStrategy.MERGE)
+            },
+            onKeepBoth = {
+                importConflict = null
+                startBundleImport(bundle, ProjectConflictStrategy.RENAME)
+            },
+            onDismiss = { importConflict = null },
+        )
+    }
+
+    importItemConflict?.let { bundle ->
+        ImportItemConflictDialog(
+            collisions = itemCollisions(bundle),
+            onRename = {
+                importItemConflict = null
+                viewModel.confirmOpenTaskerBundleImport(bundle, pendingProjectStrategy, ItemConflictStrategy.RENAME)
+            },
+            onOverwriteDelete = {
+                importItemConflict = null
+                viewModel.confirmOpenTaskerBundleImport(bundle, pendingProjectStrategy, ItemConflictStrategy.OVERWRITE_DELETE)
+            },
+            onOverwriteBackup = {
+                importItemConflict = null
+                viewModel.confirmOpenTaskerBundleImport(bundle, pendingProjectStrategy, ItemConflictStrategy.OVERWRITE_BACKUP)
+            },
+            onDismiss = { importItemConflict = null },
+        )
+    }
+
+    viewModel.openTaskerImportResult?.let { report ->
+        ImportResultDialog(report = report, onDismiss = { viewModel.clearImportResult() })
     }
 
     if (showCreateTaskDialog) {
@@ -1271,19 +2261,23 @@ fun ActiveAutomationUi(
             task = null,
             onDismiss = { showCreateTaskDialog = false },
             onSave = { name, priority ->
-                viewModel.createTask(name, priority)
+                viewModel.createTask(name, priority, currentProjectId)
                 showCreateTaskDialog = false
             },
         )
     }
 
+    if (showTaskLibrary) {
+        TaskLibraryDialog(tasks = tasks, onDismiss = { showTaskLibrary = false })
+    }
+
     taskDialog?.let { task ->
         TaskEditorDialog(
             task = task,
-            onDismiss = { clearTaskDialog() },
+            onDismiss = { taskDialog = null },
             onSave = { name, priority ->
                 viewModel.updateTask(task.copy(name = name.trim(), priority = priority.coerceIn(0, 10)))
-                clearTaskDialog()
+                taskDialog = null
             },
         )
     }
@@ -1293,8 +2287,8 @@ fun ActiveAutomationUi(
             profile = null,
             tasks = tasks,
             onDismiss = { showCreateProfileDialog = false },
-            onSave = { name, enabled, enterTaskId, cooldown, automationMode, group ->
-                viewModel.createProfile(name, enabled, enterTaskId, cooldown, automationMode, group)
+            onSave = { name, enabled, enterTaskId, cooldown, automationMode ->
+                viewModel.createProfile(name, enabled, enterTaskId, cooldown, automationMode, currentProjectId)
                 showCreateProfileDialog = false
             },
         )
@@ -1305,7 +2299,7 @@ fun ActiveAutomationUi(
             onDismiss = { showTemplateDialog = false },
             onSelect = { template ->
                 showTemplateDialog = false
-                selectedTemplateId = template.id
+                selectedTemplate = template
             },
         )
     }
@@ -1313,11 +2307,11 @@ fun ActiveAutomationUi(
     selectedTemplate?.let { template ->
         TemplateSlotDialog(
             template = template,
-            onDismiss = { selectedTemplateId = null },
+            onDismiss = { selectedTemplate = null },
             onInstall = { values ->
                 viewModel.installProfileTemplate(template, values)
-                selectedTemplateId = null
-                screenOrdinal = OpenTaskerScreen.Profiles.ordinal
+                selectedTemplate = null
+                screen = OpenTaskerScreen.Profiles
             },
         )
     }
@@ -1326,8 +2320,8 @@ fun ActiveAutomationUi(
         ProfileEditorDialog(
             profile = profile,
             tasks = tasks,
-            onDismiss = { clearProfileDialog() },
-            onSave = { name, enabled, enterTaskId, cooldown, automationMode, group ->
+            onDismiss = { profileDialog = null },
+            onSave = { name, enabled, enterTaskId, cooldown, automationMode ->
                 viewModel.updateProfile(
                     profile.copy(
                         name = name.trim(),
@@ -1335,20 +2329,19 @@ fun ActiveAutomationUi(
                         enterTaskId = enterTaskId,
                         cooldownSec = cooldown.coerceAtLeast(0),
                         automationMode = automationMode,
-                        group = group,
                     )
                 )
-                clearProfileDialog()
+                profileDialog = null
             },
         )
     }
 
     actionPickerTask?.let { task ->
         ActionPickerDialog(
-            onDismiss = { clearActionPicker() },
+            onDismiss = { actionPickerTask = null },
             onSelect = { metadata ->
-                clearActionPicker()
-                openActionEdit(task, metadata)
+                actionPickerTask = null
+                actionEdit = ActionEditState(task, metadata)
             },
         )
     }
@@ -1356,23 +2349,26 @@ fun ActiveAutomationUi(
     actionEdit?.let { state ->
         ActionConfigDialog(
             state = state,
-            onDismiss = { clearActionEdit() },
+            allTasks = tasks,
+            projects = projects,
+            currentProjectId = currentProjectId,
+            onDismiss = { actionEdit = null },
             onSave = { action ->
                 val updatedActions = state.index?.let { index ->
                     state.task.actions.mapIndexed { i, existing -> if (i == index) action else existing }
                 } ?: (state.task.actions + action)
                 viewModel.updateTask(state.task.copy(actions = updatedActions), if (state.index == null) "Action added" else "Action updated")
-                clearActionEdit()
+                actionEdit = null
             },
         )
     }
 
     contextPickerProfile?.let { profile ->
         ContextTypePickerDialog(
-            onDismiss = { clearContextPicker() },
+            onDismiss = { contextPickerProfile = null },
             onSelect = { type ->
-                clearContextPicker()
-                openContextEdit(profile, type)
+                contextPickerProfile = null
+                contextEdit = ContextEditState(profile, type)
             },
         )
     }
@@ -1380,7 +2376,7 @@ fun ActiveAutomationUi(
     contextEdit?.let { state ->
         ContextConfigDialog(
             state = state,
-            onDismiss = { clearContextEdit() },
+            onDismiss = { contextEdit = null },
             onSave = { context ->
                 val updatedContexts = state.index?.let { index ->
                     state.profile.contexts.mapIndexed { i, existing -> if (i == index) context else existing }
@@ -1389,58 +2385,8 @@ fun ActiveAutomationUi(
                     state.profile.copy(contexts = updatedContexts),
                     if (state.index == null) "Context added" else "Context updated",
                 )
-                clearContextEdit()
+                contextEdit = null
             },
-        )
-    }
-}
-
-@Composable
-private fun OpenTaskerNavigationItem(
-    selected: Boolean,
-    onClick: () -> Unit,
-    icon: ImageVector,
-    label: String,
-    modifier: Modifier = Modifier,
-) {
-    val contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-    Column(
-        modifier = modifier
-            .heightIn(min = 68.dp)
-            .clickable(role = Role.Tab, onClick = onClick)
-            .semantics(mergeDescendants = true) {
-                this.selected = selected
-                stateDescription = if (selected) "Selected" else "Not selected"
-            }
-            .padding(horizontal = 4.dp, vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Surface(
-            color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.46f) else Color.Transparent,
-            shape = RoundedCornerShape(6.dp),
-            border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)) else null,
-        ) {
-            Box(
-                modifier = Modifier.size(width = 48.dp, height = 32.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    icon,
-                    contentDescription = label,
-                    tint = contentColor,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-        }
-        Spacer(Modifier.height(2.dp))
-        Text(
-            label,
-            style = MaterialTheme.typography.labelMedium,
-            color = contentColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
         )
     }
 }
@@ -1449,154 +2395,108 @@ private fun OpenTaskerNavigationItem(
 private fun ProfilesScreen(
     profiles: List<Profile>,
     tasks: List<Task>,
-    runLogs: List<RunLogEntry>,
-    storageDecodeIssues: List<StorageDecodeIssue>,
+    expandedProfiles: SnapshotStateMap<Long, Boolean>,
     onCreateTaskFirst: () -> Unit,
     onCreateProfile: () -> Unit,
-    onBrowseTemplates: () -> Unit,
-    onExportOpenTaskerBundle: () -> Unit,
-    onImportOpenTaskerBundle: () -> Unit,
-    openTaskerBundleBusy: Boolean,
-    onImportTaskerXml: () -> Unit,
-    taskerImportBusy: Boolean,
     onEditProfile: (Profile) -> Unit,
     onDeleteProfile: (Profile) -> Unit,
     onToggleProfile: (Profile, Boolean) -> Unit,
     onAddContext: (Profile) -> Unit,
     onEditContext: (Profile, Int, ContextSpec) -> Unit,
     onDeleteContext: (Profile, Int) -> Unit,
+    onMoveProfile: (Profile) -> Unit,
+    onExportProfile: (Profile) -> Unit,
+    manualSort: Boolean,
+    onReorder: (List<Profile>) -> Unit,
+    selectedIds: Set<Long>,
+    onLongPressProfile: (Profile) -> Unit,
+    onToggleSelectProfile: (Profile) -> Unit,
+    onSelectAllProfiles: () -> Unit,
+    onClearProfileSelection: () -> Unit,
+    onDeleteSelectedProfiles: () -> Unit,
+    onMoveSelectedToProject: () -> Unit,
+    groupOps: GroupOps,
     contentPadding: PaddingValues,
 ) {
     if (tasks.isEmpty()) {
         EmptyState(
-            title = "Build your first automation",
-            body = "Start from a guided template for the fastest path, import existing work, or create a blank task when you know the exact steps.",
-            actionLabel = "Browse Templates",
-            onAction = onBrowseTemplates,
-            secondaryActionLabel = if (openTaskerBundleBusy) "Reading Bundle..." else "Import JSON",
-            onSecondaryAction = onImportOpenTaskerBundle,
-            secondaryActionEnabled = !openTaskerBundleBusy,
-            tertiaryActionLabel = if (taskerImportBusy) "Reading XML..." else "Import Tasker XML",
-            onTertiaryAction = onImportTaskerXml,
-            tertiaryActionEnabled = !taskerImportBusy,
-            quaternaryActionLabel = "Create Blank Task",
-            onQuaternaryAction = onCreateTaskFirst,
+            title = "No tasks yet",
+            body = "Profiles run tasks, so start with a task. Tap ＋ to create one, or to import a 白い熊 自由作業盤 JSON bundle or a Tasker XML export.",
+            actionLabel = "Create blank task",
+            onAction = onCreateTaskFirst,
             contentPadding = contentPadding,
         )
         return
     }
     if (profiles.isEmpty()) {
         EmptyState(
-            title = "Create your first profile",
-            body = "Profiles decide when a task runs. Use a template for the fastest path, import existing workflows, or connect a blank profile to your task.",
-            actionLabel = "Browse Templates",
-            onAction = onBrowseTemplates,
-            secondaryActionLabel = if (openTaskerBundleBusy) "Reading Bundle..." else "Import JSON",
-            onSecondaryAction = onImportOpenTaskerBundle,
-            secondaryActionEnabled = !openTaskerBundleBusy,
-            tertiaryActionLabel = if (taskerImportBusy) "Reading XML..." else "Import Tasker XML",
-            onTertiaryAction = onImportTaskerXml,
-            tertiaryActionEnabled = !taskerImportBusy,
-            quaternaryActionLabel = "Create Blank Profile",
-            onQuaternaryAction = onCreateProfile,
+            title = "No profiles yet",
+            body = "Profiles connect contexts to tasks. Tap ＋ to create a blank profile, start from a template, or import a bundle.",
+            actionLabel = "Create blank profile",
+            onAction = onCreateProfile,
             contentPadding = contentPadding,
         )
         return
     }
 
-    var profileSearchQuery by rememberSaveable { mutableStateOf("") }
-    var selectedGroup by rememberSaveable { mutableStateOf<String?>(null) }
-    val groups = remember(profiles) {
-        profiles.mapNotNull { it.group }.distinct().sorted()
-    }
-    val filteredProfiles = profiles
-        .filter { selectedGroup == null || it.group == selectedGroup }
-        .filter { profileSearchQuery.isBlank() || it.name.contains(profileSearchQuery, ignoreCase = true) }
-
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(contentPadding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
-    ) {
-        item {
-            WorkspaceSummaryCard(
-                profiles = profiles,
-                tasks = tasks,
-                runLogs = runLogs,
-                onBrowseTemplates = onBrowseTemplates,
-                onExportOpenTaskerBundle = onExportOpenTaskerBundle,
-                onImportOpenTaskerBundle = onImportOpenTaskerBundle,
-                openTaskerBundleBusy = openTaskerBundleBusy,
-                onImportTaskerXml = onImportTaskerXml,
-                taskerImportBusy = taskerImportBusy,
+    val listState = rememberLazyListState()
+    val reorder = rememberListReorderState()
+    val selectionActive = selectedIds.isNotEmpty()
+    Column(Modifier.fillMaxSize().padding(contentPadding)) {
+        if (selectionActive) {
+            SelectionBar(
+                count = selectedIds.size,
+                total = profiles.size,
+                onSelectAll = onSelectAllProfiles,
+                onClear = onClearProfileSelection,
+                onDelete = onDeleteSelectedProfiles,
+                onMoveToProject = onMoveSelectedToProject,
             )
         }
-        item {
-            TemplatePromptCard(onBrowseTemplates)
-        }
-        if (storageDecodeIssues.isNotEmpty()) {
-            item {
-                StorageDecodeWarningCard(storageDecodeIssues)
-            }
-        }
-        item {
-            OutlinedTextField(
-                value = profileSearchQuery,
-                onValueChange = { profileSearchQuery = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Search profiles...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
-                trailingIcon = if (profileSearchQuery.isNotEmpty()) {
-                    { IconButton(onClick = { profileSearchQuery = "" }) { Icon(Icons.Default.Clear, contentDescription = "Clear search") } }
-                } else null,
-                singleLine = true,
-                shape = RoundedCornerShape(DesignSystem.Radii.lg),
-            )
-        }
-        if (groups.isNotEmpty()) {
-            item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
-                    item {
-                        FilterChip(
-                            selected = selectedGroup == null,
-                            onClick = { selectedGroup = null },
-                            label = { Text("All") },
-                        )
-                    }
-                    items(groups, key = { it }) { group ->
-                        FilterChip(
-                            selected = selectedGroup == group,
-                            onClick = { selectedGroup = if (selectedGroup == group) null else group },
-                            label = { Text(group) },
-                        )
-                    }
-                }
-            }
-        }
-        if (filteredProfiles.isEmpty()) {
-            item {
-                InlineNotice(
-                    title = "No matching profiles",
-                    body = "Clear search or switch groups to see more automations.",
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
-        items(filteredProfiles, key = { it.id }) { profile ->
+        val moveHost = rememberGroupMoveHost()
+        val dragState = rememberGroupDragState()
+        val profileCard: @Composable (Profile) -> Unit = { profile ->
             val enterTaskName = tasks.firstOrNull { it.id == profile.enterTaskId }?.name ?: "Missing task #${profile.enterTaskId}"
             ProfileCard(
                 profile = profile,
                 enterTaskName = enterTaskName,
+                selectionActive = selectionActive,
+                selected = profile.id in selectedIds,
+                expanded = expandedProfiles[profile.id] == true,
+                onToggleExpanded = { expandedProfiles[profile.id] = expandedProfiles[profile.id] != true },
+                onLongPress = { onLongPressProfile(profile) },
+                onToggleSelect = { onToggleSelectProfile(profile) },
                 onEdit = { onEditProfile(profile) },
                 onDelete = { onDeleteProfile(profile) },
                 onToggle = { onToggleProfile(profile, it) },
                 onAddContext = { onAddContext(profile) },
                 onEditContext = { index, context -> onEditContext(profile, index, context) },
                 onDeleteContext = { index -> onDeleteContext(profile, index) },
+                onMove = { onMoveProfile(profile) },
+                onExport = { onExportProfile(profile) },
             )
         }
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().weight(1f),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (groupOps.groups.isEmpty()) {
+                items(profiles, key = { it.id }) { profile ->
+                    ReorderableRow(reorder, listState, profiles, profile, { it.id }, manualSort && !selectionActive, onReorder) {
+                        profileCard(profile)
+                    }
+                }
+            } else {
+                groupedItems(
+                    profiles, { it.id.toString() }, groupOps, dragState,
+                    onMoveItem = { moveHost.movingItemKey = it },
+                    onMoveGroup = { moveHost.movingGroup = it },
+                ) { profile -> profileCard(profile) }
+            }
+        }
+        GroupMoveDialogs(groupOps, moveHost)
     }
 }
 
@@ -1614,7 +2514,7 @@ private fun readBoundedOpenTaskerBundle(context: Context, uri: Uri): String {
         context = context,
         uri = uri,
         maxBytes = OPEN_TASKER_BUNDLE_IMPORT_MAX_BYTES,
-        label = "OpenTasker bundle",
+        label = "白い熊 自由作業盤 bundle",
     )
 }
 
@@ -1639,125 +2539,31 @@ private fun readBoundedDocumentText(context: Context, uri: Uri, maxBytes: Int, l
     }
 }
 
+/** The Task-library summary — description + counts — surfaced from the Tasks top-bar ⓘ, off the list. */
 @Composable
-private fun WorkspaceSummaryCard(
-    profiles: List<Profile>,
-    tasks: List<Task>,
-    runLogs: List<RunLogEntry>,
-    onBrowseTemplates: () -> Unit,
-    onExportOpenTaskerBundle: () -> Unit,
-    onImportOpenTaskerBundle: () -> Unit,
-    openTaskerBundleBusy: Boolean,
-    onImportTaskerXml: () -> Unit,
-    taskerImportBusy: Boolean,
-) {
-    val enabledProfiles = profiles.count { it.enabled }
-    val configuredContexts = profiles.sumOf { it.contexts.size }
-    val totalActions = tasks.sumOf { it.actions.size }
-    val recentFailure = runLogs.firstOrNull { !it.success }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
-        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-                Column(Modifier.weight(1f)) {
-                    Text("Automation workspace", style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        "Review readiness before enabling profiles. Templates stay disabled until you approve them.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                StatusPill(
-                    label = if (enabledProfiles > 0) "$enabledProfiles live" else "Paused",
-                    color = if (enabledProfiles > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                SummaryMetric("${profiles.size}", "Profiles", Modifier.weight(1f))
-                SummaryMetric("$configuredContexts", "Contexts", Modifier.weight(1f))
-                SummaryMetric("$totalActions", "Actions", Modifier.weight(1f))
-            }
-            if (recentFailure != null) {
-                InlineNotice(
-                    title = "Recent failure",
-                    body = "${recentFailure.taskName}: ${recentFailure.message.ifBlank { "Review the run log for details." }}",
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = onBrowseTemplates, modifier = Modifier.weight(1f)) {
-                    Text("Templates")
-                }
-                OutlinedButton(
-                    onClick = onImportTaskerXml,
-                    enabled = !taskerImportBusy,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(if (taskerImportBusy) "Reading XML" else "Import Tasker")
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(
-                    onClick = onExportOpenTaskerBundle,
-                    enabled = !openTaskerBundleBusy,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(if (openTaskerBundleBusy) "Working" else "Export JSON")
-                }
-                OutlinedButton(
-                    onClick = onImportOpenTaskerBundle,
-                    enabled = !openTaskerBundleBusy,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(if (openTaskerBundleBusy) "Reading JSON" else "Import JSON")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TaskLibrarySummaryCard(tasks: List<Task>, onCreateTask: () -> Unit) {
+private fun TaskLibraryDialog(tasks: List<Task>, onDismiss: () -> Unit) {
     val totalActions = tasks.sumOf { it.actions.size }
     val emptyTasks = tasks.count { it.actions.isEmpty() }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
-        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
-    ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-                Column(Modifier.weight(1f)) {
-                    Text("Task library", style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        "Build reusable action sequences, then attach them to profiles when the order and permissions are ready.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Button(onClick = onCreateTask) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add task")
-                    Spacer(Modifier.width(6.dp))
-                    Text("Task")
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = onDismiss,
+        title = { Text("Task library") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text(
+                    "Build reusable action sequences, then attach them to profiles when the order and permissions are ready.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    SummaryMetric("${tasks.size}", "Tasks", Modifier.weight(1f))
+                    SummaryMetric("$totalActions", "Actions", Modifier.weight(1f))
+                    SummaryMetric("$emptyTasks", "Need actions", Modifier.weight(1f))
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                SummaryMetric("${tasks.size}", "Tasks", Modifier.weight(1f))
-                SummaryMetric("$totalActions", "Actions", Modifier.weight(1f))
-                SummaryMetric("$emptyTasks", "Need actions", Modifier.weight(1f))
-            }
-        }
-    }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+    )
 }
 
 @Composable
@@ -1786,9 +2592,9 @@ internal fun StatusPill(
 ) {
     Surface(
         modifier = modifier,
-        color = color.copy(alpha = 0.14f),
-        shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.34f)),
+        color = Color.Transparent,
+        shape = RoundedCornerShape(999.dp),
+        border = BorderStroke(1.dp, color),
     ) {
         Text(
             text = label,
@@ -1816,7 +2622,7 @@ internal fun InlineNotice(title: String, body: String, color: Color) {
         ) {
             Icon(
                 if (color == MaterialTheme.colorScheme.error) Icons.Filled.Error else Icons.Filled.Info,
-                contentDescription = if (color == MaterialTheme.colorScheme.error) "Error" else "Info",
+                contentDescription = null,
                 tint = color,
                 modifier = Modifier.size(20.dp),
             )
@@ -1829,125 +2635,150 @@ internal fun InlineNotice(title: String, body: String, color: Color) {
 }
 
 @Composable
-private fun StorageDecodeWarningCard(issues: List<StorageDecodeIssue>) {
-    val issueSummary = issues.take(3).joinToString(separator = "; ") { issue ->
-        "${issue.recordType.label} \"${issue.recordName}\" #${issue.recordId}: ${issue.fieldName}"
-    }
-    val remaining = issues.size - 3
-    val suffix = if (remaining > 0) "; $remaining more" else ""
-    InlineNotice(
-        title = "Stored data needs review",
-        body = "OpenTasker loaded affected records with safe fallbacks. $issueSummary$suffix.",
-        color = MaterialTheme.colorScheme.error,
-    )
-}
-
-@Composable
-private fun TemplatePromptCard(onBrowseTemplates: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)),
-        shape = RoundedCornerShape(16.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text("Templates", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Create starter profiles with named slots, clear safety notes, and disabled-by-default review.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            OutlinedButton(onClick = onBrowseTemplates) {
-                Text("Browse")
-            }
-        }
-    }
-}
-
-@Composable
 private fun ProfileCard(
     profile: Profile,
     enterTaskName: String,
+    selectionActive: Boolean,
+    selected: Boolean,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    onLongPress: () -> Unit,
+    onToggleSelect: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onToggle: (Boolean) -> Unit,
     onAddContext: () -> Unit,
     onEditContext: (Int, ContextSpec) -> Unit,
     onDeleteContext: (Int) -> Unit,
+    onMove: () -> Unit,
+    onExport: () -> Unit,
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (profile.enabled) 0.72f else 0.46f),
+            containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (profile.enabled) 0.72f else 0.46f),
         ),
         border = BorderStroke(
-            1.dp,
-            if (profile.enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.24f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f),
+            if (selected) 2.dp else 1.dp,
+            when {
+                selected -> MaterialTheme.colorScheme.primary
+                profile.enabled -> MaterialTheme.colorScheme.primary
+                else -> MaterialTheme.colorScheme.outlineVariant
+            },
         ),
         shape = RoundedCornerShape(16.dp),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().selectableItem(
+                    selectionActive = selectionActive,
+                    onLongPress = onLongPress,
+                    onToggleSelect = onToggleSelect,
+                    onTapNormal = onToggleExpanded,
+                ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (selectionActive) {
+                    SelectionCheck(selected)
+                }
                 Column(Modifier.weight(1f)) {
                     Text(profile.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("Runs: $enterTaskName", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "Runs: $enterTaskName" +
+                            if (!expanded) " - ${if (profile.enabled) "enabled" else "paused"}, ${profile.contexts.size} context${plural(profile.contexts.size)}" else "",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (expanded) {
+                    IconButton(onClick = onExport) {
+                        Icon(Icons.Filled.Upload, contentDescription = "Export profile")
+                    }
                 }
                 Switch(checked = profile.enabled, onCheckedChange = onToggle)
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Collapse profile" else "Expand profile",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                item {
+            if (expanded) {
+                ItemNoteSection("profiles", profile.id.toString())
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     StatusPill(
                         label = if (profile.enabled) "Enabled" else "Paused",
                         color = if (profile.enabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    StatusPill("${profile.contexts.size} context${plural(profile.contexts.size)}", MaterialTheme.colorScheme.primary)
+                    StatusPill("${profile.cooldownSec}s cooldown", MaterialTheme.colorScheme.secondary)
                 }
-                item { StatusPill("${profile.contexts.size} context${plural(profile.contexts.size)}", MaterialTheme.colorScheme.primary) }
-                item { StatusPill("${profile.cooldownSec}s cooldown", MaterialTheme.colorScheme.secondary) }
-                item { StatusPill(profile.automationMode.name.lowercase(), MaterialTheme.colorScheme.onSurfaceVariant) }
-                profile.group?.let { group ->
-                    item { StatusPill(group, MaterialTheme.colorScheme.inversePrimary) }
-                }
-            }
-            if (profile.contexts.isEmpty()) {
-                InlineNotice(
-                    title = "Profile cannot match yet",
-                    body = "Add at least one context before relying on this profile.",
-                    color = MaterialTheme.colorScheme.error,
-                )
-            } else {
-                profile.contexts.forEachIndexed { index, context ->
-                    ContextRow(
-                        context = context,
-                        onEdit = { onEditContext(index, context) },
-                        onDelete = { onDeleteContext(index) },
+                StatusPill(profile.automationMode.name.lowercase(), MaterialTheme.colorScheme.onSurfaceVariant)
+                if (profile.contexts.isEmpty()) {
+                    InlineNotice(
+                        title = "Profile cannot match yet",
+                        body = "Add at least one context before relying on this profile.",
+                        color = MaterialTheme.colorScheme.error,
                     )
+                } else {
+                    profile.contexts.forEachIndexed { index, context ->
+                        ContextRow(
+                            context = context,
+                            onEdit = { onEditContext(index, context) },
+                            onDelete = { onDeleteContext(index) },
+                        )
+                    }
                 }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Edit profile")
-                    Spacer(Modifier.width(6.dp))
-                    Text("Edit")
+                // The run task as a prominent bordered box BELOW the trigger(s) — the profile's payload,
+                // the thing it actually does. Underlined "Task:" heading, name in the accent color.
+                Surface(
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+                ) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            "Task:",
+                            style = MaterialTheme.typography.labelMedium.copy(textDecoration = TextDecoration.Underline),
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            enterTaskName,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
-                OutlinedButton(onClick = onAddContext, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add context")
-                    Spacer(Modifier.width(6.dp))
-                    Text("Add Context")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Edit, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Edit")
+                    }
+                    OutlinedButton(onClick = onAddContext, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Add Context")
+                    }
                 }
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete profile")
-                    Spacer(Modifier.width(6.dp))
-                    Text("Delete Profile")
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    TextButton(onClick = onMove) {
+                        Icon(Icons.Filled.Folder, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Move")
+                    }
+                    TextButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Delete, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Delete Profile")
+                    }
                 }
             }
         }
@@ -1957,7 +2788,8 @@ private fun ProfileCard(
 @Composable
 private fun TasksScreen(
     tasks: List<Task>,
-    storageDecodeIssues: List<StorageDecodeIssue>,
+    expandedTasks: SnapshotStateMap<Long, Boolean>,
+    expandedActions: SnapshotStateMap<String, Boolean>,
     onCreateTask: () -> Unit,
     onEditTask: (Task) -> Unit,
     onDeleteTask: (Task) -> Unit,
@@ -1966,6 +2798,19 @@ private fun TasksScreen(
     onAddAction: (Task) -> Unit,
     onEditAction: (Task, Int, ActionSpec) -> Unit,
     onDeleteAction: (Task, Int) -> Unit,
+    onMoveTask: (Task) -> Unit,
+    onExportTask: (Task) -> Unit,
+    onReorderAction: (Task, List<ActionSpec>) -> Unit,
+    manualSort: Boolean,
+    onReorder: (List<Task>) -> Unit,
+    selectedIds: Set<Long>,
+    onLongPressTask: (Task) -> Unit,
+    onToggleSelectTask: (Task) -> Unit,
+    onSelectAllTasks: () -> Unit,
+    onClearTaskSelection: () -> Unit,
+    onDeleteSelectedTasks: () -> Unit,
+    onMoveSelectedToProject: () -> Unit,
+    groupOps: GroupOps,
     contentPadding: PaddingValues,
 ) {
     if (tasks.isEmpty()) {
@@ -1978,51 +2823,37 @@ private fun TasksScreen(
         )
         return
     }
-    var taskSearchQuery by rememberSaveable { mutableStateOf("") }
-    val filteredTasks = if (taskSearchQuery.isBlank()) tasks
-        else tasks.filter { it.name.contains(taskSearchQuery, ignoreCase = true) }
-
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(contentPadding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
-    ) {
-        item {
-            TaskLibrarySummaryCard(tasks = tasks, onCreateTask = onCreateTask)
-        }
-        if (storageDecodeIssues.isNotEmpty()) {
-            item {
-                StorageDecodeWarningCard(storageDecodeIssues)
-            }
-        }
-        item {
-            OutlinedTextField(
-                value = taskSearchQuery,
-                onValueChange = { taskSearchQuery = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Search tasks...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
-                trailingIcon = if (taskSearchQuery.isNotEmpty()) {
-                    { IconButton(onClick = { taskSearchQuery = "" }) { Icon(Icons.Default.Clear, contentDescription = "Clear search") } }
-                } else null,
-                singleLine = true,
-                shape = RoundedCornerShape(DesignSystem.Radii.lg),
+    val listState = rememberLazyListState()
+    val reorder = rememberListReorderState()
+    val selectionActive = selectedIds.isNotEmpty()
+    Column(Modifier.fillMaxSize().padding(contentPadding)) {
+        if (selectionActive) {
+            SelectionBar(
+                count = selectedIds.size,
+                total = tasks.size,
+                onSelectAll = onSelectAllTasks,
+                onClear = onClearTaskSelection,
+                onDelete = onDeleteSelectedTasks,
+                onMoveToProject = onMoveSelectedToProject,
             )
         }
-        if (filteredTasks.isEmpty()) {
-            item {
-                InlineNotice(
-                    title = "No matching tasks",
-                    body = "Clear search to return to the full task library.",
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
-        items(filteredTasks, key = { it.id }) { task ->
+        var pickerForKey by remember { mutableStateOf<String?>(null) }
+        var movingGroup by remember { mutableStateOf<ItemGroupEntity?>(null) }
+        val dragState = rememberGroupDragState()
+        val taskCard: @Composable (Task) -> Unit = { task ->
             TaskCard(
                 task = task,
+                selectionActive = selectionActive,
+                selected = task.id in selectedIds,
+                onLongPress = { onLongPressTask(task) },
+                onToggleSelect = { onToggleSelectTask(task) },
+                expanded = expandedTasks[task.id] == true,
+                onToggleExpanded = { expandedTasks[task.id] = expandedTasks[task.id] != true },
+                isActionExpanded = { index -> expandedActions["${task.id}:$index"] == true },
+                onToggleAction = { index ->
+                    val k = "${task.id}:$index"
+                    expandedActions[k] = expandedActions[k] != true
+                },
                 onEdit = { onEditTask(task) },
                 onDelete = { onDeleteTask(task) },
                 onRun = { onRunTask(task) },
@@ -2030,6 +2861,46 @@ private fun TasksScreen(
                 onAddAction = { onAddAction(task) },
                 onEditAction = { index, action -> onEditAction(task, index, action) },
                 onDeleteAction = { index -> onDeleteAction(task, index) },
+                onMove = { onMoveTask(task) },
+                onExport = { onExportTask(task) },
+                onReorderActions = { newOrder -> onReorderAction(task, newOrder) },
+            )
+        }
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().weight(1f),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (groupOps.groups.isEmpty()) {
+                items(tasks, key = { it.id }) { task ->
+                    ReorderableRow(reorder, listState, tasks, task, { it.id }, manualSort && !selectionActive, onReorder) {
+                        taskCard(task)
+                    }
+                }
+            } else {
+                groupedItems(
+                    tasks, { it.id.toString() }, groupOps, dragState,
+                    onMoveItem = { pickerForKey = it },
+                    onMoveGroup = { movingGroup = it },
+                ) { task -> taskCard(task) }
+            }
+        }
+        pickerForKey?.let { key ->
+            GroupPickerDialog(
+                groups = groupOps.groups,
+                onPick = { gid -> groupOps.setItemGroup(key, gid); pickerForKey = null },
+                onCreate = { name -> groupOps.createGroupForItem(key, name); pickerForKey = null },
+                onDismiss = { pickerForKey = null },
+            )
+        }
+        movingGroup?.let { g ->
+            val excluded = descendantGroupIds(g.id, groupOps.groups) + g.id
+            GroupPickerDialog(
+                groups = groupOps.groups.filter { it.id !in excluded },
+                onPick = { pid -> groupOps.setGroupParent(g, pid); movingGroup = null },
+                onCreate = null,
+                onDismiss = { movingGroup = null },
             )
         }
     }
@@ -2038,6 +2909,14 @@ private fun TasksScreen(
 @Composable
 private fun TaskCard(
     task: Task,
+    selectionActive: Boolean,
+    selected: Boolean,
+    onLongPress: () -> Unit,
+    onToggleSelect: () -> Unit,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    isActionExpanded: (Int) -> Boolean,
+    onToggleAction: (Int) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onRun: () -> Unit,
@@ -2045,77 +2924,155 @@ private fun TaskCard(
     onAddAction: () -> Unit,
     onEditAction: (Int, ActionSpec) -> Unit,
     onDeleteAction: (Int) -> Unit,
+    onMove: () -> Unit,
+    onExport: () -> Unit,
+    onReorderActions: (List<ActionSpec>) -> Unit,
 ) {
+    var draggingIndex by remember(task.id) { mutableStateOf<Int?>(null) }
+    var dragOffsetY by remember(task.id) { mutableFloatStateOf(0f) }
+    var actionRowHeightPx by remember(task.id) { mutableIntStateOf(0) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+        ),
+        border = BorderStroke(
+            if (selected) 2.dp else 1.dp,
+            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        ),
         shape = RoundedCornerShape(16.dp),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().selectableItem(
+                    selectionActive = selectionActive,
+                    onLongPress = onLongPress,
+                    onToggleSelect = onToggleSelect,
+                    onTapNormal = onToggleExpanded,
+                ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (selectionActive) {
+                    SelectionCheck(selected)
+                } else if (!expanded) {
+                    // Run from the collapsed row — pinned to the far left, away from the fold chevron on the
+                    // right, so a run tap can't be mistaken for a fold tap.
+                    IconButton(onClick = onRun) {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = "Run task", tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
                 Column(Modifier.weight(1f)) {
                     Text(task.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(
-                        "Priority ${task.priority} - ${task.collisionMode.name.lowercase().replace('_', ' ')}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    if (expanded) {
+                        Text(
+                            "Priority ${task.priority} - ${task.collisionMode.name.lowercase().replace('_', ' ')}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
-            }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                item { StatusPill("${task.actions.size} action${plural(task.actions.size)}", MaterialTheme.colorScheme.primary) }
-                item { StatusPill("Priority ${task.priority}", MaterialTheme.colorScheme.secondary) }
-                item { StatusPill(task.collisionMode.name.lowercase().replace('_', ' '), MaterialTheme.colorScheme.onSurfaceVariant) }
-            }
-            if (task.actions.isEmpty()) {
-                InlineNotice(
-                    title = "Task has no actions",
-                    body = "Add at least one action before attaching this task to an enabled profile.",
-                    color = MaterialTheme.colorScheme.error,
+                if (expanded) {
+                    IconButton(onClick = onExport) {
+                        Icon(Icons.Filled.Upload, contentDescription = "Export task")
+                    }
+                }
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Collapse task" else "Expand task",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            } else {
-                task.actions.forEachIndexed { index, action ->
-                    ActionRow(
-                        index = index,
-                        action = action,
-                        onEdit = { onEditAction(index, action) },
-                        onDelete = { onDeleteAction(index) },
+            }
+            if (expanded) {
+                ItemNoteSection("tasks", task.id.toString())
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        StatusPill("${task.actions.size} action${plural(task.actions.size)}", MaterialTheme.colorScheme.primary)
+                        StatusPill("Priority ${task.priority}", MaterialTheme.colorScheme.secondary)
+                    }
+                    StatusPill(task.collisionMode.name.lowercase().replace('_', ' '), MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (task.actions.isEmpty()) {
+                    InlineNotice(
+                        title = "Task has no actions",
+                        body = "Add at least one action before attaching this task to an enabled profile.",
+                        color = MaterialTheme.colorScheme.error,
                     )
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Edit task")
-                    Spacer(Modifier.width(6.dp))
-                    Text("Edit")
-                }
-                OutlinedButton(onClick = onAddAction, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add action")
-                    Spacer(Modifier.width(6.dp))
-                    Text("Add Action")
-                }
-            }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                item {
-                    OutlinedButton(onClick = onRun) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = "Run task")
-                        Spacer(Modifier.width(6.dp))
-                        Text("Run")
+                } else {
+                    task.actions.forEachIndexed { index, action ->
+                        val dragging = draggingIndex == index
+                        ActionRow(
+                            index = index,
+                            action = action,
+                            expanded = isActionExpanded(index),
+                            onToggle = { onToggleAction(index) },
+                            onEdit = { onEditAction(index, action) },
+                            onDelete = { onDeleteAction(index) },
+                            modifier = Modifier
+                                .zIndex(if (dragging) 1f else 0f)
+                                .graphicsLayer { translationY = if (dragging) dragOffsetY else 0f }
+                                .onSizeChanged { if (actionRowHeightPx == 0 && it.height > 0) actionRowHeightPx = it.height },
+                            dragHandleModifier = Modifier.pointerInput(index, task.id) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { draggingIndex = index; dragOffsetY = 0f },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        dragOffsetY += dragAmount.y
+                                    },
+                                    onDragEnd = {
+                                        val from = index
+                                        val shift = if (actionRowHeightPx > 0) (dragOffsetY / actionRowHeightPx).roundToInt() else 0
+                                        val to = (from + shift).coerceIn(0, task.actions.lastIndex)
+                                        if (to != from) {
+                                            val reordered = task.actions.toMutableList().apply { add(to, removeAt(from)) }
+                                            onReorderActions(reordered)
+                                        }
+                                        draggingIndex = null
+                                        dragOffsetY = 0f
+                                    },
+                                    onDragCancel = {
+                                        draggingIndex = null
+                                        dragOffsetY = 0f
+                                    },
+                                )
+                            },
+                        )
                     }
                 }
-                item {
-                    OutlinedButton(onClick = onPin) {
-                        Icon(Icons.Filled.PushPin, contentDescription = "Pin task")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Edit, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
-                        Text("Pin")
+                        Text("Edit")
+                    }
+                    OutlinedButton(onClick = onAddAction, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Add Action")
                     }
                 }
-                item {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = onRun) {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Run")
+                        }
+                        OutlinedButton(onClick = onPin) {
+                            Icon(Icons.Filled.PushPin, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Pin")
+                        }
+                        OutlinedButton(onClick = onMove) {
+                            Icon(Icons.Filled.Folder, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Move")
+                        }
+                    }
                     TextButton(onClick = onDelete) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Delete task")
+                        Icon(Icons.Filled.Delete, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
                         Text("Delete Task")
                     }
@@ -2125,49 +3082,177 @@ private fun TaskCard(
     }
 }
 
+/** Open this app's system notification settings (its channels), falling back to app details. */
+private fun openNotificationSettings(context: Context) {
+    runCatching {
+        context.startActivity(
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }.onFailure { openAppDetailsSettings(context) }
+}
+
+/** Open this app's "App info" settings page (where every permission toggle lives). */
+private fun openAppDetailsSettings(context: Context) {
+    runCatching {
+        context.startActivity(
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+}
+
+/** Deep-link to the settings screen that grants [requirement]; fall back to App info if there is none. */
+private fun openCapabilitySettings(context: Context, requirement: CapabilityRequirement) {
+    val intent = CapabilityState.settingsIntent(requirement, context)
+    if (intent == null) {
+        openAppDetailsSettings(context)
+        return
+    }
+    runCatching { context.startActivity(intent) }.onFailure { openAppDetailsSettings(context) }
+}
+
+/** Amber/warning colour for a granted-requirement FYI note (theme-aware). */
+@Composable
+// A clear YELLOW for the "granted, FYI" note — deliberately NOT SemanticColor.warning* (peach), which is
+// almost indistinguishable from the dark-theme error red, so amber-vs-red was unreadable on the black theme.
+private fun capabilityWarningColor(): Color =
+    if (isSystemInDarkTheme()) Color(0xFFFFD54F) else Color(0xFF8D6E00)
+
+/** A one-line summary of an action's key args for the collapsed action card — which profile/state, which
+ *  task is run, the flashed text, … — so a task reads at a glance without unfolding every action. */
+private fun actionConfigSummary(action: ActionSpec, metadata: ActionMetadata?): String {
+    val a = action.args
+    fun v(vararg keys: String) = keys.firstNotNullOfOrNull { a[it]?.takeIf { s -> s.isNotBlank() } }
+    val raw = when (action.type) {
+        "profile.toggle" -> listOfNotNull(v("profile"), v("state")).joinToString(" → ")
+        "task.run" -> v("task")
+        "flash" -> v("text")
+        "notify.show" -> v("title", "text")
+        "notify.dismiss" -> v("package")
+        "var.set" -> listOfNotNull(v("name"), v("value")).joinToString(" = ")
+        "var.replace", "var.clear", "var.adjust" -> v("name")
+        "scene.show", "scene.hide" -> v("scene")
+        "widget.set" -> listOfNotNull(v("widget"), v("template")).joinToString(" ← ")
+        "datetime" -> v("format")
+        "send.intent" -> v("action", "component", "package")
+        else -> metadata?.fields?.firstNotNullOfOrNull { f -> a[f.key]?.takeIf { it.isNotBlank() } }
+            ?: a.values.firstOrNull { it.isNotBlank() }
+    }
+    return raw?.replace("\n", " ")?.trim()?.take(80).orEmpty()
+}
+
 @Composable
 private fun ActionRow(
     index: Int,
     action: ActionSpec,
+    expanded: Boolean,
+    onToggle: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+    dragHandleModifier: Modifier = Modifier,
 ) {
     val metadata = ActionMetadataRegistry.get(action.type)
     val capability = ActionCapabilityRegistry.get(action.type)
+    val context = LocalContext.current
+    val warningColor = capabilityWarningColor()
+    // Re-evaluate the requirement live, so an action whose permission/service is already granted no longer
+    // claims "needs setup"; bump permRefresh after launching a fix so returning re-evaluates.
+    var permRefresh by remember { mutableStateOf(0) }
+    val met = remember(permRefresh) { CapabilityState.isMet(capability.requirement, context) }
+    val effectiveLevel = if (met) CapabilityLevel.Supported else capability.level
+    val isPostNotifications = capability.requirement == CapabilityRequirement.PostNotifications
+    // Granting POST_NOTIFICATIONS from the card; if the system won't prompt (already denied), fall to settings.
+    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        permRefresh++
+        if (!granted) openNotificationSettings(context)
+    }
     Surface(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
-        shape = RoundedCornerShape(DesignSystem.Radii.lg),
-        modifier = Modifier.fillMaxWidth(),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
+        shape = RoundedCornerShape(12.dp),
+        modifier = modifier.fillMaxWidth().animateContentSize(),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
-        ) {
-            StatusPill("#${index + 1}", MaterialTheme.colorScheme.secondary)
-            Column(Modifier.weight(1f)) {
-                Text(action.label ?: metadata?.name ?: action.type, style = MaterialTheme.typography.titleSmall)
-                Text(
-                    action.args.entries.joinToString { "${it.key}=${it.value}" }.ifBlank { metadata?.description ?: "No arguments" },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+        Column(Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    Icons.Filled.DragIndicator,
+                    contentDescription = "Drag to reorder",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = dragHandleModifier,
                 )
-                if (capability.level != CapabilityLevel.Supported) {
-                    Spacer(Modifier.height(6.dp))
+                StatusPill("#${index + 1}", MaterialTheme.colorScheme.secondary)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        action.label ?: metadata?.name ?: action.type,
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    val summary = actionConfigSummary(action, metadata)
+                    if (summary.isNotBlank()) {
+                        Text(
+                            summary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                if (effectiveLevel != CapabilityLevel.Supported) {
                     StatusPill(
-                        if (capability.level == CapabilityLevel.Unsupported) "Unsupported" else "Needs setup",
-                        if (capability.level == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        if (effectiveLevel == CapabilityLevel.Unsupported) "Unsupported" else "Needs setup",
+                        if (effectiveLevel == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                     )
                 }
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Collapse action" else "Expand action",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Filled.Edit, contentDescription = "Edit action")
-            }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete action", tint = MaterialTheme.colorScheme.error)
+            if (expanded) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    metadata?.description?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (action.args.isEmpty()) {
+                        Text("No arguments configured", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        action.args.forEach { (key, value) ->
+                            Text("$key = $value", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    action.condition?.takeIf { it.isNotBlank() }?.let {
+                        Text("Condition: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (action.continueOnError) {
+                        Text("Continues on error", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    CapabilityNote(capability)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = onEdit) {
+                            Icon(Icons.Filled.Edit, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Edit")
+                        }
+                        TextButton(onClick = onDelete) {
+                            Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Delete")
+                        }
+                    }
+                }
             }
         }
     }
@@ -2183,7 +3268,7 @@ private fun ContextRow(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
         shape = RoundedCornerShape(DesignSystem.Radii.lg),
         modifier = Modifier.fillMaxWidth(),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -2212,7 +3297,6 @@ private fun ContextRow(
         }
     }
 }
-
 
 @Composable
 private fun EmptyState(
@@ -2246,13 +3330,13 @@ private fun EmptyState(
     ) {
         Surface(
             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
-            shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)),
+            shape = RoundedCornerShape(18.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
         ) {
             Box(modifier = Modifier.padding(14.dp), contentAlignment = Alignment.Center) {
                 Icon(
                     Icons.Filled.Info,
-                    contentDescription = "Info",
+                    contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(30.dp),
                 )
@@ -2269,14 +3353,8 @@ private fun EmptyState(
         )
         if (actionLabel != null && onAction != null) {
             Spacer(Modifier.height(24.dp))
-            Button(
-                onClick = onAction,
-                enabled = actionEnabled,
-                modifier = actionWidth
-                    .heightIn(min = 48.dp),
-                shape = RoundedCornerShape(DesignSystem.Radii.lg),
-            ) {
-                Text(actionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+            OutlinedButton(onClick = onAction, enabled = actionEnabled, modifier = Modifier.fillMaxWidth()) {
+                Text(actionLabel)
             }
         }
         if (
@@ -2318,22 +3396,18 @@ private fun EmptyState(
             OutlinedButton(
                 onClick = onSecondaryAction,
                 enabled = secondaryActionEnabled,
-                modifier = actionWidth
-                    .heightIn(min = 48.dp),
-                shape = RoundedCornerShape(DesignSystem.Radii.lg),
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(secondaryActionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                Text(secondaryActionLabel)
             }
         } else if (tertiaryActionLabel != null && onTertiaryAction != null) {
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
                 onClick = onTertiaryAction,
                 enabled = tertiaryActionEnabled,
-                modifier = actionWidth
-                    .heightIn(min = 48.dp),
-                shape = RoundedCornerShape(DesignSystem.Radii.lg),
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(tertiaryActionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                Text(tertiaryActionLabel)
             }
         }
         if (quaternaryActionLabel != null && onQuaternaryAction != null) {
@@ -2341,13 +3415,196 @@ private fun EmptyState(
             TextButton(
                 onClick = onQuaternaryAction,
                 enabled = quaternaryActionEnabled,
-                modifier = actionWidth
-                    .heightIn(min = 48.dp),
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(quaternaryActionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                Text(quaternaryActionLabel)
             }
         }
     }
+}
+
+@Composable
+private fun NewVariableDialog(
+    existingKeys: Set<String>,
+    onDismiss: () -> Unit,
+    onConfirm: (name: String, value: String) -> Unit,
+) {
+    var rawName by remember { mutableStateOf("%") }
+    var value by remember { mutableStateOf("") }
+    // Normalise to a leading %; a manually-added var is a super-global (projectId 0).
+    val name = rawName.trim().let { if (it.startsWith("%")) it else "%$it" }
+    val duplicate = "0:$name" in existingKeys
+    val valid = name.length > 1 && !duplicate
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = onDismiss,
+        title = { Text("New variable") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = rawName,
+                    onValueChange = { rawName = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    isError = duplicate,
+                    supportingText = {
+                        Text(
+                            if (duplicate) "A variable named $name already exists." else "Stored as a super-global (%ALLCAPS stays global everywhere).",
+                        )
+                    },
+                )
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it },
+                    label = { Text("Value") },
+                    singleLine = true,
+                )
+            }
+        },
+        confirmButton = { TextButton(enabled = valid, onClick = { onConfirm(name, value) }) { Text("Create") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun ExportOptionsDialog(
+    request: ExportRequest,
+    onDismiss: () -> Unit,
+    onExport: (Boolean) -> Unit,
+) {
+    var includeVariables by remember { mutableStateOf(false) }
+    // The "also bundle all global variables" option only makes sense for profile/task/scene exports;
+    // a variables or widget-templates export already carries exactly what it should.
+    val canIncludeVars = request.variableKeys.isEmpty() && request.templateNames.isEmpty()
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = onDismiss,
+        title = { Text("Export") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(request.name, style = MaterialTheme.typography.bodyMedium)
+                if (canIncludeVars) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Checkbox(checked = includeVariables, onCheckedChange = { includeVariables = it })
+                        Text("Include global variables", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onExport(canIncludeVars && includeVariables) }) { Text("Export") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun ImportProjectConflictDialog(
+    conflictingNames: List<String>,
+    onOverwrite: () -> Unit,
+    onKeepBoth: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val single = conflictingNames.singleOrNull()
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = onDismiss,
+        title = { Text("Project already exists") },
+        text = {
+            Text(
+                if (single != null) {
+                    "A project named “$single” already exists. Import into it (file the imported items under the existing project), or create a separate new (renamed) project?"
+                } else {
+                    "These projects already exist: ${conflictingNames.joinToString { "“$it”" }}. Import into them, or create separate new (renamed) projects?"
+                },
+            )
+        },
+        // Stacked so long names don't overflow; default (import into existing) on top.
+        confirmButton = {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+                TextButton(onClick = onOverwrite) {
+                    Text(if (single != null) "Import into “$single”" else "Import into existing")
+                }
+                TextButton(onClick = onKeepBoth) { Text("Create new project") }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        },
+    )
+}
+
+@Composable
+private fun ImportItemConflictDialog(
+    collisions: List<String>,
+    onRename: () -> Unit,
+    onOverwriteDelete: () -> Unit,
+    onOverwriteBackup: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = onDismiss,
+        title = { Text("Some items already exist") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("These already exist in your workspace:", style = MaterialTheme.typography.bodyMedium)
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    collisions.take(12).forEach { Text("•  $it", style = MaterialTheme.typography.bodySmall) }
+                    if (collisions.size > 12) {
+                        Text("…and ${collisions.size - 12} more", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Text(
+                    "Import with new names keeps both. Overwrite and backup current renames the existing ones to “.<timestamp>.bak” before importing. Overwrite and delete current removes them first.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        // Stacked; default (backs up then imports) on top.
+        confirmButton = {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+                TextButton(onClick = onOverwriteBackup) { Text("Overwrite and backup current") }
+                TextButton(onClick = onOverwriteDelete) { Text("Overwrite and delete current") }
+                TextButton(onClick = onRename) { Text("Import with new names") }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        },
+    )
+}
+
+@Composable
+private fun ImportResultDialog(report: BundleImportReport, onDismiss: () -> Unit) {
+    val counts = buildList {
+        if (report.insertedTasks > 0) add("${report.insertedTasks} task${plural(report.insertedTasks)}")
+        if (report.insertedProfiles > 0) add("${report.insertedProfiles} disabled profile${plural(report.insertedProfiles)}")
+        if (report.insertedScenes > 0) add("${report.insertedScenes} scene${plural(report.insertedScenes)}")
+        if (report.insertedTemplates > 0) add("${report.insertedTemplates} template${plural(report.insertedTemplates)}")
+        if (report.insertedVariables > 0) add("${report.insertedVariables} variable${plural(report.insertedVariables)}")
+        if (report.insertedProjects > 0) add("${report.insertedProjects} new project${plural(report.insertedProjects)}")
+    }
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = onDismiss,
+        title = { Text("Import complete") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(if (counts.isEmpty()) "Nothing new was imported." else "Imported ${counts.joinToString()}.", style = MaterialTheme.typography.bodyMedium)
+                if (report.projectNames.isNotEmpty()) {
+                    Text(
+                        "Filed under: ${report.projectNames.joinToString { "“$it”" }}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                if (report.lossyWarnings.isNotEmpty()) {
+                    Text(
+                        report.lossyWarnings.joinToString("\n") { "• $it" },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } },
+    )
 }
 
 @Composable
@@ -2357,11 +3614,12 @@ private fun DeleteConfirmationDialog(
     onConfirm: () -> Unit,
 ) {
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         icon = {
             Icon(
                 Icons.Filled.Delete,
-                contentDescription = "Delete",
+                contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
             )
         },
@@ -2384,9 +3642,10 @@ private fun DeleteConfirmationDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
             ) {
                 Text(target.confirmLabel)
             }
@@ -2395,18 +3654,18 @@ private fun DeleteConfirmationDialog(
     )
 }
 
-
 @Composable
 private fun TemplatePickerDialog(
     onDismiss: () -> Unit,
     onSelect: (ProfileTemplate) -> Unit,
 ) {
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text("Starter templates") },
         text = {
             LazyColumn(
-                modifier = Modifier.heightIn(max = 460.dp),
+                modifier = Modifier.height(460.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 items(ProfileTemplateCatalog.all, key = { it.id }) { template ->
@@ -2426,7 +3685,7 @@ private fun TemplatePickerDialog(
                                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f)
                             },
                         ),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         shape = RoundedCornerShape(14.dp),
                     ) {
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -2464,16 +3723,17 @@ private fun TemplateSlotDialog(
     onDismiss: () -> Unit,
     onInstall: (Map<String, String>) -> Unit,
 ) {
-    var values by rememberSaveable(template.id) { mutableStateOf(template.defaults()) }
+    var values by remember(template.id) { mutableStateOf(template.defaults()) }
     val missingRequired = template.slots.any { it.required && values[it.key].isNullOrBlank() }
 
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text(template.title) },
         text = {
             LazyColumn(
-                modifier = Modifier.heightIn(max = 420.dp),
-                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
+                modifier = Modifier.height(420.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
                     Text(template.summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -2502,7 +3762,7 @@ private fun TemplateSlotDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 enabled = !missingRequired && template.installable,
                 onClick = { onInstall(values) },
             ) {
@@ -2519,12 +3779,13 @@ private fun TaskEditorDialog(
     onDismiss: () -> Unit,
     onSave: (String, Int) -> Unit,
 ) {
-    var name by rememberSaveable(task?.id) { mutableStateOf(task?.name.orEmpty()) }
-    var priority by rememberSaveable(task?.id) { mutableStateOf((task?.priority ?: 5).toString()) }
+    var name by remember(task?.id) { mutableStateOf(task?.name.orEmpty()) }
+    var priority by remember(task?.id) { mutableStateOf((task?.priority ?: 5).toString()) }
     val parsedPriority = priority.toIntOrNull()
     val canSave = name.isNotBlank() && parsedPriority != null && parsedPriority in 0..10
 
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text(if (task == null) "Create Task" else "Edit Task") },
         text = {
@@ -2544,14 +3805,13 @@ private fun TaskEditorDialog(
                     label = { Text("Priority") },
                     supportingText = { Text(if (parsedPriority == null || parsedPriority !in 0..10) "Enter a value from 0 to 10." else "Higher priority tasks run first when queues compete.") },
                     isError = parsedPriority == null || parsedPriority !in 0..10,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
         confirmButton = {
-            Button(enabled = canSave, onClick = { onSave(name, parsedPriority ?: 5) }) {
+            OutlinedButton(enabled = canSave, onClick = { onSave(name, parsedPriority ?: 5) }) {
                 Text("Save")
             }
         },
@@ -2559,28 +3819,53 @@ private fun TaskEditorDialog(
     )
 }
 
+/** A thin, always-visible scrollbar thumb on the right edge — drawn only while [state] can scroll, so a
+ *  bordered list (e.g. the profile editor's task picker) reads as obviously scrollable at a glance. */
+private fun Modifier.alwaysVisibleScrollbar(state: ScrollState, color: Color): Modifier = drawWithContent {
+    drawContent()
+    val max = state.maxValue
+    if (max > 0) {
+        val viewport = size.height
+        val thumbH = (viewport * viewport / (viewport + max)).coerceAtLeast(28.dp.toPx())
+        val thumbY = (viewport - thumbH) * (state.value.toFloat() / max)
+        val w = 4.dp.toPx()
+        drawRoundRect(
+            color = color.copy(alpha = 0.7f),
+            topLeft = Offset(size.width - w - 1.dp.toPx(), thumbY),
+            size = Size(w, thumbH),
+            cornerRadius = CornerRadius(w / 2f),
+        )
+    }
+}
+
 @Composable
 private fun ProfileEditorDialog(
     profile: Profile?,
     tasks: List<Task>,
     onDismiss: () -> Unit,
-    onSave: (String, Boolean, Long, Int, AutomationMode, String?) -> Unit,
+    onSave: (String, Boolean, Long, Int, AutomationMode) -> Unit,
 ) {
     val initialTaskId = profile?.enterTaskId ?: tasks.firstOrNull()?.id ?: 0L
-    var name by rememberSaveable(profile?.id) { mutableStateOf(profile?.name.orEmpty()) }
-    var enabled by rememberSaveable(profile?.id) { mutableStateOf(profile?.enabled ?: true) }
-    var enterTaskId by rememberSaveable(profile?.id, tasks) { mutableLongStateOf(initialTaskId) }
-    var cooldown by rememberSaveable(profile?.id) { mutableStateOf((profile?.cooldownSec ?: 0).toString()) }
-    var automationMode by rememberSaveable(profile?.id) { mutableStateOf(profile?.automationMode ?: AutomationMode.SINGLE) }
-    var group by rememberSaveable(profile?.id) { mutableStateOf(profile?.group.orEmpty()) }
+    var name by remember(profile?.id) { mutableStateOf(profile?.name.orEmpty()) }
+    var enabled by remember(profile?.id) { mutableStateOf(profile?.enabled ?: true) }
+    var enterTaskId by remember(profile?.id, tasks) { mutableLongStateOf(initialTaskId) }
+    var cooldown by remember(profile?.id) { mutableStateOf((profile?.cooldownSec ?: 0).toString()) }
+    var automationMode by remember(profile?.id) { mutableStateOf(profile?.automationMode ?: AutomationMode.SINGLE) }
     val parsedCooldown = cooldown.toIntOrNull()
     val canSave = name.isNotBlank() && enterTaskId > 0 && (cooldown.isBlank() || parsedCooldown != null)
 
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text(if (profile == null) "Create Profile" else "Edit Profile") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+            // Scrollable: the task list + cooldown + re-trigger options exceed the dialog's bounded
+            // height, and without this the AlertDialog clips everything past the first few tasks (so a
+            // task like dt.tick further down the list couldn't be selected at all).
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -2590,29 +3875,10 @@ private fun ProfileEditorDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
-                    value = group,
-                    onValueChange = { group = it },
-                    label = { Text("Group") },
-                    placeholder = { Text("Work, Home, Travel") },
-                    supportingText = { Text("Optional. Groups profiles for filtering.") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f),
-                    shape = RoundedCornerShape(DesignSystem.Radii.lg),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .toggleable(
-                            value = enabled,
-                            role = Role.Switch,
-                            onValueChange = { enabled = it },
-                        )
-                        .semantics {
-                            stateDescription = if (enabled) "On" else "Off"
-                        },
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -2626,17 +3892,50 @@ private fun ProfileEditorDialog(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        Switch(checked = enabled, onCheckedChange = null)
+                        Switch(checked = enabled, onCheckedChange = { enabled = it })
                     }
                 }
-                Text("Enter task", style = MaterialTheme.typography.labelLarge)
-                tasks.forEach { task ->
-                    SelectableOption(
-                        title = task.name,
-                        body = "${task.actions.size} action${plural(task.actions.size)}",
-                        selected = task.id == enterTaskId,
-                        onClick = { enterTaskId = task.id },
-                    )
+                Text(
+                    "Enter task:",
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        textDecoration = TextDecoration.Underline,
+                    ),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                // All the selectable tasks live in one bordered box so they read as a single "enter task"
+                // group; it's height-capped + scrolls internally with an always-visible scrollbar, so a long
+                // task list is obviously scrollable at a glance (and never clips behind the dialog).
+                val taskScroll = rememberScrollState()
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .heightIn(max = 240.dp)
+                            .verticalScroll(taskScroll)
+                            .alwaysVisibleScrollbar(taskScroll, MaterialTheme.colorScheme.primary)
+                            .padding(start = 8.dp, top = 8.dp, bottom = 8.dp, end = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (tasks.isEmpty()) {
+                            Text(
+                                "No tasks yet — create one in the Tasks tab first.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        tasks.forEach { task ->
+                            SelectableOption(
+                                title = task.name,
+                                body = "${task.actions.size} action${plural(task.actions.size)}",
+                                selected = task.id == enterTaskId,
+                                onClick = { enterTaskId = task.id },
+                            )
+                        }
+                    }
                 }
                 OutlinedTextField(
                     value = cooldown,
@@ -2644,7 +3943,6 @@ private fun ProfileEditorDialog(
                     label = { Text("Cooldown seconds") },
                     supportingText = { Text(if (cooldown.isNotBlank() && parsedCooldown == null) "Enter seconds as a whole number." else "Prevents rapid re-triggering after a match.") },
                     isError = cooldown.isNotBlank() && parsedCooldown == null,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -2661,7 +3959,7 @@ private fun ProfileEditorDialog(
             }
         },
         confirmButton = {
-            Button(enabled = canSave, onClick = { onSave(name, enabled, enterTaskId, parsedCooldown ?: 0, automationMode, group.trim().ifBlank { null }) }) {
+            OutlinedButton(enabled = canSave, onClick = { onSave(name, enabled, enterTaskId, parsedCooldown ?: 0, automationMode) }) {
                 Text("Save")
             }
         },
@@ -2686,7 +3984,7 @@ private fun SelectableOption(
         ),
         border = BorderStroke(
             1.dp,
-            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.55f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.60f),
+            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
         ),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
     ) {
@@ -2717,15 +4015,40 @@ private fun ActionPickerDialog(
             .toSortedMap()
             .map { (category, actions) -> category to actions.sortedBy { it.name } }
     }
+    var query by remember { mutableStateOf("") }
+    val filteredGroups = remember(query) {
+        if (query.isBlank()) {
+            actionGroups
+        } else {
+            actionGroups.mapNotNull { (category, actions) ->
+                val matches = actions.filter {
+                    it.name.contains(query, ignoreCase = true) ||
+                        category.contains(query, ignoreCase = true) ||
+                        it.description.contains(query, ignoreCase = true)
+                }
+                if (matches.isEmpty()) null else category to matches
+            }
+        }
+    }
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text("Add action") },
         text = {
-            LazyColumn(
-                modifier = Modifier.heightIn(max = 420.dp),
-                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
-            ) {
-                actionGroups.forEach { (category, actions) ->
+            Column {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = { Text("Search actions") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                LazyColumn(
+                    modifier = Modifier.height(380.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    filteredGroups.forEach { (category, actions) ->
                     item(key = "category-$category") {
                         Text(
                             category,
@@ -2736,6 +4059,11 @@ private fun ActionPickerDialog(
                     }
                     items(actions, key = { it.id }) { metadata ->
                         val capability = ActionCapabilityRegistry.get(metadata.id)
+                        val pickerContext = LocalContext.current
+                        val pickerWarningColor = capabilityWarningColor()
+                        // Live: a granted requirement drops the "Setup" pill and shows its note in amber, not red.
+                        val met = remember(metadata.id) { CapabilityState.isMet(capability.requirement, pickerContext) }
+                        val effectiveLevel = if (met) CapabilityLevel.Supported else capability.level
                         Card(
                             onClick = { onSelect(metadata) },
                             enabled = capability.canAdd,
@@ -2747,7 +4075,7 @@ private fun ActionPickerDialog(
                                     MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
                                 },
                             ),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             shape = RoundedCornerShape(14.dp),
                         ) {
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs)) {
@@ -2757,20 +4085,19 @@ private fun ActionPickerDialog(
                                     horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
                                 ) {
                                     Text(metadata.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                                    if (capability.level != CapabilityLevel.Supported) {
+                                    if (effectiveLevel != CapabilityLevel.Supported) {
                                         StatusPill(
-                                            if (capability.level == CapabilityLevel.Unsupported) "Unsupported" else "Setup",
-                                            if (capability.level == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                            if (effectiveLevel == CapabilityLevel.Unsupported) "Unsupported" else "Setup",
+                                            if (effectiveLevel == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                                         )
                                     }
                                 }
                                 Text(metadata.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                if (capability.level != CapabilityLevel.Supported) {
-                                    Text(capability.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                                }
+                                CapabilityNote(capability)
                             }
                         }
                     }
+                }
                 }
             }
         },
@@ -2779,74 +4106,100 @@ private fun ActionPickerDialog(
     )
 }
 
-private fun existingActionArgValue(
-    actionId: String,
-    key: String,
-    args: Map<String, String>,
-): String = args[key] ?: when (actionId to key) {
-    "brightness.set" to "brightness" -> args["level"]
-    "screenshot.take" to "path" -> args["filename"]
-    "file.read" to "var" -> args["variable"]
-    "file.write" to "text" -> args["content"]
-    "file.append" to "text" -> args["content"]
-    "file.list" to "var" -> args["variable"]
-    "http.get" to "var" -> args["variable"]
-    "http.post" to "data" -> args["body"]
-    "http.post" to "var" -> args["variable"]
-    else -> null
-}.orEmpty()
-
 @Composable
 private fun ActionConfigDialog(
     state: ActionEditState,
+    allTasks: List<Task>,
+    projects: List<Project>,
+    currentProjectId: Long?,
     onDismiss: () -> Unit,
     onSave: (ActionSpec) -> Unit,
 ) {
-    var label by rememberSaveable(state.existing?.id, state.metadata.id) {
+    var showTaskPicker by remember { mutableStateOf(false) }
+    var label by remember(state.existing?.id, state.metadata.id) {
         mutableStateOf(state.existing?.label ?: state.metadata.name)
     }
-    var values by rememberSaveable(state.existing?.id, state.metadata.id) {
-        mutableStateOf(
-            state.metadata.fields.associate { field ->
-                field.key to existingActionArgValue(
-                    actionId = state.metadata.id,
-                    key = field.key,
-                    args = state.existing?.args.orEmpty(),
-                )
-            }
-        )
+    var values by remember(state.existing?.id, state.metadata.id) {
+        mutableStateOf(state.metadata.fields.associate { field -> field.key to state.existing?.args?.get(field.key).orEmpty() })
+    }
+    // Run Task takes named parameters (param:<name>); Return Values takes named results (ret:<name>).
+    val dynamicPrefix = when (state.metadata.id) {
+        SUB_TASK_ACTION_ID -> SUB_TASK_PARAM_PREFIX
+        RETURN_VALUES_ACTION_ID -> RETURN_VALUE_PREFIX
+        else -> null
+    }
+    var dynamicPairs by remember(state.existing?.id, state.metadata.id) {
+        val initial: List<Pair<String, String>> = dynamicPrefix?.let { prefix ->
+            state.existing?.args.orEmpty()
+                .filterKeys { it.startsWith(prefix) }
+                .map { (key, value) -> key.removePrefix(prefix) to value }
+        }.orEmpty()
+        mutableStateOf(initial)
+    }
+    var continueOnError by remember(state.existing?.id, state.metadata.id) {
+        mutableStateOf(state.existing?.continueOnError ?: false)
     }
     val capability = remember(state.metadata.id) { ActionCapabilityRegistry.get(state.metadata.id) }
     val missingRequired = state.metadata.fields.any { it.required && values[it.key].isNullOrBlank() }
+    val context = LocalContext.current
+    val warningColor = capabilityWarningColor()
+    // Live: recompute the requirement; bump permRefresh after a fix launch so returning re-evaluates.
+    var permRefresh by remember { mutableStateOf(0) }
+    val met = remember(permRefresh, state.metadata.id) { CapabilityState.isMet(capability.requirement, context) }
+    val effectiveLevel = if (met) CapabilityLevel.Supported else capability.level
+    val isPostNotifications = capability.requirement == CapabilityRequirement.PostNotifications
+    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        permRefresh++
+        if (!granted) openNotificationSettings(context)
+    }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(state.metadata.name) },
-        text = {
-            LazyColumn(
-                modifier = Modifier.heightIn(max = 420.dp),
-                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
-            ) {
-                item {
-                    Text(state.metadata.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (capability.level != CapabilityLevel.Supported) {
-                        Spacer(Modifier.height(8.dp))
-                        Surface(
-                            color = if (capability.level == CapabilityLevel.Unsupported) {
-                                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Column(Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "Cancel") }
+                    Text(
+                        state.metadata.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).padding(start = 4.dp),
+                    )
+                    OutlinedButton(
+                        enabled = !missingRequired && capability.canAdd,
+                        onClick = {
+                            val dynamicArgs = if (dynamicPrefix != null) {
+                                dynamicPairs.filter { it.first.isNotBlank() }
+                                    .associate { (name, value) -> "$dynamicPrefix${name.trim()}" to value }
                             } else {
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-                            },
-                            shape = RoundedCornerShape(DesignSystem.Radii.lg),
-                        ) {
-                            Text(
-                                capability.reason,
-                                modifier = Modifier.padding(12.dp),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                emptyMap()
+                            }
+                            onSave(
+                                ActionSpec(
+                                    id = state.existing?.id ?: 0,
+                                    type = state.metadata.id,
+                                    label = label.trim().ifBlank { state.metadata.name },
+                                    args = values.filterValues { it.isNotBlank() } + dynamicArgs,
+                                    continueOnError = continueOnError,
+                                    condition = state.existing?.condition,
+                                )
                             )
-                        }
-                    }
+                        },
+                    ) { Text("Save") }
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                    contentPadding = PaddingValues(vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    item {
+                        Text(state.metadata.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    CapabilityNote(capability)
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = label,
@@ -2858,58 +4211,201 @@ private fun ActionConfigDialog(
                     )
                 }
                 items(state.metadata.fields, key = { it.key }) { field ->
-                    ActionFieldInput(
-                        field = field,
-                        value = values[field.key].orEmpty(),
-                        onChange = { newValue -> values = values + (field.key to newValue) },
-                    )
+                    if (state.metadata.id == SUB_TASK_ACTION_ID && field.key == "task") {
+                        OutlinedTextField(
+                            value = values[field.key].orEmpty(),
+                            onValueChange = { newValue -> values = values + (field.key to newValue) },
+                            label = { Text(field.label + if (field.required) " *" else "") },
+                            placeholder = field.hint?.let { { Text(it) } },
+                            singleLine = true,
+                            trailingIcon = {
+                                IconButton(onClick = { showTaskPicker = true }) {
+                                    Icon(Icons.Filled.Menu, contentDescription = "Pick task")
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    } else {
+                        ActionFieldInput(
+                            field = field,
+                            value = values[field.key].orEmpty(),
+                            onChange = { newValue -> values = values + (field.key to newValue) },
+                        )
+                    }
+                }
+                if (dynamicPrefix != null) {
+                    item {
+                        DynamicArgsEditor(
+                            title = if (state.metadata.id == RETURN_VALUES_ACTION_ID) "Return values" else "Parameters",
+                            addLabel = if (state.metadata.id == RETURN_VALUES_ACTION_ID) "Add return value" else "Add parameter",
+                            pairs = dynamicPairs,
+                            onChange = { dynamicPairs = it },
+                        )
+                    }
+                }
+                item {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Continue on error", style = MaterialTheme.typography.labelLarge)
+                                Text(
+                                    "If this action fails, run the rest of the task anyway (e.g. to branch on a Run Task's %ok/%error).",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Switch(checked = continueOnError, onCheckedChange = { continueOnError = it })
+                        }
+                    }
+                }
+                }
+            }
+        }
+    }
+
+    if (showTaskPicker) {
+        TaskPickerDialog(
+            allTasks = allTasks,
+            projects = projects,
+            currentProjectId = currentProjectId,
+            onPick = { task ->
+                values = values + ("task" to task.name)
+                showTaskPicker = false
+            },
+            onDismiss = { showTaskPicker = false },
+        )
+    }
+}
+
+@Composable
+private fun TaskPickerDialog(
+    allTasks: List<Task>,
+    projects: List<Project>,
+    currentProjectId: Long?,
+    onPick: (Task) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val tasksByProject = remember(allTasks) { allTasks.groupBy { it.projectId } }
+    val expandedProjects = remember { mutableStateMapOf<Long, Boolean>() }
+    var unfiledExpanded by remember { mutableStateOf(currentProjectId == null) }
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = onDismiss,
+        title = { Text("Pick a task") },
+        text = {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                projects.forEach { project ->
+                    val tasksHere = tasksByProject[project.id].orEmpty().sortedBy { it.name.lowercase() }
+                    val expanded = expandedProjects[project.id] ?: (project.id == currentProjectId)
+                    TaskPickerGroupHeader(project.name, tasksHere.size, expanded) {
+                        expandedProjects[project.id] = !expanded
+                    }
+                    if (expanded) tasksHere.forEach { task -> TaskPickerRow(task.name) { onPick(task) } }
+                }
+                val unfiled = tasksByProject[null].orEmpty().sortedBy { it.name.lowercase() }
+                if (unfiled.isNotEmpty() || projects.isEmpty()) {
+                    TaskPickerGroupHeader("Unfiled", unfiled.size, unfiledExpanded) { unfiledExpanded = !unfiledExpanded }
+                    if (unfiledExpanded) unfiled.forEach { task -> TaskPickerRow(task.name) { onPick(task) } }
                 }
             }
         },
-        confirmButton = {
-            Button(
-                enabled = !missingRequired && capability.canAdd,
-                onClick = {
-                    onSave(
-                        ActionSpec(
-                            id = state.existing?.id ?: 0,
-                            type = state.metadata.id,
-                            label = label.trim().ifBlank { state.metadata.name },
-                            args = values.filterValues { it.isNotBlank() },
-                            continueOnError = state.existing?.continueOnError ?: false,
-                            condition = state.existing?.condition,
-                        )
-                    )
-                },
-            ) {
-                Text("Save")
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
     )
+}
+
+@Composable
+private fun TaskPickerGroupHeader(name: String, count: Int, expanded: Boolean, onToggle: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        Text(name, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+        Text("$count", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun TaskPickerRow(name: String, onClick: () -> Unit) {
+    Text(
+        name,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(start = 32.dp, top = 10.dp, bottom = 10.dp, end = 8.dp),
+        style = MaterialTheme.typography.bodyLarge,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Composable
+private fun DynamicArgsEditor(
+    title: String,
+    addLabel: String,
+    pairs: List<Pair<String, String>>,
+    onChange: (List<Pair<String, String>>) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        pairs.forEachIndexed { index, (name, value) ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { newName -> onChange(pairs.mapIndexed { i, p -> if (i == index) newName to p.second else p }) },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { newValue -> onChange(pairs.mapIndexed { i, p -> if (i == index) p.first to newValue else p }) },
+                    label = { Text("Value") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1.3f),
+                )
+                IconButton(onClick = { onChange(pairs.filterIndexed { i, _ -> i != index }) }) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Remove")
+                }
+            }
+        }
+        OutlinedButton(onClick = { onChange(pairs + ("" to "")) }) {
+            Icon(Icons.Filled.Add, contentDescription = null)
+            Spacer(Modifier.width(6.dp))
+            Text(addLabel)
+        }
+    }
 }
 
 @Composable
 private fun ActionFieldInput(field: ActionField, value: String, onChange: (String) -> Unit) {
     val label = field.label + if (field.required) " *" else ""
     when (field.fieldType) {
-        FieldType.CHECKBOX -> {
-            val checked = value.toBoolean()
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
-                shape = RoundedCornerShape(DesignSystem.Radii.lg),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .toggleable(
-                        value = checked,
-                        role = Role.Switch,
-                        onValueChange = { onChange(it.toString()) },
-                    )
-                    .semantics {
-                        stateDescription = if (checked) "On" else "Off"
-                    },
-            ) {
+        FieldType.CHECKBOX -> Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
             Row(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -2920,9 +4416,8 @@ private fun ActionFieldInput(field: ActionField, value: String, onChange: (Strin
                         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                Switch(checked = checked, onCheckedChange = null)
+                Switch(checked = value.toBoolean(), onCheckedChange = { onChange(it.toString()) })
             }
-        }
         }
 
         FieldType.MULTILINE -> OutlinedTextField(
@@ -2941,23 +4436,142 @@ private fun ActionFieldInput(field: ActionField, value: String, onChange: (Strin
             label = { Text(label) },
             placeholder = field.hint?.let { { Text(it) } },
             supportingText = if (field.required) {{ Text("Required") }} else null,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
 
-        FieldType.DROPDOWN,
+        FieldType.COLOR -> {
+            var showPicker by remember { mutableStateOf(false) }
+            val parsed = remember(value) {
+                runCatching { if (value.isBlank()) null else android.graphics.Color.parseColor(value) }.getOrNull()
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { showPicker = true }.padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(label, style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        if (parsed == null) "Default" else value.uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Box(
+                    Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(if (parsed == null) Color.Transparent else Color(parsed))
+                        .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
+                )
+            }
+            if (showPicker) {
+                RgbaColorPickerDialog(
+                    initial = value,
+                    onConfirm = { onChange(it); showPicker = false },
+                    onClear = { onChange(""); showPicker = false },
+                    onDismiss = { showPicker = false },
+                )
+            }
+        }
+
+        FieldType.WIDGET_LAYOUT -> {
+            var editing by remember { mutableStateOf(false) }
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(label, style = MaterialTheme.typography.labelLarge)
+                OutlinedButton(onClick = { editing = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (value.isBlank()) "Design layout (visual editor)" else "Edit layout visually")
+                }
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = onChange,
+                    label = { Text("Layout JSON (advanced)") },
+                    placeholder = field.hint?.let { { Text(it) } },
+                    supportingText = if (field.required) {{ Text("Required") }} else null,
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (editing) {
+                Dialog(
+                    onDismissRequest = { editing = false },
+                    properties = DialogProperties(usePlatformDefaultWidth = false),
+                ) {
+                    WidgetEditor(
+                        initialJson = value,
+                        onDone = { onChange(it); editing = false },
+                        onCancel = { editing = false },
+                    )
+                }
+            }
+        }
+
+        // Editable combo: free-text (so it can be a %variable) PLUS a picker of the field's options.
+        FieldType.DROPDOWN -> {
+            var expanded by remember { mutableStateOf(false) }
+            Box(Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = onChange,
+                    label = { Text(label) },
+                    placeholder = field.hint?.let { { Text(it) } },
+                    supportingText = if (field.required) {{ Text("Required") }} else null,
+                    singleLine = true,
+                    trailingIcon = if (field.options.isEmpty()) null else {
+                        {
+                            IconButton(onClick = { expanded = true }) {
+                                Icon(Icons.Filled.ArrowDropDown, contentDescription = "Choose a value")
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    field.options.forEach { opt ->
+                        DropdownMenuItem(text = { Text(opt) }, onClick = { onChange(opt); expanded = false })
+                    }
+                }
+            }
+        }
+
         FieldType.TEXT -> OutlinedTextField(
             value = value,
             onValueChange = onChange,
             label = { Text(label) },
             placeholder = field.hint?.let { { Text(it) } },
             supportingText = if (field.required) {{ Text("Required") }} else null,
-            singleLine = field.fieldType != FieldType.MULTILINE,
+            singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+
+        FieldType.APP_PACKAGE -> {
+            // Editable text (a package name or %var) plus an installed-apps picker that fills it.
+            var showPicker by remember { mutableStateOf(false) }
+            OutlinedTextField(
+                value = value,
+                onValueChange = onChange,
+                label = { Text(label) },
+                placeholder = field.hint?.let { { Text(it) } },
+                supportingText = if (field.required) {{ Text("Required") }} else null,
+                singleLine = true,
+                trailingIcon = {
+                    IconButton(onClick = { showPicker = true }) {
+                        Icon(Icons.Filled.Apps, contentDescription = "Pick an app")
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (showPicker) {
+                AppPickerDialog(
+                    onDismiss = { showPicker = false },
+                    onPick = { pkg -> onChange(pkg); showPicker = false },
+                )
+            }
+        }
     }
 }
+
 
 @Composable
 private fun DayScheduleInput(value: String, onChange: (String) -> Unit) {
@@ -3035,14 +4649,14 @@ private fun DayPresetButton(
 ) {
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier.heightIn(min = 48.dp),
+        modifier = modifier,
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f) else Color.Transparent,
             contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
         ),
         border = BorderStroke(
             1.dp,
-            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.62f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f),
+            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
         ),
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
     ) {
@@ -3053,6 +4667,7 @@ private fun DayPresetButton(
 @Composable
 private fun ContextTypePickerDialog(onDismiss: () -> Unit, onSelect: (ContextType) -> Unit) {
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text("Add context") },
         text = {
@@ -3062,7 +4677,7 @@ private fun ContextTypePickerDialog(onDismiss: () -> Unit, onSelect: (ContextTyp
                         onClick = { onSelect(type) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         shape = RoundedCornerShape(14.dp),
                     ) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs)) {
@@ -3084,11 +4699,11 @@ private fun ContextConfigDialog(
     onDismiss: () -> Unit,
     onSave: (ContextSpec) -> Unit,
 ) {
-    var invert by rememberSaveable(state.profile.id, state.index, state.type) { mutableStateOf(state.existing?.invert ?: false) }
-    var config by rememberSaveable(state.profile.id, state.index, state.type) {
+    var invert by remember(state.existing, state.type) { mutableStateOf(state.existing?.invert ?: false) }
+    var config by remember(state.existing, state.type) {
         mutableStateOf(defaultContextConfig(state.type) + (state.existing?.config ?: emptyMap()))
     }
-    var nfcWriteMessage by rememberSaveable(state.profile.id, state.index, state.type) { mutableStateOf<String?>(null) }
+    var nfcWriteMessage by remember { mutableStateOf<String?>(null) }
     val fields = contextFields(state.type)
     val saveConfig = contextConfigForSave(state.type, config)
     val missingRequired = fields.any { it.required && config[it.key].isNullOrBlank() } ||
@@ -3101,30 +4716,21 @@ private fun ContextConfigDialog(
     }
 
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text(state.type.name.lowercase().replaceFirstChar { it.uppercase() }) },
         text = {
             LazyColumn(
-                modifier = Modifier.heightIn(max = 420.dp),
-                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
+                modifier = Modifier.height(420.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
                     Text(contextDescription(state.type), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(12.dp))
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
-                        shape = RoundedCornerShape(DesignSystem.Radii.lg),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .toggleable(
-                                value = invert,
-                                role = Role.Switch,
-                                onValueChange = { invert = it },
-                            )
-                            .semantics {
-                                stateDescription = if (invert) "On" else "Off"
-                            },
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -3138,7 +4744,7 @@ private fun ContextConfigDialog(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            Switch(checked = invert, onCheckedChange = null)
+                            Switch(checked = invert, onCheckedChange = { invert = it })
                         }
                     }
                     HorizontalDivider()
@@ -3188,7 +4794,7 @@ private fun ContextConfigDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 enabled = !missingRequired,
                 onClick = { onSave(ContextSpec(state.type, saveConfig, invert)) },
             ) {
@@ -3219,7 +4825,8 @@ private fun contextFields(type: ContextType): List<ActionField> = when (type) {
         ActionField("value", "Expected value", required = true, hint = "true/false, connected/disconnected, on/off, 80"),
     )
     ContextType.EVENT -> listOf(
-        ActionField("event", "Event type", required = true, hint = "boot_completed, notification, nfc, bluetooth, calendar, sunrise, sunset, shake, package_added, package_removed, package_replaced"),
+        ActionField("event", "Event type", required = true, hint = "minute, boot_completed, notification, nfc, bluetooth, calendar, sunrise, sunset, shake, package_added, package_removed, package_replaced, orientation, app_foreground"),
+        ActionField("everyMinutes", "Every N minutes", FieldType.NUMBER, hint = "for event=minute; blank/1 = every minute"),
         ActionField("state", "Event state", hint = "during, upcoming, connected, disconnected"),
         ActionField("calendar", "Calendar name", hint = "Work"),
         ActionField("beforeMinutes", "Before minutes", FieldType.NUMBER, hint = "15"),
@@ -3284,9 +4891,9 @@ private fun NfcWriteHelperCard(
     onArm: (String) -> Unit,
 ) {
     val label = if (tagId.isBlank()) {
-        "OpenTasker NFC trigger"
+        "白い熊 自由作業盤 NFC trigger"
     } else {
-        "OpenTasker NFC trigger $tagId"
+        "白い熊 自由作業盤 NFC trigger $tagId"
     }
 
     Surface(
@@ -3300,7 +4907,7 @@ private fun NfcWriteHelperCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
             ) {
-                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.secondary)
+                Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text("NFC write helper", style = MaterialTheme.typography.labelLarge)
                     Text(

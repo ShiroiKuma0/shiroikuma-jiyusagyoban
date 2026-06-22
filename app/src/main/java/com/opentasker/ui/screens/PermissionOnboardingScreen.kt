@@ -32,12 +32,14 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -65,12 +67,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.opentasker.app.BuildConfig
+import com.opentasker.core.accessibility.ShiroiKumaAccessibilityService
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import com.opentasker.core.location.LocationPolicyDisclosures
 import com.opentasker.core.permissions.OemBatteryGuidance
-import com.opentasker.ui.theme.ThemeMode
-import com.opentasker.ui.theme.ThemePreference
 import kotlinx.coroutines.launch
 import com.opentasker.core.permissions.UsageAccess
 import com.opentasker.core.power.ShizukuPowerBackend
@@ -108,10 +109,12 @@ private sealed interface PermissionAction {
 fun PermissionOnboardingScreen(
     contentPadding: PaddingValues,
     onMessage: (String) -> Unit,
+    onOpenUiCustomization: () -> Unit,
     backupState: BackupSetupState,
     onCreateBackup: () -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
+    onExportWorkspace: () -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -148,17 +151,43 @@ fun PermissionOnboardingScreen(
     ) {
         item {
             Card(
+                onClick = onOpenUiCustomization,
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.66f)),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
-                shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shape = RoundedCornerShape(18.dp),
+            ) {
+                Row(
+                    Modifier.padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("白い熊 自由作業盤 UI", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Colors, borders, and fonts. Long-press the Setup tab to jump here anytime.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.66f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shape = RoundedCornerShape(18.dp),
             ) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Column(Modifier.weight(1f)) {
                             Text("Setup checklist", style = MaterialTheme.typography.headlineSmall)
                             Text(
-                                "OpenTasker can run with missing access, but affected automations stay gated until setup is complete.",
+                                "白い熊 自由作業盤 can run with missing access, but affected automations stay gated until setup is complete.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -189,14 +218,13 @@ fun PermissionOnboardingScreen(
             }
         }
 
-        item { ThemeSetupCard() }
-
         item {
             BackupSetupCard(
                 state = backupState,
                 onCreateBackup = onCreateBackup,
                 onExportBackup = onExportBackup,
                 onImportBackup = onImportBackup,
+                onExportWorkspace = onExportWorkspace,
             )
         }
 
@@ -206,7 +234,21 @@ fun PermissionOnboardingScreen(
                 onRunAction = {
                     when (val action = item.action) {
                         PermissionAction.None -> onMessage("${item.title} is already ready.")
-                        is PermissionAction.RuntimePermission -> permissionLauncher.launch(action.permission)
+                        is PermissionAction.RuntimePermission ->
+                            // Not yet granted → ask. Already granted → open this app's details page so it
+                            // can be toggled off (re-requesting a granted runtime permission does nothing).
+                            if (item.granted) {
+                                openSettingsIntent(
+                                    context,
+                                    Intent(
+                                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        Uri.fromParts("package", context.packageName, null),
+                                    ),
+                                    onMessage,
+                                )
+                            } else {
+                                permissionLauncher.launch(action.permission)
+                            }
                         is PermissionAction.SettingsIntent -> openSettingsIntent(context, action.intent, onMessage)
                         is PermissionAction.OemSettings -> openOemSettings(context, action, onMessage)
                     }
@@ -217,117 +259,17 @@ fun PermissionOnboardingScreen(
 }
 
 @Composable
-private fun ThemeSetupCard() {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val currentMode by ThemePreference.observe(context).collectAsState(initial = ThemeMode.System)
-    val onSelectMode: (ThemeMode) -> Unit = { mode ->
-        scope.launch { ThemePreference.set(context, mode) }
-    }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
-        shape = RoundedCornerShape(16.dp),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("Theme", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Choose the display mode used across navigation, setup, and runtime review surfaces.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                ThemeMode.entries.chunked(2).forEach { rowModes ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        rowModes.forEach { mode ->
-                            ThemeChoice(
-                                mode = mode,
-                                selected = mode == currentMode,
-                                onSelect = onSelectMode,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ThemeChoice(
-    mode: ThemeMode,
-    selected: Boolean,
-    onSelect: (ThemeMode) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val label = when (mode) {
-        ThemeMode.System -> "System"
-        ThemeMode.Dark -> "Dark"
-        ThemeMode.Light -> "Light"
-        ThemeMode.HighContrast -> "High contrast"
-    }
-    val accent = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
-    Surface(
-        modifier = modifier
-            .heightIn(min = 52.dp)
-            .selectable(
-                selected = selected,
-                role = Role.RadioButton,
-                onClick = { if (!selected) onSelect(mode) },
-            )
-            .semantics {
-                this.selected = selected
-                stateDescription = if (selected) "$label selected" else "$label not selected"
-            },
-        color = if (selected) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
-        } else {
-            MaterialTheme.colorScheme.surface.copy(alpha = 0.48f)
-        },
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, accent.copy(alpha = if (selected) 0.58f else 0.72f)),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            Text(
-                label,
-                style = MaterialTheme.typography.labelLarge,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (selected) {
-                Spacer(Modifier.width(6.dp))
-                Icon(
-                    Icons.Filled.CheckCircle,
-                    contentDescription = "$label selected",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun BackupSetupCard(
     state: BackupSetupState,
     onCreateBackup: () -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
+    onExportWorkspace: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         shape = RoundedCornerShape(16.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -341,7 +283,7 @@ private fun BackupSetupCard(
             }
             BackupStateBanner(state)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                Button(
+                OutlinedButton(
                     onClick = onCreateBackup,
                     enabled = !state.busy,
                     modifier = Modifier.fillMaxWidth(),
@@ -369,6 +311,19 @@ private fun BackupSetupCard(
                         Text("Import", maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
+                HorizontalDivider()
+                Text(
+                    "Or export everything as a portable 白い熊 自由作業盤 JSON bundle (projects, profiles, tasks, scenes, variables and widget templates) — the same format every tab's + menu imports.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(
+                    onClick = onExportWorkspace,
+                    enabled = !state.busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Export Workspace (JSON)")
+                }
             }
         }
     }
@@ -387,7 +342,7 @@ private fun BackupStateBanner(state: BackupSetupState) {
         else -> "No backup yet"
     }
     val body = when {
-        state.pendingRestore -> "Restart OpenTasker to apply the staged restore before the database opens."
+        state.pendingRestore -> "Restart 白い熊 自由作業盤 to apply the staged restore before the database opens."
         state.latestBackupName != null -> "Latest backup: ${state.latestBackupName}"
         else -> "Create a local backup before testing imports or risky automation changes."
     }
@@ -444,7 +399,7 @@ private fun PermissionSetupCard(
         ),
         border = BorderStroke(
             1.dp,
-            if (item.granted || item.optional) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f) else MaterialTheme.colorScheme.error.copy(alpha = 0.26f),
+            if (item.granted || item.optional) MaterialTheme.colorScheme.outlineVariant else MaterialTheme.colorScheme.error.copy(alpha = 0.26f),
         ),
         shape = RoundedCornerShape(16.dp),
     ) {
@@ -494,9 +449,10 @@ private fun PermissionSetupCard(
                 Button(onClick = onRunAction, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                     Text(item.actionLabel)
                 }
-            } else if (item.action is PermissionAction.SettingsIntent && item.title == "App visibility") {
+            } else if (item.action !is PermissionAction.None) {
+                // Granted: keep a link to the relevant Settings page so it can be reviewed / toggled off.
                 OutlinedButton(onClick = onRunAction, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                    Text("Review app settings")
+                    Text("Open settings")
                 }
             }
         }
@@ -509,7 +465,7 @@ private fun PermissionMetric(value: String, label: String, modifier: Modifier = 
         modifier = modifier,
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(value, style = MaterialTheme.typography.titleMedium)
@@ -539,7 +495,7 @@ private fun PermissionRequirement(label: String) {
     Surface(
         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f),
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
     ) {
         Text(
             label,
@@ -569,7 +525,7 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
         PermissionSetupItem(
             title = "Exact alarms",
-            body = "Allows precise scheduled automations. If denied, OpenTasker falls back to inexact delivery windows.",
+            body = "Allows precise scheduled automations. If denied, 白い熊 自由作業盤 falls back to inexact delivery windows.",
             granted = ExactAlarmSupport.canScheduleExactAlarms(context),
             actionLabel = "Open settings",
             action = PermissionAction.SettingsIntent(ExactAlarmSupport.settingsIntent(context)),
@@ -577,7 +533,7 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
         PermissionSetupItem(
             title = "Battery optimization",
-            body = "OEM and Android battery managers can stop background automation. Exempting OpenTasker improves reliability. " +
+            body = "OEM and Android battery managers can stop background automation. Exempting 白い熊 自由作業盤 improves reliability. " +
                 oem.summary,
             granted = ignoresBatteryOptimizations(context),
             actionLabel = "Open settings",
@@ -616,7 +572,7 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
         PermissionSetupItem(
             title = "Calendar access",
-            body = "Needed for local calendar-window triggers. OpenTasker only emits redacted calendar metadata to matching.",
+            body = "Needed for local calendar-window triggers. 白い熊 自由作業盤 only emits redacted calendar metadata to matching.",
             granted = hasPermission(context, Manifest.permission.READ_CALENDAR),
             actionLabel = "Request",
             action = PermissionAction.RuntimePermission(Manifest.permission.READ_CALENDAR),
@@ -631,6 +587,14 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
                 Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}")),
             ),
             requiredFor = "Scenes, overlay UI",
+        ),
+        PermissionSetupItem(
+            title = "Accessibility service",
+            body = "Lets 白い熊 自由作業盤 perform global navigation — Back, Home, Recents, notification/quick-settings panels — used by the edge-bar gestures.",
+            granted = ShiroiKumaAccessibilityService.isConnected,
+            actionLabel = "Open settings",
+            action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)),
+            requiredFor = "Back / Home / Recents actions",
         ),
         PermissionSetupItem(
             title = "Foreground location",
@@ -690,7 +654,7 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ) else null,
         PermissionSetupItem(
             title = "Do Not Disturb access",
-            body = "Needed before OpenTasker can change interruption filters or DND-related settings.",
+            body = "Needed before 白い熊 自由作業盤 can change interruption filters or DND-related settings.",
             granted = hasNotificationPolicyAccess(context),
             actionLabel = "Open settings",
             action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)),

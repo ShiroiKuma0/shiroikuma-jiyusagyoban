@@ -19,10 +19,13 @@ suspend fun executeAndLogTask(
     source: String,
     metadata: List<String> = emptyList(),
     initialVariables: Map<String, String> = emptyMap(),
+    eventLocals: Map<String, String> = emptyMap(),
     logTag: String = TAG,
 ): TaskExecutionResult {
-    val variables = VariableStore()
+    val variables = VariableStore(com.opentasker.core.engine.variables.PersistentGlobalScope, task.projectId)
     initialVariables.forEach { (name, value) -> variables.set(name, value) }
+    // Force-local so this invocation's event snapshot shadows the (possibly since-overwritten) super-global.
+    eventLocals.forEach { (name, value) -> variables.setLocal(name, value) }
     val ctx = ActionContext(appContext, variables) { msg -> Log.i(logTag, msg) }
     val runner = TaskRunner(ctx, resolveTask = dbSubTaskResolver(db))
     val report = runner.run(task)

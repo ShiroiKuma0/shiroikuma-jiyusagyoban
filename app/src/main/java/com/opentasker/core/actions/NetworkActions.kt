@@ -167,7 +167,7 @@ class DownloadAction : Action {
             enforceHttpPolicy(parsedUrl, args)?.let { return it }
             if (urlTargetsLocalNetwork(parsedUrl)) checkLocalNetworkPermission(ctx)?.let { return it }
             val destination = safeDownloadFile(ctx, path)
-                ?: return ActionResult.Failure("path is outside OpenTasker downloads")
+                ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 downloads")
             destination.parentFile?.mkdirs()
 
             val connection = parsedUrl.openConnection() as HttpURLConnection

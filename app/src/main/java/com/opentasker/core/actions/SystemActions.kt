@@ -1,5 +1,6 @@
 package com.opentasker.core.actions
 
+import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.os.Build
 import android.os.VibrationEffect
@@ -9,6 +10,9 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.shizuku.ShizukuShell
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Vibrate device.
@@ -87,10 +91,11 @@ class ScreenOffAction : Action {
     override val id = "screen.off"
     override val category = ActionCategory.SETTINGS
 
-    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        ctx.logger("Screen off")
-        return ActionResult.Failure("Screen-off requires privileged power management access")
-    }
+    // Accessibility GLOBAL_ACTION_LOCK_SCREEN first (no Shizuku needed — but it also LOCKS the device),
+    // then fall back to the Shizuku KEYCODE_SLEEP keyevent (pure sleep, no lock). globalAction() does the
+    // hybrid (in-process accessibility action, else the key event when keyCode != 0).
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult =
+        globalAction(ctx, AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN, "Turn screen off", keyCode = 223)
 }
 
 /**
@@ -104,9 +109,12 @@ class WakeAction : Action {
     override val category = ActionCategory.SETTINGS
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val dur = args["duration_sec"]?.toLongOrNull() ?: 10L
-        ctx.logger("Wake (${dur}s)")
-        return ActionResult.Failure("Screen wake requires a foreground activity or privileged wake flow")
+        if (!ShizukuShell.available()) return ActionResult.Failure("Screen wake needs Shizuku")
+        val ok = runCatching {
+            withContext(Dispatchers.IO) { ShizukuShell.exec("input keyevent 224").exitCode == 0 } // KEYCODE_WAKEUP
+        }.getOrDefault(false)
+        ctx.logger(if (ok) "Wake (Shizuku)" else "Wake failed")
+        return if (ok) ActionResult.Success else ActionResult.Failure("Wake keyevent failed")
     }
 }
 

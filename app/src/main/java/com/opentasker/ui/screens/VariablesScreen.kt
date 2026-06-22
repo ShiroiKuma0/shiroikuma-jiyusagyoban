@@ -1,6 +1,8 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,11 +17,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -31,8 +37,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -42,6 +48,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.model.Variable
+import com.opentasker.ui.components.GroupMoveDialogs
+import com.opentasker.ui.components.GroupOps
+import com.opentasker.ui.components.groupedItems
+import com.opentasker.ui.components.rememberGroupDragState
+import com.opentasker.ui.components.rememberGroupMoveHost
+import com.opentasker.ui.components.ItemNoteSection
+import com.opentasker.ui.components.SelectionBar
+import com.opentasker.ui.components.SelectionCheck
+import com.opentasker.ui.components.selectableItem
 import com.opentasker.ui.theme.DesignSystem
 
 private val SENSITIVE_NAMES = setOf("password", "token", "secret", "key", "credential", "auth")
@@ -49,17 +64,28 @@ private val SENSITIVE_NAMES = setOf("password", "token", "secret", "key", "crede
 private fun isSensitive(name: String): Boolean =
     SENSITIVE_NAMES.any { name.lowercase().contains(it) }
 
+/** Stable selection key for a variable (name alone isn't unique across scopes). */
+fun variableKey(v: Variable): String = "${v.projectId}:${v.name}"
+
 @Composable
 fun VariablesScreen(
     variables: List<Variable>,
     contentPadding: PaddingValues,
-    onUpdate: (name: String, value: String) -> Unit,
-    onDelete: (name: String) -> Unit,
+    onUpdate: (projectId: Long, name: String, value: String) -> Unit,
+    onDelete: (projectId: Long, name: String) -> Unit,
     onMessage: (String) -> Unit,
+    expandedVars: SnapshotStateMap<String, Boolean>,
+    selectedKeys: Set<String>,
+    onLongPressVar: (Variable) -> Unit,
+    onToggleSelectVar: (Variable) -> Unit,
+    onSelectAllVars: () -> Unit,
+    onClearVarSelection: () -> Unit,
+    onDeleteSelectedVars: () -> Unit,
+    groupOps: GroupOps,
 ) {
-    var searchQuery by rememberSaveable { mutableStateOf("") }
-    var editTargetName by rememberSaveable { mutableStateOf<String?>(null) }
-    var pendingDeleteName by rememberSaveable { mutableStateOf<String?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+    var editTarget by remember { mutableStateOf<Variable?>(null) }
+    val selectionActive = selectedKeys.isNotEmpty()
 
     val filtered = remember(variables, searchQuery) {
         if (searchQuery.isBlank()) variables
@@ -69,111 +95,70 @@ fun VariablesScreen(
         }
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(contentPadding),
-        contentPadding = PaddingValues(DesignSystem.Screen.horizontalPadding),
-        verticalArrangement = Arrangement.spacedBy(DesignSystem.Screen.cardGap),
-    ) {
-        item {
-            VariableSummaryCard(
-                totalCount = variables.size,
-                visibleCount = filtered.size,
-                sensitiveCount = variables.count { isSensitive(it.name) },
+    Column(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
+        if (selectionActive) {
+            SelectionBar(
+                count = selectedKeys.size,
+                total = variables.size,
+                onSelectAll = onSelectAllVars,
+                onClear = onClearVarSelection,
+                onDelete = onDeleteSelectedVars,
             )
         }
-        item {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                label = { Text(stringResource(R.string.variables_search_label)) },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.variables_search_label)) },
-                trailingIcon = if (searchQuery.isNotBlank()) {
-                    {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Filled.Clear, contentDescription = stringResource(R.string.variables_search_clear))
-                        }
-                    }
-                } else {
-                    null
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(DesignSystem.Radii.md),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        if (filtered.isEmpty()) {
-            item {
-                VariableEmptyState(
-                    title = if (variables.isEmpty()) stringResource(R.string.empty_variables_title) else stringResource(R.string.empty_variables_search),
-                    body = if (variables.isEmpty()) {
-                        stringResource(R.string.empty_variables_body)
-                    } else {
-                        stringResource(R.string.empty_variables_search_body)
-                    },
-                )
-            }
-        } else {
-            items(filtered, key = { it.name }) { variable ->
-                VariableRow(
-                    variable = variable,
-                    onEdit = { editTargetName = variable.name },
-                    onDelete = { pendingDeleteName = variable.name },
-                )
-            }
-        }
-    }
-
-    val editTarget = remember(variables, editTargetName) {
-        editTargetName?.let { targetName -> variables.firstOrNull { it.name == targetName } }
-    }
-
-    pendingDeleteName?.let { name ->
-        val deletedMsg = stringResource(R.string.variables_deleted, name)
-        AlertDialog(
-            onDismissRequest = { pendingDeleteName = null },
-            icon = {
-                Icon(
-                    Icons.Filled.Delete,
-                    contentDescription = stringResource(R.string.action_delete),
-                    tint = MaterialTheme.colorScheme.error,
-                )
-            },
-            title = { Text(stringResource(R.string.dialog_delete_variable, name)) },
-            text = {
-                Text(
-                    stringResource(R.string.variables_delete_body),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onDelete(name)
-                        pendingDeleteName = null
-                        if (editTargetName == name) editTargetName = null
-                        onMessage(deletedMsg)
-                    },
-                ) {
-                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingDeleteName = null }) { Text(stringResource(R.string.action_cancel)) }
-            },
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            label = { Text("Search variables") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         )
+
+        if (filtered.isEmpty()) {
+            Text(
+                text = if (variables.isEmpty()) "No global variables set" else "No matches",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(16.dp),
+            )
+        }
+
+        val moveHost = rememberGroupMoveHost()
+        val dragState = rememberGroupDragState()
+        val variableRow: @Composable (Variable) -> Unit = { variable ->
+            val key = variableKey(variable)
+            VariableRow(
+                variable = variable,
+                selectionActive = selectionActive,
+                selected = key in selectedKeys,
+                expanded = expandedVars[key] == true,
+                onToggleExpanded = { expandedVars[key] = expandedVars[key] != true },
+                onLongPress = { onLongPressVar(variable) },
+                onToggleSelect = { onToggleSelectVar(variable) },
+                onEdit = { editTarget = variable },
+                onDelete = { onDelete(variable.projectId, variable.name) },
+            )
+        }
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            if (groupOps.groups.isEmpty()) {
+                items(filtered, key = { variableKey(it) }) { variable -> variableRow(variable) }
+            } else {
+                groupedItems(
+                    filtered, { variableKey(it) }, groupOps, dragState,
+                    onMoveItem = { moveHost.movingItemKey = it },
+                    onMoveGroup = { moveHost.movingGroup = it },
+                ) { variable -> variableRow(variable) }
+            }
+        }
+        GroupMoveDialogs(groupOps, moveHost)
     }
 
     editTarget?.let { target ->
-        val updatedMsg = stringResource(R.string.variables_updated, target.name)
         EditVariableDialog(
             variable = target,
-            onDismiss = { editTargetName = null },
+            onDismiss = { editTarget = null },
             onSave = { newValue ->
-                onUpdate(target.name, newValue)
-                editTargetName = null
-                onMessage(updatedMsg)
+                onUpdate(target.projectId, target.name, newValue)
+                editTarget = null
+                onMessage("Updated ${target.name}")
             },
         )
     }
@@ -259,49 +244,74 @@ private fun VariableEmptyState(title: String, body: String) {
 @Composable
 private fun VariableRow(
     variable: Variable,
+    selectionActive: Boolean,
+    selected: Boolean,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    onLongPress: () -> Unit,
+    onToggleSelect: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val sensitive = isSensitive(variable.name)
     Card(
-        onClick = onEdit,
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = DesignSystem.Opacity.restingSurface)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = DesignSystem.Opacity.subtleBorder)),
-        shape = RoundedCornerShape(DesignSystem.Radii.lg),
+        border = BorderStroke(
+            if (selected) 2.dp else 1.dp,
+            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        ),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).animateContentSize().selectableItem(
+            selectionActive = selectionActive,
+            onLongPress = onLongPress,
+            onToggleSelect = onToggleSelect,
+            onTapNormal = onToggleExpanded,
+        ),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "%${variable.name}",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = if (sensitive) stringResource(R.string.variables_masked_value) else variable.value,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (sensitive) {
-                    VariablePill(stringResource(R.string.label_hidden), MaterialTheme.colorScheme.secondary)
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (selectionActive) {
+                    SelectionCheck(selected)
                 }
-            }
-            IconButton(onClick = onDelete) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "%${variable.name}",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                    Text(
+                        text = if (variable.projectId == 0L) "super-global" else "project-global",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Icon(
-                    Icons.Filled.Delete,
-                    contentDescription = stringResource(R.string.action_delete),
-                    tint = MaterialTheme.colorScheme.error,
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Collapse variable" else "Expand variable",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            if (expanded) {
+                ItemNoteSection("vars", "${variable.projectId}:${variable.name}")
+                Text(
+                    text = if (isSensitive(variable.name)) "***" else variable.value,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = FontFamily.Monospace,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onEdit) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Edit variable")
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Delete variable")
+                    }
+                }
             }
         }
     }
@@ -331,9 +341,10 @@ private fun EditVariableDialog(
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,
 ) {
-    var value by rememberSaveable(variable.name) { mutableStateOf(variable.value) }
+    var value by remember { mutableStateOf(variable.value) }
 
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text("%${variable.name}") },
         text = {

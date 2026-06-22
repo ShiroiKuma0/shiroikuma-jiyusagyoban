@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">OpenTasker</string>
-    <string name="permission_automation_label">Control OpenTasker automations</string>
-    <string name="permission_automation_description">Allows same-signer integrations to run OpenTasker tasks, toggle profiles, and query automation status through documented intents.</string>
+    <string name="app_name">白い熊 自由作業盤</string>
+    <string name="permission_automation_label">Control 白い熊 自由作業盤 automations</string>
+    <string name="permission_automation_description">Allows same-signer integrations to run 白い熊 自由作業盤 tasks, toggle profiles, and query automation status through documented intents.</string>
     <string name="error_prefix">Error: %1$s</string>
     <string name="success_prefix">Success: %1$s</string>
-    <string name="widget_task_description">Run an OpenTasker task with one tap</string>
+    <string name="widget_task_description">Run an 白い熊 自由作業盤 task with one tap</string>
 
     <!-- Navigation -->
     <string name="nav_profiles">Profiles</string>
@@ -238,4 +238,10 @@
     <!-- Flow -->
     <string name="flow_empty_title">No automation flow</string>
     <string name="flow_empty_body">Create profiles and tasks to see their connections here.</string>
+
+    <!-- Fork additions (白い熊 自由作業盤) -->
+    <string name="accessibility_service_description">Lets 白い熊 自由作業盤 actions perform system gestures — Back, Recents, the notification and quick-settings panels, the power dialog, and lock screen. No screen content is read.</string>
+    <string name="widget_task_label">白い熊 自由作業盤 (Task)</string>
+    <string name="widget_styled_label">白い熊 自由作業盤 (Styled)</string>
+    <string name="widget_styled_description">Designable widget — a styled layout a task can update (e.g. a clock).</string>
 </resources>

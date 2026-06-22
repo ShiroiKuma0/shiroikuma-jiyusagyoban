@@ -3,6 +3,7 @@ package com.opentasker.core.actions
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import com.opentasker.core.contexts.NotificationTriggerService
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -83,6 +84,24 @@ class NotifyAction : Action {
             builder.addAction(0, label, pi)
         }
 
+        // Body tap (contentIntent) runs a task — clickable in the collapsed view too, unlike action
+        // buttons which only show when the notification is expanded.
+        args["tap_task"]?.takeIf { it.isNotBlank() }?.let { taskName ->
+            val req = (notifId.hashCode() * 31 + 99) and 0x7FFFFFFF
+            val tapIntent = Intent(ctx.app, NotificationActionReceiver::class.java).apply {
+                action = NotificationActionReceiver.ACTION_NOTIFICATION_BUTTON
+                putExtra(NotificationActionReceiver.EXTRA_TASK_NAME, taskName)
+                putExtra(NotificationActionReceiver.EXTRA_BUTTON_LABEL, title)
+                putExtra("_req", req)
+            }
+            builder.setContentIntent(
+                PendingIntent.getBroadcast(
+                    ctx.app, req, tapIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                ),
+            )
+        }
+
         val notification = builder.build()
 
         return try {
@@ -131,6 +150,22 @@ class NotifyCancelAction : Action {
     }
 }
 
+/** Dismiss every clearable notification from another app, by package — needs notification access. */
+class NotifyDismissAction : Action {
+    override val id = "notify.dismiss"
+    override val category = ActionCategory.NOTIFICATION
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val pkg = args["package"]?.trim().orEmpty()
+        if (pkg.isEmpty()) return ActionResult.Failure("Specify 'package' to dismiss notifications from")
+        val listener = NotificationTriggerService.instance
+            ?: return ActionResult.Failure("Notification access not granted (listener not connected)")
+        val n = listener.dismissPackage(pkg)
+        ctx.logger("Dismissed $n notification(s) from $pkg")
+        return ActionResult.Success
+    }
+}
+
 internal object NotificationChannels {
     data class ChannelDef(
         val id: String,
@@ -139,9 +174,9 @@ internal object NotificationChannels {
     )
 
     private val channels = mapOf(
-        "quiet" to ChannelDef("opentasker.quiet", "OpenTasker quiet", NotificationManager.IMPORTANCE_LOW),
-        "default" to ChannelDef("opentasker.actions", "OpenTasker actions", NotificationManager.IMPORTANCE_DEFAULT),
-        "urgent" to ChannelDef("opentasker.urgent", "OpenTasker urgent", NotificationManager.IMPORTANCE_HIGH),
+        "quiet" to ChannelDef("opentasker.quiet", "白い熊 自由作業盤 quiet", NotificationManager.IMPORTANCE_LOW),
+        "default" to ChannelDef("opentasker.actions", "白い熊 自由作業盤 actions", NotificationManager.IMPORTANCE_DEFAULT),
+        "urgent" to ChannelDef("opentasker.urgent", "白い熊 自由作業盤 urgent", NotificationManager.IMPORTANCE_HIGH),
     )
 
     fun resolve(key: String): ChannelDef =

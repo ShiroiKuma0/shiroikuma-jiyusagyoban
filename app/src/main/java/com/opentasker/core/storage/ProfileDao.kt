@@ -24,7 +24,10 @@ data class ProfileEntity(
     val cooldownSec: Int,
     val contextsJson: String,
     val automationMode: String = AutomationMode.SINGLE.name,
-    val profileGroup: String? = null,
+    val projectId: Long? = null,
+    val position: Int = 0,
+    val enterTaskName: String = "",
+    val exitTaskName: String = "",
 ) {
     fun toDomain(): Profile {
         val result = toDomainDecodeResult()
@@ -39,7 +42,7 @@ data class ProfileEntity(
         val contexts = runCatching { Json.decodeFromString<List<ContextSpec>>(contextsJson) }
             .getOrElse { error ->
                 return StorageDecodeResult(
-                    value = Profile(id, name, enabled, emptyList(), enterTaskId, exitTaskId, cooldownSec, mode, profileGroup),
+                    value = Profile(id, name, enabled, emptyList(), enterTaskId, exitTaskId, cooldownSec, mode, projectId, position, enterTaskName, exitTaskName),
                     issue = StorageDecodeIssue(
                         recordType = StorageRecordType.PROFILE,
                         recordId = id,
@@ -60,14 +63,17 @@ data class ProfileEntity(
                 exitTaskId,
                 cooldownSec,
                 mode,
-                profileGroup,
+                projectId,
+                position,
+                enterTaskName,
+                exitTaskName,
             ),
         )
     }
 }
 
 fun Profile.toEntity() = ProfileEntity(
-    id, name, enabled, enterTaskId, exitTaskId, cooldownSec, Json.encodeToString(contexts), automationMode.name, group
+    id, name, enabled, enterTaskId, exitTaskId, cooldownSec, Json.encodeToString(contexts), automationMode.name, projectId, position, enterTaskName, exitTaskName
 )
 
 @Dao
@@ -76,7 +82,9 @@ interface ProfileDao {
     @Update suspend fun update(p: ProfileEntity)
     @Delete suspend fun delete(p: ProfileEntity)
     @Query("SELECT * FROM profiles WHERE id = :id") suspend fun getById(id: Long): ProfileEntity?
-    @Query("SELECT * FROM profiles") suspend fun getAll(): List<ProfileEntity>
+    @Query("SELECT * FROM profiles ORDER BY position, id") suspend fun getAll(): List<ProfileEntity>
     @Query("SELECT * FROM profiles WHERE enabled = 1") suspend fun getAllEnabled(): List<ProfileEntity>
-    @Query("SELECT * FROM profiles") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<ProfileEntity>>
+    @Query("SELECT * FROM profiles ORDER BY position, id") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<ProfileEntity>>
+    @Query("UPDATE profiles SET position = :position WHERE id = :id") suspend fun setPosition(id: Long, position: Int)
+    @Query("SELECT COALESCE(MAX(position), -1) + 1 FROM profiles") suspend fun nextPosition(): Int
 }

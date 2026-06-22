@@ -17,6 +17,7 @@ data class TemplateScope(
     val global: Map<String, String> = emptyMap(),
     val task: Map<String, String> = emptyMap(),
     val event: Map<String, String> = emptyMap(),
+    val param: Map<String, String> = emptyMap(),
     val arrays: Map<String, List<String>> = emptyMap(),
 )
 
@@ -50,6 +51,7 @@ enum class TemplateValueSource {
     TASK,
     EVENT,
     GLOBAL,
+    PARAM,
     ARRAY,
     LITERAL,
     DEFAULT,
@@ -217,6 +219,11 @@ class TemplateExpressionEngine(
                 normalized.removePrefix("global."),
                 scope.global,
                 TemplateValueSource.GLOBAL,
+            )
+            normalized.startsWith("param.") -> resolveInMap(
+                normalized.removePrefix("param."),
+                scope.param,
+                TemplateValueSource.PARAM,
             )
             normalized.startsWith("array.") -> resolveArray(
                 normalized.removePrefix("array."),

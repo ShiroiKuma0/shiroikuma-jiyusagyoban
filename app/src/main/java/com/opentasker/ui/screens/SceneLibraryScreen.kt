@@ -1,8 +1,12 @@
 package com.opentasker.ui.screens
 
 import android.provider.Settings
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -19,24 +23,45 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.Checkbox
+import com.opentasker.ui.components.GroupMoveDialogs
+import com.opentasker.ui.components.GroupOps
+import com.opentasker.ui.components.groupedItems
+import com.opentasker.ui.components.rememberGroupDragState
+import com.opentasker.ui.components.rememberGroupMoveHost
+import com.opentasker.ui.components.ItemNoteSection
+import com.opentasker.ui.components.ReorderableRow
+import com.opentasker.ui.theme.ThemeStore
+import com.opentasker.ui.components.RgbaColorPickerDialog
+import com.opentasker.ui.components.SelectionBar
+import com.opentasker.ui.components.SelectionCheck
+import com.opentasker.ui.components.rememberListReorderState
+import com.opentasker.ui.components.selectableItem
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -46,6 +71,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -54,11 +80,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -67,6 +94,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.IntOffset
@@ -86,47 +114,69 @@ import com.opentasker.core.scenes.SceneElementDrafts
 import com.opentasker.core.scenes.SceneIssue
 import com.opentasker.core.scenes.SceneIssueSeverity
 import com.opentasker.core.scenes.SceneValidator
+import com.opentasker.scenes.SceneElementView
 
 @Composable
 fun SceneLibraryScreen(
     scenes: List<Scene>,
     tasks: List<Task>,
-    onCreateScene: (String, Int, Int) -> Unit,
+    onCreateScene: (name: String, widthDp: Int, heightDp: Int, bgColor: String?, cornerRadiusDp: Int, scrimAlpha: Int, borderColor: String?, borderWidth: Int, defaultPosition: String, defaultModal: Boolean, defaultDismissOnOutside: Boolean) -> Unit,
     onUpdateScene: (Scene, String) -> Unit,
     onDeleteScene: (Scene) -> Unit,
+    onMoveScene: (Scene) -> Unit,
+    onExportScene: (Scene) -> Unit,
+    manualSort: Boolean,
+    onReorder: (List<Scene>) -> Unit,
+    selectedIds: Set<Long>,
+    onLongPressScene: (Scene) -> Unit,
+    onToggleSelectScene: (Scene) -> Unit,
+    onSelectAllScenes: () -> Unit,
+    onClearSceneSelection: () -> Unit,
+    onDeleteSelectedScenes: () -> Unit,
+    onMoveSelectedToProject: () -> Unit,
+    createSignal: Int,
+    hiddenByFilter: Int,
+    expandedScenes: SnapshotStateMap<Long, Boolean>,
+    groupOps: GroupOps,
     contentPadding: PaddingValues,
 ) {
-    var showCreateDialog by rememberSaveable { mutableStateOf(false) }
-    var elementEditorSceneId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var elementEditorIndex by rememberSaveable { mutableStateOf<Int?>(null) }
-    var pendingElementDeleteSceneId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var pendingElementDeleteIndex by rememberSaveable { mutableStateOf<Int?>(null) }
-    val sortedScenes = remember(scenes) { scenes.sortedBy { it.name.lowercase() } }
-    val elementEditor = remember(scenes, elementEditorSceneId, elementEditorIndex) {
-        sceneElementEditorState(scenes, elementEditorSceneId, elementEditorIndex, allowNew = true)
-    }
-    val pendingElementDelete = remember(scenes, pendingElementDeleteSceneId, pendingElementDeleteIndex) {
-        sceneElementEditorState(scenes, pendingElementDeleteSceneId, pendingElementDeleteIndex, allowNew = false)
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var editSceneTarget by remember { mutableStateOf<Scene?>(null) }
+    var elementEditor by remember { mutableStateOf<SceneElementEditorState?>(null) }
+    var pendingElementDelete by remember { mutableStateOf<SceneElementEditorState?>(null) }
+    // Order comes from the ViewModel (Alphabetical or Manual); don't re-sort here.
+    val sortedScenes = scenes
+
+    // "New scene" lives in the tab's + menu (TabActionsFab); a tick of [createSignal] opens the dialog.
+    LaunchedEffect(createSignal) {
+        if (createSignal > 0) showCreateDialog = true
     }
 
-    LaunchedEffect(elementEditorSceneId, elementEditor) {
-        if (elementEditorSceneId != null && elementEditor == null) {
-            elementEditorSceneId = null
-            elementEditorIndex = null
-        }
-    }
-    LaunchedEffect(pendingElementDeleteSceneId, pendingElementDelete) {
-        if (pendingElementDeleteSceneId != null && pendingElementDelete == null) {
-            pendingElementDeleteSceneId = null
-            pendingElementDeleteIndex = null
-        }
+    editSceneTarget?.let { target ->
+        SceneEditorDialog(
+            initial = target,
+            onDismiss = { editSceneTarget = null },
+            onSave = { name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside ->
+                onUpdateScene(
+                    target.copy(
+                        name = name, widthDp = widthDp, heightDp = heightDp,
+                        bgColor = bgColor, cornerRadiusDp = corner, scrimAlpha = scrim,
+                        borderColor = borderColor, borderWidth = borderWidth,
+                        defaultPosition = defaultPosition, defaultModal = defaultModal,
+                        defaultDismissOnOutside = defaultDismissOnOutside,
+                    ),
+                    "Scene updated",
+                )
+                editSceneTarget = null
+            },
+        )
     }
 
     if (showCreateDialog) {
         SceneEditorDialog(
             onDismiss = { showCreateDialog = false },
-            onSave = { name, widthDp, heightDp ->
-                onCreateScene(name, widthDp, heightDp)
+            onSave = { name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside ->
+                onCreateScene(name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside)
                 showCreateDialog = false
             },
         )
@@ -136,10 +186,7 @@ fun SceneLibraryScreen(
         SceneElementEditorDialog(
             state = state,
             tasks = tasks,
-            onDismiss = {
-                elementEditorSceneId = null
-                elementEditorIndex = null
-            },
+            onDismiss = { elementEditor = null },
             onSave = { element ->
                 val updatedScene = if (state.index == null) {
                     state.scene.copy(elements = state.scene.elements + element)
@@ -151,8 +198,7 @@ fun SceneLibraryScreen(
                     )
                 }
                 onUpdateScene(updatedScene, if (state.index == null) "Element added" else "Element updated")
-                elementEditorSceneId = null
-                elementEditorIndex = null
+                elementEditor = null
             },
         )
     }
@@ -160,10 +206,7 @@ fun SceneLibraryScreen(
     pendingElementDelete?.let { state ->
         SceneElementDeleteDialog(
             state = state,
-            onDismiss = {
-                pendingElementDeleteSceneId = null
-                pendingElementDeleteIndex = null
-            },
+            onDismiss = { pendingElementDelete = null },
             onConfirm = {
                 val index = state.index
                 if (index != null) {
@@ -172,8 +215,7 @@ fun SceneLibraryScreen(
                         "Element removed",
                     )
                 }
-                pendingElementDeleteSceneId = null
-                pendingElementDeleteIndex = null
+                pendingElementDelete = null
             },
         )
     }
@@ -181,84 +223,105 @@ fun SceneLibraryScreen(
     if (sortedScenes.isEmpty()) {
         SceneEmptyState(
             contentPadding = contentPadding,
+            hiddenByFilter = hiddenByFilter,
             onCreateScene = { showCreateDialog = true },
         )
         return
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(contentPadding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
-    ) {
-        item {
-            SceneOverviewCard(
-                scenes = sortedScenes,
-                tasks = tasks,
-                onCreateScene = { showCreateDialog = true },
+    val listState = rememberLazyListState()
+    val reorder = rememberListReorderState()
+    val selectionActive = selectedIds.isNotEmpty()
+    Column(Modifier.fillMaxSize().padding(contentPadding)) {
+        if (selectionActive) {
+            SelectionBar(
+                count = selectedIds.size,
+                total = sortedScenes.size,
+                onSelectAll = onSelectAllScenes,
+                onClear = onClearSceneSelection,
+                onDelete = onDeleteSelectedScenes,
+                onMoveToProject = onMoveSelectedToProject,
             )
         }
-        items(sortedScenes, key = { it.id }) { scene ->
-            val sceneContext = LocalContext.current
-            SceneCard(
-                scene = scene,
-                tasks = tasks,
-                onAddElement = {
-                    elementEditorSceneId = scene.id
-                    elementEditorIndex = null
-                },
-                onEditElement = { index, _ ->
-                    elementEditorSceneId = scene.id
-                    elementEditorIndex = index
-                },
-                onDeleteElement = { index, _ ->
-                    pendingElementDeleteSceneId = scene.id
-                    pendingElementDeleteIndex = index
-                },
-                onMoveElement = { index, element ->
-                    onUpdateScene(
-                        scene.copy(
-                            elements = scene.elements.mapIndexed { i, existing ->
-                                if (i == index) element else existing
-                            },
-                        ),
-                        "Element moved",
+        val moveHost = rememberGroupMoveHost()
+        val dragState = rememberGroupDragState()
+        val sceneCard: @Composable (Scene) -> Unit = { scene ->
+                    SceneCard(
+                        scene = scene,
+                        tasks = tasks,
+                        selectionActive = selectionActive,
+                        selected = scene.id in selectedIds,
+                        expanded = expandedScenes[scene.id] == true,
+                        onToggleExpanded = { expandedScenes[scene.id] = expandedScenes[scene.id] != true },
+                        onLongPress = { onLongPressScene(scene) },
+                        onToggleSelect = { onToggleSelectScene(scene) },
+                    onAddElement = { elementEditor = SceneElementEditorState(scene = scene) },
+                    onEditElement = { index, element -> elementEditor = SceneElementEditorState(scene, index, element) },
+                    onDeleteElement = { index, element -> pendingElementDelete = SceneElementEditorState(scene, index, element) },
+                    onMoveElement = { index, element ->
+                        onUpdateScene(
+                            scene.copy(
+                                elements = scene.elements.mapIndexed { i, existing ->
+                                    if (i == index) element else existing
+                                },
+                            ),
+                            "Element moved",
+                        )
+                    },
+                    onDuplicateElement = { index ->
+                        val source = scene.elements[index]
+                        val copy = source.copy(
+                            id = SceneElementDrafts.nextElementId(scene),
+                            xDp = (source.xDp + 8).coerceAtMost((scene.widthDp - source.widthDp).coerceAtLeast(0)),
+                            yDp = (source.yDp + 8).coerceAtMost((scene.heightDp - source.heightDp).coerceAtLeast(0)),
+                        )
+                        onUpdateScene(
+                            scene.copy(
+                                elements = scene.elements.toMutableList().apply { add(index + 1, copy) },
+                            ),
+                            "Element duplicated",
+                        )
+                    },
+                    onMoveElementForward = { index ->
+                        if (index < scene.elements.lastIndex) {
+                            val reordered = scene.elements.toMutableList().apply { add(index + 1, removeAt(index)) }
+                            onUpdateScene(scene.copy(elements = reordered), "Element brought forward")
+                        }
+                    },
+                    onMoveElementBackward = { index ->
+                        if (index > 0) {
+                            val reordered = scene.elements.toMutableList().apply { add(index - 1, removeAt(index)) }
+                            onUpdateScene(scene.copy(elements = reordered), "Element sent back")
+                        }
+                    },
+                    onDelete = { onDeleteScene(scene) },
+                    onMoveToProject = { onMoveScene(scene) },
+                    onExportToBundle = { onExportScene(scene) },
+                    onEditScene = { editSceneTarget = scene },
                     )
-                },
-                onDelete = { onDeleteScene(scene) },
-                onShowOverlay = { SceneOverlayService.show(sceneContext, scene) },
-            )
         }
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().weight(1f),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (groupOps.groups.isEmpty()) {
+                items(sortedScenes, key = { it.id }) { scene ->
+                    ReorderableRow(reorder, listState, sortedScenes, scene, { it.id }, manualSort && !selectionActive, onReorder) {
+                        sceneCard(scene)
+                    }
+                }
+            } else {
+                groupedItems(
+                    sortedScenes, { it.id.toString() }, groupOps, dragState,
+                    onMoveItem = { moveHost.movingItemKey = it },
+                    onMoveGroup = { moveHost.movingGroup = it },
+                ) { scene -> sceneCard(scene) }
+            }
+        }
+        GroupMoveDialogs(groupOps, moveHost)
     }
-}
-
-private fun sceneElementEditorState(
-    scenes: List<Scene>,
-    sceneId: Long?,
-    index: Int?,
-    allowNew: Boolean,
-): SceneElementEditorState? {
-    val scene = scenes.firstOrNull { it.id == sceneId } ?: return null
-    return if (index == null) {
-        if (allowNew) SceneElementEditorState(scene = scene) else null
-    } else {
-        SceneElementEditorState(
-            scene = scene,
-            index = index,
-            element = scene.elements.getOrNull(index) ?: return null,
-        )
-    }
-}
-
-private fun SceneElement.nudgedWithin(scene: Scene, deltaX: Int, deltaY: Int): SceneElement {
-    val maxX = (scene.widthDp - widthDp).coerceAtLeast(0)
-    val maxY = (scene.heightDp - heightDp).coerceAtLeast(0)
-    return copy(
-        xDp = (xDp + deltaX).coerceIn(0, maxX),
-        yDp = (yDp + deltaY).coerceIn(0, maxY),
-    )
 }
 
 private data class SceneElementEditorState(
@@ -270,6 +333,7 @@ private data class SceneElementEditorState(
 @Composable
 private fun SceneEmptyState(
     contentPadding: PaddingValues,
+    hiddenByFilter: Int,
     onCreateScene: () -> Unit,
 ) {
     Box(
@@ -279,87 +343,24 @@ private fun SceneEmptyState(
             .padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f),
-            shape = RoundedCornerShape(DesignSystem.Radii.xxl),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
-        ) {
-            Column(
-                modifier = Modifier.padding(18.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
-            ) {
-                Icon(
-                    Icons.Filled.Info,
-                    contentDescription = "Scene library empty",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(32.dp),
-                )
-                Text(stringResource(R.string.empty_scenes_title), style = MaterialTheme.typography.titleLarge)
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("No scenes yet", style = MaterialTheme.typography.titleLarge)
+            Text(
+                "Create a panel before adding overlay elements.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (hiddenByFilter > 0) {
                 Text(
-                    stringResource(R.string.empty_scenes_body),
+                    "$hiddenByFilter scene${plural(hiddenByFilter)} ${if (hiddenByFilter == 1) "is" else "are"} filed under another project — switch the project filter (top-right) to see ${if (hiddenByFilter == 1) "it" else "them"}.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
-                Button(
-                    onClick = onCreateScene,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(DesignSystem.Radii.lg),
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.scenes_create))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.scenes_create))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SceneOverviewCard(
-    scenes: List<Scene>,
-    tasks: List<Task>,
-    onCreateScene: () -> Unit,
-) {
-    val context = LocalContext.current
-    val overlayReady = Settings.canDrawOverlays(context)
-    val issues = remember(scenes, tasks) {
-        scenes.flatMap { scene -> SceneValidator.validate(scene, tasks) }
-    }
-    val errorCount = issues.count { it.severity == SceneIssueSeverity.ERROR }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
-        shape = RoundedCornerShape(DesignSystem.Radii.xxl),
-    ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.title_scene_library), style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        "${scenes.sumOf { it.elements.size }} element${plural(scenes.sumOf { it.elements.size })} across ${scenes.size} scene${plural(scenes.size)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                SceneStatusPill(
-                    label = if (overlayReady) stringResource(R.string.status_overlay_ready) else stringResource(R.string.status_needs_setup),
-                    color = if (overlayReady) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center,
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                SceneMetric("${scenes.size}", "Scenes", Modifier.weight(1f))
-                SceneMetric("${scenes.sumOf { it.elements.size }}", "Elements", Modifier.weight(1f))
-                SceneMetric("$errorCount", "Errors", Modifier.weight(1f))
-            }
-            Button(onClick = onCreateScene, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(DesignSystem.Radii.lg)) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.scenes_create))
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.scenes_create))
+            OutlinedButton(onClick = onCreateScene) {
+                Icon(Icons.Filled.Add, contentDescription = null)
+                Text("Create Scene")
             }
         }
     }
@@ -369,102 +370,127 @@ private fun SceneOverviewCard(
 private fun SceneCard(
     scene: Scene,
     tasks: List<Task>,
+    selectionActive: Boolean,
+    selected: Boolean,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    onLongPress: () -> Unit,
+    onToggleSelect: () -> Unit,
     onAddElement: () -> Unit,
     onEditElement: (Int, SceneElement) -> Unit,
     onDeleteElement: (Int, SceneElement) -> Unit,
     onMoveElement: (Int, SceneElement) -> Unit,
+    onDuplicateElement: (Int) -> Unit,
+    onMoveElementForward: (Int) -> Unit,
+    onMoveElementBackward: (Int) -> Unit,
     onDelete: () -> Unit,
-    onShowOverlay: () -> Unit = {},
+    onMoveToProject: () -> Unit,
+    onExportToBundle: () -> Unit,
+    onEditScene: () -> Unit,
 ) {
     val taskNames = remember(tasks) { tasks.associate { it.id to it.name } }
     val issues = remember(scene, tasks) { SceneValidator.validate(scene, tasks) }
-    var selectedIndices by remember(scene.id) { mutableStateOf(emptySet<Int>()) }
-    val context = LocalContext.current
-    val overlayReady = Settings.canDrawOverlays(context)
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)),
-        shape = RoundedCornerShape(DesignSystem.Radii.xxl),
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+            else MaterialTheme.colorScheme.surface,
+        ),
+        border = BorderStroke(
+            if (selected) 2.dp else 1.dp,
+            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        ),
+        shape = RoundedCornerShape(18.dp),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().selectableItem(
+                    selectionActive = selectionActive,
+                    onLongPress = onLongPress,
+                    onToggleSelect = onToggleSelect,
+                    onTapNormal = onToggleExpanded,
+                ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (selectionActive) {
+                    SelectionCheck(selected)
+                }
                 Column(Modifier.weight(1f)) {
                     Text(scene.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        "${scene.widthDp} x ${scene.heightDp} dp - ${scene.elements.size} element${plural(scene.elements.size)}",
+                        "${scene.widthDp} x ${scene.heightDp} dp - ${scene.elements.size} element${plural(scene.elements.size)}" +
+                            if (!expanded && issues.isNotEmpty()) " - ${issues.size} issue${plural(issues.size)}" else "",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (overlayReady && scene.elements.isNotEmpty()) {
-                    OutlinedButton(onClick = onShowOverlay) {
-                        Text("Show", maxLines = 1)
+                if (expanded) {
+                    IconButton(onClick = onEditScene) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Edit scene properties")
+                    }
+                    IconButton(onClick = onExportToBundle) {
+                        Icon(Icons.Filled.Upload, contentDescription = "Export scene")
+                    }
+                    IconButton(onClick = onMoveToProject) {
+                        Icon(Icons.Filled.Folder, contentDescription = "Move scene to project")
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Delete scene", tint = MaterialTheme.colorScheme.error)
                     }
                 }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.scenes_delete), tint = MaterialTheme.colorScheme.error)
-                }
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Collapse scene" else "Expand scene",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
-            ScenePreviewBox(
-                scene = scene,
-                onMoveElement = { index, xDp, yDp ->
-                    scene.elements.getOrNull(index)?.let { element ->
-                        onMoveElement(index, element.copy(xDp = xDp, yDp = yDp))
-                    }
-                },
-                onResizeElement = { index, widthDp, heightDp ->
-                    scene.elements.getOrNull(index)?.let { element ->
-                        onMoveElement(index, element.copy(widthDp = widthDp, heightDp = heightDp))
-                    }
-                },
-                selectedIndices = selectedIndices,
-                onToggleSelect = { index ->
-                    selectedIndices = if (index in selectedIndices) selectedIndices - index else selectedIndices + index
-                },
-                onMoveSelected = { dx, dy ->
-                    val updated = scene.elements.mapIndexed { i, el ->
-                        if (i in selectedIndices) el.nudgedWithin(scene, dx, dy) else el
-                    }
-                    val updatedScene = scene.copy(elements = updated)
-                    updated.forEachIndexed { i, el ->
-                        if (i in selectedIndices && el != scene.elements[i]) {
-                            onMoveElement(i, el)
+            if (expanded) {
+                ItemNoteSection("scenes", scene.id.toString())
+                ScenePreviewBox(
+                    scene = scene,
+                    onMoveElement = { index, xDp, yDp ->
+                        scene.elements.getOrNull(index)?.let { element ->
+                            onMoveElement(index, element.copy(xDp = xDp, yDp = yDp))
+                        }
+                    },
+                    onResizeElement = { index, widthDp, heightDp ->
+                        scene.elements.getOrNull(index)?.let { element ->
+                            onMoveElement(index, element.copy(widthDp = widthDp, heightDp = heightDp))
+                        }
+                    },
+                )
+
+                OutlinedButton(onClick = onAddElement, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Add Element")
+                }
+
+                if (scene.elements.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        scene.elements.forEachIndexed { index, element ->
+                            SceneElementRow(
+                                element = element,
+                                taskNames = taskNames,
+                                onEdit = { onEditElement(index, element) },
+                                onDelete = { onDeleteElement(index, element) },
+                                onDuplicate = { onDuplicateElement(index) },
+                                onMoveForward = { onMoveElementForward(index) },
+                                onMoveBackward = { onMoveElementBackward(index) },
+                            )
                         }
                     }
-                },
-            )
-
-            OutlinedButton(onClick = onAddElement, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Add, contentDescription = "Add element")
-                Spacer(Modifier.width(6.dp))
-                Text("Add Element")
-            }
-
-            if (scene.elements.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
-                    scene.elements.forEachIndexed { index, element ->
-                        SceneElementRow(
-                            scene = scene,
-                            element = element,
-                            taskNames = taskNames,
-                            onNudge = { deltaX, deltaY ->
-                                onMoveElement(index, element.nudgedWithin(scene, deltaX, deltaY))
-                            },
-                            onEdit = { onEditElement(index, element) },
-                            onDelete = { onDeleteElement(index, element) },
-                        )
-                    }
                 }
-            }
 
-            if (issues.isNotEmpty()) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    issues.take(4).forEach { issue ->
-                        SceneIssueText(issue)
+                if (issues.isNotEmpty()) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        issues.take(4).forEach { issue ->
+                            SceneIssueText(issue)
+                        }
                     }
                 }
             }
@@ -476,21 +502,17 @@ private fun SceneCard(
 private fun ScenePreviewBox(
     scene: Scene,
     onMoveElement: (Int, Int, Int) -> Unit,
-    onResizeElement: (Int, Int, Int) -> Unit = { _, _, _ -> },
-    selectedIndices: Set<Int> = emptySet(),
-    onToggleSelect: (Int) -> Unit = {},
-    onMoveSelected: (Int, Int) -> Unit = { _, _ -> },
+    onResizeElement: (Int, Int, Int) -> Unit,
 ) {
-    var activeGuides by remember { mutableStateOf<List<AlignmentGuide>>(emptyList()) }
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 96.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
         shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Canvas ${scene.widthDp} x ${scene.heightDp} dp", style = MaterialTheme.typography.labelLarge)
             if (scene.elements.isEmpty()) {
                 Text("No elements", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -504,15 +526,14 @@ private fun ScenePreviewBox(
                         maxHeight = 280f,
                     )
                     val projections = SceneCanvasProjector.project(scene, canvasWidth, canvasHeight)
-                    val guideColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.50f)
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
                             .size(width = maxWidth, height = canvasHeight.dp)
                             .clipToBounds(),
                         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.70f),
-                        shape = RoundedCornerShape(DesignSystem.Radii.lg),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     ) {
                         Box(Modifier.fillMaxSize()) {
                             projections.forEachIndexed { index, projection ->
@@ -522,52 +543,9 @@ private fun ScenePreviewBox(
                                     projection = projection,
                                     canvasWidth = canvasWidth,
                                     canvasHeight = canvasHeight,
-                                    onMoveElement = { idx, xDp, yDp ->
-                                        if (selectedIndices.size > 1 && idx in selectedIndices) {
-                                            val origElement = scene.elements[idx]
-                                            val dx = xDp - origElement.xDp
-                                            val dy = yDp - origElement.yDp
-                                            onMoveSelected(dx, dy)
-                                        } else {
-                                            onMoveElement(idx, xDp, yDp)
-                                        }
-                                    },
+                                    onMoveElement = onMoveElement,
                                     onResizeElement = onResizeElement,
-                                    selected = index in selectedIndices,
-                                    onSelect = { onToggleSelect(index) },
-                                    onAlignmentGuidesChanged = { guides -> activeGuides = guides },
                                 )
-                            }
-                            if (activeGuides.isNotEmpty()) {
-                                val scaleX = canvasWidth / (scene.widthDp.takeIf { it > 0 } ?: 1).toFloat()
-                                val scaleY = canvasHeight / (scene.heightDp.takeIf { it > 0 } ?: 1).toFloat()
-                                Canvas(Modifier.fillMaxSize()) {
-                                    val dash = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))
-                                    activeGuides.forEach { guide ->
-                                        when (guide.orientation) {
-                                            GuideOrientation.VERTICAL -> {
-                                                val x = guide.position * scaleX
-                                                drawLine(
-                                                    color = guideColor,
-                                                    start = Offset(x, 0f),
-                                                    end = Offset(x, size.height),
-                                                    strokeWidth = 1.5f,
-                                                    pathEffect = dash,
-                                                )
-                                            }
-                                            GuideOrientation.HORIZONTAL -> {
-                                                val y = guide.position * scaleY
-                                                drawLine(
-                                                    color = guideColor,
-                                                    start = Offset(0f, y),
-                                                    end = Offset(size.width, y),
-                                                    strokeWidth = 1.5f,
-                                                    pathEffect = dash,
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
                             }
                         }
                     }
@@ -585,17 +563,14 @@ private fun SceneCanvasElement(
     canvasWidth: Float,
     canvasHeight: Float,
     onMoveElement: (Int, Int, Int) -> Unit,
-    onResizeElement: (Int, Int, Int) -> Unit = { _, _, _ -> },
-    selected: Boolean = false,
-    onSelect: () -> Unit = {},
-    onAlignmentGuidesChanged: (List<AlignmentGuide>) -> Unit = {},
+    onResizeElement: (Int, Int, Int) -> Unit,
 ) {
     val element = projection.element
     val density = LocalDensity.current
-    var dragX by remember(scene.id, element.id, projection.x, projection.y) { mutableFloatStateOf(0f) }
-    var dragY by remember(scene.id, element.id, projection.x, projection.y) { mutableFloatStateOf(0f) }
-    var resizeDx by remember(scene.id, element.id, projection.width, projection.height) { mutableFloatStateOf(0f) }
-    var resizeDy by remember(scene.id, element.id, projection.width, projection.height) { mutableFloatStateOf(0f) }
+    var dragX by remember(scene.id, element.id, projection.x, projection.y) { mutableStateOf(0f) }
+    var dragY by remember(scene.id, element.id, projection.x, projection.y) { mutableStateOf(0f) }
+    var resizeW by remember(scene.id, element.id, projection.width, projection.height) { mutableStateOf(0f) }
+    var resizeH by remember(scene.id, element.id, projection.width, projection.height) { mutableStateOf(0f) }
     val color = when (element.type) {
         SceneElementType.BUTTON -> MaterialTheme.colorScheme.primary
         SceneElementType.TEXT -> MaterialTheme.colorScheme.tertiary
@@ -603,82 +578,46 @@ private fun SceneCanvasElement(
         SceneElementType.IMAGE -> MaterialTheme.colorScheme.error
         else -> MaterialTheme.colorScheme.primary
     }
-    val borderColor = if (selected) MaterialTheme.colorScheme.primary else color.copy(alpha = 0.52f)
-    val borderWidth = if (selected) 2.dp else 1.dp
-    val currentWidth = (projection.width + resizeDx).coerceAtLeast(12f)
-    val currentHeight = (projection.height + resizeDy).coerceAtLeast(12f)
     Box(
-        modifier = Modifier
-            .offset {
-                with(density) {
-                    IntOffset(
-                        x = (projection.x + dragX).dp.roundToPx(),
-                        y = (projection.y + dragY).dp.roundToPx(),
-                    )
-                }
-            }
-            .size(width = currentWidth.dp, height = currentHeight.dp),
+        Modifier
+            .offset(x = (projection.x + dragX).dp, y = (projection.y + dragY).dp)
+            .size(
+                width = (projection.width + resizeW).coerceAtLeast(12f).dp,
+                height = (projection.height + resizeH).coerceAtLeast(12f).dp,
+            ),
     ) {
         Surface(
             modifier = Modifier
                 .fillMaxSize()
                 .pointerInput(scene.id, element.id, projection.x, projection.y, canvasWidth, canvasHeight, density.density) {
                     detectDragGestures(
-                        onDragStart = { onSelect() },
                         onDrag = { change, dragAmount ->
                             change.consume()
                             dragX += dragAmount.x / density.density
                             dragY += dragAmount.y / density.density
-                            val (candidateX, candidateY) = SceneCanvasProjector.scenePositionForCanvasOffset(
-                                scene = scene,
-                                element = element,
-                                canvasX = projection.x + dragX,
-                                canvasY = projection.y + dragY,
-                                canvasWidth = canvasWidth,
-                                canvasHeight = canvasHeight,
-                            )
-                            val alignment = SceneAlignmentGuides.findGuides(
-                                scene = scene,
-                                movingIndex = index,
-                                candidateX = candidateX,
-                                candidateY = candidateY,
-                                candidateW = element.widthDp,
-                                candidateH = element.heightDp,
-                            )
-                            onAlignmentGuidesChanged(alignment.guides)
                         },
                         onDragEnd = {
-                            val (candidateX, candidateY) = SceneCanvasProjector.scenePositionForCanvasOffset(
+                            val (xDp, yDp) = SceneCanvasProjector.scenePositionForCanvasOffset(
                                 scene = scene,
                                 element = element,
                                 canvasX = projection.x + dragX,
                                 canvasY = projection.y + dragY,
                                 canvasWidth = canvasWidth,
                                 canvasHeight = canvasHeight,
-                            )
-                            val alignment = SceneAlignmentGuides.findGuides(
-                                scene = scene,
-                                movingIndex = index,
-                                candidateX = candidateX,
-                                candidateY = candidateY,
-                                candidateW = element.widthDp,
-                                candidateH = element.heightDp,
                             )
                             dragX = 0f
                             dragY = 0f
-                            onAlignmentGuidesChanged(emptyList())
-                            onMoveElement(index, alignment.snappedX, alignment.snappedY)
+                            onMoveElement(index, xDp, yDp)
                         },
                         onDragCancel = {
                             dragX = 0f
                             dragY = 0f
-                            onAlignmentGuidesChanged(emptyList())
                         },
                     )
                 },
-            color = color.copy(alpha = if (selected) 0.22f else 0.14f),
+            color = color.copy(alpha = 0.14f),
             shape = RoundedCornerShape(8.dp),
-            border = BorderStroke(borderWidth, borderColor),
+            border = BorderStroke(1.dp, color.copy(alpha = 0.52f)),
         ) {
             Box(Modifier.fillMaxSize().padding(4.dp), contentAlignment = Alignment.Center) {
                 Text(
@@ -690,34 +629,45 @@ private fun SceneCanvasElement(
                 )
             }
         }
-        Surface(
-            modifier = Modifier
+        // Bottom-right resize grip: drag to change the element's width/height (top-left stays put).
+        Box(
+            Modifier
                 .align(Alignment.BottomEnd)
-                .size(14.dp)
+                .size(18.dp)
                 .pointerInput(scene.id, element.id, projection.width, projection.height, canvasWidth, canvasHeight, density.density) {
                     detectDragGestures(
                         onDrag = { change, dragAmount ->
                             change.consume()
-                            resizeDx += dragAmount.x / density.density
-                            resizeDy += dragAmount.y / density.density
+                            resizeW += dragAmount.x / density.density
+                            resizeH += dragAmount.y / density.density
                         },
                         onDragEnd = {
-                            val scale = scene.widthDp / canvasWidth
-                            val newW = ((element.widthDp + (resizeDx * scale).toInt()).coerceIn(MIN_ELEMENT_SIZE, scene.widthDp))
-                            val newH = ((element.heightDp + (resizeDy * scale).toInt()).coerceIn(MIN_ELEMENT_SIZE, scene.heightDp))
-                            resizeDx = 0f
-                            resizeDy = 0f
-                            onResizeElement(index, newW, newH)
+                            val (wDp, hDp) = SceneCanvasProjector.sceneSizeForCanvasSize(
+                                scene = scene,
+                                element = element,
+                                canvasW = projection.width + resizeW,
+                                canvasH = projection.height + resizeH,
+                                canvasWidth = canvasWidth,
+                                canvasHeight = canvasHeight,
+                            )
+                            resizeW = 0f
+                            resizeH = 0f
+                            onResizeElement(index, wDp, hDp)
                         },
                         onDragCancel = {
-                            resizeDx = 0f
-                            resizeDy = 0f
+                            resizeW = 0f
+                            resizeH = 0f
                         },
                     )
                 },
-            color = color.copy(alpha = 0.62f),
-            shape = RoundedCornerShape(4.dp),
-        ) {}
+            contentAlignment = Alignment.BottomEnd,
+        ) {
+            Box(
+                Modifier
+                    .size(12.dp)
+                    .background(color.copy(alpha = 0.9f), RoundedCornerShape(topStart = 7.dp, bottomEnd = 8.dp)),
+            )
+        }
     }
 }
 
@@ -725,94 +675,74 @@ private const val MIN_ELEMENT_SIZE = 8
 
 @Composable
 private fun SceneElementRow(
-    scene: Scene,
     element: SceneElement,
     taskNames: Map<Long, String>,
-    onNudge: (Int, Int) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onDuplicate: () -> Unit,
+    onMoveForward: () -> Unit,
+    onMoveBackward: () -> Unit,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f),
-        shape = RoundedCornerShape(DesignSystem.Radii.lg),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Column(
+        Row(
             Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
-            ) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(sceneElementTypeLabel(element.type), style = MaterialTheme.typography.labelLarge)
-                    sceneElementSummary(element)?.let { summary ->
-                        Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
-                    }
-                    Text(
-                        "Bounds ${element.xDp},${element.yDp} ${element.widthDp}x${element.heightDp} dp",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    listOfNotNull(
-                        element.tapTaskId?.let { "Tap: ${taskNames[it] ?: "missing #$it"}" },
-                        element.longPressTaskId?.let { "Long press: ${taskNames[it] ?: "missing #$it"}" },
-                    ).forEach { binding ->
-                        Text(binding, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(sceneElementTypeLabel(element.type), style = MaterialTheme.typography.labelLarge)
+                sceneElementSummary(element)?.let { summary ->
+                    Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
                 }
-                Row {
-                    IconButton(onClick = onEdit) {
-                        Icon(Icons.Filled.Edit, contentDescription = "Edit element")
+                Text(
+                    "Bounds ${element.xDp},${element.yDp} ${element.widthDp}x${element.heightDp} dp",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                listOfNotNull(
+                    element.tapTaskId?.let { "Tap: ${taskNames[it] ?: "missing #$it"}" },
+                    element.longPressTaskId?.let { "Long press: ${taskNames[it] ?: "missing #$it"}" },
+                ).forEach { binding ->
+                    Text(binding, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Row {
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Filled.Edit, contentDescription = "Edit element")
+                }
+                Box {
+                    var menuOpen by remember { mutableStateOf(false) }
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "More element actions")
                     }
-                    IconButton(onClick = onDelete) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Delete element", tint = MaterialTheme.colorScheme.error)
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Duplicate") },
+                            leadingIcon = { Icon(Icons.Filled.ContentCopy, contentDescription = null) },
+                            onClick = { menuOpen = false; onDuplicate() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Bring forward") },
+                            leadingIcon = { Icon(Icons.Filled.ArrowUpward, contentDescription = null) },
+                            onClick = { menuOpen = false; onMoveForward() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Send back") },
+                            leadingIcon = { Icon(Icons.Filled.ArrowDownward, contentDescription = null) },
+                            onClick = { menuOpen = false; onMoveBackward() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete") },
+                            leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                            onClick = { menuOpen = false; onDelete() },
+                        )
                     }
                 }
             }
-            SceneElementNudgeControls(
-                scene = scene,
-                element = element,
-                onNudge = onNudge,
-            )
-        }
-    }
-}
-
-@Composable
-private fun SceneElementNudgeControls(
-    scene: Scene,
-    element: SceneElement,
-    onNudge: (Int, Int) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        IconButton(
-            enabled = element.xDp > 0,
-            onClick = { onNudge(-1, 0) },
-        ) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Move element left 1 dp")
-        }
-        IconButton(
-            enabled = element.yDp > 0,
-            onClick = { onNudge(0, -1) },
-        ) {
-            Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move element up 1 dp")
-        }
-        IconButton(
-            enabled = element.yDp < (scene.heightDp - element.heightDp).coerceAtLeast(0),
-            onClick = { onNudge(0, 1) },
-        ) {
-            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move element down 1 dp")
-        }
-        IconButton(
-            enabled = element.xDp < (scene.widthDp - element.widthDp).coerceAtLeast(0),
-            onClick = { onNudge(1, 0) },
-        ) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Move element right 1 dp")
         }
     }
 }
@@ -825,14 +755,8 @@ private fun SceneElementDeleteDialog(
 ) {
     val element = state.element
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                Icons.Filled.Delete,
-                contentDescription = "Remove element",
-                tint = MaterialTheme.colorScheme.error,
-            )
-        },
         title = { Text("Remove element?") },
         text = {
             Text(
@@ -841,15 +765,7 @@ private fun SceneElementDeleteDialog(
             )
         },
         confirmButton = {
-            Button(
-                onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    contentColor = MaterialTheme.colorScheme.onError,
-                ),
-            ) {
-                Text("Remove Element")
-            }
+            OutlinedButton(onClick = onConfirm) { Text("Remove") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
@@ -867,22 +783,40 @@ private fun SceneElementEditorDialog(
     val initial = remember(state) {
         state.element ?: SceneElementDrafts.defaultElement(state.scene, SceneElementType.BUTTON)
     }
-    var type by rememberSaveable(state.scene.id, state.index) {
-        mutableStateOf(initial.type.takeIf { it in SceneElementDrafts.editableTypes } ?: SceneElementType.BUTTON)
-    }
-    var x by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.xDp.toString()) }
-    var y by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.yDp.toString()) }
-    var width by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.widthDp.toString()) }
-    var height by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.heightDp.toString()) }
-    var label by rememberSaveable(state.scene.id, state.index) {
+    var type by remember(state) { mutableStateOf(initial.type.takeIf { it in SceneElementDrafts.editableTypes } ?: SceneElementType.BUTTON) }
+    var x by remember(state) { mutableStateOf(initial.xDp.toString()) }
+    var y by remember(state) { mutableStateOf(initial.yDp.toString()) }
+    var width by remember(state) { mutableStateOf(initial.widthDp.toString()) }
+    var height by remember(state) { mutableStateOf(initial.heightDp.toString()) }
+    var label by remember(state) {
         mutableStateOf(initial.config["label"] ?: initial.config["text"] ?: "")
     }
-    var sliderMin by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.config["min"] ?: "0") }
-    var sliderMax by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.config["max"] ?: "100") }
-    var sliderValue by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.config["value"] ?: "50") }
-    var imageSource by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.config["source"] ?: "") }
-    var tapTaskId by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.tapTaskId) }
-    var longPressTaskId by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.longPressTaskId) }
+    var sliderMin by remember(state) { mutableStateOf(initial.config["min"] ?: "0") }
+    var sliderMax by remember(state) { mutableStateOf(initial.config["max"] ?: "100") }
+    var sliderValue by remember(state) { mutableStateOf(initial.config["value"] ?: "50") }
+    var sliderVar by remember(state) { mutableStateOf(initial.config["var"] ?: "") }
+    // Number-picker step (defaults to 1).
+    var numberStep by remember(state) { mutableStateOf(initial.config["step"] ?: "1") }
+    var sliderVertical by remember(state) { mutableStateOf(initial.config["orientation"].equals("vertical", ignoreCase = true)) }
+    // Checkbox/Toggle initial on/off state.
+    var boolValue by remember(state) { mutableStateOf((initial.config["value"] ?: "false").trim().lowercase() in setOf("true", "1", "on", "yes")) }
+    // Edit-text / spinner initial value.
+    var textValue by remember(state) { mutableStateOf(initial.config["value"] ?: "") }
+    var spinnerOptions by remember(state) { mutableStateOf(initial.config["options"] ?: "") }
+    // Rectangle corner radius (dp).
+    var shapeCorner by remember(state) { mutableStateOf(initial.config["cornerRadius"] ?: "0") }
+    var imageSource by remember(state) { mutableStateOf(initial.config["source"] ?: "") }
+    // Style (Text / Button): colours as "#AARRGGBB" (blank = element default), size in sp, bold, align.
+    var styleTextColor by remember(state) { mutableStateOf(initial.config["textColor"] ?: "") }
+    var styleBgColor by remember(state) { mutableStateOf(initial.config["bgColor"] ?: "") }
+    var styleSize by remember(state) { mutableStateOf(initial.config["textSize"] ?: "") }
+    var styleBold by remember(state) { mutableStateOf((initial.config["bold"] ?: "").trim().lowercase() in setOf("true", "1", "on", "yes")) }
+    var styleAlign by remember(state) { mutableStateOf(initial.config["align"]?.trim()?.lowercase() ?: "start") }
+    var styleBorderColor by remember(state) { mutableStateOf(initial.config["borderColor"] ?: "") }
+    var styleBorderWidth by remember(state) { mutableStateOf(initial.config["borderWidth"] ?: "") }
+    var styleFont by remember(state) { mutableStateOf(initial.config["font"] ?: "") }
+    var tapTaskId by remember(state) { mutableStateOf(initial.tapTaskId) }
+    var longPressTaskId by remember(state) { mutableStateOf(initial.longPressTaskId) }
 
     val parsedX = x.toIntOrNull()
     val parsedY = y.toIntOrNull()
@@ -890,9 +824,12 @@ private fun SceneElementEditorDialog(
     val parsedHeight = height.toIntOrNull()
     val parsedSliderMin = sliderMin.toIntOrNull()
     val parsedSliderMax = sliderMax.toIntOrNull()
-    val parsedSliderValue = sliderValue.toIntOrNull()
-    val sliderValid = type != SceneElementType.SLIDER ||
-        (parsedSliderMin != null && parsedSliderMax != null && parsedSliderValue != null && parsedSliderMin <= parsedSliderMax)
+    // Value may be a number (the start position) or a %var that resolves at show time.
+    val sliderValueIsVar = sliderValue.trim().startsWith("%")
+    val parsedSliderValue = if (sliderValueIsVar) null else sliderValue.toIntOrNull()
+    val sliderValid = (type != SceneElementType.SLIDER && type != SceneElementType.NUMBER_PICKER) ||
+        (parsedSliderMin != null && parsedSliderMax != null && parsedSliderMin <= parsedSliderMax &&
+            (sliderValueIsVar || parsedSliderValue != null))
     val canSave = parsedX != null &&
         parsedY != null &&
         parsedWidth != null &&
@@ -904,15 +841,59 @@ private fun SceneElementEditorDialog(
         sliderValid
 
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text(if (state.index == null) "Add Element" else "Edit Element") },
         text = {
-            Column(
-                modifier = Modifier
-                    .heightIn(max = 560.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
-            ) {
+            // Live preview: render the element exactly as the runtime would, from the current
+            // in-dialog state, so style/colour/size/text edits show immediately. Pinned above the
+            // scrolling field list.
+            val previewWidth = (parsedWidth ?: initial.widthDp).coerceIn(8, 280)
+            val previewHeight = (parsedHeight ?: initial.heightDp).coerceIn(8, 160)
+            val previewElement = SceneElement(
+                id = initial.id,
+                type = type,
+                xDp = 0,
+                yDp = 0,
+                widthDp = previewWidth,
+                heightDp = previewHeight,
+                config = elementConfig(
+                    type, label, sliderMin, sliderMax, sliderValue, sliderVar, sliderVertical, numberStep, boolValue,
+                    textValue, spinnerOptions, shapeCorner, imageSource,
+                    SceneElementStyle(styleTextColor, styleBgColor, styleSize, styleBold, styleAlign, styleBorderColor, styleBorderWidth, styleFont),
+                ),
+                tapTaskId = null,
+                longPressTaskId = null,
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Live preview", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = state.scene.bgColor
+                        ?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() }
+                        ?: MaterialTheme.colorScheme.background,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 84.dp)
+                            .padding(12.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(Modifier.size(previewWidth.dp, previewHeight.dp)) {
+                            SceneElementView(previewElement, onRunTask = {}, onSetVar = { _, _ -> })
+                        }
+                    }
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                 SceneElementTypeSelector(
                     selected = type,
                     onSelect = { selected ->
@@ -924,7 +905,22 @@ private fun SceneElementEditorDialog(
                         sliderMin = defaults.config["min"] ?: "0"
                         sliderMax = defaults.config["max"] ?: "100"
                         sliderValue = defaults.config["value"] ?: "50"
+                        sliderVar = defaults.config["var"] ?: ""
+                        numberStep = defaults.config["step"] ?: "1"
+                        sliderVertical = defaults.config["orientation"].equals("vertical", ignoreCase = true)
+                        boolValue = (defaults.config["value"] ?: "false").trim().lowercase() in setOf("true", "1", "on", "yes")
+                        textValue = if (selected == SceneElementType.EDIT_TEXT || selected == SceneElementType.SPINNER) (defaults.config["value"] ?: "") else ""
+                        spinnerOptions = defaults.config["options"] ?: ""
+                        shapeCorner = defaults.config["cornerRadius"] ?: "0"
                         imageSource = defaults.config["source"] ?: ""
+                        styleTextColor = defaults.config["textColor"] ?: ""
+                        styleBgColor = defaults.config["bgColor"] ?: ""
+                        styleSize = defaults.config["textSize"] ?: ""
+                        styleBold = (defaults.config["bold"] ?: "").trim().lowercase() in setOf("true", "1", "on", "yes")
+                        styleAlign = defaults.config["align"]?.trim()?.lowercase() ?: "start"
+                        styleBorderColor = defaults.config["borderColor"] ?: ""
+                        styleBorderWidth = defaults.config["borderWidth"] ?: ""
+                        styleFont = defaults.config["font"] ?: ""
                     },
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
@@ -964,6 +960,36 @@ private fun SceneElementEditorDialog(
                         modifier = Modifier.fillMaxWidth(),
                     )
 
+                    SceneElementType.EDIT_TEXT -> {
+                        OutlinedTextField(
+                            value = label,
+                            onValueChange = { label = it.take(48) },
+                            label = { Text("Field label / hint") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = textValue,
+                            onValueChange = { textValue = it.take(160) },
+                            label = { Text("Initial text") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = sliderVar,
+                            onValueChange = { sliderVar = it.take(40) },
+                            label = { Text("Store value in variable") },
+                            placeholder = { Text("%NAME") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            "When you press Done or leave the field, the text is written to this variable and the Tap task runs.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
                     SceneElementType.SLIDER -> {
                         OutlinedTextField(
                             value = label,
@@ -975,8 +1001,158 @@ private fun SceneElementEditorDialog(
                         Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                             NumberField("Min", sliderMin, { sliderMin = it.filter(Char::isDigit).take(5) }, parsedSliderMin == null, Modifier.weight(1f))
                             NumberField("Max", sliderMax, { sliderMax = it.filter(Char::isDigit).take(5) }, parsedSliderMax == null || (parsedSliderMin != null && parsedSliderMax < parsedSliderMin), Modifier.weight(1f))
-                            NumberField("Value", sliderValue, { sliderValue = it.filter(Char::isDigit).take(5) }, parsedSliderValue == null, Modifier.weight(1f))
+                            OutlinedTextField(
+                                value = sliderValue,
+                                onValueChange = { sliderValue = it.take(16) },
+                                label = { Text("Start") },
+                                singleLine = true,
+                                isError = !(sliderValueIsVar || parsedSliderValue != null),
+                                modifier = Modifier.weight(1f),
+                            )
                         }
+                        OutlinedTextField(
+                            value = sliderVar,
+                            onValueChange = { sliderVar = it.take(40) },
+                            label = { Text("Store value in variable") },
+                            placeholder = { Text("%VOL") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text("Vertical", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                            Switch(checked = sliderVertical, onCheckedChange = { sliderVertical = it })
+                        }
+                        Text(
+                            "On release the value is written to this variable and the Tap task runs. Set Start to a %var (e.g. %VOL) to open at that variable's current value. Vertical fills the element's height (size it tall).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
+                    SceneElementType.NUMBER_PICKER -> {
+                        OutlinedTextField(
+                            value = label,
+                            onValueChange = { label = it.take(48) },
+                            label = { Text("Label (optional)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            NumberField("Min", sliderMin, { sliderMin = it.filter(Char::isDigit).take(6) }, parsedSliderMin == null, Modifier.weight(1f))
+                            NumberField("Max", sliderMax, { sliderMax = it.filter(Char::isDigit).take(6) }, parsedSliderMax == null || (parsedSliderMin != null && parsedSliderMax < parsedSliderMin), Modifier.weight(1f))
+                            NumberField("Step", numberStep, { numberStep = it.filter(Char::isDigit).take(4) }, isError = false, modifier = Modifier.weight(1f))
+                        }
+                        OutlinedTextField(
+                            value = sliderValue,
+                            onValueChange = { sliderValue = it.take(16) },
+                            label = { Text("Start") },
+                            singleLine = true,
+                            isError = !(sliderValueIsVar || parsedSliderValue != null),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = sliderVar,
+                            onValueChange = { sliderVar = it.take(40) },
+                            label = { Text("Store value in variable") },
+                            placeholder = { Text("%COUNT") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            "Tapping − / + changes the value by Step (clamped to Min–Max), writes it to this variable, and runs the Tap task. Set Start to a %var (e.g. %COUNT) to open at that variable's current value.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
+                    SceneElementType.CHECKBOX, SceneElementType.TOGGLE -> {
+                        OutlinedTextField(
+                            value = label,
+                            onValueChange = { label = it.take(48) },
+                            label = { Text("Label") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = sliderVar,
+                            onValueChange = { sliderVar = it.take(40) },
+                            label = { Text("Store value in variable") },
+                            placeholder = { Text("%FLAG") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text("Initially on", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                            Switch(checked = boolValue, onCheckedChange = { boolValue = it })
+                        }
+                        Text(
+                            "On change the value (true/false) is written to this variable and the Tap task runs.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
+                    SceneElementType.SPINNER -> {
+                        OutlinedTextField(
+                            value = label,
+                            onValueChange = { label = it.take(48) },
+                            label = { Text("Label (shown when empty)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = spinnerOptions,
+                            onValueChange = { spinnerOptions = it.take(600) },
+                            label = { Text("Options (comma or new line)") },
+                            minLines = 2,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = textValue,
+                            onValueChange = { textValue = it.take(80) },
+                            label = { Text("Initial value") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = sliderVar,
+                            onValueChange = { sliderVar = it.take(40) },
+                            label = { Text("Store value in variable") },
+                            placeholder = { Text("%CHOICE") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            "Selecting an option writes it to this variable and runs the Tap task.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
+                    SceneElementType.RECTANGLE, SceneElementType.OVAL -> {
+                        SceneColorField(label = "Fill colour", value = styleBgColor, onChange = { styleBgColor = it })
+                        if (type == SceneElementType.RECTANGLE) {
+                            NumberField("Corner (dp)", shapeCorner, { shapeCorner = it.filter(Char::isDigit).take(2) }, isError = false, modifier = Modifier.fillMaxWidth())
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.weight(1f)) {
+                                SceneColorField(label = "Border colour", value = styleBorderColor, onChange = { styleBorderColor = it })
+                            }
+                            NumberField("Border (dp)", styleBorderWidth, { styleBorderWidth = it.filter(Char::isDigit).take(2) }, isError = false, modifier = Modifier.weight(1f))
+                        }
+                        Text(
+                            "Blank fill = transparent; blank border colour = theme yellow.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
 
                     SceneElementType.IMAGE -> OutlinedTextField(
@@ -988,6 +1164,69 @@ private fun SceneElementEditorDialog(
                     )
 
                     else -> Unit
+                }
+                val boxStyled = type == SceneElementType.TEXT || type == SceneElementType.BUTTON
+                val textStyled = boxStyled ||
+                    type == SceneElementType.SLIDER || type == SceneElementType.NUMBER_PICKER ||
+                    type == SceneElementType.CHECKBOX ||
+                    type == SceneElementType.TOGGLE || type == SceneElementType.SPINNER
+                if (textStyled) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Text("Style", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    SceneColorField(
+                        label = if (type == SceneElementType.TEXT) "Text colour" else "Label colour",
+                        value = styleTextColor,
+                        onChange = { styleTextColor = it },
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        NumberField("Size (sp)", styleSize, { styleSize = it.filter(Char::isDigit).take(3) }, isError = false, modifier = Modifier.weight(1f))
+                        Text("Bold", style = MaterialTheme.typography.bodyMedium)
+                        Switch(checked = styleBold, onCheckedChange = { styleBold = it })
+                    }
+                    // Font picker — the element's text/label font (e.g. a brush font on a slider heading).
+                    val fontOptions = remember { ThemeStore.availableFonts() }
+                    var fontMenuOpen by remember { mutableStateOf(false) }
+                    Box(Modifier.fillMaxWidth()) {
+                        OutlinedButton(onClick = { fontMenuOpen = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                "Font: " + (fontOptions.firstOrNull { it.fileName == styleFont }?.displayName ?: styleFont.ifBlank { "Default" }),
+                                maxLines = 1,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                        }
+                        DropdownMenu(expanded = fontMenuOpen, onDismissRequest = { fontMenuOpen = false }) {
+                            fontOptions.forEach { opt ->
+                                DropdownMenuItem(
+                                    text = { Text(opt.displayName) },
+                                    onClick = { styleFont = opt.fileName; fontMenuOpen = false },
+                                )
+                            }
+                        }
+                    }
+                    if (boxStyled) {
+                        SceneColorField(
+                            label = if (type == SceneElementType.BUTTON) "Button colour" else "Background colour",
+                            value = styleBgColor,
+                            onChange = { styleBgColor = it },
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            listOf("start" to "Left", "center" to "Center", "end" to "Right").forEach { (key, text) ->
+                                FilterChip(
+                                    selected = styleAlign == key,
+                                    onClick = { styleAlign = key },
+                                    label = { Text(text) },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.weight(1f)) {
+                                SceneColorField(label = "Border colour", value = styleBorderColor, onChange = { styleBorderColor = it })
+                            }
+                            NumberField("Border (dp)", styleBorderWidth, { styleBorderWidth = it.filter(Char::isDigit).take(2) }, isError = false, modifier = Modifier.weight(1f))
+                        }
+                    }
                 }
                 SceneTaskBindingSelector(
                     label = "Tap task",
@@ -1001,10 +1240,11 @@ private fun SceneElementEditorDialog(
                     selectedTaskId = longPressTaskId,
                     onSelect = { longPressTaskId = it },
                 )
+                }
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 enabled = canSave,
                 onClick = {
                     onSave(
@@ -1015,7 +1255,11 @@ private fun SceneElementEditorDialog(
                             yDp = parsedY ?: 0,
                             widthDp = parsedWidth ?: 1,
                             heightDp = parsedHeight ?: 1,
-                            config = elementConfig(type, label, sliderMin, sliderMax, sliderValue, imageSource),
+                            config = elementConfig(
+                                type, label, sliderMin, sliderMax, sliderValue, sliderVar, sliderVertical, numberStep, boolValue,
+                                textValue, spinnerOptions, shapeCorner, imageSource,
+                                SceneElementStyle(styleTextColor, styleBgColor, styleSize, styleBold, styleAlign, styleBorderColor, styleBorderWidth, styleFont),
+                            ),
                             tapTaskId = tapTaskId,
                             longPressTaskId = longPressTaskId,
                         ),
@@ -1036,7 +1280,7 @@ private fun SceneElementTypeSelector(
     selected: SceneElementType,
     onSelect: (SceneElementType) -> Unit,
 ) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
     Box {
         OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
             Text(sceneElementTypeLabel(selected), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -1062,7 +1306,7 @@ private fun SceneTaskBindingSelector(
     selectedTaskId: Long?,
     onSelect: (Long?) -> Unit,
 ) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
     val taskNames = remember(tasks) { tasks.associate { it.id to it.name } }
     Box {
         OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
@@ -1106,7 +1350,6 @@ private fun NumberField(
         onValueChange = onValueChange,
         label = { Text(label) },
         isError = isError,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         singleLine = true,
         modifier = modifier,
     )
@@ -1126,61 +1369,35 @@ private fun SceneIssueText(issue: SceneIssue) {
 }
 
 @Composable
-private fun SceneMetric(value: String, label: String, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
-        shape = RoundedCornerShape(DesignSystem.Radii.lg),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(value, style = MaterialTheme.typography.titleMedium)
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
-private fun SceneStatusPill(
-    label: String,
-    color: Color,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier,
-        color = color.copy(alpha = 0.14f),
-        shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.34f)),
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = color,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-        )
-    }
-}
-
-@Composable
 private fun SceneEditorDialog(
+    initial: Scene? = null,
     onDismiss: () -> Unit,
-    onSave: (String, Int, Int) -> Unit,
+    onSave: (name: String, widthDp: Int, heightDp: Int, bgColor: String?, cornerRadiusDp: Int, scrimAlpha: Int, borderColor: String?, borderWidth: Int, defaultPosition: String, defaultModal: Boolean, defaultDismissOnOutside: Boolean) -> Unit,
 ) {
-    var name by rememberSaveable { mutableStateOf("") }
-    var width by rememberSaveable { mutableStateOf("320") }
-    var height by rememberSaveable { mutableStateOf("240") }
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var width by remember { mutableStateOf((initial?.widthDp ?: 320).toString()) }
+    var height by remember { mutableStateOf((initial?.heightDp ?: 240).toString()) }
+    var bgColor by remember { mutableStateOf(initial?.bgColor ?: "") }
+    var corner by remember { mutableStateOf((initial?.cornerRadiusDp ?: 16).toString()) }
+    var scrim by remember { mutableStateOf((initial?.scrimAlpha ?: 55).toString()) }
+    var borderColor by remember { mutableStateOf(initial?.borderColor ?: "") }
+    var border by remember { mutableStateOf((initial?.borderWidth ?: 0).toString()) }
+    var defaultPosition by remember { mutableStateOf(initial?.defaultPosition?.lowercase() ?: "center") }
+    var defaultModal by remember { mutableStateOf(initial?.defaultModal ?: true) }
+    var defaultDismissOnOutside by remember { mutableStateOf(initial?.defaultDismissOnOutside ?: true) }
     val parsedWidth = width.toIntOrNull()
     val parsedHeight = height.toIntOrNull()
     val canSave = name.isNotBlank() && parsedWidth != null && parsedHeight != null && parsedWidth > 0 && parsedHeight > 0
 
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
-        title = { Text("Create Scene") },
+        title = { Text(if (initial == null) "Create Scene" else "Edit Scene") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+            Column(
+                modifier = Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -1188,30 +1405,75 @@ private fun SceneEditorDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
-                    value = width,
-                    onValueChange = { width = it.filter(Char::isDigit).take(4) },
-                    label = { Text("Width dp") },
-                    isError = parsedWidth == null || parsedWidth <= 0,
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    NumberField("Width dp", width, { width = it.filter(Char::isDigit).take(4) }, parsedWidth == null || parsedWidth <= 0, Modifier.weight(1f))
+                    NumberField("Height dp", height, { height = it.filter(Char::isDigit).take(4) }, parsedHeight == null || parsedHeight <= 0, Modifier.weight(1f))
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Text("Panel", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                SceneColorField(label = "Background colour", value = bgColor, onChange = { bgColor = it })
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    NumberField("Corner (dp)", corner, { corner = it.filter(Char::isDigit).take(2) }, isError = false, modifier = Modifier.weight(1f))
+                    NumberField("Scrim %", scrim, { scrim = it.filter(Char::isDigit).take(3) }, isError = false, modifier = Modifier.weight(1f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) {
+                        SceneColorField(label = "Border colour", value = borderColor, onChange = { borderColor = it })
+                    }
+                    NumberField("Border (dp)", border, { border = it.filter(Char::isDigit).take(2) }, isError = false, modifier = Modifier.weight(1f))
+                }
+                Text(
+                    "Blanks use the theme: background = black, text/borders = yellow. Scrim is the dim behind a modal scene (0 = clear, 100 = black); border 0 = none.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                OutlinedTextField(
-                    value = height,
-                    onValueChange = { height = it.filter(Char::isDigit).take(4) },
-                    label = { Text("Height dp") },
-                    isError = parsedHeight == null || parsedHeight <= 0,
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Text("Default presentation", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    listOf("top" to "Top", "center" to "Center", "bottom" to "Bottom").forEach { (key, text) ->
+                        FilterChip(
+                            selected = defaultPosition == key,
+                            onClick = { defaultPosition = key },
+                            label = { Text(text) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Modal (block underneath)", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Switch(checked = defaultModal, onCheckedChange = { defaultModal = it })
+                }
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Tap outside dismisses", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Switch(checked = defaultDismissOnOutside, onCheckedChange = { defaultDismissOnOutside = it }, enabled = defaultModal)
+                }
+                Text(
+                    "How this scene shows when scene.show omits position/modal/dismiss. An explicit action argument still wins. Non-modal is a tap-through HUD (can't take text input).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 enabled = canSave,
-                onClick = { onSave(name.trim(), parsedWidth ?: 320, parsedHeight ?: 240) },
+                onClick = {
+                    onSave(
+                        name.trim(),
+                        parsedWidth ?: 320,
+                        parsedHeight ?: 240,
+                        bgColor.trim().ifBlank { null },
+                        corner.toIntOrNull()?.coerceAtLeast(0) ?: 16,
+                        (scrim.toIntOrNull() ?: 55).coerceIn(0, 100),
+                        borderColor.trim().ifBlank { null },
+                        border.toIntOrNull()?.coerceAtLeast(0) ?: 0,
+                        defaultPosition,
+                        defaultModal,
+                        defaultDismissOnOutside,
+                    )
+                },
             ) {
-                Text(stringResource(R.string.action_create))
+                Text(if (initial == null) "Create" else "Save")
             }
         },
         dismissButton = {
@@ -1238,8 +1500,91 @@ private fun sceneElementSummary(element: SceneElement): String? = when (element.
         val max = element.config["max"].orEmpty().ifBlank { "100" }
         "$label: $value ($min-$max)"
     }
+    SceneElementType.NUMBER_PICKER -> {
+        val label = element.config["label"].orEmpty().ifBlank { "Number" }
+        val value = element.config["value"].orEmpty().ifBlank { "0" }
+        val min = element.config["min"].orEmpty().ifBlank { "0" }
+        val max = element.config["max"].orEmpty().ifBlank { "100" }
+        val step = element.config["step"].orEmpty().ifBlank { "1" }
+        "$label: $value ($min-$max, step $step)"
+    }
+    SceneElementType.CHECKBOX, SceneElementType.TOGGLE -> {
+        val label = element.config["label"].orEmpty().ifBlank { sceneElementTypeLabel(element.type) }
+        val on = element.config["value"].orEmpty().trim().lowercase() in setOf("true", "1", "on", "yes")
+        "$label (${if (on) "on" else "off"})"
+    }
+    SceneElementType.EDIT_TEXT -> {
+        val label = element.config["label"].orEmpty().ifBlank { "Text field" }
+        val value = element.config["value"].orEmpty()
+        if (value.isBlank()) label else "$label: $value"
+    }
+    SceneElementType.SPINNER -> {
+        val value = element.config["value"].orEmpty()
+        value.ifBlank { element.config["options"]?.takeIf { it.isNotBlank() } ?: "Spinner" }
+    }
     SceneElementType.IMAGE -> element.config["source"]?.takeIf { it.isNotBlank() }
     else -> null
+}
+
+@Composable
+private fun SceneColorField(label: String, value: String, onChange: (String) -> Unit) {
+    var showPicker by remember { mutableStateOf(false) }
+    val parsed = remember(value) {
+        runCatching { if (value.isBlank()) null else android.graphics.Color.parseColor(value) }.getOrNull()
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { showPicker = true }.padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                if (parsed == null) "Default" else value.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Box(
+            Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(if (parsed == null) Color.Transparent else Color(parsed))
+                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
+        )
+    }
+    if (showPicker) {
+        RgbaColorPickerDialog(
+            initial = value,
+            onConfirm = { onChange(it); showPicker = false },
+            onClear = { onChange(""); showPicker = false },
+            onDismiss = { showPicker = false },
+        )
+    }
+}
+
+/** Style fields shared by Text/Button elements. Colours are "#AARRGGBB" (blank = default). */
+private data class SceneElementStyle(
+    val textColor: String,
+    val bgColor: String,
+    val size: String,
+    val bold: Boolean,
+    val align: String,
+    val borderColor: String,
+    val borderWidth: String,
+    val font: String = "",
+)
+
+/** Adds the non-default style keys to a config builder. */
+private fun MutableMap<String, String>.putStyle(style: SceneElementStyle) {
+    style.textColor.trim().takeIf { it.isNotBlank() }?.let { put("textColor", it) }
+    style.bgColor.trim().takeIf { it.isNotBlank() }?.let { put("bgColor", it) }
+    style.size.trim().toIntOrNull()?.takeIf { it > 0 }?.let { put("textSize", it.toString()) }
+    if (style.bold) put("bold", "true")
+    if (style.align.isNotBlank() && style.align != "start") put("align", style.align)
+    style.borderColor.trim().takeIf { it.isNotBlank() }?.let { put("borderColor", it) }
+    style.borderWidth.trim().toIntOrNull()?.takeIf { it > 0 }?.let { put("borderWidth", it.toString()) }
+    style.font.trim().takeIf { it.isNotBlank() }?.let { put("font", it) }
 }
 
 private fun elementConfig(
@@ -1248,20 +1593,74 @@ private fun elementConfig(
     sliderMin: String,
     sliderMax: String,
     sliderValue: String,
+    sliderVar: String,
+    sliderVertical: Boolean,
+    numberStep: String,
+    boolValue: Boolean,
+    textValue: String,
+    spinnerOptions: String,
+    shapeCorner: String,
     imageSource: String,
+    style: SceneElementStyle,
 ): Map<String, String> = when (type) {
-    SceneElementType.TEXT -> mapOf("text" to label.ifBlank { "Text" })
-    SceneElementType.BUTTON -> mapOf("label" to label.ifBlank { "Button" })
+    SceneElementType.TEXT -> buildMap { put("text", label.ifBlank { "Text" }); putStyle(style) }
+    SceneElementType.BUTTON -> buildMap { put("label", label.ifBlank { "Button" }); putStyle(style) }
+    SceneElementType.EDIT_TEXT -> buildMap {
+        put("label", label.ifBlank { "Text" })
+        put("value", textValue)
+        sliderVar.trim().removePrefix("%").takeIf { it.isNotBlank() }?.let { put("var", it) }
+    }
+    SceneElementType.CHECKBOX, SceneElementType.TOGGLE -> buildMap {
+        put("label", label.ifBlank { sceneElementTypeLabel(type) })
+        put("value", boolValue.toString())
+        sliderVar.trim().removePrefix("%").takeIf { it.isNotBlank() }?.let { put("var", it) }
+        putStyle(style)
+    }
     SceneElementType.SLIDER -> {
         val min = sliderMin.toIntOrNull() ?: 0
         val max = (sliderMax.toIntOrNull() ?: 100).coerceAtLeast(min)
-        val value = (sliderValue.toIntOrNull() ?: min).coerceIn(min, max)
-        mapOf(
-            "label" to label.ifBlank { "Slider" },
-            "min" to min.toString(),
-            "max" to max.toString(),
-            "value" to value.toString(),
-        )
+        // A %var start value is kept literal (resolved at show time); a number is clamped to range.
+        val value = if (sliderValue.trim().startsWith("%")) sliderValue.trim()
+        else (sliderValue.toIntOrNull() ?: min).coerceIn(min, max).toString()
+        buildMap {
+            put("label", label.ifBlank { "Slider" })
+            put("min", min.toString())
+            put("max", max.toString())
+            put("value", value)
+            sliderVar.trim().removePrefix("%").takeIf { it.isNotBlank() }?.let { put("var", it) }
+            if (sliderVertical) put("orientation", "vertical")
+            putStyle(style)
+        }
+    }
+    SceneElementType.NUMBER_PICKER -> {
+        val min = sliderMin.toIntOrNull() ?: 0
+        val max = (sliderMax.toIntOrNull() ?: 100).coerceAtLeast(min)
+        val step = (numberStep.toIntOrNull() ?: 1).coerceAtLeast(1)
+        // A %var start value is kept literal (resolved at show time); a number is clamped to range.
+        val value = if (sliderValue.trim().startsWith("%")) sliderValue.trim()
+        else (sliderValue.toIntOrNull() ?: min).coerceIn(min, max).toString()
+        buildMap {
+            label.trim().takeIf { it.isNotBlank() }?.let { put("label", it) }
+            put("min", min.toString())
+            put("max", max.toString())
+            put("step", step.toString())
+            put("value", value)
+            sliderVar.trim().removePrefix("%").takeIf { it.isNotBlank() }?.let { put("var", it) }
+            putStyle(style)
+        }
+    }
+    SceneElementType.SPINNER -> buildMap {
+        put("label", label.ifBlank { "Spinner" })
+        spinnerOptions.trim().takeIf { it.isNotBlank() }?.let { put("options", it) }
+        put("value", textValue)
+        sliderVar.trim().removePrefix("%").takeIf { it.isNotBlank() }?.let { put("var", it) }
+        putStyle(style)
+    }
+    SceneElementType.RECTANGLE, SceneElementType.OVAL -> buildMap {
+        style.bgColor.trim().takeIf { it.isNotBlank() }?.let { put("bgColor", it) }
+        style.borderColor.trim().takeIf { it.isNotBlank() }?.let { put("borderColor", it) }
+        style.borderWidth.trim().toIntOrNull()?.takeIf { it > 0 }?.let { put("borderWidth", it.toString()) }
+        if (type == SceneElementType.RECTANGLE) shapeCorner.trim().toIntOrNull()?.takeIf { it > 0 }?.let { put("cornerRadius", it.toString()) }
     }
     SceneElementType.IMAGE -> mapOf("source" to imageSource.ifBlank { "Image" })
     else -> emptyMap()

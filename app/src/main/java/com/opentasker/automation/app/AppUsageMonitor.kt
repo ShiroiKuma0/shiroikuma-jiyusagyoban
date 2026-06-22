@@ -6,6 +6,7 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import com.opentasker.core.contexts.AppForegroundChangedContextEvents
 import com.opentasker.core.contexts.ApplicationContextEvents
 import com.opentasker.core.permissions.UsageAccess
 import kotlinx.coroutines.CoroutineScope
@@ -57,6 +58,7 @@ class AppUsageMonitor(
         if (currentPackage == previousPackage) return
 
         ApplicationContextEvents.publishForeground(currentPackage)
+        AppForegroundChangedContextEvents.publish(currentPackage)
         lastForegroundPackage = currentPackage
         Log.d(TAG, "Foreground app changed: $previousPackage -> $currentPackage")
     }
@@ -90,7 +92,7 @@ class AppUsageMonitor(
     companion object {
         private const val TAG = "AppUsageMonitor"
         private const val POLL_INTERVAL_MS = 2_000L
-        private const val MISSING_ACCESS_RETRY_MS = 30_000L
+        private const val MISSING_ACCESS_RETRY_MS = 5_000L
         private const val LOOKBACK_WINDOW_MS = 10_000L
 
         @Suppress("DEPRECATION")

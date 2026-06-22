@@ -1,3 +1,6 @@
+import java.io.File
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -12,6 +15,22 @@ val releaseKeyAlias = System.getenv("OPEN_TASKER_RELEASE_KEY_ALIAS")
 val releaseKeyPassword = System.getenv("OPEN_TASKER_RELEASE_KEY_PASSWORD")
 val appVersionCode = 77
 val appVersionName = "0.2.75"
+
+// --- shiroikuma fork: per-build version tail ---
+// forkVersionName = "<upstreamBase>+N", forkVersionCode = <upstreamCode>*10000 + N,
+// where N = BUILD_NUMBER from gradle.properties (bumped every build, reset to 1 on upstream sync).
+val forkBuildNumber = (project.findProperty("BUILD_NUMBER") as String?)?.trim()?.toIntOrNull() ?: 1
+val forkVersionName = "$appVersionName+$forkBuildNumber"
+val forkVersionCode = appVersionCode * 10000 + forkBuildNumber
+
+// --- shiroikuma fork: release signing from a gitignored keystore.properties ---
+// (falls back to the upstream OPEN_TASKER_* env vars when the file is absent).
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) keystorePropertiesFile.inputStream().use { load(it) }
+}
+val useKeystoreProperties = keystorePropertiesFile.exists()
+
 val allowedDistributions = setOf("standard", "fdroid", "play")
 val selectedDistribution = providers.gradleProperty("openTaskerDistribution")
     .orElse("standard")
@@ -21,7 +40,7 @@ require(selectedDistribution in allowedDistributions) {
     "Unsupported OpenTasker distribution '$selectedDistribution'. Expected one of: ${allowedDistributions.joinToString()}."
 }
 val smsActionAvailable = selectedDistribution != "play"
-val hasReleaseSigning = listOf(
+val hasReleaseSigning = useKeystoreProperties || listOf(
     releaseKeystorePath,
     releaseKeystorePassword,
     releaseKeyAlias,
@@ -34,11 +53,11 @@ android {
     buildToolsVersion = "36.0.0"
 
     defaultConfig {
-        applicationId = "com.opentasker.app"
+        applicationId = "shiroikuma.jiyusagyoban"
         minSdk = 26
         targetSdk = 37
-        versionCode = appVersionCode
-        versionName = appVersionName
+        versionCode = forkVersionCode
+        versionName = forkVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "DISTRIBUTION", "\"$selectedDistribution\"")
         buildConfigField("Boolean", "SMS_ACTION_AVAILABLE", smsActionAvailable.toString())
@@ -55,10 +74,17 @@ android {
         }
         if (hasReleaseSigning) {
             create("release") {
-                storeFile = file(releaseKeystorePath!!)
-                storePassword = releaseKeystorePassword
-                keyAlias = releaseKeyAlias
-                keyPassword = releaseKeyPassword
+                if (useKeystoreProperties) {
+                    storeFile = file(keystoreProperties.getProperty("storeFile"))
+                    storePassword = keystoreProperties.getProperty("storePassword")
+                    keyAlias = keystoreProperties.getProperty("keyAlias")
+                    keyPassword = keystoreProperties.getProperty("keyPassword")
+                } else {
+                    storeFile = file(releaseKeystorePath!!)
+                    storePassword = releaseKeystorePassword
+                    keyAlias = releaseKeyAlias
+                    keyPassword = releaseKeyPassword
+                }
             }
         }
     }
@@ -137,6 +163,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.re2j)
+    implementation(libs.shizuku.api)
+    implementation(libs.shizuku.provider)
+
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
 
@@ -294,5 +323,38 @@ tasks.register("verifyPlayManifestPolicy") {
             "Play distribution merged manifest must not contain READ_PHONE_STATE"
         }
         println("Play manifest policy check passed: SMS/phone-state permissions are absent.")
+    }
+}
+
+// --- shiroikuma fork: archive naming + one-shot build task ---
+base {
+    archivesName = "shiroikuma-jiyusagyoban_${forkVersionName}_arm64-v8a"
+}
+
+tasks.register("buildFork") {
+    group = "build"
+    description = "Build the signed release APK, copy it to ~/tmp, and bump BUILD_NUMBER for next time."
+    dependsOn("assembleRelease")
+    doLast {
+        val apkName = "shiroikuma-jiyusagyoban_${forkVersionName}_arm64-v8a.apk"
+        val outputDir = layout.buildDirectory.dir("outputs/apk/release").get().asFile
+        val targetDir = File(System.getProperty("user.home"), "tmp").apply { mkdirs() }
+        val apk = outputDir.listFiles { _, name -> name.endsWith(".apk") }?.firstOrNull()
+            ?: throw GradleException("No APK found in $outputDir")
+        val target = File(targetDir, apkName)
+        apk.copyTo(target, overwrite = true)
+        println("\u001b[1;36m>>> ${target.absolutePath}\u001b[0m")
+        println("\u001b[1;36m>>> versionCode $forkVersionCode\u001b[0m")
+
+        // Auto-increment BUILD_NUMBER for the next build.
+        val propsFile = rootProject.file("gradle.properties")
+        val next = forkBuildNumber + 1
+        val text = propsFile.readText()
+        propsFile.writeText(
+            if (Regex("(?m)^BUILD_NUMBER=").containsMatchIn(text))
+                text.replace(Regex("(?m)^BUILD_NUMBER=.*$"), "BUILD_NUMBER=$next")
+            else text.trimEnd() + "\n\n# shiroikuma fork: per-build version tail\nBUILD_NUMBER=$next\n"
+        )
+        println("\u001b[1;36m>>> BUILD_NUMBER bumped to $next\u001b[0m")
     }
 }

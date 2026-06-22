@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.CalendarContract
 import androidx.core.content.ContextCompat
+import com.opentasker.core.engine.EngineHeartbeat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
@@ -22,11 +23,13 @@ object CalendarSunContextEvents {
         val tickJob = launch(Dispatchers.IO) {
             while (isActive) {
                 val now = System.currentTimeMillis()
+                trySend(buildSecTick(now)) // per-second tick for sub-minute `interval` event profiles
                 val minute = now / MILLIS_PER_MINUTE
                 if (minute != lastMinute) {
                     lastMinute = minute
                     buildCalendarEvent(app, now).forEach { trySend(it) }
                     trySend(buildSunTick(now))
+                    EngineHeartbeat.markTick(now)
                 }
                 delay(1_000)
             }
@@ -113,6 +116,13 @@ object CalendarSunContextEvents {
             ),
         )
     }
+
+    /** Per-second tick carrying the epoch second, for sub-minute `interval` event profiles (the wakedance). */
+    internal fun buildSecTick(nowMs: Long): ContextEvent = ContextEvent(
+        type = "event",
+        matched = true,
+        metadata = mapOf("event" to "sec_tick", "epochSecond" to (nowMs / 1000).toString()),
+    )
 
     private fun queryCalendarInstances(app: Context, nowMs: Long): List<CalendarInstance> {
         val begin = nowMs - MILLIS_PER_MINUTE
