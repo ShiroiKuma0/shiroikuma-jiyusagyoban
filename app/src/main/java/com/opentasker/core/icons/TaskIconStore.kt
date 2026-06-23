@@ -55,6 +55,9 @@ object TaskIconStore {
         writePng(context, drawableToBitmap(drawable, target))
     }.getOrNull()
 
+    /** [saveFromApp] using the cached application context — for non-UI callers (e.g. actions). */
+    fun saveFromApp(pkg: String): String? = appContext?.let { saveFromApp(it, pkg) }
+
     /**
      * Render an emoji (or a short glyph/character) centered on a transparent square PNG. Color emoji draw
      * in their own colors; plain characters use [glyphColor]. Returns the absolute path, or null.

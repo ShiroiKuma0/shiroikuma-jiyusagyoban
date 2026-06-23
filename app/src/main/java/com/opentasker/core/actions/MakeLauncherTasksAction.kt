@@ -7,6 +7,7 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.icons.TaskIconStore
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.storage.ItemGroupEntity
 import com.opentasker.core.storage.ItemMetaEntity
@@ -103,6 +104,8 @@ class MakeLauncherTasksAction : Action {
                     actionsJson = Json.encodeToString(actions),
                     projectId = pid,
                     position = 0,
+                    // Default the task's icon to the selected app's icon (snapshotted to a PNG).
+                    iconPath = TaskIconStore.saveFromApp(pkg),
                 )
                 val newId = db.taskDao().insert(entity)
                 db.itemMetaDao().upsert(
