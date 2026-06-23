@@ -176,13 +176,27 @@
             </intent-filter>
         </service>
 
+        <!-- exported: a third-party launcher (e.g. 白い熊 雷起動盤) fires the raw shortcut intent itself,
+             so the run-task trampoline must be startable from another app. -->
         <activity
             android:name="com.opentasker.widget.TaskRunActivity"
-            android:exported="false"
+            android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:excludeFromRecents="true"
             android:noHistory="true"
             android:taskAffinity="" />
+
+        <!-- Launcher "add a shortcut" entry: picks a task, returns a home-screen shortcut that runs it. -->
+        <activity
+            android:name="com.opentasker.widget.CreateTaskShortcutActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.OpenTasker">
+            <intent-filter>
+                <action android:name="android.intent.action.CREATE_SHORTCUT" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
         <activity
             android:name="com.opentasker.scenes.SceneActivity"

@@ -3,6 +3,7 @@ package com.opentasker.core.transfer
 import androidx.room.withTransaction
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
+import com.opentasker.core.icons.TaskIconStore
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Project
 import com.opentasker.core.model.Scene
@@ -27,10 +28,13 @@ import java.util.Date
 import java.util.Locale
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.io.File
 
 // v4 adds `templates` (widget-layout templates, previously a separate processor). v3 added per-item
 // `position` + per-category `sort`; v2 added `projects` + projectId. Older bundles still import (missing
 // fields default), so the version is a floor on what THIS build can read, not a gate.
+// Tasks may also carry an optional base64 `iconData` (embedded icon PNG, for cross-device imports); it's
+// purely additive — older builds ignore the unknown key — so the schema version stays 4.
 const val OPEN_TASKER_BUNDLE_SCHEMA_VERSION = 4
 
 @Serializable
@@ -315,7 +319,9 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
         name: String = "白い熊 自由作業盤 Export",
         description: String = "",
     ): OpenTaskerBundle {
+        // Embed each task's icon bytes so it survives a cross-device import (the path alone is device-local).
         val tasks = db.taskDao().getAll().map { it.toDomain() }
+            .map { it.copy(iconData = TaskIconStore.encodeIcon(it.iconPath)) }
         val profiles = db.profileDao().getAll().map { it.toDomain() }
         val variables = db.variableDao().getAll().map { it.toDomain() }
         val scenes = db.sceneDao().getAll().map { it.toDomain() }
@@ -363,6 +369,7 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
     ): OpenTaskerBundle {
         val profiles = db.profileDao().getAll().map { it.toDomain() }.filter { it.id in profileIds }
         val tasks = db.taskDao().getAll().map { it.toDomain() }.filter { it.id in taskIds }
+            .map { it.copy(iconData = TaskIconStore.encodeIcon(it.iconPath)) }
         val scenes = db.sceneDao().getAll().map { it.toDomain() }.filter { it.id in sceneIds }
         val allVariables = db.variableDao().getAll().map { it.toDomain() }
         val variables = when {
@@ -475,13 +482,23 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             val sceneIdMap = mutableMapOf<Long, Long>()
             bundle.tasks.sortedWith(compareBy<Task> { it.name.lowercase() }.thenBy { it.id }).forEach { task ->
                 val pid = remapProjectId(task.projectId)
+                // Resolve the icon: reuse the local file if it still exists (same-device re-import), else
+                // materialize the embedded bytes (cross-device), else none.
+                val iconPath = when {
+                    !task.iconPath.isNullOrBlank() && File(task.iconPath).exists() -> task.iconPath
+                    task.iconData != null -> TaskIconStore.materializeIcon(task.iconData)
+                    else -> null
+                }
+                val withIcon = task.copy(iconPath = iconPath)
                 val reuseId = reusableTaskIds.remove(task.name.lowercase())
                 val resolvedId = if (reuseId != null) {
-                    db.taskDao().update(task.copy(id = reuseId, projectId = pid).toEntity())  // in-place: same id, new actions
+                    val oldIcon = db.taskDao().getById(reuseId)?.iconPath
+                    if (oldIcon != null && oldIcon != iconPath) TaskIconStore.delete(oldIcon)  // don't leak the replaced icon
+                    db.taskDao().update(withIcon.copy(id = reuseId, projectId = pid).toEntity())  // in-place: same id, new actions
                     reuseId
                 } else {
                     val newName = uniqueName(task.name, takenTaskNames)
-                    val newId = db.taskDao().insert(task.copy(id = 0, name = newName, projectId = pid).toEntity())
+                    val newId = db.taskDao().insert(withIcon.copy(id = 0, name = newName, projectId = pid).toEntity())
                     takenTaskNames += newName.lowercase()
                     newId
                 }

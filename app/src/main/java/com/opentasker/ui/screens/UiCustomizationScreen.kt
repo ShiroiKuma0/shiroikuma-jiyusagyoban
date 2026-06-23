@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -55,6 +56,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -62,10 +64,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.drawable.toBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.unit.sp
 import com.opentasker.ui.theme.FontOption
 import com.opentasker.ui.theme.ThemePrefs
@@ -239,6 +247,9 @@ fun UiCustomizationScreen(
                     onCheckedChange = { ThemeStore.update { p -> p.copy(advancedActionPicker = it) } },
                 )
             }
+
+            item { SectionHeader("Task list") }
+            item { TaskIconSizeRow(level = 1, prefs = prefs) }
         }
     }
 
@@ -428,6 +439,55 @@ private fun FlashPreview(level: Int, prefs: ThemePrefs) {
                     fontWeight = FontWeight(prefs.flashFontWeight),
                     modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
                 )
+            }
+        }
+    }
+}
+
+/** Global task-icon size: a slider plus a live preview mirroring how an icon sits on a task card. */
+@Composable
+private fun TaskIconSizeRow(level: Int, prefs: ThemePrefs) {
+    val context = LocalContext.current
+    val sample by produceState<ImageBitmap?>(initialValue = null) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                context.packageManager.getApplicationIcon(context.packageName).toBitmap(192, 192).asImageBitmap()
+            }.getOrNull()
+        }
+    }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = rowStartPadding(level), end = 16.dp, top = 8.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Task icon size", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "${prefs.taskIconSizeDp} dp",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Slider(
+            value = prefs.taskIconSizeDp.toFloat(),
+            onValueChange = { v -> ThemeStore.update { it.copy(taskIconSizeDp = v.roundToInt()) } },
+            valueRange = ThemePrefs.TASK_ICON_MIN.toFloat()..ThemePrefs.TASK_ICON_MAX.toFloat(),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text("Live preview", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // Fixed-height box so the row doesn't jump as the icon grows/shrinks.
+        Box(Modifier.fillMaxWidth().height((ThemePrefs.TASK_ICON_MAX + 8).dp), contentAlignment = Alignment.CenterStart) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val bmp = sample
+                if (bmp != null) {
+                    Image(
+                        bitmap = bmp,
+                        contentDescription = null,
+                        modifier = Modifier.size(prefs.taskIconSizeDp.dp).clip(RoundedCornerShape(6.dp)),
+                    )
+                }
+                Text("フラッシュ 林檎", style = MaterialTheme.typography.titleLarge, maxLines = 1)
             }
         }
     }

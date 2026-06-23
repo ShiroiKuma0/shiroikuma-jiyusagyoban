@@ -41,6 +41,8 @@ data class ThemePrefs(
     val flashCornerRadiusDp: Int = 12,           // [0, FLASH_CORNER_MAX]
     val flashTextSizeSp: Int = 16,               // [FLASH_TEXT_MIN, FLASH_TEXT_MAX]
     val flashFontWeight: Int = 700,              // 100..900 (Bold by default — bigger & heavier)
+    // ---- Task list -------------------------------------------------------------------------------
+    val taskIconSizeDp: Int = 32,                // size of a task's custom icon on its card [TASK_ICON_MIN, TASK_ICON_MAX]
 ) {
     companion object {
         const val BLACK = 0xFF000000.toInt()
@@ -57,6 +59,9 @@ data class ThemePrefs(
         const val FLASH_TEXT_MAX = 30
         const val FONT_WEIGHT_MIN = 100
         const val FONT_WEIGHT_MAX = 900
+
+        const val TASK_ICON_MIN = 16
+        const val TASK_ICON_MAX = 96
 
         val DEFAULT = ThemePrefs()
     }
@@ -93,6 +98,7 @@ object ThemeStore {
     private const val K_FLASH_CORNER = "flash_corner"
     private const val K_FLASH_TEXT_SIZE = "flash_text_size"
     private const val K_FLASH_FONT_WEIGHT = "flash_font_weight"
+    private const val K_TASK_ICON_SIZE = "task_icon_size"
 
     private lateinit var appContext: Context
     private lateinit var prefs: SharedPreferences
@@ -128,6 +134,7 @@ object ThemeStore {
         flashCornerRadiusDp = flashCornerRadiusDp.coerceIn(0, ThemePrefs.FLASH_CORNER_MAX),
         flashTextSizeSp = flashTextSizeSp.coerceIn(ThemePrefs.FLASH_TEXT_MIN, ThemePrefs.FLASH_TEXT_MAX),
         flashFontWeight = flashFontWeight.coerceIn(ThemePrefs.FONT_WEIGHT_MIN, ThemePrefs.FONT_WEIGHT_MAX),
+        taskIconSizeDp = taskIconSizeDp.coerceIn(ThemePrefs.TASK_ICON_MIN, ThemePrefs.TASK_ICON_MAX),
     )
 
     private fun load(): ThemePrefs {
@@ -151,6 +158,7 @@ object ThemeStore {
             flashCornerRadiusDp = prefs.getInt(K_FLASH_CORNER, d.flashCornerRadiusDp),
             flashTextSizeSp = prefs.getInt(K_FLASH_TEXT_SIZE, d.flashTextSizeSp),
             flashFontWeight = prefs.getInt(K_FLASH_FONT_WEIGHT, d.flashFontWeight),
+            taskIconSizeDp = prefs.getInt(K_TASK_ICON_SIZE, d.taskIconSizeDp),
         ).normalized()
     }
 
@@ -174,6 +182,7 @@ object ThemeStore {
             putInt(K_FLASH_CORNER, p.flashCornerRadiusDp)
             putInt(K_FLASH_TEXT_SIZE, p.flashTextSizeSp)
             putInt(K_FLASH_FONT_WEIGHT, p.flashFontWeight)
+            putInt(K_TASK_ICON_SIZE, p.taskIconSizeDp)
         }
     }
 

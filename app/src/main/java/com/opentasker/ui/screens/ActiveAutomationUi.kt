@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.compose.animation.animateContentSize
@@ -22,6 +23,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -144,6 +146,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -189,6 +192,7 @@ import com.opentasker.core.contexts.EventContextPreset
 import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.contexts.contextConfigSummary
 import com.opentasker.core.engine.executeAndLogTask
+import com.opentasker.core.icons.TaskIconStore
 import com.opentasker.widget.TaskShortcutHelper
 import com.opentasker.widget.WidgetEditor
 import com.opentasker.core.engine.ActionTraceStatus
@@ -524,8 +528,8 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun createTask(name: String, priority: Int, projectId: Long? = null) = launchWithMessage("Task created") {
-        db.taskDao().insert(Task(name = name.trim(), priority = priority.coerceIn(0, 10), projectId = projectId, position = db.taskDao().nextPosition()).toEntity())
+    fun createTask(name: String, priority: Int, projectId: Long? = null, iconPath: String? = null) = launchWithMessage("Task created") {
+        db.taskDao().insert(Task(name = name.trim(), priority = priority.coerceIn(0, 10), projectId = projectId, position = db.taskDao().nextPosition(), iconPath = iconPath).toEntity())
     }
 
     /** Persist a manual reorder of the visible (filtered) tasks by reusing their own position slots. */
@@ -546,6 +550,10 @@ class ActiveAutomationViewModel(
             )
             db.editHistoryDao().pruneOld(EditHistoryDao.TYPE_TASK, task.id)
         }
+        // A replaced or cleared icon leaves its old PNG behind — remove it once the change is persisted.
+        if (previous != null && previous.iconPath != task.iconPath) {
+            TaskIconStore.delete(previous.iconPath)
+        }
         db.taskDao().update(task.toEntity())
     }
 
@@ -559,6 +567,7 @@ class ActiveAutomationViewModel(
                     return@launch
                 }
                 db.taskDao().delete(task.toEntity())
+                TaskIconStore.delete(task.iconPath)
             }
                 .onSuccess { events.send("Task deleted") }
                 .onFailure { events.send("Error: ${it.message ?: "Task delete failed"}") }
@@ -573,7 +582,7 @@ class ActiveAutomationViewModel(
                 val usedIds = db.profileDao().getAll().map { it.toDomain() }
                     .flatMap { listOfNotNull(it.enterTaskId, it.exitTaskId) }.toSet()
                 val (used, free) = tasks.partition { it.id in usedIds }
-                free.forEach { db.taskDao().delete(it.toEntity()) }
+                free.forEach { db.taskDao().delete(it.toEntity()); TaskIconStore.delete(it.iconPath) }
                 buildString {
                     append("Deleted ${free.size} task(s)")
                     if (used.isNotEmpty()) append("; skipped ${used.size} used by a profile")
@@ -2260,8 +2269,8 @@ fun ActiveAutomationUi(
         TaskEditorDialog(
             task = null,
             onDismiss = { showCreateTaskDialog = false },
-            onSave = { name, priority ->
-                viewModel.createTask(name, priority, currentProjectId)
+            onSave = { name, priority, iconPath ->
+                viewModel.createTask(name, priority, currentProjectId, iconPath)
                 showCreateTaskDialog = false
             },
         )
@@ -2275,8 +2284,8 @@ fun ActiveAutomationUi(
         TaskEditorDialog(
             task = task,
             onDismiss = { taskDialog = null },
-            onSave = { name, priority ->
-                viewModel.updateTask(task.copy(name = name.trim(), priority = priority.coerceIn(0, 10)))
+            onSave = { name, priority, iconPath ->
+                viewModel.updateTask(task.copy(name = name.trim(), priority = priority.coerceIn(0, 10), iconPath = iconPath))
                 taskDialog = null
             },
         )
@@ -2963,6 +2972,16 @@ private fun TaskCard(
                     IconButton(onClick = onRun) {
                         Icon(Icons.Filled.PlayArrow, contentDescription = "Run task", tint = MaterialTheme.colorScheme.primary)
                     }
+                }
+                val listIcon = remember(task.iconPath) { TaskIconStore.loadBitmap(task.iconPath) }
+                if (listIcon != null) {
+                    val themePrefs by ThemeStore.state.collectAsState()
+                    Image(
+                        bitmap = listIcon.asImageBitmap(),
+                        contentDescription = null,
+                        modifier = Modifier.size(themePrefs.taskIconSizeDp.dp).clip(RoundedCornerShape(6.dp)),
+                    )
+                    Spacer(Modifier.width(8.dp))
                 }
                 Column(Modifier.weight(1f)) {
                     Text(task.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -3777,16 +3796,46 @@ private fun TemplateSlotDialog(
 private fun TaskEditorDialog(
     task: Task?,
     onDismiss: () -> Unit,
-    onSave: (String, Int) -> Unit,
+    onSave: (String, Int, String?) -> Unit,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var name by remember(task?.id) { mutableStateOf(task?.name.orEmpty()) }
     var priority by remember(task?.id) { mutableStateOf((task?.priority ?: 5).toString()) }
     val parsedPriority = priority.toIntOrNull()
     val canSave = name.isNotBlank() && parsedPriority != null && parsedPriority in 0..10
 
+    // The persisted icon (if editing) vs. the in-progress selection. We never delete the persisted file
+    // while staging — only replaced *staged* files are cleaned up here; the persisted one is cleaned on
+    // Save (in updateTask) or kept on Cancel.
+    val originalPath = remember(task?.id) { task?.iconPath }
+    var iconPath by remember(task?.id) { mutableStateOf(task?.iconPath) }
+    val preview = remember(iconPath) { TaskIconStore.loadBitmap(iconPath) }
+    var showAppPicker by remember { mutableStateOf(false) }
+    var showEmojiPicker by remember { mutableStateOf(false) }
+
+    fun stageIcon(newPath: String?) {
+        val current = iconPath
+        if (current != null && current != originalPath) TaskIconStore.delete(current)
+        iconPath = newPath
+    }
+
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) scope.launch {
+            val saved = withContext(Dispatchers.IO) { TaskIconStore.saveFromUri(context, uri) }
+            if (saved != null) stageIcon(saved)
+        }
+    }
+
+    val cleanupAndDismiss = {
+        val current = iconPath
+        if (current != null && current != originalPath) TaskIconStore.delete(current)
+        onDismiss()
+    }
+
     AlertDialog(
         modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
-        onDismissRequest = onDismiss,
+        onDismissRequest = cleanupAndDismiss,
         title = { Text(if (task == null) "Create Task" else "Edit Task") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
@@ -3808,15 +3857,84 @@ private fun TaskEditorDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                // Shortcut / list icon. Snapshotted to a PNG on pick, so it survives the source picture
+                // being deleted or the source app being frozen. None set → uses the app's launcher icon.
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Shortcut icon", style = MaterialTheme.typography.labelLarge)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(10.dp)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (preview != null) {
+                                Image(
+                                    bitmap = preview.asImageBitmap(),
+                                    contentDescription = "Selected icon",
+                                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)),
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Filled.Apps,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(32.dp),
+                                )
+                            }
+                        }
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = { showAppPicker = true }) { Text("App") }
+                                OutlinedButton(onClick = {
+                                    photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                }) { Text("Picture") }
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = { showEmojiPicker = true }) { Text("Emoji") }
+                                if (iconPath != null) {
+                                    TextButton(onClick = { stageIcon(null) }) { Text("Clear") }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
-            OutlinedButton(enabled = canSave, onClick = { onSave(name, parsedPriority ?: 5) }) {
+            OutlinedButton(enabled = canSave, onClick = { onSave(name, parsedPriority ?: 5, iconPath) }) {
                 Text("Save")
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = cleanupAndDismiss) { Text("Cancel") } },
     )
+
+    if (showAppPicker) {
+        AppPickerDialog(
+            onDismiss = { showAppPicker = false },
+            onPick = { pkg ->
+                showAppPicker = false
+                scope.launch {
+                    val saved = withContext(Dispatchers.IO) { TaskIconStore.saveFromApp(context, pkg) }
+                    if (saved != null) stageIcon(saved)
+                }
+            },
+        )
+    }
+
+    if (showEmojiPicker) {
+        EmojiPickerDialog(
+            initial = "",
+            onDismiss = { showEmojiPicker = false },
+            onConfirm = { glyph ->
+                showEmojiPicker = false
+                scope.launch {
+                    val saved = withContext(Dispatchers.IO) { TaskIconStore.saveFromText(context, glyph) }
+                    if (saved != null) stageIcon(saved)
+                }
+            },
+        )
+    }
 }
 
 /** A thin, always-visible scrollbar thumb on the right edge — drawn only while [state] can scroll, so a

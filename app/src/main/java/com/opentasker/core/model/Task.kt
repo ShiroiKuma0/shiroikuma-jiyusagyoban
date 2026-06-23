@@ -18,6 +18,8 @@ data class Task(
     val actions: List<ActionSpec> = emptyList(),
     val projectId: Long? = null,            // null = Unfiled
     val position: Int = 0,                  // manual sort order within its tab
+    val iconPath: String? = null,           // absolute path to a saved PNG used as the shortcut/list icon
+    val iconData: String? = null,           // bundle-only: base64 PNG so the icon survives a cross-device import; never persisted
 )
 
 @Serializable
