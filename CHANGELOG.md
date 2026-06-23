@@ -3,6 +3,27 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.75+18 — 2026-06-23
+
+**Home-screen shortcuts that run a task directly**, each with a **persisted custom icon** (from an app, a picture, or an emoji), a **launcher shortcut picker**, a global **icon-size** control, and **cross-device icon transfer** in exports.
+
+### Task shortcuts
+- **Launcher "create shortcut" picker** — a new `CreateTaskShortcutActivity` registers for the system `CREATE_SHORTCUT` flow, so long-pressing the home screen → *Shortcuts* → **白い熊 自由作業盤** opens a **foldable projects → tasks picker** (all projects folded by default); choosing a task drops a home-screen shortcut that runs it.
+- The in-app **Pin to home screen** path now uses the task's custom icon (previously always the app icon).
+- **`TaskRunActivity` is now exported**, so a third-party launcher (e.g. 白い熊 雷起動盤 / raikidoban) that fires the raw shortcut intent itself can start the task — fixes the launcher's "this shortcut isn't associated with a valid app". Shortcuts carry the task **id + name**, so they survive a task re-import.
+
+### Per-task icon
+- Assign a task's icon in its editor from three sources: an **installed app's icon**, a **picture** (photo picker), or an **emoji / glyph** (new `EmojiPickerDialog` — type or tap a quick-pick, with a live preview). The chosen icon is **snapshotted to a PNG** in app storage (`TaskIconStore`) at pick time, so it keeps displaying even if the source picture is deleted or the source app is frozen, and is **baked as a bitmap** into shortcuts so it survives in the launcher regardless of the app's state.
+- The icon shows in the **editor preview**, next to the task in the **task list** (folded and unfolded), and on its **shortcut**; no icon set → the app's launcher icon.
+- **Global task-icon size** — a new **slider with a live preview** under *UI customization → Task list* (`ThemePrefs.taskIconSizeDp`, 16–96 dp) sizes every task's icon on its card.
+- The **app picker** dialog was rebuilt as a **yellow-bordered grid of app-icon tiles** (icon + name), replacing the plain text list — used here and by every app-package field.
+
+### Import / export
+- Task icons now **travel across devices**: an export embeds each icon as base64 (`Task.iconData`); import **re-materializes** it into local storage (reusing the existing local file on a same-device re-import). The bundle schema stays **v4** — the field is additive, so older builds ignore it — and `iconData` is never written to the database.
+
+### Schema
+- **DB v15** — new `tasks.iconPath` column (the saved icon's path) with a `14 → 15` migration; existing data is untouched on update.
+
 ## 0.2.75+11 — 2026-06-23
 
 Re-based the **entire fork onto upstream OpenTasker 0.2.75**, and added **Turn Screen Off**, **Freeze / Unfreeze App** + a **multi-select launcher-task generator**, a **capability-aware action editor**, and the screen-off **通知明滅 wakedance**.
