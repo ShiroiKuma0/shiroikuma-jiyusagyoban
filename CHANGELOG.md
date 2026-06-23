@@ -3,6 +3,39 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.75+11 — 2026-06-23
+
+Re-based the **entire fork onto upstream OpenTasker 0.2.75**, and added **Turn Screen Off**, **Freeze / Unfreeze App** + a **multi-select launcher-task generator**, a **capability-aware action editor**, and the screen-off **通知明滅 wakedance**.
+
+### Re-synced onto upstream 0.2.75
+- Rebased the whole fork delta from upstream **0.2.68 → 0.2.75**, keeping every customization (~31 file overlaps resolved by hand). The full pre-resync history is preserved in `backup/custom-0.2.68-pre-resync`.
+- Inherited upstream's intervening work: **Locale plugin** interop (both *condition* contexts and a *setting* target), **encrypted DB backup** (AES-256-GCM), a real **Shizuku** elevated backend + **Termux** script dispatch, scene **multi-select / alignment guides / resize**, a **visual flow editor** (zoom, edge routing, branch & subflow markers), `var.persist`, dotted/bracketed `var.set` JSON paths, **RE2/J** linear-time regex, a **Run-Log expression debugger**, and a large batch of concurrency / teardown / schema-drift hardening, plus i18n scaffolding.
+- Our **DB schema stays at v14** — no migration when you update; existing data is untouched. Upstream's redundant per-item `group` tag is dropped in favour of our richer project grouping. Gradle dependency-verification is disabled (it only fights local builds).
+
+### New actions
+- **Turn Screen Off** (`screen.off`) — accessibility `GLOBAL_ACTION_LOCK_SCREEN` first (no Shizuku needed), Shizuku `KEYCODE_SLEEP` fallback; no longer greyed out.
+- **Freeze App** (`app.freeze`) / **Unfreeze App** (`app.unfreeze`) — disable/enable any app through Shizuku (`pm disable-user` / `pm enable`).
+- **Make Launcher Tasks** (`tasks.launchers`) — a **multi-select app picker** (all installed user apps, *including frozen ones*, searchable) that writes one **unfreeze-then-launch** task per chosen app into a named project group, **re-sorted alphabetically on every run**, skipping duplicates; the group is auto-created beneath the generator task.
+
+### The 通知明滅 screen-off wakedance
+- When a notification arrives **screen-off**, the device now **wakes over the lockscreen** and rotates through every unread app (colour + sender + preview) before sleeping, repeating on a sub-minute timer. Beats EMUI's ~2 s teardown via a `SCREEN_BRIGHT` wakelock, draw-before-wake, an **opaque show-when-locked `WakedanceActivity`**, and a clean self-sleep — no lockscreen or wallpaper flash.
+- New engine primitives: a **`sec_tick`** sub-minute event trigger; `state.get screen=on/off`; `wake` / `screen.off` via Shizuku key events.
+
+### Capability-aware action editor
+- Each action now shows a **live status pill** — **red** with a one-tap **deep-link to the exact Settings screen** when its permission/service isn't set up, **yellow** (FYI) when it is — evaluated against the **same checks the Setup tab uses** (accessibility, Shizuku, modify-settings, overlay, Do-Not-Disturb, notifications). Consistent across the action picker, the in-task list, and the config dialog.
+- New **`APP_PACKAGE`** field type — type a package name / `%variable`, or pick from an installed-apps list.
+
+### Battery, scenes & recomposition
+- **Charging detection = `EXTRA_PLUGGED` only** — Huawei lingers `isCharging`/status after unplug, so charging state now follows the plug (covers wireless, drops instantly). The **電池線** battery line turns **solid red while charging**.
+- **Per-variable scene recomposition** (`derivedStateOf`) — a scene element re-renders only when *its own* expanded values change, not on every global write, cutting idle overlay CPU.
+
+### Profiles & engine
+- Profiles now link their **enter/exit task by NAME** (DB **v14** + migration) with the id as fallback, so re-importing a task — which re-ids it — no longer orphans the profile (“Missing task #N”).
+- The **Monitor** tab aggregates engine task-activity and a widget-pull log.
+
+### Docs
+- **README** fully rewritten: a two-line title (白い熊 自由作業盤 / ShiroiKuma Jiyūsagyōban), the *Jiyūsagyōban* gloss, the full **Triggers** + **115-action** tables, and fork-vs-upstream feature sections.
+
 ## 0.2.68+107 — 2026-06-21
 
 The **通知明滅 notification edge-light** port, a **self-healing always-on engine** with a live **Monitor tab**, new **notification / broadcast / orientation / app-foreground triggers**, the **music edge-light** & a full **edge-gesture** system, **item grouping** across every tab, and reliability fixes for OEM battery management.
