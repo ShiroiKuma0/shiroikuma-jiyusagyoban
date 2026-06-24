@@ -106,6 +106,8 @@ class MakeLauncherTasksAction : Action {
                     position = 0,
                     // Default the task's icon to the selected app's icon (snapshotted to a PNG).
                     iconPath = TaskIconStore.saveFromApp(pkg),
+                    // Generated launch tasks default to showing a re-freeze bubble on the Desktop.
+                    freezeBubble = true,
                 )
                 val newId = db.taskDao().insert(entity)
                 db.itemMetaDao().upsert(

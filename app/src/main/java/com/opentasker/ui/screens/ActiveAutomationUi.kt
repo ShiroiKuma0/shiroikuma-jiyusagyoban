@@ -528,8 +528,8 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun createTask(name: String, priority: Int, projectId: Long? = null, iconPath: String? = null) = launchWithMessage("Task created") {
-        db.taskDao().insert(Task(name = name.trim(), priority = priority.coerceIn(0, 10), projectId = projectId, position = db.taskDao().nextPosition(), iconPath = iconPath).toEntity())
+    fun createTask(name: String, priority: Int, projectId: Long? = null, iconPath: String? = null, freezeBubble: Boolean = false) = launchWithMessage("Task created") {
+        db.taskDao().insert(Task(name = name.trim(), priority = priority.coerceIn(0, 10), projectId = projectId, position = db.taskDao().nextPosition(), iconPath = iconPath, freezeBubble = freezeBubble).toEntity())
     }
 
     /** Persist a manual reorder of the visible (filtered) tasks by reusing their own position slots. */
@@ -1255,6 +1255,7 @@ fun ActiveAutomationUi(
     // Help sections start collapsed; hoisted so the open/closed state survives leaving the tab.
     val expandedHelpSections = remember { mutableStateMapOf<String, Boolean>() }
     var taskDialog by remember { mutableStateOf<Task?>(null) }
+    var iconPickerTask by remember { mutableStateOf<Task?>(null) }
     var showCreateTaskDialog by remember { mutableStateOf(false) }
     var profileDialog by remember { mutableStateOf<Profile?>(null) }
     var showCreateProfileDialog by remember { mutableStateOf(false) }
@@ -1848,6 +1849,8 @@ fun ActiveAutomationUi(
                 onMoveTask = { moveTarget = MoveTarget.TaskMove(it) },
                 onExportTask = { exportRequest = ExportRequest(name = "Task: ${it.name}", fileName = exportFileName(it.name), taskIds = setOf(it.id)) },
                 onReorderAction = { task, newOrder -> viewModel.updateTask(task.copy(actions = newOrder), "Actions reordered") },
+                onPickTaskIcon = { iconPickerTask = it },
+                onSetTaskFreeze = { t, on -> viewModel.updateTask(t.copy(freezeBubble = on), if (on) "Freeze bubble on" else "Freeze bubble off") },
                 manualSort = sortPrefs.tasks == SortMethod.MANUAL,
                 onReorder = { viewModel.reorderTasks(it) },
                 selectedIds = selectedTaskIds,
@@ -2269,8 +2272,8 @@ fun ActiveAutomationUi(
         TaskEditorDialog(
             task = null,
             onDismiss = { showCreateTaskDialog = false },
-            onSave = { name, priority, iconPath ->
-                viewModel.createTask(name, priority, currentProjectId, iconPath)
+            onSave = { name, priority, iconPath, freezeBubble ->
+                viewModel.createTask(name, priority, currentProjectId, iconPath, freezeBubble)
                 showCreateTaskDialog = false
             },
         )
@@ -2284,9 +2287,20 @@ fun ActiveAutomationUi(
         TaskEditorDialog(
             task = task,
             onDismiss = { taskDialog = null },
-            onSave = { name, priority, iconPath ->
-                viewModel.updateTask(task.copy(name = name.trim(), priority = priority.coerceIn(0, 10), iconPath = iconPath))
+            onSave = { name, priority, iconPath, freezeBubble ->
+                viewModel.updateTask(task.copy(name = name.trim(), priority = priority.coerceIn(0, 10), iconPath = iconPath, freezeBubble = freezeBubble))
                 taskDialog = null
+            },
+        )
+    }
+
+    iconPickerTask?.let { task ->
+        TaskIconPickerDialog(
+            initialIconPath = task.iconPath,
+            onDismiss = { iconPickerTask = null },
+            onConfirm = { newPath ->
+                viewModel.updateTask(task.copy(iconPath = newPath))
+                iconPickerTask = null
             },
         )
     }
@@ -2810,6 +2824,8 @@ private fun TasksScreen(
     onMoveTask: (Task) -> Unit,
     onExportTask: (Task) -> Unit,
     onReorderAction: (Task, List<ActionSpec>) -> Unit,
+    onPickTaskIcon: (Task) -> Unit,
+    onSetTaskFreeze: (Task, Boolean) -> Unit,
     manualSort: Boolean,
     onReorder: (List<Task>) -> Unit,
     selectedIds: Set<Long>,
@@ -2873,6 +2889,8 @@ private fun TasksScreen(
                 onMove = { onMoveTask(task) },
                 onExport = { onExportTask(task) },
                 onReorderActions = { newOrder -> onReorderAction(task, newOrder) },
+                onPickIcon = { onPickTaskIcon(task) },
+                onToggleFreeze = { onSetTaskFreeze(task, it) },
             )
         }
         LazyColumn(
@@ -2936,6 +2954,8 @@ private fun TaskCard(
     onMove: () -> Unit,
     onExport: () -> Unit,
     onReorderActions: (List<ActionSpec>) -> Unit,
+    onPickIcon: () -> Unit,
+    onToggleFreeze: (Boolean) -> Unit,
 ) {
     var draggingIndex by remember(task.id) { mutableStateOf<Int?>(null) }
     var dragOffsetY by remember(task.id) { mutableFloatStateOf(0f) }
@@ -2974,13 +2994,30 @@ private fun TaskCard(
                     }
                 }
                 val listIcon = remember(task.iconPath) { TaskIconStore.loadBitmap(task.iconPath) }
+                val themePrefs by ThemeStore.state.collectAsState()
                 if (listIcon != null) {
-                    val themePrefs by ThemeStore.state.collectAsState()
+                    // Tap the icon to change it (opens the icon picker).
                     Image(
                         bitmap = listIcon.asImageBitmap(),
-                        contentDescription = null,
-                        modifier = Modifier.size(themePrefs.taskIconSizeDp.dp).clip(RoundedCornerShape(6.dp)),
+                        contentDescription = "Change task icon",
+                        modifier = Modifier
+                            .size(themePrefs.taskIconSizeDp.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable(onClick = onPickIcon),
                     )
+                    Spacer(Modifier.width(8.dp))
+                } else if (expanded) {
+                    // No icon yet — an "add icon" affordance in the expanded view.
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp))
+                            .clickable(onClick = onPickIcon),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Filled.Apps, contentDescription = "Add task icon", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                    }
                     Spacer(Modifier.width(8.dp))
                 }
                 Column(Modifier.weight(1f)) {
@@ -3012,6 +3049,11 @@ private fun TaskCard(
                         StatusPill("Priority ${task.priority}", MaterialTheme.colorScheme.secondary)
                     }
                     StatusPill(task.collisionMode.name.lowercase().replace('_', ' '), MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                // Freeze bubble toggle, editable inline without opening the editor.
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Text("Freeze bubble", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = task.freezeBubble, onCheckedChange = onToggleFreeze)
                 }
                 if (task.actions.isEmpty()) {
                     InlineNotice(
@@ -3796,12 +3838,11 @@ private fun TemplateSlotDialog(
 private fun TaskEditorDialog(
     task: Task?,
     onDismiss: () -> Unit,
-    onSave: (String, Int, String?) -> Unit,
+    onSave: (String, Int, String?, Boolean) -> Unit,
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     var name by remember(task?.id) { mutableStateOf(task?.name.orEmpty()) }
     var priority by remember(task?.id) { mutableStateOf((task?.priority ?: 5).toString()) }
+    var freezeBubble by remember(task?.id) { mutableStateOf(task?.freezeBubble ?: false) }
     val parsedPriority = priority.toIntOrNull()
     val canSave = name.isNotBlank() && parsedPriority != null && parsedPriority in 0..10
 
@@ -3810,21 +3851,11 @@ private fun TaskEditorDialog(
     // Save (in updateTask) or kept on Cancel.
     val originalPath = remember(task?.id) { task?.iconPath }
     var iconPath by remember(task?.id) { mutableStateOf(task?.iconPath) }
-    val preview = remember(iconPath) { TaskIconStore.loadBitmap(iconPath) }
-    var showAppPicker by remember { mutableStateOf(false) }
-    var showEmojiPicker by remember { mutableStateOf(false) }
 
     fun stageIcon(newPath: String?) {
         val current = iconPath
         if (current != null && current != originalPath) TaskIconStore.delete(current)
         iconPath = newPath
-    }
-
-    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) scope.launch {
-            val saved = withContext(Dispatchers.IO) { TaskIconStore.saveFromUri(context, uri) }
-            if (saved != null) stageIcon(saved)
-        }
     }
 
     val cleanupAndDismiss = {
@@ -3857,58 +3888,76 @@ private fun TaskEditorDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                // Shortcut / list icon. Snapshotted to a PNG on pick, so it survives the source picture
-                // being deleted or the source app being frozen. None set → uses the app's launcher icon.
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Shortcut icon", style = MaterialTheme.typography.labelLarge)
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(10.dp)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (preview != null) {
-                                Image(
-                                    bitmap = preview.asImageBitmap(),
-                                    contentDescription = "Selected icon",
-                                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)),
-                                )
-                            } else {
-                                Icon(
-                                    Icons.Filled.Apps,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(32.dp),
-                                )
-                            }
-                        }
-                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedButton(onClick = { showAppPicker = true }) { Text("App") }
-                                OutlinedButton(onClick = {
-                                    photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                                }) { Text("Picture") }
-                            }
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedButton(onClick = { showEmojiPicker = true }) { Text("Emoji") }
-                                if (iconPath != null) {
-                                    TextButton(onClick = { stageIcon(null) }) { Text("Clear") }
-                                }
-                            }
-                        }
+                // Freeze bubble: running this task queues a re-freeze bubble for the app it launches,
+                // shown on the Desktop launcher.
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Freeze bubble", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            "Running this task pops a freeze bubble for its app on the Desktop — tap to freeze.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
+                    Switch(checked = freezeBubble, onCheckedChange = { freezeBubble = it })
                 }
+                TaskIconEditorRow(iconPath = iconPath, onStage = { stageIcon(it) })
             }
         },
         confirmButton = {
-            OutlinedButton(enabled = canSave, onClick = { onSave(name, parsedPriority ?: 5, iconPath) }) {
+            OutlinedButton(enabled = canSave, onClick = { onSave(name, parsedPriority ?: 5, iconPath, freezeBubble) }) {
                 Text("Save")
             }
         },
         dismissButton = { TextButton(onClick = cleanupAndDismiss) { Text("Cancel") } },
     )
+}
 
+/**
+ * The shared icon-source editor: an icon preview + App / Picture / Emoji / Clear. Each source snapshots a
+ * fresh PNG (via [TaskIconStore]) and reports it through [onStage]; the caller owns staging/cleanup.
+ */
+@Composable
+private fun TaskIconEditorRow(iconPath: String?, onStage: (String?) -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val preview = remember(iconPath) { TaskIconStore.loadBitmap(iconPath) }
+    var showAppPicker by remember { mutableStateOf(false) }
+    var showEmojiPicker by remember { mutableStateOf(false) }
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) scope.launch {
+            val saved = withContext(Dispatchers.IO) { TaskIconStore.saveFromUri(context, uri) }
+            if (saved != null) onStage(saved)
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Shortcut icon", style = MaterialTheme.typography.labelLarge)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+                if (preview != null) {
+                    Image(
+                        bitmap = preview.asImageBitmap(),
+                        contentDescription = "Selected icon",
+                        modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)),
+                    )
+                } else {
+                    Icon(Icons.Filled.Apps, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(32.dp))
+                }
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { showAppPicker = true }) { Text("App") }
+                    OutlinedButton(onClick = {
+                        photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }) { Text("Picture") }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { showEmojiPicker = true }) { Text("Emoji") }
+                    if (iconPath != null) TextButton(onClick = { onStage(null) }) { Text("Clear") }
+                }
+            }
+        }
+    }
     if (showAppPicker) {
         AppPickerDialog(
             onDismiss = { showAppPicker = false },
@@ -3916,12 +3965,11 @@ private fun TaskEditorDialog(
                 showAppPicker = false
                 scope.launch {
                     val saved = withContext(Dispatchers.IO) { TaskIconStore.saveFromApp(context, pkg) }
-                    if (saved != null) stageIcon(saved)
+                    if (saved != null) onStage(saved)
                 }
             },
         )
     }
-
     if (showEmojiPicker) {
         EmojiPickerDialog(
             initial = "",
@@ -3930,11 +3978,37 @@ private fun TaskEditorDialog(
                 showEmojiPicker = false
                 scope.launch {
                     val saved = withContext(Dispatchers.IO) { TaskIconStore.saveFromText(context, glyph) }
-                    if (saved != null) stageIcon(saved)
+                    if (saved != null) onStage(saved)
                 }
             },
         )
     }
+}
+
+/** Standalone icon picker (used from a task card's clickable icon). Stages files internally and returns
+ *  the chosen path via [onConfirm]; the caller persists it (and cleans the old file via updateTask). */
+@Composable
+private fun TaskIconPickerDialog(initialIconPath: String?, onDismiss: () -> Unit, onConfirm: (String?) -> Unit) {
+    val original = remember { initialIconPath }
+    var staged by remember { mutableStateOf(initialIconPath) }
+    fun stage(newPath: String?) {
+        val current = staged
+        if (current != null && current != original) TaskIconStore.delete(current)
+        staged = newPath
+    }
+    val cancel = {
+        val current = staged
+        if (current != null && current != original) TaskIconStore.delete(current)
+        onDismiss()
+    }
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = cancel,
+        title = { Text("Task icon") },
+        text = { TaskIconEditorRow(iconPath = staged, onStage = { stage(it) }) },
+        confirmButton = { OutlinedButton(onClick = { onConfirm(staged) }) { Text("Done") } },
+        dismissButton = { TextButton(onClick = cancel) { Text("Cancel") } },
+    )
 }
 
 /** A thin, always-visible scrollbar thumb on the right edge — drawn only while [state] can scroll, so a

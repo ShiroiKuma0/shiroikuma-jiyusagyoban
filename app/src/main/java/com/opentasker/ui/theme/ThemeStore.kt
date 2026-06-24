@@ -43,6 +43,12 @@ data class ThemePrefs(
     val flashFontWeight: Int = 700,              // 100..900 (Bold by default — bigger & heavier)
     // ---- Task list -------------------------------------------------------------------------------
     val taskIconSizeDp: Int = 32,                // size of a task's custom icon on its card [TASK_ICON_MIN, TASK_ICON_MAX]
+    // ---- Freeze bubbles (Desktop re-freeze overlays) ---------------------------------------------
+    val bubbleIconSizeDp: Int = 48,              // [BUBBLE_ICON_MIN, BUBBLE_ICON_MAX]
+    val bubbleIconCornerDp: Int = 12,            // icon corner radius; 0 = square, up to BUBBLE_ICON_CORNER_MAX
+    val bubbleLabelSizeSp: Int = 11,             // [BUBBLE_LABEL_MIN, BUBBLE_LABEL_MAX]
+    val bubbleLabelWeight: Int = 700,            // 100..900 (Bold default)
+    val bubbleFontFileName: String = "",         // "" = follow the app font; else MONOSPACE / a .ttf/.otf file
 ) {
     companion object {
         const val BLACK = 0xFF000000.toInt()
@@ -62,6 +68,12 @@ data class ThemePrefs(
 
         const val TASK_ICON_MIN = 16
         const val TASK_ICON_MAX = 96
+
+        const val BUBBLE_ICON_MIN = 24
+        const val BUBBLE_ICON_MAX = 96
+        const val BUBBLE_ICON_CORNER_MAX = 48
+        const val BUBBLE_LABEL_MIN = 8
+        const val BUBBLE_LABEL_MAX = 24
 
         val DEFAULT = ThemePrefs()
     }
@@ -99,6 +111,11 @@ object ThemeStore {
     private const val K_FLASH_TEXT_SIZE = "flash_text_size"
     private const val K_FLASH_FONT_WEIGHT = "flash_font_weight"
     private const val K_TASK_ICON_SIZE = "task_icon_size"
+    private const val K_BUBBLE_ICON_SIZE = "bubble_icon_size"
+    private const val K_BUBBLE_ICON_CORNER = "bubble_icon_corner"
+    private const val K_BUBBLE_LABEL_SIZE = "bubble_label_size"
+    private const val K_BUBBLE_LABEL_WEIGHT = "bubble_label_weight"
+    private const val K_BUBBLE_FONT = "bubble_font"
 
     private lateinit var appContext: Context
     private lateinit var prefs: SharedPreferences
@@ -135,6 +152,10 @@ object ThemeStore {
         flashTextSizeSp = flashTextSizeSp.coerceIn(ThemePrefs.FLASH_TEXT_MIN, ThemePrefs.FLASH_TEXT_MAX),
         flashFontWeight = flashFontWeight.coerceIn(ThemePrefs.FONT_WEIGHT_MIN, ThemePrefs.FONT_WEIGHT_MAX),
         taskIconSizeDp = taskIconSizeDp.coerceIn(ThemePrefs.TASK_ICON_MIN, ThemePrefs.TASK_ICON_MAX),
+        bubbleIconSizeDp = bubbleIconSizeDp.coerceIn(ThemePrefs.BUBBLE_ICON_MIN, ThemePrefs.BUBBLE_ICON_MAX),
+        bubbleIconCornerDp = bubbleIconCornerDp.coerceIn(0, ThemePrefs.BUBBLE_ICON_CORNER_MAX),
+        bubbleLabelSizeSp = bubbleLabelSizeSp.coerceIn(ThemePrefs.BUBBLE_LABEL_MIN, ThemePrefs.BUBBLE_LABEL_MAX),
+        bubbleLabelWeight = bubbleLabelWeight.coerceIn(ThemePrefs.FONT_WEIGHT_MIN, ThemePrefs.FONT_WEIGHT_MAX),
     )
 
     private fun load(): ThemePrefs {
@@ -159,6 +180,11 @@ object ThemeStore {
             flashTextSizeSp = prefs.getInt(K_FLASH_TEXT_SIZE, d.flashTextSizeSp),
             flashFontWeight = prefs.getInt(K_FLASH_FONT_WEIGHT, d.flashFontWeight),
             taskIconSizeDp = prefs.getInt(K_TASK_ICON_SIZE, d.taskIconSizeDp),
+            bubbleIconSizeDp = prefs.getInt(K_BUBBLE_ICON_SIZE, d.bubbleIconSizeDp),
+            bubbleIconCornerDp = prefs.getInt(K_BUBBLE_ICON_CORNER, d.bubbleIconCornerDp),
+            bubbleLabelSizeSp = prefs.getInt(K_BUBBLE_LABEL_SIZE, d.bubbleLabelSizeSp),
+            bubbleLabelWeight = prefs.getInt(K_BUBBLE_LABEL_WEIGHT, d.bubbleLabelWeight),
+            bubbleFontFileName = prefs.getString(K_BUBBLE_FONT, d.bubbleFontFileName) ?: d.bubbleFontFileName,
         ).normalized()
     }
 
@@ -183,6 +209,11 @@ object ThemeStore {
             putInt(K_FLASH_TEXT_SIZE, p.flashTextSizeSp)
             putInt(K_FLASH_FONT_WEIGHT, p.flashFontWeight)
             putInt(K_TASK_ICON_SIZE, p.taskIconSizeDp)
+            putInt(K_BUBBLE_ICON_SIZE, p.bubbleIconSizeDp)
+            putInt(K_BUBBLE_ICON_CORNER, p.bubbleIconCornerDp)
+            putInt(K_BUBBLE_LABEL_SIZE, p.bubbleLabelSizeSp)
+            putInt(K_BUBBLE_LABEL_WEIGHT, p.bubbleLabelWeight)
+            putString(K_BUBBLE_FONT, p.bubbleFontFileName)
         }
     }
 

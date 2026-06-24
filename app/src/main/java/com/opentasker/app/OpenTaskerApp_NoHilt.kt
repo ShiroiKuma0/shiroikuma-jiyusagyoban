@@ -33,6 +33,7 @@ class OpenTaskerApp_NoHilt : Application() {
         // Seed the black-yellow appearance defaults before any Compose code reads the theme.
         ThemeStore.init(this)
         com.opentasker.core.icons.TaskIconStore.init(this)
+        com.opentasker.core.bubbles.FreezeBubbleStore.init(this)
         com.opentasker.widget.TemplateStore.init(this)
         com.opentasker.core.storage.ListSortStore.init(this)
         com.opentasker.core.storage.RunLogSeenStore.init(this)

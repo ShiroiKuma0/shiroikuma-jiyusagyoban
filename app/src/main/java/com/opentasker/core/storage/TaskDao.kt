@@ -24,6 +24,7 @@ data class TaskEntity(
     val projectId: Long? = null,
     val position: Int = 0,
     val iconPath: String? = null,
+    val freezeBubble: Boolean = false,
 ) {
     fun toDomain(): Task {
         val result = toDomainDecodeResult()
@@ -37,7 +38,7 @@ data class TaskEntity(
         val mode = runCatching { CollisionMode.valueOf(collisionMode) }
             .getOrElse { error ->
                 return StorageDecodeResult(
-                    value = Task(id, name, priority, CollisionMode.ABORT_NEW, emptyList(), projectId, position, iconPath),
+                    value = Task(id, name, priority, CollisionMode.ABORT_NEW, emptyList(), projectId, position, iconPath, freezeBubble),
                     issue = StorageDecodeIssue(
                         recordType = StorageRecordType.TASK,
                         recordId = id,
@@ -51,7 +52,7 @@ data class TaskEntity(
         val actions = runCatching { Json.decodeFromString<List<ActionSpec>>(actionsJson) }
             .getOrElse { error ->
                 return StorageDecodeResult(
-                    value = Task(id, name, priority, mode, emptyList(), projectId, position, iconPath),
+                    value = Task(id, name, priority, mode, emptyList(), projectId, position, iconPath, freezeBubble),
                     issue = StorageDecodeIssue(
                         recordType = StorageRecordType.TASK,
                         recordId = id,
@@ -63,13 +64,13 @@ data class TaskEntity(
             }
 
         return StorageDecodeResult(
-            value = Task(id, name, priority, mode, actions, projectId, position, iconPath),
+            value = Task(id, name, priority, mode, actions, projectId, position, iconPath, freezeBubble),
         )
     }
 }
 
 fun Task.toEntity() = TaskEntity(
-    id, name, priority, collisionMode.name, Json.encodeToString(actions), projectId, position, iconPath
+    id, name, priority, collisionMode.name, Json.encodeToString(actions), projectId, position, iconPath, freezeBubble
 )
 
 @Dao

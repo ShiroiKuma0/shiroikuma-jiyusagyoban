@@ -30,6 +30,7 @@ suspend fun executeAndLogTask(
     val runner = TaskRunner(ctx, resolveTask = dbSubTaskResolver(db))
     val report = runner.run(task)
     Log.i(logTag, "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)")
+    maybeQueueFreezeBubble(appContext, task, variables)
     val classified = RunLogSource.classify(source)
     val logEntry = RunLogEntry(
         taskId = task.id,
@@ -47,6 +48,25 @@ suspend fun executeAndLogTask(
     )
     val inserted = insertRunLog(db, logEntry)
     return TaskExecutionResult(report, inserted)
+}
+
+/**
+ * If [task] is freeze-enabled, queue a re-freeze bubble for the app it launches/unfreezes. The package is
+ * read from the task's `app.launch` (preferred) or `app.unfreeze` action, expanded against the run's
+ * variables; an unresolved (`%var`-still-present) or blank package is skipped.
+ */
+private fun maybeQueueFreezeBubble(appContext: Context, task: Task, variables: VariableStore) {
+    if (!task.freezeBubble) return
+    val pkgRaw = task.actions.firstOrNull { it.type == "app.launch" }?.args?.get("package")
+        ?: task.actions.firstOrNull { it.type == "app.unfreeze" }?.args?.get("package")
+        ?: return
+    val pkg = variables.expand(pkgRaw).trim()
+    if (pkg.isEmpty() || pkg.contains('%')) return
+    val label = runCatching {
+        val pm = appContext.packageManager
+        pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+    }.getOrNull()?.takeIf { it.isNotBlank() } ?: task.name
+    com.opentasker.core.bubbles.FreezeBubbleStore.enqueue(pkg, label, task.iconPath)
 }
 
 suspend fun logSkippedRun(

@@ -580,13 +580,13 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
         PermissionSetupItem(
             title = "Overlay access",
-            body = "Needed for scene overlays and controls displayed over other apps.",
+            body = "Needed for scene overlays, freeze bubbles, and other controls displayed over other apps.",
             granted = Settings.canDrawOverlays(context),
             actionLabel = "Open settings",
             action = PermissionAction.SettingsIntent(
                 Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}")),
             ),
-            requiredFor = "Scenes, overlay UI",
+            requiredFor = "Scenes, freeze bubbles, overlay UI",
         ),
         PermissionSetupItem(
             title = "Accessibility service",

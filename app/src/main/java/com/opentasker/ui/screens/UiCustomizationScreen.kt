@@ -30,7 +30,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -102,6 +101,7 @@ fun UiCustomizationScreen(
     val scope = rememberCoroutineScope()
     var colorTarget by remember { mutableStateOf<ColorTarget?>(null) }
     var showFontPicker by remember { mutableStateOf(false) }
+    var showBubbleFontPicker by remember { mutableStateOf(false) }
     var fontsRefresh by remember { mutableIntStateOf(0) }
 
     val fontImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -161,12 +161,13 @@ fun UiCustomizationScreen(
             item { SectionHeader("Borders") }
             item { ColorRow(1, "Border color", prefs.border, ColorTarget.Border) { colorTarget = it } }
             item {
-                StepperRow(
+                SliderRow(
                     level = 1,
                     label = "Border width",
-                    value = "${prefs.borderWidthDp} dp",
-                    onDecrement = { ThemeStore.update { it.copy(borderWidthDp = it.borderWidthDp - 1) } },
-                    onIncrement = { ThemeStore.update { it.copy(borderWidthDp = it.borderWidthDp + 1) } },
+                    value = prefs.borderWidthDp,
+                    valueText = "${prefs.borderWidthDp} dp",
+                    range = 0f..ThemePrefs.BORDER_WIDTH_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(borderWidthDp = v) } },
                 )
             }
 
@@ -186,12 +187,13 @@ fun UiCustomizationScreen(
                 )
             }
             item {
-                StepperRow(
+                SliderRow(
                     level = 1,
                     label = "Text size",
-                    value = "${prefs.fontScalePct}%",
-                    onDecrement = { ThemeStore.update { it.copy(fontScalePct = it.fontScalePct - 5) } },
-                    onIncrement = { ThemeStore.update { it.copy(fontScalePct = it.fontScalePct + 5) } },
+                    value = prefs.fontScalePct,
+                    valueText = "${prefs.fontScalePct}%",
+                    range = ThemePrefs.SCALE_MIN.toFloat()..ThemePrefs.SCALE_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(fontScalePct = v) } },
                 )
             }
             item { SampleRow(level = 1) }
@@ -202,30 +204,33 @@ fun UiCustomizationScreen(
             item { ColorRow(1, "Text", prefs.flashText, ColorTarget.FlashText) { colorTarget = it } }
             item { ColorRow(1, "Border color", prefs.flashBorder, ColorTarget.FlashBorder) { colorTarget = it } }
             item {
-                StepperRow(
+                SliderRow(
                     level = 1,
                     label = "Border width",
-                    value = "${prefs.flashBorderWidthDp} dp",
-                    onDecrement = { ThemeStore.update { it.copy(flashBorderWidthDp = it.flashBorderWidthDp - 1) } },
-                    onIncrement = { ThemeStore.update { it.copy(flashBorderWidthDp = it.flashBorderWidthDp + 1) } },
+                    value = prefs.flashBorderWidthDp,
+                    valueText = "${prefs.flashBorderWidthDp} dp",
+                    range = 0f..ThemePrefs.FLASH_BORDER_WIDTH_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(flashBorderWidthDp = v) } },
                 )
             }
             item {
-                StepperRow(
+                SliderRow(
                     level = 1,
                     label = "Corner radius",
-                    value = "${prefs.flashCornerRadiusDp} dp",
-                    onDecrement = { ThemeStore.update { it.copy(flashCornerRadiusDp = it.flashCornerRadiusDp - 2) } },
-                    onIncrement = { ThemeStore.update { it.copy(flashCornerRadiusDp = it.flashCornerRadiusDp + 2) } },
+                    value = prefs.flashCornerRadiusDp,
+                    valueText = "${prefs.flashCornerRadiusDp} dp",
+                    range = 0f..ThemePrefs.FLASH_CORNER_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(flashCornerRadiusDp = v) } },
                 )
             }
             item {
-                StepperRow(
+                SliderRow(
                     level = 1,
                     label = "Text size",
-                    value = "${prefs.flashTextSizeSp} sp",
-                    onDecrement = { ThemeStore.update { it.copy(flashTextSizeSp = it.flashTextSizeSp - 1) } },
-                    onIncrement = { ThemeStore.update { it.copy(flashTextSizeSp = it.flashTextSizeSp + 1) } },
+                    value = prefs.flashTextSizeSp,
+                    valueText = "${prefs.flashTextSizeSp} sp",
+                    range = ThemePrefs.FLASH_TEXT_MIN.toFloat()..ThemePrefs.FLASH_TEXT_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(flashTextSizeSp = v) } },
                 )
             }
             item {
@@ -250,6 +255,47 @@ fun UiCustomizationScreen(
 
             item { SectionHeader("Task list") }
             item { TaskIconSizeRow(level = 1, prefs = prefs) }
+
+            item { SectionHeader("Freeze bubbles") }
+            item { FreezeBubblePreview(level = 1, prefs = prefs) }
+            item {
+                SliderRow(
+                    level = 1,
+                    label = "Icon size",
+                    value = prefs.bubbleIconSizeDp,
+                    valueText = "${prefs.bubbleIconSizeDp} dp",
+                    range = ThemePrefs.BUBBLE_ICON_MIN.toFloat()..ThemePrefs.BUBBLE_ICON_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(bubbleIconSizeDp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1,
+                    label = "Icon roundness",
+                    value = prefs.bubbleIconCornerDp,
+                    valueText = "${prefs.bubbleIconCornerDp} dp",
+                    range = 0f..ThemePrefs.BUBBLE_ICON_CORNER_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(bubbleIconCornerDp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1,
+                    label = "Label size",
+                    value = prefs.bubbleLabelSizeSp,
+                    valueText = "${prefs.bubbleLabelSizeSp} sp",
+                    range = ThemePrefs.BUBBLE_LABEL_MIN.toFloat()..ThemePrefs.BUBBLE_LABEL_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(bubbleLabelSizeSp = v) } },
+                )
+            }
+            item {
+                WeightRow(
+                    level = 1,
+                    weight = prefs.bubbleLabelWeight,
+                    onPick = { w -> ThemeStore.update { it.copy(bubbleLabelWeight = if (w == 0) 700 else w) } },
+                )
+            }
+            item { FontRow(level = 1, fileName = prefs.bubbleFontFileName, onClick = { showBubbleFontPicker = true }) }
         }
     }
 
@@ -274,6 +320,24 @@ fun UiCustomizationScreen(
             onPick = { fileName ->
                 ThemeStore.update { it.copy(fontFileName = fileName) }
                 showFontPicker = false
+            },
+            onAddFont = { fontImportLauncher.launch(arrayOf("*/*")) },
+            onDelete = { fileName ->
+                ThemeStore.deleteFont(fileName)
+                fontsRefresh++
+            },
+        )
+    }
+
+    if (showBubbleFontPicker) {
+        val fonts = remember(fontsRefresh) { ThemeStore.availableFonts() }
+        FontPickerDialog(
+            current = prefs.bubbleFontFileName,
+            fonts = fonts,
+            onDismiss = { showBubbleFontPicker = false },
+            onPick = { fileName ->
+                ThemeStore.update { it.copy(bubbleFontFileName = fileName) }
+                showBubbleFontPicker = false
             },
             onAddFont = { fontImportLauncher.launch(arrayOf("*/*")) },
             onDelete = { fileName ->
@@ -345,16 +409,28 @@ private fun ColorRow(level: Int, label: String, value: Int, target: ColorTarget,
 }
 
 @Composable
-private fun StepperRow(level: Int, label: String, value: String, onDecrement: () -> Unit, onIncrement: () -> Unit) {
-    RowScaffold(level) {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-        IconButton(onClick = onDecrement) {
-            Icon(Icons.Filled.Remove, contentDescription = "Decrease $label")
+private fun SliderRow(
+    level: Int,
+    label: String,
+    value: Int,
+    valueText: String,
+    range: ClosedFloatingPointRange<Float>,
+    onChange: (Int) -> Unit,
+) {
+    Column(
+        Modifier.fillMaxWidth().padding(start = rowStartPadding(level), end = 16.dp, top = 8.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Text(valueText, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Text(value, Modifier.width(56.dp), style = MaterialTheme.typography.labelLarge, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-        IconButton(onClick = onIncrement) {
-            Icon(Icons.Filled.Add, contentDescription = "Increase $label")
-        }
+        Slider(
+            value = value.toFloat(),
+            onValueChange = { onChange(it.roundToInt()) },
+            valueRange = range,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
@@ -488,6 +564,64 @@ private fun TaskIconSizeRow(level: Int, prefs: ThemePrefs) {
                     )
                 }
                 Text("フラッシュ 林檎", style = MaterialTheme.typography.titleLarge, maxLines = 1)
+            }
+        }
+    }
+}
+
+/** Live preview of a freeze bubble: the app's own icon + ❄ badge + label, reflecting every bubble setting. */
+@Composable
+private fun FreezeBubblePreview(level: Int, prefs: ThemePrefs) {
+    val context = LocalContext.current
+    val sample by produceState<ImageBitmap?>(initialValue = null) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                context.packageManager.getApplicationIcon(context.packageName).toBitmap(192, 192).asImageBitmap()
+            }.getOrNull()
+        }
+    }
+    val font = prefs.bubbleFontFileName.ifBlank { prefs.fontFileName }
+    val family = ThemeStore.fontFamily(font)
+    val label = runCatching { context.applicationInfo.loadLabel(context.packageManager).toString() }.getOrDefault("App")
+    val badgeDp = (prefs.bubbleIconSizeDp * 0.4f).coerceIn(14f, 26f)
+
+    Column(
+        Modifier.fillMaxWidth().padding(start = rowStartPadding(level), end = 16.dp, top = 8.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("Live preview", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Box(Modifier.fillMaxWidth().height((ThemePrefs.BUBBLE_ICON_MAX + 44).dp), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Box {
+                    val bmp = sample
+                    if (bmp != null) {
+                        Image(
+                            bitmap = bmp,
+                            contentDescription = null,
+                            modifier = Modifier.size(prefs.bubbleIconSizeDp.dp).clip(RoundedCornerShape(prefs.bubbleIconCornerDp.dp)),
+                        )
+                    }
+                    Box(
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .size(badgeDp.dp)
+                            .clip(CircleShape)
+                            .background(Color(prefs.background))
+                            .border(1.dp, Color(prefs.accent), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("❄", color = Color(prefs.accent), fontSize = (badgeDp * 0.6f).sp)
+                    }
+                }
+                Text(
+                    label,
+                    color = Color(prefs.accent),
+                    fontSize = prefs.bubbleLabelSizeSp.sp,
+                    fontWeight = FontWeight(prefs.bubbleLabelWeight.coerceIn(100, 900)),
+                    fontFamily = family ?: FontFamily.Default,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }

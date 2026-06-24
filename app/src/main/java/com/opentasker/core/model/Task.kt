@@ -19,6 +19,7 @@ data class Task(
     val projectId: Long? = null,            // null = Unfiled
     val position: Int = 0,                  // manual sort order within its tab
     val iconPath: String? = null,           // absolute path to a saved PNG used as the shortcut/list icon
+    val freezeBubble: Boolean = false,      // running this task queues a "freeze" bubble for the app it launches
     val iconData: String? = null,           // bundle-only: base64 PNG so the icon survives a cross-device import; never persisted
 )
 

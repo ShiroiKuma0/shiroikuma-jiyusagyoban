@@ -19,6 +19,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.opentasker.app.MainActivity
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.core.bubbles.FreezeBubbleOverlayManager
 import com.opentasker.automation.app.AppUsageMonitor
 import com.opentasker.automation.network.ConnectivityMonitor
 import com.opentasker.automation.network.WiFiNetworkMonitor
@@ -115,6 +116,8 @@ class AutomationService : Service() {
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
         CameraMicContextEvents.start(this)
+        // Freeze bubbles: render pending re-freeze bubbles, gated to the Desktop launcher being foreground.
+        FreezeBubbleOverlayManager.start(this, scope)
         profileCooldowns.putAll(cooldownStore.loadAll())
         scope.launch { pruneRunLogs(force = true) }
         // Re-arm matchers (and dynamic receivers like the broadcast trigger) whenever profiles change,
