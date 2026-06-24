@@ -3,6 +3,28 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.75+25 — 2026-06-25
+
+**Freeze bubbles** — a native port of the Tasker 凍結 融解 re-freeze workflow — plus a tiled app picker, app-icon launcher tasks, an inline freeze toggle + tappable task icon, fully styleable bubbles, and every numeric UI-customization setting converted to a slider.
+
+### Freeze bubbles
+- **Per-task "Freeze bubble" flag** (DB **v16**, `MIGRATION_15_16`). Running a flagged task queues a re-freeze bubble for the app it launches/unfreezes (package read from its `app.launch` / `app.unfreeze` action). Toggle it in the task editor **or inline on the expanded task card**; **Make Launcher Tasks enables it by default**.
+- **Desktop-gated overlay** — bubbles render as draggable `TYPE_APPLICATION_OVERLAY` windows shown **only while the default home launcher is foreground** (auto-detected), hidden everywhere else. Each shows the app's icon + a ❄ badge + label.
+- **Tap a bubble → freeze the app** (`app.freeze` via Shizuku) and remove it; **long-tap → dismiss only**. Bubbles are **draggable**, **persist across reboots** (`FreezeBubbleStore`), de-dupe per app, and **re-clamp on rotation / fold** keeping their position relative to the top-right edge.
+- **Fully styleable** under *UI customization → Freeze bubbles*: icon size, icon roundness, label size, label weight, and label font — with a **live preview**.
+- The Setup tab's **Overlay access** row now notes freeze bubbles.
+
+### Launcher tasks & icons
+- The **Make Launcher Tasks** app picker is now a **yellow-bordered grid of app-icon tiles** (icon + name, multi-select with a check badge), replacing the plain text list — shared with every app-package field.
+- Generated unfreeze-then-launch tasks now **default their icon to the selected app's icon**.
+- A task's **icon is tappable in the list** — opens the icon picker (App / Picture / Emoji / Clear) without opening the editor; tasks with no icon show an "add icon" affordance when expanded. The picker is a shared component (`TaskIconEditorRow` / `TaskIconPickerDialog`) used by both the card and the editor.
+
+### UI customization
+- **Every numeric setting is now a slider** (was +/− steppers): Borders → Border width; Typography → Text size; Flash / toast → Border width, Corner radius, Text size; plus the freeze-bubble sizes. The flash and bubble sections keep their live previews.
+
+### Infrastructure
+- New `FreezeBubbleStore` (SharedPreferences) + `FreezeBubbleOverlayManager`, started from `AutomationService`; bubble enqueue hooked into `executeAndLogTask` (covers every run path). `TaskIconStore` gains a context-free `saveFromApp(pkg)` for non-UI callers.
+
 ## 0.2.75+18 — 2026-06-23
 
 **Home-screen shortcuts that run a task directly**, each with a **persisted custom icon** (from an app, a picture, or an emoji), a **launcher shortcut picker**, a global **icon-size** control, and **cross-device icon transfer** in exports.
