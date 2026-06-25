@@ -21,6 +21,7 @@ enum class CapabilityRequirement {
     NotificationListener,
     Overlay,
     Dnd,
+    AllFiles,
 }
 
 data class ActionCapability(
@@ -54,7 +55,8 @@ object ActionCapabilityRegistry {
         "screenshot.take" to shizukuCapability("Screenshot"),
         "location.mode" to shizukuCapability("Location mode"),
         "ime.set" to shizukuCapability("Set keyboard"),
-        "sound.play" to audioOutputCapability("Plays audio from a file path or content URI."),
+        "sound.play" to audioOutputCapability("Plays audio from a file path or content URI; a file outside the app's own folders needs All files access.")
+            .let { if (it.level == CapabilityLevel.Supported) it.copy(requirement = CapabilityRequirement.AllFiles) else it },
         "sound.stop" to mediaKeyCapability("Stop playback via media key dispatch."),
         "sound.pause" to mediaKeyCapability("Pause playback via media key dispatch."),
         "track.next" to mediaKeyCapability("Next track via media key dispatch."),

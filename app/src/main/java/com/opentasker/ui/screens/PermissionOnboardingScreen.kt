@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -587,6 +588,20 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
                 Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}")),
             ),
             requiredFor = "Scenes, freeze bubbles, overlay UI",
+        ),
+        PermissionSetupItem(
+            title = "All files access",
+            body = "Needed to read files outside the app — e.g. custom notification tones stored in shared storage (the 通知明滅 Jami tone).",
+            granted = Build.VERSION.SDK_INT < 30 || Environment.isExternalStorageManager(),
+            actionLabel = "Open settings",
+            action = PermissionAction.SettingsIntent(
+                if (Build.VERSION.SDK_INT >= 30) {
+                    Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${context.packageName}"))
+                } else {
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+                },
+            ),
+            requiredFor = "Custom tones, file actions on shared storage",
         ),
         PermissionSetupItem(
             title = "Accessibility service",

@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -35,6 +36,9 @@ object CapabilityState {
             NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
         CapabilityRequirement.Dnd ->
             (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).isNotificationPolicyAccessGranted
+        CapabilityRequirement.AllFiles ->
+            if (Build.VERSION.SDK_INT >= 30) Environment.isExternalStorageManager()
+            else ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
     }
 
     /** The settings screen that grants [req], or null when there is nothing to deep-link (e.g. [CapabilityRequirement.None]). */
@@ -53,6 +57,11 @@ object CapabilityState {
             CapabilityRequirement.Shizuku ->
                 context.packageManager.getLaunchIntentForPackage(ShizukuPowerBackend.MANAGER_PACKAGE)
                     ?: Intent(Intent.ACTION_VIEW, Uri.parse(ShizukuPowerBackend.SETUP_URL))
+            CapabilityRequirement.AllFiles ->
+                if (Build.VERSION.SDK_INT >= 30)
+                    Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + context.packageName))
+                else
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + context.packageName))
         }
         return intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
@@ -67,6 +76,7 @@ object CapabilityState {
         CapabilityRequirement.PostNotifications -> "Needs notification permission."
         CapabilityRequirement.NotificationListener -> "Needs notification access."
         CapabilityRequirement.Dnd -> "Needs Do Not Disturb access."
+        CapabilityRequirement.AllFiles -> "Needs All files access to read files outside the app (e.g. tones in shared storage)."
     }
 
     /** Short status-pill text for the current state of [req] (granted vs. not). */
@@ -79,6 +89,7 @@ object CapabilityState {
         CapabilityRequirement.PostNotifications -> if (met) "Notifications allowed" else "Notifications off"
         CapabilityRequirement.NotificationListener -> if (met) "Notification access on" else "Notification access off"
         CapabilityRequirement.Dnd -> if (met) "Do Not Disturb access on" else "Do Not Disturb access off"
+        CapabilityRequirement.AllFiles -> if (met) "All files access on" else "All files access off"
     }
 
     /** Short button text for the fix action. */
@@ -91,5 +102,6 @@ object CapabilityState {
         CapabilityRequirement.NotificationListener -> "Enable notification access"
         CapabilityRequirement.Dnd -> "Grant Do Not Disturb access"
         CapabilityRequirement.PostNotifications -> "Grant notification access"
+        CapabilityRequirement.AllFiles -> "Grant All files access"
     }
 }
