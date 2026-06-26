@@ -3,6 +3,31 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.75+31 — 2026-06-26
+
+**Move actions around freely** — long-press to multi-select and **clone / copy / cut / delete / paste** actions within and **between** tasks — plus a workspace-wide shift to **name-based linking**: scenes, scene-element task links, and `task.run` all resolve by **name** (not fragile ids), imports **overwrite in place**, and item names are now **unique within a project**. And `sound.play` can read tones anywhere in shared storage.
+
+### Task editor — action multi-select & clipboard
+- **Long-press an action** in a task to select it (multi-select by long-pressing / tapping more rows; selected rows are highlighted with a ✓). The long-press menu acts on the **whole selection**: **Clone** (duplicate in place), **Copy**, **Cut**, **Delete**.
+- **Paste before / Paste after** the long-pressed action (shown once something has been copied/cut). An app-wide **`ActionClipboard`** holds the copied/cut actions, so you can **move actions between tasks**, not just within one.
+- The drag handle keeps its own long-press reorder; a plain tap still expands a row (or toggles its selection while selecting).
+
+### Link everything by name (no more broken links on re-import)
+- **`scene.show` / `scene.hide`** resolve a scene by **`(project, name)`** — the scene in the calling task's project wins, then any-project by name (deterministic by position then id), then a numeric id only as a legacy fallback. `VariableStore.projectId` is exposed so the action knows the caller's project.
+- **Scene element task links** — tap, long-press, and the edge-gesture handlers — now carry a **task name** (`tapTaskName` / `longPressTaskName`, JSON-only, no migration) and resolve **name-first** at run time *and* on import. A re-imported or recreated task no longer silently drops a slider/button's action: the editor stores the name on pick, **export back-fills** names from ids, and **import re-binds** by name → the bundle id map → the raw id.
+- **`task.run`** resolves **name-first** (exact, then case-insensitive), with the numeric id only as a legacy fallback — matching the scene/profile resolvers.
+
+### Import — overwrite in place
+- **Profiles and scenes now overwrite *in place*** on import (reuse the existing row id, matched by name), just like tasks already did — so a re-import **keeps each item's id, group membership, and notes** instead of deleting + re-inserting and orphaning them. A profile overwrite preserves its enabled state.
+- The **default conflict strategy is now Overwrite** (in place), and the conflict dialog leads with it. The "missing tap task" import warning no longer misfires when a scene element carries a name to re-bind against.
+
+### Name uniqueness
+- The **task / profile / scene editors block a duplicate name within the same project**, and the **project editor blocks a duplicate project name** — Save is disabled with an inline error (widget templates already did this).
+- Enforced at the DB level by **UNIQUE indices** on `(projectId, name)` for tasks/profiles/scenes and `(name)` for projects (**DB schema v16 → v17**, `MIGRATION_16_17`). The migration **self-heals** first — any pre-existing collision is renamed `"<name> (<id>)"` so the index build can never fail; SQLite treats Unfiled (null-project) rows as distinct, so the editor's UI check covers those.
+
+### Sound
+- **`sound.play` — all-files access.** A new **All-files capability** (`Environment.isExternalStorageManager()` / `MANAGE_EXTERNAL_STORAGE` on API 30+, `READ_EXTERNAL_STORAGE` below) lets `sound.play` read custom tones **anywhere in shared storage** (e.g. the 通知明滅 Jami notification tone), surfaced as a capability pill on the action and a new **"All files access"** row on the Setup tab with a deep-link to grant it.
+
 ## 0.2.75+25 — 2026-06-25
 
 **Freeze bubbles** — a native port of the Tasker 凍結 融解 re-freeze workflow — plus a tiled app picker, app-icon launcher tasks, an inline freeze toggle + tappable task icon, fully styleable bubbles, and every numeric UI-customization setting converted to a slider.
