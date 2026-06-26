@@ -251,13 +251,16 @@ object OpenTaskerBundleCodec {
             }
         }
 
+        // A link only truly breaks when the task is NOT in the bundle AND the element carries no task
+        // NAME to re-bind against an existing task on import. With a name present it resolves by name, so
+        // don't cry wolf (this is the warning that misfired for a scene-only re-import).
         bundle.scenes.forEach { scene ->
             scene.elements.forEach { element ->
-                if (element.tapTaskId != null && element.tapTaskId !in taskIds) {
-                    lossyWarnings += "Scene '${scene.name}' element ${element.id} references missing tap task ${element.tapTaskId}; the link will be dropped."
+                if (element.tapTaskId != null && element.tapTaskId !in taskIds && element.tapTaskName.isBlank()) {
+                    lossyWarnings += "Scene '${scene.name}' element ${element.id} references missing tap task ${element.tapTaskId} (no name to re-bind); the link will be dropped."
                 }
-                if (element.longPressTaskId != null && element.longPressTaskId !in taskIds) {
-                    lossyWarnings += "Scene '${scene.name}' element ${element.id} references missing long-press task ${element.longPressTaskId}; the link will be dropped."
+                if (element.longPressTaskId != null && element.longPressTaskId !in taskIds && element.longPressTaskName.isBlank()) {
+                    lossyWarnings += "Scene '${scene.name}' element ${element.id} references missing long-press task ${element.longPressTaskId} (no name to re-bind); the link will be dropped."
                 }
             }
         }
@@ -324,7 +327,8 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             .map { it.copy(iconData = TaskIconStore.encodeIcon(it.iconPath)) }
         val profiles = db.profileDao().getAll().map { it.toDomain() }
         val variables = db.variableDao().getAll().map { it.toDomain() }
-        val scenes = db.sceneDao().getAll().map { it.toDomain() }
+        val taskNameById = db.taskDao().getAll().associate { it.id to it.name }
+        val scenes = backfillSceneTaskNames(db.sceneDao().getAll().map { it.toDomain() }, taskNameById)
         val projects = db.projectDao().getAll().map { it.toDomain() }
         val itemMeta = db.itemMetaDao().getAll()
             .filter { it.note.isNotBlank() || it.groupId != null }
@@ -370,7 +374,10 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
         val profiles = db.profileDao().getAll().map { it.toDomain() }.filter { it.id in profileIds }
         val tasks = db.taskDao().getAll().map { it.toDomain() }.filter { it.id in taskIds }
             .map { it.copy(iconData = TaskIconStore.encodeIcon(it.iconPath)) }
-        val scenes = db.sceneDao().getAll().map { it.toDomain() }.filter { it.id in sceneIds }
+        // Backfill names from ALL tasks (a selected scene may link a task outside the selection).
+        val taskNameById = db.taskDao().getAll().associate { it.id to it.name }
+        val scenes = backfillSceneTaskNames(
+            db.sceneDao().getAll().map { it.toDomain() }.filter { it.id in sceneIds }, taskNameById)
         val allVariables = db.variableDao().getAll().map { it.toDomain() }
         val variables = when {
             includeVariables -> allVariables
@@ -415,7 +422,8 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
     suspend fun importBundle(
         bundle: OpenTaskerBundle,
         projectConflictStrategy: ProjectConflictStrategy = ProjectConflictStrategy.MERGE,
-        itemConflictStrategy: ItemConflictStrategy = ItemConflictStrategy.RENAME,
+        // Default: overwrite a same-name item IN PLACE (reuse its row id, so groups/notes/links survive).
+        itemConflictStrategy: ItemConflictStrategy = ItemConflictStrategy.OVERWRITE_DELETE,
     ): BundleImportReport {
         val plan = OpenTaskerBundleCodec.validate(bundle)
         require(plan.canImport) { plan.warnings.joinToString() }
@@ -515,14 +523,24 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
                 insertedVariables++
             }
 
+            // Profiles overwrite IN PLACE on OVERWRITE_DELETE (reuse the existing row id → the profile keeps
+            // its group/note and a stable id); BACKUP renames the old one aside; RENAME leaves it.
             val incomingProfileNames = bundle.profiles.mapTo(mutableSetOf()) { it.name.lowercase() }
-            db.profileDao().getAll().filter { it.name.lowercase() in incomingProfileNames }.forEach { existing ->
-                when (itemConflictStrategy) {
-                    ItemConflictStrategy.OVERWRITE_DELETE -> db.profileDao().delete(existing)
-                    ItemConflictStrategy.OVERWRITE_BACKUP -> db.profileDao().update(existing.copy(name = backupName(existing.name)))
-                    ItemConflictStrategy.RENAME -> Unit
+            val reusableProfileIds = mutableMapOf<String, Long>()
+            val reusedProfileEnabled = mutableMapOf<String, Boolean>()
+            db.profileDao().getAll().filter { it.name.lowercase() in incomingProfileNames }
+                .groupBy { it.name.lowercase() }
+                .forEach { (name, existing) ->
+                    when (itemConflictStrategy) {
+                        ItemConflictStrategy.OVERWRITE_DELETE -> {
+                            reusableProfileIds[name] = existing.first().id
+                            reusedProfileEnabled[name] = existing.first().enabled
+                            existing.drop(1).forEach { db.profileDao().delete(it) }
+                        }
+                        ItemConflictStrategy.OVERWRITE_BACKUP -> existing.forEach { db.profileDao().update(it.copy(name = backupName(it.name))) }
+                        ItemConflictStrategy.RENAME -> Unit
+                    }
                 }
-            }
             val takenProfileNames = db.profileDao().getAll().mapTo(mutableSetOf()) { it.name.lowercase() }
             bundle.profiles.sortedWith(compareBy<Profile> { it.name.lowercase() }.thenBy { it.id }).forEach { profile ->
                 val enterTaskId = taskIdMap[profile.enterTaskId]
@@ -530,43 +548,68 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
                     lossyWarnings += "Skipped profile '${profile.name}' because enter task ${profile.enterTaskId} was not imported."
                     return@forEach
                 }
-                val newName = uniqueName(profile.name, takenProfileNames)
+                val reuseId = reusableProfileIds.remove(profile.name.lowercase())
+                val newName = if (reuseId != null) profile.name else uniqueName(profile.name, takenProfileNames)
                 val pid = remapProjectId(profile.projectId)
                 val remappedExitId = profile.exitTaskId?.let { taskIdMap[it] }
+                // Overwriting in place keeps the existing on/off state; a brand-new profile imports disabled.
+                val enabled = if (reuseId != null) reusedProfileEnabled[profile.name.lowercase()] ?: false else false
                 // Bind enter/exit task by NAME too, so a later task-only re-import (which re-ids the task)
                 // resolves by name instead of orphaning this profile.
                 val remappedProfile = profile.copy(
-                    id = 0,
+                    id = reuseId ?: 0,
                     name = newName,
-                    enabled = false,
+                    enabled = enabled,
                     enterTaskId = enterTaskId,
                     enterTaskName = db.taskDao().getById(enterTaskId)?.name ?: profile.enterTaskName,
                     exitTaskId = remappedExitId,
                     exitTaskName = remappedExitId?.let { db.taskDao().getById(it)?.name } ?: "",
                     projectId = pid,
                 )
-                profileIdMap[profile.id] = db.profileDao().insert(remappedProfile.toEntity())
+                profileIdMap[profile.id] = if (reuseId != null) {
+                    db.profileDao().update(remappedProfile.toEntity()); reuseId
+                } else {
+                    db.profileDao().insert(remappedProfile.toEntity())
+                }
                 takenProfileNames += newName.lowercase()
                 targetProjectIds += pid
                 insertedProfiles++
             }
 
+            // Scenes overwrite IN PLACE on OVERWRITE_DELETE (reuse the row id → the scene keeps its group/
+            // note and a stable id); BACKUP renames the old one aside; RENAME leaves it.
             val incomingSceneNames = bundle.scenes.mapTo(mutableSetOf()) { it.name.lowercase() }
-            db.sceneDao().getAll().filter { it.name.lowercase() in incomingSceneNames }.forEach { existing ->
-                when (itemConflictStrategy) {
-                    ItemConflictStrategy.OVERWRITE_DELETE -> db.sceneDao().delete(existing)
-                    ItemConflictStrategy.OVERWRITE_BACKUP -> db.sceneDao().update(existing.copy(name = backupName(existing.name)))
-                    ItemConflictStrategy.RENAME -> Unit
+            val reusableSceneIds = mutableMapOf<String, Long>()
+            db.sceneDao().getAll().filter { it.name.lowercase() in incomingSceneNames }
+                .groupBy { it.name.lowercase() }
+                .forEach { (name, existing) ->
+                    when (itemConflictStrategy) {
+                        ItemConflictStrategy.OVERWRITE_DELETE -> {
+                            reusableSceneIds[name] = existing.first().id
+                            existing.drop(1).forEach { db.sceneDao().delete(it) }
+                        }
+                        ItemConflictStrategy.OVERWRITE_BACKUP -> existing.forEach { db.sceneDao().update(it.copy(name = backupName(it.name))) }
+                        ItemConflictStrategy.RENAME -> Unit
+                    }
                 }
-            }
+            // Snapshot device tasks (post-import) so element task links re-bind by NAME (id is a fallback).
+            val devTasksForScenes = db.taskDao().getAll()
+            val taskNameToId = devTasksForScenes.associate { it.name.lowercase() to it.id }
+            val taskIdToName = devTasksForScenes.associate { it.id to it.name }
             val takenSceneNames = db.sceneDao().getAll().mapTo(mutableSetOf()) { it.name.lowercase() }
             bundle.scenes.sortedWith(compareBy<Scene> { it.name.lowercase() }.thenBy { it.id }).forEach { scene ->
                 val remappedElements = scene.elements.map { element ->
-                    remapSceneElement(element, taskIdMap)
+                    remapSceneElement(element, taskIdMap, taskNameToId, taskIdToName)
                 }
-                val newName = uniqueName(scene.name, takenSceneNames)
+                val reuseId = reusableSceneIds.remove(scene.name.lowercase())
+                val newName = if (reuseId != null) scene.name else uniqueName(scene.name, takenSceneNames)
                 val pid = remapProjectId(scene.projectId)
-                sceneIdMap[scene.id] = db.sceneDao().insert(scene.copy(id = 0, name = newName, elements = remappedElements, projectId = pid).toEntity())
+                val remapped = scene.copy(id = reuseId ?: 0, name = newName, elements = remappedElements, projectId = pid)
+                sceneIdMap[scene.id] = if (reuseId != null) {
+                    db.sceneDao().update(remapped.toEntity()); reuseId
+                } else {
+                    db.sceneDao().insert(remapped.toEntity())
+                }
                 takenSceneNames += newName.lowercase()
                 targetProjectIds += pid
                 insertedScenes++
@@ -675,21 +718,66 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
         )
     }
 
-    // Config keys whose value is a task id (gesture handlers), so they must be remapped on import too —
-    // unlike the tapTaskId/longPressTaskId fields, these live in the free-form config map.
+    // Config keys whose value targets a task (gesture handlers) — these live in the free-form config map
+    // (the value is a task NAME going forward, or a legacy id string for older scenes).
     private val taskIdConfigKeys = setOf(
         "swipeUp", "swipeDown", "swipeLeft", "swipeRight",
         "longSwipeUp", "longSwipeDown", "longSwipeLeft", "longSwipeRight", "doubleTap", "moveDebug",
     )
 
-    private fun remapSceneElement(element: SceneElement, taskIdMap: Map<Long, Long>): SceneElement =
-        element.copy(
-            tapTaskId = element.tapTaskId?.let { taskIdMap[it] },
-            longPressTaskId = element.longPressTaskId?.let { taskIdMap[it] },
-            config = element.config.mapValues { (key, value) ->
-                if (key in taskIdConfigKeys) value.toLongOrNull()?.let { taskIdMap[it]?.toString() } ?: value else value
-            },
+    /**
+     * Re-link a scene element's task references on import. Resolves NAME-first (survives a re-id and a
+     * task that isn't in the bundle — it re-binds to an existing same-name task), then the bundle id map,
+     * then the raw id if it still exists. Gesture-config values are rewritten to the resolved task NAME so
+     * they too become id-independent. [taskNameToId]/[taskIdToName] are the post-import device task tables.
+     */
+    private fun remapSceneElement(
+        element: SceneElement,
+        taskIdMap: Map<Long, Long>,
+        taskNameToId: Map<String, Long>,
+        taskIdToName: Map<Long, String>,
+    ): SceneElement {
+        fun resolve(name: String, id: Long?): Pair<Long?, String> {
+            if (name.isNotBlank()) taskNameToId[name.lowercase()]?.let { return it to (taskIdToName[it] ?: name) }
+            if (id != null) {
+                val mapped = taskIdMap[id] ?: id.takeIf { taskIdToName.containsKey(it) }
+                if (mapped != null) return mapped to (taskIdToName[mapped] ?: "")
+            }
+            return null to name   // unresolved: keep the name so a later import can still re-bind it
+        }
+        val (tapId, tapName) = resolve(element.tapTaskName, element.tapTaskId)
+        val (lpId, lpName) = resolve(element.longPressTaskName, element.longPressTaskId)
+        val newConfig = element.config.mapValues { (key, value) ->
+            if (key in taskIdConfigKeys && value.isNotBlank()) {
+                val asId = value.toLongOrNull()
+                val (_, nm) = resolve(if (asId == null) value else "", asId)
+                nm.ifBlank { value }   // store the resolved NAME (id-independent); keep the original if unresolved
+            } else value
+        }
+        return element.copy(
+            tapTaskId = tapId, tapTaskName = tapName,
+            longPressTaskId = lpId, longPressTaskName = lpName,
+            config = newConfig,
         )
+    }
+
+    /**
+     * Fill each scene element's task NAME from its id on EXPORT, so the bundle re-binds by name on import
+     * (even if the linked task isn't included, or gets re-id'd). Also rewrites legacy gesture-config id
+     * values to the task name. Existing names are left as-is. [taskNameById] = current device id→name.
+     */
+    private fun backfillSceneTaskNames(scenes: List<Scene>, taskNameById: Map<Long, String>): List<Scene> =
+        scenes.map { scene ->
+            scene.copy(elements = scene.elements.map { el ->
+                el.copy(
+                    tapTaskName = el.tapTaskName.ifBlank { el.tapTaskId?.let { taskNameById[it] } ?: "" },
+                    longPressTaskName = el.longPressTaskName.ifBlank { el.longPressTaskId?.let { taskNameById[it] } ?: "" },
+                    config = el.config.mapValues { (k, v) ->
+                        if (k in taskIdConfigKeys) v.toLongOrNull()?.let { taskNameById[it] } ?: v else v
+                    },
+                )
+            })
+        }
 
     /** Returns [base], or "[base] (2)", "(3)", … so it doesn't collide with [takenLowercase]. */
     private fun uniqueName(base: String, takenLowercase: Set<String>): String {

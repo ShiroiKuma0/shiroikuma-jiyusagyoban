@@ -119,6 +119,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -943,7 +944,7 @@ class ActiveAutomationViewModel(
     fun confirmOpenTaskerBundleImport(
         bundle: OpenTaskerBundle,
         projectConflictStrategy: ProjectConflictStrategy = ProjectConflictStrategy.MERGE,
-        itemConflictStrategy: ItemConflictStrategy = ItemConflictStrategy.RENAME,
+        itemConflictStrategy: ItemConflictStrategy = ItemConflictStrategy.OVERWRITE_DELETE,
     ) {
         viewModelScope.launch {
             if (openTaskerBundleBusy) return@launch
@@ -2204,7 +2205,8 @@ fun ActiveAutomationUi(
             pendingProjectStrategy = projStrat
             importItemConflict = b
         } else {
-            viewModel.confirmOpenTaskerBundleImport(b, projStrat, ItemConflictStrategy.RENAME)
+            // No name clashes → strategy is moot; default to overwrite for consistency.
+            viewModel.confirmOpenTaskerBundleImport(b, projStrat, ItemConflictStrategy.OVERWRITE_DELETE)
         }
     }
 
@@ -2271,6 +2273,8 @@ fun ActiveAutomationUi(
     if (showCreateTaskDialog) {
         TaskEditorDialog(
             task = null,
+            siblingNames = tasks.filter { (it.projectId ?: 0L) == (currentProjectId ?: 0L) }
+                .mapTo(mutableSetOf()) { it.name.trim().lowercase() },
             onDismiss = { showCreateTaskDialog = false },
             onSave = { name, priority, iconPath, freezeBubble ->
                 viewModel.createTask(name, priority, currentProjectId, iconPath, freezeBubble)
@@ -2286,6 +2290,8 @@ fun ActiveAutomationUi(
     taskDialog?.let { task ->
         TaskEditorDialog(
             task = task,
+            siblingNames = tasks.filter { (it.projectId ?: 0L) == (task.projectId ?: 0L) && it.id != task.id }
+                .mapTo(mutableSetOf()) { it.name.trim().lowercase() },
             onDismiss = { taskDialog = null },
             onSave = { name, priority, iconPath, freezeBubble ->
                 viewModel.updateTask(task.copy(name = name.trim(), priority = priority.coerceIn(0, 10), iconPath = iconPath, freezeBubble = freezeBubble))
@@ -2309,6 +2315,8 @@ fun ActiveAutomationUi(
         ProfileEditorDialog(
             profile = null,
             tasks = tasks,
+            siblingNames = profiles.filter { (it.projectId ?: 0L) == (currentProjectId ?: 0L) }
+                .mapTo(mutableSetOf()) { it.name.trim().lowercase() },
             onDismiss = { showCreateProfileDialog = false },
             onSave = { name, enabled, enterTaskId, cooldown, automationMode ->
                 viewModel.createProfile(name, enabled, enterTaskId, cooldown, automationMode, currentProjectId)
@@ -2343,6 +2351,8 @@ fun ActiveAutomationUi(
         ProfileEditorDialog(
             profile = profile,
             tasks = tasks,
+            siblingNames = profiles.filter { (it.projectId ?: 0L) == (profile.projectId ?: 0L) && it.id != profile.id }
+                .mapTo(mutableSetOf()) { it.name.trim().lowercase() },
             onDismiss = { profileDialog = null },
             onSave = { name, enabled, enterTaskId, cooldown, automationMode ->
                 viewModel.updateProfile(
@@ -3613,17 +3623,17 @@ private fun ImportItemConflictDialog(
                     }
                 }
                 Text(
-                    "Import with new names keeps both. Overwrite and backup current renames the existing ones to “.<timestamp>.bak” before importing. Overwrite and delete current removes them first.",
+                    "Overwrite updates each existing item in place (keeping its group, notes and links) — the default. Overwrite and backup renames the existing ones to “.<timestamp>.bak” first. Import with new names keeps both.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         },
-        // Stacked; default (backs up then imports) on top.
+        // Stacked; default (overwrite in place) on top and emphasised.
         confirmButton = {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+                Button(onClick = onOverwriteDelete) { Text("Overwrite") }
                 TextButton(onClick = onOverwriteBackup) { Text("Overwrite and backup current") }
-                TextButton(onClick = onOverwriteDelete) { Text("Overwrite and delete current") }
                 TextButton(onClick = onRename) { Text("Import with new names") }
                 TextButton(onClick = onDismiss) { Text("Cancel") }
             }
@@ -3837,6 +3847,7 @@ private fun TemplateSlotDialog(
 @Composable
 private fun TaskEditorDialog(
     task: Task?,
+    siblingNames: Set<String> = emptySet(),
     onDismiss: () -> Unit,
     onSave: (String, Int, String?, Boolean) -> Unit,
 ) {
@@ -3844,7 +3855,9 @@ private fun TaskEditorDialog(
     var priority by remember(task?.id) { mutableStateOf((task?.priority ?: 5).toString()) }
     var freezeBubble by remember(task?.id) { mutableStateOf(task?.freezeBubble ?: false) }
     val parsedPriority = priority.toIntOrNull()
-    val canSave = name.isNotBlank() && parsedPriority != null && parsedPriority in 0..10
+    // Names are unique within a project (siblingNames = other tasks in the same project, lowercased).
+    val nameClash = name.isNotBlank() && name.trim().lowercase() in siblingNames
+    val canSave = name.isNotBlank() && !nameClash && parsedPriority != null && parsedPriority in 0..10
 
     // The persisted icon (if editing) vs. the in-progress selection. We never delete the persisted file
     // while staging — only replaced *staged* files are cleaned up here; the persisted one is cleaned on
@@ -3875,7 +3888,8 @@ private fun TaskEditorDialog(
                     onValueChange = { name = it },
                     label = { Text("Task name") },
                     placeholder = { Text("Morning focus mode") },
-                    supportingText = { Text("Use a clear verb or outcome so profiles stay easy to scan.") },
+                    isError = nameClash,
+                    supportingText = { Text(if (nameClash) "Another task in this project already has that name." else "Use a clear verb or outcome so profiles stay easy to scan.") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -4034,6 +4048,7 @@ private fun Modifier.alwaysVisibleScrollbar(state: ScrollState, color: Color): M
 private fun ProfileEditorDialog(
     profile: Profile?,
     tasks: List<Task>,
+    siblingNames: Set<String> = emptySet(),
     onDismiss: () -> Unit,
     onSave: (String, Boolean, Long, Int, AutomationMode) -> Unit,
 ) {
@@ -4044,7 +4059,9 @@ private fun ProfileEditorDialog(
     var cooldown by remember(profile?.id) { mutableStateOf((profile?.cooldownSec ?: 0).toString()) }
     var automationMode by remember(profile?.id) { mutableStateOf(profile?.automationMode ?: AutomationMode.SINGLE) }
     val parsedCooldown = cooldown.toIntOrNull()
-    val canSave = name.isNotBlank() && enterTaskId > 0 && (cooldown.isBlank() || parsedCooldown != null)
+    // Names are unique within a project (siblingNames = other profiles in the same project, lowercased).
+    val nameClash = name.isNotBlank() && name.trim().lowercase() in siblingNames
+    val canSave = name.isNotBlank() && !nameClash && enterTaskId > 0 && (cooldown.isBlank() || parsedCooldown != null)
 
     AlertDialog(
         modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
@@ -4063,7 +4080,8 @@ private fun ProfileEditorDialog(
                     onValueChange = { name = it },
                     label = { Text("Profile name") },
                     placeholder = { Text("Weekday work mode") },
-                    supportingText = { Text("Profiles read best when they describe the situation they detect.") },
+                    isError = nameClash,
+                    supportingText = { Text(if (nameClash) "Another profile in this project already has that name." else "Profiles read best when they describe the situation they detect.") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )

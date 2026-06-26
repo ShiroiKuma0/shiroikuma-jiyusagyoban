@@ -34,6 +34,11 @@ data class SceneElement(
     val config: Map<String, String> = emptyMap(),
     val tapTaskId: Long? = null,
     val longPressTaskId: Long? = null,
+    // Name of the linked task, resolved BEFORE the id (which is only a legacy fallback). A name survives
+    // re-imports that re-id the task, and disambiguates same-name tasks by project. Empty = no link / not
+    // yet backfilled (older scenes carry only the id; export + the editor populate these going forward).
+    val tapTaskName: String = "",
+    val longPressTaskName: String = "",
 )
 
 @Serializable

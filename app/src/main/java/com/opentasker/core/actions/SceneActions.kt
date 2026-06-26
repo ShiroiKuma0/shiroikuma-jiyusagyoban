@@ -8,9 +8,35 @@ import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.engine.variables.expandAgainstGlobals
 import com.opentasker.core.model.Scene
+import com.opentasker.core.storage.SceneDao
+import com.opentasker.core.storage.SceneEntity
 import com.opentasker.scenes.SceneActivity
 import com.opentasker.scenes.SceneOverlayManager
 import com.opentasker.scenes.WakedanceActivity
+
+/**
+ * Resolve a scene reference (from `scene.show` / `scene.hide`) to a stored scene.
+ *
+ * Scenes are linked by **name**, keyed by `(project, name)` — a name is unique within a project, but
+ * the same name may exist in different projects. So a reference resolves, in order:
+ *   1. a scene with that name in the **caller's project** (the common case — survives re-imports that
+ *      re-id the scene, and disambiguates same-name scenes across projects);
+ *   2. otherwise any scene with that name (cross-project show), chosen deterministically (lowest
+ *      position, then id) so it never flips between equally-named candidates;
+ *   3. finally, a purely-numeric ref as a raw id — back-compat only; a real name always wins.
+ *
+ * [callerProjectId] is the running task's project (0 = Unfiled/super); a scene's null projectId is
+ * also Unfiled, so the two are compared as `(projectId ?: 0)`.
+ */
+internal suspend fun resolveScene(dao: SceneDao, ref: String, callerProjectId: Long): SceneEntity? {
+    val all = dao.getAll()
+    all.firstOrNull { (it.projectId ?: 0L) == callerProjectId && it.name.equals(ref, ignoreCase = true) }
+        ?.let { return it }
+    all.filter { it.name.equals(ref, ignoreCase = true) }
+        .minByOrNull { it.position.toLong() * 10_000_000L + it.id }
+        ?.let { return it }
+    return ref.toLongOrNull()?.let { id -> all.firstOrNull { it.id == id } }
+}
 
 /** Expand %vars in the scene's PANEL colors (bg / border) against the persisted globals at show time.
  *  Element configs are deliberately left RAW: `SceneElementView.v()` re-reads + expands them LIVE on
@@ -34,8 +60,7 @@ class ShowSceneAction : Action {
         val ref = args["scene"]?.trim().orEmpty()
         if (ref.isEmpty()) return ActionResult.Failure("missing scene name")
         val dao = OpenTaskerApp_NoHilt.db.sceneDao()
-        val entity = ref.toLongOrNull()?.let { dao.getById(it) }
-            ?: dao.getAll().firstOrNull { it.toDomain().name.equals(ref, ignoreCase = true) }
+        val entity = resolveScene(dao, ref, ctx.variables.projectId)
             ?: return ActionResult.Failure("scene not found: \"$ref\"")
         val scene = entity.toDomain().withGlobalsExpanded()
         // Resolution for the presentation flags: an explicit arg wins; otherwise fall back to the
@@ -108,8 +133,7 @@ class HideSceneAction : Action {
         val ref = args["scene"]?.trim().orEmpty()
         if (ref.isNotEmpty()) {
             val dao = OpenTaskerApp_NoHilt.db.sceneDao()
-            val entity = ref.toLongOrNull()?.let { dao.getById(it) }
-                ?: dao.getAll().firstOrNull { it.toDomain().name.equals(ref, ignoreCase = true) }
+            val entity = resolveScene(dao, ref, ctx.variables.projectId)
                 ?: return ActionResult.Failure("scene not found: \"$ref\"")
             SceneOverlayManager.hide(entity.id)
             ctx.logger("Hid scene \"${entity.toDomain().name}\"")

@@ -34,7 +34,9 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class VariableStore private constructor(
     private val globalScope: GlobalVariableScope,
-    private val projectId: Long,            // 0 = Unfiled/super; >0 = the running task's project
+    /** 0 = Unfiled/super; >0 = the running task's project. Exposed so actions can resolve
+     *  project-scoped references (e.g. a scene by its `(project, name)` key). */
+    val projectId: Long,
     private val arrayStore: ArrayStore,
 ) {
     /** Standalone store with no persistence (ad-hoc / unit tests). */

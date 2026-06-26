@@ -97,6 +97,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.engine.executeAndLogTask
+import com.opentasker.core.engine.resolveTaskByName
 import com.opentasker.core.engine.variables.PersistentGlobalScope
 import com.opentasker.core.engine.variables.expandAgainstGlobals
 import com.opentasker.core.model.Scene
@@ -194,18 +195,19 @@ open class SceneActivity : ComponentActivity() {
                 // showWhenLocked scenes render fullscreen (the wakedance black mask fills the screen);
                 // the normal Activity fallback is modal (a scrim + scaled card).
                 if (fullscreen) {
-                    SceneOverlay(scene, modal = false, fullscreen = true, onDismiss = { finish() }, onRunTask = ::runTask, onSetVar = ::setVar)
+                    SceneOverlay(scene, modal = false, fullscreen = true, onDismiss = { finish() }, onRunTask = { ref -> runTask(ref, scene?.projectId) }, onSetVar = ::setVar)
                 } else {
-                    SceneOverlay(scene, modal = true, position = position, dismissOnOutside = dismissOnOutside, onDismiss = { finish() }, onRunTask = ::runTask, onSetVar = ::setVar)
+                    SceneOverlay(scene, modal = true, position = position, dismissOnOutside = dismissOnOutside, onDismiss = { finish() }, onRunTask = { ref -> runTask(ref, scene?.projectId) }, onSetVar = ::setVar)
                 }
             }
         }
     }
 
-    private fun runTask(taskId: Long) {
+    private fun runTask(ref: String, projectId: Long?) {
         io.launch {
             val db = OpenTaskerApp_NoHilt.db
-            val task = db.taskDao().getById(taskId)?.toDomain() ?: return@launch
+            // Name-first (the element carries the task NAME; the id is only a legacy fallback).
+            val task = resolveTaskByName(db, ref, projectId) ?: return@launch
             executeAndLogTask(applicationContext, db, task, source = "Scene")
         }
     }
@@ -263,7 +265,7 @@ internal fun SceneOverlay(
     fillHeight: Boolean = false,
     fillWidth: Boolean = false,
     onDismiss: () -> Unit,
-    onRunTask: (Long) -> Unit,
+    onRunTask: (String) -> Unit,
     onSetVar: (sceneProjectId: Long?, name: String, value: String) -> Unit,
 ) {
     if (scene == null) return
@@ -299,7 +301,7 @@ private fun SceneCard(
     fullscreen: Boolean = false,
     fillHeight: Boolean = false,
     fillWidth: Boolean = false,
-    onRunTask: (Long) -> Unit,
+    onRunTask: (String) -> Unit,
     onSetVar: (sceneProjectId: Long?, name: String, value: String) -> Unit,
 ) {
     val sw = scene.widthDp.coerceAtLeast(1)
@@ -343,10 +345,16 @@ private fun SceneCard(
 @Composable
 internal fun SceneElementView(
     element: SceneElement,
-    onRunTask: (Long) -> Unit,
+    onRunTask: (String) -> Unit,
     onSetVar: (name: String, value: String) -> Unit,
 ) {
     val cfg = element.config
+    // Task links resolve NAME-first: prefer the element's stored task name, fall back to the legacy id.
+    // Gesture-config values (swipeUp, doubleTap, …) are passed through as-is — a name (new) or an id
+    // string (legacy); runTask's resolver tries name then id, so both keep working.
+    fun taskRef(name: String, id: Long?): String? = name.ifBlank { id?.toString() ?: "" }.ifBlank { null }
+    val tapRef = taskRef(element.tapTaskName, element.tapTaskId)
+    val longPressRef = taskRef(element.longPressTaskName, element.longPressTaskId)
     // Expand each config value against the globals via derivedStateOf, so this element recomposes ONLY
     // when one of ITS OWN variables changes — not on every global write. (Before, every element read a
     // shared revision, so any var change re-ran every on-screen overlay at once — a real idle CPU cost
@@ -397,25 +405,27 @@ internal fun SceneElementView(
         SceneElementType.BUTTON -> {
             // Edge bars: a strip binds any of swipe up/down/left/right (short) and longSwipe* (a longer
             // drag in that direction), plus tap, double-tap and long-press — each to its own task.
-            val swipeUp = cfg["swipeUp"]?.toLongOrNull()
-            val swipeDown = cfg["swipeDown"]?.toLongOrNull()
-            val swipeLeft = cfg["swipeLeft"]?.toLongOrNull()
-            val swipeRight = cfg["swipeRight"]?.toLongOrNull()
-            val longSwipeUp = cfg["longSwipeUp"]?.toLongOrNull()
-            val longSwipeDown = cfg["longSwipeDown"]?.toLongOrNull()
-            val longSwipeLeft = cfg["longSwipeLeft"]?.toLongOrNull()
-            val longSwipeRight = cfg["longSwipeRight"]?.toLongOrNull()
-            val doubleTapId = cfg["doubleTap"]?.toLongOrNull()
-            val moveDebug = cfg["moveDebug"]?.toLongOrNull()   // DEBUG: fires once on the first pointer move
-            val tapId = element.tapTaskId
-            val longPressId = element.longPressTaskId
+            // Gesture targets: a task NAME (new) or a legacy id string — runTask resolves either.
+            fun cfgRef(key: String): String? = cfg[key]?.trim()?.takeIf { it.isNotBlank() }
+            val swipeUp = cfgRef("swipeUp")
+            val swipeDown = cfgRef("swipeDown")
+            val swipeLeft = cfgRef("swipeLeft")
+            val swipeRight = cfgRef("swipeRight")
+            val longSwipeUp = cfgRef("longSwipeUp")
+            val longSwipeDown = cfgRef("longSwipeDown")
+            val longSwipeLeft = cfgRef("longSwipeLeft")
+            val longSwipeRight = cfgRef("longSwipeRight")
+            val doubleTapId = cfgRef("doubleTap")
+            val moveDebug = cfgRef("moveDebug")   // DEBUG: fires once on the first pointer move
+            val tapId = tapRef
+            val longPressId = longPressRef
             val hasSwipe = swipeUp != null || swipeDown != null || swipeLeft != null || swipeRight != null ||
                 longSwipeUp != null || longSwipeDown != null || longSwipeLeft != null || longSwipeRight != null ||
                 moveDebug != null
             val slopPx = with(LocalDensity.current) { 36.dp.toPx() }
             val longSwipePx = with(LocalDensity.current) { 140.dp.toPx() }
             // Pick the task for the swipe's dominant axis from a (up,down,left,right) set.
-            fun pick(dx: Float, dy: Float, up: Long?, down: Long?, left: Long?, right: Long?): Long? =
+            fun pick(dx: Float, dy: Float, up: String?, down: String?, left: String?, right: String?): String? =
                 if (kotlin.math.abs(dx) > kotlin.math.abs(dy)) { if (dx > 0) right else left }
                 else { if (dy > 0) down else up }
             Box(
@@ -483,7 +493,7 @@ internal fun SceneElementView(
             // read that variable (e.g. a Set Volume action with level = %VOL).
             val onSettled: () -> Unit = {
                 if (!varName.isNullOrBlank()) onSetVar(varName, value.roundToInt().toString())
-                element.tapTaskId?.let(onRunTask)
+                tapRef?.let(onRunTask)
             }
             var lastSent by remember(element.id) { mutableStateOf(Int.MIN_VALUE) }
             var moved by remember(element.id) { mutableStateOf(false) }
@@ -553,11 +563,11 @@ internal fun SceneElementView(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 // Run the element's tap task when the user presses Done or the field loses focus.
-                keyboardActions = KeyboardActions(onDone = { element.tapTaskId?.let(onRunTask) }),
+                keyboardActions = KeyboardActions(onDone = { tapRef?.let(onRunTask) }),
                 modifier = Modifier
                     .fillMaxSize()
                     .onFocusChanged { st ->
-                        if (focused && !st.isFocused) element.tapTaskId?.let(onRunTask)
+                        if (focused && !st.isFocused) tapRef?.let(onRunTask)
                         focused = st.isFocused
                     },
             )
@@ -570,7 +580,7 @@ internal fun SceneElementView(
             val onChanged: (Boolean) -> Unit = { c ->
                 checked = c
                 if (!varName.isNullOrBlank()) onSetVar(varName, c.toString())
-                element.tapTaskId?.let(onRunTask)
+                tapRef?.let(onRunTask)
             }
             Row(
                 Modifier.fillMaxSize(),
@@ -615,7 +625,7 @@ internal fun SceneElementView(
                             expanded = false
                             // On select: write the value to `var` and run the tap task.
                             if (!varName.isNullOrBlank()) onSetVar(varName, opt)
-                            element.tapTaskId?.let(onRunTask)
+                            tapRef?.let(onRunTask)
                         })
                     }
                 }
@@ -634,7 +644,7 @@ internal fun SceneElementView(
             val onChanged: (Int) -> Unit = { next ->
                 value = next.coerceIn(min, max)
                 if (!varName.isNullOrBlank()) onSetVar(varName, value.toString())
-                element.tapTaskId?.let(onRunTask)
+                tapRef?.let(onRunTask)
             }
             val label = v("label", "")
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -677,11 +687,11 @@ internal fun SceneElementView(
                     .then(if (fill != null) Modifier.background(fill) else Modifier)
                     .then(if (styleBorderW > 0) Modifier.border(styleBorderW.dp, styleBorderColor ?: MaterialTheme.colorScheme.outline, shape) else Modifier)
                     .then(
-                        if (element.tapTaskId != null || element.longPressTaskId != null) {
+                        if (tapRef != null || longPressRef != null) {
                             Modifier.pointerInput(element.id) {
                                 detectTapGestures(
-                                    onTap = { element.tapTaskId?.let(onRunTask) },
-                                    onLongPress = { element.longPressTaskId?.let(onRunTask) },
+                                    onTap = { tapRef?.let(onRunTask) },
+                                    onLongPress = { longPressRef?.let(onRunTask) },
                                 )
                             }
                         } else Modifier,

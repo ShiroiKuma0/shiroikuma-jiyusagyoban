@@ -26,6 +26,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.accessibility.ShiroiKumaAccessibilityService
 import com.opentasker.core.engine.executeAndLogTask
+import com.opentasker.core.engine.resolveTaskByName
 import com.opentasker.core.engine.variables.PersistentGlobalScope
 import com.opentasker.core.model.Scene
 import com.opentasker.ui.theme.OpenTaskerTheme
@@ -174,7 +175,7 @@ object SceneOverlayManager {
                             fillHeight = heightFraction > 0f,
                             fillWidth = widthFraction > 0f,
                             onDismiss = { hide(scene.id) },
-                            onRunTask = ::runTask,
+                            onRunTask = { ref -> runTask(ref, scene.projectId) },
                             onSetVar = ::setVar,
                         )
                     }
@@ -346,10 +347,11 @@ object SceneOverlayManager {
         overlay.owner.onDestroy()
     }
 
-    private fun runTask(taskId: Long) {
+    private fun runTask(ref: String, projectId: Long?) {
         io.launch {
             val db = OpenTaskerApp_NoHilt.db
-            val task = db.taskDao().getById(taskId)?.toDomain() ?: return@launch
+            // Name-first (the element carries the task NAME; the id is only a legacy fallback).
+            val task = resolveTaskByName(db, ref, projectId) ?: return@launch
             executeAndLogTask(appContext ?: return@launch, db, task, source = "Scene")
         }
     }

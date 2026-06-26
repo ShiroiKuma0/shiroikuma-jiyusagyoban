@@ -155,6 +155,8 @@ fun SceneLibraryScreen(
     editSceneTarget?.let { target ->
         SceneEditorDialog(
             initial = target,
+            siblingNames = scenes.filter { (it.projectId ?: 0L) == (target.projectId ?: 0L) && it.id != target.id }
+                .mapTo(mutableSetOf()) { it.name.trim().lowercase() },
             onDismiss = { editSceneTarget = null },
             onSave = { name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside ->
                 onUpdateScene(
@@ -174,6 +176,7 @@ fun SceneLibraryScreen(
 
     if (showCreateDialog) {
         SceneEditorDialog(
+            siblingNames = scenes.mapTo(mutableSetOf()) { it.name.trim().lowercase() },
             onDismiss = { showCreateDialog = false },
             onSave = { name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside ->
                 onCreateScene(name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside)
@@ -1260,8 +1263,12 @@ private fun SceneElementEditorDialog(
                                 textValue, spinnerOptions, shapeCorner, imageSource,
                                 SceneElementStyle(styleTextColor, styleBgColor, styleSize, styleBold, styleAlign, styleBorderColor, styleBorderWidth, styleFont),
                             ),
+                            // Store the NAME too (resolved name-first at run time / on import; the id
+                            // is only a legacy fallback). Keeps the link alive across re-ids / re-imports.
                             tapTaskId = tapTaskId,
+                            tapTaskName = tapTaskId?.let { id -> tasks.firstOrNull { it.id == id }?.name } ?: "",
                             longPressTaskId = longPressTaskId,
+                            longPressTaskName = longPressTaskId?.let { id -> tasks.firstOrNull { it.id == id }?.name } ?: "",
                         ),
                     )
                 },
@@ -1371,6 +1378,7 @@ private fun SceneIssueText(issue: SceneIssue) {
 @Composable
 private fun SceneEditorDialog(
     initial: Scene? = null,
+    siblingNames: Set<String> = emptySet(),
     onDismiss: () -> Unit,
     onSave: (name: String, widthDp: Int, heightDp: Int, bgColor: String?, cornerRadiusDp: Int, scrimAlpha: Int, borderColor: String?, borderWidth: Int, defaultPosition: String, defaultModal: Boolean, defaultDismissOnOutside: Boolean) -> Unit,
 ) {
@@ -1387,7 +1395,9 @@ private fun SceneEditorDialog(
     var defaultDismissOnOutside by remember { mutableStateOf(initial?.defaultDismissOnOutside ?: true) }
     val parsedWidth = width.toIntOrNull()
     val parsedHeight = height.toIntOrNull()
-    val canSave = name.isNotBlank() && parsedWidth != null && parsedHeight != null && parsedWidth > 0 && parsedHeight > 0
+    // Scene names are unique within a project (siblingNames = other scenes in the same project).
+    val nameClash = name.isNotBlank() && name.trim().lowercase() in siblingNames
+    val canSave = name.isNotBlank() && !nameClash && parsedWidth != null && parsedHeight != null && parsedWidth > 0 && parsedHeight > 0
 
     AlertDialog(
         modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
@@ -1402,6 +1412,10 @@ private fun SceneEditorDialog(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Scene name") },
+                    isError = nameClash,
+                    supportingText = if (nameClash) {
+                        { Text("Another scene in this project already has that name.") }
+                    } else null,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )

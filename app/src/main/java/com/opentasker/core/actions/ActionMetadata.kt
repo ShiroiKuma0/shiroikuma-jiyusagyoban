@@ -716,7 +716,7 @@ fun registerActionMetadata() {
             description = "Display a scene (from the Scenes tab). With the Display-over-other-apps permission it shows over other apps; its elements run tasks on tap and %vars in text are expanded.",
             category = "System",
             fields = listOf(
-                ActionField("scene", "Scene name", required = true, hint = "the scene's name (or id)"),
+                ActionField("scene", "Scene name", required = true, hint = "the scene's name — resolves within this task's project first, so a name reused in another project still finds the right one (a numeric id also works)"),
                 ActionField("position", "Position", FieldType.DROPDOWN, hint = "top / center / bottom (default center)"),
                 ActionField("modal", "Modal", FieldType.CHECKBOX, hint = "block the app underneath (on) vs tap-through HUD (off)"),
                 ActionField("dismissOnOutside", "Tap outside closes", FieldType.CHECKBOX, hint = "default on; off = close only via Back, a button, or timeout"),

@@ -231,6 +231,7 @@ fun ProjectsManagementScreen(
     if (creating) {
         ProjectEditDialog(
             initial = null,
+            siblingNames = projects.mapTo(mutableSetOf()) { it.name.trim().lowercase() },
             onDismiss = { creating = false },
             onConfirm = { name, color -> onCreate(name, color); creating = false },
         )
@@ -238,6 +239,7 @@ fun ProjectsManagementScreen(
     editing?.let { project ->
         ProjectEditDialog(
             initial = project,
+            siblingNames = projects.filter { it.id != project.id }.mapTo(mutableSetOf()) { it.name.trim().lowercase() },
             onDismiss = { editing = null },
             onConfirm = { name, color ->
                 onUpdate(project.copy(name = name, color = color))
@@ -305,11 +307,14 @@ private fun ProjectManagementRow(
 @Composable
 private fun ProjectEditDialog(
     initial: Project?,
+    siblingNames: Set<String> = emptySet(),
     onDismiss: () -> Unit,
     onConfirm: (name: String, color: Int?) -> Unit,
 ) {
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var color by remember { mutableStateOf(initial?.color) }
+    // Project names are unique across the workspace.
+    val nameClash = name.isNotBlank() && name.trim().lowercase() in siblingNames
     AlertDialog(
         modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
@@ -320,6 +325,10 @@ private fun ProjectEditDialog(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Name") },
+                    isError = nameClash,
+                    supportingText = if (nameClash) {
+                        { Text("A project with that name already exists.") }
+                    } else null,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -333,7 +342,7 @@ private fun ProjectEditDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(name.trim(), color) }, enabled = name.isNotBlank()) {
+            TextButton(onClick = { onConfirm(name.trim(), color) }, enabled = name.isNotBlank() && !nameClash) {
                 Text(if (initial == null) "Create" else "Save")
             }
         },

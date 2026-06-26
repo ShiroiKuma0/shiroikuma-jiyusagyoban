@@ -96,6 +96,26 @@ suspend fun logSkippedRun(
 }
 
 /**
+ * Resolve a task reference NAME-first (the id is only a legacy fallback), scoped to [projectId] when
+ * given — a `(project, name)` match wins, then any-project name match (deterministic: lowest position
+ * then id), then the numeric id. Used by scene elements (tap / long-press / gesture) so a link survives
+ * re-imports that re-id the task and disambiguates same-name tasks across projects. Mirrors the scene
+ * resolver in SceneActions. (Distinct from [dbSubTaskResolver], which stays id-first for `task.run`.)
+ */
+suspend fun resolveTaskByName(db: AppDatabase, ref: String, projectId: Long?): Task? {
+    if (ref.isBlank()) return null
+    val all = db.taskDao().getAll()
+    if (projectId != null) {
+        all.firstOrNull { (it.projectId ?: 0L) == projectId && it.name.equals(ref, ignoreCase = true) }
+            ?.let { return it.toDomain() }
+    }
+    all.filter { it.name.equals(ref, ignoreCase = true) }
+        .minByOrNull { it.position.toLong() * 10_000_000L + it.id }
+        ?.let { return it.toDomain() }
+    return ref.toLongOrNull()?.let { id -> all.firstOrNull { it.id == id }?.toDomain() }
+}
+
+/**
  * Resolves a sub-task by numeric id first, then by exact name (case-insensitive), for `task.run`.
  */
 fun dbSubTaskResolver(db: AppDatabase): SubTaskResolver = resolver@{ ref ->
