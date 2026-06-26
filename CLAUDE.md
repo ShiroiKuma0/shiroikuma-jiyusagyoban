@@ -88,6 +88,12 @@ default **`standard`**.
   repro, a widget-driver task, etc.), export it as an importable **JSON bundle** (`OpenTaskerBundle`
   schema — `schemaVersion`/`tasks[]/actions[]` with `type` + `args`) and `adb push` it to
   `/sdcard/tmp/` for 白い熊 to import. Never a tabular spec or "add these actions" instructions.
+- **Version every pushed JSON uniquely with a full datetime.** Each bundle/JSON `adb push`ed to the
+  phone must carry a `yyyy-MM-dd_HH-mm-ss` stamp (our format — `date +%Y-%m-%d_%H-%M-%S`, to the
+  SECOND) in its FILENAME, e.g. `volume-panel-reorder_2026-06-26_12-56-22.json`. Date-only (or a
+  `b`/`(2)` suffix) is **not** enough — a same-day re-push must get a fresh stamp so it never collides
+  and 白い熊 always knows which is current. Prune the older copies; state the exact filename in the
+  handover. (See the `version-pushed-files` memory.)
 - **Always run `adb` with `dangerouslyDisableSandbox: true`** (the sandbox blocks adb's server
   socket, so `adb devices` shows empty). Every `adb` invocation goes through the unsandboxed path.
 - **Never `adb install` / `adb uninstall`.** Push to `/sdcard/tmp/`; 白い熊 installs manually.
