@@ -94,11 +94,17 @@ default **`standard`**.
   `b`/`(2)` suffix) is **not** enough — a same-day re-push must get a fresh stamp so it never collides
   and 白い熊 always knows which is current. Prune the older copies; state the exact filename in the
   handover. (See the `version-pushed-files` memory.)
+- **Always ask 白い熊 to confirm a shipped bundle, then sync the mirror.** Whenever you hand over a JSON
+  bundle, explicitly **request confirmation** that it imported / works. The moment 白い熊 OKs it, update
+  the workspace mirror (`~/〇/[666] 私資料/[666][60792] …`) to match and **commit it** — see the
+  `workspace-mirror` skill.
 - **Always run `adb` with `dangerouslyDisableSandbox: true`** (the sandbox blocks adb's server
   socket, so `adb devices` shows empty). Every `adb` invocation goes through the unsandboxed path.
 - **Never `adb install` / `adb uninstall`.** Push to `/sdcard/tmp/`; 白い熊 installs manually.
-- **Never commit/push unprompted.** Build-only until 白い熊 says **"Push"** (`custom` rebases →
-  `git push --force-with-lease origin custom`; `master` fast-forwards).
+- **Never commit/push unprompted. On 白い熊's "Push", commit + push BOTH repos.** (1) the code repo —
+  `custom` → `git push --force-with-lease origin custom`, `master` fast-forwards (this is the only one
+  on github); (2) the workspace mirror at `~/〇/[666] 私資料/[666][60792] …` — a **local `git commit`
+  only; it has NO github/remote and never will**. Build-only until 白い熊 says "Push."
 - `keystore.properties` and `*.jks` are gitignored — never commit them.
 - On a new upstream version, run the `upstream-new-version` skill (rebase `custom`, reset
   `BUILD_NUMBER=1`, build `+1`).

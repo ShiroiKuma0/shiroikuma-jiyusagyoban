@@ -33,10 +33,16 @@ git -C "$D" -c user.name="白い熊" commit -m "Sync export <appVersion> (<YYYY-
 `explode.py` **wipes & rewrites** the tree (everything but `.git/`, `scripts/`, and the dotfiles/docs),
 so items deleted in the app show up as removed files in `git diff`.
 
-### Claude made a targeted change (shipped a bundle / edited a task)
-Also edit the matching file(s) in the mirror so it stays current between full exports — e.g. after
-shipping `batt-power.v2.json`, update `時間と日付/tasks/時間と日付 ⇨ 起動 ….json` and add the new
-`電池ウィジェット・電源` profile + `dt.batt.refresh` task files. Commit.
+### Claude shipped a bundle → 白い熊 OKs it → sync the mirror (REQUIRED workflow)
+Whenever you hand 白い熊 a JSON bundle, you **explicitly request confirmation** that it imported / works
+(don't move on without asking). **The moment 白い熊 OKs it**, update the mirror to match and commit —
+write the bundle's changed objects **verbatim** into the matching per-item files
+(`<project>/{tasks,profiles,scenes}/<name>.json`, plus any new profile / scene / variable / `_globals`
+entry), then commit. This keeps the mirror current between full exports — e.g. after shipping
+`batt-power.v2.json`, update `時間と日付/tasks/時間と日付 ⇨ 起動 ….json` and add the new
+`電池ウィジェット・電源` profile + `dt.batt.refresh` task files, then commit. (A periodic full
+`Setup → Export` + `explode.py` reconciles the whole snapshot — ids, item-meta, groups, orphans, the
+`tapTaskName` backfill — so prefer that when many items moved.)
 
 ### Consulting / modifying current content
 Read the per-item JSON directly (e.g. `通知明滅/tasks/通知明滅点灯.json`) to see exactly what's
@@ -47,7 +53,11 @@ see the `bundle-required-fields` memory) and push the bundle to `/sdcard/tmp/`.
 ## Rules
 - The phone's Room DB is the source of truth; the mirror reflects the **last export**. After 白い熊 edits
   things in the app, get a fresh export before trusting the mirror for those items.
-- Commit per change. **Push only when 白い熊 says “Push.”** (Remote is TBD — 白い熊 will set it up; until
-  then it's a local repo.)
+- **This mirror is LOCAL-only — it has NO github/remote, and never will.** It is *our* private version
+  control; it just lives on disk. So "pushing" the mirror only ever means a local `git commit`.
+- **Sync the mirror the moment 白い熊 OKs a shipped bundle** (the workflow above) and commit it then.
+- **On 白い熊's “Push”, commit + push BOTH repos:** the code repo (`custom` →
+  `git push --force-with-lease origin custom`; `master` fast-forwards) AND this mirror (a local
+  `commit` only — no push). Don't push the mirror anywhere; don't skip it either.
 - **No Claude attribution** in commits (global rule).
 - `git`/`scp` run **unsandboxed** (`dangerouslyDisableSandbox: true`).
