@@ -14,7 +14,9 @@ import androidx.core.content.ContextCompat
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -254,6 +256,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
@@ -1849,7 +1852,7 @@ fun ActiveAutomationUi(
                 },
                 onMoveTask = { moveTarget = MoveTarget.TaskMove(it) },
                 onExportTask = { exportRequest = ExportRequest(name = "Task: ${it.name}", fileName = exportFileName(it.name), taskIds = setOf(it.id)) },
-                onReorderAction = { task, newOrder -> viewModel.updateTask(task.copy(actions = newOrder), "Actions reordered") },
+                onReorderAction = { task, newOrder -> viewModel.updateTask(task.copy(actions = newOrder), "Actions updated") },
                 onPickTaskIcon = { iconPickerTask = it },
                 onSetTaskFreeze = { t, on -> viewModel.updateTask(t.copy(freezeBubble = on), if (on) "Freeze bubble on" else "Freeze bubble off") },
                 manualSort = sortPrefs.tasks == SortMethod.MANUAL,
@@ -2943,6 +2946,16 @@ private fun TasksScreen(
     }
 }
 
+/**
+ * App-wide clipboard for task actions — Copy/Cut from one task's action list and Paste into another (or
+ * the same) task. Holds immutable [ActionSpec] copies and survives across cards while the app is open.
+ */
+object ActionClipboard {
+    private val _actions = MutableStateFlow<List<ActionSpec>>(emptyList())
+    val actions: StateFlow<List<ActionSpec>> = _actions.asStateFlow()
+    fun put(items: List<ActionSpec>) { _actions.value = items.map { it.copy() } }
+}
+
 @Composable
 private fun TaskCard(
     task: Task,
@@ -2970,6 +2983,20 @@ private fun TaskCard(
     var draggingIndex by remember(task.id) { mutableStateOf<Int?>(null) }
     var dragOffsetY by remember(task.id) { mutableFloatStateOf(0f) }
     var actionRowHeightPx by remember(task.id) { mutableIntStateOf(0) }
+    // Action multi-select + clipboard: long-press a row to select it (and open its menu); the menu's
+    // Clone/Copy/Cut/Delete act on the whole selection, Paste drops the clipboard after that row.
+    var selectedActions by remember(task.id) { mutableStateOf<Set<Int>>(emptySet()) }
+    var actionMenuIndex by remember(task.id) { mutableStateOf<Int?>(null) }
+    val clipboard by ActionClipboard.actions.collectAsState()
+    val actionSelectionActive = selectedActions.isNotEmpty()
+    // Apply a new action list (persists via updateTask) and reset the selection/menu.
+    val applyActions: (List<ActionSpec>) -> Unit = { newActions ->
+        onReorderActions(newActions); selectedActions = emptySet(); actionMenuIndex = null
+    }
+    // The indices to act on: the current selection, or just the long-pressed row if nothing is selected.
+    val targetActions: (Int) -> List<Int> = { i ->
+        (if (selectedActions.isEmpty()) listOf(i) else selectedActions.toList()).sorted().filter { it in task.actions.indices }
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -3078,7 +3105,37 @@ private fun TaskCard(
                             index = index,
                             action = action,
                             expanded = isActionExpanded(index),
-                            onToggle = { onToggleAction(index) },
+                            selected = index in selectedActions,
+                            selectionActive = actionSelectionActive,
+                            menuExpanded = actionMenuIndex == index,
+                            clipboardEmpty = clipboard.isEmpty(),
+                            onTap = {
+                                if (actionSelectionActive) {
+                                    selectedActions = if (index in selectedActions) selectedActions - index else selectedActions + index
+                                } else onToggleAction(index)
+                            },
+                            onLongPress = { selectedActions = selectedActions + index; actionMenuIndex = index },
+                            onMenuDismiss = { actionMenuIndex = null },
+                            onClone = {
+                                val sel = targetActions(index)
+                                val copies = sel.map { task.actions[it].copy() }
+                                applyActions(task.actions.toMutableList().apply { addAll((sel.maxOrNull() ?: index) + 1, copies) })
+                            },
+                            onCopy = {
+                                ActionClipboard.put(targetActions(index).map { task.actions[it] })
+                                selectedActions = emptySet(); actionMenuIndex = null
+                            },
+                            onCut = {
+                                val sel = targetActions(index).toSet()
+                                ActionClipboard.put(sel.sorted().map { task.actions[it] })
+                                applyActions(task.actions.filterIndexed { i, _ -> i !in sel })
+                            },
+                            onDeleteSelection = {
+                                val sel = targetActions(index).toSet()
+                                applyActions(task.actions.filterIndexed { i, _ -> i !in sel })
+                            },
+                            onPasteBefore = { applyActions(task.actions.toMutableList().apply { addAll(index, clipboard) }) },
+                            onPaste = { applyActions(task.actions.toMutableList().apply { addAll(index + 1, clipboard) }) },
                             onEdit = { onEditAction(index, action) },
                             onDelete = { onDeleteAction(index) },
                             modifier = Modifier
@@ -3215,11 +3272,24 @@ private fun actionConfigSummary(action: ActionSpec, metadata: ActionMetadata?): 
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun ActionRow(
     index: Int,
     action: ActionSpec,
     expanded: Boolean,
-    onToggle: () -> Unit,
+    selected: Boolean,
+    selectionActive: Boolean,
+    menuExpanded: Boolean,
+    clipboardEmpty: Boolean,
+    onTap: () -> Unit,
+    onLongPress: () -> Unit,
+    onMenuDismiss: () -> Unit,
+    onClone: () -> Unit,
+    onCopy: () -> Unit,
+    onCut: () -> Unit,
+    onDeleteSelection: () -> Unit,
+    onPasteBefore: () -> Unit,
+    onPaste: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
@@ -3241,21 +3311,30 @@ private fun ActionRow(
         if (!granted) openNotificationSettings(context)
     }
     Surface(
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
+        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                else MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
         shape = RoundedCornerShape(12.dp),
         modifier = modifier.fillMaxWidth().animateContentSize(),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        border = BorderStroke(
+            if (selected) 2.dp else 1.dp,
+            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        ),
     ) {
         Column(Modifier.fillMaxWidth()) {
+          Box {
             Row(
-                modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(12.dp),
+                // Tap = expand (or toggle selection while selecting); long-press = select + open the
+                // clone/copy/cut/delete/paste menu. (The drag handle keeps its own long-press reorder.)
+                modifier = Modifier.fillMaxWidth()
+                    .combinedClickable(onClick = onTap, onLongClick = onLongPress)
+                    .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Icon(
-                    Icons.Filled.DragIndicator,
-                    contentDescription = "Drag to reorder",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    if (selectionActive && selected) Icons.Filled.CheckCircle else Icons.Filled.DragIndicator,
+                    contentDescription = if (selectionActive) "Selected" else "Drag to reorder",
+                    tint = if (selectionActive && selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = dragHandleModifier,
                 )
                 StatusPill("#${index + 1}", MaterialTheme.colorScheme.secondary)
@@ -3289,6 +3368,19 @@ private fun ActionRow(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            // Long-press menu — Clone/Copy/Cut/Delete act on the whole selection; Paste drops the
+            // clipboard right after this action (shown only when something has been copied/cut).
+            DropdownMenu(expanded = menuExpanded, onDismissRequest = onMenuDismiss) {
+                DropdownMenuItem(text = { Text("Clone") }, onClick = onClone)
+                DropdownMenuItem(text = { Text("Copy") }, onClick = onCopy)
+                DropdownMenuItem(text = { Text("Cut") }, onClick = onCut)
+                DropdownMenuItem(text = { Text("Delete") }, onClick = onDeleteSelection)
+                if (!clipboardEmpty) {
+                    DropdownMenuItem(text = { Text("Paste before") }, onClick = onPasteBefore)
+                    DropdownMenuItem(text = { Text("Paste after") }, onClick = onPaste)
+                }
+            }
+          }
             if (expanded) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
