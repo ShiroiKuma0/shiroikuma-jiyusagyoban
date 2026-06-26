@@ -3,6 +3,7 @@ package com.opentasker.core.storage
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
@@ -13,7 +14,7 @@ import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
 
-@Entity("scenes")
+@Entity("scenes", indices = [Index(value = ["projectId", "name"], unique = true)])
 data class SceneEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,

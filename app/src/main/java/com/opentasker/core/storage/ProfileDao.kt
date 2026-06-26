@@ -3,6 +3,7 @@ package com.opentasker.core.storage
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
@@ -14,7 +15,7 @@ import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ContextSpec
 
-@Entity("profiles")
+@Entity("profiles", indices = [Index(value = ["projectId", "name"], unique = true)])
 data class ProfileEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,

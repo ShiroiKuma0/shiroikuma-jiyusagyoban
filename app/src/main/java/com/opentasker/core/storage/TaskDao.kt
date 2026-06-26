@@ -3,6 +3,7 @@ package com.opentasker.core.storage
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
@@ -14,7 +15,9 @@ import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.Task
 
-@Entity("tasks")
+// Unique (projectId, name): a task name is unique within its project (SQLite treats NULL projectId —
+// Unfiled — as distinct, so the editor's UI check covers Unfiled).
+@Entity("tasks", indices = [Index(value = ["projectId", "name"], unique = true)])
 data class TaskEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,

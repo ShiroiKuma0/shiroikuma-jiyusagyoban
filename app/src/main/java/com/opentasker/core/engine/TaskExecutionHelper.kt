@@ -116,14 +116,14 @@ suspend fun resolveTaskByName(db: AppDatabase, ref: String, projectId: Long?): T
 }
 
 /**
- * Resolves a sub-task by numeric id first, then by exact name (case-insensitive), for `task.run`.
+ * Resolves a sub-task by NAME first (exact, then case-insensitive); the numeric id is only a legacy
+ * fallback. Used by `task.run` — matches the name-first resolution scenes use, so re-imports that re-id
+ * a task don't strand callers that reference it.
  */
 fun dbSubTaskResolver(db: AppDatabase): SubTaskResolver = resolver@{ ref ->
-    val byId = ref.toLongOrNull()?.let { db.taskDao().getById(it) }
-    if (byId != null) return@resolver byId.toDomain()
-    val exact = db.taskDao().getByName(ref)
-    if (exact != null) return@resolver exact.toDomain()
-    db.taskDao().getAll().firstOrNull { it.name.equals(ref, ignoreCase = true) }?.toDomain()
+    db.taskDao().getByName(ref)?.let { return@resolver it.toDomain() }
+    db.taskDao().getAll().firstOrNull { it.name.equals(ref, ignoreCase = true) }?.let { return@resolver it.toDomain() }
+    ref.toLongOrNull()?.let { db.taskDao().getById(it) }?.toDomain()
 }
 
 suspend fun insertRunLog(db: AppDatabase, entry: RunLogEntry): Boolean =

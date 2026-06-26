@@ -182,6 +182,27 @@ object DatabaseMigrations {
         }
     }
 
+    // Enforce name uniqueness at the DB level: (projectId, name) unique for tasks/profiles/scenes, name
+    // unique for projects (mirrors the editors' UI check). SQLite treats NULL projectId (Unfiled) as
+    // distinct, so only filed rows are constrained here — the UI covers Unfiled. Self-heals first: any
+    // pre-existing collision is renamed "<name> (<id>)" so the unique index can never fail to build.
+    val MIGRATION_16_17 = object : Migration(16, 17) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            for (table in listOf("tasks", "profiles", "scenes")) {
+                db.execSQL(
+                    "UPDATE $table SET name = name || ' (' || id || ')' WHERE projectId IS NOT NULL AND " +
+                        "id NOT IN (SELECT MIN(id) FROM $table WHERE projectId IS NOT NULL GROUP BY projectId, name)"
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_${table}_projectId_name` ON `$table` (`projectId`, `name`)")
+            }
+            db.execSQL(
+                "UPDATE projects SET name = name || ' (' || id || ')' WHERE " +
+                    "id NOT IN (SELECT MIN(id) FROM projects GROUP BY name)"
+            )
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_projects_name` ON `projects` (`name`)")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -199,6 +220,7 @@ object DatabaseMigrations {
             MIGRATION_13_14,
             MIGRATION_14_15,
             MIGRATION_15_16,
+            MIGRATION_16_17,
         )
     }
 }
