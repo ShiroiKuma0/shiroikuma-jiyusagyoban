@@ -185,7 +185,7 @@ Require-MetadataValue -Text $metadataText -Key "versionName" -Expected $versionN
 Require-MetadataValue -Text $metadataText -Key "versionCode" -Expected $versionCode
 Require-MetadataValue -Text $metadataText -Key "CurrentVersion" -Expected $versionName
 Require-MetadataValue -Text $metadataText -Key "CurrentVersionCode" -Expected $versionCode
-Require-MetadataValue -Text $metadataText -Key "Changelog" -Expected "https://github.com/SysAdminDoc/OpenTasker/blob/HEAD/CHANGELOG.md"
+Require-MetadataValue -Text $metadataText -Key "Changelog" -Expected "https://github.com/SysAdminDoc/OpenTasker/releases"
 
 $metadataCommits = @(Get-MetadataValues -Text $metadataText -Key "commit")
 if ($metadataCommits.Count -ne 1) {

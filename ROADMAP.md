@@ -9,13 +9,6 @@ Only open work belongs here; git history and `CHANGELOG.md` are the release reco
 
 ### P0 -- Release blockers and trust
 
-- [ ] P0 — Sync F-Droid metadata with the current release contract
-  Why: Draft metadata still advertises `0.2.73`/version code `75` while the app builds `0.2.75`/version code `77`, so release verification cannot be trusted.
-  Evidence: `fdroid/metadata/com.opentasker.app.yml`; `app/build.gradle.kts`; `tools/verify-fdroid-release.ps1`
-  Touches: `fdroid/metadata/com.opentasker.app.yml`, `tools/verify-fdroid-release.ps1`, release checklist references as needed.
-  Acceptance: `.\tools\verify-fdroid-release.ps1 -BuildRelease -SkipTagCheck` passes locally; metadata version, version code, commit, changelog, output, and Gradle values agree.
-  Complexity: S
-
 - [ ] P0 — Add a release truth gate for README and shipped-feature claims
   Why: README and docs still contain stale SDK 36-era and readiness-only wording after API 37, Shizuku, Termux, scene overlay, and visual-flow work shipped.
   Evidence: `README.md`; `docs/SHIZUKU.md`; `docs/TERMUX_SCRIPTING.md`; `docs/SCENES.md`; `docs/VISUAL_FLOW.md`; `app/build.gradle.kts`
