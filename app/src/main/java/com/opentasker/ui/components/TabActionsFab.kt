@@ -41,7 +41,7 @@ fun TabActionsFab(actions: List<TabAction>) {
         ) {
             Icon(Icons.Filled.Add, contentDescription = "Add / import / export")
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        ThemedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             actions.forEach { action ->
                 DropdownMenuItem(
                     text = { Text(action.label) },

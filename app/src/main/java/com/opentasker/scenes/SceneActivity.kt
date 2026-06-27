@@ -56,6 +56,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import com.opentasker.ui.components.ThemedDropdownMenu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -618,7 +619,7 @@ internal fun SceneElementView(
                     )
                     Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
                 }
-                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     options.forEach { opt ->
                         DropdownMenuItem(text = { Text(opt) }, onClick = {
                             selected = opt

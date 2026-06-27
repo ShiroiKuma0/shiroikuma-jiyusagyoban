@@ -64,6 +64,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import com.opentasker.ui.components.ThemedDropdownMenu
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -722,7 +723,7 @@ private fun SceneElementRow(
                     IconButton(onClick = { menuOpen = true }) {
                         Icon(Icons.Filled.MoreVert, contentDescription = "More element actions")
                     }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    ThemedDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(
                             text = { Text("Duplicate") },
                             leadingIcon = { Icon(Icons.Filled.ContentCopy, contentDescription = null) },
@@ -1198,7 +1199,7 @@ private fun SceneElementEditorDialog(
                             )
                             Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
                         }
-                        DropdownMenu(expanded = fontMenuOpen, onDismissRequest = { fontMenuOpen = false }) {
+                        ThemedDropdownMenu(expanded = fontMenuOpen, onDismissRequest = { fontMenuOpen = false }) {
                             fontOptions.forEach { opt ->
                                 DropdownMenuItem(
                                     text = { Text(opt.displayName) },
@@ -1292,7 +1293,7 @@ private fun SceneElementTypeSelector(
         OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
             Text(sceneElementTypeLabel(selected), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             SceneElementDrafts.editableTypes.forEach { type ->
                 DropdownMenuItem(
                     text = { Text(sceneElementTypeLabel(type)) },
@@ -1323,7 +1324,7 @@ private fun SceneTaskBindingSelector(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
                 text = { Text("None") },
                 onClick = {

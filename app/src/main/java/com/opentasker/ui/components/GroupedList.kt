@@ -210,7 +210,7 @@ fun <T> LazyListScope.groupedItems(
                     var menu by remember { mutableStateOf(false) }
                     IconButton(onClick = { menu = true }) {
                         Icon(Icons.Filled.MoreVert, contentDescription = "Group")
-                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        ThemedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             DropdownMenuItem(
                                 text = { Text("Move into group…") },
                                 onClick = { menu = false; onMoveItem(key) },
@@ -276,7 +276,7 @@ fun GroupHeaderRow(
         )
         IconButton(onClick = { menuOpen = true }) {
             Icon(Icons.Filled.MoreVert, contentDescription = "Group actions")
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            ThemedDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(
                     text = { Text("New subgroup") },
                     leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null) },

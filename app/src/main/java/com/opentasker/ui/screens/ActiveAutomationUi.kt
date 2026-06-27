@@ -115,6 +115,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import com.opentasker.ui.components.ThemedDropdownMenu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -3370,7 +3371,7 @@ private fun ActionRow(
             }
             // Long-press menu — Clone/Copy/Cut/Delete act on the whole selection; Paste drops the
             // clipboard right after this action (shown only when something has been copied/cut).
-            DropdownMenu(expanded = menuExpanded, onDismissRequest = onMenuDismiss) {
+            ThemedDropdownMenu(expanded = menuExpanded, onDismissRequest = onMenuDismiss) {
                 DropdownMenuItem(text = { Text("Clone") }, onClick = onClone)
                 DropdownMenuItem(text = { Text("Copy") }, onClick = onCopy)
                 DropdownMenuItem(text = { Text("Cut") }, onClick = onCut)
@@ -4829,7 +4830,7 @@ private fun ActionFieldInput(field: ActionField, value: String, onChange: (Strin
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     field.options.forEach { opt ->
                         DropdownMenuItem(text = { Text(opt) }, onClick = { onChange(opt); expanded = false })
                     }

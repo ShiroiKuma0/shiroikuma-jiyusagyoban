@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import com.opentasker.ui.components.ThemedDropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -461,7 +462,7 @@ private fun WeightRow(level: Int, weight: Int, onPick: (Int) -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             WEIGHT_OPTIONS.forEach { (label, w) ->
                 DropdownMenuItem(
                     text = { Text(label) },

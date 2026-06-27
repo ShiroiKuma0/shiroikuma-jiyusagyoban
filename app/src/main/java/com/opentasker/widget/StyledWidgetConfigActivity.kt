@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import com.opentasker.ui.components.ThemedDropdownMenu
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -101,7 +102,7 @@ class StyledWidgetConfigActivity : ComponentActivity() {
                             OutlinedButton(onClick = { tapMenu = true }, modifier = Modifier.fillMaxWidth()) {
                                 Text(if (tapTask.isBlank()) "Tap task: none" else "Tap task: $tapTask")
                             }
-                            DropdownMenu(expanded = tapMenu, onDismissRequest = { tapMenu = false }) {
+                            ThemedDropdownMenu(expanded = tapMenu, onDismissRequest = { tapMenu = false }) {
                                 DropdownMenuItem(text = { Text("None") }, onClick = { tapTask = ""; tapMenu = false })
                                 taskNames.forEach { n ->
                                     DropdownMenuItem(text = { Text(n) }, onClick = { tapTask = n; tapMenu = false })
@@ -112,7 +113,7 @@ class StyledWidgetConfigActivity : ComponentActivity() {
                             OutlinedButton(onClick = { templateMenu = true }, modifier = Modifier.fillMaxWidth()) {
                                 Text(if (template.isBlank()) "Content: Custom layout" else "Content: template \"$template\"")
                             }
-                            DropdownMenu(expanded = templateMenu, onDismissRequest = { templateMenu = false }) {
+                            ThemedDropdownMenu(expanded = templateMenu, onDismissRequest = { templateMenu = false }) {
                                 DropdownMenuItem(text = { Text("Custom layout (edit below)") }, onClick = { template = ""; templateMenu = false })
                                 templateNames.forEach { n ->
                                     DropdownMenuItem(text = { Text(n) }, onClick = { template = n; templateMenu = false })

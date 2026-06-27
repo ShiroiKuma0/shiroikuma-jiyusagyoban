@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import com.opentasker.ui.components.ThemedDropdownMenu
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -431,7 +432,7 @@ private fun DropdownField(label: String, value: String, options: List<String>, o
         // Transparent overlay catches taps (a readOnly field won't open the menu on its own),
         // while the field keeps normal — not disabled/dimmed — colours.
         Box(Modifier.matchParentSize().clickable { expanded = true })
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEach { opt ->
                 DropdownMenuItem(text = { Text(opt) }, onClick = { onSelect(opt); expanded = false })
             }

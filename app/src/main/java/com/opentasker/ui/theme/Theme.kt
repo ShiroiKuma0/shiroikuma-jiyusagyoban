@@ -85,11 +85,14 @@ fun colorSchemeFrom(prefs: ThemePrefs): ColorScheme {
         // made every button's text render as a muted/olive yellow while its border stayed bright.
         // Point it at the full-strength text colour so button labels are pure #FFFF00 like the headings.
         onSurfaceVariant = text,
+        // All surfaceContainer roles are pure black so elevated popups — DropdownMenus
+        // (surfaceContainer) and AlertDialogs (surfaceContainerHigh) — render true black, not the
+        // lifted/brownish `surface`. Cards keep `surface` (set directly), so they're unaffected.
         surfaceContainerLowest = background,
-        surfaceContainerLow = surface,
-        surfaceContainer = surface,
-        surfaceContainerHigh = surface,
-        surfaceContainerHighest = surface,
+        surfaceContainerLow = background,
+        surfaceContainer = background,
+        surfaceContainerHigh = background,
+        surfaceContainerHighest = background,
         surfaceTint = Color.Transparent,
         inverseSurface = text,
         inverseOnSurface = background,
