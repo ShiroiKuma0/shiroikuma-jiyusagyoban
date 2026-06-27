@@ -8,6 +8,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Base64
 import androidx.core.graphics.drawable.IconCompat
@@ -57,6 +58,23 @@ object TaskIconStore {
 
     /** [saveFromApp] using the cached application context — for non-UI callers (e.g. actions). */
     fun saveFromApp(pkg: String): String? = appContext?.let { saveFromApp(it, pkg) }
+
+    /**
+     * Snapshot an audio file's (mp3 / ogg / flac / m4a …) embedded album art to a square PNG. Returns the
+     * path, or null if the file has no embedded artwork (caller can tell 白い熊 to pick another).
+     */
+    fun saveFromAudio(context: Context, uri: Uri): String? = runCatching {
+        val mmr = MediaMetadataRetriever()
+        val art: ByteArray? = try {
+            mmr.setDataSource(context, uri)
+            mmr.embeddedPicture
+        } finally {
+            runCatching { mmr.release() }
+        }
+        if (art == null || art.isEmpty()) return null
+        val decoded = BitmapFactory.decodeByteArray(art, 0, art.size) ?: return null
+        writePng(context, squareScale(decoded, targetSize(context)))
+    }.getOrNull()
 
     /**
      * Render an emoji (or a short glyph/character) centered on a transparent square PNG. Color emoji draw
@@ -153,6 +171,15 @@ object TaskIconStore {
         val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
         val size = am?.launcherLargeIconSize ?: 192
         return size.coerceIn(96, 256)
+    }
+
+    /** Center-crop [src] to a square and scale it to [target]px, recycling intermediates. */
+    private fun squareScale(src: Bitmap, target: Int): Bitmap {
+        val side = min(src.width, src.height)
+        val cropped = Bitmap.createBitmap(src, (src.width - side) / 2, (src.height - side) / 2, side, side)
+        if (cropped != src) src.recycle()
+        return if (cropped.width == target && cropped.height == target) cropped
+        else Bitmap.createScaledBitmap(cropped, target, target, true).also { if (it != cropped) cropped.recycle() }
     }
 
     private fun drawableToBitmap(drawable: Drawable, size: Int): Bitmap {

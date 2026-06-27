@@ -49,6 +49,13 @@ data class ThemePrefs(
     val bubbleLabelSizeSp: Int = 11,             // [BUBBLE_LABEL_MIN, BUBBLE_LABEL_MAX]
     val bubbleLabelWeight: Int = 700,            // 100..900 (Bold default)
     val bubbleFontFileName: String = "",         // "" = follow the app font; else MONOSPACE / a .ttf/.otf file
+    // ---- Launcher "add task shortcut" picker (projects → folder-boxes → tasks) --------------------
+    val pickerFontSizeSp: Int = 15,              // [PICKER_FONT_MIN, PICKER_FONT_MAX]
+    val pickerRowPadDp: Int = 3,                 // vertical padding per row; 0 = tightest [0, PICKER_PAD_MAX]
+    val pickerIndentDp: Int = 14,                // indent per nesting level [0, PICKER_INDENT_MAX]
+    val pickerGroupCornerDp: Int = 12,           // group folder-box corner radius [0, PICKER_CORNER_MAX]
+    val pickerGroupBorderDp: Int = 1,            // group folder-box border width; 0 = no box [0, PICKER_BORDER_MAX]
+    val pickerFontFileName: String = "",         // "" = follow the app font; else MONOSPACE / a .ttf/.otf file
 ) {
     companion object {
         const val BLACK = 0xFF000000.toInt()
@@ -74,6 +81,13 @@ data class ThemePrefs(
         const val BUBBLE_ICON_CORNER_MAX = 48
         const val BUBBLE_LABEL_MIN = 8
         const val BUBBLE_LABEL_MAX = 24
+
+        const val PICKER_FONT_MIN = 11
+        const val PICKER_FONT_MAX = 28
+        const val PICKER_PAD_MAX = 24
+        const val PICKER_INDENT_MAX = 40
+        const val PICKER_CORNER_MAX = 28
+        const val PICKER_BORDER_MAX = 4
 
         val DEFAULT = ThemePrefs()
     }
@@ -116,6 +130,12 @@ object ThemeStore {
     private const val K_BUBBLE_LABEL_SIZE = "bubble_label_size"
     private const val K_BUBBLE_LABEL_WEIGHT = "bubble_label_weight"
     private const val K_BUBBLE_FONT = "bubble_font"
+    private const val K_PICKER_FONT_SIZE = "picker_font_size"
+    private const val K_PICKER_ROW_PAD = "picker_row_pad"
+    private const val K_PICKER_INDENT = "picker_indent"
+    private const val K_PICKER_GROUP_CORNER = "picker_group_corner"
+    private const val K_PICKER_GROUP_BORDER = "picker_group_border"
+    private const val K_PICKER_FONT = "picker_font"
 
     private lateinit var appContext: Context
     private lateinit var prefs: SharedPreferences
@@ -156,6 +176,11 @@ object ThemeStore {
         bubbleIconCornerDp = bubbleIconCornerDp.coerceIn(0, ThemePrefs.BUBBLE_ICON_CORNER_MAX),
         bubbleLabelSizeSp = bubbleLabelSizeSp.coerceIn(ThemePrefs.BUBBLE_LABEL_MIN, ThemePrefs.BUBBLE_LABEL_MAX),
         bubbleLabelWeight = bubbleLabelWeight.coerceIn(ThemePrefs.FONT_WEIGHT_MIN, ThemePrefs.FONT_WEIGHT_MAX),
+        pickerFontSizeSp = pickerFontSizeSp.coerceIn(ThemePrefs.PICKER_FONT_MIN, ThemePrefs.PICKER_FONT_MAX),
+        pickerRowPadDp = pickerRowPadDp.coerceIn(0, ThemePrefs.PICKER_PAD_MAX),
+        pickerIndentDp = pickerIndentDp.coerceIn(0, ThemePrefs.PICKER_INDENT_MAX),
+        pickerGroupCornerDp = pickerGroupCornerDp.coerceIn(0, ThemePrefs.PICKER_CORNER_MAX),
+        pickerGroupBorderDp = pickerGroupBorderDp.coerceIn(0, ThemePrefs.PICKER_BORDER_MAX),
     )
 
     private fun load(): ThemePrefs {
@@ -185,6 +210,12 @@ object ThemeStore {
             bubbleLabelSizeSp = prefs.getInt(K_BUBBLE_LABEL_SIZE, d.bubbleLabelSizeSp),
             bubbleLabelWeight = prefs.getInt(K_BUBBLE_LABEL_WEIGHT, d.bubbleLabelWeight),
             bubbleFontFileName = prefs.getString(K_BUBBLE_FONT, d.bubbleFontFileName) ?: d.bubbleFontFileName,
+            pickerFontSizeSp = prefs.getInt(K_PICKER_FONT_SIZE, d.pickerFontSizeSp),
+            pickerRowPadDp = prefs.getInt(K_PICKER_ROW_PAD, d.pickerRowPadDp),
+            pickerIndentDp = prefs.getInt(K_PICKER_INDENT, d.pickerIndentDp),
+            pickerGroupCornerDp = prefs.getInt(K_PICKER_GROUP_CORNER, d.pickerGroupCornerDp),
+            pickerGroupBorderDp = prefs.getInt(K_PICKER_GROUP_BORDER, d.pickerGroupBorderDp),
+            pickerFontFileName = prefs.getString(K_PICKER_FONT, d.pickerFontFileName) ?: d.pickerFontFileName,
         ).normalized()
     }
 
@@ -214,6 +245,12 @@ object ThemeStore {
             putInt(K_BUBBLE_LABEL_SIZE, p.bubbleLabelSizeSp)
             putInt(K_BUBBLE_LABEL_WEIGHT, p.bubbleLabelWeight)
             putString(K_BUBBLE_FONT, p.bubbleFontFileName)
+            putInt(K_PICKER_FONT_SIZE, p.pickerFontSizeSp)
+            putInt(K_PICKER_ROW_PAD, p.pickerRowPadDp)
+            putInt(K_PICKER_INDENT, p.pickerIndentDp)
+            putInt(K_PICKER_GROUP_CORNER, p.pickerGroupCornerDp)
+            putInt(K_PICKER_GROUP_BORDER, p.pickerGroupBorderDp)
+            putString(K_PICKER_FONT, p.pickerFontFileName)
         }
     }
 

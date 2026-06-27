@@ -4037,6 +4037,14 @@ private fun TaskIconEditorRow(iconPath: String?, onStage: (String?) -> Unit) {
             if (saved != null) onStage(saved)
         }
     }
+    // Pick an audio file (mp3/ogg/…) and use its embedded album art as the icon.
+    val audioPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) scope.launch {
+            val saved = withContext(Dispatchers.IO) { TaskIconStore.saveFromAudio(context, uri) }
+            if (saved != null) onStage(saved)
+            else android.widget.Toast.makeText(context, "No album art in that file", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("Shortcut icon", style = MaterialTheme.typography.labelLarge)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -4060,6 +4068,7 @@ private fun TaskIconEditorRow(iconPath: String?, onStage: (String?) -> Unit) {
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { showEmojiPicker = true }) { Text("Emoji") }
+                    OutlinedButton(onClick = { audioPicker.launch("audio/*") }) { Text("Audio") }
                     if (iconPath != null) TextButton(onClick = { onStage(null) }) { Text("Clear") }
                 }
             }

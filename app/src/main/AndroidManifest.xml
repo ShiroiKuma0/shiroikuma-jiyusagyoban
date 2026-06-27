@@ -194,7 +194,7 @@
             android:name="com.opentasker.widget.CreateTaskShortcutActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.OpenTasker">
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
             <intent-filter>
                 <action android:name="android.intent.action.CREATE_SHORTCUT" />
                 <category android:name="android.intent.category.DEFAULT" />

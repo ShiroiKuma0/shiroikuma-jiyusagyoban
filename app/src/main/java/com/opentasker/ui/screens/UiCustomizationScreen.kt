@@ -103,6 +103,7 @@ fun UiCustomizationScreen(
     var colorTarget by remember { mutableStateOf<ColorTarget?>(null) }
     var showFontPicker by remember { mutableStateOf(false) }
     var showBubbleFontPicker by remember { mutableStateOf(false) }
+    var showPickerFontPicker by remember { mutableStateOf(false) }
     var fontsRefresh by remember { mutableIntStateOf(0) }
 
     val fontImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -297,6 +298,49 @@ fun UiCustomizationScreen(
                 )
             }
             item { FontRow(level = 1, fileName = prefs.bubbleFontFileName, onClick = { showBubbleFontPicker = true }) }
+
+            item { SectionHeader("Shortcut picker") }
+            item {
+                SliderRow(
+                    level = 1, label = "Font size",
+                    value = prefs.pickerFontSizeSp, valueText = "${prefs.pickerFontSizeSp} sp",
+                    range = ThemePrefs.PICKER_FONT_MIN.toFloat()..ThemePrefs.PICKER_FONT_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(pickerFontSizeSp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Row spacing",
+                    value = prefs.pickerRowPadDp, valueText = "${prefs.pickerRowPadDp} dp",
+                    range = 0f..ThemePrefs.PICKER_PAD_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(pickerRowPadDp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Indent per level",
+                    value = prefs.pickerIndentDp, valueText = "${prefs.pickerIndentDp} dp",
+                    range = 0f..ThemePrefs.PICKER_INDENT_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(pickerIndentDp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Group box roundness",
+                    value = prefs.pickerGroupCornerDp, valueText = "${prefs.pickerGroupCornerDp} dp",
+                    range = 0f..ThemePrefs.PICKER_CORNER_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(pickerGroupCornerDp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Group box border",
+                    value = prefs.pickerGroupBorderDp, valueText = "${prefs.pickerGroupBorderDp} dp",
+                    range = 0f..ThemePrefs.PICKER_BORDER_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(pickerGroupBorderDp = v) } },
+                )
+            }
+            item { FontRow(level = 1, fileName = prefs.pickerFontFileName, onClick = { showPickerFontPicker = true }) }
         }
     }
 
@@ -339,6 +383,24 @@ fun UiCustomizationScreen(
             onPick = { fileName ->
                 ThemeStore.update { it.copy(bubbleFontFileName = fileName) }
                 showBubbleFontPicker = false
+            },
+            onAddFont = { fontImportLauncher.launch(arrayOf("*/*")) },
+            onDelete = { fileName ->
+                ThemeStore.deleteFont(fileName)
+                fontsRefresh++
+            },
+        )
+    }
+
+    if (showPickerFontPicker) {
+        val fonts = remember(fontsRefresh) { ThemeStore.availableFonts() }
+        FontPickerDialog(
+            current = prefs.pickerFontFileName,
+            fonts = fonts,
+            onDismiss = { showPickerFontPicker = false },
+            onPick = { fileName ->
+                ThemeStore.update { it.copy(pickerFontFileName = fileName) }
+                showPickerFontPicker = false
             },
             onAddFont = { fontImportLauncher.launch(arrayOf("*/*")) },
             onDelete = { fileName ->
