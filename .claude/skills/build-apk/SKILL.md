@@ -1,6 +1,6 @@
 ---
 name: build-apk
-description: Build the signed release APK with the buildFork Gradle task, then always ask whether to adb push it to the connected phone (first choice) or scp it to skhw. Always build first without asking for permission to build — the ONLY question you ever ask is the transfer question afterward. Use whenever 白い熊 asks to build the app, build the APK, make a release build, or build and send to the phone.
+description: Build the signed release APK with the buildFork Gradle task, then deliver it automatically via the global /after-build skill (adb push if a phone is connected, else scp to skhw — no transfer prompt). Always build first without asking for permission to build. Use whenever 白い熊 asks to build the app, build the APK, make a release build, or build and send to the phone.
 ---
 
 # Build the release APK and optionally send to the phone
@@ -11,8 +11,8 @@ Kotlin/Compose, no native code, no Fossify Commons.
 
 > **Never ask whether to build — just build.** When this skill applies (白い熊 asked to build, or
 > you've made changes ready to test), run the build immediately. Do **not** ask "shall I build?".
-> The **only** question in this whole flow is the `AskUserQuestion` about transferring the APK, asked
-> **after** a successful build.
+> Delivery is automatic too: after a successful build, the APK is sent via the global **/after-build**
+> skill with no transfer prompt.
 
 > **Every `adb push` goes ONLY to `/sdcard/tmp/`.** This holds for the APK *and any other
 > file* (import bundles, configs, logs, screenshots) — never `/sdcard/Download/` or anywhere
@@ -38,20 +38,12 @@ Kotlin/Compose, no native code, no Fossify Commons.
    - If it fails with **`SDK location not found`**, create the gitignored `local.properties` at the repo
      root with `sdk.dir=/home/shiroikuma/android-sdk` (a background shell doesn't inherit `ANDROID_HOME`).
 
-3. **At the end of every successful build, ALWAYS ask** via `AskUserQuestion` how to transfer the APK —
-   no exceptions, no assuming. Options, in this order: **"adb push"** (FIRST) / **"Scp to skhw"** /
-   **"No, just build"**. Fire this as soon as the build reports `BUILD SUCCESSFUL`.
-
-4. **Transfer per the answer:**
-   - **adb push:**
-     - `adb devices` — confirm a device is connected.
-     - `adb shell mkdir -p /sdcard/tmp`
-     - `adb push ~/tmp/<apk name> /sdcard/tmp/<apk name>`
-     - Verify: `adb shell ls -l /sdcard/tmp/<apk name>`.
-     - Never `adb install` — 白い熊 installs manually from `/sdcard/tmp/`.
-   - **Scp to skhw** — invoke the global **scp** skill (copies the newest APK in `~/tmp/` to `skhw:~/tmp/`).
-     If skhw is unreachable (its tunnel is served by the phone's sshd and may be down), report that and
-     offer the adb push instead.
+3. **At the end of every successful build, ALWAYS deliver via the global /after-build skill** — no
+   exceptions, no asking. As soon as the build reports `BUILD SUCCESSFUL` and the APK is in `~/tmp/`,
+   invoke **/after-build**: it runs `/adb-check` UNSANDBOXED (a sandboxed check falsely reports no
+   device), then `/adb-push` to `/sdcard/tmp/` if a phone is connected, otherwise `/scp` to
+   `skhw:~/tmp/`, and announces the filename that landed. Never `adb install` — 白い熊 installs
+   manually from `/sdcard/tmp/`.
 
 ## Notes / invariants
 

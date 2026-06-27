@@ -64,8 +64,8 @@ upstream (fast-forward only); `custom` carries our patches and is rebased onto e
    `SendIntentAction` (impl + registration + metadata) against the new layout.
 
 6. **Build the new `+1`** via the **build-apk** skill
-   (`JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew buildFork < /dev/null`), then **ask** before any
-   `adb push`. This is the first build of the new upstream line (`<newVersion>+1`).
+   (`JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew buildFork < /dev/null`), then deliver it via
+   the global **/after-build** skill (no transfer prompt). This is the first build of the new upstream line (`<newVersion>+1`).
 
 7. **Stop.** Let 白い熊 test. Commit/push only on their explicit **"Push"**. `custom` was rebased, so it
    needs `git push --force-with-lease origin custom`; `master` is a plain fast-forward.
