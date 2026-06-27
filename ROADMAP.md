@@ -7,15 +7,6 @@ Only open work belongs here; git history and `CHANGELOG.md` are the release reco
 
 ## Research-Driven Additions
 
-### P0 -- Release blockers and trust
-
-- [ ] P0 — Add a release truth gate for README and shipped-feature claims
-  Why: README and docs still contain stale SDK 36-era and readiness-only wording after API 37, Shizuku, Termux, scene overlay, and visual-flow work shipped.
-  Evidence: `README.md`; `docs/SHIZUKU.md`; `docs/TERMUX_SCRIPTING.md`; `docs/SCENES.md`; `docs/VISUAL_FLOW.md`; `app/build.gradle.kts`
-  Touches: a docs verification script or source test, README release table, feature docs that mirror Gradle/app capabilities.
-  Acceptance: Automated verification fails when README SDK/version/dependency values disagree with Gradle or when shipped backend docs still describe implemented features as readiness-only.
-  Complexity: M
-
 ### P1 -- Maintainability, accessibility, and localization
 
 - [ ] P1 — Complete user-facing string extraction and Weblate-ready translation plumbing

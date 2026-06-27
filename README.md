@@ -49,7 +49,7 @@
 | Variable | 1 | set variable |
 | Flow | 1+7 | wait; engine: task.run, if/else/end if, for each/end for, stop |
 | Plugin | 2 | Locale setting dispatch, Locale condition query |
-| Script | 1 | gated Termux script run (not yet wired) |
+| Script | 1 | gated Termux `RUN_COMMAND` dispatch |
 | Import | 1 | unsupported Tasker action placeholder |
 
 Privileged actions (airplane, mobile data, screenshot, reboot, screen off) are gated to fail honestly. SMS is available in standard/F-Droid builds; Play builds omit SMS/phone-state permissions.
@@ -80,8 +80,8 @@ Privileged actions (airplane, mobile data, screenshot, reboot, screen off) are g
 - Compact-safe profile, task, and run-log cards with horizontally safe status chips and filtered empty states
 - Variable vault, Flow, Scenes, and Inspector surfaces with summary metrics, clear status language, and polished empty states
 - Guided profile templates with variable slots and safety notes
-- Scene element editor with drag-to-move, scaled canvas previews, and tap/long-press task bindings
-- Read-only flow graphs mapping profiles to contexts, tasks, and actions
+- Scene element editor with drag-to-move, resize handles, multi-select, alignment guides, scaled canvas previews, overlay launch, and tap/long-press task bindings
+- Flow graphs with zoom/pan canvas previews, edge routing, branch/subflow markers, node deep links, and picker-backed add commands
 - Profile and task search bars
 - Saveable editor/dialog state across rotation and resize
 
@@ -89,15 +89,15 @@ Privileged actions (airplane, mobile data, screenshot, reboot, screen off) are g
 
 - F-Droid readiness profile with dependency-policy and metadata verification
 - Play distribution profile with SMS/phone-state manifest policy gate
-- GitHub Actions CI with SHA-pinned actions and least-privilege permissions
+- Local release verification scripts for F-Droid metadata, readiness, and APK payload comparison
 - Environment-driven release signing
 - SQLite database backup/restore
 - APK payload comparison harness for reproducibility checks
 
-### Power-user readiness (detection only)
+### Power-user backends
 
-- Shizuku manager status detection and elevated-action hints
-- Termux/Termux:Tasker package detection and script readiness status
+- Shizuku manager/service/permission status, kill switch, and an allowlisted shell runner for elevated action candidates
+- Termux/Termux:Tasker package checks plus gated `RUN_COMMAND` dispatch when permission and package prerequisites are satisfied
 
 ---
 
@@ -158,10 +158,10 @@ Play manifest policy check:
 | Build Tools | 36.0.0 |
 | JDK | 17 or 21 |
 | Min SDK | 26 (Android 8.0) |
-| Compile SDK | 36 |
-| Target SDK | 36 |
+| Compile SDK | 37 |
+| Target SDK | 37 |
 | Room | 2.8.4 |
-| Compose BOM | 2026.04.01 |
+| Compose BOM | 2026.05.00 |
 | WorkManager | 2.11.2 |
 
 All dependency versions are centralized in `gradle/libs.versions.toml`.
@@ -172,10 +172,11 @@ All dependency versions are centralized in `gradle/libs.versions.toml`.
 
 See [ROADMAP.md](ROADMAP.md) for the full backlog. Key remaining work:
 
-- Scene multi-select layout edits, alignment guides, and overlay launch
-- Visual flow editor authoring (drag/drop, branch visualization, persist edits)
+- Weblate-ready string extraction and translation plumbing
+- Repeatable accessibility checks for setup, editor, scene, and run-log flows
+- Expanded Compose UI tests for onboarding, editors, scenes, and import/export errors
 - Broad device-verified background geofence reliability evidence
-- Target SDK 36 platform readiness pass (FGS, predictive back, large-screen QA)
+- API 37 platform readiness pass (FGS, predictive back, large-screen QA)
 - Macrobenchmark and Baseline Profile for cold-start performance
 
 ---
