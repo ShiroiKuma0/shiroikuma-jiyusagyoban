@@ -3,6 +3,21 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.75+36 — 2026-06-27
+
+**Pure-black, yellow-framed popups everywhere**, a task **icon from a song's album art**, and a **redesigned launcher shortcut picker** — now a tall floating dialog whose tasks are organised into bordered folder-boxes, with its own UI-customization controls.
+
+### Menus & dialogs
+- **All popup menus and dialogs are now true black with a yellow border**, matching the cards and search box — no more the lifted, brownish Material surface. The theme's `surfaceContainer*` roles are pinned to pure black, and a shared `ThemedDropdownMenu` (black container + 1.5 dp yellow border) backs **every** dropdown: the `+` FAB menu, the project switcher, the scene / widget / sort / font menus, and the action-clipboard menu. Standalone dialogs (task icon, etc.) carry the same yellow rounded frame.
+
+### Task icons
+- **New "Audio" icon source** in the task icon picker (App / Picture / Emoji / **Audio** / Clear): pick an **mp3 / ogg / flac / m4a** and the task takes its **embedded album art** as the icon — extracted with `MediaMetadataRetriever`, centre-cropped and snapshotted to a PNG like the other sources. A toast tells you if the file has no embedded artwork.
+
+### Launcher shortcut picker (add-to-home-screen → 白い熊 自由作業盤)
+- **Now a floating dialog**, not a fullscreen page: a tall + wide (94 % × 90 %) card with a **yellow rounded frame** over a dimmed scrim. Dismiss by tapping outside or the bottom **Cancel** button (black background, yellow rounded border).
+- **Tasks are organised by group.** Each project, unfolded, shows its groups as **bordered rounded folder-boxes** — a folded group is visibly a closed box, so its siblings below can no longer be mistaken for its contents — then the project's ungrouped tasks. Groups **nest**, order is preserved, expanded group contents are indented deeper, and the old misleading play-arrow on task rows is gone.
+- **New UI-customization → Shortcut picker section:** font size, row spacing, indent per level, group-box roundness, group-box border, and font — all applied live.
+
 ## 0.2.75+31 — 2026-06-26
 
 **Move actions around freely** — long-press to multi-select and **clone / copy / cut / delete / paste** actions within and **between** tasks — plus a workspace-wide shift to **name-based linking**: scenes, scene-element task links, and `task.run` all resolve by **name** (not fragile ids), imports **overwrite in place**, and item names are now **unique within a project**. And `sound.play` can read tones anywhere in shared storage.
