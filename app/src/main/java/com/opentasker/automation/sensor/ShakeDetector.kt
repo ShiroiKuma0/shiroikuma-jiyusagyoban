@@ -5,8 +5,8 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.util.Log
 import com.opentasker.core.contexts.ShakeContextEvents
+import com.opentasker.core.logging.AppLogger
 import kotlin.math.sqrt
 
 class ShakeDetector(context: Context) {
@@ -32,7 +32,7 @@ class ShakeDetector(context: Context) {
             if (now - lastShakeTime < DEBOUNCE_MS) return
             lastShakeTime = now
 
-            Log.i(TAG, "Shake detected: magnitude=${magnitude}g")
+            AppLogger.info(TAG, "Shake detected: magnitude=${magnitude}g")
             ShakeContextEvents.publish(magnitude)
         }
 
@@ -41,7 +41,7 @@ class ShakeDetector(context: Context) {
 
     fun start() {
         if (accelerometer == null) {
-            Log.w(TAG, "No accelerometer sensor available")
+            AppLogger.warn(TAG, "No accelerometer sensor available")
             return
         }
         sensorManager?.registerListener(
@@ -49,12 +49,12 @@ class ShakeDetector(context: Context) {
             accelerometer,
             SensorManager.SENSOR_DELAY_UI,
         )
-        Log.i(TAG, "Shake detector started")
+        AppLogger.info(TAG, "Shake detector started")
     }
 
     fun stop() {
         sensorManager?.unregisterListener(listener)
-        Log.i(TAG, "Shake detector stopped")
+        AppLogger.info(TAG, "Shake detector stopped")
     }
 
     companion object {

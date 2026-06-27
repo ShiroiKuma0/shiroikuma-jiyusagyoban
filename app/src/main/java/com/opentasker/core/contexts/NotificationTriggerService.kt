@@ -3,7 +3,7 @@ package com.opentasker.core.contexts
 import android.app.Notification
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import android.util.Log
+import com.opentasker.core.logging.AppLogger
 
 class NotificationTriggerService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -18,7 +18,7 @@ class NotificationTriggerService : NotificationListenerService() {
             title = title,
             body = body,
         )
-        Log.d(
+        AppLogger.debug(
             TAG,
             "Notification event accepted=$accepted package=${sbn.packageName} titleChars=${title?.length ?: 0} bodyChars=${body?.length ?: 0}",
         )

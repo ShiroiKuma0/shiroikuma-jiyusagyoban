@@ -69,9 +69,30 @@ class ActiveAutomationModuleSplitTest {
     @Test
     fun appShellKeepsPremiumCreateAndOnboardingActionsDiscoverable() {
         val shellSource = screensSourceRoot.resolve("ActiveAutomationUi.kt").readText()
+        val listSource = screensSourceRoot.resolve("ActiveAutomationLists.kt").readText()
+        val editorSource = screensSourceRoot.resolve("EditorDialogs.kt").readText()
 
         assertTrue("Create actions should stay labeled, not icon-only", shellSource.contains("ExtendedFloatingActionButton"))
-        assertTrue("First-run onboarding should recommend guided templates first", shellSource.contains("actionLabel = \"Browse Templates\""))
-        assertTrue("Empty-state actions should not stretch awkwardly on large screens", shellSource.contains("widthIn(max = 420.dp)"))
+        assertTrue("First-run onboarding should recommend guided templates first", listSource.contains("actionLabel = \"Browse Templates\""))
+        assertTrue("Empty-state actions should not stretch awkwardly on large screens", editorSource.contains("widthIn(max = 420.dp)"))
+    }
+
+    @Test
+    fun activeAutomationShellStaysBelowModuleSplitCeiling() {
+        val shell = screensSourceRoot.resolve("ActiveAutomationUi.kt")
+        val extractedModules = listOf(
+            "ActiveAutomationLists.kt",
+            "ActiveAutomationViewModel.kt",
+            "ActionEditorDialogs.kt",
+            "ContextEditorDialogs.kt",
+            "EditorDialogs.kt",
+            "ImportReviewDialogs.kt",
+            "RunLogScreenContent.kt",
+        )
+
+        assertTrue("ActiveAutomationUi.kt should stay under 1,500 lines", Files.readAllLines(shell).size < 1_500)
+        extractedModules.forEach { fileName ->
+            assertTrue("Missing extracted active-automation module: $fileName", Files.exists(screensSourceRoot.resolve(fileName)))
+        }
     }
 }

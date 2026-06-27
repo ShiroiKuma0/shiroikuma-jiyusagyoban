@@ -5,9 +5,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.engine.executeAndLogTask
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.storage.toEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -63,7 +63,7 @@ class AutomationTargetReceiver : BroadcastReceiver() {
                 pending.setResultCode(response.resultCode)
                 pending.setResultExtras(response.extras)
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to publish automation target result", e)
+                AppLogger.error(TAG, "Failed to publish automation target result", e)
             } finally {
                 pending.finish()
             }
@@ -169,7 +169,7 @@ class AutomationTargetReceiver : BroadcastReceiver() {
     }
 
     private fun failure(message: String): TargetResponse {
-        Log.w(TAG, message)
+        AppLogger.warn(TAG, message)
         return TargetResponse(
             Activity.RESULT_CANCELED,
             Bundle().apply { putString(AutomationTargetContract.EXTRA_ERROR, message) },

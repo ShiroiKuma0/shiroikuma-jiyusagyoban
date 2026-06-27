@@ -2,8 +2,8 @@ package com.opentasker.core.diagnostics
 
 import android.content.Context
 import android.os.Build
-import android.util.Log
 import com.opentasker.app.BuildConfig
+import com.opentasker.core.logging.AppLogger
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -46,9 +46,9 @@ object CrashLogHandler {
                 writer.append(sw.toString())
             }
 
-            Log.e(TAG, "Crash log written to ${file.absolutePath}")
+            AppLogger.error(TAG, "Crash log written to ${file.absolutePath}")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to write crash log", e)
+            AppLogger.error(TAG, "Failed to write crash log", e)
         }
     }
 

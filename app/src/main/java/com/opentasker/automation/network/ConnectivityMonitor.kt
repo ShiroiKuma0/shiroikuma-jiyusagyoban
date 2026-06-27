@@ -5,8 +5,8 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
-import android.util.Log
 import com.opentasker.core.contexts.DeviceStateEvents
+import com.opentasker.core.logging.AppLogger
 import java.util.concurrent.atomic.AtomicBoolean
 
 class ConnectivityMonitor(context: Context) {
@@ -35,7 +35,7 @@ class ConnectivityMonitor(context: Context) {
         val manager = cm
         if (manager == null) {
             started.set(false)
-            Log.w(TAG, "ConnectivityManager unavailable; connectivity monitoring disabled")
+            AppLogger.warn(TAG, "ConnectivityManager unavailable; connectivity monitoring disabled")
             emitState(ConnState(internet = false, networkType = "none", vpn = false))
             return
         }
@@ -45,10 +45,10 @@ class ConnectivityMonitor(context: Context) {
         try {
             manager.registerNetworkCallback(request, callback)
             emitCurrentState()
-            Log.d(TAG, "Connectivity callback registered")
+            AppLogger.debug(TAG, "Connectivity callback registered")
         } catch (ex: RuntimeException) {
             started.set(false)
-            Log.e(TAG, "Failed to register connectivity callback", ex)
+            AppLogger.error(TAG, "Failed to register connectivity callback", ex)
             emitState(ConnState(internet = false, networkType = "none", vpn = false))
         }
     }
@@ -57,9 +57,9 @@ class ConnectivityMonitor(context: Context) {
         if (!started.compareAndSet(true, false)) return
         try {
             cm?.unregisterNetworkCallback(callback)
-            Log.d(TAG, "Connectivity callback unregistered")
+            AppLogger.debug(TAG, "Connectivity callback unregistered")
         } catch (ex: RuntimeException) {
-            Log.w(TAG, "Connectivity callback was already unregistered", ex)
+            AppLogger.warn(TAG, "Connectivity callback was already unregistered", ex)
         }
     }
 
@@ -83,7 +83,7 @@ class ConnectivityMonitor(context: Context) {
     private fun emitState(state: ConnState) {
         if (state == lastState) return
         lastState = state
-        Log.d(TAG, "Connectivity: internet=${state.internet}, type=${state.networkType}, vpn=${state.vpn}")
+        AppLogger.debug(TAG, "Connectivity: internet=${state.internet}, type=${state.networkType}, vpn=${state.vpn}")
         DeviceStateEvents.publishConnectivity(state.internet, state.networkType, state.vpn)
     }
 

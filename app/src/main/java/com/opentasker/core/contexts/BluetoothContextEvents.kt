@@ -6,7 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
-import android.util.Log
+import com.opentasker.core.logging.AppLogger
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -48,7 +48,7 @@ object BluetoothContextEvents {
             val name = device.safeName()
             val address = device?.address.orEmpty()
             // Log device name + state only; the address is intentionally omitted from logs.
-            Log.d(TAG, "Bluetooth event: state=$state, device=$name")
+            AppLogger.debug(TAG, "Bluetooth event: state=$state, device=$name")
             events_.tryEmit(buildEvent(state, name, address))
         }
     }

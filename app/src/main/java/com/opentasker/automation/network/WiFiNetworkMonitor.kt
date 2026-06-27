@@ -8,8 +8,8 @@ import android.net.NetworkRequest
 import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.os.Build
-import android.util.Log
 import com.opentasker.core.contexts.DeviceStateEvents
+import com.opentasker.core.logging.AppLogger
 import java.util.concurrent.atomic.AtomicBoolean
 
 class WiFiNetworkMonitor(
@@ -39,7 +39,7 @@ class WiFiNetworkMonitor(
         val cm = connectivityManager
         if (cm == null) {
             started.set(false)
-            Log.w(TAG, "ConnectivityManager unavailable; WiFi monitoring disabled")
+            AppLogger.warn(TAG, "ConnectivityManager unavailable; WiFi monitoring disabled")
             emitState(WiFiState(connected = false, ssid = UNKNOWN_SSID))
             return
         }
@@ -51,10 +51,10 @@ class WiFiNetworkMonitor(
         try {
             cm.registerNetworkCallback(request, callback)
             emitCurrentState()
-            Log.d(TAG, "WiFi NetworkCallback registered")
+            AppLogger.debug(TAG, "WiFi NetworkCallback registered")
         } catch (ex: RuntimeException) {
             started.set(false)
-            Log.e(TAG, "Failed to register WiFi NetworkCallback", ex)
+            AppLogger.error(TAG, "Failed to register WiFi NetworkCallback", ex)
             emitState(WiFiState(connected = false, ssid = UNKNOWN_SSID))
         }
     }
@@ -63,9 +63,9 @@ class WiFiNetworkMonitor(
         if (!started.compareAndSet(true, false)) return
         try {
             connectivityManager?.unregisterNetworkCallback(callback)
-            Log.d(TAG, "WiFi NetworkCallback unregistered")
+            AppLogger.debug(TAG, "WiFi NetworkCallback unregistered")
         } catch (ex: RuntimeException) {
-            Log.w(TAG, "WiFi NetworkCallback was already unregistered", ex)
+            AppLogger.warn(TAG, "WiFi NetworkCallback was already unregistered", ex)
         }
     }
 
@@ -81,7 +81,7 @@ class WiFiNetworkMonitor(
     private fun emitState(state: WiFiState) {
         if (state == lastState) return
         lastState = state
-        Log.d(TAG, "WiFi event: connected=${state.connected}, ssid=${state.ssid}")
+        AppLogger.debug(TAG, "WiFi event: connected=${state.connected}, ssid=${state.ssid}")
         DeviceStateEvents.publishWifi(state.ssid, state.connected)
     }
 
@@ -101,7 +101,7 @@ class WiFiNetworkMonitor(
             val wifiManager = appContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
             normalizeSsid(wifiManager?.connectionInfo?.ssid)
         } catch (ex: SecurityException) {
-            Log.w(TAG, "WiFi SSID unavailable because permission or location access is denied", ex)
+            AppLogger.warn(TAG, "WiFi SSID unavailable because permission or location access is denied", ex)
             UNKNOWN_SSID
         }
     }

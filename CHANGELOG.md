@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Reliability**: routed remaining direct platform log calls through `AppLogger` and added a source-level regression guard so `android.util.Log` stays isolated to the logging wrapper.
+- **Maintainability**: finished the active-automation shell split into owned view-model, list, editor, action, and context modules while keeping `ActiveAutomationUi.kt` under 1,500 lines.
+
 ## v0.2.75 - 2026-06-19
 
 Scene editor finishing pass and visual flow editor authoring.

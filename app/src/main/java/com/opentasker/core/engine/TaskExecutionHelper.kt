@@ -1,7 +1,7 @@
 package com.opentasker.core.engine
 
 import android.content.Context
-import android.util.Log
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.AppDatabase
@@ -23,10 +23,10 @@ suspend fun executeAndLogTask(
 ): TaskExecutionResult {
     val variables = VariableStore()
     initialVariables.forEach { (name, value) -> variables.set(name, value) }
-    val ctx = ActionContext(appContext, variables) { msg -> Log.i(logTag, msg) }
+    val ctx = ActionContext(appContext, variables) { msg -> AppLogger.info(logTag, msg) }
     val runner = TaskRunner(ctx, resolveTask = dbSubTaskResolver(db))
     val report = runner.run(task)
-    Log.i(logTag, "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)")
+    AppLogger.info(logTag, "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)")
     val classified = RunLogSource.classify(source)
     val logEntry = RunLogEntry(
         taskId = task.id,
@@ -85,7 +85,7 @@ fun dbSubTaskResolver(db: AppDatabase): SubTaskResolver = resolver@{ ref ->
 
 suspend fun insertRunLog(db: AppDatabase, entry: RunLogEntry): Boolean =
     runCatching { db.runLogDao().insert(entry.toEntity()) }
-        .onFailure { e -> Log.e(TAG, "Failed to write run log for task ${entry.taskId}", e) }
+        .onFailure { e -> AppLogger.error(TAG, "Failed to write run log for task ${entry.taskId}", e) }
         .isSuccess
 
 private const val TAG = "OpenTasker"

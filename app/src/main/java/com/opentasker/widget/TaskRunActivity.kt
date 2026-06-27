@@ -2,10 +2,10 @@ package com.opentasker.widget
 
 import android.app.Activity
 import android.os.Bundle
-import android.util.Log
 import android.widget.Toast
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.engine.executeAndLogTask
+import com.opentasker.core.logging.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -42,7 +42,7 @@ class TaskRunActivity : Activity() {
                     "${task.name} $status (${result.report.durationMs}ms)"
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Task run failed", e)
+                AppLogger.error(TAG, "Task run failed", e)
                 "Task run failed"
             }
             runOnUiThread {

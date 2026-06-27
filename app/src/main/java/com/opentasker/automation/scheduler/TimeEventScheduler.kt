@@ -4,8 +4,8 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import com.opentasker.automation.receiver.TimeEventReceiver
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.scheduling.AlarmSchedulePrecision
 import com.opentasker.core.scheduling.ExactAlarmSupport
 
@@ -21,7 +21,7 @@ class TimeEventScheduler(context: Context) {
         when (ExactAlarmSupport.schedulePrecision(appContext)) {
             AlarmSchedulePrecision.Exact -> {
                 alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
-                Log.d(TAG, "Scheduled exact time tick for $triggerAtMillis")
+                AppLogger.debug(TAG, "Scheduled exact time tick for $triggerAtMillis")
             }
             AlarmSchedulePrecision.InexactFallback -> {
                 alarmManager.setWindow(
@@ -30,7 +30,7 @@ class TimeEventScheduler(context: Context) {
                     INEXACT_WINDOW_MS,
                     pendingIntent,
                 )
-                Log.w(TAG, "Exact alarms unavailable; scheduled inexact time tick for $triggerAtMillis")
+                AppLogger.warn(TAG, "Exact alarms unavailable; scheduled inexact time tick for $triggerAtMillis")
             }
         }
     }

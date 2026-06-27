@@ -1,20 +1,13 @@
 # OpenTasker Roadmap
 
 **Current app version:** 0.2.75
-**Last updated:** 2026-06-26
+**Last updated:** 2026-06-27
 
 Only open work belongs here; git history and `CHANGELOG.md` are the release record.
 
 ## Research-Driven Additions
 
 ### P0 -- Release blockers and trust
-
-- [ ] P0 — Replace remaining direct platform logging with `AppLogger`
-  Why: Direct `android.util.Log` calls still bypass the diagnostic and redaction boundary in trigger, receiver, widget, crash, and task-run paths.
-  Evidence: `rg 'Log\.' app/src/main/java`; `app/src/main/java/com/opentasker/core/logging/AppLogger.kt`; `app/src/main/java/com/opentasker/automation/app/AppUsageMonitor.kt`; `app/src/main/java/com/opentasker/automation/network/ConnectivityMonitor.kt`; `app/src/main/java/com/opentasker/automation/network/WiFiNetworkMonitor.kt`; `app/src/main/java/com/opentasker/automation/scheduler/TimeEventScheduler.kt`; `app/src/main/java/com/opentasker/automation/sensor/ShakeDetector.kt`; `app/src/main/java/com/opentasker/core/diagnostics/CrashLogHandler.kt`; `app/src/main/java/com/opentasker/core/actions/NotificationActionReceiver.kt`; `app/src/main/java/com/opentasker/core/engine/TaskExecutionHelper.kt`
-  Touches: logging call sites in `app/src/main/java`, `AppLogger.kt`, and a source-level regression test.
-  Acceptance: Only `AppLogger.kt` calls `android.util.Log`; CI fails if `Log.` appears outside the approved logging wrapper.
-  Complexity: S
 
 - [ ] P0 — Sync F-Droid metadata with the current release contract
   Why: Draft metadata still advertises `0.2.73`/version code `75` while the app builds `0.2.75`/version code `77`, so release verification cannot be trusted.
@@ -31,13 +24,6 @@ Only open work belongs here; git history and `CHANGELOG.md` are the release reco
   Complexity: M
 
 ### P1 -- Maintainability, accessibility, and localization
-
-- [ ] P1 — Finish the `ActiveAutomationUi` module split
-  Why: `ActiveAutomationUi.kt` is about 3,201 lines and still owns navigation, CRUD, import/export, editor state, permission prompts, and dispatch wiring.
-  Evidence: `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationUi.kt`; untracked split candidates `ActionEditorDialogs.kt`, `ContextEditorDialogs.kt`, `EditorDialogs.kt`, and `ActiveAutomationViewModel.kt`
-  Touches: active-automation screen package, editor dialogs, view model/state holders, existing screen tests.
-  Acceptance: `ActiveAutomationUi.kt` is under 1,500 lines; profile/task/editor/import flows have owned files; existing tests pass; no split files remain untracked.
-  Complexity: M
 
 - [ ] P1 — Complete user-facing string extraction and Weblate-ready translation plumbing
   Why: Thirteen locale directories are empty and UI source still contains many hardcoded labels/messages, so localized builds cannot be meaningfully produced.

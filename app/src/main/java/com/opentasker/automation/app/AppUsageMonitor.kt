@@ -5,8 +5,8 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.os.Build
-import android.util.Log
 import com.opentasker.core.contexts.ApplicationContextEvents
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.permissions.UsageAccess
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,7 +30,7 @@ class AppUsageMonitor(
             while (isActive) {
                 if (!UsageAccess.hasUsageStatsAccess(appContext)) {
                     if (!warnedMissingAccess) {
-                        Log.w(TAG, "Usage access is not granted; app-open triggers are paused")
+                        AppLogger.warn(TAG, "Usage access is not granted; app-open triggers are paused")
                         warnedMissingAccess = true
                     }
                     delay(MISSING_ACCESS_RETRY_MS)
@@ -58,7 +58,7 @@ class AppUsageMonitor(
 
         ApplicationContextEvents.publishForeground(currentPackage)
         lastForegroundPackage = currentPackage
-        Log.d(TAG, "Foreground app changed: $previousPackage -> $currentPackage")
+        AppLogger.debug(TAG, "Foreground app changed: $previousPackage -> $currentPackage")
     }
 
     private fun readForegroundPackage(nowMillis: Long): String? {
@@ -79,10 +79,10 @@ class AppUsageMonitor(
 
             selectLatestForegroundPackage(foregroundEvents)
         } catch (ex: SecurityException) {
-            Log.w(TAG, "UsageStatsManager query denied; app-open triggers are paused", ex)
+            AppLogger.warn(TAG, "UsageStatsManager query denied; app-open triggers are paused", ex)
             null
         } catch (ex: RuntimeException) {
-            Log.e(TAG, "UsageStatsManager query failed", ex)
+            AppLogger.error(TAG, "UsageStatsManager query failed", ex)
             null
         }
     }

@@ -3,9 +3,9 @@ package com.opentasker.core.actions
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.engine.executeAndLogTask
+import com.opentasker.core.logging.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,7 +24,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 val db = OpenTaskerApp_NoHilt.db
                 val entity = db.taskDao().getByName(taskName)
                 if (entity == null) {
-                    Log.w(TAG, "Notification button '$buttonLabel' — task '$taskName' not found")
+                    AppLogger.warn(TAG, "Notification button '$buttonLabel' task '$taskName' not found")
                     return@launch
                 }
                 val task = entity.toDomain()
@@ -36,9 +36,9 @@ class NotificationActionReceiver : BroadcastReceiver() {
                     metadata = listOf("button=$buttonLabel"),
                 )
                 val status = if (result.report.success) "succeeded" else "failed"
-                Log.i(TAG, "Notification button '$buttonLabel' → ${task.name} $status (${result.report.durationMs}ms)")
+                AppLogger.info(TAG, "Notification button '$buttonLabel' -> ${task.name} $status (${result.report.durationMs}ms)")
             } catch (e: Exception) {
-                Log.e(TAG, "Notification button '$buttonLabel' failed", e)
+                AppLogger.error(TAG, "Notification button '$buttonLabel' failed", e)
             } finally {
                 pending.finish()
             }
