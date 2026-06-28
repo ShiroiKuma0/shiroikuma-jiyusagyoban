@@ -621,25 +621,25 @@ Items blocking release or v0.4 entry:
 ### P0-1: Complete Execution Engine Test Coverage ⭐
 - **Fit:** 5 (core)  | **Impact:** 5 (critical)  | **Effort:** 2 | **Risk:** 1 | **Dependencies:** None
 - **Description:** Unit tests for AutomationService → ProfileMatcher → TaskRunner pipeline. Verify context matching, action execution, variable expansion, error handling, cooldown.
-- **Source:** v0.3-dev status (CLAUDE.md): "Testing Checklist (next session)" — requires manual verification
+- **Source:** v0.3-dev status: "Testing Checklist (next session)" — requires manual verification
 - **Priority:** CRITICAL — ship v0.3 untested = user risk
 
 ### P0-2: Variable Expansion System (Basic) ⭐
 - **Fit:** 5 (core)  | **Impact:** 5 (critical)  | **Effort:** 2 | **Risk:** 2 | **Dependencies:** None
 - **Description:** `%variable` inline expansion in action arguments. Support local vs global scope, escaping. No arrays/math yet (P1).
-- **Source:** Tasker user guide (ARCHITECTURE.md mentions %expansion); v0.1 partial (CLAUDE.md: "Variable expansion (`%name`, `%name(#)`, `%name(<arr>)`)")
+- **Source:** Tasker user guide (ARCHITECTURE.md mentions %expansion); v0.1 partial ("Variable expansion (`%name`, `%name(#)`, `%name(<arr>)`)")
 - **Priority:** CRITICAL — actions can't parameterize without variables
 
 ### P0-3: Fix Gradle Build Path Issue (-- username) ⭐
 - **Fit:** 5 (infrastructure)  | **Impact:** 4 (blocks dev)  | **Effort:** 1 | **Risk:** 1 | **Dependencies:** None
 - **Description:** PowerShell path parsing fails with `--` in username. Document workaround (`cd OpenTasker && ./gradlew` relative path) or use absolute path escaping.
-- **Source:** CLAUDE.md: "PowerShell path parsing — `--` in username breaks PowerShell argument parsing."
+- **Source:** Known issue: "PowerShell path parsing — `--` in username breaks PowerShell argument parsing."
 - **Priority:** HIGH — dev experience blocker
 
 ### P0-4: Profile Execution End-to-End Demo ⭐
 - **Fit:** 5 (core)  | **Impact:** 4 (user-facing)  | **Effort:** 1 | **Risk:** 1 | **Dependencies:** P0-1, P0-2
 - **Description:** Tutorial/docs: create simple profile (WiFi on → notify), enable, trigger, verify execution logged. No advanced features needed.
-- **Source:** CLAUDE.md: "Testing Checklist (next session)" — manual walkthrough steps documented
+- **Source:** Testing Checklist (next session) — manual walkthrough steps documented
 - **Priority:** HIGH — v0.3 release readiness
 
 ### P0-5: Import Basic Tasker `.tsk.xml` (Profiles) ⭐⭐ STRETCH
@@ -1272,7 +1272,7 @@ P2-3 (webhook mode)
 
 **Note on ROADMAP.md:** Due to tool constraints, I cannot write to files. The reconciled roadmap is provided in full text (iter-1-roadmap-reconcile.md). **Recommended action:** Copy/paste reconciliation into repo ROADMAP.md.
 
-**No stale references identified:** All CLAUDE.md, README.md, and ROADMAP.md cross-references are current.
+**No stale references identified:** All README.md and ROADMAP.md cross-references are current.
 
 ---
 
