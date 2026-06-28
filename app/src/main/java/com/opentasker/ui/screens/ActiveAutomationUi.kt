@@ -84,6 +84,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.stateDescription
@@ -99,6 +100,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.withTransaction
 import com.opentasker.app.BuildConfig
+import com.opentasker.app.R
 import com.opentasker.core.actions.ActionField
 import com.opentasker.core.diagnostics.DiagnosticExport
 import com.opentasker.core.actions.ActionMetadata
@@ -499,29 +501,32 @@ fun ActiveAutomationUi(
         },
         floatingActionButton = {
             when (screen) {
-                OpenTaskerScreen.Profiles -> ExtendedFloatingActionButton(
-                    onClick = {
-                        if (tasks.isEmpty()) {
-                            showCreateTaskDialog = true
-                        } else {
-                            showCreateProfileDialog = true
-                        }
-                    },
-                    shape = RoundedCornerShape(DesignSystem.Radii.lg),
-                    icon = {
-                        Icon(
-                            Icons.Filled.Add,
-                            contentDescription = if (tasks.isEmpty()) "Create task icon" else "Create profile icon",
-                        )
-                    },
-                    text = { Text(if (tasks.isEmpty()) "New task" else "New profile") },
-                )
+                OpenTaskerScreen.Profiles -> {
+                    val createLabel = stringResource(if (tasks.isEmpty()) R.string.task_new else R.string.profile_new)
+                    ExtendedFloatingActionButton(
+                        onClick = {
+                            if (tasks.isEmpty()) {
+                                showCreateTaskDialog = true
+                            } else {
+                                showCreateProfileDialog = true
+                            }
+                        },
+                        shape = RoundedCornerShape(DesignSystem.Radii.lg),
+                        icon = {
+                            Icon(
+                                Icons.Filled.Add,
+                                contentDescription = createLabel,
+                            )
+                        },
+                        text = { Text(createLabel) },
+                    )
+                }
 
                 OpenTaskerScreen.Tasks -> ExtendedFloatingActionButton(
                     onClick = { showCreateTaskDialog = true },
                     shape = RoundedCornerShape(DesignSystem.Radii.lg),
-                    icon = { Icon(Icons.Filled.Add, contentDescription = "Create task icon") },
-                    text = { Text("New task") },
+                    icon = { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.task_new)) },
+                    text = { Text(stringResource(R.string.task_new)) },
                 )
 
                 OpenTaskerScreen.Vars,
@@ -872,13 +877,15 @@ private fun OpenTaskerNavigationItem(
     modifier: Modifier = Modifier,
 ) {
     val contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    val selectedDescription = stringResource(R.string.a11y_selected)
+    val notSelectedDescription = stringResource(R.string.a11y_not_selected)
     Column(
         modifier = modifier
             .heightIn(min = 68.dp)
             .clickable(role = Role.Tab, onClick = onClick)
             .semantics(mergeDescendants = true) {
                 this.selected = selected
-                stateDescription = if (selected) "Selected" else "Not selected"
+                stateDescription = if (selected) selectedDescription else notSelectedDescription
             }
             .padding(horizontal = 4.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -959,6 +966,7 @@ internal fun StatusPill(
 
 @Composable
 internal fun InlineNotice(title: String, body: String, color: Color) {
+    val isError = color == MaterialTheme.colorScheme.error
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = color.copy(alpha = 0.12f),
@@ -971,8 +979,8 @@ internal fun InlineNotice(title: String, body: String, color: Color) {
             verticalAlignment = Alignment.Top,
         ) {
             Icon(
-                if (color == MaterialTheme.colorScheme.error) Icons.Filled.Error else Icons.Filled.Info,
-                contentDescription = if (color == MaterialTheme.colorScheme.error) "Error" else "Info",
+                if (isError) Icons.Filled.Error else Icons.Filled.Info,
+                contentDescription = stringResource(if (isError) R.string.ui_error_content_description else R.string.ui_info_content_description),
                 tint = color,
                 modifier = Modifier.size(20.dp),
             )

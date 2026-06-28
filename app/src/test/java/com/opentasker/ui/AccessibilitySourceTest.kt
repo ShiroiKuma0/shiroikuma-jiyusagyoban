@@ -56,6 +56,81 @@ class AccessibilitySourceTest {
         assertFalse("Missing scene nudge accessibility labels: $missingLabels", missingLabels.isNotEmpty())
     }
 
+    @Test
+    fun criticalFlowsKeepAccessibilityContracts() {
+        val requiredMarkersByFile = mapOf(
+            "screens/PermissionOnboardingScreen.kt" to listOf(
+                "role = Role.RadioButton",
+                "stateDescription = selectionDescription",
+                "R.string.a11y_option_selected",
+                "R.string.status_granted",
+                "R.string.status_optional",
+                "R.string.status_required",
+            ),
+            "screens/EditorDialogs.kt" to listOf(
+                "role = Role.Switch",
+                "stateDescription = if (enabled) onLabel else offLabel",
+                "enabled = canSave",
+                "R.string.ui_info_content_description",
+                "R.string.delete_cannot_undo",
+            ),
+            "screens/ActionEditorDialogs.kt" to listOf(
+                "role = Role.Switch",
+                "stateDescription = stateDescriptionLabel",
+                "enabled = !missingRequired && capability.canAdd",
+                "R.string.label_required",
+            ),
+            "screens/ContextEditorDialogs.kt" to listOf(
+                "role = Role.Switch",
+                "stateDescription = if (invert) onLabel else offLabel",
+                "enabled = !missingRequired",
+                "R.string.context_invert_helper",
+            ),
+            "screens/SceneLibraryScreen.kt" to listOf(
+                "R.string.scenes_empty_content_description",
+                "R.string.scenes_remove_element_content_description",
+                "R.string.scenes_move_left_content_description",
+                "enabled = canSave",
+            ),
+            "screens/RunLogScreenContent.kt" to listOf(
+                "R.string.empty_run_log_title",
+                "R.string.empty_run_log_search_title",
+                "R.string.run_log_share_diagnostic",
+                "contentDescription = when (outcome)",
+            ),
+        )
+
+        val missingMarkers = requiredMarkersByFile.flatMap { (relativePath, markers) ->
+            val source = uiSourceRoot.resolve(relativePath).readText()
+            markers.filterNot(source::contains).map { "$relativePath: $it" }
+        }
+
+        assertTrue("Missing critical-flow accessibility markers: $missingMarkers", missingMarkers.isEmpty())
+    }
+
+    @Test
+    fun appShellAndSetupDoNotShipHardcodedSemanticLabels() {
+        val checkedFiles = listOf(
+            "screens/ActiveAutomationUi.kt",
+            "screens/PermissionOnboardingScreen.kt",
+        )
+        val forbiddenPatterns = mapOf(
+            "literal contentDescription" to Regex("""contentDescription\s*=\s*""" + "\""),
+            "literal stateDescription" to Regex("""stateDescription\s*=\s*""" + "\""),
+            "interpolated selected state" to Regex("""\${'$'}label\s+(not\s+)?selected"""),
+            "literal create icon" to Regex("""Create (task|profile) icon"""),
+        )
+
+        val offenders = checkedFiles.flatMap { relativePath ->
+            val source = uiSourceRoot.resolve(relativePath).readText()
+            forbiddenPatterns.mapNotNull { (name, pattern) ->
+                if (pattern.containsMatchIn(source)) "$relativePath: $name" else null
+            }
+        }
+
+        assertTrue("Hardcoded accessibility semantic labels found: $offenders", offenders.isEmpty())
+    }
+
     private fun kotlinFiles(): List<Path> =
         Files.walk(uiSourceRoot).use { stream ->
             stream

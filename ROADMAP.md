@@ -9,13 +9,6 @@ Only open work belongs here; git history and `CHANGELOG.md` are the release reco
 
 ### P1 -- Maintainability, accessibility, and localization
 
-- [ ] P1 — Add repeatable accessibility checks for critical flows
-  Why: Source-level content-description coverage exists, but setup, profile/task editors, scenes, destructive actions, and run-log flows do not have a repeatable accessibility gate.
-  Evidence: `app/src/test/java/com/opentasker/ui/AccessibilitySourceTest.kt`; `app/src/androidTest/java/com/opentasker/ui/screens/RunLogScreenContentTest.kt`; https://support.google.com/googleplay/android-developer/answer/10964491
-  Touches: Compose semantics/test tags, accessibility source tests, androidTest accessibility checks for setup/editor/scene/run-log paths.
-  Acceptance: Automated tests cover missing labels, disabled-state clarity, large-text clipping, and keyboard/TalkBack semantics on onboarding, profile creation, task/action/context editors, scene creation, and run logs.
-  Complexity: M
-
 - [ ] P1 — Expand Compose UI tests beyond Run Log
   Why: Run Log has instrumentation coverage, but editor and setup paths carry most user-facing breakage risk.
   Evidence: `app/src/androidTest/java/com/opentasker/ui/screens/RunLogScreenContentTest.kt`; `app/src/main/java/com/opentasker/ui/screens/PermissionOnboardingScreen.kt`; `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationUi.kt`; `app/src/main/java/com/opentasker/ui/screens/SceneLibraryScreen.kt`

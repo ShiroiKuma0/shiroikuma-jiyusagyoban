@@ -135,7 +135,9 @@
     <string name="setup_local_network_body">Android 17+ requires this permission for any LAN device communication (HTTP, Ping, Wake-on-LAN, MQTT, mDNS). Without it, network actions targeting local addresses will fail.</string>
     <string name="setup_intro">OpenTasker can run with missing access but some features may not work.</string>
     <string name="setup_pending_required">Pending required items must be completed before automations will trigger reliably.</string>
+    <string name="setup_status_order">Pending required items are listed first. Optional integrations are listed after required setup.</string>
     <string name="setup_review_settings">Review app settings</string>
+    <string name="setup_optional_requirement">Optional: %1$s</string>
 
     <!-- Setup - Theme -->
     <string name="setup_theme_label">Theme</string>
@@ -280,6 +282,10 @@
     <string name="label_paused">Paused</string>
     <string name="label_unsupported">Unsupported</string>
     <string name="label_inverted">Inverted</string>
+    <string name="a11y_selected">Selected</string>
+    <string name="a11y_not_selected">Not selected</string>
+    <string name="a11y_option_selected">%1$s selected</string>
+    <string name="a11y_option_not_selected">%1$s not selected</string>
     <string name="label_live_count">%1$d live</string>
     <string name="label_issue_count">%1$d issue(s)</string>
     <string name="label_context_count">%1$d context(s)</string>

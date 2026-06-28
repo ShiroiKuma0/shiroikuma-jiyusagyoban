@@ -172,7 +172,6 @@ All dependency versions are centralized in `gradle/libs.versions.toml`.
 
 See [ROADMAP.md](ROADMAP.md) for the full backlog. Key remaining work:
 
-- Repeatable accessibility checks for setup, editor, scene, and run-log flows
 - Expanded Compose UI tests for onboarding, editors, scenes, and import/export errors
 - Broad device-verified background geofence reliability evidence
 - API 37 platform readiness pass (FGS, predictive back, large-screen QA)

@@ -54,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.stateDescription
@@ -65,6 +66,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.opentasker.app.BuildConfig
+import com.opentasker.app.R
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import com.opentasker.core.location.LocationPolicyDisclosures
@@ -177,11 +179,11 @@ fun PermissionOnboardingScreen(
                         trackColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.70f),
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        PermissionMetric("$grantedCount", "Ready", Modifier.weight(1f))
-                        PermissionMetric("$pendingCount", "Needs setup", Modifier.weight(1f))
+                        PermissionMetric("$grantedCount", stringResource(R.string.status_ready), Modifier.weight(1f))
+                        PermissionMetric("$pendingCount", stringResource(R.string.status_needs_setup), Modifier.weight(1f))
                     }
                     Text(
-                        "Pending required items are listed first. Optional integrations are listed after required setup.",
+                        stringResource(R.string.setup_status_order),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -266,12 +268,16 @@ private fun ThemeChoice(
     modifier: Modifier = Modifier,
 ) {
     val label = when (mode) {
-        ThemeMode.System -> "System"
-        ThemeMode.Dark -> "Dark"
-        ThemeMode.Light -> "Light"
-        ThemeMode.HighContrast -> "High contrast"
+        ThemeMode.System -> stringResource(R.string.theme_system)
+        ThemeMode.Dark -> stringResource(R.string.theme_dark)
+        ThemeMode.Light -> stringResource(R.string.theme_light)
+        ThemeMode.HighContrast -> stringResource(R.string.theme_high_contrast)
     }
     val accent = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+    val selectionDescription = stringResource(
+        if (selected) R.string.a11y_option_selected else R.string.a11y_option_not_selected,
+        label,
+    )
     Surface(
         modifier = modifier
             .heightIn(min = 52.dp)
@@ -282,7 +288,7 @@ private fun ThemeChoice(
             )
             .semantics {
                 this.selected = selected
-                stateDescription = if (selected) "$label selected" else "$label not selected"
+                stateDescription = selectionDescription
             },
         color = if (selected) {
             MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
@@ -308,7 +314,7 @@ private fun ThemeChoice(
                 Spacer(Modifier.width(6.dp))
                 Icon(
                     Icons.Filled.CheckCircle,
-                    contentDescription = "$label selected",
+                    contentDescription = selectionDescription,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(18.dp),
                 )
@@ -422,10 +428,10 @@ private fun PermissionSetupCard(
     onRunAction: () -> Unit,
 ) {
     val stateLabel = when {
-        item.optional && item.granted -> "Detected"
-        item.optional -> "Optional"
-        item.granted -> "Ready"
-        else -> "Needs setup"
+        item.optional && item.granted -> stringResource(R.string.status_detected)
+        item.optional -> stringResource(R.string.status_optional)
+        item.granted -> stringResource(R.string.status_ready)
+        else -> stringResource(R.string.status_needs_setup)
     }
     val stateColor = when {
         item.optional && item.granted -> MaterialTheme.colorScheme.tertiary
@@ -466,9 +472,9 @@ private fun PermissionSetupCard(
                                 else -> Icons.Filled.Error
                             },
                             contentDescription = when {
-                                item.granted -> "Granted"
-                                item.optional -> "Optional"
-                                else -> "Required"
+                                item.granted -> stringResource(R.string.status_granted)
+                                item.optional -> stringResource(R.string.status_optional)
+                                else -> stringResource(R.string.status_required)
                             },
                             tint = stateColor,
                             modifier = Modifier.size(22.dp),
@@ -489,14 +495,14 @@ private fun PermissionSetupCard(
                 )
             }
             Text(item.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            PermissionRequirement(label = if (item.optional) "Optional: ${item.requiredFor}" else item.requiredFor)
+            PermissionRequirement(label = if (item.optional) stringResource(R.string.setup_optional_requirement, item.requiredFor) else item.requiredFor)
             if (!item.granted) {
                 Button(onClick = onRunAction, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                     Text(item.actionLabel)
                 }
             } else if (item.action is PermissionAction.SettingsIntent && item.title == "App visibility") {
                 OutlinedButton(onClick = onRunAction, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                    Text("Review app settings")
+                    Text(stringResource(R.string.setup_review_settings))
                 }
             }
         }
