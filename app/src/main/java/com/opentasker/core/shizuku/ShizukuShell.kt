@@ -38,6 +38,13 @@ object ShizukuShell {
         return ShellResult(stdout, stderr, exit)
     }
 
+    /**
+     * Spawn `sh -c <command>` through Shizuku and return the live [Process] WITHOUT draining it — for
+     * long-running commands whose stdout is read incrementally (e.g. `getevent`). The caller owns the
+     * process lifecycle and must `destroy()` it. Throws if exec isn't available.
+     */
+    fun stream(command: String): Process = newProcess(arrayOf("sh", "-c", command))
+
     private fun newProcess(cmd: Array<String>): Process {
         val method = Shizuku::class.java.getDeclaredMethod(
             "newProcess",

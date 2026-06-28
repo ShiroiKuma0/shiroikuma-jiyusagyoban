@@ -148,6 +148,25 @@ object ContextMatchEvaluator {
             if (actualOrientation !in expectedOrientations) return false
         }
 
+        // Hardware-key trigger (event=hardware_key): narrow by key (volume_up / volume_down / power)
+        // and/or press type (short / long / double). Omit either to fire on any value.
+        val expectedKeys = firstConfig(spec, "key", "keys")
+            .splitCsv()
+            .map { it.lowercase(Locale.US) }
+            .toSet()
+        if (expectedKeys.isNotEmpty()) {
+            val actualKey = event.metadata["key"].orEmpty().lowercase(Locale.US)
+            if (actualKey !in expectedKeys) return false
+        }
+        val expectedPresses = firstConfig(spec, "press", "presses")
+            .splitCsv()
+            .map { it.lowercase(Locale.US) }
+            .toSet()
+        if (expectedPresses.isNotEmpty()) {
+            val actualPress = event.metadata["press"].orEmpty().lowercase(Locale.US)
+            if (actualPress !in expectedPresses) return false
+        }
+
         // Broadcast (Intent Received) trigger: narrow by the intent action(s). Case-sensitive.
         val configuredActions = firstConfig(spec, "action", "actions")
             .splitCsv()

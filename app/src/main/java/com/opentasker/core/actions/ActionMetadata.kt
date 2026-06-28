@@ -518,6 +518,15 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "screen.lockdown",
+            name = "Lockdown",
+            description = "Lock and require PIN/password (biometrics disabled) — Android 9+ (needs the accessibility service)",
+            category = "Interface",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "call.place",
             name = "Call",
             description = "Place a phone call (or open the dialer without CALL_PHONE)",
@@ -1447,6 +1456,28 @@ fun registerActionMetadata() {
             id = "media.mute",
             name = "Mute",
             description = "Mute audio",
+            category = "Media",
+            fields = emptyList()
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "audio.record.start",
+            name = "Start Recording",
+            description = "Start a voice recording (AAC/m4a). No-op if already recording.",
+            category = "Media",
+            fields = listOf(
+                ActionField("dir", "Output directory", hint = "e.g. %PKEY_DIR or /sdcard/Recordings; blank = app folder"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "audio.record.stop",
+            name = "Stop Recording",
+            description = "Stop the in-progress voice recording and save it (exposes %path).",
             category = "Media",
             fields = emptyList()
         )

@@ -5137,8 +5137,10 @@ private fun contextFields(type: ContextType): List<ActionField> = when (type) {
         ActionField("value", "Expected value", required = true, hint = "true/false, connected/disconnected, on/off, 80"),
     )
     ContextType.EVENT -> listOf(
-        ActionField("event", "Event type", required = true, hint = "minute, boot_completed, notification, nfc, bluetooth, calendar, sunrise, sunset, shake, package_added, package_removed, package_replaced, orientation, app_foreground"),
+        ActionField("event", "Event type", required = true, hint = "minute, boot_completed, notification, nfc, bluetooth, calendar, sunrise, sunset, shake, package_added, package_removed, package_replaced, orientation, app_foreground, hardware_key"),
         ActionField("everyMinutes", "Every N minutes", FieldType.NUMBER, hint = "for event=minute; blank/1 = every minute"),
+        ActionField("key", "Hardware key", hint = "for event=hardware_key: volume_up, volume_down, power"),
+        ActionField("press", "Press type", hint = "for event=hardware_key: short, long (double reserved)"),
         ActionField("state", "Event state", hint = "during, upcoming, connected, disconnected"),
         ActionField("calendar", "Calendar name", hint = "Work"),
         ActionField("beforeMinutes", "Before minutes", FieldType.NUMBER, hint = "15"),

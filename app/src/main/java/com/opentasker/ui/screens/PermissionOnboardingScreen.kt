@@ -103,6 +103,8 @@ private sealed interface PermissionAction {
         val targets: List<OemBatteryGuidance.SettingsTarget>,
         val fallbackUrl: String,
     ) : PermissionAction
+    /** Device-admin add screen — launched for-result so it doesn't blink shut. */
+    data class DeviceAdmin(val intent: Intent) : PermissionAction
     data object None : PermissionAction
 }
 
@@ -121,6 +123,11 @@ fun PermissionOnboardingScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     var refreshTick by remember { mutableIntStateOf(0) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        refreshTick++
+    }
+    // Device-admin add must be started for-result from the Activity (NOT as a new task, which makes the
+    // system's translucent DeviceAdminAdd screen open and instantly finish).
+    val deviceAdminLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         refreshTick++
     }
 
@@ -252,6 +259,12 @@ fun PermissionOnboardingScreen(
                             }
                         is PermissionAction.SettingsIntent -> openSettingsIntent(context, action.intent, onMessage)
                         is PermissionAction.OemSettings -> openOemSettings(context, action, onMessage)
+                        is PermissionAction.DeviceAdmin ->
+                            try {
+                                deviceAdminLauncher.launch(action.intent)
+                            } catch (ex: Exception) {
+                                onMessage("Device admin screen could not be opened: ${ex.message ?: "no handler"}")
+                            }
                     }
                 },
             )
@@ -523,6 +536,31 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
                 PermissionAction.None
             },
             requiredFor = "Foreground service, notification actions",
+        ),
+        PermissionSetupItem(
+            title = "Microphone",
+            body = "Required for the voice-recording actions (e.g. the 物理鍵 record-on-keypress task).",
+            granted = hasPermission(context, Manifest.permission.RECORD_AUDIO),
+            actionLabel = "Request",
+            action = PermissionAction.RuntimePermission(Manifest.permission.RECORD_AUDIO),
+            requiredFor = "Voice recording (audio.record.*)",
+        ),
+        PermissionSetupItem(
+            title = "Device admin (lockdown)",
+            body = "Lets the 物理鍵 lockdown action lock the device and require your PIN/password (biometrics disabled until the next credential entry).",
+            granted = run {
+                val dpm = context.getSystemService(android.app.admin.DevicePolicyManager::class.java)
+                val admin = android.content.ComponentName(context, com.opentasker.core.admin.DeviceAdmin::class.java)
+                dpm?.isAdminActive(admin) == true
+            },
+            actionLabel = "Enable",
+            action = PermissionAction.DeviceAdmin(
+                Intent(android.app.admin.DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).putExtra(
+                    android.app.admin.DevicePolicyManager.EXTRA_DEVICE_ADMIN,
+                    android.content.ComponentName(context, com.opentasker.core.admin.DeviceAdmin::class.java),
+                ),
+            ),
+            requiredFor = "物理鍵 システムロック (screen.lockdown)",
         ),
         PermissionSetupItem(
             title = "Exact alarms",

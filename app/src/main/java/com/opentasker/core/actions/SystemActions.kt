@@ -85,6 +85,37 @@ class LockDeviceAction : Action {
 }
 
 /**
+ * Lockdown: lock now and require the PIN/password on the next unlock (biometrics disabled), i.e. the
+ * power-menu "Lockdown". Uses our Device Admin: tries `lockNow(FLAG_EVICT_CREDENTIAL_ENCRYPTION_KEY)`
+ * (forces credential where the OS allows it for the admin) and falls back to a plain `lockNow()`.
+ * Requires the user to have enabled 白い熊 自由作業盤 as a Device Admin.
+ */
+class LockdownAction : Action {
+    override val id = "screen.lockdown"
+    override val category = ActionCategory.SYSTEM
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val dpm = ctx.app.getSystemService(android.app.admin.DevicePolicyManager::class.java)
+            ?: return ActionResult.Failure("DevicePolicyManager unavailable")
+        val admin = android.content.ComponentName(ctx.app, com.opentasker.core.admin.DeviceAdmin::class.java)
+        if (!dpm.isAdminActive(admin)) {
+            return ActionResult.Failure("Enable Device Admin first (Permissions → Device admin / lockdown)")
+        }
+        return try {
+            try {
+                dpm.lockNow(android.app.admin.DevicePolicyManager.FLAG_EVICT_CREDENTIAL_ENCRYPTION_KEY)
+            } catch (e: SecurityException) {
+                dpm.lockNow() // non-managed admin can't evict the CE key → plain immediate lock
+            }
+            ctx.logger("Lockdown")
+            ActionResult.Success
+        } catch (e: Exception) {
+            ActionResult.Failure("lockdown failed: ${e.message}")
+        }
+    }
+}
+
+/**
  * Turn off screen.
  */
 class ScreenOffAction : Action {

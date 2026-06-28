@@ -2,6 +2,8 @@ package com.opentasker.core
 
 import com.opentasker.core.actions.AirplaneModeAction
 import com.opentasker.core.actions.AppendFileAction
+import com.opentasker.core.actions.AudioRecordStartAction
+import com.opentasker.core.actions.AudioRecordStopAction
 import com.opentasker.core.actions.BluetoothToggleAction
 import com.opentasker.core.actions.BrightnessAction
 import com.opentasker.core.actions.DoNotDisturbAction
@@ -92,6 +94,7 @@ import com.opentasker.core.actions.NotificationsPanelAction
 import com.opentasker.core.actions.QuickSettingsPanelAction
 import com.opentasker.core.actions.PowerDialogAction
 import com.opentasker.core.actions.LockScreenAction
+import com.opentasker.core.actions.LockdownAction
 import com.opentasker.core.actions.PlaceCallAction
 import com.opentasker.core.actions.AutoBrightnessAction
 import com.opentasker.core.actions.OpenFileAction
@@ -177,6 +180,8 @@ private fun registerBuiltInActions() {
         NextTrackAction(),
         PreviousTrackAction(),
         MuteAction(),
+        AudioRecordStartAction(),
+        AudioRecordStopAction(),
         VibrateAction(),
         RebootAction(),
         LockDeviceAction(),
@@ -214,6 +219,7 @@ private fun registerBuiltInActions() {
         QuickSettingsPanelAction(),
         PowerDialogAction(),
         LockScreenAction(),
+        LockdownAction(),
         PlaceCallAction(),
         AutoBrightnessAction(),
         OpenFileAction(),

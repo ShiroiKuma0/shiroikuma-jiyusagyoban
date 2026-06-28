@@ -76,6 +76,7 @@ class AutomationService : Service() {
     private val appUsageMonitor by lazy { AppUsageMonitor(this) }
     private val shakeDetector by lazy { ShakeDetector(this) }
     private val orientationDetector by lazy { OrientationDetector(this) }
+    private val hardwareKeyListener by lazy { com.opentasker.core.input.ShizukuKeyEventListener() }
     private val runLogRetentionSettings by lazy { RunLogRetentionSettings(this) }
     
     private val cooldownStore by lazy { CooldownStore(this) }
@@ -103,6 +104,7 @@ class AutomationService : Service() {
         appUsageMonitor.start(scope)
         shakeDetector.start()
         orientationDetector.start()
+        hardwareKeyListener.start(scope)
         ContextCompat.registerReceiver(
             this,
             PackageContextEvents.receiver,
@@ -189,6 +191,7 @@ class AutomationService : Service() {
         appUsageMonitor.stop()
         shakeDetector.stop()
         orientationDetector.stop()
+        hardwareKeyListener.stop()
         runCatching { unregisterReceiver(PackageContextEvents.receiver) }
         runCatching { unregisterReceiver(BluetoothContextEvents.receiver) }
         CameraMicContextEvents.stop(this)

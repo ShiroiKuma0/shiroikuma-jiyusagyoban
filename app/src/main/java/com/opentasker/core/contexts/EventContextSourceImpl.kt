@@ -34,5 +34,6 @@ class EventContextSourceImpl : ContextSource {
         BroadcastContextEvents.events,
         OrientationContextEvents.events,
         AppForegroundChangedContextEvents.events,
+        HardwareKeyContextEvents.events,
     )
 }
