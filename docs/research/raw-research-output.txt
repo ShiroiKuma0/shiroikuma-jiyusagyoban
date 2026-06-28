@@ -878,7 +878,7 @@ Reordered by dependency + impact:
 #### Must-Have (Blockers)
 1. **[P0-1] Test coverage: AutomationService → ProfileMatcher → TaskRunner**
    - Unit tests for context matching, action execution, cooldown, error handling
-   - Manual testing checklist (from CLAUDE.md)
+   - Manual testing checklist
    - *Effort:* 2d | *Impact:* Critical
    
 2. **[P0-2] Variable expansion system (basic)**
@@ -1079,7 +1079,7 @@ Reordered by dependency + impact:
 
 **Findings:**
 - ✅ **Tasker actions (43 existing):** Traced to `ROADMAP.md v0.1.x`, `README.md`, verified against official Tasker user guide (tasker.joaoapps.com/userguide/en/index.html)
-- ✅ **Variable expansion:** Traced to CLAUDE.md + Tasker guide
+- ✅ **Variable expansion:** Traced to project docs + Tasker guide
 - ✅ **Geofence context:** Android JobScheduler docs + Tasker Location context (https://developer.android.com/reference/android/app/job/JobScheduler)
 - ✅ **New actions (Bluetooth, Calendar, JSON, Regex):** Cross-referenced with awesome-workflow-automation list (N8N, Make, IFTTT models)
 - ✅ **Scene elements:** Tasker user guide (Button, Slider, EditText, Image, Web, Map, Spinner, Toggle)
