@@ -39,10 +39,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.opentasker.app.R
 import com.opentasker.core.actions.ActionField
 import com.opentasker.core.actions.FieldType
 import com.opentasker.core.contexts.CalendarSunEventPresets
@@ -57,7 +59,7 @@ import com.opentasker.ui.theme.DesignSystem
 internal fun ContextTypePickerDialog(onDismiss: () -> Unit, onSelect: (ContextType) -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add context") },
+        title = { Text(stringResource(R.string.dialog_add_context)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
                 ContextType.entries.forEach { type ->
@@ -77,7 +79,7 @@ internal fun ContextTypePickerDialog(onDismiss: () -> Unit, onSelect: (ContextTy
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
     )
 }
 
@@ -96,6 +98,8 @@ internal fun ContextConfigDialog(
     val saveConfig = contextConfigForSave(state.type, config)
     val missingRequired = fields.any { it.required && config[it.key].isNullOrBlank() } ||
         (state.type == ContextType.DAY && saveConfig["days"].isNullOrBlank())
+    val onLabel = stringResource(R.string.label_on)
+    val offLabel = stringResource(R.string.label_off)
 
     LaunchedEffect(Unit) {
         NfcTagWriteSession.results.collect { result ->
@@ -126,7 +130,7 @@ internal fun ContextConfigDialog(
                                 onValueChange = { invert = it },
                             )
                             .semantics {
-                                stateDescription = if (invert) "On" else "Off"
+                                stateDescription = if (invert) onLabel else offLabel
                             },
                     ) {
                         Row(
@@ -134,9 +138,9 @@ internal fun ContextConfigDialog(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(Modifier.weight(1f)) {
-                                Text("Invert match", style = MaterialTheme.typography.labelLarge)
+                                Text(stringResource(R.string.context_invert_match), style = MaterialTheme.typography.labelLarge)
                                 Text(
-                                    "Run when this context is not true.",
+                                    stringResource(R.string.context_invert_helper),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -195,10 +199,10 @@ internal fun ContextConfigDialog(
                 enabled = !missingRequired,
                 onClick = { onSave(ContextSpec(state.type, saveConfig, invert)) },
             ) {
-                Text("Save")
+                Text(stringResource(R.string.action_save))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 
@@ -287,22 +291,22 @@ internal fun DayScheduleInput(value: String, onChange: (String) -> Unit) {
     val allDays = DaySchedule.orderedDays.toSet()
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Day schedule", style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.context_day_schedule), style = MaterialTheme.typography.labelLarge)
         Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
             DayPresetButton(
-                label = "Daily",
+                label = stringResource(R.string.context_daily),
                 selected = selected == allDays,
                 onClick = { onChange(DaySchedule.canonicalize(allDays).orEmpty()) },
                 modifier = Modifier.weight(1f),
             )
             DayPresetButton(
-                label = "Weekdays",
+                label = stringResource(R.string.context_weekdays),
                 selected = selected == DaySchedule.weekdays,
                 onClick = { onChange(DaySchedule.canonicalize(DaySchedule.weekdays).orEmpty()) },
                 modifier = Modifier.weight(1f),
             )
             DayPresetButton(
-                label = "Weekend",
+                label = stringResource(R.string.context_weekend),
                 selected = selected == DaySchedule.weekends,
                 onClick = { onChange(DaySchedule.canonicalize(DaySchedule.weekends).orEmpty()) },
                 modifier = Modifier.weight(1f),
@@ -329,13 +333,13 @@ internal fun DayScheduleInput(value: String, onChange: (String) -> Unit) {
         OutlinedTextField(
             value = value,
             onValueChange = { onChange(it) },
-            label = { Text("Days *") },
-            placeholder = { Text("weekdays, weekends, MON-FRI") },
+            label = { Text(stringResource(R.string.context_days_label)) },
+            placeholder = { Text(stringResource(R.string.context_days_hint)) },
             supportingText = {
                 Text(
                     when {
-                        value.isBlank() -> "Select at least one day."
-                        canonical.isBlank() -> "Use weekdays, weekends, every day, or day tokens/ranges."
+                        value.isBlank() -> stringResource(R.string.context_days_select_one)
+                        canonical.isBlank() -> stringResource(R.string.context_days_invalid_helper)
                         else -> DaySchedule.displayLabel(value)
                     },
                 )
@@ -378,9 +382,9 @@ internal fun NfcWriteHelperCard(
     onArm: (String) -> Unit,
 ) {
     val label = if (tagId.isBlank()) {
-        "OpenTasker NFC trigger"
+        stringResource(R.string.context_nfc_trigger_label)
     } else {
-        "OpenTasker NFC trigger $tagId"
+        stringResource(R.string.context_nfc_trigger_label_with_tag, tagId)
     }
 
     Surface(
@@ -394,17 +398,17 @@ internal fun NfcWriteHelperCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
             ) {
-                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.secondary)
+                Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.action_edit), tint = MaterialTheme.colorScheme.secondary)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("NFC write helper", style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.context_nfc_write_helper), style = MaterialTheme.typography.labelLarge)
                     Text(
-                        "Arms a one-time NDEF text write for the next scanned tag.",
+                        stringResource(R.string.context_nfc_write_helper_body),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 OutlinedButton(onClick = { onArm(label) }) {
-                    Text("Arm")
+                    Text(stringResource(R.string.action_arm))
                 }
             }
             message?.takeIf { it.isNotBlank() }?.let { value ->
@@ -420,7 +424,7 @@ internal fun EventPresetRow(
     onApply: (EventContextPreset) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
-        Text("Presets", style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.context_presets), style = MaterialTheme.typography.labelLarge)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
             items(presets, key = { it.id }) { preset ->
                 OutlinedButton(onClick = { onApply(preset) }) {

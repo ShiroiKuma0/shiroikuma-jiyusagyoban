@@ -9,13 +9,6 @@ Only open work belongs here; git history and `CHANGELOG.md` are the release reco
 
 ### P1 -- Maintainability, accessibility, and localization
 
-- [ ] P1 — Complete user-facing string extraction and Weblate-ready translation plumbing
-  Why: Thirteen locale directories are empty and UI source still contains many hardcoded labels/messages, so localized builds cannot be meaningfully produced.
-  Evidence: `app/src/main/res/values-*/strings.xml`; `app/src/main/res/values/strings.xml`; `app/src/main/java/com/opentasker/ui/screens`; https://hosted.weblate.org/
-  Touches: `strings.xml`, locale resource directories, Compose screen text, README translation notes, optional Weblate configuration.
-  Acceptance: Core screens use string resources for all user-visible copy; pseudo-locale or lint/source tests catch new hardcoded UI text; Weblate can ingest the project.
-  Complexity: M
-
 - [ ] P1 — Add repeatable accessibility checks for critical flows
   Why: Source-level content-description coverage exists, but setup, profile/task editors, scenes, destructive actions, and run-log flows do not have a repeatable accessibility gate.
   Evidence: `app/src/test/java/com/opentasker/ui/AccessibilitySourceTest.kt`; `app/src/androidTest/java/com/opentasker/ui/screens/RunLogScreenContentTest.kt`; https://support.google.com/googleplay/android-developer/answer/10964491

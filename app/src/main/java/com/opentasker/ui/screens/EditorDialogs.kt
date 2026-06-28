@@ -46,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
@@ -53,6 +54,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.opentasker.app.R
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.ContextSpec
@@ -73,7 +75,7 @@ internal fun TemplatePickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Starter templates") },
+        title = { Text(stringResource(R.string.title_starter_templates)) },
         text = {
             LazyColumn(
                 modifier = Modifier.heightIn(max = 460.dp),
@@ -81,9 +83,9 @@ internal fun TemplatePickerDialog(
             ) {
                 items(ProfileTemplateCatalog.all, key = { it.id }) { template ->
                     val status = when (template.availability) {
-                        TemplateAvailability.Ready -> "Ready"
-                        TemplateAvailability.RequiresSetup -> "Needs setup"
-                        TemplateAvailability.Planned -> "Planned"
+                        TemplateAvailability.Ready -> stringResource(R.string.status_ready)
+                        TemplateAvailability.RequiresSetup -> stringResource(R.string.status_needs_setup)
+                        TemplateAvailability.Planned -> stringResource(R.string.status_planned)
                     }
                     Card(
                         onClick = { onSelect(template) },
@@ -124,7 +126,7 @@ internal fun TemplatePickerDialog(
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
     )
 }
 
@@ -153,7 +155,7 @@ internal fun TemplateSlotDialog(
                         shape = RoundedCornerShape(DesignSystem.Radii.lg),
                     ) {
                         Text(
-                            "Profiles created from templates start disabled so you can review permissions, actions, and contexts before enabling.",
+                            stringResource(R.string.template_disabled_review),
                             modifier = Modifier.padding(12.dp),
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -176,10 +178,10 @@ internal fun TemplateSlotDialog(
                 enabled = !missingRequired && template.installable,
                 onClick = { onInstall(values) },
             ) {
-                Text("Create for Review")
+                Text(stringResource(R.string.action_create_for_review))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 
@@ -196,23 +198,31 @@ internal fun TaskEditorDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (task == null) "Create Task" else "Edit Task") },
+        title = { Text(if (task == null) stringResource(R.string.dialog_create_task) else stringResource(R.string.dialog_edit_task)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Task name") },
-                    placeholder = { Text("Morning focus mode") },
-                    supportingText = { Text("Use a clear verb or outcome so profiles stay easy to scan.") },
+                    label = { Text(stringResource(R.string.task_name_label)) },
+                    placeholder = { Text(stringResource(R.string.task_name_hint)) },
+                    supportingText = { Text(stringResource(R.string.task_name_helper)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = priority,
                     onValueChange = { priority = it.filter(Char::isDigit).take(2) },
-                    label = { Text("Priority") },
-                    supportingText = { Text(if (parsedPriority == null || parsedPriority !in 0..10) "Enter a value from 0 to 10." else "Higher priority tasks run first when queues compete.") },
+                    label = { Text(stringResource(R.string.task_priority_label)) },
+                    supportingText = {
+                        Text(
+                            if (parsedPriority == null || parsedPriority !in 0..10) {
+                                stringResource(R.string.task_priority_invalid)
+                            } else {
+                                stringResource(R.string.task_priority_helper)
+                            }
+                        )
+                    },
                     isError = parsedPriority == null || parsedPriority !in 0..10,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
@@ -222,10 +232,10 @@ internal fun TaskEditorDialog(
         },
         confirmButton = {
             Button(enabled = canSave, onClick = { onSave(name, parsedPriority ?: 5) }) {
-                Text("Save")
+                Text(stringResource(R.string.action_save))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 
@@ -245,27 +255,29 @@ internal fun ProfileEditorDialog(
     var group by rememberSaveable(profile?.id) { mutableStateOf(profile?.group.orEmpty()) }
     val parsedCooldown = cooldown.toIntOrNull()
     val canSave = name.isNotBlank() && enterTaskId > 0 && (cooldown.isBlank() || parsedCooldown != null)
+    val onLabel = stringResource(R.string.label_on)
+    val offLabel = stringResource(R.string.label_off)
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (profile == null) "Create Profile" else "Edit Profile") },
+        title = { Text(if (profile == null) stringResource(R.string.dialog_create_profile) else stringResource(R.string.dialog_edit_profile)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Profile name") },
-                    placeholder = { Text("Weekday work mode") },
-                    supportingText = { Text("Profiles read best when they describe the situation they detect.") },
+                    label = { Text(stringResource(R.string.profile_name_label)) },
+                    placeholder = { Text(stringResource(R.string.profile_name_hint)) },
+                    supportingText = { Text(stringResource(R.string.profile_name_helper)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = group,
                     onValueChange = { group = it },
-                    label = { Text("Group") },
-                    placeholder = { Text("Work, Home, Travel") },
-                    supportingText = { Text("Optional. Groups profiles for filtering.") },
+                    label = { Text(stringResource(R.string.profile_group_label)) },
+                    placeholder = { Text(stringResource(R.string.profile_group_hint)) },
+                    supportingText = { Text(stringResource(R.string.profile_group_helper)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -281,7 +293,7 @@ internal fun ProfileEditorDialog(
                             onValueChange = { enabled = it },
                         )
                         .semantics {
-                            stateDescription = if (enabled) "On" else "Off"
+                            stateDescription = if (enabled) onLabel else offLabel
                         },
                 ) {
                     Row(
@@ -289,9 +301,9 @@ internal fun ProfileEditorDialog(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text("Enable after saving", style = MaterialTheme.typography.labelLarge)
+                            Text(stringResource(R.string.profile_enable_after_save), style = MaterialTheme.typography.labelLarge)
                             Text(
-                                "Leave off until contexts and actions are reviewed.",
+                                stringResource(R.string.profile_enable_after_save_helper),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -299,11 +311,11 @@ internal fun ProfileEditorDialog(
                         Switch(checked = enabled, onCheckedChange = null)
                     }
                 }
-                Text("Enter task", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.profile_enter_task), style = MaterialTheme.typography.labelLarge)
                 tasks.forEach { task ->
                     SelectableOption(
                         title = task.name,
-                        body = "${task.actions.size} action${plural(task.actions.size)}",
+                        body = stringResource(R.string.label_action_count, task.actions.size),
                         selected = task.id == enterTaskId,
                         onClick = { enterTaskId = task.id },
                     )
@@ -311,14 +323,22 @@ internal fun ProfileEditorDialog(
                 OutlinedTextField(
                     value = cooldown,
                     onValueChange = { cooldown = it.filter(Char::isDigit).take(5) },
-                    label = { Text("Cooldown seconds") },
-                    supportingText = { Text(if (cooldown.isNotBlank() && parsedCooldown == null) "Enter seconds as a whole number." else "Prevents rapid re-triggering after a match.") },
+                    label = { Text(stringResource(R.string.profile_cooldown_label)) },
+                    supportingText = {
+                        Text(
+                            if (cooldown.isNotBlank() && parsedCooldown == null) {
+                                stringResource(R.string.profile_cooldown_invalid)
+                            } else {
+                                stringResource(R.string.profile_cooldown_helper)
+                            }
+                        )
+                    },
                     isError = cooldown.isNotBlank() && parsedCooldown == null,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Text("Re-trigger behavior", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.profile_retrigger_label), style = MaterialTheme.typography.labelLarge)
                 AutomationMode.entries.forEach { mode ->
                     val label = mode.name.lowercase().replaceFirstChar { it.uppercase() }
                     SelectableOption(
@@ -332,10 +352,10 @@ internal fun ProfileEditorDialog(
         },
         confirmButton = {
             Button(enabled = canSave, onClick = { onSave(name, enabled, enterTaskId, parsedCooldown ?: 0, automationMode, group.trim().ifBlank { null }) }) {
-                Text("Save")
+                Text(stringResource(R.string.action_save))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 
@@ -370,17 +390,18 @@ internal fun SelectableOption(
                 Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (selected) {
-                StatusPill("Selected", MaterialTheme.colorScheme.primary)
+                StatusPill(stringResource(R.string.label_selected), MaterialTheme.colorScheme.primary)
             }
         }
     }
 }
 
+@Composable
 internal fun automationModeDescription(mode: AutomationMode): String = when (mode) {
-    AutomationMode.SINGLE -> "ignore while running"
-    AutomationMode.RESTART -> "cancel and restart"
-    AutomationMode.QUEUED -> "run again in order"
-    AutomationMode.PARALLEL -> "allow overlap"
+    AutomationMode.SINGLE -> stringResource(R.string.automation_mode_single)
+    AutomationMode.RESTART -> stringResource(R.string.automation_mode_restart)
+    AutomationMode.QUEUED -> stringResource(R.string.automation_mode_queued)
+    AutomationMode.PARALLEL -> stringResource(R.string.automation_mode_parallel)
 }
 
 @Composable
@@ -421,7 +442,7 @@ internal fun EmptyState(
             Box(modifier = Modifier.padding(14.dp), contentAlignment = Alignment.Center) {
                 Icon(
                     Icons.Filled.Info,
-                    contentDescription = "Info",
+                    contentDescription = stringResource(R.string.ui_info_content_description),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(30.dp),
                 )
@@ -520,39 +541,11 @@ internal fun EmptyState(
 }
 
 internal sealed interface DeleteTarget {
-    val title: String
-    val body: String
-    val confirmLabel: String
-
-    data class ProfileTarget(val profile: Profile) : DeleteTarget {
-        override val title = "Delete profile?"
-        override val body = "This removes \"${profile.name}\" and its contexts. The linked task remains available."
-        override val confirmLabel = "Delete Profile"
-    }
-
-    data class TaskTarget(val task: Task) : DeleteTarget {
-        override val title = "Delete task?"
-        override val body = "This permanently removes \"${task.name}\" and its ${task.actions.size} action${plural(task.actions.size)}."
-        override val confirmLabel = "Delete Task"
-    }
-
-    data class SceneTarget(val scene: Scene) : DeleteTarget {
-        override val title = "Delete scene?"
-        override val body = "This permanently removes \"${scene.name}\" and its ${scene.elements.size} element${plural(scene.elements.size)}."
-        override val confirmLabel = "Delete Scene"
-    }
-
-    data class ActionTarget(val task: Task, val index: Int, val action: ActionSpec) : DeleteTarget {
-        override val title = "Remove action?"
-        override val body = "This removes step ${index + 1} from \"${task.name}\". Remaining actions keep their order."
-        override val confirmLabel = "Remove Action"
-    }
-
-    data class ContextTarget(val profile: Profile, val index: Int, val context: ContextSpec) : DeleteTarget {
-        override val title = "Remove context?"
-        override val body = "This removes the ${context.type.name.lowercase()} condition from \"${profile.name}\"."
-        override val confirmLabel = "Remove Context"
-    }
+    data class ProfileTarget(val profile: Profile) : DeleteTarget
+    data class TaskTarget(val task: Task) : DeleteTarget
+    data class SceneTarget(val scene: Scene) : DeleteTarget
+    data class ActionTarget(val task: Task, val index: Int, val action: ActionSpec) : DeleteTarget
+    data class ContextTarget(val profile: Profile, val index: Int, val context: ContextSpec) : DeleteTarget
 }
 
 @Composable
@@ -561,26 +554,47 @@ internal fun DeleteConfirmationDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
+    val title = when (target) {
+        is DeleteTarget.ProfileTarget -> stringResource(R.string.dialog_delete_profile)
+        is DeleteTarget.TaskTarget -> stringResource(R.string.dialog_delete_task)
+        is DeleteTarget.SceneTarget -> stringResource(R.string.dialog_delete_scene)
+        is DeleteTarget.ActionTarget -> stringResource(R.string.dialog_remove_action)
+        is DeleteTarget.ContextTarget -> stringResource(R.string.dialog_remove_context)
+    }
+    val body = when (target) {
+        is DeleteTarget.ProfileTarget -> stringResource(R.string.delete_profile_body, target.profile.name)
+        is DeleteTarget.TaskTarget -> stringResource(R.string.delete_task_body, target.task.name, target.task.actions.size)
+        is DeleteTarget.SceneTarget -> stringResource(R.string.delete_scene_body, target.scene.name, target.scene.elements.size)
+        is DeleteTarget.ActionTarget -> stringResource(R.string.delete_action_body, target.index + 1, target.task.name)
+        is DeleteTarget.ContextTarget -> stringResource(R.string.delete_context_body, target.context.type.name.lowercase(), target.profile.name)
+    }
+    val confirmLabel = when (target) {
+        is DeleteTarget.ProfileTarget -> stringResource(R.string.profile_delete)
+        is DeleteTarget.TaskTarget -> stringResource(R.string.task_delete)
+        is DeleteTarget.SceneTarget -> stringResource(R.string.scenes_delete)
+        is DeleteTarget.ActionTarget -> stringResource(R.string.action_remove_action)
+        is DeleteTarget.ContextTarget -> stringResource(R.string.action_remove_context)
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
             Icon(
                 Icons.Filled.Delete,
-                contentDescription = "Delete",
+                contentDescription = stringResource(R.string.action_delete),
                 tint = MaterialTheme.colorScheme.error,
             )
         },
-        title = { Text(target.title) },
+        title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(target.body, style = MaterialTheme.typography.bodyMedium)
+                Text(body, style = MaterialTheme.typography.bodyMedium)
                 Surface(
                     color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.24f),
                     shape = RoundedCornerShape(DesignSystem.Radii.lg),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.24f)),
                 ) {
                     Text(
-                        "This action cannot be undone.",
+                        stringResource(R.string.delete_cannot_undo),
                         modifier = Modifier.padding(12.dp),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -593,10 +607,10 @@ internal fun DeleteConfirmationDialog(
                 onClick = onConfirm,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
             ) {
-                Text(target.confirmLabel)
+                Text(confirmLabel)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 

@@ -292,7 +292,7 @@ private fun SceneEmptyState(
             ) {
                 Icon(
                     Icons.Filled.Info,
-                    contentDescription = "Scene library empty",
+                    contentDescription = stringResource(R.string.scenes_empty_content_description),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp),
                 )
@@ -341,7 +341,7 @@ private fun SceneOverviewCard(
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.title_scene_library), style = MaterialTheme.typography.titleLarge)
                     Text(
-                        "${scenes.sumOf { it.elements.size }} element${plural(scenes.sumOf { it.elements.size })} across ${scenes.size} scene${plural(scenes.size)}",
+                        stringResource(R.string.scenes_overview_summary, scenes.sumOf { it.elements.size }, scenes.size),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -352,9 +352,9 @@ private fun SceneOverviewCard(
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                SceneMetric("${scenes.size}", "Scenes", Modifier.weight(1f))
-                SceneMetric("${scenes.sumOf { it.elements.size }}", "Elements", Modifier.weight(1f))
-                SceneMetric("$errorCount", "Errors", Modifier.weight(1f))
+                SceneMetric("${scenes.size}", stringResource(R.string.label_scenes), Modifier.weight(1f))
+                SceneMetric("${scenes.sumOf { it.elements.size }}", stringResource(R.string.label_elements), Modifier.weight(1f))
+                SceneMetric("$errorCount", stringResource(R.string.label_errors), Modifier.weight(1f))
             }
             Button(onClick = onCreateScene, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(DesignSystem.Radii.lg)) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.scenes_create))
@@ -393,14 +393,14 @@ private fun SceneCard(
                 Column(Modifier.weight(1f)) {
                     Text(scene.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        "${scene.widthDp} x ${scene.heightDp} dp - ${scene.elements.size} element${plural(scene.elements.size)}",
+                        stringResource(R.string.scenes_card_summary, scene.widthDp, scene.heightDp, scene.elements.size),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 if (overlayReady && scene.elements.isNotEmpty()) {
                     OutlinedButton(onClick = onShowOverlay) {
-                        Text("Show", maxLines = 1)
+                        Text(stringResource(R.string.action_show), maxLines = 1)
                     }
                 }
                 IconButton(onClick = onDelete) {
@@ -438,9 +438,9 @@ private fun SceneCard(
             )
 
             OutlinedButton(onClick = onAddElement, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Add, contentDescription = "Add element")
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.scenes_add_element_content_description))
                 Spacer(Modifier.width(6.dp))
-                Text("Add Element")
+                Text(stringResource(R.string.action_add_element))
             }
 
             if (scene.elements.isNotEmpty()) {
@@ -491,9 +491,9 @@ private fun ScenePreviewBox(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
-            Text("Canvas ${scene.widthDp} x ${scene.heightDp} dp", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.scenes_canvas_size, scene.widthDp, scene.heightDp), style = MaterialTheme.typography.labelLarge)
             if (scene.elements.isEmpty()) {
-                Text("No elements", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.empty_scene_elements), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val canvasWidth = maxWidth.value
@@ -751,23 +751,39 @@ private fun SceneElementRow(
                         Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
                     }
                     Text(
-                        "Bounds ${element.xDp},${element.yDp} ${element.widthDp}x${element.heightDp} dp",
+                        stringResource(
+                            R.string.scenes_element_bounds,
+                            element.xDp,
+                            element.yDp,
+                            element.widthDp,
+                            element.heightDp,
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     listOfNotNull(
-                        element.tapTaskId?.let { "Tap: ${taskNames[it] ?: "missing #$it"}" },
-                        element.longPressTaskId?.let { "Long press: ${taskNames[it] ?: "missing #$it"}" },
+                        element.tapTaskId?.let {
+                            stringResource(
+                                R.string.scenes_binding_tap,
+                                taskNames[it] ?: stringResource(R.string.scenes_missing_task_id, it),
+                            )
+                        },
+                        element.longPressTaskId?.let {
+                            stringResource(
+                                R.string.scenes_binding_long_press,
+                                taskNames[it] ?: stringResource(R.string.scenes_missing_task_id, it),
+                            )
+                        },
                     ).forEach { binding ->
                         Text(binding, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 Row {
                     IconButton(onClick = onEdit) {
-                        Icon(Icons.Filled.Edit, contentDescription = "Edit element")
+                        Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.scenes_edit_element_content_description))
                     }
                     IconButton(onClick = onDelete) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Delete element", tint = MaterialTheme.colorScheme.error)
+                        Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.scenes_delete_element_content_description), tint = MaterialTheme.colorScheme.error)
                     }
                 }
             }
@@ -794,25 +810,25 @@ private fun SceneElementNudgeControls(
             enabled = element.xDp > 0,
             onClick = { onNudge(-1, 0) },
         ) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Move element left 1 dp")
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.scenes_move_left_content_description))
         }
         IconButton(
             enabled = element.yDp > 0,
             onClick = { onNudge(0, -1) },
         ) {
-            Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move element up 1 dp")
+            Icon(Icons.Filled.KeyboardArrowUp, contentDescription = stringResource(R.string.scenes_move_up_content_description))
         }
         IconButton(
             enabled = element.yDp < (scene.heightDp - element.heightDp).coerceAtLeast(0),
             onClick = { onNudge(0, 1) },
         ) {
-            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move element down 1 dp")
+            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = stringResource(R.string.scenes_move_down_content_description))
         }
         IconButton(
             enabled = element.xDp < (scene.widthDp - element.widthDp).coerceAtLeast(0),
             onClick = { onNudge(1, 0) },
         ) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Move element right 1 dp")
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.scenes_move_right_content_description))
         }
     }
 }
@@ -829,14 +845,20 @@ private fun SceneElementDeleteDialog(
         icon = {
             Icon(
                 Icons.Filled.Delete,
-                contentDescription = "Remove element",
+                contentDescription = stringResource(R.string.scenes_remove_element_content_description),
                 tint = MaterialTheme.colorScheme.error,
             )
         },
-        title = { Text("Remove element?") },
+        title = { Text(stringResource(R.string.dialog_remove_element)) },
         text = {
+            val elementLabel = element?.type?.let { sceneElementTypeLabel(it) }
+                ?: stringResource(R.string.label_selected).lowercase()
             Text(
-                "This removes the ${element?.type?.let(::sceneElementTypeLabel) ?: "selected"} element from \"${state.scene.name}\".",
+                stringResource(
+                    R.string.scenes_remove_element_body,
+                    elementLabel,
+                    state.scene.name,
+                ),
                 style = MaterialTheme.typography.bodyMedium,
             )
         },
@@ -848,7 +870,7 @@ private fun SceneElementDeleteDialog(
                     contentColor = MaterialTheme.colorScheme.onError,
                 ),
             ) {
-                Text("Remove Element")
+                Text(stringResource(R.string.action_remove_element))
             }
         },
         dismissButton = {
@@ -902,6 +924,10 @@ private fun SceneElementEditorDialog(
         parsedWidth > 0 &&
         parsedHeight > 0 &&
         sliderValid
+    val defaultTextLabel = stringResource(R.string.scene_element_type_text)
+    val defaultButtonLabel = stringResource(R.string.scene_element_type_button)
+    val defaultSliderLabel = stringResource(R.string.scene_element_type_slider)
+    val defaultImageLabel = stringResource(R.string.scene_element_type_image)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -928,19 +954,19 @@ private fun SceneElementEditorDialog(
                     },
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                    NumberField("X dp", x, { x = it.filter(Char::isDigit).take(4) }, parsedX == null, Modifier.weight(1f))
-                    NumberField("Y dp", y, { y = it.filter(Char::isDigit).take(4) }, parsedY == null, Modifier.weight(1f))
+                    NumberField(stringResource(R.string.label_x_dp), x, { x = it.filter(Char::isDigit).take(4) }, parsedX == null, Modifier.weight(1f))
+                    NumberField(stringResource(R.string.label_y_dp), y, { y = it.filter(Char::isDigit).take(4) }, parsedY == null, Modifier.weight(1f))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                     NumberField(
-                        label = "Width dp",
+                        label = stringResource(R.string.label_width_dp),
                         value = width,
                         onValueChange = { width = it.filter(Char::isDigit).take(4) },
                         isError = parsedWidth == null || parsedWidth <= 0,
                         modifier = Modifier.weight(1f),
                     )
                     NumberField(
-                        label = "Height dp",
+                        label = stringResource(R.string.label_height_dp),
                         value = height,
                         onValueChange = { height = it.filter(Char::isDigit).take(4) },
                         isError = parsedHeight == null || parsedHeight <= 0,
@@ -951,7 +977,7 @@ private fun SceneElementEditorDialog(
                     SceneElementType.TEXT -> OutlinedTextField(
                         value = label,
                         onValueChange = { label = it.take(80) },
-                        label = { Text("Text") },
+                        label = { Text(stringResource(R.string.label_text)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -959,7 +985,7 @@ private fun SceneElementEditorDialog(
                     SceneElementType.BUTTON -> OutlinedTextField(
                         value = label,
                         onValueChange = { label = it.take(48) },
-                        label = { Text("Button label") },
+                        label = { Text(stringResource(R.string.label_button_label)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -968,21 +994,21 @@ private fun SceneElementEditorDialog(
                         OutlinedTextField(
                             value = label,
                             onValueChange = { label = it.take(48) },
-                            label = { Text("Slider label") },
+                            label = { Text(stringResource(R.string.label_slider_label)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                            NumberField("Min", sliderMin, { sliderMin = it.filter(Char::isDigit).take(5) }, parsedSliderMin == null, Modifier.weight(1f))
-                            NumberField("Max", sliderMax, { sliderMax = it.filter(Char::isDigit).take(5) }, parsedSliderMax == null || (parsedSliderMin != null && parsedSliderMax < parsedSliderMin), Modifier.weight(1f))
-                            NumberField("Value", sliderValue, { sliderValue = it.filter(Char::isDigit).take(5) }, parsedSliderValue == null, Modifier.weight(1f))
+                            NumberField(stringResource(R.string.label_min), sliderMin, { sliderMin = it.filter(Char::isDigit).take(5) }, parsedSliderMin == null, Modifier.weight(1f))
+                            NumberField(stringResource(R.string.label_max), sliderMax, { sliderMax = it.filter(Char::isDigit).take(5) }, parsedSliderMax == null || (parsedSliderMin != null && parsedSliderMax < parsedSliderMin), Modifier.weight(1f))
+                            NumberField(stringResource(R.string.label_value), sliderValue, { sliderValue = it.filter(Char::isDigit).take(5) }, parsedSliderValue == null, Modifier.weight(1f))
                         }
                     }
 
                     SceneElementType.IMAGE -> OutlinedTextField(
                         value = imageSource,
                         onValueChange = { imageSource = it.take(160) },
-                        label = { Text("Image label or URI") },
+                        label = { Text(stringResource(R.string.label_image_label_or_uri)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -990,13 +1016,13 @@ private fun SceneElementEditorDialog(
                     else -> Unit
                 }
                 SceneTaskBindingSelector(
-                    label = "Tap task",
+                    label = stringResource(R.string.label_tap_task),
                     tasks = tasks,
                     selectedTaskId = tapTaskId,
                     onSelect = { tapTaskId = it },
                 )
                 SceneTaskBindingSelector(
-                    label = "Long-press task",
+                    label = stringResource(R.string.label_long_press_task),
                     tasks = tasks,
                     selectedTaskId = longPressTaskId,
                     onSelect = { longPressTaskId = it },
@@ -1015,14 +1041,25 @@ private fun SceneElementEditorDialog(
                             yDp = parsedY ?: 0,
                             widthDp = parsedWidth ?: 1,
                             heightDp = parsedHeight ?: 1,
-                            config = elementConfig(type, label, sliderMin, sliderMax, sliderValue, imageSource),
+                            config = elementConfig(
+                                type = type,
+                                label = label,
+                                sliderMin = sliderMin,
+                                sliderMax = sliderMax,
+                                sliderValue = sliderValue,
+                                imageSource = imageSource,
+                                defaultTextLabel = defaultTextLabel,
+                                defaultButtonLabel = defaultButtonLabel,
+                                defaultSliderLabel = defaultSliderLabel,
+                                defaultImageLabel = defaultImageLabel,
+                            ),
                             tapTaskId = tapTaskId,
                             longPressTaskId = longPressTaskId,
                         ),
                     )
                 },
             ) {
-                Text(if (state.index == null) "Add" else "Save")
+                Text(if (state.index == null) stringResource(R.string.action_add_element) else stringResource(R.string.action_save))
             }
         },
         dismissButton = {
@@ -1064,17 +1101,20 @@ private fun SceneTaskBindingSelector(
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     val taskNames = remember(tasks) { tasks.associate { it.id to it.name } }
+    val selectedTaskLabel = selectedTaskId?.let { taskId ->
+        taskNames[taskId] ?: stringResource(R.string.scenes_missing_task_id, taskId)
+    } ?: stringResource(R.string.label_none)
     Box {
         OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
             Text(
-                "$label: ${selectedTaskId?.let { taskNames[it] ?: "missing #$it" } ?: "None"}",
+                stringResource(R.string.scenes_task_binding_value, label, selectedTaskLabel),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
-                text = { Text("None") },
+                text = { Text(stringResource(R.string.label_none)) },
                 onClick = {
                     onSelect(null)
                     expanded = false
@@ -1178,20 +1218,20 @@ private fun SceneEditorDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Create Scene") },
+        title = { Text(stringResource(R.string.scenes_create)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Scene name") },
+                    label = { Text(stringResource(R.string.scenes_scene_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = width,
                     onValueChange = { width = it.filter(Char::isDigit).take(4) },
-                    label = { Text("Width dp") },
+                    label = { Text(stringResource(R.string.label_width_dp)) },
                     isError = parsedWidth == null || parsedWidth <= 0,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -1199,7 +1239,7 @@ private fun SceneEditorDialog(
                 OutlinedTextField(
                     value = height,
                     onValueChange = { height = it.filter(Char::isDigit).take(4) },
-                    label = { Text("Height dp") },
+                    label = { Text(stringResource(R.string.label_height_dp)) },
                     isError = parsedHeight == null || parsedHeight <= 0,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -1220,23 +1260,25 @@ private fun SceneEditorDialog(
     )
 }
 
+@Composable
 private fun sceneElementTypeLabel(type: SceneElementType): String = when (type) {
-    SceneElementType.BUTTON -> "Button"
-    SceneElementType.TEXT -> "Text"
-    SceneElementType.SLIDER -> "Slider"
-    SceneElementType.IMAGE -> "Image"
+    SceneElementType.BUTTON -> stringResource(R.string.scene_element_type_button)
+    SceneElementType.TEXT -> stringResource(R.string.scene_element_type_text)
+    SceneElementType.SLIDER -> stringResource(R.string.scene_element_type_slider)
+    SceneElementType.IMAGE -> stringResource(R.string.scene_element_type_image)
     else -> type.name.lowercase().replace("_", " ").replaceFirstChar { it.uppercase() }
 }
 
+@Composable
 private fun sceneElementSummary(element: SceneElement): String? = when (element.type) {
     SceneElementType.TEXT -> element.config["text"]?.takeIf { it.isNotBlank() }
     SceneElementType.BUTTON -> element.config["label"]?.takeIf { it.isNotBlank() }
     SceneElementType.SLIDER -> {
-        val label = element.config["label"].orEmpty().ifBlank { "Slider" }
+        val label = element.config["label"].orEmpty().ifBlank { stringResource(R.string.scene_element_type_slider) }
         val value = element.config["value"].orEmpty().ifBlank { "0" }
         val min = element.config["min"].orEmpty().ifBlank { "0" }
         val max = element.config["max"].orEmpty().ifBlank { "100" }
-        "$label: $value ($min-$max)"
+        stringResource(R.string.scenes_slider_summary, label, value, min, max)
     }
     SceneElementType.IMAGE -> element.config["source"]?.takeIf { it.isNotBlank() }
     else -> null
@@ -1249,21 +1291,25 @@ private fun elementConfig(
     sliderMax: String,
     sliderValue: String,
     imageSource: String,
+    defaultTextLabel: String,
+    defaultButtonLabel: String,
+    defaultSliderLabel: String,
+    defaultImageLabel: String,
 ): Map<String, String> = when (type) {
-    SceneElementType.TEXT -> mapOf("text" to label.ifBlank { "Text" })
-    SceneElementType.BUTTON -> mapOf("label" to label.ifBlank { "Button" })
+    SceneElementType.TEXT -> mapOf("text" to label.ifBlank { defaultTextLabel })
+    SceneElementType.BUTTON -> mapOf("label" to label.ifBlank { defaultButtonLabel })
     SceneElementType.SLIDER -> {
         val min = sliderMin.toIntOrNull() ?: 0
         val max = (sliderMax.toIntOrNull() ?: 100).coerceAtLeast(min)
         val value = (sliderValue.toIntOrNull() ?: min).coerceIn(min, max)
         mapOf(
-            "label" to label.ifBlank { "Slider" },
+            "label" to label.ifBlank { defaultSliderLabel },
             "min" to min.toString(),
             "max" to max.toString(),
             "value" to value.toString(),
         )
     }
-    SceneElementType.IMAGE -> mapOf("source" to imageSource.ifBlank { "Image" })
+    SceneElementType.IMAGE -> mapOf("source" to imageSource.ifBlank { defaultImageLabel })
     else -> emptyMap()
 }
 

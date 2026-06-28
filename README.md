@@ -172,7 +172,6 @@ All dependency versions are centralized in `gradle/libs.versions.toml`.
 
 See [ROADMAP.md](ROADMAP.md) for the full backlog. Key remaining work:
 
-- Weblate-ready string extraction and translation plumbing
 - Repeatable accessibility checks for setup, editor, scene, and run-log flows
 - Expanded Compose UI tests for onboarding, editors, scenes, and import/export errors
 - Broad device-verified background geofence reliability evidence
@@ -191,7 +190,7 @@ Issues and pull requests welcome. See [ROADMAP.md](ROADMAP.md) for planned featu
 
 ### Translations
 
-OpenTasker supports localization. String resources live in `app/src/main/res/values/strings.xml` (English default). To contribute a translation:
+OpenTasker supports localization. String resources live in `app/src/main/res/values/strings.xml` (English default), with `app/src/main/res/values-*/strings.xml` locale targets ready for Weblate-style translation workflows. To contribute a translation:
 
 1. Copy `app/src/main/res/values/strings.xml` to `app/src/main/res/values-<locale>/strings.xml`
 2. Translate only the string values (not the `name` attributes)

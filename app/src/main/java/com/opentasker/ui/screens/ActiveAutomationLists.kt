@@ -46,10 +46,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.opentasker.app.R
 import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
@@ -85,17 +87,17 @@ internal fun ProfilesScreen(
 ) {
     if (tasks.isEmpty()) {
         EmptyState(
-            title = "Build your first automation",
-            body = "Start from a guided template for the fastest path, import existing work, or create a blank task when you know the exact steps.",
-            actionLabel = "Browse Templates",
+            title = stringResource(R.string.empty_first_automation_title),
+            body = stringResource(R.string.empty_first_automation_body),
+            actionLabel = stringResource(R.string.action_browse_templates),
             onAction = onBrowseTemplates,
-            secondaryActionLabel = if (openTaskerBundleBusy) "Reading Bundle..." else "Import JSON",
+            secondaryActionLabel = if (openTaskerBundleBusy) stringResource(R.string.import_reading_bundle) else stringResource(R.string.import_import_json),
             onSecondaryAction = onImportOpenTaskerBundle,
             secondaryActionEnabled = !openTaskerBundleBusy,
-            tertiaryActionLabel = if (taskerImportBusy) "Reading XML..." else "Import Tasker XML",
+            tertiaryActionLabel = if (taskerImportBusy) stringResource(R.string.import_reading_xml) else stringResource(R.string.action_import_tasker_xml),
             onTertiaryAction = onImportTaskerXml,
             tertiaryActionEnabled = !taskerImportBusy,
-            quaternaryActionLabel = "Create Blank Task",
+            quaternaryActionLabel = stringResource(R.string.action_create_blank_task),
             onQuaternaryAction = onCreateTaskFirst,
             contentPadding = contentPadding,
         )
@@ -103,17 +105,17 @@ internal fun ProfilesScreen(
     }
     if (profiles.isEmpty()) {
         EmptyState(
-            title = "Create your first profile",
-            body = "Profiles decide when a task runs. Use a template for the fastest path, import existing workflows, or connect a blank profile to your task.",
-            actionLabel = "Browse Templates",
+            title = stringResource(R.string.empty_first_profile_title),
+            body = stringResource(R.string.empty_first_profile_body),
+            actionLabel = stringResource(R.string.action_browse_templates),
             onAction = onBrowseTemplates,
-            secondaryActionLabel = if (openTaskerBundleBusy) "Reading Bundle..." else "Import JSON",
+            secondaryActionLabel = if (openTaskerBundleBusy) stringResource(R.string.import_reading_bundle) else stringResource(R.string.import_import_json),
             onSecondaryAction = onImportOpenTaskerBundle,
             secondaryActionEnabled = !openTaskerBundleBusy,
-            tertiaryActionLabel = if (taskerImportBusy) "Reading XML..." else "Import Tasker XML",
+            tertiaryActionLabel = if (taskerImportBusy) stringResource(R.string.import_reading_xml) else stringResource(R.string.action_import_tasker_xml),
             onTertiaryAction = onImportTaskerXml,
             tertiaryActionEnabled = !taskerImportBusy,
-            quaternaryActionLabel = "Create Blank Profile",
+            quaternaryActionLabel = stringResource(R.string.action_create_blank_profile),
             onQuaternaryAction = onCreateProfile,
             contentPadding = contentPadding,
         )
@@ -162,10 +164,10 @@ internal fun ProfilesScreen(
                 value = profileSearchQuery,
                 onValueChange = { profileSearchQuery = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Search profiles...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+                placeholder = { Text(stringResource(R.string.workspace_search_profiles)) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = stringResource(R.string.variables_search_label)) },
                 trailingIcon = if (profileSearchQuery.isNotEmpty()) {
-                    { IconButton(onClick = { profileSearchQuery = "" }) { Icon(Icons.Default.Clear, contentDescription = "Clear search") } }
+                    { IconButton(onClick = { profileSearchQuery = "" }) { Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.variables_search_clear)) } }
                 } else null,
                 singleLine = true,
                 shape = RoundedCornerShape(DesignSystem.Radii.lg),
@@ -178,7 +180,7 @@ internal fun ProfilesScreen(
                         FilterChip(
                             selected = selectedGroup == null,
                             onClick = { selectedGroup = null },
-                            label = { Text("All") },
+                            label = { Text(stringResource(R.string.label_all)) },
                         )
                     }
                     items(groups, key = { it }) { group ->
@@ -194,14 +196,14 @@ internal fun ProfilesScreen(
         if (filteredProfiles.isEmpty()) {
             item {
                 InlineNotice(
-                    title = "No matching profiles",
-                    body = "Clear search or switch groups to see more automations.",
+                    title = stringResource(R.string.workspace_no_matching_profiles),
+                    body = stringResource(R.string.workspace_no_matching_profiles_body),
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
         }
         items(filteredProfiles, key = { it.id }) { profile ->
-            val enterTaskName = tasks.firstOrNull { it.id == profile.enterTaskId }?.name ?: "Missing task #${profile.enterTaskId}"
+            val enterTaskName = tasks.firstOrNull { it.id == profile.enterTaskId }?.name ?: stringResource(R.string.workspace_missing_task, profile.enterTaskId)
             ProfileCard(
                 profile = profile,
                 enterTaskName = enterTaskName,
@@ -232,6 +234,7 @@ private fun WorkspaceSummaryCard(
     val configuredContexts = profiles.sumOf { it.contexts.size }
     val totalActions = tasks.sumOf { it.actions.size }
     val recentFailure = runLogs.firstOrNull { !it.success }
+    val reviewDetails = stringResource(R.string.workspace_review_run_log_details)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -245,40 +248,40 @@ private fun WorkspaceSummaryCard(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
                 Column(Modifier.weight(1f)) {
-                    Text("Automation workspace", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.title_automation_workspace), style = MaterialTheme.typography.titleLarge)
                     Text(
-                        "Review readiness before enabling profiles. Templates stay disabled until you approve them.",
+                        stringResource(R.string.workspace_review_readiness_templates),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 StatusPill(
-                    label = if (enabledProfiles > 0) "$enabledProfiles live" else "Paused",
+                    label = if (enabledProfiles > 0) stringResource(R.string.label_live_count, enabledProfiles) else stringResource(R.string.label_paused),
                     color = if (enabledProfiles > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                SummaryMetric("${profiles.size}", "Profiles", Modifier.weight(1f))
-                SummaryMetric("$configuredContexts", "Contexts", Modifier.weight(1f))
-                SummaryMetric("$totalActions", "Actions", Modifier.weight(1f))
+                SummaryMetric("${profiles.size}", stringResource(R.string.label_profiles), Modifier.weight(1f))
+                SummaryMetric("$configuredContexts", stringResource(R.string.label_contexts), Modifier.weight(1f))
+                SummaryMetric("$totalActions", stringResource(R.string.label_actions), Modifier.weight(1f))
             }
             if (recentFailure != null) {
                 InlineNotice(
-                    title = "Recent failure",
-                    body = "${recentFailure.taskName}: ${recentFailure.message.ifBlank { "Review the run log for details." }}",
+                    title = stringResource(R.string.workspace_recent_failure),
+                    body = "${recentFailure.taskName}: ${recentFailure.message.ifBlank { reviewDetails }}",
                     color = MaterialTheme.colorScheme.error,
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(onClick = onBrowseTemplates, modifier = Modifier.weight(1f)) {
-                    Text("Templates")
+                    Text(stringResource(R.string.workspace_templates))
                 }
                 OutlinedButton(
                     onClick = onImportTaskerXml,
                     enabled = !taskerImportBusy,
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text(if (taskerImportBusy) "Reading XML" else "Import Tasker")
+                    Text(if (taskerImportBusy) stringResource(R.string.import_reading_xml) else stringResource(R.string.import_tasker))
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
@@ -287,14 +290,14 @@ private fun WorkspaceSummaryCard(
                     enabled = !openTaskerBundleBusy,
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text(if (openTaskerBundleBusy) "Working" else "Export JSON")
+                    Text(if (openTaskerBundleBusy) stringResource(R.string.action_working) else stringResource(R.string.import_export_json))
                 }
                 OutlinedButton(
                     onClick = onImportOpenTaskerBundle,
                     enabled = !openTaskerBundleBusy,
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text(if (openTaskerBundleBusy) "Reading JSON" else "Import JSON")
+                    Text(if (openTaskerBundleBusy) stringResource(R.string.import_reading_json) else stringResource(R.string.import_import_json))
                 }
             }
         }
@@ -315,23 +318,23 @@ private fun TaskLibrarySummaryCard(tasks: List<Task>, onCreateTask: () -> Unit) 
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
                 Column(Modifier.weight(1f)) {
-                    Text("Task library", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.title_task_library), style = MaterialTheme.typography.titleLarge)
                     Text(
-                        "Build reusable action sequences, then attach them to profiles when the order and permissions are ready.",
+                        stringResource(R.string.workspace_task_library_ready_body),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Button(onClick = onCreateTask) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add task")
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.task_new))
                     Spacer(Modifier.width(6.dp))
-                    Text("Task")
+                    Text(stringResource(R.string.action_task))
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                SummaryMetric("${tasks.size}", "Tasks", Modifier.weight(1f))
-                SummaryMetric("$totalActions", "Actions", Modifier.weight(1f))
-                SummaryMetric("$emptyTasks", "Need actions", Modifier.weight(1f))
+                SummaryMetric("${tasks.size}", stringResource(R.string.label_tasks), Modifier.weight(1f))
+                SummaryMetric("$totalActions", stringResource(R.string.label_actions), Modifier.weight(1f))
+                SummaryMetric("$emptyTasks", stringResource(R.string.label_need_actions), Modifier.weight(1f))
             }
         }
     }
@@ -343,10 +346,10 @@ private fun StorageDecodeWarningCard(issues: List<StorageDecodeIssue>) {
         "${issue.recordType.label} \"${issue.recordName}\" #${issue.recordId}: ${issue.fieldName}"
     }
     val remaining = issues.size - 3
-    val suffix = if (remaining > 0) "; $remaining more" else ""
+    val suffix = if (remaining > 0) "; ${stringResource(R.string.label_more_count, remaining)}" else ""
     InlineNotice(
-        title = "Stored data needs review",
-        body = "OpenTasker loaded affected records with safe fallbacks. $issueSummary$suffix.",
+        title = stringResource(R.string.workspace_stored_data_review),
+        body = stringResource(R.string.workspace_stored_data_review_body, issueSummary, suffix),
         color = MaterialTheme.colorScheme.error,
     )
 }
@@ -365,15 +368,15 @@ private fun TemplatePromptCard(onBrowseTemplates: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Templates", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.workspace_templates), style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Create starter profiles with named slots, clear safety notes, and disabled-by-default review.",
+                    stringResource(R.string.workspace_templates_body),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             OutlinedButton(onClick = onBrowseTemplates) {
-                Text("Browse")
+                Text(stringResource(R.string.action_browse))
             }
         }
     }
@@ -407,19 +410,19 @@ private fun ProfileCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(profile.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("Runs: $enterTaskName", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.workspace_runs_task, enterTaskName), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = profile.enabled, onCheckedChange = onToggle)
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 item {
                     StatusPill(
-                        label = if (profile.enabled) "Enabled" else "Paused",
+                        label = if (profile.enabled) stringResource(R.string.label_enabled) else stringResource(R.string.label_paused),
                         color = if (profile.enabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                item { StatusPill("${profile.contexts.size} context${plural(profile.contexts.size)}", MaterialTheme.colorScheme.primary) }
-                item { StatusPill("${profile.cooldownSec}s cooldown", MaterialTheme.colorScheme.secondary) }
+                item { StatusPill(stringResource(R.string.label_context_count, profile.contexts.size), MaterialTheme.colorScheme.primary) }
+                item { StatusPill(stringResource(R.string.label_cooldown_seconds, profile.cooldownSec), MaterialTheme.colorScheme.secondary) }
                 item { StatusPill(profile.automationMode.name.lowercase(), MaterialTheme.colorScheme.onSurfaceVariant) }
                 profile.group?.let { group ->
                     item { StatusPill(group, MaterialTheme.colorScheme.inversePrimary) }
@@ -427,8 +430,8 @@ private fun ProfileCard(
             }
             if (profile.contexts.isEmpty()) {
                 InlineNotice(
-                    title = "Profile cannot match yet",
-                    body = "Add at least one context before relying on this profile.",
+                    title = stringResource(R.string.workspace_profile_cannot_match),
+                    body = stringResource(R.string.workspace_profile_cannot_match_body),
                     color = MaterialTheme.colorScheme.error,
                 )
             } else {
@@ -442,21 +445,21 @@ private fun ProfileCard(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Edit profile")
+                    Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit))
                     Spacer(Modifier.width(6.dp))
-                    Text("Edit")
+                    Text(stringResource(R.string.action_edit))
                 }
                 OutlinedButton(onClick = onAddContext, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add context")
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.profile_add_context))
                     Spacer(Modifier.width(6.dp))
-                    Text("Add Context")
+                    Text(stringResource(R.string.profile_add_context))
                 }
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete profile")
+                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.profile_delete))
                     Spacer(Modifier.width(6.dp))
-                    Text("Delete Profile")
+                    Text(stringResource(R.string.profile_delete))
                 }
             }
         }
@@ -479,9 +482,9 @@ internal fun TasksScreen(
 ) {
     if (tasks.isEmpty()) {
         EmptyState(
-            title = "No tasks yet",
-            body = "Tasks are ordered action lists. Create a task, then add actions from the metadata registry.",
-            actionLabel = "Create Task",
+            title = stringResource(R.string.empty_tasks_title),
+            body = stringResource(R.string.empty_tasks_create_body),
+            actionLabel = stringResource(R.string.action_create_task),
             onAction = onCreateTask,
             contentPadding = contentPadding,
         )
@@ -511,10 +514,10 @@ internal fun TasksScreen(
                 value = taskSearchQuery,
                 onValueChange = { taskSearchQuery = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Search tasks...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+                placeholder = { Text(stringResource(R.string.workspace_search_tasks)) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = stringResource(R.string.run_log_search_label)) },
                 trailingIcon = if (taskSearchQuery.isNotEmpty()) {
-                    { IconButton(onClick = { taskSearchQuery = "" }) { Icon(Icons.Default.Clear, contentDescription = "Clear search") } }
+                    { IconButton(onClick = { taskSearchQuery = "" }) { Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.variables_search_clear)) } }
                 } else null,
                 singleLine = true,
                 shape = RoundedCornerShape(DesignSystem.Radii.lg),
@@ -523,8 +526,8 @@ internal fun TasksScreen(
         if (filteredTasks.isEmpty()) {
             item {
                 InlineNotice(
-                    title = "No matching tasks",
-                    body = "Clear search to return to the full task library.",
+                    title = stringResource(R.string.workspace_no_matching_tasks),
+                    body = stringResource(R.string.workspace_no_matching_tasks_body),
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
@@ -568,21 +571,21 @@ private fun TaskCard(
                 Column(Modifier.weight(1f)) {
                     Text(task.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        "Priority ${task.priority} - ${task.collisionMode.name.lowercase().replace('_', ' ')}",
+                        stringResource(R.string.workspace_task_priority, task.priority, task.collisionMode.name.lowercase().replace('_', ' ')),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                item { StatusPill("${task.actions.size} action${plural(task.actions.size)}", MaterialTheme.colorScheme.primary) }
-                item { StatusPill("Priority ${task.priority}", MaterialTheme.colorScheme.secondary) }
+                item { StatusPill(stringResource(R.string.label_action_count, task.actions.size), MaterialTheme.colorScheme.primary) }
+                item { StatusPill(stringResource(R.string.label_priority_short, task.priority), MaterialTheme.colorScheme.secondary) }
                 item { StatusPill(task.collisionMode.name.lowercase().replace('_', ' '), MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             if (task.actions.isEmpty()) {
                 InlineNotice(
-                    title = "Task has no actions",
-                    body = "Add at least one action before attaching this task to an enabled profile.",
+                    title = stringResource(R.string.workspace_task_has_no_actions),
+                    body = stringResource(R.string.workspace_task_has_no_actions_body),
                     color = MaterialTheme.colorScheme.error,
                 )
             } else {
@@ -597,36 +600,36 @@ private fun TaskCard(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Edit task")
+                    Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit))
                     Spacer(Modifier.width(6.dp))
-                    Text("Edit")
+                    Text(stringResource(R.string.action_edit))
                 }
                 OutlinedButton(onClick = onAddAction, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add action")
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.task_add_action))
                     Spacer(Modifier.width(6.dp))
-                    Text("Add Action")
+                    Text(stringResource(R.string.task_add_action))
                 }
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 item {
                     OutlinedButton(onClick = onRun) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = "Run task")
+                        Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.action_run))
                         Spacer(Modifier.width(6.dp))
-                        Text("Run")
+                        Text(stringResource(R.string.action_run))
                     }
                 }
                 item {
                     OutlinedButton(onClick = onPin) {
-                        Icon(Icons.Filled.PushPin, contentDescription = "Pin task")
+                        Icon(Icons.Filled.PushPin, contentDescription = stringResource(R.string.action_pin))
                         Spacer(Modifier.width(6.dp))
-                        Text("Pin")
+                        Text(stringResource(R.string.action_pin))
                     }
                 }
                 item {
                     TextButton(onClick = onDelete) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Delete task")
+                        Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.task_delete))
                         Spacer(Modifier.width(6.dp))
-                        Text("Delete Task")
+                        Text(stringResource(R.string.task_delete))
                     }
                 }
             }
@@ -658,7 +661,7 @@ private fun ActionRow(
             Column(Modifier.weight(1f)) {
                 Text(action.label ?: metadata?.name ?: action.type, style = MaterialTheme.typography.titleSmall)
                 Text(
-                    action.args.entries.joinToString { "${it.key}=${it.value}" }.ifBlank { metadata?.description ?: "No arguments" },
+                    action.args.entries.joinToString { "${it.key}=${it.value}" }.ifBlank { metadata?.description ?: stringResource(R.string.workspace_no_arguments) },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
@@ -667,16 +670,16 @@ private fun ActionRow(
                 if (capability.level != CapabilityLevel.Supported) {
                     Spacer(Modifier.height(6.dp))
                     StatusPill(
-                        if (capability.level == CapabilityLevel.Unsupported) "Unsupported" else "Needs setup",
+                        if (capability.level == CapabilityLevel.Unsupported) stringResource(R.string.label_unsupported) else stringResource(R.string.status_needs_setup),
                         if (capability.level == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                     )
                 }
             }
             IconButton(onClick = onEdit) {
-                Icon(Icons.Filled.Edit, contentDescription = "Edit action")
+                Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit))
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete action", tint = MaterialTheme.colorScheme.error)
+                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete), tint = MaterialTheme.colorScheme.error)
             }
         }
     }
@@ -710,13 +713,13 @@ private fun ContextRow(
                 )
             }
             if (context.invert) {
-                StatusPill("Inverted", MaterialTheme.colorScheme.secondary)
+                StatusPill(stringResource(R.string.label_inverted), MaterialTheme.colorScheme.secondary)
             }
             IconButton(onClick = onEdit) {
-                Icon(Icons.Filled.Edit, contentDescription = "Edit context")
+                Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit))
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete context", tint = MaterialTheme.colorScheme.error)
+                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete), tint = MaterialTheme.colorScheme.error)
             }
         }
     }

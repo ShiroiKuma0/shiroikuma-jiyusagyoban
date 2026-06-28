@@ -73,7 +73,7 @@ class ActiveAutomationModuleSplitTest {
         val editorSource = screensSourceRoot.resolve("EditorDialogs.kt").readText()
 
         assertTrue("Create actions should stay labeled, not icon-only", shellSource.contains("ExtendedFloatingActionButton"))
-        assertTrue("First-run onboarding should recommend guided templates first", listSource.contains("actionLabel = \"Browse Templates\""))
+        assertTrue("First-run onboarding should recommend guided templates first", listSource.contains("R.string.action_browse_templates"))
         assertTrue("Empty-state actions should not stretch awkwardly on large screens", editorSource.contains("widthIn(max = 420.dp)"))
     }
 

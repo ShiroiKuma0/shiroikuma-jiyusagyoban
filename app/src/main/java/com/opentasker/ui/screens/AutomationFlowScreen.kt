@@ -49,11 +49,13 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.opentasker.app.R
 import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.flow.AutomationFlowGraph
 import com.opentasker.core.flow.AutomationFlowGraphBuilder
@@ -129,19 +131,19 @@ private fun FlowEmptyState(contentPadding: PaddingValues) {
             ) {
                 Icon(
                     Icons.Filled.Info,
-                    contentDescription = "Flow view empty",
+                    contentDescription = stringResource(R.string.flow_empty_content_description),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp),
                 )
-                Text("No profile graph yet", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.flow_empty_profile_graph_title), style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "Create or import a profile to generate a readable automation graph with contexts, tasks, actions, and missing references.",
+                    stringResource(R.string.flow_empty_profile_graph_body),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
                 FlowStatusPill(
-                    label = "Waiting for profile",
+                    label = stringResource(R.string.flow_waiting_for_profile),
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
@@ -168,22 +170,22 @@ private fun FlowOverviewCard(
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f)) {
-                    Text("Flow overview", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.flow_overview_title), style = MaterialTheme.typography.titleLarge)
                     Text(
-                        "Read-only profile graph generated from the active Room data.",
+                        stringResource(R.string.flow_overview_body),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 FlowStatusPill(
-                    label = if (warningCount == 0) "Ready" else "$warningCount issue${plural(warningCount)}",
+                    label = if (warningCount == 0) stringResource(R.string.status_ready) else stringResource(R.string.label_issue_count, warningCount),
                     color = if (warningCount == 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                FlowMetric("${profiles.size}", "Profiles", Modifier.weight(1f))
-                FlowMetric("$contextCount", "Contexts", Modifier.weight(1f))
-                FlowMetric("$actionCount", "Actions", Modifier.weight(1f))
+                FlowMetric("${profiles.size}", stringResource(R.string.label_profiles), Modifier.weight(1f))
+                FlowMetric("$contextCount", stringResource(R.string.label_contexts), Modifier.weight(1f))
+                FlowMetric("$actionCount", stringResource(R.string.label_actions), Modifier.weight(1f))
             }
         }
     }
@@ -212,13 +214,17 @@ private fun FlowGraphCard(
                 Column(Modifier.weight(1f)) {
                     Text(graph.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        "${graph.contextNodes.size} context${plural(graph.contextNodes.size)} - ${graph.nodes.count { it.kind == AutomationFlowNodeKind.ACTION }} action${plural(graph.nodes.count { it.kind == AutomationFlowNodeKind.ACTION })}",
+                        stringResource(
+                            R.string.flow_context_action_summary,
+                            graph.contextNodes.size,
+                            graph.nodes.count { it.kind == AutomationFlowNodeKind.ACTION },
+                        ),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 FlowStatusPill(
-                    label = if (profileNode.muted) "Disabled" else "Enabled",
+                    label = if (profileNode.muted) stringResource(R.string.status_disabled) else stringResource(R.string.label_enabled),
                     color = if (profileNode.muted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
                 )
             }
@@ -239,17 +245,17 @@ private fun FlowGraphCard(
                         )
                     }
                 }
-                FlowEdgeLabel("all context rules")
+                FlowEdgeLabel(stringResource(R.string.flow_all_context_rules))
             }
-            FlowInlineCommand(label = "Add Context", onClick = { onAddContext(graph.profileId) })
+            FlowInlineCommand(label = stringResource(R.string.profile_add_context), onClick = { onAddContext(graph.profileId) })
 
             FlowNodeView(profileNode, onNodeTargetSelected)
-            FlowTaskLane(graph, graph.enterTaskNode, "enter", onNodeTargetSelected, onAddAction)
-            FlowTaskLane(graph, graph.exitTaskNode, "exit", onNodeTargetSelected, onAddAction)
+            FlowTaskLane(graph, graph.enterTaskNode, stringResource(R.string.flow_enter), onNodeTargetSelected, onAddAction)
+            FlowTaskLane(graph, graph.exitTaskNode, stringResource(R.string.flow_exit), onNodeTargetSelected, onAddAction)
 
             val missingNodes = graph.nodes.filter { it.kind == AutomationFlowNodeKind.MISSING }
             missingNodes.forEach { missingNode ->
-                FlowEdgeLabel("missing reference")
+                FlowEdgeLabel(stringResource(R.string.flow_missing_reference))
                 FlowNodeView(missingNode, onNodeTargetSelected)
             }
 
@@ -275,7 +281,7 @@ private fun FlowInlineCommand(
     onClick: () -> Unit,
 ) {
     OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        Icon(Icons.Filled.Add, contentDescription = "Add")
+        Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.flow_add_content_description))
         Spacer(Modifier.width(6.dp))
         Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
@@ -300,10 +306,10 @@ private fun FlowCanvasOverview(
 
     val edgeColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.60f)
     val lanes = buildList {
-        if (graph.contextNodes.isNotEmpty()) add(FlowLaneData("Contexts", graph.contextNodes))
-        add(FlowLaneData("Profile", listOf(profileNode)))
-        graph.enterTaskNode?.let { add(FlowLaneData("Enter", listOf(it) + graph.actionNodesFor(it.id))) }
-        graph.exitTaskNode?.let { add(FlowLaneData("Exit", listOf(it) + graph.actionNodesFor(it.id))) }
+        if (graph.contextNodes.isNotEmpty()) add(FlowLaneData(stringResource(R.string.flow_lane_contexts), graph.contextNodes))
+        add(FlowLaneData(stringResource(R.string.flow_lane_profile), listOf(profileNode)))
+        graph.enterTaskNode?.let { add(FlowLaneData(stringResource(R.string.flow_lane_enter), listOf(it) + graph.actionNodesFor(it.id))) }
+        graph.exitTaskNode?.let { add(FlowLaneData(stringResource(R.string.flow_lane_exit), listOf(it) + graph.actionNodesFor(it.id))) }
     }
 
     Surface(
@@ -429,7 +435,7 @@ private fun FlowCanvasNode(
             )
             node.condition?.let {
                 Text(
-                    "if",
+                    stringResource(R.string.flow_if),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.tertiary,
                     maxLines = 1,
@@ -452,11 +458,11 @@ private fun FlowTaskLane(
     FlowEdgeLabel(label)
     FlowNodeView(taskNode, onNodeTargetSelected)
     graph.actionNodesFor(taskNode.id).forEachIndexed { index, actionNode ->
-        FlowEdgeLabel(graph.incomingEdgeLabel(actionNode.id) ?: if (index == 0) "step ${index + 1}" else "then")
+        FlowEdgeLabel(graph.incomingEdgeLabel(actionNode.id) ?: if (index == 0) stringResource(R.string.flow_step_label, index + 1) else stringResource(R.string.flow_then))
         FlowNodeView(actionNode, onNodeTargetSelected)
     }
     (taskNode.target as? AutomationFlowTarget.Task)?.taskId?.let { taskId ->
-        FlowInlineCommand(label = "Add Step", onClick = { onAddAction(taskId) })
+        FlowInlineCommand(label = stringResource(R.string.action_add_step), onClick = { onAddAction(taskId) })
     }
 }
 
@@ -510,12 +516,12 @@ private fun FlowNodeView(
                 ) {
                     Icon(
                         Icons.Filled.SubdirectoryArrowRight,
-                        contentDescription = "Sub-task reference",
+                        contentDescription = stringResource(R.string.flow_sub_task_reference),
                         modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.secondary,
                     )
                     FlowStatusPill(
-                        label = "Subflow",
+                        label = stringResource(R.string.flow_subflow),
                         color = MaterialTheme.colorScheme.secondary,
                     )
                 }
@@ -527,17 +533,17 @@ private fun FlowNodeView(
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.CallSplit,
-                        contentDescription = "Branch condition",
+                        contentDescription = stringResource(R.string.flow_branch_condition),
                         modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.tertiary,
                     )
                     FlowStatusPill(
-                        label = "Branch",
+                        label = stringResource(R.string.flow_branch),
                         color = MaterialTheme.colorScheme.tertiary,
                     )
                 }
                 Text(
-                    "if $condition",
+                    stringResource(R.string.flow_if_condition, condition),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.tertiary,
                     maxLines = 1,

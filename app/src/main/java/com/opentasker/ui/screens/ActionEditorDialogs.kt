@@ -33,11 +33,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.opentasker.app.R
 import com.opentasker.core.actions.ActionField
 import com.opentasker.core.actions.ActionMetadata
 import com.opentasker.core.actions.ActionMetadataRegistry
@@ -60,7 +62,7 @@ internal fun ActionPickerDialog(
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add action") },
+        title = { Text(stringResource(R.string.dialog_add_action)) },
         text = {
             LazyColumn(
                 modifier = Modifier.heightIn(max = 420.dp),
@@ -100,7 +102,7 @@ internal fun ActionPickerDialog(
                                     Text(metadata.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                                     if (capability.level != CapabilityLevel.Supported) {
                                         StatusPill(
-                                            if (capability.level == CapabilityLevel.Unsupported) "Unsupported" else "Setup",
+                                            if (capability.level == CapabilityLevel.Unsupported) stringResource(R.string.label_unsupported) else stringResource(R.string.label_setup),
                                             if (capability.level == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                                         )
                                     }
@@ -116,7 +118,7 @@ internal fun ActionPickerDialog(
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
     )
 }
 
@@ -192,8 +194,8 @@ internal fun ActionConfigDialog(
                     OutlinedTextField(
                         value = label,
                         onValueChange = { label = it },
-                        label = { Text("Action label") },
-                        supportingText = { Text("Shown in task steps and run-log traces.") },
+                        label = { Text(stringResource(R.string.action_label_field)) },
+                        supportingText = { Text(stringResource(R.string.action_label_hint)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -223,10 +225,10 @@ internal fun ActionConfigDialog(
                     )
                 },
             ) {
-                Text("Save")
+                Text(stringResource(R.string.action_save))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 
@@ -236,6 +238,7 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
     when (field.fieldType) {
         FieldType.CHECKBOX -> {
             val checked = value.toBoolean()
+            val stateDescriptionLabel = if (checked) stringResource(R.string.label_on) else stringResource(R.string.label_off)
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
                 shape = RoundedCornerShape(DesignSystem.Radii.lg),
@@ -248,7 +251,7 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
                         onValueChange = { onChange(it.toString()) },
                     )
                     .semantics {
-                        stateDescription = if (checked) "On" else "Off"
+                        stateDescription = stateDescriptionLabel
                     },
             ) {
             Row(
@@ -271,7 +274,7 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
             onValueChange = onChange,
             label = { Text(label) },
             placeholder = field.hint?.let { { Text(it) } },
-            supportingText = if (field.required) {{ Text("Required") }} else null,
+            supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
             minLines = 3,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -281,7 +284,7 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
             onValueChange = { onChange(it.filter { ch -> ch.isDigit() || ch == '-' || ch == '.' }) },
             label = { Text(label) },
             placeholder = field.hint?.let { { Text(it) } },
-            supportingText = if (field.required) {{ Text("Required") }} else null,
+            supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
@@ -293,7 +296,7 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
             onValueChange = onChange,
             label = { Text(label) },
             placeholder = field.hint?.let { { Text(it) } },
-            supportingText = if (field.required) {{ Text("Required") }} else null,
+            supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
             singleLine = field.fieldType != FieldType.MULTILINE,
             modifier = Modifier.fillMaxWidth(),
         )

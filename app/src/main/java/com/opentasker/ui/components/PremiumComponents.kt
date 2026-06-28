@@ -40,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.error
@@ -47,6 +48,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import com.opentasker.app.R
 import com.opentasker.ui.theme.DesignSystem
 
 /**
@@ -74,6 +76,7 @@ fun TextFieldWithError(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
+    val errorContentDescription = stringResource(R.string.ui_error_content_description)
     
     Column(modifier = modifier) {
         OutlinedTextField(
@@ -87,7 +90,7 @@ fun TextFieldWithError(
                 {
                     Icon(
                         Icons.Default.Error,
-                        contentDescription = "Error",
+                        contentDescription = errorContentDescription,
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(DesignSystem.ComponentSize.iconMedium)
                     )
@@ -161,8 +164,8 @@ fun LoadingButton(
     }
     
     val stateDescription = when {
-        isLoading -> "$text in progress"
-        !enabled -> "$text disabled"
+        isLoading -> stringResource(R.string.ui_loading_in_progress, text)
+        !enabled -> stringResource(R.string.ui_disabled_label, text)
         else -> text
     }
 
@@ -268,6 +271,8 @@ fun LoadingIndicator(
     modifier: Modifier = Modifier,
     message: String? = null
 ) {
+    val errorContentDescription = stringResource(R.string.ui_error_content_description)
+    val retryContentDescription = stringResource(R.string.ui_retry_loading_content_description)
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -299,6 +304,9 @@ fun ErrorState(
     modifier: Modifier = Modifier,
     onRetry: (() -> Unit)? = null,
 ) {
+    val errorContentDescription = stringResource(R.string.ui_error_content_description)
+    val retryContentDescription = stringResource(R.string.ui_retry_content_description)
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -309,7 +317,7 @@ fun ErrorState(
     ) {
         Icon(
             Icons.Default.Error,
-            contentDescription = "Error",
+            contentDescription = errorContentDescription,
             modifier = Modifier.size(DesignSystem.ComponentSize.iconLarge),
             tint = MaterialTheme.colorScheme.error
         )
@@ -324,9 +332,9 @@ fun ErrorState(
             Spacer(modifier = Modifier.height(DesignSystem.Spacing.md))
             TextButton(
                 onClick = onRetry,
-                modifier = Modifier.semantics { contentDescription = "Retry loading this content" }
+                modifier = Modifier.semantics { contentDescription = retryContentDescription }
             ) {
-                Text("Retry")
+                Text(stringResource(R.string.action_retry))
             }
         }
     }

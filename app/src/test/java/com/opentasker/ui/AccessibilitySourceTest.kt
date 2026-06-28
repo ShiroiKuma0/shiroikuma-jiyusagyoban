@@ -46,10 +46,10 @@ class AccessibilitySourceTest {
 
         val sceneSource = uiSourceRoot.resolve("screens/SceneLibraryScreen.kt").readText()
         val requiredNudgeLabels = listOf(
-            "Move element left 1 dp",
-            "Move element up 1 dp",
-            "Move element down 1 dp",
-            "Move element right 1 dp",
+            "R.string.scenes_move_left_content_description",
+            "R.string.scenes_move_up_content_description",
+            "R.string.scenes_move_down_content_description",
+            "R.string.scenes_move_right_content_description",
         )
         val missingLabels = requiredNudgeLabels.filterNot(sceneSource::contains)
 
