@@ -9,13 +9,6 @@ Only open work belongs here; git history and `CHANGELOG.md` are the release reco
 
 ### P1 -- Maintainability, accessibility, and localization
 
-- [ ] P1 — Expand Compose UI tests beyond Run Log
-  Why: Run Log has instrumentation coverage, but editor and setup paths carry most user-facing breakage risk.
-  Evidence: `app/src/androidTest/java/com/opentasker/ui/screens/RunLogScreenContentTest.kt`; `app/src/main/java/com/opentasker/ui/screens/PermissionOnboardingScreen.kt`; `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationUi.kt`; `app/src/main/java/com/opentasker/ui/screens/SceneLibraryScreen.kt`
-  Touches: `app/src/androidTest`, Compose test tags/semantics, editor validation hooks.
-  Acceptance: Instrumented UI tests cover first-launch onboarding, profile creation, task/action editor validation, context editor validation, scene creation, and import/export error states.
-  Complexity: M
-
 ### P2 -- Ecosystem integrations and observability
 
 - [ ] P2 — Add a repeatable Locale plugin compatibility fixture
