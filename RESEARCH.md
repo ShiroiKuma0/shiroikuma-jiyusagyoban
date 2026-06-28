@@ -1,70 +1,90 @@
-# Research — OpenTasker
+# Research - OpenTasker
 
 ## Executive Summary
-OpenTasker is a local-first Android automation app built with Kotlin, Jetpack Compose, Room, WorkManager, a foreground automation service, Locale-plugin hosting/target support, Shizuku and Termux backends, encrypted backup/restore, visual scene/flow authoring, widgets, quick settings, NFC, JSON import/export, and diagnostic run logs. Its strongest current shape is privacy-preserving Android automation for F-Droid and power users who want Tasker-like capability without mandatory cloud accounts. The highest-value direction is beta hardening before ecosystem expansion: replace remaining direct platform logs with the `AppLogger` diagnostics path; fix stale F-Droid metadata and release evidence; add a docs/toolchain truth gate; finish the `ActiveAutomationUi.kt` split; complete string-resource extraction and translation plumbing; add repeatable accessibility and editor UI tests; add a repeatable Locale plugin fixture; then evaluate Home Assistant, MQTT, UnifiedPush/ntfy, Glance, Navigation3, and bounded accessibility automation.
+OpenTasker is a local-first Android automation app for profiles, contexts, tasks, actions, scenes, flows, widgets, Locale plugins, Shizuku/Termux power paths, Tasker migration, encrypted backup, and diagnostic run logs. Its strongest current shape is now broader than the previous research pass: recent commits landed API 37 targeting, logging boundary guards, F-Droid metadata sync, accessibility source gates, string-resource extraction for core screens, critical Compose UI tests, Shizuku/Termux execution baselines, scene/flow authoring, and release truth tests. The highest-value direction is beta trust hardening: fix the public backup failure, refresh stale F-Droid build evidence, validate Android 17 local-network and background-service behavior on devices, capture real TalkBack/large-screen evidence, complete setup/backups localization, split the scene editor, and then expand migration, sharing, and local automation bridges.
+
+Top opportunities:
+- P0: fix GitHub issue #3, where Create Local Backup reports missing `profiles`, `tasks`, and `run_logs` despite existing data.
+- P1: refresh F-Droid lint/build/reproducibility evidence; `docs/FDROID_READINESS.md` still cites `0.2.70` while Gradle and metadata are `0.2.75`/`77`.
+- P1: run an API 37 device matrix for `ACCESS_LOCAL_NETWORK`, foreground-service timeout behavior, overlay scenes, Bluetooth, background location, notifications, and predictive back.
+- P1: convert setup/backup visible copy to resources and seed at least one real locale path beyond empty Weblate skeleton files.
+- P1: add rendered TalkBack/font-scale/large-screen evidence for setup, editors, scene canvas, flow graph, import review, and run-log diagnostics.
+- P1: split `SceneLibraryScreen.kt` after the active-automation split; it is now the largest UI file at 1,271 lines.
+- P1: harden Termux script allowlist/hash UX and bounded stdout/stderr/exit-code capture before promoting script output workflows.
+- P1: add device-backed Shizuku action evidence and per-action risk copy before broad elevated-action release claims.
+- P2: expand Tasker XML import/export mappings and migration reports for the next safest action/context families.
+- P2: add a local community-share preview/import review path before any remote marketplace.
 
 ## Product Map
-- Core workflows: create profiles from contexts, attach task/action sequences, run automations through `AutomationService`, inspect failures in run logs, and manage setup/permissions before enabling high-risk features.
-- Core workflows: author scenes and visual flows, import/export profiles and Tasker-compatible data, share templates, back up encrypted app data, and run diagnostics.
-- User personas: privacy-focused F-Droid users, Tasker migrants, Android power users/sysadmins, home-automation users, degoogled-device users, and users who need explicit permission control for Shizuku, Termux, notifications, widgets, NFC, and local-network actions.
-- Platforms and distribution: Android API 26+, `compileSdk`/`targetSdk` 37 in `app/build.gradle.kts`, Gradle 9.4.1, AGP 9.2.1, Kotlin 2.3.21, standard/F-Droid/Play build profiles, GitHub Actions CI, and draft F-Droid metadata.
-- Key integrations and data flows: Room entities/DAOs feed Compose StateFlow screens; WorkManager prunes run logs; `AutomationService` executes actions; Locale, Shizuku, Termux, SAF, widgets, quick settings, NFC, broadcasts, HTTP/LAN actions, encrypted backup, JSON export/import, and diagnostic logs cross the app boundary.
+- Core workflows: create profiles from contexts, attach task/action sequences, run them through `AutomationService`, inspect failures in run logs, and keep guarded features behind Setup.
+- Core workflows: author scenes and visual flows, import/export OpenTasker bundles and Tasker XML, share profile manifests, run widgets/shortcuts/QS tiles, and back up/restore local data.
+- User personas: privacy-focused F-Droid users, Tasker migrants, Android power users, home-automation users, degoogled-device users, and users who need explicit control over Shizuku, Termux, SMS, notifications, local network, overlays, and location.
+- Platforms and distribution: Android API 26+, `compileSdk`/`targetSdk` 37 in `app/build.gradle.kts`, Gradle 9.4.1, AGP 9.2.1, Kotlin 2.3.21, Compose BOM 2026.05.00, Room 2.8.4, WorkManager 2.11.2, standard/F-Droid/Play profiles, MIT license.
+- Key integrations and data flows: Room + DataStore feed Compose StateFlow screens; `AutomationService` executes tasks; `TaskRunner` expands variables/templates and writes run logs; Locale, Shizuku, Termux, SAF, widgets, QS tiles, NFC, broadcasts, local-network actions, JSON bundles, Tasker XML, encrypted backups, and diagnostics cross trust boundaries.
 
 ## Competitive Landscape
-- Tasker: deep action coverage, scenes, plugin ecosystem, Shizuku-style elevated actions, calendar/contact breadth, App Factory, and AI-assisted task creation. OpenTasker should learn from Tasker's action breadth and plugin maturity, but avoid its proprietary lock-in, steep learning curve, and complexity-heavy defaults.
-- MacroDroid: guided templates, simple macro creation, community templates, Wear OS support, and approachable onboarding. OpenTasker should learn from its template-first entry path and discoverability, but avoid artificial free-tier limits and cloud-dependent community features.
-- Automate: flowchart automation, live flow debugging, and community-shared flows. OpenTasker should learn from visual flow labels, execution tracing, and importable examples, but avoid making graph editing the only authoring path.
-- Samsung Modes and Routines: low-friction device routines, natural-language assisted creation, calendar/weather/location/device-condition triggers, and vendor-integrated permissions. OpenTasker should learn from its guided creation and contextual suggestions, but avoid vendor-only features that cannot work across F-Droid and non-Samsung devices.
-- Easer, PhoneProfilesPlus, and Automation by Jens: FOSS profile automation with explicit logical operators, profile modes, HTTP events, cell-learning ideas, and long-lived Android survivability lessons. OpenTasker should learn from their condition model and F-Droid resilience, but avoid dormant UX patterns and narrow feature silos.
-- AutoJs6 and related Auto.js forks: powerful script and accessibility automation, broad ecosystem demand, and Shizuku/elevated execution patterns. OpenTasker should learn from opt-in power-user extension points, but avoid unbounded code execution and accessibility-service abuse.
-- Home Assistant, Node-RED, and n8n: strong integration catalogs, webhooks, MQTT/event buses, sensors, audit trails, and flow automation. OpenTasker should learn from their local-protocol bridges and observability, but avoid turning the app into a server-required product.
+- Tasker: still sets the ceiling for action breadth, scenes, variables, plugins, App Factory, and migration expectations. OpenTasker should learn from its plugin/migration depth, but avoid proprietary lock-in, opaque complexity, and store-policy fragility.
+- MacroDroid: wins on beginner UX, trigger-action-constraint mental model, community templates, and overlay/custom UI discovery. OpenTasker should learn from template-first creation and share browsing, but avoid free-tier limits and cloud-dependent sharing.
+- Automate: wins on visual flowcharts, 400+ blocks, app integration, HTTP/webhooks, and community flows. OpenTasker should learn from graph debugging and reusable examples, but keep form/list editing as the stable authoring path.
+- Samsung Modes and Routines: wins on recommended routines, quick panel access, widgets, device-integrated permissions, and low-friction suggestions. OpenTasker should learn from guided mode/routine setup, but avoid Samsung-only assumptions.
+- Easer and PhoneProfilesPlus: show long-lived FOSS lessons around profile modes, event/state condition models, and Android background survival. OpenTasker should learn from explicit profile semantics, but avoid dormant UX and narrow action surfaces.
+- Auto.js/AutoJs6 and newer Android phone-control frameworks: prove demand for scripting, accessibility, OCR, and device-control automation. OpenTasker should keep deterministic rule-based automation, explicit permission gates, and bounded script bridges while rejecting arbitrary UI-control scripting.
+- Home Assistant, Node-RED, n8n, ntfy, UnifiedPush, and MQTT clients: show strong demand for local protocol bridges, webhooks, event buses, and push-trigger paths. OpenTasker should add narrow local bridges first, not a server-required architecture.
 
 ## Security, Privacy, and Reliability
-- Verified risk: direct `android.util.Log` calls remain outside `AppLogger.kt`, including `OpenTaskerApp_NoHilt.kt`, `AppUsageMonitor.kt`, `ConnectivityMonitor.kt`, `WiFiNetworkMonitor.kt`, `TimeEventScheduler.kt`, `ShakeDetector.kt`, `CrashLogHandler.kt`, `AutomationTargetReceiver.kt`, `BootReceiver.kt`, `BluetoothContextEvents.kt`, `NotificationActionReceiver.kt`, `TaskExecutionHelper.kt`, and `NotificationTriggerService.kt`. These bypass the app-level diagnostics and redaction boundary.
-- Verified risk: `fdroid/metadata/com.opentasker.app.yml` still advertises `0.2.73`/version code `75` while `app/build.gradle.kts` builds `0.2.75`/version code `77`; `tools/verify-fdroid-release.ps1` expects metadata, Gradle, changelog, and output paths to agree.
-- Verified risk: README and docs still contain stale release/toolchain claims, including SDK 36-era wording and "readiness" language for shipped Shizuku, Termux, scene, and flow features. This creates release and onboarding drift.
-- Likely risk: `app/src/main/res/xml/network_security_config.xml` uses IP-like domain entries for private ranges; Android domain-config entries are hostname oriented, so LAN cleartext behavior should be validated with the existing HTTP/local-network policy before changing it.
-- Likely risk: Termux script dispatch is intentionally delegated, but `app/src/main/java/com/opentasker/core/actions/ScriptActions.kt` should make any script allowlist/hash expectations explicit and testable before more script automation is promoted.
-- Missing guardrails: repeatable TalkBack/accessibility evidence, Locale plugin compatibility fixtures, API 37/local-network device evidence, and reproducible F-Droid release evidence.
-- Recovery and rollback needs: keep encrypted backup staged-restore behavior covered, add export/import migration tests as schemas evolve, and make run-log diagnostics consistently redacted through `AppLogger`.
+- Verified bug: GitHub issue #3 reports Create Local Backup failing with `Backup is missing required table(s): profiles, tasks, run_logs`; the relevant validation path is `app/src/main/java/com/opentasker/core/storage/DatabaseBackupManager.kt`.
+- Verified risk: `DatabaseBackupManager.backup()` copies only `opentasker.db` after a WAL checkpoint; issue #3 suggests either the live DB file is not initialized/closed as expected, validation is checking the wrong file/name, or the backup path is racing app startup. Add a regression that reproduces Create Local Backup through `ActiveAutomationViewModel`.
+- Verified drift: `docs/FDROID_READINESS.md` still says local metadata tracks `0.2.70`/`72`, while `fdroid/metadata/com.opentasker.app.yml` and `app/build.gradle.kts` are `0.2.75`/`77`.
+- Verified risk: Android 17 local-network docs make `ACCESS_LOCAL_NETWORK` mandatory for target SDK 37 local TCP/UDP traffic; OpenTasker declares and checks it for network actions, but needs device evidence for HTTP, Ping, WoL, future MQTT, denial, revocation, and permission re-request flows.
+- Verified risk: source-level accessibility gates exist, but there is no rendered TalkBack/font-scale/large-screen evidence for the densest screens.
+- Verified risk: locale skeleton directories exist, but every `values-*` `strings.xml` file is only 6 lines/278 bytes; Setup/backup copy in `PermissionOnboardingScreen.kt` still has hardcoded visible strings.
+- Verified risk: Termux dispatch exists, but docs state script hash checks are not user-facing and stdout/stderr capture is not a complete output-ingestion pipeline.
+- Verified risk: Shizuku command execution is allowlisted and kill-switch gated, but docs still require device evidence and user-facing risk copy for each elevated action variant.
+- Missing guardrails: repeatable Locale fixture app, rendered accessibility evidence, API 37 device evidence, F-Droid local build evidence, scene overlay device evidence, and backup create/export/import end-to-end issue regression.
+- Recovery and rollback needs: backup should create a known-good rollback, failed restores should preserve the failed payload for diagnostics, and run-log/diagnostic exports should surface backup failure cause without leaking data.
 
 ## Architecture Assessment
-- `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationUi.kt` is still about 3,201 lines and owns navigation, CRUD, import/export, editor state, permission prompts, and dispatch wiring. The untracked split files `ActionEditorDialogs.kt`, `ContextEditorDialogs.kt`, `EditorDialogs.kt`, and `ActiveAutomationViewModel.kt` indicate the correct boundary is already being extracted.
-- `app/src/main/java/com/opentasker/ui/screens/SceneLibraryScreen.kt` is about 1,225 lines and should be split after the active-automation screen, especially around editor state, rendering, and persistence helpers.
-- Compose UI test coverage exists for run logs, but profile creation, task/action/context editors, onboarding permission rows, import/export failure states, scene creation, and destructive flows still need instrumentation tests.
-- Unit coverage has grown around DAOs, encryption, WorkManager pruning, permission denial, and validation paths; the next useful test expansion is cross-boundary UI behavior and release metadata checks, not more generic model tests.
-- Localization is structurally incomplete: `values-ar`, `values-de`, `values-es`, `values-fr`, `values-hi`, `values-it`, `values-ja`, `values-ko`, `values-pl`, `values-pt-rBR`, `values-ru`, `values-tr`, and `values-zh-rCN` contain empty `strings.xml` files, while UI sources still contain many hardcoded user-facing labels/messages.
-- Dependency posture is modern: API 37 target/compile, AGP 9.2.1, Kotlin 2.3.21, Compose BOM 2026.05.00, Room 2.8.4, WorkManager 2.11.2, Navigation Compose 2.9.8, and kotlinx-serialization 1.11.0. Room 3 and Navigation3 are not immediate migrations because the app's higher-risk gaps are release correctness, logging, accessibility, and UI decomposition.
+- `app/src/main/java/com/opentasker/ui/screens/SceneLibraryScreen.kt` is 1,271 lines and owns scene list, element editing, canvas projection, dragging/resizing, multi-select, alignment guides, validation, and overlay actions; split editor state, canvas controls, cards, and dialogs next.
+- `app/src/main/java/com/opentasker/ui/screens/PermissionOnboardingScreen.kt` is 790 lines and mixes permission inventory, backup UX, theme selection, OEM settings routing, and visible copy; backup/setup localization and test seams should be separated.
+- `app/src/main/java/com/opentasker/core/storage/DatabaseBackupManager.kt` is 360 lines and includes backup creation, export, import, staging, pending restore apply, validation, and bounded copy helpers; issue #3 makes this boundary a near-term reliability focus.
+- `app/src/main/java/com/opentasker/core/actions/ActionMetadata.kt` is 691 lines; action breadth is useful, but future MQTT/Home Assistant/Tasker mappings should preserve registry/runtime parity tests.
+- `app/src/main/java/com/opentasker/core/expressions/TemplateExpressionEngine.kt` is 630 lines and already has strong fail-closed policy; do not expand into arbitrary code execution.
+- Compose instrumentation now covers critical flows, but not rendered TalkBack traversal, 200% font scale, split-screen/large-screen layouts, scene overlay launch, graph editing on real devices, or backup issue #3.
+- `docs/LOCALE_PLUGIN_HOST.md`, `docs/TERMUX_SCRIPTING.md`, `docs/SHIZUKU.md`, `docs/SCENES.md`, and `docs/VISUAL_FLOW.md` contain concrete "Next Work" that should feed implementation without new research.
 
 ## Rejected Ideas
-- Cloud-required automation backend: rejected because it conflicts with the app's local-first/F-Droid privacy posture; source class: Home Assistant, Node-RED, n8n comparison.
-- Mandatory root, Shizuku, or ADB for core workflows: rejected because setup friction and store-policy risk would make the main app less reliable; source class: Tasker and AutoJs6 elevated-action ecosystems.
-- Unbounded JavaScript or accessibility scripting: rejected because it creates high abuse, review, and user-trust risk; source class: AutoJs6/AutoInput-style automation and Google Play AccessibilityService policy.
-- App Factory/APK generator in the next cycle: rejected because signing, permissions, generated-code policy, and support surface are too large before beta hardening; source class: Tasker App Factory.
-- Room 3 migration now: rejected because current Room 2.8.4 is recent and the roadmap has higher-confidence release and UX gaps; source class: AndroidX Room release notes.
-- Full Home Assistant `mobile_app` clone first: rejected as a first integration step because registration, auth, sensors, notifications, and lifecycle management are larger than an outbound webhook/MQTT bridge; source class: Home Assistant Android companion docs.
-- Google Home or Matter direct control now: rejected because Play Services/vendor requirements and certification burden conflict with F-Droid portability; source class: Android/home automation platform research.
-- Closed template marketplace: rejected because open JSON sharing and local import/export fit the project better; source class: MacroDroid community templates and FOSS distribution constraints.
-- Calendar CRUD actions in this roadmap: rejected for this cycle because `WRITE_CALENDAR` is a sensitive permission expansion and release correctness, logging, accessibility, and editor reliability are higher-confidence beta blockers; source class: Tasker and Samsung Modes and Routines.
-- API 37 `OnAlarmListener` scheduler rewrite now: rejected for this cycle because `app/src/main/java/com/opentasker/automation/scheduler/TimeEventScheduler.kt` already has exact/inexact fallback behavior and device evidence matters more than an API-specific simplification; source class: Android 17 platform docs.
+- Cloud-required automation backend: rejected because it conflicts with local-first/F-Droid privacy; source: Home Assistant, Node-RED, n8n comparison.
+- Full Home Assistant `mobile_app` clone first: rejected because registration, auth, sensors, notifications, and lifecycle scope are too large before a webhook/MQTT bridge; source: Home Assistant companion docs.
+- Unbounded JavaScript, arbitrary shell, or accessibility scripting: rejected because it creates high abuse, policy, and trust risk; source: Auto.js/AutoJs6 and Google Play AccessibilityService policy.
+- AccessibilityService for app detection: rejected because OpenTasker already uses UsageStats and the policy history is fragile; source: Tasker accessibility-policy discussions.
+- App Factory/APK generator now: rejected because generated signing, permission review, support burden, and policy complexity are larger than beta hardening; source: Tasker feature comparison.
+- Closed template marketplace: rejected because offline bundle manifests and local import review better fit F-Droid and privacy; source: MacroDroid/Automate community feature comparison.
+- Room 3 migration now: rejected because Room 2.8.4 is current enough and backup/device-evidence risks are higher confidence; source: AndroidX release research and current `gradle/libs.versions.toml`.
+- Navigation3 migration now: already tracked as a P3 evaluation; do not migrate while editor state and graph/scene tests are still being hardened.
+- Glance widget rewrite now: already tracked as a P3 evaluation; RemoteViews widgets should stay until capability/test tradeoffs are measured.
+- Wear OS companion now: rejected for this research pass because phone reliability, F-Droid readiness, backup trust, and local bridges are stronger near-term fit.
 
 ## Sources
+Project evidence:
+- https://github.com/SysAdminDoc/OpenTasker
+- https://github.com/SysAdminDoc/OpenTasker/issues/3
+
 Direct competitors and adjacent products:
 - https://tasker.joaoapps.com/
 - https://tasker.joaoapps.com/userguide/en/
 - https://www.macrodroid.com/
 - https://llamalab.com/automate/
+- https://www.samsung.com/us/support/answer/ANS10002538/
 - https://github.com/renyuneyun/Easer
 - https://github.com/henrichg/PhoneProfilesPlus
 - https://server47.de/automation/
 - https://github.com/SuperMonster003/AutoJs6
-- https://github.com/home-assistant/android
 
-Integrations and automation ecosystems:
+Local automation and integration ecosystems:
 - https://github.com/twofortyfouram/android-plugin-api-for-locale
 - https://github.com/termux/termux-app/wiki/RUN_COMMAND-Intent
 - https://github.com/RikkaApps/Shizuku-API
-- https://companion.home-assistant.io/docs/notifications/notification-commands/
+- https://github.com/home-assistant/android
 - https://companion.home-assistant.io/docs/core/sensors/
 - https://github.com/binwiederhier/ntfy
 - https://github.com/UnifiedPush/android-connector
@@ -72,20 +92,18 @@ Integrations and automation ecosystems:
 - https://nodered.org/docs/
 - https://github.com/n8n-io/n8n
 
-Android platform, distribution, and tooling:
-- https://developer.android.com/about/versions/17/behavior-changes-17
+Android platform, policy, distribution, and tooling:
 - https://developer.android.com/privacy-and-security/local-network-permission
+- https://developer.android.com/about/versions/17/behavior-changes-17
 - https://developer.android.com/develop/background-work/services/fgs/timeout
-- https://developer.android.com/jetpack/androidx/releases/glance
-- https://developer.android.com/jetpack/androidx/releases/navigation3
 - https://developer.android.com/topic/performance/baselineprofiles/overview
+- https://developer.android.com/topic/performance/benchmarking/macrobenchmark-overview
 - https://support.google.com/googleplay/android-developer/answer/10964491
-- https://f-droid.org/en/docs/Submitting_to_F-Droid_Quick_Start_Guide/
 - https://f-droid.org/en/docs/Reproducible_Builds/
 - https://docs.gradle.org/current/userguide/dependency_verification.html
 - https://hosted.weblate.org/
 
 ## Open Questions
-- Which exact Android 17/API 37 device or emulator matrix should be treated as release evidence for local-network permission, foreground-service behavior, TalkBack, geofence durability, and notification restrictions?
-- Should the first Home Assistant bridge be outbound webhooks, MQTT, or full `mobile_app` registration?
-- Which Shizuku elevated actions are acceptable for Play/F-Droid-facing release claims, and which should remain advanced/off-by-default only?
+- Which physical API 37 devices/emulators should count as release evidence for local network, foreground services, overlay scenes, geofence durability, TalkBack, notifications, and Bluetooth?
+- Should the first Home Assistant bridge be outbound webhook, MQTT publish, or a constrained `mobile_app` subset?
+- Which Shizuku commands are acceptable for public release claims after device evidence, and which stay advanced/off-by-default only?
