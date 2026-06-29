@@ -1282,6 +1282,10 @@ fun ActiveAutomationUi(
     var confirmDeleteSelectedTemplates by remember { mutableStateOf(false) }
     var selectedVarKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
     var confirmDeleteSelectedVars by remember { mutableStateOf(false) }
+    // Group multi-select (long-press a group header): one shared set, since only the current tab's groups
+    // are ever selected (it clears on tab switch). Bulk-delete orphans members back to the top level.
+    var selectedGroupIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var confirmDeleteSelectedGroups by remember { mutableStateOf(false) }
     // The "+" menu on the Scenes/Widgets tabs lives outside those screens; bumping a signal triggers
     // each screen's own create dialog. Vars has no in-screen create, so its dialog lives here.
     var sceneCreateSignal by remember { mutableIntStateOf(0) }
@@ -1385,6 +1389,7 @@ fun ActiveAutomationUi(
         selectedSceneIds = emptySet()
         selectedTemplateNames = emptySet()
         selectedVarKeys = emptySet()
+        selectedGroupIds = emptySet()
     }
     // Opening the Log tab marks all current failures as seen (clears the nav dot).
     LaunchedEffect(screen, newestFailureTs) {
@@ -1587,13 +1592,10 @@ fun ActiveAutomationUi(
           }
         },
         floatingActionButton = {
-            // Uniform per-tab "+" menu: New <item> / Import JSON / Import Tasker (where it applies) /
-            // Export. Every import routes through the one unified bundle flow; export reuses ExportRequest.
+            // Uniform per-tab "+" menu: New <item> / Import JSON / Export (set apart by a divider).
+            // Every import routes through the one unified bundle flow; export reuses ExportRequest.
             val importJson = TabAction("Import JSON…", Icons.Filled.Download) {
                 openTaskerBundleImportLauncher.launch(OPEN_TASKER_BUNDLE_MIME_TYPES)
-            }
-            val importTasker = TabAction("Import Tasker XML…", Icons.Filled.SwapHoriz) {
-                taskerXmlLauncher.launch(TASKER_XML_MIME_TYPES)
             }
             val actions: List<TabAction> = when (screen) {
                 OpenTaskerScreen.Profiles -> listOf(
@@ -1603,8 +1605,7 @@ fun ActiveAutomationUi(
                     TabAction("From template…", Icons.Filled.Dashboard) { showTemplateDialog = true },
                     TabAction("New group", Icons.Filled.CreateNewFolder) { newGroupTab = "profiles" },
                     importJson,
-                    importTasker,
-                    TabAction("Export profiles…", Icons.Filled.Upload) {
+                    TabAction("Export profiles…", Icons.Filled.Upload, dividerBefore = true) {
                         exportRequest = ExportRequest(
                             name = "All profiles (${visibleProfiles.size})",
                             fileName = exportFileName("profiles"),
@@ -1617,8 +1618,7 @@ fun ActiveAutomationUi(
                     TabAction("New task", Icons.Filled.Add) { showCreateTaskDialog = true },
                     TabAction("New group", Icons.Filled.CreateNewFolder) { newGroupTab = "tasks" },
                     importJson,
-                    importTasker,
-                    TabAction("Export tasks…", Icons.Filled.Upload) {
+                    TabAction("Export tasks…", Icons.Filled.Upload, dividerBefore = true) {
                         exportRequest = ExportRequest(
                             name = "All tasks (${visibleTasks.size})",
                             fileName = exportFileName("tasks"),
@@ -1631,7 +1631,7 @@ fun ActiveAutomationUi(
                     TabAction("New scene", Icons.Filled.Add) { sceneCreateSignal++ },
                     TabAction("New group", Icons.Filled.CreateNewFolder) { newGroupTab = "scenes" },
                     importJson,
-                    TabAction("Export scenes…", Icons.Filled.Upload) {
+                    TabAction("Export scenes…", Icons.Filled.Upload, dividerBefore = true) {
                         exportRequest = ExportRequest(
                             name = "All scenes (${visibleScenes.size})",
                             fileName = exportFileName("scenes"),
@@ -1644,7 +1644,7 @@ fun ActiveAutomationUi(
                     TabAction("New widget template", Icons.Filled.Add) { widgetCreateSignal++ },
                     TabAction("New group", Icons.Filled.CreateNewFolder) { newGroupTab = "widgets" },
                     importJson,
-                    TabAction("Export templates…", Icons.Filled.Upload) {
+                    TabAction("Export templates…", Icons.Filled.Upload, dividerBefore = true) {
                         exportRequest = ExportRequest(
                             name = "All widget templates (${widgetTemplates.size})",
                             fileName = exportFileName("widget templates"),
@@ -1657,7 +1657,7 @@ fun ActiveAutomationUi(
                     TabAction("New variable…", Icons.Filled.Add) { showNewVarDialog = true },
                     TabAction("New group", Icons.Filled.CreateNewFolder) { newGroupTab = "vars" },
                     importJson,
-                    TabAction("Export variables…", Icons.Filled.Upload) {
+                    TabAction("Export variables…", Icons.Filled.Upload, dividerBefore = true) {
                         exportRequest = ExportRequest(
                             name = "All variables (${globalVariables.size})",
                             fileName = exportFileName("variables"),
@@ -1827,6 +1827,12 @@ fun ActiveAutomationUi(
                 onClearProfileSelection = { selectedProfileIds = emptySet() },
                 onDeleteSelectedProfiles = { confirmDeleteSelectedProfiles = true },
                 onMoveSelectedToProject = { bulkMoveTab = OpenTaskerScreen.Profiles },
+                selectedGroupIds = selectedGroupIds,
+                onLongPressGroup = { selectedGroupIds = selectedGroupIds + it.id },
+                onToggleSelectGroup = { selectedGroupIds = if (it.id in selectedGroupIds) selectedGroupIds - it.id else selectedGroupIds + it.id },
+                onSelectAllGroups = { selectedGroupIds = groupOpsFor("profiles").groups.map { it.id }.toSet() },
+                onClearGroupSelection = { selectedGroupIds = emptySet() },
+                onDeleteSelectedGroups = { confirmDeleteSelectedGroups = true },
                 groupOps = groupOpsFor("profiles"),
                 contentPadding = innerPadding,
             )
@@ -1865,6 +1871,12 @@ fun ActiveAutomationUi(
                 onClearTaskSelection = { selectedTaskIds = emptySet() },
                 onDeleteSelectedTasks = { confirmDeleteSelectedTasks = true },
                 onMoveSelectedToProject = { bulkMoveTab = OpenTaskerScreen.Tasks },
+                selectedGroupIds = selectedGroupIds,
+                onLongPressGroup = { selectedGroupIds = selectedGroupIds + it.id },
+                onToggleSelectGroup = { selectedGroupIds = if (it.id in selectedGroupIds) selectedGroupIds - it.id else selectedGroupIds + it.id },
+                onSelectAllGroups = { selectedGroupIds = groupOpsFor("tasks").groups.map { it.id }.toSet() },
+                onClearGroupSelection = { selectedGroupIds = emptySet() },
+                onDeleteSelectedGroups = { confirmDeleteSelectedGroups = true },
                 groupOps = groupOpsFor("tasks"),
                 contentPadding = innerPadding,
             )
@@ -1929,6 +1941,12 @@ fun ActiveAutomationUi(
                 onClearSceneSelection = { selectedSceneIds = emptySet() },
                 onDeleteSelectedScenes = { confirmDeleteSelectedScenes = true },
                 onMoveSelectedToProject = { bulkMoveTab = OpenTaskerScreen.Scenes },
+                selectedGroupIds = selectedGroupIds,
+                onLongPressGroup = { selectedGroupIds = selectedGroupIds + it.id },
+                onToggleSelectGroup = { selectedGroupIds = if (it.id in selectedGroupIds) selectedGroupIds - it.id else selectedGroupIds + it.id },
+                onSelectAllGroups = { selectedGroupIds = groupOpsFor("scenes").groups.map { it.id }.toSet() },
+                onClearGroupSelection = { selectedGroupIds = emptySet() },
+                onDeleteSelectedGroups = { confirmDeleteSelectedGroups = true },
                 createSignal = sceneCreateSignal,
                 hiddenByFilter = scenes.size - visibleScenes.size,
                 expandedScenes = expandedScenes,
@@ -2155,6 +2173,31 @@ fun ActiveAutomationUi(
                 selectedVarKeys = emptySet(); confirmDeleteSelectedVars = false
             },
             onDismiss = { confirmDeleteSelectedVars = false },
+        )
+    }
+
+    if (confirmDeleteSelectedGroups) {
+        val count = selectedGroupIds.size
+        // Resolve the selected groups from whichever list tab is showing (selection clears on tab switch).
+        val groupsForTab = when (screen) {
+            OpenTaskerScreen.Tasks -> groupOpsFor("tasks").groups
+            OpenTaskerScreen.Profiles -> groupOpsFor("profiles").groups
+            OpenTaskerScreen.Scenes -> groupOpsFor("scenes").groups
+            else -> emptyList()
+        }
+        AlertDialog(
+            modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+            onDismissRequest = { confirmDeleteSelectedGroups = false },
+            title = { Text("Delete $count group${if (count == 1) "" else "s"}?") },
+            text = { Text("This removes the selected groups. Their members and sub-groups are kept (moved back to the top level).") },
+            confirmButton = {
+                TextButton(onClick = {
+                    groupsForTab.filter { it.id in selectedGroupIds }.forEach { viewModel.deleteGroup(it) }
+                    selectedGroupIds = emptySet()
+                    confirmDeleteSelectedGroups = false
+                }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDeleteSelectedGroups = false }) { Text("Cancel") } },
         )
     }
 
@@ -2452,6 +2495,12 @@ private fun ProfilesScreen(
     onClearProfileSelection: () -> Unit,
     onDeleteSelectedProfiles: () -> Unit,
     onMoveSelectedToProject: () -> Unit,
+    selectedGroupIds: Set<Long> = emptySet(),
+    onLongPressGroup: (ItemGroupEntity) -> Unit = {},
+    onToggleSelectGroup: (ItemGroupEntity) -> Unit = {},
+    onSelectAllGroups: () -> Unit = {},
+    onClearGroupSelection: () -> Unit = {},
+    onDeleteSelectedGroups: () -> Unit = {},
     groupOps: GroupOps,
     contentPadding: PaddingValues,
 ) {
@@ -2479,6 +2528,7 @@ private fun ProfilesScreen(
     val listState = rememberLazyListState()
     val reorder = rememberListReorderState()
     val selectionActive = selectedIds.isNotEmpty()
+    val groupSelectionActive = selectedGroupIds.isNotEmpty()
     Column(Modifier.fillMaxSize().padding(contentPadding)) {
         if (selectionActive) {
             SelectionBar(
@@ -2488,6 +2538,16 @@ private fun ProfilesScreen(
                 onClear = onClearProfileSelection,
                 onDelete = onDeleteSelectedProfiles,
                 onMoveToProject = onMoveSelectedToProject,
+            )
+        }
+        if (groupSelectionActive) {
+            SelectionBar(
+                count = selectedGroupIds.size,
+                total = groupOps.groups.size,
+                onSelectAll = onSelectAllGroups,
+                onClear = onClearGroupSelection,
+                onDelete = onDeleteSelectedGroups,
+                noun = "groups",
             )
         }
         val moveHost = rememberGroupMoveHost()
@@ -2516,7 +2576,9 @@ private fun ProfilesScreen(
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().weight(1f),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            // Reserve clearance for the bottom-right "+" FAB so the LAST row's ⋮ menu (e.g. an empty
+            // group header at the very bottom) is never hidden under it.
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 88.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (groupOps.groups.isEmpty()) {
@@ -2530,6 +2592,9 @@ private fun ProfilesScreen(
                     profiles, { it.id.toString() }, groupOps, dragState,
                     onMoveItem = { moveHost.movingItemKey = it },
                     onMoveGroup = { moveHost.movingGroup = it },
+                    selectedGroupIds = selectedGroupIds,
+                    onLongPressGroup = onLongPressGroup,
+                    onToggleSelectGroup = onToggleSelectGroup,
                 ) { profile -> profileCard(profile) }
             }
         }
@@ -2849,6 +2914,12 @@ private fun TasksScreen(
     onClearTaskSelection: () -> Unit,
     onDeleteSelectedTasks: () -> Unit,
     onMoveSelectedToProject: () -> Unit,
+    selectedGroupIds: Set<Long> = emptySet(),
+    onLongPressGroup: (ItemGroupEntity) -> Unit = {},
+    onToggleSelectGroup: (ItemGroupEntity) -> Unit = {},
+    onSelectAllGroups: () -> Unit = {},
+    onClearGroupSelection: () -> Unit = {},
+    onDeleteSelectedGroups: () -> Unit = {},
     groupOps: GroupOps,
     contentPadding: PaddingValues,
 ) {
@@ -2865,6 +2936,7 @@ private fun TasksScreen(
     val listState = rememberLazyListState()
     val reorder = rememberListReorderState()
     val selectionActive = selectedIds.isNotEmpty()
+    val groupSelectionActive = selectedGroupIds.isNotEmpty()
     Column(Modifier.fillMaxSize().padding(contentPadding)) {
         if (selectionActive) {
             SelectionBar(
@@ -2874,6 +2946,16 @@ private fun TasksScreen(
                 onClear = onClearTaskSelection,
                 onDelete = onDeleteSelectedTasks,
                 onMoveToProject = onMoveSelectedToProject,
+            )
+        }
+        if (groupSelectionActive) {
+            SelectionBar(
+                count = selectedGroupIds.size,
+                total = groupOps.groups.size,
+                onSelectAll = onSelectAllGroups,
+                onClear = onClearGroupSelection,
+                onDelete = onDeleteSelectedGroups,
+                noun = "groups",
             )
         }
         var pickerForKey by remember { mutableStateOf<String?>(null) }
@@ -2910,7 +2992,9 @@ private fun TasksScreen(
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().weight(1f),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            // Reserve clearance for the bottom-right "+" FAB so the LAST row's ⋮ menu (e.g. an empty
+            // group header at the very bottom) is never hidden under it.
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 88.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (groupOps.groups.isEmpty()) {
@@ -2924,6 +3008,9 @@ private fun TasksScreen(
                     tasks, { it.id.toString() }, groupOps, dragState,
                     onMoveItem = { pickerForKey = it },
                     onMoveGroup = { movingGroup = it },
+                    selectedGroupIds = selectedGroupIds,
+                    onLongPressGroup = onLongPressGroup,
+                    onToggleSelectGroup = onToggleSelectGroup,
                 ) { task -> taskCard(task) }
             }
         }
@@ -3681,10 +3768,11 @@ private fun ImportProjectConflictDialog(
                 },
             )
         },
-        // Stacked so long names don't overflow; default (import into existing) on top.
+        // Stacked so long names don't overflow; default (import into existing) on top and emphasised
+        // (a filled Button), matching the item-conflict dialog's "Overwrite".
         confirmButton = {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
-                TextButton(onClick = onOverwrite) {
+                Button(onClick = onOverwrite) {
                     Text(if (single != null) "Import into “$single”" else "Import into existing")
                 }
                 TextButton(onClick = onKeepBoth) { Text("Create new project") }

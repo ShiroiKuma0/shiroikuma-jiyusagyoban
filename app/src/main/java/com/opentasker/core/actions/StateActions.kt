@@ -7,6 +7,7 @@ import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import android.os.PowerManager
 import android.provider.Settings
+import com.opentasker.core.contexts.ApplicationContextEvents
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
@@ -21,6 +22,8 @@ import com.opentasker.core.engine.ActionResult
  *   - `charging` → "true" / "false".
  *   - `wifi`     → "true" / "false" (WiFi enabled).
  *   - `airplane` → "true" / "false".
+ *   - `screen`   → "on" / "off".
+ *   - `app`      → the foreground app's package name ("" if unknown).
  */
 class StateGetAction : Action {
     override val id = "state.get"
@@ -58,7 +61,12 @@ class StateGetAction : Action {
         val screenOn = (app.getSystemService(Context.POWER_SERVICE) as? PowerManager)?.isInteractive == true
         store("screen", if (screenOn) "on" else "off")
 
-        ctx.logger("State: battery=$pct% charging=$charging wifi=$wifi airplane=$airplane screen=${if (screenOn) "on" else "off"}")
+        // Foreground app package — for branching on the current app (e.g. physical-key per-app remaps).
+        // Sourced from the usage monitor (needs the engine running + PACKAGE_USAGE_STATS); "" if unknown.
+        val foreground = ApplicationContextEvents.current
+        store("app", foreground)
+
+        ctx.logger("State: battery=$pct% charging=$charging wifi=$wifi airplane=$airplane screen=${if (screenOn) "on" else "off"} app=$foreground")
         return ActionResult.Success
     }
 }

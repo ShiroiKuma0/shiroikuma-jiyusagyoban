@@ -116,6 +116,31 @@ class LockdownAction : Action {
 }
 
 /**
+ * Power off the device via Shizuku (shell `svc power shutdown`, falling back to `reboot -p`).
+ * Requires Shizuku running + granted.
+ */
+class PowerOffAction : Action {
+    override val id = "power.off"
+    override val category = ActionCategory.SYSTEM
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        if (!ShizukuShell.available()) {
+            return ActionResult.Failure("power off needs Shizuku running + access granted")
+        }
+        return withContext(Dispatchers.IO) {
+            val ok = runCatching { ShizukuShell.exec("svc power shutdown").exitCode == 0 }.getOrDefault(false) ||
+                runCatching { ShizukuShell.exec("reboot -p").exitCode == 0 }.getOrDefault(false)
+            if (ok) {
+                ctx.logger("Power off")
+                ActionResult.Success
+            } else {
+                ActionResult.Failure("power off command failed")
+            }
+        }
+    }
+}
+
+/**
  * Turn off screen.
  */
 class ScreenOffAction : Action {

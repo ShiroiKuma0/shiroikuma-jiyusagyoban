@@ -39,6 +39,8 @@ fun SelectionBar(
     onClear: () -> Unit,
     onDelete: () -> Unit,
     onMoveToProject: (() -> Unit)? = null,
+    // Shown as "$count $noun" — defaults to the item wording; the group bar passes "groups".
+    noun: String = "selected",
 ) {
     Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)) {
         Row(
@@ -47,7 +49,7 @@ fun SelectionBar(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             IconButton(onClick = onClear) { Icon(Icons.Filled.Close, contentDescription = "Clear selection") }
-            Text("$count selected", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Text("$count $noun", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             TextButton(onClick = onSelectAll, enabled = count < total) { Text("Select all") }
             if (onMoveToProject != null) {
                 IconButton(onClick = onMoveToProject) { Icon(Icons.AutoMirrored.Filled.DriveFileMove, contentDescription = "Move selected to project") }

@@ -39,6 +39,12 @@ object CapabilityState {
         CapabilityRequirement.AllFiles ->
             if (Build.VERSION.SDK_INT >= 30) Environment.isExternalStorageManager()
             else ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        CapabilityRequirement.DeviceAdmin -> {
+            val dpm = context.getSystemService(android.app.admin.DevicePolicyManager::class.java)
+            dpm?.isAdminActive(android.content.ComponentName(context, com.opentasker.core.admin.DeviceAdmin::class.java)) == true
+        }
+        CapabilityRequirement.Microphone ->
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
     }
 
     /** The settings screen that grants [req], or null when there is nothing to deep-link (e.g. [CapabilityRequirement.None]). */
@@ -62,6 +68,13 @@ object CapabilityState {
                     Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + context.packageName))
                 else
                     Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + context.packageName))
+            CapabilityRequirement.DeviceAdmin ->
+                Intent(android.app.admin.DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).putExtra(
+                    android.app.admin.DevicePolicyManager.EXTRA_DEVICE_ADMIN,
+                    android.content.ComponentName(context, com.opentasker.core.admin.DeviceAdmin::class.java),
+                )
+            CapabilityRequirement.Microphone ->
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + context.packageName))
         }
         return intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
@@ -77,6 +90,8 @@ object CapabilityState {
         CapabilityRequirement.NotificationListener -> "Needs notification access."
         CapabilityRequirement.Dnd -> "Needs Do Not Disturb access."
         CapabilityRequirement.AllFiles -> "Needs All files access to read files outside the app (e.g. tones in shared storage)."
+        CapabilityRequirement.DeviceAdmin -> "Needs Device admin enabled."
+        CapabilityRequirement.Microphone -> "Needs the Microphone permission."
     }
 
     /** Short status-pill text for the current state of [req] (granted vs. not). */
@@ -90,6 +105,8 @@ object CapabilityState {
         CapabilityRequirement.NotificationListener -> if (met) "Notification access on" else "Notification access off"
         CapabilityRequirement.Dnd -> if (met) "Do Not Disturb access on" else "Do Not Disturb access off"
         CapabilityRequirement.AllFiles -> if (met) "All files access on" else "All files access off"
+        CapabilityRequirement.DeviceAdmin -> if (met) "Device admin on" else "Device admin off"
+        CapabilityRequirement.Microphone -> if (met) "Microphone allowed" else "Microphone off"
     }
 
     /** Short button text for the fix action. */
@@ -103,5 +120,40 @@ object CapabilityState {
         CapabilityRequirement.Dnd -> "Grant Do Not Disturb access"
         CapabilityRequirement.PostNotifications -> "Grant notification access"
         CapabilityRequirement.AllFiles -> "Grant All files access"
+        CapabilityRequirement.DeviceAdmin -> "Enable device admin"
+        CapabilityRequirement.Microphone -> "Grant microphone"
+    }
+
+    /** Short noun for a permission, for the run-time block dialog (“needs: Accessibility”). */
+    fun shortLabel(req: CapabilityRequirement): String = when (req) {
+        CapabilityRequirement.None -> ""
+        CapabilityRequirement.Accessibility -> "Accessibility"
+        CapabilityRequirement.Shizuku -> "Shizuku"
+        CapabilityRequirement.WriteSettings -> "Modify system settings"
+        CapabilityRequirement.Overlay -> "Display over other apps"
+        CapabilityRequirement.PostNotifications -> "Notifications"
+        CapabilityRequirement.NotificationListener -> "Notification access"
+        CapabilityRequirement.Dnd -> "Do Not Disturb access"
+        CapabilityRequirement.AllFiles -> "All files access"
+        CapabilityRequirement.DeviceAdmin -> "Device admin"
+        CapabilityRequirement.Microphone -> "Microphone"
+    }
+
+    /** A missing, blocking permission and the action types in the task that need it. */
+    data class MissingCapability(val requirement: CapabilityRequirement, val actionTypes: List<String>)
+
+    /**
+     * Permissions a task needs that are BLOCKING and not currently granted. Empty = the task may run.
+     * Used as a pre-flight gate so a task never runs half-broken for lack of a permission.
+     */
+    fun missingForTask(task: com.opentasker.core.model.Task, context: Context): List<MissingCapability> {
+        val byReq = LinkedHashMap<CapabilityRequirement, MutableList<String>>()
+        for (action in task.actions) {
+            val cap = ActionCapabilityRegistry.get(action.type)
+            if (cap.requirement != CapabilityRequirement.None && cap.blocking && !isMet(cap.requirement, context)) {
+                byReq.getOrPut(cap.requirement) { mutableListOf() }.add(action.type)
+            }
+        }
+        return byReq.map { (req, types) -> MissingCapability(req, types.distinct()) }
     }
 }

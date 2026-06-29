@@ -26,6 +26,7 @@ object HardwareKeyContextEvents {
     const val PRESS_SHORT = "short"
     const val PRESS_LONG = "long"
     const val PRESS_DOUBLE = "double"
+    const val PRESS_TRIPLE = "triple"
 
     private val keys = MutableSharedFlow<ContextEvent>(
         extraBufferCapacity = 32,

@@ -104,7 +104,7 @@ class AutomationService : Service() {
         appUsageMonitor.start(scope)
         shakeDetector.start()
         orientationDetector.start()
-        hardwareKeyListener.start(scope)
+        hardwareKeyListener.start(this, scope)
         ContextCompat.registerReceiver(
             this,
             PackageContextEvents.receiver,

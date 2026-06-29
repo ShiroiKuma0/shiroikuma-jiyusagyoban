@@ -51,6 +51,7 @@ android {
     namespace = "com.opentasker.app"
     compileSdk = 37
     buildToolsVersion = "36.0.0"
+    ndkVersion = "28.2.13676358"
 
     defaultConfig {
         applicationId = "shiroikuma.jiyusagyoban"
@@ -63,6 +64,16 @@ android {
         buildConfigField("Boolean", "SMS_ACTION_AVAILABLE", smsActionAvailable.toString())
         manifestPlaceholders["smsPermissionName"] = if (smsActionAvailable) "android.permission.SEND_SMS" else "android.permission.INTERNET"
         manifestPlaceholders["phoneStatePermissionName"] = if (smsActionAvailable) "android.permission.READ_PHONE_STATE" else "android.permission.ACCESS_NETWORK_STATE"
+        ndk {
+            // The native key-grabber (libevgrab.so) ships arm64 only, matching our single-ABI APK.
+            abiFilters += "arm64-v8a"
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
     }
 
     signingConfigs {
@@ -112,10 +123,14 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        aidl = true
     }
 
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        // Extract libevgrab.so to nativeLibraryDir so the Shizuku UserService (KeyGrabberService) can
+        // System.load() it by absolute path from the privileged process.
+        jniLibs.useLegacyPackaging = true
     }
 
     sourceSets {

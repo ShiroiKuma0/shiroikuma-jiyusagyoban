@@ -99,6 +99,7 @@
     <application
         android:name=".OpenTaskerApp_NoHilt"
         android:label="@string/app_name"
+        android:extractNativeLibs="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/Theme.OpenTasker"
@@ -278,6 +279,14 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="shiroikuma.jiyusagyoban.action.SET_WIDGET_NAME" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.opentasker.widget.GetWidgetBindingReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="shiroikuma.jiyusagyoban.action.GET_WIDGET_BINDING" />
             </intent-filter>
         </receiver>
 

@@ -39,6 +39,7 @@ import com.opentasker.core.actions.PlaySoundAction
 import com.opentasker.core.actions.PreviousTrackAction
 import com.opentasker.core.actions.ReadFileAction
 import com.opentasker.core.actions.RingerModeAction
+import com.opentasker.core.actions.PowerOffAction
 import com.opentasker.core.actions.RebootAction
 import com.opentasker.core.actions.SayAction
 import com.opentasker.core.actions.ScreenOffAction
@@ -50,6 +51,7 @@ import com.opentasker.core.actions.SendIntentAction
 import com.opentasker.core.actions.SendSmsAction
 import com.opentasker.core.actions.SetVariableAction
 import com.opentasker.core.actions.StopSoundAction
+import com.opentasker.core.actions.TogglePlayPauseAction
 import com.opentasker.core.actions.TaskerUnsupportedAction
 import com.opentasker.core.actions.TermuxScriptAction
 import com.opentasker.core.actions.TileStateAction
@@ -177,6 +179,7 @@ private fun registerBuiltInActions() {
         PlaySoundAction(),
         StopSoundAction(),
         PauseSoundAction(),
+        TogglePlayPauseAction(),
         NextTrackAction(),
         PreviousTrackAction(),
         MuteAction(),
@@ -184,6 +187,7 @@ private fun registerBuiltInActions() {
         AudioRecordStopAction(),
         VibrateAction(),
         RebootAction(),
+        PowerOffAction(),
         LockDeviceAction(),
         ScreenOffAction(),
         WakeAction(),

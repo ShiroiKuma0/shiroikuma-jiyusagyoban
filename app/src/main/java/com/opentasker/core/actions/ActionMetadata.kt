@@ -1042,6 +1042,8 @@ fun registerActionMetadata() {
                 ActionField("charging", "Charging → variable", hint = "var for true/false (e.g. CHG)"),
                 ActionField("wifi", "WiFi on → variable", hint = "var for true/false (e.g. WIFI)"),
                 ActionField("airplane", "Airplane on → variable", hint = "var for true/false (e.g. AIR)"),
+                ActionField("screen", "Screen on → variable", hint = "var for on/off (e.g. SCR)"),
+                ActionField("app", "Foreground app → variable", hint = "var for the package name (e.g. APP)"),
             )
         )
     )
@@ -1453,6 +1455,16 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "media.playpause",
+            name = "Play/Pause",
+            description = "Toggle media play/pause",
+            category = "Media",
+            fields = emptyList()
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "media.mute",
             name = "Mute",
             description = "Mute audio",
@@ -1501,6 +1513,16 @@ fun registerActionMetadata() {
             id = "reboot",
             name = "Reboot Device",
             description = "Reboot the device",
+            category = "System",
+            fields = emptyList()
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "power.off",
+            name = "Power Off",
+            description = "Shut down the device (via Shizuku).",
             category = "System",
             fields = emptyList()
         )

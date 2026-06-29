@@ -31,12 +31,14 @@ class SetWidgetNameReceiver : BroadcastReceiver() {
             appWidgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
         }
         val name = intent.getStringExtra(EXTRA_WIDGET_NAME)?.trim().orEmpty()
+        // null = template field not sent (leave the binding as-is); "" = clear (back to static); else = bind.
+        val template = intent.getStringExtra(EXTRA_WIDGET_TEMPLATE)
         val provider = intent.getStringExtra(EXTRA_PROVIDER)?.let(ComponentName::unflattenFromString)
 
         val handled = protocol == PROTOCOL_VERSION &&
             appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID &&
-            name.isNotEmpty() &&
-            runCatching { persistAndRender(app, appWidgetId, name, provider) }.getOrDefault(false)
+            (name.isNotEmpty() || template != null) &&   // name OR template — a pull widget has no name
+            runCatching { persistAndRender(app, appWidgetId, name, provider, template) }.getOrDefault(false)
 
         // Only ordered broadcasts carry a result; setting it for a non-ordered one is a no-op/warning.
         if (isOrderedBroadcast) {
@@ -44,20 +46,31 @@ class SetWidgetNameReceiver : BroadcastReceiver() {
         }
     }
 
-    /** Persist `appWidgetId → name` for the addressed provider and re-render it. Returns false if unhandled. */
-    private fun persistAndRender(app: Context, appWidgetId: Int, name: String, provider: ComponentName?): Boolean {
+    /**
+     * Persist `appWidgetId → name` and/or its pull `template` for the addressed provider and re-render it.
+     * [template] null = leave the binding untouched; blank = clear it (back to static); else = bind to it.
+     * Returns false if unhandled.
+     */
+    private fun persistAndRender(app: Context, appWidgetId: Int, name: String, provider: ComponentName?, template: String?): Boolean {
         val manager = AppWidgetManager.getInstance(app) ?: return false
         val isTask = provider?.className?.endsWith("TaskWidgetProvider") == true
         val isStyled = provider == null || provider.className.endsWith("StyledWidgetProvider")
         return when {
             isTask -> {
-                app.getSharedPreferences(TaskWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
-                    .edit { putString(TaskWidgetProvider.keyTaskName(appWidgetId), name) }
+                // Task widgets have only a name, no pull template.
+                if (name.isNotEmpty()) {
+                    app.getSharedPreferences(TaskWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
+                        .edit { putString(TaskWidgetProvider.keyTaskName(appWidgetId), name) }
+                }
                 TaskWidgetProvider.updateWidget(app, manager, appWidgetId)
                 true
             }
             isStyled -> {
-                StyledWidgetStore.setName(app, appWidgetId, name)
+                if (name.isNotEmpty()) StyledWidgetStore.setName(app, appWidgetId, name)
+                if (template != null) {
+                    if (template.isBlank()) StyledWidgetStore.clearTemplate(app, appWidgetId)
+                    else StyledWidgetStore.setTemplate(app, appWidgetId, template)
+                }
                 StyledWidgetProvider.renderWidget(app, manager, appWidgetId)
                 true
             }
@@ -67,8 +80,10 @@ class SetWidgetNameReceiver : BroadcastReceiver() {
 
     companion object {
         const val ACTION_SET_WIDGET_NAME = "shiroikuma.jiyusagyoban.action.SET_WIDGET_NAME"
+        const val ACTION_GET_WIDGET_BINDING = "shiroikuma.jiyusagyoban.action.GET_WIDGET_BINDING"
         const val EXTRA_APPWIDGET_ID = "android.appwidget.extra.APPWIDGET_ID"
         const val EXTRA_WIDGET_NAME = "shiroikuma.jiyusagyoban.extra.WIDGET_NAME"
+        const val EXTRA_WIDGET_TEMPLATE = "shiroikuma.jiyusagyoban.extra.WIDGET_TEMPLATE"
         const val EXTRA_PROVIDER = "shiroikuma.jiyusagyoban.extra.PROVIDER"
         const val EXTRA_PROTOCOL = "shiroikuma.jiyusagyoban.extra.PROTOCOL"
         const val PROTOCOL_VERSION = 1

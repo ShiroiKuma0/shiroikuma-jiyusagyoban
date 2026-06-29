@@ -103,6 +103,7 @@ import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.core.model.Scene
+import com.opentasker.core.storage.ItemGroupEntity
 import com.opentasker.core.model.SceneElement
 import com.opentasker.core.model.SceneElementType
 import com.opentasker.core.model.Task
@@ -135,6 +136,12 @@ fun SceneLibraryScreen(
     onClearSceneSelection: () -> Unit,
     onDeleteSelectedScenes: () -> Unit,
     onMoveSelectedToProject: () -> Unit,
+    selectedGroupIds: Set<Long> = emptySet(),
+    onLongPressGroup: (ItemGroupEntity) -> Unit = {},
+    onToggleSelectGroup: (ItemGroupEntity) -> Unit = {},
+    onSelectAllGroups: () -> Unit = {},
+    onClearGroupSelection: () -> Unit = {},
+    onDeleteSelectedGroups: () -> Unit = {},
     createSignal: Int,
     hiddenByFilter: Int,
     expandedScenes: SnapshotStateMap<Long, Boolean>,
@@ -236,6 +243,7 @@ fun SceneLibraryScreen(
     val listState = rememberLazyListState()
     val reorder = rememberListReorderState()
     val selectionActive = selectedIds.isNotEmpty()
+    val groupSelectionActive = selectedGroupIds.isNotEmpty()
     Column(Modifier.fillMaxSize().padding(contentPadding)) {
         if (selectionActive) {
             SelectionBar(
@@ -245,6 +253,16 @@ fun SceneLibraryScreen(
                 onClear = onClearSceneSelection,
                 onDelete = onDeleteSelectedScenes,
                 onMoveToProject = onMoveSelectedToProject,
+            )
+        }
+        if (groupSelectionActive) {
+            SelectionBar(
+                count = selectedGroupIds.size,
+                total = groupOps.groups.size,
+                onSelectAll = onSelectAllGroups,
+                onClear = onClearGroupSelection,
+                onDelete = onDeleteSelectedGroups,
+                noun = "groups",
             )
         }
         val moveHost = rememberGroupMoveHost()
@@ -321,6 +339,9 @@ fun SceneLibraryScreen(
                     sortedScenes, { it.id.toString() }, groupOps, dragState,
                     onMoveItem = { moveHost.movingItemKey = it },
                     onMoveGroup = { moveHost.movingGroup = it },
+                    selectedGroupIds = selectedGroupIds,
+                    onLongPressGroup = onLongPressGroup,
+                    onToggleSelectGroup = onToggleSelectGroup,
                 ) { scene -> sceneCard(scene) }
             }
         }

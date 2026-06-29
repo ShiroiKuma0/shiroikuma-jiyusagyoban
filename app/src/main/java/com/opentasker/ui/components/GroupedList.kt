@@ -1,7 +1,9 @@
 package com.opentasker.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -133,6 +135,10 @@ fun <T> LazyListScope.groupedItems(
     drag: GroupDragState,
     onMoveItem: (String) -> Unit,
     onMoveGroup: (ItemGroupEntity) -> Unit,
+    // Group multi-select (long-press a header to start): defaulted so tabs that don't opt in still compile.
+    selectedGroupIds: Set<Long> = emptySet(),
+    onLongPressGroup: (ItemGroupEntity) -> Unit = {},
+    onToggleSelectGroup: (ItemGroupEntity) -> Unit = {},
     itemContent: @Composable (T) -> Unit,
 ) {
     val rows = buildGroupRows(items, keyOf, ops.groups, ops.groupIdOf, dragActive = drag.draggingKey != null)
@@ -154,6 +160,10 @@ fun <T> LazyListScope.groupedItems(
                     memberCount = row.memberCount,
                     depth = row.depth,
                     highlighted = drag.targetGroupId() == row.group.id,
+                    selected = row.group.id in selectedGroupIds,
+                    selectionActive = selectedGroupIds.isNotEmpty(),
+                    onToggleSelect = { onToggleSelectGroup(row.group) },
+                    onLongPress = { onLongPressGroup(row.group) },
                     onToggleExpanded = { ops.toggleGroup(row.group) },
                     onRename = { ops.renameGroup(row.group, it) },
                     onDelete = { ops.deleteGroup(row.group) },
@@ -230,13 +240,19 @@ fun <T> LazyListScope.groupedItems(
 }
 
 /** Foldable group header — chevron + name + member count + an overflow menu (rename / delete / nest). */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun GroupHeaderRow(
     group: ItemGroupEntity,
     memberCount: Int,
     depth: Int,
     highlighted: Boolean = false,
+    // Multi-select: [selected] = this group is picked; while [selectionActive] a tap toggles instead of folds.
+    selected: Boolean = false,
+    selectionActive: Boolean = false,
     onToggleExpanded: () -> Unit,
+    onToggleSelect: () -> Unit = {},
+    onLongPress: () -> Unit = {},
     onRename: (String) -> Unit,
     onDelete: () -> Unit,
     onMoveInto: () -> Unit,
@@ -252,8 +268,15 @@ fun GroupHeaderRow(
             .padding(start = (depth * GROUP_INDENT_DP).dp)
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = if (highlighted) 0.42f else 0.16f))
-            .clickable { onToggleExpanded() }
+            .background(
+                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
+                else MaterialTheme.colorScheme.primary.copy(alpha = if (highlighted) 0.42f else 0.16f),
+            )
+            // Tap = fold (or toggle selection while selecting); long-press = start/extend a group selection.
+            .combinedClickable(
+                onClick = { if (selectionActive) onToggleSelect() else onToggleExpanded() },
+                onLongClick = onLongPress,
+            )
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),

@@ -2,12 +2,14 @@ package com.opentasker.ui.components
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -17,11 +19,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 
-/** One entry in a tab's action menu (New / Import / Export / …). */
-data class TabAction(val label: String, val icon: ImageVector, val onClick: () -> Unit)
+/** One entry in a tab's action menu (New / Import / Export / …). [dividerBefore] draws a separator line
+ *  above this item (used to set Export apart from the New/Import items). */
+data class TabAction(
+    val label: String,
+    val icon: ImageVector,
+    val dividerBefore: Boolean = false,
+    val onClick: () -> Unit,
+)
 
 /**
  * The uniform per-tab "+" button: tapping it opens a menu of [actions] (New <item>, Import JSON,
@@ -43,6 +52,13 @@ fun TabActionsFab(actions: List<TabAction>) {
         }
         ThemedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             actions.forEach { action ->
+                if (action.dividerBefore) {
+                    // Pure yellow line, inset from both ends so it reads clearly as a divider (not edge-to-edge).
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        color = Color(0xFFFFFF00),
+                    )
+                }
                 DropdownMenuItem(
                     text = { Text(action.label) },
                     leadingIcon = { Icon(action.icon, contentDescription = null) },

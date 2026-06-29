@@ -1,5 +1,8 @@
 package com.opentasker.core.engine
 
+import com.opentasker.core.capabilities.CapabilityState
+import com.opentasker.core.dialog.DialogActivity
+import com.opentasker.core.dialog.DialogBridge
 import com.opentasker.core.expressions.TemplateExpansionTrace
 import com.opentasker.core.expressions.TemplateExpressionEngine
 import com.opentasker.core.model.ActionSpec
@@ -7,6 +10,7 @@ import com.opentasker.core.model.Task
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Resolves a sub-task by id or name for the `task.run` action. */
 typealias SubTaskResolver = suspend (ref: String) -> Task?
@@ -23,6 +27,8 @@ class TaskRunner(
     private val templateExpressionEngine: TemplateExpressionEngine = TemplateExpressionEngine(),
     private val resolveTask: SubTaskResolver? = null,
     private val depth: Int = 0,
+    /** Resolves a projectId → project name, for the permission-block dialog. Null → "Unfiled". */
+    private val projectNameResolver: (suspend (Long?) -> String?)? = null,
 ) {
     /** A live `flow.foreach` iteration in progress. */
     private class LoopFrame(
@@ -33,6 +39,35 @@ class TaskRunner(
     )
 
     suspend fun run(task: Task): TaskRunReport {
+        // Pre-flight permission gate: if the task uses an action whose special access isn't granted,
+        // DON'T run any action — show a modal OK dialog naming the task, project, and missing permission(s).
+        val missing = CapabilityState.missingForTask(task, ctx.app)
+        if (missing.isNotEmpty()) {
+            val preStart = System.currentTimeMillis()
+            val project = runCatching { projectNameResolver?.invoke(task.projectId) }.getOrNull() ?: "Unfiled"
+            showPermissionBlockDialog(project, task.name, missing)
+            val summary = missing.joinToString(", ") { CapabilityState.shortLabel(it.requirement) }
+            val failure = ActionResult.Failure("Not run — missing permission(s): $summary")
+            return TaskRunReport(
+                taskId = task.id,
+                taskName = task.name,
+                startedAt = preStart,
+                durationMs = System.currentTimeMillis() - preStart,
+                results = listOf(failure),
+                traces = listOf(
+                    ActionExecutionTrace(
+                        index = 0,
+                        actionType = "permission",
+                        label = "permission check",
+                        durationMs = 0,
+                        status = ActionTraceStatus.FAILURE,
+                        message = failure.message,
+                    ),
+                ),
+                success = false,
+            )
+        }
+
         ctx.variables.pushScope()
         val started = System.currentTimeMillis()
         val results = mutableListOf<ActionResult>()
@@ -264,7 +299,7 @@ class TaskRunner(
             returns = mutableMapOf(),
             logger = ctx.logger,
         )
-        val child = TaskRunner(childCtx, templateExpressionEngine, resolveTask, depth + 1)
+        val child = TaskRunner(childCtx, templateExpressionEngine, resolveTask, depth + 1, projectNameResolver)
         val report = child.run(target)
 
         // Surface the sub-task's named results and status back to the caller as variables.
@@ -279,6 +314,31 @@ class TaskRunner(
             ActionResult.Failure(errorMessage.ifBlank { "sub-task '${target.name}' failed" })
         }
         return result to traceFor(index, spec, started, result, expansionReport)
+    }
+
+    /** Modal OK dialog (via DialogActivity) naming the task, project, and each missing permission. */
+    private suspend fun showPermissionBlockDialog(
+        project: String,
+        taskName: String,
+        missing: List<CapabilityState.MissingCapability>,
+    ) {
+        val lines = missing.joinToString("\n") { m ->
+            "• ${CapabilityState.shortLabel(m.requirement)} — needed by: ${m.actionTypes.joinToString(", ")}"
+        }
+        val text = "Can't run “$taskName” (project “$project”).\n\nMissing permission(s):\n$lines\n\n" +
+            "Grant it in Settings, then run again."
+        val id = java.util.UUID.randomUUID().toString()
+        val deferred = DialogBridge.register(id)
+        val intent = android.content.Intent(ctx.app, DialogActivity::class.java).apply {
+            putExtra(DialogActivity.EXTRA_ID, id)
+            putExtra(DialogActivity.EXTRA_TYPE, DialogActivity.TYPE_TEXT)
+            putExtra(DialogActivity.EXTRA_TITLE, "Permission required")
+            putExtra(DialogActivity.EXTRA_TEXT, text)
+            putExtra(DialogActivity.EXTRA_OK, "OK")
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val shown = runCatching { ctx.app.startActivity(intent); true }.getOrDefault(false)
+        if (shown) runCatching { withTimeoutOrNull(120_000L) { deferred.await() } } else DialogBridge.cancel(id)
     }
 
     private fun shouldRun(spec: ActionSpec): Boolean {

@@ -24,6 +24,9 @@ object StyledWidgetStore {
     fun setTemplate(ctx: Context, id: Int, name: String) = prefs(ctx).edit { putString("$id.template", name) }
     fun getTemplate(ctx: Context, id: Int): String? = prefs(ctx).getString("$id.template", null)?.takeIf { it.isNotBlank() }
 
+    /** Drop the pull binding (back to the static [getLayout]). */
+    fun clearTemplate(ctx: Context, id: Int) = prefs(ctx).edit { remove("$id.template") }
+
     fun setTapTask(ctx: Context, id: Int, taskId: Long) = prefs(ctx).edit { putLong("$id.taptask", taskId) }
     fun getTapTask(ctx: Context, id: Int): Long = prefs(ctx).getLong("$id.taptask", -1L)
 

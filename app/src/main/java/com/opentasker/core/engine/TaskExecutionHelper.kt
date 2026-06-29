@@ -27,7 +27,11 @@ suspend fun executeAndLogTask(
     // Force-local so this invocation's event snapshot shadows the (possibly since-overwritten) super-global.
     eventLocals.forEach { (name, value) -> variables.setLocal(name, value) }
     val ctx = ActionContext(appContext, variables) { msg -> Log.i(logTag, msg) }
-    val runner = TaskRunner(ctx, resolveTask = dbSubTaskResolver(db))
+    val runner = TaskRunner(
+        ctx,
+        resolveTask = dbSubTaskResolver(db),
+        projectNameResolver = { pid -> pid?.let { db.projectDao().getById(it)?.name } },
+    )
     val report = runner.run(task)
     Log.i(logTag, "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)")
     maybeQueueFreezeBubble(appContext, task, variables)
