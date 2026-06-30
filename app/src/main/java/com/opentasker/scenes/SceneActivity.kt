@@ -46,13 +46,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -329,15 +338,23 @@ private fun SceneCard(
             // Modal: absorb taps so tapping the card (not the scrim) doesn't dismiss.
             .then(if (absorbTaps) Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {} else Modifier),
     ) {
-        scene.elements.forEach { element ->
-            // widthDp/heightDp <= 0 means "fill the card" — lets an element span a full-width bar scene.
-            Box(
-                Modifier
-                    .offset((element.xDp * scale).dp, (element.yDp * scale).dp)
-                    .then(if (element.widthDp > 0) Modifier.width((element.widthDp * scale).dp) else Modifier.fillMaxWidth())
-                    .then(if (element.heightDp > 0) Modifier.height((element.heightDp * scale).dp) else Modifier.fillMaxHeight()),
-            ) {
-                SceneElementView(element, onRunTask) { name, value -> onSetVar(scene.projectId, name, value) }
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val cardWidthDp = maxWidth.value  // the card's actual width in dp (= the real screen width when fullWidth)
+            scene.elements.forEach { element ->
+                // `xr` = the element's LEFT x measured from the card's RIGHT edge (right-anchored). Lets a
+                // fixed-width cluster hug the right of a full-width card, so it FILLS a folded screen and sits
+                // at the right ~half of a wider one — without depending on the (foldable-broken) window gravity.
+                val xr = element.config["xr"]?.trim()?.toFloatOrNull()
+                val xOffDp = if (xr != null) (cardWidthDp - xr) else (element.xDp * scale)
+                // widthDp/heightDp <= 0 means "fill the card" — lets an element span a full-width bar scene.
+                Box(
+                    Modifier
+                        .offset(xOffDp.dp, (element.yDp * scale).dp)
+                        .then(if (element.widthDp > 0) Modifier.width((element.widthDp * scale).dp) else Modifier.fillMaxWidth())
+                        .then(if (element.heightDp > 0) Modifier.height((element.heightDp * scale).dp) else Modifier.fillMaxHeight()),
+                ) {
+                    SceneElementView(element, onRunTask) { name, value -> onSetVar(scene.projectId, name, value) }
+                }
             }
         }
     }
@@ -511,7 +528,47 @@ internal fun SceneElementView(
             val onFinished: () -> Unit = { moved = false; if (!swipeOnly) onSettled() }
             val sliderColors = tint?.let { SliderDefaults.colors(thumbColor = it, activeTrackColor = it, inactiveTrackColor = it) }
             val label = v("label", "Slider")
-            if (vertical) {
+            // Fill style (style:"fill"): a fat rounded-capsule bar that fills from the bottom (no thumb),
+            // with a channel icon seated at the base. trackColor / fillColor / icon / iconColor / iconSize
+            // are configurable; drag (or tap) anywhere on the bar sets the level. Inherently vertical.
+            val styleFill = cfg["style"].equals("fill", ignoreCase = true)
+            if (styleFill) {
+                val trackColor = sceneColor(v("trackColor")) ?: Color(0xFF222222)
+                val fillColor = sceneColor(v("fillColor")) ?: tint ?: Color(0xFFFFFF00)
+                val iconSpec = cfg["icon"]?.trim()
+                val iconColor = sceneColor(v("iconColor")) ?: trackColor
+                val iconSz = cfg["iconSize"]?.toFloatOrNull() ?: 22f
+                val frac = ((value - min) / (max - min)).coerceIn(0f, 1f)
+                fun valueAtY(y: Float, hPx: Int): Float =
+                    min + (1f - (y / hPx.toFloat()).coerceIn(0f, 1f)) * (max - min)
+                Box(
+                    Modifier.fillMaxSize()
+                        .clip(RoundedCornerShape(percent = 50))
+                        .background(trackColor)
+                        .pointerInput(element.id) {
+                            detectTapGestures { off -> onChange(valueAtY(off.y, size.height)); onFinished() }
+                        }
+                        .pointerInput(element.id) {
+                            detectDragGestures(
+                                onDragStart = { off -> onChange(valueAtY(off.y, size.height)) },
+                                onDrag = { ch, _ -> ch.consume(); onChange(valueAtY(ch.position.y, size.height)) },
+                                onDragEnd = { onFinished() },
+                                onDragCancel = { onFinished() },
+                            )
+                        },
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    // The fill is clipped to the capsule by the parent, so its bottom is rounded.
+                    Box(Modifier.fillMaxWidth().fillMaxHeight(frac).background(fillColor))
+                    val vec = sliderIcon(iconSpec)
+                    Box(Modifier.fillMaxWidth().padding(bottom = 14.dp), contentAlignment = Alignment.BottomCenter) {
+                        when {
+                            vec != null -> Icon(vec, contentDescription = null, tint = iconColor, modifier = Modifier.size(iconSz.dp))
+                            !iconSpec.isNullOrBlank() -> Text(iconSpec, color = iconColor, fontSize = iconSz.sp)
+                        }
+                    }
+                }
+            } else if (vertical) {
                 // A horizontal Slider rotated 90° CCW: its track length follows the element height, so
                 // the top is max and dragging up increases the value.
                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -781,6 +838,19 @@ internal fun SceneElementView(
 
 /** Truthy parse for checkbox/toggle scene values. */
 private fun sceneBool(s: String): Boolean = s.trim().lowercase() in setOf("true", "1", "on", "yes")
+
+/** Channel icon for a fill-style slider (config `icon`). Unknown names → null (the renderer then shows the
+ *  raw `icon` string as a glyph). */
+private fun sliderIcon(name: String?): ImageVector? = when (name?.trim()?.lowercase()) {
+    "brightness", "light", "sun" -> Icons.Filled.LightMode
+    "media", "music", "song", "note" -> Icons.Filled.MusicNote
+    "ring", "ringer", "notification", "notif", "bell" -> Icons.Filled.Notifications
+    "alarm", "clock" -> Icons.Filled.Alarm
+    "call", "phone" -> Icons.Filled.Call
+    "mic", "microphone" -> Icons.Filled.Mic
+    "volume", "vol" -> Icons.AutoMirrored.Filled.VolumeUp
+    else -> null
+}
 
 /**
  * One detector for an edge strip's whole gesture set: 4-direction swipe, tap, double-tap, long-press.
