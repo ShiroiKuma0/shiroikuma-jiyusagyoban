@@ -2,6 +2,7 @@ package com.opentasker.ui.screens
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -15,6 +16,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -231,5 +233,84 @@ private fun TaskerImportListSection(
         title = title,
         body = values.take(5).joinToString("\n") + if (values.size > 5) "\n${values.size - 5} more" else "",
         color = color,
+    )
+}
+
+/** Asks how to handle a bundle whose project name(s) already exist: import into the existing project
+ *  (MERGE) or create a separate renamed project (RENAME). "Import into existing" is the default. */
+@Composable
+internal fun ImportProjectConflictDialog(
+    conflictingNames: List<String>,
+    onOverwrite: () -> Unit,
+    onKeepBoth: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val single = conflictingNames.singleOrNull()
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = onDismiss,
+        title = { Text("Project already exists") },
+        text = {
+            Text(
+                if (single != null) {
+                    "A project named “$single” already exists. Import into it (file the imported items under the existing project), or create a separate new (renamed) project?"
+                } else {
+                    "These projects already exist: ${conflictingNames.joinToString { "“$it”" }}. Import into them, or create separate new (renamed) projects?"
+                },
+            )
+        },
+        // Stacked so long names don't overflow; default (import into existing) on top and emphasised
+        // (a filled Button), matching the item-conflict dialog's "Overwrite".
+        confirmButton = {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+                Button(onClick = onOverwrite) {
+                    Text(if (single != null) "Import into “$single”" else "Import into existing")
+                }
+                TextButton(onClick = onKeepBoth) { Text("Create new project") }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        },
+    )
+}
+
+/** Asks how to handle bundle items (task/profile/scene/template) whose names already exist: overwrite
+ *  in place (default), overwrite keeping a backup, or import as renamed copies. */
+@Composable
+internal fun ImportItemConflictDialog(
+    collisions: List<String>,
+    onRename: () -> Unit,
+    onOverwriteDelete: () -> Unit,
+    onOverwriteBackup: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = onDismiss,
+        title = { Text("Some items already exist") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("These already exist in your workspace:", style = MaterialTheme.typography.bodyMedium)
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    collisions.take(12).forEach { Text("•  $it", style = MaterialTheme.typography.bodySmall) }
+                    if (collisions.size > 12) {
+                        Text("…and ${collisions.size - 12} more", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Text(
+                    "Overwrite updates each existing item in place (keeping its group, notes and links) — the default. Overwrite and backup renames the existing ones to “.<timestamp>.bak” first. Import with new names keeps both.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        // Stacked; default (overwrite in place) on top and emphasised.
+        confirmButton = {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+                Button(onClick = onOverwriteDelete) { Text("Overwrite") }
+                TextButton(onClick = onOverwriteBackup) { Text("Overwrite and backup current") }
+                TextButton(onClick = onRename) { Text("Import with new names") }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        },
     )
 }

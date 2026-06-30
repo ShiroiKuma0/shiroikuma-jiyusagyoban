@@ -47,7 +47,26 @@ import com.opentasker.core.actions.FieldType
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.model.ActionSpec
+import com.opentasker.ui.components.RgbaColorPickerDialog
+import com.opentasker.ui.components.ThemedDropdownMenu
 import com.opentasker.ui.theme.DesignSystem
+import com.opentasker.widget.WidgetEditor
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 
 @Composable
 internal fun ActionPickerDialog(
@@ -290,14 +309,135 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
             modifier = Modifier.fillMaxWidth(),
         )
 
-        FieldType.DROPDOWN,
+        // #AARRGGBB via the shared RGBA slider picker; a tappable swatch shows the current value.
+        FieldType.COLOR -> {
+            var showPicker by remember { mutableStateOf(false) }
+            val parsed = remember(value) {
+                runCatching { if (value.isBlank()) null else android.graphics.Color.parseColor(value) }.getOrNull()
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { showPicker = true }.padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(label, style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        if (parsed == null) "Default" else value.uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Box(
+                    Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(if (parsed == null) Color.Transparent else Color(parsed))
+                        .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
+                )
+            }
+            if (showPicker) {
+                RgbaColorPickerDialog(
+                    initial = value,
+                    onConfirm = { onChange(it); showPicker = false },
+                    onClear = { onChange(""); showPicker = false },
+                    onDismiss = { showPicker = false },
+                )
+            }
+        }
+
+        // Visual widget-layout editor (full-screen), with a raw-JSON advanced fallback below it.
+        FieldType.WIDGET_LAYOUT -> {
+            var editing by remember { mutableStateOf(false) }
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(label, style = MaterialTheme.typography.labelLarge)
+                OutlinedButton(onClick = { editing = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (value.isBlank()) "Design layout (visual editor)" else "Edit layout visually")
+                }
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = onChange,
+                    label = { Text("Layout JSON (advanced)") },
+                    placeholder = field.hint?.let { { Text(it) } },
+                    supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (editing) {
+                Dialog(
+                    onDismissRequest = { editing = false },
+                    properties = DialogProperties(usePlatformDefaultWidth = false),
+                ) {
+                    WidgetEditor(
+                        initialJson = value,
+                        onDone = { onChange(it); editing = false },
+                        onCancel = { editing = false },
+                    )
+                }
+            }
+        }
+
+        // Editable combo: free-text (so it can be a %variable) PLUS a dropdown of the field's options.
+        FieldType.DROPDOWN -> {
+            var expanded by remember { mutableStateOf(false) }
+            Box(Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = onChange,
+                    label = { Text(label) },
+                    placeholder = field.hint?.let { { Text(it) } },
+                    supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
+                    singleLine = true,
+                    trailingIcon = if (field.options.isEmpty()) null else {
+                        {
+                            IconButton(onClick = { expanded = true }) {
+                                Icon(Icons.Filled.ArrowDropDown, contentDescription = "Choose a value")
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    field.options.forEach { opt ->
+                        DropdownMenuItem(text = { Text(opt) }, onClick = { onChange(opt); expanded = false })
+                    }
+                }
+            }
+        }
+
+        // Editable text (a package name or %var) plus an installed-apps picker that fills it.
+        FieldType.APP_PACKAGE -> {
+            var showPicker by remember { mutableStateOf(false) }
+            OutlinedTextField(
+                value = value,
+                onValueChange = onChange,
+                label = { Text(label) },
+                placeholder = field.hint?.let { { Text(it) } },
+                supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
+                singleLine = true,
+                trailingIcon = {
+                    IconButton(onClick = { showPicker = true }) {
+                        Icon(Icons.Filled.Apps, contentDescription = "Pick an app")
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (showPicker) {
+                AppPickerDialog(
+                    onDismiss = { showPicker = false },
+                    onPick = { pkg -> onChange(pkg); showPicker = false },
+                )
+            }
+        }
+
         FieldType.TEXT -> OutlinedTextField(
             value = value,
             onValueChange = onChange,
             label = { Text(label) },
             placeholder = field.hint?.let { { Text(it) } },
             supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
-            singleLine = field.fieldType != FieldType.MULTILINE,
+            singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
     }

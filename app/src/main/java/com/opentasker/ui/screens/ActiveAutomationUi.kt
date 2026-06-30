@@ -7,7 +7,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,11 +44,15 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.UnfoldLess
+import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -49,7 +60,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -74,11 +84,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -93,6 +105,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.opentasker.ui.components.GroupOps
+import com.opentasker.ui.components.TabAction
+import com.opentasker.ui.components.TabActionsFab
+import com.opentasker.ui.components.ThemedDropdownMenu
 import com.opentasker.ui.theme.DesignSystem
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -122,6 +138,7 @@ import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProjectFilter
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
@@ -131,16 +148,21 @@ import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.EditHistoryDao
 import com.opentasker.core.storage.EditHistoryEntity
 import com.opentasker.core.storage.VariableEntity
+import com.opentasker.core.storage.ListSortStore
 import com.opentasker.core.storage.RunLogRetentionPolicy
 import com.opentasker.core.storage.RunLogRetentionSettings
+import com.opentasker.core.storage.SortMethod
+import com.opentasker.core.storage.SortTab
 import com.opentasker.core.storage.StorageDecodeIssue
 import com.opentasker.core.storage.minimumTimestamp
 import com.opentasker.core.storage.normalized
 import com.opentasker.core.storage.toEntity
 import com.opentasker.core.transfer.BundleImportPlan
+import com.opentasker.core.transfer.ItemConflictStrategy
 import com.opentasker.core.transfer.OpenTaskerBundle
 import com.opentasker.core.transfer.OpenTaskerBundleCodec
 import com.opentasker.core.transfer.OpenTaskerBundleRepository
+import com.opentasker.core.transfer.ProjectConflictStrategy
 import com.opentasker.core.transfer.TaskerImportPlanner
 import com.opentasker.core.transfer.TaskerImportPreview
 import com.opentasker.core.transfer.TaskerXmlImportReport
@@ -179,15 +201,31 @@ private const val DELETE_TARGET_CONTEXT = "context"
 
 
 private enum class OpenTaskerScreen(val label: String) {
+    Monitor("Monitor"),
+    Projects("Projects"),
     Profiles("Profiles"),
     Tasks("Tasks"),
     Vars("Variables"),
     Flow("Flow"),
     Scenes("Scenes"),
+    Widgets("Widgets"),
     Inspector("Inspector"),
     Setup("Setup"),
     RunLog("Run Log"),
+    Help("Help & Tools"),
 }
+
+/** A pending selective ("Export profiles/tasks/…") export awaiting the SAF create-document URI. */
+private data class PendingExport(
+    val fileName: String,
+    val name: String,
+    val profileIds: Set<Long> = emptySet(),
+    val taskIds: Set<Long> = emptySet(),
+    val sceneIds: Set<Long> = emptySet(),
+    val templateNames: Set<String> = emptySet(),
+    val variableKeys: Set<String> = emptySet(),
+    val includeVariables: Boolean = false,
+)
 
 private val primaryNavigationScreens = listOf(
     OpenTaskerScreen.Profiles,
@@ -204,9 +242,13 @@ private fun OpenTaskerScreen.icon(): ImageVector = when (this) {
     OpenTaskerScreen.Vars -> Icons.Filled.Menu
     OpenTaskerScreen.Flow -> Icons.Filled.Info
     OpenTaskerScreen.Scenes -> Icons.Filled.Edit
+    OpenTaskerScreen.Widgets -> Icons.Filled.PushPin
     OpenTaskerScreen.Inspector -> Icons.Filled.Info
     OpenTaskerScreen.Setup -> Icons.Filled.Settings
     OpenTaskerScreen.RunLog -> Icons.Filled.Info
+    OpenTaskerScreen.Monitor -> Icons.Filled.PlayArrow
+    OpenTaskerScreen.Projects -> Icons.Filled.Folder
+    OpenTaskerScreen.Help -> Icons.Filled.Info
 }
 
 internal data class ActionEditState(
@@ -223,7 +265,14 @@ internal data class ContextEditState(
     val existing: ContextSpec? = null,
 )
 
-
+/**
+ * Drives the top-bar expand/collapse-all toggle for a list tab: returns (anyExpanded, onToggle) where
+ * onToggle collapses everything if any card is open, otherwise expands every visible card.
+ */
+private fun <K> expandAllControl(map: SnapshotStateMap<K, Boolean>, keys: List<K>): Pair<Boolean, () -> Unit> {
+    val anyExpanded = keys.any { map[it] == true }
+    return anyExpanded to { keys.forEach { map[it] = !anyExpanded } }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -236,24 +285,131 @@ fun ActiveAutomationUi(
     val profiles by viewModel.profiles.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
     val scenes by viewModel.scenes.collectAsState()
+    val dataLoaded by viewModel.dataLoaded.collectAsState()
+    val projects by viewModel.projects.collectAsState()
+    val projectFilter = viewModel.projectFilter
+    val currentProjectId = (projectFilter as? ProjectFilter.Of)?.projectId
+    val itemGroups by viewModel.itemGroups.collectAsState()
+    val itemMeta by viewModel.itemMeta.collectAsState()
+    // Build the GroupOps a list tab needs, pre-filtered to that tab + the active project filter. Groups
+    // are scoped to the SAME project filter as their items, so they appear whenever their members do.
+    // `scoped = false` (used by Widgets) ignores the active project filter: widget templates carry no
+    // projectId, so their groups must show regardless of which project is selected.
+    fun groupOpsFor(tab: String, scoped: Boolean = true) = GroupOps(
+        groups = itemGroups.filter {
+            it.tab == tab && (!scoped || when (val f = projectFilter) {
+                is ProjectFilter.All -> true
+                is ProjectFilter.Unfiled -> it.projectId == null
+                is ProjectFilter.Of -> it.projectId == f.projectId
+            })
+        }.sortedBy { it.position },
+        groupIdOf = { key -> itemMeta.firstOrNull { it.tab == tab && it.itemKey == key }?.groupId },
+        projectId = if (scoped) currentProjectId else null,
+        setItemGroup = { key, gid -> viewModel.setItemGroup(tab, key, gid) },
+        createGroupForItem = { key, name ->
+            // File the new group in the same project as the item so it stays visible alongside it.
+            val pid = if (!scoped) null else (when (tab) {
+                "tasks" -> tasks.firstOrNull { it.id.toString() == key }?.projectId
+                "profiles" -> profiles.firstOrNull { it.id.toString() == key }?.projectId
+                "scenes" -> scenes.firstOrNull { it.id.toString() == key }?.projectId
+                else -> null
+            } ?: currentProjectId)
+            viewModel.moveItemToNewGroup(tab, pid, name, key)
+        },
+        createSubgroup = { parent, name -> viewModel.createGroup(parent.tab, parent.projectId, name, parent.id) },
+        setGroupParent = { g, pid -> viewModel.setGroupParent(g, pid) },
+        toggleGroup = { viewModel.toggleGroupExpanded(it) },
+        renameGroup = { g, n -> viewModel.renameGroup(g, n) },
+        deleteGroup = { viewModel.deleteGroup(it) },
+    )
+    val visibleProfiles = when (val f = projectFilter) {
+        ProjectFilter.All -> profiles
+        ProjectFilter.Unfiled -> profiles.filter { it.projectId == null }
+        is ProjectFilter.Of -> profiles.filter { it.projectId == f.projectId }
+    }
+    val visibleTasks = when (val f = projectFilter) {
+        ProjectFilter.All -> tasks
+        ProjectFilter.Unfiled -> tasks.filter { it.projectId == null }
+        is ProjectFilter.Of -> tasks.filter { it.projectId == f.projectId }
+    }
+    val visibleScenes = when (val f = projectFilter) {
+        ProjectFilter.All -> scenes
+        ProjectFilter.Unfiled -> scenes.filter { it.projectId == null }
+        is ProjectFilter.Of -> scenes.filter { it.projectId == f.projectId }
+    }
     val runLogs by viewModel.runLogs.collectAsState()
     val globalVariables by viewModel.globalVariables.collectAsState()
+    // Variables tab: expand/collapse + multi-select are local Compose state (the fork's VariablesScreen
+    // owns the rest). An empty GroupOps disables variable grouping — the grouping backend wiring
+    // (itemGroupDao + groupOpsFor) was dropped when the ViewModel/UI were taken from upstream; restoring
+    // it is a later manual step.
+    val expandedVars = remember { mutableStateMapOf<String, Boolean>() }
+    // Per-card fold state for the Profiles / Tasks / Scenes list tabs (de9f47a). An empty map = every card
+    // collapsed (the default); the top-bar expand/collapse-all toggle and each card's chevron flip entries.
+    // Plain remember (kept while on the tab, reset on tab switch) — mirrors expandedVars / expandedTemplates.
+    val expandedProfiles = remember { mutableStateMapOf<Long, Boolean>() }
+    val expandedTasks = remember { mutableStateMapOf<Long, Boolean>() }
+    val expandedScenes = remember { mutableStateMapOf<Long, Boolean>() }
+    // Flow tab: per-card fold state keyed by profileId (the graph key). Default collapsed, like the others.
+    val expandedFlows = remember { mutableStateMapOf<Long, Boolean>() }
+    var selectedVarKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val emptyVarGroupOps = remember {
+        GroupOps(
+            groups = emptyList(),
+            groupIdOf = { null },
+            projectId = null,
+            setItemGroup = { _, _ -> },
+            createGroupForItem = { _, _ -> },
+            createSubgroup = { _, _ -> },
+            setGroupParent = { _, _ -> },
+            toggleGroup = { },
+            renameGroup = { _, _ -> },
+            deleteGroup = { },
+        )
+    }
+    // Widget templates (the re-wired Widgets tab) + its expand/select state. Templates live in the
+    // device-local TemplateStore, not the DB, so they're read directly from its StateFlow.
+    val widgetTemplates by com.opentasker.widget.TemplateStore.state.collectAsState()
+    val expandedTemplates = remember { mutableStateMapOf<String, Boolean>() }
+    var selectedTemplateNames by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var widgetCreateSignal by remember { mutableIntStateOf(0) }
+    // Scenes "New scene" routes through the tab "+" menu like Tasks/Widgets: a tick opens the create dialog.
+    var sceneCreateSignal by remember { mutableIntStateOf(0) }
+    // Projects "New project" routes through the Projects tab "+" menu the same way: a tick opens its dialog.
+    var projectCreateSignal by remember { mutableIntStateOf(0) }
+    // Help (the re-wired Help tab): per-section fold state hoisted so it survives leaving the tab.
+    val expandedHelpSections = remember { mutableStateMapOf<String, Boolean>() }
+    // UI customization is a full-screen overlay reached from the top-bar overflow. (Projects is now a tab.)
+    var showUiCustomization by rememberSaveable { mutableStateOf(false) }
+    val sortPrefs by ListSortStore.state.collectAsState()
+    // A selective export ("Export profiles/tasks/…") waiting for the SAF create-document URI.
+    var pendingExport by remember { mutableStateOf<PendingExport?>(null) }
     val runLogRetentionPolicy by viewModel.runLogRetentionPolicy.collectAsState()
-    val backupSetupState by viewModel.backupSetupState.collectAsState()
     val storageDecodeIssues by viewModel.storageDecodeIssues.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    var screenOrdinal by rememberSaveable { mutableIntStateOf(0) }
+    // Monitor is the leftmost tab (ordinal 0) but the app should still LAND on Profiles, so seed the
+    // initial selection with Profiles' ordinal rather than 0.
+    var screenOrdinal by rememberSaveable { mutableIntStateOf(OpenTaskerScreen.Profiles.ordinal) }
     val screen = OpenTaskerScreen.entries.getOrElse(screenOrdinal) { OpenTaskerScreen.Profiles }
     var taskDialogId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var showCreateTaskDialog by rememberSaveable { mutableStateOf(false) }
+    // Quick icon picker invoked by tapping a task card's icon (or its "add icon" affordance).
+    var iconPickerTask by remember { mutableStateOf<Task?>(null) }
+    // Import-conflict chooser: after the review confirm, ask how to handle project / item name clashes.
+    var importConflict by remember { mutableStateOf<OpenTaskerBundle?>(null) }
+    var importItemConflict by remember { mutableStateOf<OpenTaskerBundle?>(null) }
+    var pendingProjectStrategy by remember { mutableStateOf(ProjectConflictStrategy.MERGE) }
     var profileDialogId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var showCreateProfileDialog by rememberSaveable { mutableStateOf(false) }
     var showTemplateDialog by rememberSaveable { mutableStateOf(false) }
     val onboardingCompleted by OnboardingPreference.hasCompleted(context).collectAsState(initial = true)
     LaunchedEffect(onboardingCompleted) {
         if (!onboardingCompleted) {
-            showTemplateDialog = true
+            // Fork: upstream's first-launch template-onboarding dialog is unwanted here (we have our own
+            // Setup + workspace workflow) and was flashing then being torn down under the main window on
+            // first start. Silently mark onboarding completed so it never auto-pops; the template picker
+            // stays reachable through the normal UI.
             OnboardingPreference.markCompleted(context)
         }
     }
@@ -284,13 +440,28 @@ fun ActiveAutomationUi(
     val openTaskerBundleImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.previewOpenTaskerBundle(it) }
     }
-    val databaseBackupExportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/octet-stream")
+    val selectionExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
-        uri?.let { viewModel.exportDatabaseBackup(it) }
+        val req = pendingExport
+        if (uri != null && req != null) {
+            viewModel.exportSelectionBundle(
+                uri = uri,
+                appVersion = BuildConfig.VERSION_NAME,
+                profileIds = req.profileIds,
+                taskIds = req.taskIds,
+                sceneIds = req.sceneIds,
+                includeVariables = req.includeVariables,
+                name = req.name,
+                templateNames = req.templateNames,
+                variableKeys = req.variableKeys,
+            )
+        }
+        pendingExport = null
     }
-    val databaseBackupImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let { viewModel.importDatabaseBackup(it) }
+    fun startSelectionExport(req: PendingExport) {
+        pendingExport = req
+        selectionExportLauncher.launch(req.fileName)
     }
     val taskDialog = taskDialogId.takeIf { it != NO_DIALOG_ENTITY_ID }
         ?.let { taskId -> tasks.firstOrNull { it.id == taskId } }
@@ -470,9 +641,18 @@ fun ActiveAutomationUi(
         OpenTaskerScreen.Vars -> "${globalVariables.size} global variables"
         OpenTaskerScreen.Flow -> "${profiles.size} profiles - ${tasks.size} tasks"
         OpenTaskerScreen.Scenes -> "${scenes.sumOf { it.elements.size }} elements - ${scenes.size} scenes"
+        OpenTaskerScreen.Widgets -> "${widgetTemplates.size} widget templates"
         OpenTaskerScreen.Inspector -> "Live context health"
         OpenTaskerScreen.Setup -> "Permission and reliability checks"
         OpenTaskerScreen.RunLog -> "${runLogs.size} recent entries"
+        OpenTaskerScreen.Monitor -> "Engine and live state"
+        OpenTaskerScreen.Projects -> "${projects.size} projects"
+        OpenTaskerScreen.Help -> "Schema and action reference"
+    }
+
+    if (showUiCustomization) {
+        UiCustomizationScreen(onBack = { showUiCustomization = false })
+        return
     }
 
     Scaffold(
@@ -484,7 +664,7 @@ fun ActiveAutomationUi(
             TopAppBar(
                 title = {
                     Column {
-                        Text("OpenTasker", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("白い熊 自由作業盤", maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
                             "${screen.label} - $headerDetail",
                             style = MaterialTheme.typography.labelMedium,
@@ -497,84 +677,208 @@ fun ActiveAutomationUi(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                 ),
+                actions = {
+                    // Expand / collapse every card on the current list tab (de9f47a). Default = all collapsed.
+                    val expandAll: Pair<Boolean, () -> Unit>? = when (screen) {
+                        OpenTaskerScreen.Profiles -> expandAllControl(expandedProfiles, visibleProfiles.map { it.id })
+                        OpenTaskerScreen.Tasks -> expandAllControl(expandedTasks, visibleTasks.map { it.id })
+                        OpenTaskerScreen.Flow -> expandAllControl(expandedFlows, profiles.map { it.id })
+                        OpenTaskerScreen.Scenes -> expandAllControl(expandedScenes, visibleScenes.map { it.id })
+                        OpenTaskerScreen.Widgets -> expandAllControl(expandedTemplates, widgetTemplates.map { it.name })
+                        OpenTaskerScreen.Vars -> expandAllControl(expandedVars, globalVariables.map { variableKey(it) })
+                        else -> null
+                    }
+                    if (expandAll != null) {
+                        IconButton(onClick = expandAll.second) {
+                            Icon(
+                                if (expandAll.first) Icons.Filled.UnfoldLess else Icons.Filled.UnfoldMore,
+                                contentDescription = if (expandAll.first) "Collapse all" else "Expand all",
+                            )
+                        }
+                    }
+                    var showOverflow by remember { mutableStateOf(false) }
+                    // Tap = overflow menu; long-press = jump straight to 白い熊 自由作業盤 UI.
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .pointerInput(Unit) {
+                                detectTapGestures(
+                                    onTap = { showOverflow = true },
+                                    onLongPress = { showUiCustomization = true },
+                                )
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "More options (long-press: 白い熊 自由作業盤 UI)")
+                    }
+                    ThemedDropdownMenu(expanded = showOverflow, onDismissRequest = { showOverflow = false }) {
+                        DropdownMenuItem(
+                            text = { Text("白い熊 自由作業盤 UI") },
+                            leadingIcon = { Icon(Icons.Filled.Settings, contentDescription = null) },
+                            onClick = { showOverflow = false; showUiCustomization = true },
+                        )
+                    }
+                },
             )
         },
         floatingActionButton = {
-            when (screen) {
-                OpenTaskerScreen.Profiles -> {
-                    val createLabel = stringResource(if (tasks.isEmpty()) R.string.task_new else R.string.profile_new)
-                    ExtendedFloatingActionButton(
-                        onClick = {
-                            if (tasks.isEmpty()) {
-                                showCreateTaskDialog = true
-                            } else {
-                                showCreateProfileDialog = true
-                            }
-                        },
-                        shape = RoundedCornerShape(DesignSystem.Radii.lg),
-                        icon = {
-                            Icon(
-                                Icons.Filled.Add,
-                                contentDescription = createLabel,
-                            )
-                        },
-                        text = { Text(createLabel) },
-                    )
-                }
-
-                OpenTaskerScreen.Tasks -> ExtendedFloatingActionButton(
-                    onClick = { showCreateTaskDialog = true },
-                    shape = RoundedCornerShape(DesignSystem.Radii.lg),
-                    icon = { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.task_new)) },
-                    text = { Text(stringResource(R.string.task_new)) },
+            // The fork's uniform per-tab "+" menu: New <item> / Import JSON / Export <selection> (set
+            // apart by a divider). Import routes through the unified bundle flow; export reuses the
+            // selective-export bundle (exportSelectionBundle).
+            val importJson = TabAction("Import JSON…", Icons.Filled.Add) {
+                openTaskerBundleImportLauncher.launch(OPEN_TASKER_BUNDLE_MIME_TYPES)
+            }
+            val actions: List<TabAction> = when (screen) {
+                OpenTaskerScreen.Profiles -> listOf(
+                    TabAction(if (tasks.isEmpty()) "New profile (needs a task)" else "New profile", Icons.Filled.Add) {
+                        if (tasks.isEmpty()) showCreateTaskDialog = true else showCreateProfileDialog = true
+                    },
+                    TabAction("From template…", Icons.Filled.Add) { showTemplateDialog = true },
+                    importJson,
+                    TabAction("Export profiles…", Icons.Filled.Edit, dividerBefore = true) {
+                        startSelectionExport(
+                            PendingExport(
+                                fileName = exportFileName("profiles"),
+                                name = "All profiles (${visibleProfiles.size})",
+                                profileIds = visibleProfiles.map { it.id }.toSet(),
+                            ),
+                        )
+                    },
+                    TabAction("Export everything…", Icons.Filled.Edit) {
+                        openTaskerBundleExportLauncher.launch(openTaskerBundleExportName())
+                    },
                 )
 
-                OpenTaskerScreen.Vars,
+                OpenTaskerScreen.Tasks -> listOf(
+                    TabAction("New task", Icons.Filled.Add) { showCreateTaskDialog = true },
+                    importJson,
+                    TabAction("Export tasks…", Icons.Filled.Edit, dividerBefore = true) {
+                        startSelectionExport(
+                            PendingExport(
+                                fileName = exportFileName("tasks"),
+                                name = "All tasks (${visibleTasks.size})",
+                                taskIds = visibleTasks.map { it.id }.toSet(),
+                            ),
+                        )
+                    },
+                    TabAction("Export everything…", Icons.Filled.Edit) {
+                        openTaskerBundleExportLauncher.launch(openTaskerBundleExportName())
+                    },
+                )
+
+                OpenTaskerScreen.Widgets -> listOf(
+                    TabAction("New widget template", Icons.Filled.Add) { widgetCreateSignal++ },
+                    importJson,
+                    TabAction("Export templates…", Icons.Filled.Edit, dividerBefore = true) {
+                        startSelectionExport(
+                            PendingExport(
+                                fileName = exportFileName("widget templates"),
+                                name = "All widget templates (${widgetTemplates.size})",
+                                templateNames = widgetTemplates.map { it.name }.toSet(),
+                            ),
+                        )
+                    },
+                    TabAction("Export everything…", Icons.Filled.Edit) {
+                        openTaskerBundleExportLauncher.launch(openTaskerBundleExportName())
+                    },
+                )
+
+                OpenTaskerScreen.Vars -> listOf(
+                    importJson,
+                    TabAction("Export variables…", Icons.Filled.Edit, dividerBefore = true) {
+                        startSelectionExport(
+                            PendingExport(
+                                fileName = exportFileName("variables"),
+                                name = "All variables (${globalVariables.size})",
+                                variableKeys = globalVariables.map { variableKey(it) }.toSet(),
+                            ),
+                        )
+                    },
+                    TabAction("Export everything…", Icons.Filled.Edit) {
+                        openTaskerBundleExportLauncher.launch(openTaskerBundleExportName())
+                    },
+                )
+
+                OpenTaskerScreen.Scenes -> listOf(
+                    TabAction("New scene", Icons.Filled.Add) { sceneCreateSignal++ },
+                    importJson,
+                    TabAction("Export scenes…", Icons.Filled.Edit, dividerBefore = true) {
+                        startSelectionExport(
+                            PendingExport(
+                                fileName = exportFileName("scenes"),
+                                name = "All scenes (${visibleScenes.size})",
+                                sceneIds = visibleScenes.map { it.id }.toSet(),
+                            ),
+                        )
+                    },
+                    TabAction("Export everything…", Icons.Filled.Edit) {
+                        openTaskerBundleExportLauncher.launch(openTaskerBundleExportName())
+                    },
+                )
+
+                OpenTaskerScreen.Projects -> listOf(
+                    TabAction("New project", Icons.Filled.Add) { projectCreateSignal++ },
+                    importJson,
+                    TabAction("Export everything…", Icons.Filled.Edit, dividerBefore = true) {
+                        openTaskerBundleExportLauncher.launch(openTaskerBundleExportName())
+                    },
+                )
+
                 OpenTaskerScreen.Flow,
-                OpenTaskerScreen.Scenes,
                 OpenTaskerScreen.Inspector,
                 OpenTaskerScreen.Setup,
-                OpenTaskerScreen.RunLog -> Unit
+                OpenTaskerScreen.RunLog,
+                OpenTaskerScreen.Monitor,
+                OpenTaskerScreen.Help -> emptyList()
             }
+            TabActionsFab(actions)
         },
         bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-                tonalElevation = 0.dp,
-            ) {
-                primaryNavigationScreens.forEach { destination ->
-                    OpenTaskerNavigationItem(
-                        selected = screen == destination,
-                        onClick = {
-                            screenOrdinal = destination.ordinal
-                            showMoreDestinations = false
-                        },
-                        icon = destination.icon(),
-                        label = destination.label,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                Box(Modifier.weight(1f)) {
-                    OpenTaskerNavigationItem(
-                        selected = screen in secondaryNavigationScreens,
-                        onClick = { showMoreDestinations = true },
-                        icon = Icons.Filled.Menu,
-                        label = "More",
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    DropdownMenu(
-                        expanded = showMoreDestinations,
-                        onDismissRequest = { showMoreDestinations = false },
-                        modifier = Modifier.align(Alignment.TopEnd),
-                    ) {
-                        secondaryNavigationScreens.forEach { destination ->
-                            DropdownMenuItem(
-                                text = { Text(destination.label) },
-                                leadingIcon = { Icon(destination.icon(), contentDescription = destination.label) },
-                                onClick = {
-                                    screenOrdinal = destination.ordinal
-                                    showMoreDestinations = false
-                                },
+            // Fork: a single horizontally-scrollable bar showing ALL destinations inline (no "More"
+            // overflow), matching de9f47a. Long-press the Setup cog jumps straight to 白い熊 自由作業盤 UI.
+            // Opaque background so edge-to-edge screens (e.g. Monitor) don't show through the bar.
+            Column(Modifier.background(MaterialTheme.colorScheme.surface)) {
+                HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.primary)
+                val navScroll = rememberScrollState()
+                val primary = MaterialTheme.colorScheme.primary
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(navScroll)
+                        .navigationBarsPadding()
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OpenTaskerScreen.entries.forEach { destination ->
+                        val selected = screen == destination
+                        val tapModifier = if (destination == OpenTaskerScreen.Setup) {
+                            Modifier.pointerInput(Unit) {
+                                detectTapGestures(
+                                    onTap = { screenOrdinal = OpenTaskerScreen.Setup.ordinal },
+                                    onLongPress = { showUiCustomization = true },
+                                )
+                            }
+                        } else {
+                            Modifier.clickable { screenOrdinal = destination.ordinal }
+                        }
+                        Column(
+                            modifier = Modifier
+                                .widthIn(min = 64.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .then(tapModifier)
+                                .background(if (selected) primary.copy(alpha = 0.16f) else androidx.compose.ui.graphics.Color.Transparent)
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            Icon(destination.icon(), contentDescription = null, tint = primary)
+                            Text(
+                                destination.label,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = primary,
+                                maxLines = 1,
                             )
                         }
                     }
@@ -583,11 +887,53 @@ fun ActiveAutomationUi(
         },
     ) { innerPadding ->
         when (screen) {
+            OpenTaskerScreen.Projects -> ProjectsManagementScreen(
+                contentPadding = innerPadding,
+                projects = projects,
+                memberCount = { pid ->
+                    profiles.count { it.projectId == pid } +
+                        tasks.count { it.projectId == pid } +
+                        scenes.count { it.projectId == pid }
+                },
+                sortMethod = sortPrefs.projects,
+                onToggleSort = {
+                    ListSortStore.set(
+                        SortTab.PROJECTS,
+                        if (sortPrefs.projects == SortMethod.MANUAL) SortMethod.ALPHABETICAL else SortMethod.MANUAL,
+                    )
+                },
+                createSignal = projectCreateSignal,
+                onCreate = { name, color -> viewModel.createProject(name, color) },
+                onUpdate = { viewModel.updateProject(it) },
+                onDelete = { project, deleteItems -> viewModel.deleteProject(project, deleteItems) },
+                onMoveUp = { viewModel.moveProject(it, up = true) },
+                onMoveDown = { viewModel.moveProject(it, up = false) },
+                onExportProject = { project ->
+                    startSelectionExport(
+                        PendingExport(
+                            fileName = exportFileName(project.name),
+                            name = "Project: ${project.name}",
+                            profileIds = profiles.filter { it.projectId == project.id }.map { it.id }.toSet(),
+                            taskIds = tasks.filter { it.projectId == project.id }.map { it.id }.toSet(),
+                            sceneIds = scenes.filter { it.projectId == project.id }.map { it.id }.toSet(),
+                        ),
+                    )
+                },
+            )
+
             OpenTaskerScreen.Profiles -> ProfilesScreen(
-                profiles = profiles,
+                profiles = visibleProfiles,
                 tasks = tasks,
+                expandedProfiles = expandedProfiles,
                 runLogs = runLogs,
                 storageDecodeIssues = storageDecodeIssues,
+                projects = projects,
+                projectFilter = projectFilter,
+                currentProjectId = currentProjectId,
+                onSelectProject = viewModel::selectProject,
+                groupOps = groupOpsFor("profiles"),
+                onMoveProfilesToProject = viewModel::moveProfilesToProject,
+                onDeleteProfiles = viewModel::deleteProfiles,
                 onCreateTaskFirst = {
                     screenOrdinal = OpenTaskerScreen.Tasks.ordinal
                     showCreateTaskDialog = true
@@ -612,15 +958,25 @@ fun ActiveAutomationUi(
                     if (profile.contexts.getOrNull(index) != null) openDeleteContext(profile, index)
                 },
                 contentPadding = innerPadding,
+                loaded = dataLoaded,
             )
 
             OpenTaskerScreen.Tasks -> TasksScreen(
-                tasks = tasks,
+                tasks = visibleTasks,
+                expandedTasks = expandedTasks,
                 storageDecodeIssues = storageDecodeIssues,
+                projects = projects,
+                projectFilter = projectFilter,
+                currentProjectId = currentProjectId,
+                onSelectProject = viewModel::selectProject,
+                groupOps = groupOpsFor("tasks"),
+                onMoveTasksToProject = viewModel::moveTasksToProject,
+                onDeleteTasks = viewModel::deleteTasks,
                 onCreateTask = { showCreateTaskDialog = true },
                 onEditTask = { openTaskDialog(it) },
                 onDeleteTask = { openDeleteTask(it) },
                 onRunTask = { viewModel.runTaskNow(it) },
+                onSetTaskFreeze = { t, on -> viewModel.updateTask(t.copy(freezeBubble = on), if (on) "Freeze bubble on" else "Freeze bubble off") },
                 onPinTask = { viewModel.pinTaskShortcut(it) },
                 onAddAction = { openActionPicker(it) },
                 onEditAction = { task, index, action ->
@@ -631,13 +987,19 @@ fun ActiveAutomationUi(
                 onDeleteAction = { task, index ->
                     if (task.actions.getOrNull(index) != null) openDeleteAction(task, index)
                 },
+                onApplyActions = { task, newActions ->
+                    viewModel.updateTask(task.copy(actions = newActions), "Actions updated")
+                },
+                onPickTaskIcon = { iconPickerTask = it },
                 contentPadding = innerPadding,
+                loaded = dataLoaded,
             )
 
             OpenTaskerScreen.Flow -> AutomationFlowScreen(
                 profiles = profiles,
                 tasks = tasks,
                 contentPadding = innerPadding,
+                expandedFlows = expandedFlows,
                 onNodeTargetSelected = openFlowTarget,
                 onAddContext = { profileId ->
                     val profile = profiles.firstOrNull { it.id == profileId }
@@ -665,12 +1027,45 @@ fun ActiveAutomationUi(
                 onUpdate = viewModel::updateVariable,
                 onDelete = viewModel::deleteVariable,
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
+                expandedVars = expandedVars,
+                selectedKeys = selectedVarKeys,
+                onLongPressVar = { selectedVarKeys = selectedVarKeys + variableKey(it) },
+                onToggleSelectVar = {
+                    val k = variableKey(it)
+                    selectedVarKeys = if (k in selectedVarKeys) selectedVarKeys - k else selectedVarKeys + k
+                },
+                onSelectAllVars = { selectedVarKeys = globalVariables.map { variableKey(it) }.toSet() },
+                onClearVarSelection = { selectedVarKeys = emptySet() },
+                onDeleteSelectedVars = {
+                    globalVariables.filter { variableKey(it) in selectedVarKeys }
+                        .forEach { viewModel.deleteVariable(it.projectId, it.name) }
+                    selectedVarKeys = emptySet()
+                },
+                groupOps = emptyVarGroupOps,
             )
 
+            // Scenes: the scene LIST has the fork's folding + multi-select (move-to-project / bulk-delete),
+            // wired through the same way as Tasks/Profiles. SceneLibraryScreen still owns the scene canvas /
+            // element editor below the list — that part is unchanged.
             OpenTaskerScreen.Scenes -> SceneLibraryScreen(
-                scenes = scenes,
+                scenes = visibleScenes,
+                expandedScenes = expandedScenes,
                 tasks = tasks,
-                onCreateScene = viewModel::createScene,
+                projects = projects,
+                projectFilter = projectFilter,
+                currentProjectId = currentProjectId,
+                onSelectProject = viewModel::selectProject,
+                groupOps = groupOpsFor("scenes"),
+                onMoveScenesToProject = viewModel::moveScenesToProject,
+                onDeleteScenes = viewModel::deleteScenes,
+                createSignal = sceneCreateSignal,
+                onCreateScene = { name, widthDp, heightDp, bgColor, cornerRadiusDp, scrimAlpha, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside ->
+                    viewModel.createScene(
+                        name, widthDp, heightDp, currentProjectId,
+                        bgColor, cornerRadiusDp, scrimAlpha, borderColor, borderWidth,
+                        defaultPosition, defaultModal, defaultDismissOnOutside,
+                    )
+                },
                 onUpdateScene = viewModel::updateScene,
                 onDeleteScene = { openDeleteScene(it) },
                 contentPadding = innerPadding,
@@ -679,10 +1074,6 @@ fun ActiveAutomationUi(
             OpenTaskerScreen.Setup -> PermissionOnboardingScreen(
                 contentPadding = innerPadding,
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
-                backupState = backupSetupState,
-                onCreateBackup = viewModel::createDatabaseBackup,
-                onExportBackup = { databaseBackupExportLauncher.launch(databaseBackupExportName()) },
-                onImportBackup = { databaseBackupImportLauncher.launch(DATABASE_BACKUP_MIME_TYPES) },
             )
 
             OpenTaskerScreen.Inspector -> ContextInspectorScreen(db = db, contentPadding = innerPadding)
@@ -694,6 +1085,56 @@ fun ActiveAutomationUi(
                 onRetentionPolicyChange = viewModel::updateRunLogRetention,
                 onShareDiagnostic = viewModel::shareDiagnosticReport,
                 contentPadding = innerPadding,
+            )
+
+            OpenTaskerScreen.Widgets -> WidgetTemplatesScreen(
+                templates = widgetTemplates,
+                onSave = { name, layout -> com.opentasker.widget.TemplateStore.put(name, layout) },
+                onDelete = { com.opentasker.widget.TemplateStore.delete(it) },
+                onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
+                createSignal = widgetCreateSignal,
+                expandedTemplates = expandedTemplates,
+                selectedNames = selectedTemplateNames,
+                onLongPressTemplate = { selectedTemplateNames = selectedTemplateNames + it.name },
+                onToggleSelectTemplate = {
+                    selectedTemplateNames =
+                        if (it.name in selectedTemplateNames) selectedTemplateNames - it.name
+                        else selectedTemplateNames + it.name
+                },
+                onSelectAllTemplates = { selectedTemplateNames = widgetTemplates.map { it.name }.toSet() },
+                onClearTemplateSelection = { selectedTemplateNames = emptySet() },
+                onDeleteSelectedTemplates = {
+                    selectedTemplateNames.forEach { com.opentasker.widget.TemplateStore.delete(it) }
+                    selectedTemplateNames = emptySet()
+                },
+                groupOps = groupOpsFor("widgets", scoped = false),
+                contentPadding = innerPadding,
+            )
+
+            OpenTaskerScreen.Monitor -> MonitorScreen(
+                profiles = profiles,
+                tasks = tasks,
+                projects = projects,
+                lastFired = runLogs.filter { it.sourceLabel != null }
+                    .groupBy { it.sourceLabel!! }
+                    .mapValues { (_, rows) -> rows.maxOf { it.timestamp } },
+                runLogs = runLogs,
+                contentPadding = innerPadding,
+            )
+
+            OpenTaskerScreen.Help -> HelpDocumentationScreen(
+                contentPadding = innerPadding,
+                expandedSections = expandedHelpSections,
+                tasks = tasks,
+                scenes = scenes,
+                onBrowseTemplates = { showTemplateDialog = true },
+                onCreateTask = { showCreateTaskDialog = true },
+                onCreateScene = {
+                    // Create-scene lives in SceneLibraryScreen; jump to the Scenes tab and tick its
+                    // create signal so the new-scene dialog opens there.
+                    screenOrdinal = OpenTaskerScreen.Scenes.ordinal
+                    sceneCreateSignal++
+                },
             )
         }
     }
@@ -730,21 +1171,94 @@ fun ActiveAutomationUi(
         )
     }
 
+    // The names already present in the workspace that an incoming bundle would clash with.
+    val itemCollisions: (OpenTaskerBundle) -> List<String> = { b ->
+        val taskNames = tasks.mapTo(HashSet()) { it.name.lowercase() }
+        val profileNames = profiles.mapTo(HashSet()) { it.name.lowercase() }
+        val sceneNames = scenes.mapTo(HashSet()) { it.name.lowercase() }
+        val templateNames = widgetTemplates.mapTo(HashSet()) { it.name.lowercase() }
+        buildList {
+            b.tasks.filter { it.name.lowercase() in taskNames }.forEach { add("Task “${it.name}”") }
+            b.profiles.filter { it.name.lowercase() in profileNames }.forEach { add("Profile “${it.name}”") }
+            b.scenes.filter { it.name.lowercase() in sceneNames }.forEach { add("Scene “${it.name}”") }
+            b.templates.filter { it.name.lowercase() in templateNames }.forEach { add("Widget template “${it.name}”") }
+        }
+    }
+    // After the project choice, ask the item-conflict question if any names clash; else import directly.
+    val startBundleImport: (OpenTaskerBundle, ProjectConflictStrategy) -> Unit = { b, projStrat ->
+        if (itemCollisions(b).isNotEmpty()) {
+            pendingProjectStrategy = projStrat
+            importItemConflict = b
+        } else {
+            // No name clashes → strategy is moot; default to overwrite for consistency.
+            viewModel.confirmOpenTaskerBundleImport(b, projStrat, ItemConflictStrategy.OVERWRITE_DELETE)
+        }
+    }
+
     openTaskerBundleReview?.let { state ->
         OpenTaskerBundleReviewDialog(
             state = state,
             busy = openTaskerBundleBusy,
             onDismiss = viewModel::clearOpenTaskerBundleReview,
-            onConfirm = { viewModel.confirmOpenTaskerBundleImport(state.bundle) },
+            onConfirm = {
+                val hasProjectCollision = state.bundle.projects.any { incoming ->
+                    projects.any { it.name.equals(incoming.name, ignoreCase = true) }
+                }
+                viewModel.clearOpenTaskerBundleReview()
+                if (hasProjectCollision) {
+                    importConflict = state.bundle
+                } else {
+                    startBundleImport(state.bundle, ProjectConflictStrategy.RENAME)
+                }
+            },
+        )
+    }
+
+    importConflict?.let { bundle ->
+        val conflictingNames = bundle.projects
+            .filter { incoming -> projects.any { it.name.equals(incoming.name, ignoreCase = true) } }
+            .map { it.name }
+        ImportProjectConflictDialog(
+            conflictingNames = conflictingNames,
+            onOverwrite = {
+                importConflict = null
+                startBundleImport(bundle, ProjectConflictStrategy.MERGE)
+            },
+            onKeepBoth = {
+                importConflict = null
+                startBundleImport(bundle, ProjectConflictStrategy.RENAME)
+            },
+            onDismiss = { importConflict = null },
+        )
+    }
+
+    importItemConflict?.let { bundle ->
+        ImportItemConflictDialog(
+            collisions = itemCollisions(bundle),
+            onRename = {
+                importItemConflict = null
+                viewModel.confirmOpenTaskerBundleImport(bundle, pendingProjectStrategy, ItemConflictStrategy.RENAME)
+            },
+            onOverwriteDelete = {
+                importItemConflict = null
+                viewModel.confirmOpenTaskerBundleImport(bundle, pendingProjectStrategy, ItemConflictStrategy.OVERWRITE_DELETE)
+            },
+            onOverwriteBackup = {
+                importItemConflict = null
+                viewModel.confirmOpenTaskerBundleImport(bundle, pendingProjectStrategy, ItemConflictStrategy.OVERWRITE_BACKUP)
+            },
+            onDismiss = { importItemConflict = null },
         )
     }
 
     if (showCreateTaskDialog) {
         TaskEditorDialog(
             task = null,
+            siblingNames = tasks.filter { (it.projectId ?: 0L) == (currentProjectId ?: 0L) }
+                .map { it.name.trim().lowercase() }.toSet(),
             onDismiss = { showCreateTaskDialog = false },
-            onSave = { name, priority ->
-                viewModel.createTask(name, priority)
+            onSave = { name, priority, iconPath, freezeBubble ->
+                viewModel.createTask(name, priority, currentProjectId, iconPath, freezeBubble)
                 showCreateTaskDialog = false
             },
         )
@@ -753,10 +1267,23 @@ fun ActiveAutomationUi(
     taskDialog?.let { task ->
         TaskEditorDialog(
             task = task,
+            siblingNames = tasks.filter { (it.projectId ?: 0L) == (task.projectId ?: 0L) && it.id != task.id }
+                .map { it.name.trim().lowercase() }.toSet(),
             onDismiss = { clearTaskDialog() },
-            onSave = { name, priority ->
-                viewModel.updateTask(task.copy(name = name.trim(), priority = priority.coerceIn(0, 10)))
+            onSave = { name, priority, iconPath, freezeBubble ->
+                viewModel.updateTask(task.copy(name = name.trim(), priority = priority.coerceIn(0, 10), iconPath = iconPath, freezeBubble = freezeBubble))
                 clearTaskDialog()
+            },
+        )
+    }
+
+    iconPickerTask?.let { t ->
+        TaskIconPickerDialog(
+            initialIconPath = t.iconPath,
+            onDismiss = { iconPickerTask = null },
+            onConfirm = { path ->
+                viewModel.updateTask(t.copy(iconPath = path))
+                iconPickerTask = null
             },
         )
     }
@@ -765,9 +1292,11 @@ fun ActiveAutomationUi(
         ProfileEditorDialog(
             profile = null,
             tasks = tasks,
+            siblingNames = profiles.filter { (it.projectId ?: 0L) == (currentProjectId ?: 0L) }
+                .map { it.name.trim().lowercase() }.toSet(),
             onDismiss = { showCreateProfileDialog = false },
             onSave = { name, enabled, enterTaskId, cooldown, automationMode, group ->
-                viewModel.createProfile(name, enabled, enterTaskId, cooldown, automationMode, group)
+                viewModel.createProfile(name, enabled, enterTaskId, cooldown, automationMode, group, currentProjectId)
                 showCreateProfileDialog = false
             },
         )
@@ -799,6 +1328,8 @@ fun ActiveAutomationUi(
         ProfileEditorDialog(
             profile = profile,
             tasks = tasks,
+            siblingNames = profiles.filter { (it.projectId ?: 0L) == (profile.projectId ?: 0L) && it.id != profile.id }
+                .map { it.name.trim().lowercase() }.toSet(),
             onDismiss = { clearProfileDialog() },
             onSave = { name, enabled, enterTaskId, cooldown, automationMode, group ->
                 viewModel.updateProfile(

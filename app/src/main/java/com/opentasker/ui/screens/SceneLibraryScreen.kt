@@ -2,6 +2,9 @@ package com.opentasker.ui.screens
 
 import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,8 +23,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -29,6 +34,8 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -39,6 +46,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,6 +54,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -56,9 +65,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -73,6 +84,19 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.ui.theme.DesignSystem
+import com.opentasker.ui.components.ConfirmDeleteSelected
+import com.opentasker.ui.components.GroupMoveDialogs
+import com.opentasker.ui.components.GroupOps
+import com.opentasker.ui.components.ItemNoteSection
+import com.opentasker.ui.components.RgbaColorPickerDialog
+import com.opentasker.ui.components.SelectionBar
+import com.opentasker.ui.components.SelectionCheck
+import com.opentasker.ui.components.groupedItems
+import com.opentasker.ui.components.rememberGroupDragState
+import com.opentasker.ui.components.rememberGroupMoveHost
+import com.opentasker.ui.components.selectableItem
+import com.opentasker.core.model.Project
+import com.opentasker.core.model.ProjectFilter
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
 import com.opentasker.core.model.SceneElementType
@@ -90,13 +114,33 @@ import com.opentasker.core.scenes.SceneValidator
 @Composable
 fun SceneLibraryScreen(
     scenes: List<Scene>,
+    expandedScenes: SnapshotStateMap<Long, Boolean>,
     tasks: List<Task>,
-    onCreateScene: (String, Int, Int) -> Unit,
+    projects: List<Project>,
+    projectFilter: ProjectFilter,
+    currentProjectId: Long?,
+    onSelectProject: (ProjectFilter) -> Unit,
+    groupOps: GroupOps,
+    onMoveScenesToProject: (List<Scene>, Long?) -> Unit,
+    onDeleteScenes: (List<Scene>) -> Unit,
+    createSignal: Int,
+    onCreateScene: (name: String, widthDp: Int, heightDp: Int, bgColor: String?, cornerRadiusDp: Int, scrimAlpha: Int, borderColor: String?, borderWidth: Int, defaultPosition: String, defaultModal: Boolean, defaultDismissOnOutside: Boolean) -> Unit,
     onUpdateScene: (Scene, String) -> Unit,
     onDeleteScene: (Scene) -> Unit,
     contentPadding: PaddingValues,
 ) {
+    // Item + group multi-selection live here (re-mounting the screen on a tab switch resets them). Set<Long>
+    // has no Saver, so plain remember — not rememberSaveable — is correct. Mirrors TasksScreen.
+    var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var selectedGroupIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var showMoveDialog by remember { mutableStateOf(false) }
+    var confirmDeleteItems by remember { mutableStateOf(false) }
+    var confirmDeleteGroups by remember { mutableStateOf(false) }
+    val selectionActive = selectedIds.isNotEmpty()
+    val groupSelectionActive = selectedGroupIds.isNotEmpty()
+
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
+    var editSceneTargetId by rememberSaveable { mutableStateOf<Long?>(null) }
     var elementEditorSceneId by rememberSaveable { mutableStateOf<Long?>(null) }
     var elementEditorIndex by rememberSaveable { mutableStateOf<Int?>(null) }
     var pendingElementDeleteSceneId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -107,6 +151,11 @@ fun SceneLibraryScreen(
     }
     val pendingElementDelete = remember(scenes, pendingElementDeleteSceneId, pendingElementDeleteIndex) {
         sceneElementEditorState(scenes, pendingElementDeleteSceneId, pendingElementDeleteIndex, allowNew = false)
+    }
+
+    // "New scene" lives in the tab's "+" menu (TabActionsFab); a tick of [createSignal] opens the dialog.
+    LaunchedEffect(createSignal) {
+        if (createSignal > 0) showCreateDialog = true
     }
 
     LaunchedEffect(elementEditorSceneId, elementEditor) {
@@ -124,10 +173,33 @@ fun SceneLibraryScreen(
 
     if (showCreateDialog) {
         SceneEditorDialog(
+            siblingNames = scenes.mapTo(mutableSetOf()) { it.name.trim().lowercase() },
             onDismiss = { showCreateDialog = false },
-            onSave = { name, widthDp, heightDp ->
-                onCreateScene(name, widthDp, heightDp)
+            onSave = { name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside ->
+                onCreateScene(name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside)
                 showCreateDialog = false
+            },
+        )
+    }
+
+    scenes.firstOrNull { it.id == editSceneTargetId }?.let { target ->
+        SceneEditorDialog(
+            initial = target,
+            siblingNames = scenes.filter { (it.projectId ?: 0L) == (target.projectId ?: 0L) && it.id != target.id }
+                .mapTo(mutableSetOf()) { it.name.trim().lowercase() },
+            onDismiss = { editSceneTargetId = null },
+            onSave = { name, widthDp, heightDp, bgColor, corner, scrim, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside ->
+                onUpdateScene(
+                    target.copy(
+                        name = name, widthDp = widthDp, heightDp = heightDp,
+                        bgColor = bgColor, cornerRadiusDp = corner, scrimAlpha = scrim,
+                        borderColor = borderColor, borderWidth = borderWidth,
+                        defaultPosition = defaultPosition, defaultModal = defaultModal,
+                        defaultDismissOnOutside = defaultDismissOnOutside,
+                    ),
+                    "Scene updated",
+                )
+                editSceneTargetId = null
             },
         )
     }
@@ -178,59 +250,137 @@ fun SceneLibraryScreen(
         )
     }
 
-    if (sortedScenes.isEmpty()) {
-        SceneEmptyState(
-            contentPadding = contentPadding,
-            onCreateScene = { showCreateDialog = true },
-        )
-        return
+    Column(Modifier.fillMaxSize().padding(contentPadding)) {
+        if (projects.isNotEmpty()) {
+            ProjectFilterChips(projects, projectFilter, onSelectProject, Modifier.padding(vertical = 8.dp))
+        }
+        if (selectionActive) {
+            SelectionBar(
+                count = selectedIds.size,
+                total = sortedScenes.size,
+                onSelectAll = { selectedIds = sortedScenes.map { it.id }.toSet() },
+                onClear = { selectedIds = emptySet() },
+                onDelete = { confirmDeleteItems = true },
+                onMoveToProject = if (projects.isNotEmpty()) ({ showMoveDialog = true }) else null,
+            )
+        }
+        if (groupSelectionActive) {
+            SelectionBar(
+                count = selectedGroupIds.size,
+                total = groupOps.groups.size,
+                onSelectAll = { selectedGroupIds = groupOps.groups.map { it.id }.toSet() },
+                onClear = { selectedGroupIds = emptySet() },
+                onDelete = { confirmDeleteGroups = true },
+                noun = "groups",
+            )
+        }
+        if (sortedScenes.isEmpty()) {
+            Box(Modifier.weight(1f)) {
+                SceneEmptyState(
+                    contentPadding = PaddingValues(0.dp),
+                    onCreateScene = { showCreateDialog = true },
+                )
+            }
+        } else {
+            val moveHost = rememberGroupMoveHost()
+            val dragState = rememberGroupDragState()
+            val sceneCard: @Composable (Scene) -> Unit = { scene ->
+                val sceneContext = LocalContext.current
+                SceneCard(
+                    scene = scene,
+                    tasks = tasks,
+                    selectionActive = selectionActive,
+                    selected = scene.id in selectedIds,
+                    expanded = expandedScenes[scene.id] == true,
+                    onToggleExpanded = { expandedScenes[scene.id] = expandedScenes[scene.id] != true },
+                    onLongPress = { selectedIds = selectedIds + scene.id },
+                    onToggleSelect = { selectedIds = if (scene.id in selectedIds) selectedIds - scene.id else selectedIds + scene.id },
+                    onAddElement = {
+                        elementEditorSceneId = scene.id
+                        elementEditorIndex = null
+                    },
+                    onEditElement = { index, _ ->
+                        elementEditorSceneId = scene.id
+                        elementEditorIndex = index
+                    },
+                    onDeleteElement = { index, _ ->
+                        pendingElementDeleteSceneId = scene.id
+                        pendingElementDeleteIndex = index
+                    },
+                    onMoveElement = { index, element ->
+                        onUpdateScene(
+                            scene.copy(
+                                elements = scene.elements.mapIndexed { i, existing ->
+                                    if (i == index) element else existing
+                                },
+                            ),
+                            "Element moved",
+                        )
+                    },
+                    onEditScene = { editSceneTargetId = scene.id },
+                    onDelete = { onDeleteScene(scene) },
+                    onShowOverlay = { SceneOverlayService.show(sceneContext, scene) },
+                )
+            }
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().weight(1f),
+                // Reserve clearance for the bottom-right "+" FAB so the last row is never hidden under it.
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 88.dp),
+                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
+            ) {
+                if (groupOps.groups.isEmpty()) {
+                    items(sortedScenes, key = { it.id }) { scene -> sceneCard(scene) }
+                } else {
+                    groupedItems(
+                        sortedScenes, { it.id.toString() }, groupOps, dragState,
+                        onMoveItem = { moveHost.movingItemKey = it },
+                        onMoveGroup = { moveHost.movingGroup = it },
+                        selectedGroupIds = selectedGroupIds,
+                        onLongPressGroup = { selectedGroupIds = selectedGroupIds + it.id },
+                        onToggleSelectGroup = { g -> selectedGroupIds = if (g.id in selectedGroupIds) selectedGroupIds - g.id else selectedGroupIds + g.id },
+                    ) { scene -> sceneCard(scene) }
+                }
+            }
+            GroupMoveDialogs(groupOps, moveHost)
+        }
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(contentPadding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
-    ) {
-        item {
-            SceneOverviewCard(
-                scenes = sortedScenes,
-                tasks = tasks,
-                onCreateScene = { showCreateDialog = true },
-            )
-        }
-        items(sortedScenes, key = { it.id }) { scene ->
-            val sceneContext = LocalContext.current
-            SceneCard(
-                scene = scene,
-                tasks = tasks,
-                onAddElement = {
-                    elementEditorSceneId = scene.id
-                    elementEditorIndex = null
-                },
-                onEditElement = { index, _ ->
-                    elementEditorSceneId = scene.id
-                    elementEditorIndex = index
-                },
-                onDeleteElement = { index, _ ->
-                    pendingElementDeleteSceneId = scene.id
-                    pendingElementDeleteIndex = index
-                },
-                onMoveElement = { index, element ->
-                    onUpdateScene(
-                        scene.copy(
-                            elements = scene.elements.mapIndexed { i, existing ->
-                                if (i == index) element else existing
-                            },
-                        ),
-                        "Element moved",
-                    )
-                },
-                onDelete = { onDeleteScene(scene) },
-                onShowOverlay = { SceneOverlayService.show(sceneContext, scene) },
-            )
-        }
+    if (showMoveDialog) {
+        ProjectPickerDialog(
+            title = "Move ${selectedIds.size} scene${plural(selectedIds.size)}",
+            projects = projects,
+            currentProjectId = currentProjectId,
+            onPick = { pid ->
+                onMoveScenesToProject(sortedScenes.filter { it.id in selectedIds }, pid)
+                selectedIds = emptySet()
+                showMoveDialog = false
+            },
+            onDismiss = { showMoveDialog = false },
+        )
+    }
+    if (confirmDeleteItems) {
+        ConfirmDeleteSelected(
+            count = selectedIds.size,
+            noun = "scene",
+            onConfirm = {
+                onDeleteScenes(sortedScenes.filter { it.id in selectedIds })
+                selectedIds = emptySet()
+                confirmDeleteItems = false
+            },
+            onDismiss = { confirmDeleteItems = false },
+        )
+    }
+    if (confirmDeleteGroups) {
+        ConfirmDeleteSelected(
+            count = selectedGroupIds.size,
+            noun = "group",
+            onConfirm = {
+                groupOps.groups.filter { it.id in selectedGroupIds }.forEach { groupOps.deleteGroup(it) }
+                selectedGroupIds = emptySet()
+                confirmDeleteGroups = false
+            },
+            onDismiss = { confirmDeleteGroups = false },
+        )
     }
 }
 
@@ -318,7 +468,7 @@ private fun SceneEmptyState(
 }
 
 @Composable
-private fun SceneOverviewCard(
+internal fun SceneOverviewCard(
     scenes: List<Scene>,
     tasks: List<Task>,
     onCreateScene: () -> Unit,
@@ -369,10 +519,17 @@ private fun SceneOverviewCard(
 private fun SceneCard(
     scene: Scene,
     tasks: List<Task>,
+    selectionActive: Boolean,
+    selected: Boolean,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    onLongPress: () -> Unit,
+    onToggleSelect: () -> Unit,
     onAddElement: () -> Unit,
     onEditElement: (Int, SceneElement) -> Unit,
     onDeleteElement: (Int, SceneElement) -> Unit,
     onMoveElement: (Int, SceneElement) -> Unit,
+    onEditScene: () -> Unit,
     onDelete: () -> Unit,
     onShowOverlay: () -> Unit = {},
 ) {
@@ -384,87 +541,123 @@ private fun SceneCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+            else MaterialTheme.colorScheme.surface,
+        ),
+        border = BorderStroke(
+            if (selected) 2.dp else 1.dp,
+            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f),
+        ),
         shape = RoundedCornerShape(DesignSystem.Radii.xxl),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().selectableItem(
+                    selectionActive = selectionActive,
+                    onLongPress = onLongPress,
+                    onToggleSelect = onToggleSelect,
+                    onTapNormal = onToggleExpanded,
+                ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
+            ) {
+                if (selectionActive) {
+                    SelectionCheck(selected)
+                }
                 Column(Modifier.weight(1f)) {
                     Text(scene.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    // Collapsed: size + element count, plus an issue count when there is anything wrong.
                     Text(
-                        stringResource(R.string.scenes_card_summary, scene.widthDp, scene.heightDp, scene.elements.size),
+                        text = stringResource(R.string.scenes_card_summary, scene.widthDp, scene.heightDp, scene.elements.size) +
+                            if (!expanded && issues.isNotEmpty()) " - ${issues.size} issue${plural(issues.size)}" else "",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (overlayReady && scene.elements.isNotEmpty()) {
-                    OutlinedButton(onClick = onShowOverlay) {
-                        Text(stringResource(R.string.action_show), maxLines = 1)
-                    }
-                }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.scenes_delete), tint = MaterialTheme.colorScheme.error)
-                }
-            }
-
-            ScenePreviewBox(
-                scene = scene,
-                onMoveElement = { index, xDp, yDp ->
-                    scene.elements.getOrNull(index)?.let { element ->
-                        onMoveElement(index, element.copy(xDp = xDp, yDp = yDp))
-                    }
-                },
-                onResizeElement = { index, widthDp, heightDp ->
-                    scene.elements.getOrNull(index)?.let { element ->
-                        onMoveElement(index, element.copy(widthDp = widthDp, heightDp = heightDp))
-                    }
-                },
-                selectedIndices = selectedIndices,
-                onToggleSelect = { index ->
-                    selectedIndices = if (index in selectedIndices) selectedIndices - index else selectedIndices + index
-                },
-                onMoveSelected = { dx, dy ->
-                    val updated = scene.elements.mapIndexed { i, el ->
-                        if (i in selectedIndices) el.nudgedWithin(scene, dx, dy) else el
-                    }
-                    val updatedScene = scene.copy(elements = updated)
-                    updated.forEachIndexed { i, el ->
-                        if (i in selectedIndices && el != scene.elements[i]) {
-                            onMoveElement(i, el)
+                if (expanded) {
+                    if (overlayReady && scene.elements.isNotEmpty()) {
+                        OutlinedButton(onClick = onShowOverlay) {
+                            Text(stringResource(R.string.action_show), maxLines = 1)
                         }
                     }
-                },
-            )
-
-            OutlinedButton(onClick = onAddElement, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.scenes_add_element_content_description))
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.action_add_element))
-            }
-
-            if (scene.elements.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
-                    scene.elements.forEachIndexed { index, element ->
-                        SceneElementRow(
-                            scene = scene,
-                            element = element,
-                            taskNames = taskNames,
-                            onNudge = { deltaX, deltaY ->
-                                onMoveElement(index, element.nudgedWithin(scene, deltaX, deltaY))
-                            },
-                            onEdit = { onEditElement(index, element) },
-                            onDelete = { onDeleteElement(index, element) },
-                        )
+                    IconButton(onClick = onEditScene) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Edit scene properties")
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.scenes_delete), tint = MaterialTheme.colorScheme.error)
                     }
                 }
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Collapse scene" else "Expand scene",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
-            if (issues.isNotEmpty()) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    issues.take(4).forEach { issue ->
-                        SceneIssueText(issue)
+            if (expanded) {
+                ItemNoteSection("scenes", scene.id.toString())
+
+                ScenePreviewBox(
+                    scene = scene,
+                    onMoveElement = { index, xDp, yDp ->
+                        scene.elements.getOrNull(index)?.let { element ->
+                            onMoveElement(index, element.copy(xDp = xDp, yDp = yDp))
+                        }
+                    },
+                    onResizeElement = { index, widthDp, heightDp ->
+                        scene.elements.getOrNull(index)?.let { element ->
+                            onMoveElement(index, element.copy(widthDp = widthDp, heightDp = heightDp))
+                        }
+                    },
+                    selectedIndices = selectedIndices,
+                    onToggleSelect = { index ->
+                        selectedIndices = if (index in selectedIndices) selectedIndices - index else selectedIndices + index
+                    },
+                    onMoveSelected = { dx, dy ->
+                        val updated = scene.elements.mapIndexed { i, el ->
+                            if (i in selectedIndices) el.nudgedWithin(scene, dx, dy) else el
+                        }
+                        val updatedScene = scene.copy(elements = updated)
+                        updated.forEachIndexed { i, el ->
+                            if (i in selectedIndices && el != scene.elements[i]) {
+                                onMoveElement(i, el)
+                            }
+                        }
+                    },
+                )
+
+                OutlinedButton(onClick = onAddElement, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.scenes_add_element_content_description))
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.action_add_element))
+                }
+
+                if (scene.elements.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
+                        scene.elements.forEachIndexed { index, element ->
+                            SceneElementRow(
+                                scene = scene,
+                                element = element,
+                                taskNames = taskNames,
+                                onNudge = { deltaX, deltaY ->
+                                    onMoveElement(index, element.nudgedWithin(scene, deltaX, deltaY))
+                                },
+                                onEdit = { onEditElement(index, element) },
+                                onDelete = { onDeleteElement(index, element) },
+                            )
+                        }
+                    }
+                }
+
+                if (issues.isNotEmpty()) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        issues.take(4).forEach { issue ->
+                            SceneIssueText(issue)
+                        }
                     }
                 }
             }
@@ -623,7 +816,9 @@ private fun SceneCanvasElement(
             modifier = Modifier
                 .fillMaxSize()
                 .pointerInput(scene.id, element.id, projection.x, projection.y, canvasWidth, canvasHeight, density.density) {
-                    detectDragGestures(
+                    // Element move requires a deliberate LONG-PRESS first, so fling-scrolling the list/canvas
+                    // no longer accidentally drags an element (白い熊's report). Resize handle is unchanged.
+                    detectDragGesturesAfterLongPress(
                         onDragStart = { onSelect() },
                         onDrag = { change, dragAmount ->
                             change.consume()
@@ -1055,6 +1250,9 @@ private fun SceneElementEditorDialog(
                             ),
                             tapTaskId = tapTaskId,
                             longPressTaskId = longPressTaskId,
+                            // Persist the linked task NAME too, so the link survives a re-import that re-ids the task.
+                            tapTaskName = tasks.firstOrNull { it.id == tapTaskId }?.name ?: "",
+                            longPressTaskName = tasks.firstOrNull { it.id == longPressTaskId }?.name ?: "",
                         ),
                     )
                 },
@@ -1206,58 +1404,160 @@ private fun SceneStatusPill(
 
 @Composable
 private fun SceneEditorDialog(
+    initial: Scene? = null,
+    siblingNames: Set<String> = emptySet(),
     onDismiss: () -> Unit,
-    onSave: (String, Int, Int) -> Unit,
+    onSave: (name: String, widthDp: Int, heightDp: Int, bgColor: String?, cornerRadiusDp: Int, scrimAlpha: Int, borderColor: String?, borderWidth: Int, defaultPosition: String, defaultModal: Boolean, defaultDismissOnOutside: Boolean) -> Unit,
 ) {
-    var name by rememberSaveable { mutableStateOf("") }
-    var width by rememberSaveable { mutableStateOf("320") }
-    var height by rememberSaveable { mutableStateOf("240") }
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var width by remember { mutableStateOf((initial?.widthDp ?: 320).toString()) }
+    var height by remember { mutableStateOf((initial?.heightDp ?: 240).toString()) }
+    var bgColor by remember { mutableStateOf(initial?.bgColor ?: "") }
+    var corner by remember { mutableStateOf((initial?.cornerRadiusDp ?: 16).toString()) }
+    var scrim by remember { mutableStateOf((initial?.scrimAlpha ?: 55).toString()) }
+    var borderColor by remember { mutableStateOf(initial?.borderColor ?: "") }
+    var border by remember { mutableStateOf((initial?.borderWidth ?: 0).toString()) }
+    var defaultPosition by remember { mutableStateOf(initial?.defaultPosition?.lowercase() ?: "center") }
+    var defaultModal by remember { mutableStateOf(initial?.defaultModal ?: true) }
+    var defaultDismissOnOutside by remember { mutableStateOf(initial?.defaultDismissOnOutside ?: true) }
     val parsedWidth = width.toIntOrNull()
     val parsedHeight = height.toIntOrNull()
-    val canSave = name.isNotBlank() && parsedWidth != null && parsedHeight != null && parsedWidth > 0 && parsedHeight > 0
+    // Scene names are unique within a project (siblingNames = other scenes in the same project).
+    val nameClash = name.isNotBlank() && name.trim().lowercase() in siblingNames
+    val canSave = name.isNotBlank() && !nameClash && parsedWidth != null && parsedHeight != null && parsedWidth > 0 && parsedHeight > 0
 
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.scenes_create)) },
+        title = { Text(if (initial == null) "Create Scene" else "Edit Scene") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+            Column(
+                modifier = Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.scenes_scene_name)) },
+                    label = { Text("Scene name") },
+                    isError = nameClash,
+                    supportingText = if (nameClash) {
+                        { Text("Another scene in this project already has that name.") }
+                    } else null,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
-                    value = width,
-                    onValueChange = { width = it.filter(Char::isDigit).take(4) },
-                    label = { Text(stringResource(R.string.label_width_dp)) },
-                    isError = parsedWidth == null || parsedWidth <= 0,
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    NumberField("Width dp", width, { width = it.filter(Char::isDigit).take(4) }, parsedWidth == null || parsedWidth <= 0, Modifier.weight(1f))
+                    NumberField("Height dp", height, { height = it.filter(Char::isDigit).take(4) }, parsedHeight == null || parsedHeight <= 0, Modifier.weight(1f))
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Text("Panel", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                SceneColorField(label = "Background colour", value = bgColor, onChange = { bgColor = it })
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    NumberField("Corner (dp)", corner, { corner = it.filter(Char::isDigit).take(2) }, isError = false, modifier = Modifier.weight(1f))
+                    NumberField("Scrim %", scrim, { scrim = it.filter(Char::isDigit).take(3) }, isError = false, modifier = Modifier.weight(1f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) {
+                        SceneColorField(label = "Border colour", value = borderColor, onChange = { borderColor = it })
+                    }
+                    NumberField("Border (dp)", border, { border = it.filter(Char::isDigit).take(2) }, isError = false, modifier = Modifier.weight(1f))
+                }
+                Text(
+                    "Blanks use the theme: background = black, text/borders = yellow. Scrim is the dim behind a modal scene (0 = clear, 100 = black); border 0 = none.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                OutlinedTextField(
-                    value = height,
-                    onValueChange = { height = it.filter(Char::isDigit).take(4) },
-                    label = { Text(stringResource(R.string.label_height_dp)) },
-                    isError = parsedHeight == null || parsedHeight <= 0,
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Text("Default presentation", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    listOf("top" to "Top", "center" to "Center", "bottom" to "Bottom").forEach { (key, text) ->
+                        FilterChip(
+                            selected = defaultPosition == key,
+                            onClick = { defaultPosition = key },
+                            label = { Text(text) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Modal (block underneath)", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Switch(checked = defaultModal, onCheckedChange = { defaultModal = it })
+                }
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Tap outside dismisses", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Switch(checked = defaultDismissOnOutside, onCheckedChange = { defaultDismissOnOutside = it }, enabled = defaultModal)
+                }
+                Text(
+                    "How this scene shows when scene.show omits position/modal/dismiss. An explicit action argument still wins. Non-modal is a tap-through HUD (can't take text input).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 enabled = canSave,
-                onClick = { onSave(name.trim(), parsedWidth ?: 320, parsedHeight ?: 240) },
+                onClick = {
+                    onSave(
+                        name.trim(),
+                        parsedWidth ?: 320,
+                        parsedHeight ?: 240,
+                        bgColor.trim().ifBlank { null },
+                        corner.toIntOrNull()?.coerceAtLeast(0) ?: 16,
+                        (scrim.toIntOrNull() ?: 55).coerceIn(0, 100),
+                        borderColor.trim().ifBlank { null },
+                        border.toIntOrNull()?.coerceAtLeast(0) ?: 0,
+                        defaultPosition,
+                        defaultModal,
+                        defaultDismissOnOutside,
+                    )
+                },
             ) {
-                Text(stringResource(R.string.action_create))
+                Text(if (initial == null) "Create" else "Save")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
+}
+
+@Composable
+private fun SceneColorField(label: String, value: String, onChange: (String) -> Unit) {
+    var showPicker by remember { mutableStateOf(false) }
+    val parsed = remember(value) {
+        runCatching { if (value.isBlank()) null else android.graphics.Color.parseColor(value) }.getOrNull()
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { showPicker = true }.padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                if (parsed == null) "Default" else value.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Box(
+            Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(if (parsed == null) Color.Transparent else Color(parsed))
+                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
+        )
+    }
+    if (showPicker) {
+        RgbaColorPickerDialog(
+            initial = value,
+            onConfirm = { onChange(it); showPicker = false },
+            onClear = { onChange(""); showPicker = false },
+            onDismiss = { showPicker = false },
+        )
+    }
 }
 
 @Composable

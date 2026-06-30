@@ -181,8 +181,6 @@ fun ContextInspectorScreen(
         return
     }
 
-    val oem = remember { OemBatteryGuidance.forDevice(Build.MANUFACTURER, Build.BRAND) }
-
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -192,11 +190,6 @@ fun ContextInspectorScreen(
     ) {
         item {
             ContextInspectorSummaryCard(snapshot = snapshot, onRefresh = viewModel::refresh)
-        }
-        if (oem.needsExtraSteps) {
-            item {
-                OemRiskNotice(oem)
-            }
         }
         item {
             Text(

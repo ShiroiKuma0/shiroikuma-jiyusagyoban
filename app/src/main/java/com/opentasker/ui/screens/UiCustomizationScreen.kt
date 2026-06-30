@@ -258,6 +258,42 @@ fun UiCustomizationScreen(
             item { SectionHeader("Task list") }
             item { TaskIconSizeRow(level = 1, prefs = prefs) }
 
+            item { SectionHeader("Tasks") }
+            item {
+                SliderRow(
+                    level = 1, label = "Gap between cards",
+                    value = prefs.taskCardGapDp, valueText = "${prefs.taskCardGapDp} dp",
+                    range = 0f..ThemePrefs.TASK_CARD_GAP_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(taskCardGapDp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Padding inside card",
+                    value = prefs.taskCardVPadDp, valueText = "${prefs.taskCardVPadDp} dp",
+                    range = 0f..ThemePrefs.TASK_CARD_VPAD_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(taskCardVPadDp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Padding inside group headers",
+                    value = prefs.groupHeaderVPadDp, valueText = "${prefs.groupHeaderVPadDp} dp",
+                    range = 0f..ThemePrefs.GROUP_HEADER_VPAD_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(groupHeaderVPadDp = v) } },
+                )
+            }
+
+            item { SectionHeader("Monitor") }
+            item {
+                SliderRow(
+                    level = 1, label = "Task row spacing",
+                    value = prefs.monitorRowPadDp, valueText = "${prefs.monitorRowPadDp} dp",
+                    range = 0f..ThemePrefs.MONITOR_PAD_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(monitorRowPadDp = v) } },
+                )
+            }
+
             item { SectionHeader("Freeze bubbles") }
             item { FreezeBubblePreview(level = 1, prefs = prefs) }
             item {

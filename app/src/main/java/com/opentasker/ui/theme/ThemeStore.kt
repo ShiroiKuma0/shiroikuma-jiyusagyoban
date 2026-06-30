@@ -43,6 +43,11 @@ data class ThemePrefs(
     val flashFontWeight: Int = 700,              // 100..900 (Bold by default — bigger & heavier)
     // ---- Task list -------------------------------------------------------------------------------
     val taskIconSizeDp: Int = 32,                // size of a task's custom icon on its card [TASK_ICON_MIN, TASK_ICON_MAX]
+    val taskCardGapDp: Int = 6,                  // gap BETWEEN task cards (Tasks tab) [0, TASK_CARD_GAP_MAX]
+    val taskCardVPadDp: Int = 8,                 // vertical padding INSIDE a task pill (Tasks tab) [0, TASK_CARD_VPAD_MAX]
+    val groupHeaderVPadDp: Int = 8,              // vertical padding INSIDE a group header (lists) [0, GROUP_HEADER_VPAD_MAX]
+    // ---- Monitor ---------------------------------------------------------------------------------
+    val monitorRowPadDp: Int = 2,                // vertical padding per Monitor task-activity row; 2 = tight [0, MONITOR_PAD_MAX]
     // ---- Freeze bubbles (Desktop re-freeze overlays) ---------------------------------------------
     val bubbleIconSizeDp: Int = 48,              // [BUBBLE_ICON_MIN, BUBBLE_ICON_MAX]
     val bubbleIconCornerDp: Int = 12,            // icon corner radius; 0 = square, up to BUBBLE_ICON_CORNER_MAX
@@ -75,6 +80,11 @@ data class ThemePrefs(
 
         const val TASK_ICON_MIN = 16
         const val TASK_ICON_MAX = 96
+        const val TASK_CARD_GAP_MAX = 24
+        const val TASK_CARD_VPAD_MAX = 24
+        const val GROUP_HEADER_VPAD_MAX = 24
+
+        const val MONITOR_PAD_MAX = 24
 
         const val BUBBLE_ICON_MIN = 24
         const val BUBBLE_ICON_MAX = 96
@@ -125,6 +135,10 @@ object ThemeStore {
     private const val K_FLASH_TEXT_SIZE = "flash_text_size"
     private const val K_FLASH_FONT_WEIGHT = "flash_font_weight"
     private const val K_TASK_ICON_SIZE = "task_icon_size"
+    private const val K_TASK_CARD_GAP = "task_card_gap"
+    private const val K_TASK_CARD_VPAD = "task_card_vpad"
+    private const val K_GROUP_HEADER_VPAD = "group_header_vpad"
+    private const val K_MONITOR_PAD = "monitor_row_pad"
     private const val K_BUBBLE_ICON_SIZE = "bubble_icon_size"
     private const val K_BUBBLE_ICON_CORNER = "bubble_icon_corner"
     private const val K_BUBBLE_LABEL_SIZE = "bubble_label_size"
@@ -172,6 +186,10 @@ object ThemeStore {
         flashTextSizeSp = flashTextSizeSp.coerceIn(ThemePrefs.FLASH_TEXT_MIN, ThemePrefs.FLASH_TEXT_MAX),
         flashFontWeight = flashFontWeight.coerceIn(ThemePrefs.FONT_WEIGHT_MIN, ThemePrefs.FONT_WEIGHT_MAX),
         taskIconSizeDp = taskIconSizeDp.coerceIn(ThemePrefs.TASK_ICON_MIN, ThemePrefs.TASK_ICON_MAX),
+        taskCardGapDp = taskCardGapDp.coerceIn(0, ThemePrefs.TASK_CARD_GAP_MAX),
+        taskCardVPadDp = taskCardVPadDp.coerceIn(0, ThemePrefs.TASK_CARD_VPAD_MAX),
+        groupHeaderVPadDp = groupHeaderVPadDp.coerceIn(0, ThemePrefs.GROUP_HEADER_VPAD_MAX),
+        monitorRowPadDp = monitorRowPadDp.coerceIn(0, ThemePrefs.MONITOR_PAD_MAX),
         bubbleIconSizeDp = bubbleIconSizeDp.coerceIn(ThemePrefs.BUBBLE_ICON_MIN, ThemePrefs.BUBBLE_ICON_MAX),
         bubbleIconCornerDp = bubbleIconCornerDp.coerceIn(0, ThemePrefs.BUBBLE_ICON_CORNER_MAX),
         bubbleLabelSizeSp = bubbleLabelSizeSp.coerceIn(ThemePrefs.BUBBLE_LABEL_MIN, ThemePrefs.BUBBLE_LABEL_MAX),
@@ -205,6 +223,10 @@ object ThemeStore {
             flashTextSizeSp = prefs.getInt(K_FLASH_TEXT_SIZE, d.flashTextSizeSp),
             flashFontWeight = prefs.getInt(K_FLASH_FONT_WEIGHT, d.flashFontWeight),
             taskIconSizeDp = prefs.getInt(K_TASK_ICON_SIZE, d.taskIconSizeDp),
+            taskCardGapDp = prefs.getInt(K_TASK_CARD_GAP, d.taskCardGapDp),
+            taskCardVPadDp = prefs.getInt(K_TASK_CARD_VPAD, d.taskCardVPadDp),
+            groupHeaderVPadDp = prefs.getInt(K_GROUP_HEADER_VPAD, d.groupHeaderVPadDp),
+            monitorRowPadDp = prefs.getInt(K_MONITOR_PAD, d.monitorRowPadDp),
             bubbleIconSizeDp = prefs.getInt(K_BUBBLE_ICON_SIZE, d.bubbleIconSizeDp),
             bubbleIconCornerDp = prefs.getInt(K_BUBBLE_ICON_CORNER, d.bubbleIconCornerDp),
             bubbleLabelSizeSp = prefs.getInt(K_BUBBLE_LABEL_SIZE, d.bubbleLabelSizeSp),
@@ -240,6 +262,10 @@ object ThemeStore {
             putInt(K_FLASH_TEXT_SIZE, p.flashTextSizeSp)
             putInt(K_FLASH_FONT_WEIGHT, p.flashFontWeight)
             putInt(K_TASK_ICON_SIZE, p.taskIconSizeDp)
+            putInt(K_TASK_CARD_GAP, p.taskCardGapDp)
+            putInt(K_TASK_CARD_VPAD, p.taskCardVPadDp)
+            putInt(K_GROUP_HEADER_VPAD, p.groupHeaderVPadDp)
+            putInt(K_MONITOR_PAD, p.monitorRowPadDp)
             putInt(K_BUBBLE_ICON_SIZE, p.bubbleIconSizeDp)
             putInt(K_BUBBLE_ICON_CORNER, p.bubbleIconCornerDp)
             putInt(K_BUBBLE_LABEL_SIZE, p.bubbleLabelSizeSp)
