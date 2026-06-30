@@ -91,7 +91,7 @@ Privileged actions (airplane, mobile data, screenshot, reboot, screen off) are g
 - Play distribution profile with SMS/phone-state manifest policy gate
 - Local release verification scripts for F-Droid metadata, readiness, and APK payload comparison
 - Environment-driven release signing
-- SQLite database backup/restore
+- SQLite database backup/restore with WAL-safe validation before local backups are published
 - APK payload comparison harness for reproducibility checks
 
 ### Power-user backends

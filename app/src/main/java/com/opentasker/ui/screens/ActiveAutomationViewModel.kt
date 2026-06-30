@@ -431,39 +431,43 @@ class ActiveAutomationViewModel(
     }
 
     fun createDatabaseBackup() {
-        viewModelScope.launch {
-            setBackupBusy(true)
+        launchBackupOperation {
             databaseBackupManager.backup()
                 .onSuccess { backup ->
                     events.send("Backup created: ${backup.name}")
                 }
                 .onFailure { events.send("Error: ${it.message ?: "Database backup failed"}") }
-            setBackupBusy(false)
         }
     }
 
     fun exportDatabaseBackup(uri: Uri) {
-        viewModelScope.launch {
-            setBackupBusy(true)
+        launchBackupOperation {
             val backup = databaseBackupManager.backup().getOrElse {
                 events.send("Error: ${it.message ?: "Database backup failed"}")
-                setBackupBusy(false)
-                return@launch
+                return@launchBackupOperation
             }
             databaseBackupManager.exportBackup(backup, uri)
                 .onSuccess { events.send("Backup exported: ${backup.name}") }
                 .onFailure { events.send("Error: ${it.message ?: "Database backup export failed"}") }
-            setBackupBusy(false)
         }
     }
 
     fun importDatabaseBackup(uri: Uri) {
-        viewModelScope.launch {
-            setBackupBusy(true)
+        launchBackupOperation {
             databaseBackupManager.stageRestore(uri)
                 .onSuccess { events.send("Backup imported. Restart OpenTasker to apply the restore.") }
                 .onFailure { events.send("Error: ${it.message ?: "Database backup import failed"}") }
-            setBackupBusy(false)
+        }
+    }
+
+    private fun launchBackupOperation(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            setBackupBusy(true)
+            try {
+                block()
+            } finally {
+                setBackupBusy(false)
+            }
         }
     }
 

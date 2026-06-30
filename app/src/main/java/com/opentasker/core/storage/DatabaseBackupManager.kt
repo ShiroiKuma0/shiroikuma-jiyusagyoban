@@ -13,6 +13,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 /**
@@ -30,26 +31,60 @@ class DatabaseBackupManager(
         runCatching {
             val sourceFile = context.getDatabasePath(databaseName)
             if (!sourceFile.exists()) {
-                throw IOException("Database file does not exist")
+                throw IOException(
+                    "Database file does not exist at ${sourceFile.absolutePath} for configured name '$databaseName'",
+                )
             }
 
-            db.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { cursor ->
-                while (cursor.moveToNext()) {
-                    // Consume the pragma cursor so SQLite performs the checkpoint before the file copy.
-                }
-            }
+            checkpointWalBeforeCopy(sourceFile)
             val backupFile = File(backupDir, "${databaseName.removeSuffix(".db")}_backup_${timestamp()}.db")
-            sourceFile.inputStream().use { input ->
-                FileOutputStream(backupFile).use { output ->
-                    input.copyTo(output)
+            val tempFile = File(backupDir, "${backupFile.name}.tmp")
+            try {
+                sourceFile.inputStream().use { input ->
+                    FileOutputStream(tempFile).use { output ->
+                        input.copyTo(output)
+                    }
                 }
+                validateDatabaseFile(tempFile)
+                publishValidatedBackup(tempFile, backupFile)
+            } catch (error: Exception) {
+                tempFile.delete()
+                throw error
             }
-            validateDatabaseFile(backupFile)
             AppLogger.info(tag, "Database backed up to ${backupFile.absolutePath}")
             backupFile
         }.onFailure { error ->
             AppLogger.error(tag, "Backup failed: ${error.message}", error)
         }
+    }
+
+    private suspend fun checkpointWalBeforeCopy(sourceFile: File) {
+        var lastStatus: WalCheckpointStatus? = null
+        repeat(WAL_CHECKPOINT_ATTEMPTS) { attempt ->
+            val status = db.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { cursor ->
+                if (!cursor.moveToFirst()) {
+                    throw IOException("Database WAL checkpoint returned no status for '$databaseName'")
+                }
+                WalCheckpointStatus(
+                    busy = cursor.getInt(0),
+                    logFrames = cursor.getInt(1),
+                    checkpointedFrames = cursor.getInt(2),
+                )
+            }
+            lastStatus = status
+            if (status.readyForMainFileCopy) return
+            if (attempt < WAL_CHECKPOINT_ATTEMPTS - 1) {
+                delay(WAL_CHECKPOINT_RETRY_DELAY_MS)
+            }
+        }
+
+        throw IOException(
+            walCheckpointIncompleteMessage(
+                databaseName = databaseName,
+                sourcePath = sourceFile.absolutePath,
+                status = requireNotNull(lastStatus),
+            ),
+        )
     }
 
     suspend fun exportEncryptedBackup(backupFile: File, destination: Uri, passphrase: CharArray): Result<Unit> =
@@ -262,9 +297,27 @@ class DatabaseBackupManager(
 
         internal const val MAX_BACKUP_BYTES = 104_857_600L
         private const val MAX_BACKUP_IMPORT_BYTES = MAX_BACKUP_BYTES
+        private const val WAL_CHECKPOINT_ATTEMPTS = 4
+        private const val WAL_CHECKPOINT_RETRY_DELAY_MS = 75L
 
         private fun timestamp(): String =
             SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
+
+        private fun publishValidatedBackup(tempFile: File, backupFile: File) {
+            try {
+                if (backupFile.exists() && !backupFile.delete()) {
+                    throw IOException("Could not replace existing backup file: ${backupFile.absolutePath}")
+                }
+                if (!tempFile.renameTo(backupFile)) {
+                    tempFile.copyTo(backupFile, overwrite = true)
+                    tempFile.delete()
+                }
+                validateDatabaseFile(backupFile)
+            } catch (error: Exception) {
+                backupFile.delete()
+                throw error
+            }
+        }
 
         private fun validateDatabaseFile(file: File) {
             if (!file.exists()) throw IOException("Backup file does not exist")
@@ -286,7 +339,10 @@ class DatabaseBackupManager(
                     }
                     val missing = requiredTables - found
                     if (missing.isNotEmpty()) {
-                        throw IOException("Backup is missing required table(s): ${missing.joinToString()}")
+                        throw IOException(
+                            "Backup copy ${file.name} is missing required table(s): ${missing.joinToString()}; " +
+                                "the configured database name/path may point at the wrong SQLite file",
+                        )
                     }
                 }
                 requiredSchema.forEach { (table, requiredColumns) ->
@@ -388,3 +444,21 @@ internal fun InputStream.copyBoundedTo(output: OutputStream, maxBytes: Long): Lo
         output.write(buffer, 0, count)
     }
 }
+
+internal data class WalCheckpointStatus(
+    val busy: Int,
+    val logFrames: Int,
+    val checkpointedFrames: Int,
+) {
+    val readyForMainFileCopy: Boolean =
+        busy == 0 && (logFrames <= 0 || checkpointedFrames >= logFrames)
+}
+
+internal fun walCheckpointIncompleteMessage(
+    databaseName: String,
+    sourcePath: String,
+    status: WalCheckpointStatus,
+): String =
+    "Database WAL checkpoint did not complete for '$databaseName' at $sourcePath; " +
+        "retry backup after current database reads finish " +
+        "(busy=${status.busy}, log=${status.logFrames}, checkpointed=${status.checkpointedFrames})"

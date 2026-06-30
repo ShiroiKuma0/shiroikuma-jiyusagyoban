@@ -5,6 +5,8 @@ import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.RunLogEntry
+import com.opentasker.core.model.Task
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -13,6 +15,38 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class DatabaseBackupManagerInstrumentedTest {
+    @Test
+    fun backupSucceedsForPopulatedCurrentSchemaDatabase() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        cleanup(context)
+
+        val db = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DATABASE)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val manager = DatabaseBackupManager(context, db, TEST_DATABASE)
+            val taskId = db.taskDao().insert(Task(name = "Report task").toEntity())
+            db.profileDao().insert(Profile(name = "Report profile", enterTaskId = taskId).toEntity())
+            db.runLogDao().insert(
+                RunLogEntry(
+                    taskId = taskId,
+                    taskName = "Report task",
+                    durationMs = 12,
+                    success = true,
+                    message = "Completed",
+                ).toEntity(),
+            )
+
+            val backup = manager.backup().getOrThrow()
+
+            assertTrue(backup.exists())
+            assertTrue(backup.length() > 0L)
+        } finally {
+            db.close()
+            cleanup(context)
+        }
+    }
+
     @Test
     fun stagedRestoreAppliesBeforeDatabaseReopens() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
