@@ -221,7 +221,10 @@ object ContextMatchEvaluator {
     private fun matchesMinuteTick(spec: ContextSpec, event: ContextEvent): Boolean {
         if (!event.metadata["event"].orEmpty().equals("sun_tick", ignoreCase = true)) return false
         val every = firstConfig(spec, "everyMinutes", "interval", "minutes").toIntOrNull()?.coerceAtLeast(1) ?: 1
-        if (every <= 1) return true
+        if (every <= 1) return true  // every-minute consumers (clock, battery line) also take the one-shot refresh tick
+        // Interval profiles (everyMinutes>1, e.g. 話す時計) fire ONLY on a real minute boundary — never on the
+        // one-shot refresh tick the engine emits on each (re)subscription, which would double-fire them at :00/:30.
+        if (event.metadata["refresh"] == "true") return false
         val minute = event.metadata["time"]?.let(::parseClockMinutes) ?: currentMinuteOfDay()
         return minute % every == 0
     }
