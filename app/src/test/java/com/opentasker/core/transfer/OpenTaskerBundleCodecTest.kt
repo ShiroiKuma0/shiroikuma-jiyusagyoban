@@ -27,8 +27,8 @@ class OpenTaskerBundleCodecTest {
             ),
             tasks = listOf(firstTask, secondTask),
             variables = listOf(
-                Variable(name = "%Z", value = "2", isGlobal = true),
-                Variable(name = "%A", value = "1", isGlobal = true),
+                Variable(name = "%Z", value = "2", projectId = 0),
+                Variable(name = "%A", value = "1", projectId = 0),
             ),
         )
 

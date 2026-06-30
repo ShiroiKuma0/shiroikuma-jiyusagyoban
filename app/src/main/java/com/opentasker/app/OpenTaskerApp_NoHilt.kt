@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.opentasker.core.registerCoreRuntime
 import com.opentasker.core.actions.registerActionMetadata
 import com.opentasker.core.logging.AppLogger
+import com.opentasker.ui.theme.ThemeStore
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.DatabaseMigrations
@@ -29,6 +30,13 @@ class OpenTaskerApp_NoHilt : Application() {
     override fun onCreate() {
         super.onCreate()
         CrashLogHandler.install(this)
+        // Seed the black-yellow appearance defaults before any Compose code reads the theme.
+        ThemeStore.init(this)
+        com.opentasker.core.icons.TaskIconStore.init(this)
+        com.opentasker.core.bubbles.FreezeBubbleStore.init(this)
+        com.opentasker.widget.TemplateStore.init(this)
+        com.opentasker.core.storage.ListSortStore.init(this)
+        com.opentasker.core.storage.RunLogSeenStore.init(this)
         registerActionMetadata()
         registerCoreRuntime()
          
@@ -51,6 +59,10 @@ class OpenTaskerApp_NoHilt : Application() {
                 .addMigrations(*DatabaseMigrations.getAllMigrations())
                 .build()
         }
+        // Warm the persistent-variable cache (super- and project-globals) before any task runs.
+        com.opentasker.core.engine.variables.PersistentGlobalScope.init(requireNotNull(_db).variableDao())
+        // Expose the running build as %APPVER so a task can flash it (catch stale installs).
+        com.opentasker.core.engine.variables.PersistentGlobalScope.set(0L, "APPVER", com.opentasker.app.BuildConfig.VERSION_NAME)
 
         RunLogPruneWorker.enqueue(this)
     }

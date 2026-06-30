@@ -24,7 +24,7 @@ data class NfcTagWriteResult(
 
 object NfcTagWritePlanner {
     private const val MAX_TEXT_CHARS = 120
-    private const val DEFAULT_TEXT = "OpenTasker NFC trigger"
+    private const val DEFAULT_TEXT = "白い熊 自由作業盤 NFC trigger"
 
     fun planTextRecord(label: String): NfcTagWritePlan {
         val text = normalizeLabel(label).ifBlank { DEFAULT_TEXT }
@@ -89,7 +89,7 @@ object NfcTagWriteSession {
                     return NfcTagWriteResult(false, "NFC tag is too small for a $payloadSize-byte record.")
                 }
                 ndef.writeNdefMessage(message)
-                return NfcTagWriteResult(true, "NFC tag written with OpenTasker helper text.")
+                return NfcTagWriteResult(true, "NFC tag written with 白い熊 自由作業盤 helper text.")
             } finally {
                 runCatching { ndef.close() }
             }
@@ -100,7 +100,7 @@ object NfcTagWriteSession {
         formatable.connect()
         try {
             formatable.format(message)
-            return NfcTagWriteResult(true, "NFC tag formatted and written with OpenTasker helper text.")
+            return NfcTagWriteResult(true, "NFC tag formatted and written with 白い熊 自由作業盤 helper text.")
         } finally {
             runCatching { formatable.close() }
         }

@@ -11,7 +11,7 @@ object LocationPolicyDisclosures {
         } else {
             "Android 10 can route users from the permission flow to the app's location settings."
         }
-        return "Needed only when geofence automations must keep evaluating after OpenTasker is no longer visible. " +
+        return "Needed only when geofence automations must keep evaluating after 白い熊 自由作業盤 is no longer visible. " +
             "$settingsPath Users can decline and keep using foreground-only automations. Public reliability still needs device verification."
     }
 
@@ -33,9 +33,9 @@ object LocationPolicyDisclosures {
                     "Background precision follows the user's foreground precision choice." +
                     android14ForegroundServiceNote(apiLevel)
             foreground && precise ->
-                "Live FOSS location source can emit while OpenTasker is running; background location from app settings is still needed for long-running geofence reliability."
+                "Live FOSS location source can emit while 白い熊 自由作業盤 is running; background location from app settings is still needed for long-running geofence reliability."
             foreground ->
-                "Live FOSS location source can emit approximate fixes while OpenTasker is running; background location from app settings and precise access are still missing."
+                "Live FOSS location source can emit approximate fixes while 白い熊 自由作業盤 is running; background location from app settings and precise access are still missing."
             else ->
                 "Foreground location permission is missing; live location contexts remain blocked until setup is complete."
         }

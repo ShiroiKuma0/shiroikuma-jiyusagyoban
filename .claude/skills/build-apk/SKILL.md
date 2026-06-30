@@ -1,0 +1,55 @@
+---
+name: build-apk
+description: Build the signed release APK with the buildFork Gradle task, then deliver it automatically via the global /after-build skill (adb push if a phone is connected, else scp to skhw — no transfer prompt). Always build first without asking for permission to build. Use whenever 白い熊 asks to build the app, build the APK, make a release build, or build and send to the phone.
+---
+
+# Build the release APK and optionally send to the phone
+
+This is **shiroikuma-jiyusagyoban** — 白い熊's fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker),
+renamed to `shiroikuma.jiyusagyoban` ("白い熊 自由作業盤") so it installs side-by-side with upstream. Pure
+Kotlin/Compose, no native code, no Fossify Commons.
+
+> **Never ask whether to build — just build.** When this skill applies (白い熊 asked to build, or
+> you've made changes ready to test), run the build immediately. Do **not** ask "shall I build?".
+> Delivery is automatic too: after a successful build, the APK is sent via the global **/after-build**
+> skill with no transfer prompt.
+
+> **Every `adb push` goes ONLY to `/sdcard/tmp/`.** This holds for the APK *and any other
+> file* (import bundles, configs, logs, screenshots) — never `/sdcard/Download/` or anywhere
+> else. Never `adb install` — 白い熊 installs manually.
+
+## Steps
+
+1. **Note the output filename.** Read the current version + build number:
+   - `grep -nE 'appVersionName|appVersionCode' app/build.gradle.kts` (the upstream base, e.g. `0.2.60` / `62`)
+   - `grep -E '^BUILD_NUMBER' gradle.properties` (the `N` used for THIS build, **before** the task bumps it)
+   - APK will be `shiroikuma-jiyusagyoban_<appVersionName>+<BUILD_NUMBER>_arm64-v8a.apk`.
+   - versionCode for this build = `appVersionCode * 10000 + BUILD_NUMBER`.
+
+2. **Build** (needs JDK 21 — the default `java` on this host is JDK 11, and Gradle 9.x aborts on it):
+   - `JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew buildFork < /dev/null`
+     (`< /dev/null` guarantees it never blocks on stdin.)
+   - `buildFork` runs `assembleRelease` (R8 minify + shrink, signed from `keystore.properties`),
+     copies the signed APK to `~/tmp/<apk name>`, and auto-increments `BUILD_NUMBER` in `gradle.properties`.
+   - It prints `>>> <path>` and `>>> versionCode <n>`. Confirm `BUILD SUCCESSFUL` and use those for the
+     exact filename/code.
+   - If it fails to resolve a signing key, check that `keystore.properties` exists at the repo root
+     (gitignored; points at `~/.android-keystores/shiroikuma-jiyusagyoban.jks`, alias `sagyoban`).
+   - If it fails with **`SDK location not found`**, create the gitignored `local.properties` at the repo
+     root with `sdk.dir=/home/shiroikuma/android-sdk` (a background shell doesn't inherit `ANDROID_HOME`).
+
+3. **At the end of every successful build, ALWAYS deliver via the global /after-build skill** — no
+   exceptions, no asking. As soon as the build reports `BUILD SUCCESSFUL` and the APK is in `~/tmp/`,
+   invoke **/after-build**: it runs `/adb-check` UNSANDBOXED (a sandboxed check falsely reports no
+   device), then `/adb-push` to `/sdcard/tmp/` if a phone is connected, otherwise `/scp` to
+   `skhw:~/tmp/`, and announces the filename that landed. Never `adb install` — 白い熊 installs
+   manually from `/sdcard/tmp/`.
+
+## Notes / invariants
+
+- **One distribution: `standard`** (the default; keeps the SMS action). The F-Droid/Play
+  `-PopenTaskerDistribution` profiles and the `verify*` tasks are upstream's — we don't ship them.
+- **buildToolsVersion is `36.0.0`** (pinned by upstream); it's installed under `~/android-sdk/build-tools/`.
+- **Never commit/push on your own.** Wait for 白い熊's explicit "Push". Build artifacts (`*.apk`) and
+  `keystore.properties` are gitignored.
+- **No Claude attribution** in any commit (see repo `CLAUDE.md`).

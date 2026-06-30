@@ -39,7 +39,7 @@ class TaskWidgetProvider : AppWidgetProvider() {
         fun updateWidget(context: Context, manager: AppWidgetManager, widgetId: Int) {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val taskId = prefs.getLong(keyTaskId(widgetId), -1L)
-            val taskName = prefs.getString(keyTaskName(widgetId), "OpenTasker") ?: "OpenTasker"
+            val taskName = prefs.getString(keyTaskName(widgetId), "白い熊 自由作業盤") ?: "白い熊 自由作業盤"
 
             val views = RemoteViews(context.packageName, R.layout.widget_task)
             views.setTextViewText(R.id.widget_task_name, taskName)

@@ -69,7 +69,7 @@ class TaskerXmlImporterTest {
 
         val variable = report.bundle.variables.single()
         assertEquals("%FOO", variable.name)
-        assertTrue(variable.isGlobal)
+        assertEquals(0L, variable.projectId)
 
         val requirement = report.bundle.metadata.capabilityRequirements.single { it.actionId == "tasker.unsupported" }
         assertEquals(CapabilityLevel.Unsupported, requirement.level)

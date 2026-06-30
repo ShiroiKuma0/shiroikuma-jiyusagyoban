@@ -86,6 +86,19 @@ class PauseSoundAction : Action {
 }
 
 /**
+ * Toggle play/pause (single media key that resumes if paused, pauses if playing).
+ */
+class TogglePlayPauseAction : Action {
+    override val id = "media.playpause"
+    override val category = ActionCategory.MEDIA
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        ctx.logger("Toggle play/pause")
+        return dispatchMediaKey(ctx, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+    }
+}
+
+/**
  * Next track.
  */
 class NextTrackAction : Action {
