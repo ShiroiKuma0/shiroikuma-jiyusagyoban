@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -61,6 +62,7 @@ import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.AutoStartSettings
 import com.opentasker.scenes.SceneOverlayManager
+import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -91,6 +93,7 @@ fun MonitorScreen(
     contentPadding: PaddingValues,
 ) {
     val context = LocalContext.current
+    val themePrefs by ThemeStore.state.collectAsState()
     LaunchedEffect(Unit) { AutoStartSettings.load(context) }
     val autoIds by AutoStartSettings.ids.collectAsState()
     var showPicker by remember { mutableStateOf(false) }
@@ -123,7 +126,7 @@ fun MonitorScreen(
     val openGlobals = sectionOpen["globals"] ?: false   // verbose — default collapsed
     val openRuns = sectionOpen["runs"] ?: true
     val openWidgets = sectionOpen["widgets"] ?: true
-    val openRunStart = sectionOpen["runstart"] ?: true
+    val openRunStart = sectionOpen["runstart"] ?: false   // only the explanatory note folds; default collapsed
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -159,132 +162,14 @@ fun MonitorScreen(
             }
         }
 
-        // --- task activity: collapse the raw run log to ONE row per task (run count + most-recent run +
-        //     failures), so the per-minute tickers (dt.tick, denchi.update) don't flood the list. This is
-        //     the analytics view — "what's firing and is it healthy" — not a scrolling per-run feed.
-        val runWindow = runLogs.sortedByDescending { it.timestamp }.take(500)
-        val taskAgg = runWindow
-            .groupBy { it.taskName.ifBlank { "task #${it.taskId}" } }
-            .map { (name, runs) ->
-                TaskActivity(name, runs.size, runs.maxOf { it.timestamp }, runs.count { !it.success })
-            }
-            .sortedByDescending { it.lastAt }
-        item { FoldHeader("Task activity (${taskAgg.size} task${if (taskAgg.size == 1) "" else "s"})", openRuns) { toggle("runs") } }
-        if (openRuns) {
-            item { Hint("Each task collapsed across the last ${runWindow.size} runs: how many times it fired and when it last ran. Green = all OK; red = at least one run failed.") }
-            if (taskAgg.isEmpty()) {
-                item { Hint("No task runs recorded yet.") }
-            }
-            items(taskAgg, key = { it.name }) { a ->
-                StatusRow(
-                    color = if (a.fails > 0) RED else GREEN,
-                    name = a.name,
-                    detail = "${a.count}× · last ${rel(now - a.lastAt)} ago" + if (a.fails > 0) " · ${a.fails} failed" else "",
-                    detailColor = if (a.fails > 0) RED else GREY,
-                )
-            }
-        }
-
-        // --- widget pulls: which placed widgets the last widget.refresh re-rendered (pull vs static) ---
-        val widgetEntries = WidgetRefreshLog.entries
-        val widgetAt = WidgetRefreshLog.lastAt
-        item { FoldHeader("Widget pulls — last tick (${widgetEntries.size})", openWidgets) { toggle("widgets") } }
-        if (openWidgets) {
-            item { Hint("The per-minute tick runs Refresh Widgets, re-rendering every placed widget. A “pull” widget (template-bound, green) re-reads globals each tick; a “static” one (grey) keeps a fixed layout and never updates — that's why a clock/battery would stay frozen.") }
-            if (widgetAt == 0L) {
-                item { Hint("No Refresh Widgets has run this session yet. If the clock/battery stay stale, the per-minute tick isn't calling it — check the clock task fired under Recent task runs above.") }
-            } else {
-                item {
-                    StatusRow(
-                        color = if (running) GREEN else GREY,
-                        name = "Last pull",
-                        detail = "${rel(now - widgetAt)} ago · ${widgetEntries.count { it.isPull }} pull / ${widgetEntries.count { !it.isPull }} static",
-                    )
-                }
-                items(widgetEntries.size) { idx ->
-                    val e = widgetEntries[idx]
-                    StatusRow(
-                        color = if (e.isPull) GREEN else GREY,
-                        name = e.label,
-                        detail = if (e.isPull) "pull" else "static — won't update",
-                    )
-                }
-            }
-        }
-
-        item { FoldHeader("On-screen overlays (${overlays.size})", openOverlays) { toggle("overlays") } }
-        if (openOverlays) {
-            if (overlays.isEmpty()) {
-                item { Hint("Nothing is drawn on screen. After an app restart the overlays are gone until re-shown — run 起動完了 ⇨ 起動 (or set it to auto-run below).") }
-            }
-            items(overlays, key = { it }) { name -> StatusRow(GREEN, name, "shown") }
-        }
-
-        item { FoldHeader("Enabled profiles (${enabled.size})", openProfiles) { toggle("profiles") } }
-        if (openProfiles) {
-            item { Hint("Armed triggers. “ran” means the trigger fired (e.g. data updated) — it does NOT mean its overlay is on screen; that's the “On-screen overlays” section above.") }
-            if (enabled.isEmpty()) {
-                item { Hint("No enabled profiles — nothing is being watched.") }
-            }
-            items(enabled, key = { it.id }) { p ->
-                val fired = lastFired[p.name]
-                val ago = if (fired != null) now - fired else -1L
-                // Grey, not green: a trigger firing is not the same as its overlay being drawn (the green
-                // "fired" misread as "working" when the 電池線 line was actually gone). Red only if the
-                // engine itself is down.
-                StatusRow(
-                    color = if (!running) RED else GREY,
-                    name = p.name,
-                    detail = if (fired == null) "idle · not run yet" else "ran ${rel(ago)} ago",
-                    detailColor = GREY,
-                )
-            }
-        }
-
-        item { FoldHeader("History", openHistory) { toggle("history") } }
-        if (openHistory) {
-            if (events.isEmpty()) {
-                item { Hint("No restarts or recoveries recorded yet.") }
-            }
-            items(events, key = { it.atMs }) { e ->
-                val (label, color) = when (e.kind) {
-                    EngineHeartbeat.HeartbeatEvent.Kind.STARTED -> "Engine started" to GREEN
-                    EngineHeartbeat.HeartbeatEvent.Kind.REARMED -> "Re-armed — engine had died for ${rel(e.staleMs)}" to RED
-                    EngineHeartbeat.HeartbeatEvent.Kind.RESURRECTED -> "Resurrected — process had been killed" to AMBER
-                    EngineHeartbeat.HeartbeatEvent.Kind.MATCHER_RESTART -> "Recovered “${e.label}” (matcher restarted)" to AMBER
-                }
-                StatusRow(color, label, CLOCK_FMT.format(Date(e.atMs)), detailColor = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-
-        // --- device state: every super-global (%ALLCAPS), refreshed each second — so a stuck %CHARGING
-        // or a stale %BATT (vs the real battery) is visible at a glance ---
-        val globals = PersistentGlobalScope.snapshot(0L).toSortedMap()
-        item { FoldHeader("Device state — globals (${globals.size})", openGlobals) { toggle("globals") } }
-        if (openGlobals) {
-            if (globals.isEmpty()) {
-                item { Hint("No globals set yet.") }
-            }
-            items(globals.entries.toList(), key = { it.key }) { (k, v) ->
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("%$k", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, maxLines = 1, modifier = Modifier.weight(0.5f))
-                    Text(v.replace("\n", " ⏎ ").take(60), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, maxLines = 1, modifier = Modifier.weight(0.5f))
-                }
-            }
-        }
-
-        // --- run-on-start: bordered box (plain black fill); the underlined heading folds the contents,
-        // the border + heading stay visible. ---
+        // --- run-on-start: bordered box (plain black fill) at the TOP; the underlined heading folds ONLY
+        // the explanatory note — the auto-run list + "Add task…" stay visible. ---
         item { Spacer(Modifier.size(4.dp)) }
         item {
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .border(3.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+                    .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
                     .padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
@@ -313,30 +198,174 @@ fun MonitorScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp,
                     )
-                    if (autoTasks.isEmpty()) {
-                        Text("Nothing set to auto-run.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-                    }
-                    autoTasks.forEach { t ->
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Dot(AMBER, 8.dp)
-                            Text(t.name, color = MaterialTheme.colorScheme.onBackground, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                            IconButton(onClick = { AutoStartSettings.remove(context, t.id) }) {
-                                Icon(Icons.Filled.Close, contentDescription = "Remove", tint = RED)
-                            }
+                }
+                if (autoTasks.isEmpty()) {
+                    Text("Nothing set to auto-run.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                }
+                autoTasks.forEach { t ->
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Dot(AMBER, 8.dp)
+                        Text(t.name, color = MaterialTheme.colorScheme.onBackground, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                        IconButton(onClick = { AutoStartSettings.remove(context, t.id) }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Remove", tint = RED)
                         }
                     }
-                    TextButton(onClick = { showPicker = true }) {
-                        Icon(Icons.Filled.Add, contentDescription = null)
-                        Spacer(Modifier.size(4.dp))
-                        Text("Add task…")
+                }
+                TextButton(onClick = { showPicker = true }) {
+                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Spacer(Modifier.size(4.dp))
+                    Text("Add task…")
+                }
+            }
+        }
+
+        // --- task activity: collapse the raw run log to ONE row per task (run count + most-recent run +
+        //     failures), so the per-minute tickers (dt.tick, denchi.update) don't flood the list. This is
+        //     the analytics view — "what's firing and is it healthy" — not a scrolling per-run feed.
+        val runWindow = runLogs.sortedByDescending { it.timestamp }.take(500)
+        val taskAgg = runWindow
+            .groupBy { it.taskName.ifBlank { "task #${it.taskId}" } }
+            .map { (name, runs) ->
+                TaskActivity(name, runs.size, runs.maxOf { it.timestamp }, runs.count { !it.success })
+            }
+            .sortedByDescending { it.lastAt }
+        item { FoldHeader("Task activity (${taskAgg.size} task${if (taskAgg.size == 1) "" else "s"})", openRuns) { toggle("runs") } }
+        if (openRuns) {
+            item { Hint("Each task collapsed across the last ${runWindow.size} runs: how many times it fired and when it last ran. Green = all OK; red = at least one run failed.") }
+            if (taskAgg.isEmpty()) {
+                item { Hint("No task runs recorded yet.") }
+            }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(themePrefs.monitorRowPadDp.dp)) {
+                    taskAgg.forEach { a ->
+                        StatusRow(
+                            color = if (a.fails > 0) RED else GREEN,
+                            name = a.name,
+                            detail = "${a.count}× · last ${rel(now - a.lastAt)} ago" + if (a.fails > 0) " · ${a.fails} failed" else "",
+                            detailColor = if (a.fails > 0) RED else GREY,
+                            vpad = 0.dp,
+                        )
                     }
                 }
             }
         }
+
+        // --- widget pulls: which placed widgets the last widget.refresh re-rendered (pull vs static) ---
+        val widgetEntries = WidgetRefreshLog.entries
+        val widgetAt = WidgetRefreshLog.lastAt
+        item { FoldHeader("Widget pulls — last tick (${widgetEntries.size})", openWidgets) { toggle("widgets") } }
+        if (openWidgets) {
+            item { Hint("The per-minute tick runs Refresh Widgets, re-rendering every placed widget. A “pull” widget (template-bound, green) re-reads globals each tick; a “static” one (grey) keeps a fixed layout and never updates — that's why a clock/battery would stay frozen.") }
+            if (widgetAt == 0L) {
+                item { Hint("No Refresh Widgets has run this session yet. If the clock/battery stay stale, the per-minute tick isn't calling it — check the clock task fired under Recent task runs above.") }
+            } else {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(themePrefs.monitorRowPadDp.dp)) {
+                        StatusRow(
+                            color = if (running) GREEN else GREY,
+                            name = "Last pull",
+                            detail = "${rel(now - widgetAt)} ago · ${widgetEntries.count { it.isPull }} pull / ${widgetEntries.count { !it.isPull }} static",
+                            vpad = 0.dp,
+                        )
+                        widgetEntries.forEach { e ->
+                            StatusRow(
+                                color = if (e.isPull) GREEN else GREY,
+                                name = e.label,
+                                detail = if (e.isPull) "pull" else "static — won't update",
+                                vpad = 0.dp,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        item { FoldHeader("On-screen overlays (${overlays.size})", openOverlays) { toggle("overlays") } }
+        if (openOverlays) {
+            if (overlays.isEmpty()) {
+                item { Hint("Nothing is drawn on screen. After an app restart the overlays are gone until re-shown — run 起動完了 ⇨ 起動 (or set it to auto-run below).") }
+            }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(themePrefs.monitorRowPadDp.dp)) {
+                    overlays.forEach { name -> StatusRow(GREEN, name, "shown", vpad = 0.dp) }
+                }
+            }
+        }
+
+        item { FoldHeader("Enabled profiles (${enabled.size})", openProfiles) { toggle("profiles") } }
+        if (openProfiles) {
+            item { Hint("Armed triggers. “ran” means the trigger fired (e.g. data updated) — it does NOT mean its overlay is on screen; that's the “On-screen overlays” section above.") }
+            if (enabled.isEmpty()) {
+                item { Hint("No enabled profiles — nothing is being watched.") }
+            }
+            // Grey, not green: a trigger firing is not the same as its overlay being drawn (the green
+            // "fired" misread as "working" when the 電池線 line was actually gone). Red only if the
+            // engine itself is down.
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(themePrefs.monitorRowPadDp.dp)) {
+                    enabled.forEach { p ->
+                        val fired = lastFired[p.name]
+                        val ago = if (fired != null) now - fired else -1L
+                        StatusRow(
+                            color = if (!running) RED else GREY,
+                            name = p.name,
+                            detail = if (fired == null) "idle · not run yet" else "ran ${rel(ago)} ago",
+                            detailColor = GREY,
+                            vpad = 0.dp,
+                        )
+                    }
+                }
+            }
+        }
+
+        item { FoldHeader("History", openHistory) { toggle("history") } }
+        if (openHistory) {
+            if (events.isEmpty()) {
+                item { Hint("No restarts or recoveries recorded yet.") }
+            }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(themePrefs.monitorRowPadDp.dp)) {
+                    events.forEach { e ->
+                        val (label, color) = when (e.kind) {
+                            EngineHeartbeat.HeartbeatEvent.Kind.STARTED -> "Engine started" to GREEN
+                            EngineHeartbeat.HeartbeatEvent.Kind.REARMED -> "Re-armed — engine had died for ${rel(e.staleMs)}" to RED
+                            EngineHeartbeat.HeartbeatEvent.Kind.RESURRECTED -> "Resurrected — process had been killed" to AMBER
+                            EngineHeartbeat.HeartbeatEvent.Kind.MATCHER_RESTART -> "Recovered “${e.label}” (matcher restarted)" to AMBER
+                        }
+                        StatusRow(color, label, CLOCK_FMT.format(Date(e.atMs)), detailColor = MaterialTheme.colorScheme.onSurfaceVariant, vpad = 0.dp)
+                    }
+                }
+            }
+        }
+
+        // --- device state: every super-global (%ALLCAPS), refreshed each second — so a stuck %CHARGING
+        // or a stale %BATT (vs the real battery) is visible at a glance ---
+        val globals = PersistentGlobalScope.snapshot(0L).toSortedMap()
+        item { FoldHeader("Device state — globals (${globals.size})", openGlobals) { toggle("globals") } }
+        if (openGlobals) {
+            if (globals.isEmpty()) {
+                item { Hint("No globals set yet.") }
+            }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(themePrefs.monitorRowPadDp.dp)) {
+                    globals.entries.toList().forEach { (k, v) ->
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 0.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("%$k", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, maxLines = 1, modifier = Modifier.weight(0.5f))
+                            Text(v.replace("\n", " ⏎ ").take(60), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, maxLines = 1, modifier = Modifier.weight(0.5f))
+                        }
+                    }
+                }
+            }
+        }
+
     }
 
     if (showPicker) {
@@ -421,9 +450,9 @@ fun MonitorScreen(
 }
 
 @Composable
-private fun StatusRow(color: Color, name: String, detail: String, detailColor: Color = GREY) {
+private fun StatusRow(color: Color, name: String, detail: String, detailColor: Color = GREY, vpad: Dp = 6.dp) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = vpad),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {

@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -67,6 +68,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.opentasker.app.BuildConfig
 import com.opentasker.app.R
+import com.opentasker.core.accessibility.ShiroiKumaAccessibilityService
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import com.opentasker.core.location.LocationPolicyDisclosures
@@ -103,6 +105,8 @@ private sealed interface PermissionAction {
         val targets: List<OemBatteryGuidance.SettingsTarget>,
         val fallbackUrl: String,
     ) : PermissionAction
+    /** Device-admin add screen — launched for-result so it doesn't blink shut. */
+    data object DeviceAdmin : PermissionAction
     data object None : PermissionAction
 }
 
@@ -110,15 +114,16 @@ private sealed interface PermissionAction {
 fun PermissionOnboardingScreen(
     contentPadding: PaddingValues,
     onMessage: (String) -> Unit,
-    backupState: BackupSetupState,
-    onCreateBackup: () -> Unit,
-    onExportBackup: () -> Unit,
-    onImportBackup: () -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var refreshTick by remember { mutableIntStateOf(0) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        refreshTick++
+    }
+    // Device-admin add must be started for-result from the Activity (NOT as a new task, which makes the
+    // system's translucent DeviceAdminAdd screen open and instantly finish).
+    val deviceAdminLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         refreshTick++
     }
 
@@ -160,7 +165,7 @@ fun PermissionOnboardingScreen(
                         Column(Modifier.weight(1f)) {
                             Text("Setup checklist", style = MaterialTheme.typography.headlineSmall)
                             Text(
-                                "OpenTasker can run with missing access, but affected automations stay gated until setup is complete.",
+                                "白い熊 自由作業盤 can run with missing access, but affected automations stay gated until setup is complete.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -191,26 +196,53 @@ fun PermissionOnboardingScreen(
             }
         }
 
-        item { ThemeSetupCard() }
-
-        item {
-            BackupSetupCard(
-                state = backupState,
-                onCreateBackup = onCreateBackup,
-                onExportBackup = onExportBackup,
-                onImportBackup = onImportBackup,
-            )
-        }
-
         items(orderedItems, key = { it.title }) { item ->
             PermissionSetupCard(
                 item = item,
                 onRunAction = {
                     when (val action = item.action) {
                         PermissionAction.None -> onMessage("${item.title} is already ready.")
-                        is PermissionAction.RuntimePermission -> permissionLauncher.launch(action.permission)
+                        is PermissionAction.RuntimePermission ->
+                            // Not yet granted → ask. Already granted → open this app's details page so it
+                            // can be toggled off (re-requesting a granted runtime permission does nothing).
+                            if (item.granted) {
+                                openSettingsIntent(
+                                    context,
+                                    Intent(
+                                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        Uri.fromParts("package", context.packageName, null),
+                                    ),
+                                    onMessage,
+                                )
+                            } else {
+                                permissionLauncher.launch(action.permission)
+                            }
                         is PermissionAction.SettingsIntent -> openSettingsIntent(context, action.intent, onMessage)
                         is PermissionAction.OemSettings -> openOemSettings(context, action, onMessage)
+                        is PermissionAction.DeviceAdmin -> {
+                            val admin = android.content.ComponentName(context, com.opentasker.core.admin.DeviceAdmin::class.java)
+                            val dpm = context.getSystemService(android.app.admin.DevicePolicyManager::class.java)
+                            if (dpm?.isAdminActive(admin) == true) {
+                                // Already active → open the device-admin LIST to review / disable it. (EMUI buries
+                                // it under Security → Advanced; ACTION_ADD_DEVICE_ADMIN no-ops once active.)
+                                openDeviceAdminSettings(context, onMessage)
+                            } else {
+                                // Not active → the direct "activate this admin?" screen (for-result so it doesn't
+                                // blink shut); if the OEM won't honor it, fall back to the device-admin list.
+                                try {
+                                    deviceAdminLauncher.launch(
+                                        Intent(android.app.admin.DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
+                                            .putExtra(android.app.admin.DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin)
+                                            .putExtra(
+                                                android.app.admin.DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                                                "Enable so 物理鍵 lockdown (screen.lockdown) can lock the device.",
+                                            ),
+                                    )
+                                } catch (ex: Exception) {
+                                    openDeviceAdminSettings(context, onMessage)
+                                }
+                            }
+                        }
                     }
                 },
             )
@@ -219,7 +251,7 @@ fun PermissionOnboardingScreen(
 }
 
 @Composable
-private fun ThemeSetupCard() {
+internal fun ThemeSetupCard() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val currentMode by ThemePreference.observe(context).collectAsState(initial = ThemeMode.System)
@@ -324,7 +356,7 @@ private fun ThemeChoice(
 }
 
 @Composable
-private fun BackupSetupCard(
+internal fun BackupSetupCard(
     state: BackupSetupState,
     onCreateBackup: () -> Unit,
     onExportBackup: () -> Unit,
@@ -393,7 +425,7 @@ private fun BackupStateBanner(state: BackupSetupState) {
         else -> "No backup yet"
     }
     val body = when {
-        state.pendingRestore -> "Restart OpenTasker to apply the staged restore before the database opens."
+        state.pendingRestore -> "Restart 白い熊 自由作業盤 to apply the staged restore before the database opens."
         state.latestBackupName != null -> "Latest backup: ${state.latestBackupName}"
         else -> "Create a local backup before testing imports or risky automation changes."
     }
@@ -496,11 +528,12 @@ private fun PermissionSetupCard(
             }
             Text(item.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             PermissionRequirement(label = if (item.optional) stringResource(R.string.setup_optional_requirement, item.requiredFor) else item.requiredFor)
-            if (!item.granted) {
+            if (!item.granted && item.action !is PermissionAction.None) {
                 Button(onClick = onRunAction, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                     Text(item.actionLabel)
                 }
-            } else if (item.action is PermissionAction.SettingsIntent && item.title == "App visibility") {
+            } else if (item.granted && item.action !is PermissionAction.None) {
+                // Granted: keep a link to the relevant Settings page so it can be reviewed / toggled off.
                 OutlinedButton(onClick = onRunAction, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                     Text(stringResource(R.string.setup_review_settings))
                 }
@@ -574,8 +607,28 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
             requiredFor = "Foreground service, notification actions",
         ),
         PermissionSetupItem(
+            title = "Microphone",
+            body = "Required for the voice-recording actions (e.g. the 物理鍵 record-on-keypress task).",
+            granted = hasPermission(context, Manifest.permission.RECORD_AUDIO),
+            actionLabel = "Request",
+            action = PermissionAction.RuntimePermission(Manifest.permission.RECORD_AUDIO),
+            requiredFor = "Voice recording (audio.record.*)",
+        ),
+        PermissionSetupItem(
+            title = "Device admin (lockdown)",
+            body = "Lets the 物理鍵 lockdown action lock the device and require your PIN/password (biometrics disabled until the next credential entry).",
+            granted = run {
+                val dpm = context.getSystemService(android.app.admin.DevicePolicyManager::class.java)
+                val admin = android.content.ComponentName(context, com.opentasker.core.admin.DeviceAdmin::class.java)
+                dpm?.isAdminActive(admin) == true
+            },
+            actionLabel = "Enable",
+            action = PermissionAction.DeviceAdmin,
+            requiredFor = "物理鍵 システムロック (screen.lockdown)",
+        ),
+        PermissionSetupItem(
             title = "Exact alarms",
-            body = "Allows precise scheduled automations. If denied, OpenTasker falls back to inexact delivery windows.",
+            body = "Allows precise scheduled automations. If denied, 白い熊 自由作業盤 falls back to inexact delivery windows.",
             granted = ExactAlarmSupport.canScheduleExactAlarms(context),
             actionLabel = "Open settings",
             action = PermissionAction.SettingsIntent(ExactAlarmSupport.settingsIntent(context)),
@@ -583,7 +636,7 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
         PermissionSetupItem(
             title = "Battery optimization",
-            body = "OEM and Android battery managers can stop background automation. Exempting OpenTasker improves reliability. " +
+            body = "OEM and Android battery managers can stop background automation. Exempting 白い熊 自由作業盤 improves reliability. " +
                 oem.summary,
             granted = ignoresBatteryOptimizations(context),
             actionLabel = "Open settings",
@@ -596,11 +649,12 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
                 append("Detected ${oem.oemName} (reliability risk: ${oem.riskLevel.label()}). ")
                 append("Battery-optimization exemption alone is often not enough on this OEM.\n\n")
                 oem.steps.forEachIndexed { index, step -> append("${index + 1}. $step\n") }
-                append("\nIf the button cannot open the right screen, see ${oem.dontKillMyAppUrl}")
+                append("\nFor more help, see ${oem.dontKillMyAppUrl}")
             }.trim(),
             granted = false,
-            actionLabel = if (oem.settingsTargets.isNotEmpty()) "Open ${oem.oemName} settings" else "Open dontkillmyapp.com",
-            action = PermissionAction.OemSettings(oem.settingsTargets, oem.dontKillMyAppUrl),
+            // Informational only — no action button; the steps above are followed by hand in OEM settings.
+            actionLabel = "",
+            action = PermissionAction.None,
             requiredFor = "Reliable background automation on ${oem.oemName}",
             optional = true,
         ) else null,
@@ -622,7 +676,7 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
         PermissionSetupItem(
             title = "Calendar access",
-            body = "Needed for local calendar-window triggers. OpenTasker only emits redacted calendar metadata to matching.",
+            body = "Needed for local calendar-window triggers. 白い熊 自由作業盤 only emits redacted calendar metadata to matching.",
             granted = hasPermission(context, Manifest.permission.READ_CALENDAR),
             actionLabel = "Request",
             action = PermissionAction.RuntimePermission(Manifest.permission.READ_CALENDAR),
@@ -630,13 +684,35 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
         PermissionSetupItem(
             title = "Overlay access",
-            body = "Needed for scene overlays and controls displayed over other apps.",
+            body = "Needed for scene overlays, freeze bubbles, and other controls displayed over other apps.",
             granted = Settings.canDrawOverlays(context),
             actionLabel = "Open settings",
             action = PermissionAction.SettingsIntent(
                 Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}")),
             ),
-            requiredFor = "Scenes, overlay UI",
+            requiredFor = "Scenes, freeze bubbles, overlay UI",
+        ),
+        PermissionSetupItem(
+            title = "All files access",
+            body = "Needed to read files outside the app — e.g. custom notification tones stored in shared storage (the 通知明滅 Jami tone).",
+            granted = Build.VERSION.SDK_INT < 30 || Environment.isExternalStorageManager(),
+            actionLabel = "Open settings",
+            action = PermissionAction.SettingsIntent(
+                if (Build.VERSION.SDK_INT >= 30) {
+                    Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${context.packageName}"))
+                } else {
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+                },
+            ),
+            requiredFor = "Custom tones, file actions on shared storage",
+        ),
+        PermissionSetupItem(
+            title = "Accessibility service",
+            body = "Lets 白い熊 自由作業盤 perform global navigation — Back, Home, Recents, notification/quick-settings panels — used by the edge-bar gestures.",
+            granted = ShiroiKumaAccessibilityService.isConnected,
+            actionLabel = "Open settings",
+            action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)),
+            requiredFor = "Back / Home / Recents actions",
         ),
         PermissionSetupItem(
             title = "Foreground location",
@@ -696,7 +772,7 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ) else null,
         PermissionSetupItem(
             title = "Do Not Disturb access",
-            body = "Needed before OpenTasker can change interruption filters or DND-related settings.",
+            body = "Needed before 白い熊 自由作業盤 can change interruption filters or DND-related settings.",
             granted = hasNotificationPolicyAccess(context),
             actionLabel = "Open settings",
             action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)),
@@ -772,6 +848,26 @@ private fun appDetailsIntent(context: Context): Intent =
 
 private fun packageDetailsIntent(packageName: String): Intent =
     Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+
+/**
+ * Open the device-admin apps list. There's no universal action, so try the AOSP DeviceAdminSettings
+ * activity (+ aliases / a common action); if none resolve, fall back to Security settings with a
+ * breadcrumb — EMUI hides the list under Security → Advanced → Device admin apps (詳細設定 → 端末管理アプリ).
+ */
+private fun openDeviceAdminSettings(context: Context, onMessage: (String) -> Unit) {
+    val pm = context.packageManager
+    val candidates = listOf(
+        Intent().setClassName("com.android.settings", "com.android.settings.Settings\$DeviceAdminSettingsActivity"),
+        Intent().setClassName("com.android.settings", "com.android.settings.DeviceAdminSettings"),
+        Intent("android.settings.DEVICE_ADMIN_SETTINGS"),
+    )
+    for (intent in candidates) {
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (intent.resolveActivity(pm) != null && runCatching { context.startActivity(intent) }.isSuccess) return
+    }
+    runCatching { context.startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    onMessage("Find it under Security → Advanced → Device admin apps (詳細設定 → 端末管理アプリ).")
+}
 
 private fun openSettingsIntent(context: Context, intent: Intent, onMessage: (String) -> Unit) {
     try {

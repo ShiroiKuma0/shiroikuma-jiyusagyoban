@@ -32,19 +32,28 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.actions.ActionMetadata
 import com.opentasker.core.actions.ActionMetadataRegistry
+import com.opentasker.core.model.Scene
+import com.opentasker.core.model.Task
 
 /**
- * The "Help" tab: in-app documentation. The concept/schema prose lives in [docSections] (kept in sync
- * with `docs/bundle-schema.md` in the repo); the **action reference** is generated live from
- * [ActionMetadataRegistry], so it can never drift from the actual built-in actions.
+ * The "Help & Tools" tab: a "Tools" section (the relocated beginner/utility cards — templates, task
+ * library, scene library) followed by in-app documentation. The concept/schema prose
+ * lives in [docSections] (kept in sync with `docs/bundle-schema.md` in the repo); the **action
+ * reference** is generated live from [ActionMetadataRegistry], so it can never drift from the actual
+ * built-in actions.
  *
- * Every section folds (collapsed by default); [expandedSections] is hoisted to the host so the
+ * Every doc section folds (collapsed by default); [expandedSections] is hoisted to the host so the
  * open/closed state survives leaving and re-entering the tab.
  */
 @Composable
 fun HelpDocumentationScreen(
     contentPadding: PaddingValues,
     expandedSections: SnapshotStateMap<String, Boolean>,
+    tasks: List<Task>,
+    scenes: List<Scene>,
+    onBrowseTemplates: () -> Unit,
+    onCreateTask: () -> Unit,
+    onCreateScene: () -> Unit,
 ) {
     val actionsByCategory = remember {
         ActionMetadataRegistry.all().sortedBy { it.name }.groupBy { it.category }.toSortedMap()
@@ -54,6 +63,17 @@ fun HelpDocumentationScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // "Tools" section at the top: the beginner/utility cards relocated out of the main tabs.
+        item(key = "tools-header") {
+            Text(
+                "Tools",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        item(key = "tools-templates") { TemplatePromptCard(onBrowseTemplates) }
+        item(key = "tools-task-library") { TaskLibrarySummaryCard(tasks = tasks, onCreateTask = onCreateTask) }
+        item(key = "tools-scene-library") { SceneOverviewCard(scenes = scenes, tasks = tasks, onCreateScene = onCreateScene) }
         items(docSections, key = { it.title }) { section ->
             DocCard(section.title, expandedSections) {
                 section.blocks.forEach { RenderBlock(it) }

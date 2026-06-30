@@ -441,7 +441,15 @@ internal fun SceneElementView(
                 longSwipeUp != null || longSwipeDown != null || longSwipeLeft != null || longSwipeRight != null ||
                 moveDebug != null
             val slopPx = with(LocalDensity.current) { 36.dp.toPx() }
-            val longSwipePx = with(LocalDensity.current) { 140.dp.toPx() }
+            // Edge-bar long-swipe threshold (dp). Lives with the edge-bar project (画面操作), set in its 01 設定
+            // task as the super-global %LONGSWIPE_DP — same pattern as %PKEY_LONGMS for 物理鍵. A per-element
+            // `longSwipeDp` config still overrides it if present. Default 200dp (was a hardcoded 140 — a normal
+            // swipe now stays "short" → Home instead of crossing into a long swipe → Recents).
+            val longSwipePx = with(LocalDensity.current) {
+                val cfgVal = v("longSwipeDp").trim().toIntOrNull()
+                val globalVal = expandAgainstGlobals("%LONGSWIPE_DP").trim().toIntOrNull()
+                (cfgVal ?: globalVal ?: 200).coerceIn(60, 400).dp.toPx()
+            }
             // Pick the task for the swipe's dominant axis from a (up,down,left,right) set.
             fun pick(dx: Float, dy: Float, up: String?, down: String?, left: String?, right: String?): String? =
                 if (kotlin.math.abs(dx) > kotlin.math.abs(dy)) { if (dx > 0) right else left }

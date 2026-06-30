@@ -1,6 +1,5 @@
 package com.opentasker.ui.screens
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,13 +17,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Sort
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -35,19 +31,16 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import com.opentasker.ui.components.ThemedDropdownMenu
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -141,16 +134,15 @@ private fun FilterItem(label: String, selected: Boolean, onClick: () -> Unit) {
     )
 }
 
-/** Full-screen management page: create / rename / recolor / reorder / delete projects. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** Projects tab content: create / rename / recolor / reorder / delete projects. */
 @Composable
 fun ProjectsManagementScreen(
+    contentPadding: PaddingValues,
     projects: List<Project>,
     memberCount: (Long) -> Int,
     sortMethod: SortMethod,
     onToggleSort: () -> Unit,
-    onBack: () -> Unit,
-    onImport: () -> Unit,
+    createSignal: Int,
     onCreate: (String, Int?) -> Unit,
     onUpdate: (Project) -> Unit,
     onDelete: (Project, Boolean) -> Unit,
@@ -159,44 +151,30 @@ fun ProjectsManagementScreen(
     onExportProject: (Project) -> Unit,
 ) {
     val manual = sortMethod == SortMethod.MANUAL
-    BackHandler(onBack = onBack)
     var editing by remember { mutableStateOf<Project?>(null) }
     var creating by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<Project?>(null) }
+    // The shell "+" menu's "New project" action ticks createSignal to open the create dialog here
+    // (mirrors how SceneLibraryScreen consumes its create signal).
+    LaunchedEffect(createSignal) {
+        if (createSignal > 0) creating = true
+    }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = { Text("Projects") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    TextButton(onClick = onToggleSort) {
-                        Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = null)
-                        Text(if (manual) "Manual" else "A–Z", modifier = Modifier.padding(start = 4.dp))
-                    }
-                    TextButton(onClick = { creating = true }) {
-                        Icon(Icons.Filled.Add, contentDescription = null)
-                        Text("New", modifier = Modifier.padding(start = 4.dp))
-                    }
-                    TextButton(onClick = onImport) {
-                        Icon(Icons.Filled.Download, contentDescription = null)
-                        Text("Import", modifier = Modifier.padding(start = 4.dp))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.background,
-                ),
-            )
-        },
-    ) { innerPadding ->
+    Column(Modifier.fillMaxSize().padding(contentPadding)) {
+        // The sort toggle used to live in this screen's own top bar; the shell now owns the top bar, so
+        // keep the Manual/A–Z toggle reachable as a small control above the list.
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = onToggleSort) {
+                Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = null)
+                Text(if (manual) "Manual" else "A–Z", modifier = Modifier.padding(start = 4.dp))
+            }
+        }
         if (projects.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(innerPadding).padding(28.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize().padding(28.dp), contentAlignment = Alignment.Center) {
                 Text(
                     "No projects yet. Create one to group profiles, tasks, and scenes.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -205,7 +183,7 @@ fun ProjectsManagementScreen(
             }
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(innerPadding),
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {

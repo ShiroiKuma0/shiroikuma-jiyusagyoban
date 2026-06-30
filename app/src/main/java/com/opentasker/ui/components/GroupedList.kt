@@ -32,6 +32,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -48,6 +49,7 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.storage.ItemGroupEntity
+import com.opentasker.ui.theme.ThemeStore
 
 /** A rendered row in a grouped list: a group header, the "Ungrouped" drop zone, or a member item. */
 sealed interface GroupRow<out T> {
@@ -263,6 +265,7 @@ fun GroupHeaderRow(
     var menuOpen by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
     var addingSub by remember { mutableStateOf(false) }
+    val themePrefs by ThemeStore.state.collectAsState()
     Row(
         modifier = modifier
             .padding(start = (depth * GROUP_INDENT_DP).dp)
@@ -277,7 +280,7 @@ fun GroupHeaderRow(
                 onClick = { if (selectionActive) onToggleSelect() else onToggleExpanded() },
                 onLongClick = onLongPress,
             )
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = themePrefs.groupHeaderVPadDp.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {

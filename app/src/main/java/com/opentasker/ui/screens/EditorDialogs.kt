@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.border
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
@@ -66,7 +67,21 @@ import com.opentasker.core.storage.StorageDecodeIssue
 import com.opentasker.core.templates.ProfileTemplate
 import com.opentasker.core.templates.ProfileTemplateCatalog
 import com.opentasker.core.templates.TemplateAvailability
+import com.opentasker.core.icons.TaskIconStore
 import com.opentasker.ui.theme.DesignSystem
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun TemplatePickerDialog(
@@ -188,16 +203,36 @@ internal fun TemplateSlotDialog(
 @Composable
 internal fun TaskEditorDialog(
     task: Task?,
+    siblingNames: Set<String> = emptySet(),
     onDismiss: () -> Unit,
-    onSave: (String, Int) -> Unit,
+    onSave: (String, Int, String?, Boolean) -> Unit,
 ) {
     var name by rememberSaveable(task?.id) { mutableStateOf(task?.name.orEmpty()) }
     var priority by rememberSaveable(task?.id) { mutableStateOf((task?.priority ?: 5).toString()) }
+    var freezeBubble by rememberSaveable(task?.id) { mutableStateOf(task?.freezeBubble ?: false) }
     val parsedPriority = priority.toIntOrNull()
-    val canSave = name.isNotBlank() && parsedPriority != null && parsedPriority in 0..10
+    // Names are unique within a project (siblingNames = other tasks in the same project, lowercased).
+    val nameClash = name.isNotBlank() && name.trim().lowercase() in siblingNames
+    val canSave = name.isNotBlank() && !nameClash && parsedPriority != null && parsedPriority in 0..10
+
+    // The persisted icon (when editing) vs. the in-progress staged selection. While staging we only delete
+    // a *staged* file we are replacing; the persisted one is cleaned on Save (in updateTask) or kept on Cancel.
+    val originalPath = remember(task?.id) { task?.iconPath }
+    var iconPath by rememberSaveable(task?.id) { mutableStateOf(task?.iconPath) }
+
+    fun stageIcon(newPath: String?) {
+        val current = iconPath
+        if (current != null && current != originalPath) TaskIconStore.delete(current)
+        iconPath = newPath
+    }
+    val cleanupAndDismiss = {
+        val current = iconPath
+        if (current != null && current != originalPath) TaskIconStore.delete(current)
+        onDismiss()
+    }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = cleanupAndDismiss,
         title = { Text(if (task == null) stringResource(R.string.dialog_create_task) else stringResource(R.string.dialog_edit_task)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
@@ -206,7 +241,13 @@ internal fun TaskEditorDialog(
                     onValueChange = { name = it },
                     label = { Text(stringResource(R.string.task_name_label)) },
                     placeholder = { Text(stringResource(R.string.task_name_hint)) },
-                    supportingText = { Text(stringResource(R.string.task_name_helper)) },
+                    isError = nameClash,
+                    supportingText = {
+                        Text(
+                            if (nameClash) "A task with this name already exists in this project."
+                            else stringResource(R.string.task_name_helper)
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -228,21 +269,118 @@ internal fun TaskEditorDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                // Freeze bubble: running this task pops a re-freeze bubble for the app it launches,
+                // shown on the Desktop launcher.
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Freeze bubble", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            "Re-freeze on the Desktop — running this task pops a freeze bubble for its app.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = freezeBubble, onCheckedChange = { freezeBubble = it })
+                }
+                TaskIconEditorRow(iconPath = iconPath, onStage = { stageIcon(it) })
             }
         },
         confirmButton = {
-            Button(enabled = canSave, onClick = { onSave(name, parsedPriority ?: 5) }) {
+            Button(enabled = canSave, onClick = { onSave(name, parsedPriority ?: 5, iconPath, freezeBubble) }) {
                 Text(stringResource(R.string.action_save))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        dismissButton = { TextButton(onClick = cleanupAndDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
+}
+
+/**
+ * The shared icon-source editor: an icon preview + App / Picture / Emoji / Audio / Clear. Each source
+ * snapshots a fresh PNG (via [TaskIconStore]) and reports it through [onStage]; the caller owns
+ * staging/cleanup. Reuses [AppPickerDialog] and [EmojiPickerDialog] (same package).
+ */
+@Composable
+private fun TaskIconEditorRow(iconPath: String?, onStage: (String?) -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val preview = remember(iconPath) { TaskIconStore.loadBitmap(iconPath) }
+    var showAppPicker by remember { mutableStateOf(false) }
+    var showEmojiPicker by remember { mutableStateOf(false) }
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) scope.launch {
+            val saved = withContext(Dispatchers.IO) { TaskIconStore.saveFromUri(context, uri) }
+            if (saved != null) onStage(saved)
+        }
+    }
+    // Pick an audio file (mp3/ogg/…) and use its embedded album art as the icon.
+    val audioPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) scope.launch {
+            val saved = withContext(Dispatchers.IO) { TaskIconStore.saveFromAudio(context, uri) }
+            if (saved != null) onStage(saved)
+            else android.widget.Toast.makeText(context, "No album art in that file", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Shortcut icon", style = MaterialTheme.typography.labelLarge)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+                if (preview != null) {
+                    Image(
+                        bitmap = preview.asImageBitmap(),
+                        contentDescription = "Selected icon",
+                        modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)),
+                    )
+                } else {
+                    Icon(Icons.Filled.Apps, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(32.dp))
+                }
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { showAppPicker = true }) { Text("App") }
+                    OutlinedButton(onClick = {
+                        photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }) { Text("Picture") }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { showEmojiPicker = true }) { Text("Emoji") }
+                    OutlinedButton(onClick = { audioPicker.launch("audio/*") }) { Text("Audio") }
+                    if (iconPath != null) TextButton(onClick = { onStage(null) }) { Text("Clear") }
+                }
+            }
+        }
+    }
+    if (showAppPicker) {
+        AppPickerDialog(
+            onDismiss = { showAppPicker = false },
+            onPick = { pkg ->
+                showAppPicker = false
+                scope.launch {
+                    val saved = withContext(Dispatchers.IO) { TaskIconStore.saveFromApp(context, pkg) }
+                    if (saved != null) onStage(saved)
+                }
+            },
+        )
+    }
+    if (showEmojiPicker) {
+        EmojiPickerDialog(
+            initial = "",
+            onDismiss = { showEmojiPicker = false },
+            onConfirm = { glyph ->
+                showEmojiPicker = false
+                scope.launch {
+                    val saved = withContext(Dispatchers.IO) { TaskIconStore.saveFromText(context, glyph) }
+                    if (saved != null) onStage(saved)
+                }
+            },
+        )
+    }
 }
 
 @Composable
 internal fun ProfileEditorDialog(
     profile: Profile?,
     tasks: List<Task>,
+    siblingNames: Set<String> = emptySet(),
     onDismiss: () -> Unit,
     onSave: (String, Boolean, Long, Int, AutomationMode, String?) -> Unit,
 ) {
@@ -254,7 +392,9 @@ internal fun ProfileEditorDialog(
     var automationMode by rememberSaveable(profile?.id) { mutableStateOf(profile?.automationMode ?: AutomationMode.SINGLE) }
     var group by rememberSaveable(profile?.id) { mutableStateOf(profile?.group.orEmpty()) }
     val parsedCooldown = cooldown.toIntOrNull()
-    val canSave = name.isNotBlank() && enterTaskId > 0 && (cooldown.isBlank() || parsedCooldown != null)
+    // Names are unique within a project (siblingNames = other profiles in the same project, lowercased).
+    val nameClash = name.isNotBlank() && name.trim().lowercase() in siblingNames
+    val canSave = name.isNotBlank() && !nameClash && enterTaskId > 0 && (cooldown.isBlank() || parsedCooldown != null)
     val onLabel = stringResource(R.string.label_on)
     val offLabel = stringResource(R.string.label_off)
 
@@ -268,7 +408,13 @@ internal fun ProfileEditorDialog(
                     onValueChange = { name = it },
                     label = { Text(stringResource(R.string.profile_name_label)) },
                     placeholder = { Text(stringResource(R.string.profile_name_hint)) },
-                    supportingText = { Text(stringResource(R.string.profile_name_helper)) },
+                    isError = nameClash,
+                    supportingText = {
+                        Text(
+                            if (nameClash) "A profile with this name already exists in this project."
+                            else stringResource(R.string.profile_name_helper)
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -615,3 +761,29 @@ internal fun DeleteConfirmationDialog(
 }
 
 private fun plural(count: Int): String = if (count == 1) "" else "s"
+
+/** Standalone icon picker (used from a task card's clickable icon). Stages files internally and returns
+ *  the chosen path via [onConfirm]; the caller persists it (and cleans the old file via updateTask). */
+@Composable
+internal fun TaskIconPickerDialog(initialIconPath: String?, onDismiss: () -> Unit, onConfirm: (String?) -> Unit) {
+    val original = remember { initialIconPath }
+    var staged by remember { mutableStateOf(initialIconPath) }
+    fun stage(newPath: String?) {
+        val current = staged
+        if (current != null && current != original) TaskIconStore.delete(current)
+        staged = newPath
+    }
+    val cancel = {
+        val current = staged
+        if (current != null && current != original) TaskIconStore.delete(current)
+        onDismiss()
+    }
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = cancel,
+        title = { Text("Task icon") },
+        text = { TaskIconEditorRow(iconPath = staged, onStage = { stage(it) }) },
+        confirmButton = { OutlinedButton(onClick = { onConfirm(staged) }) { Text("Done") } },
+        dismissButton = { TextButton(onClick = cancel) { Text(stringResource(R.string.action_cancel)) } },
+    )
+}
