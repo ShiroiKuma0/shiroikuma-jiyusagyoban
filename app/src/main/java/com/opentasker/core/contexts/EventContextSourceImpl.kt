@@ -31,5 +31,9 @@ class EventContextSourceImpl : ContextSource {
         ShakeContextEvents.events,
         PackageContextEvents.events,
         BluetoothContextEvents.events,
+        BroadcastContextEvents.events,
+        OrientationContextEvents.events,
+        AppForegroundChangedContextEvents.events,
+        HardwareKeyContextEvents.events,
     )
 }

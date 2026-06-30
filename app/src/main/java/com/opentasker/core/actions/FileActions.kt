@@ -1,5 +1,8 @@
 package com.opentasker.core.actions
 
+import android.content.Intent
+import android.webkit.MimeTypeMap
+import androidx.core.content.FileProvider
 import java.io.File
 import java.nio.file.FileSystems
 import com.opentasker.core.engine.Action
@@ -22,7 +25,7 @@ class ReadFileAction : Action {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         val varName = args["var"] ?: args["variable"] ?: "result"
         return try {
-            val file = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside OpenTasker files")
+            val file = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
             if (file.length() > MAX_READ_BYTES) {
                 return ActionResult.Failure("file exceeds ${MAX_READ_BYTES / 1024 / 1024} MB read limit (${file.length()} bytes)")
             }
@@ -55,7 +58,7 @@ class WriteFileAction : Action {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         val text = args["text"] ?: args["content"] ?: ""
         return try {
-            val file = safeUserFile(ctx, path) ?: return ActionResult.Failure("path is outside OpenTasker files")
+            val file = safeUserFile(ctx, path) ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
             val bytes = text.toByteArray(Charsets.UTF_8).size
             if (bytes > MAX_FILE_BYTES) {
                 return ActionResult.Failure("content exceeds ${MAX_FILE_BYTES / 1024 / 1024} MB write limit ($bytes bytes)")
@@ -85,7 +88,7 @@ class AppendFileAction : Action {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         val text = args["text"] ?: args["content"] ?: ""
         return try {
-            val file = safeUserFile(ctx, path) ?: return ActionResult.Failure("path is outside OpenTasker files")
+            val file = safeUserFile(ctx, path) ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
             val bytes = text.toByteArray(Charsets.UTF_8).size
             if (bytes > MAX_FILE_BYTES) {
                 return ActionResult.Failure("append content exceeds ${MAX_FILE_BYTES / 1024 / 1024} MB write limit ($bytes bytes)")
@@ -117,7 +120,7 @@ class DeleteFileAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         return try {
-            val file = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside OpenTasker files")
+            val file = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
             if (!file.isFile) return ActionResult.Failure("delete only supports files")
             if (file.delete()) {
                 ctx.logger("Delete ${file.name}")
@@ -148,7 +151,7 @@ class ListFilesAction : Action {
         val varName = args["var"] ?: args["variable"] ?: "result"
         val pattern = args["pattern"].orEmpty()
         return try {
-            val dir = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside OpenTasker files")
+            val dir = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
             if (!dir.isDirectory) return ActionResult.Failure("path is not a directory")
             val matcher = fileNameMatcher(pattern)
             val files = dir.listFiles()
@@ -177,7 +180,93 @@ private fun fileNameMatcher(pattern: String): java.nio.file.PathMatcher? {
     return FileSystems.getDefault().getPathMatcher("glob:$trimmed")
 }
 
-private fun safeUserFile(ctx: ActionContext, path: String, mustExist: Boolean = false): File? {
+/**
+ * Move/rename a file within the sandbox.
+ *
+ * Args:
+ *   - "from": source path (must exist)
+ *   - "to": destination path
+ */
+class MoveFileAction : Action {
+    override val id = "file.move"
+    override val category = ActionCategory.FILE
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val fromArg = args["from"] ?: return ActionResult.Failure("missing from")
+        val toArg = args["to"] ?: return ActionResult.Failure("missing to")
+        val src = safeUserFile(ctx, fromArg, mustExist = true) ?: return ActionResult.Failure("source is outside 白い熊 自由作業盤 files")
+        val dest = safeUserFile(ctx, toArg) ?: return ActionResult.Failure("destination is outside 白い熊 自由作業盤 files")
+        return try {
+            dest.parentFile?.mkdirs()
+            val ok = src.renameTo(dest) || run {
+                src.copyTo(dest, overwrite = true); src.delete()
+            }
+            if (ok) {
+                ctx.logger("Moved ${src.name} → ${dest.name}")
+                ActionResult.Success
+            } else {
+                ActionResult.Failure("move failed")
+            }
+        } catch (e: Exception) {
+            ActionResult.Failure("move failed: ${e.message}")
+        }
+    }
+}
+
+/**
+ * Create a directory (and any missing parents) within the sandbox.
+ *
+ * Args:
+ *   - "path": directory path
+ */
+class MakeDirectoryAction : Action {
+    override val id = "file.mkdir"
+    override val category = ActionCategory.FILE
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val path = args["path"] ?: return ActionResult.Failure("missing path")
+        val dir = safeUserFile(ctx, path) ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
+        return if (dir.isDirectory || dir.mkdirs()) {
+            ctx.logger("Created directory ${dir.name}")
+            ActionResult.Success
+        } else {
+            ActionResult.Failure("could not create directory")
+        }
+    }
+}
+
+/**
+ * Open a file with another app (ACTION_VIEW) via a content:// URI from our FileProvider.
+ *
+ * Args:
+ *   - "path": file path (must exist)
+ *   - "mime": optional MIME type override (otherwise guessed from the extension)
+ */
+class OpenFileAction : Action {
+    override val id = "file.open"
+    override val category = ActionCategory.FILE
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val path = args["path"] ?: return ActionResult.Failure("missing path")
+        val file = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
+        return try {
+            val uri = FileProvider.getUriForFile(ctx.app, "${ctx.app.packageName}.fileprovider", file)
+            val mime = args["mime"]?.takeIf { it.isNotBlank() }
+                ?: MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension.lowercase())
+                ?: "*/*"
+            val intent = Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, mime)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            ctx.app.startActivity(intent)
+            ctx.logger("Opened ${file.name}")
+            ActionResult.Success
+        } catch (e: Exception) {
+            ActionResult.Failure("could not open file: ${e.message}")
+        }
+    }
+}
+
+internal fun safeUserFile(ctx: ActionContext, path: String, mustExist: Boolean = false): File? {
     if (path.isBlank() || path.contains('\u0000')) return null
     val baseDir = File(ctx.app.filesDir, "user_files").canonicalFile
     val requested = File(baseDir, path.trimStart('/', '\\')).canonicalFile

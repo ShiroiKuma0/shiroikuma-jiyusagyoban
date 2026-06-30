@@ -1,5 +1,6 @@
 package com.opentasker.core.actions
 
+import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.os.Build
 import android.os.VibrationEffect
@@ -9,6 +10,9 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.shizuku.ShizukuShell
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Vibrate device.
@@ -81,16 +85,73 @@ class LockDeviceAction : Action {
 }
 
 /**
+ * Lockdown: lock now and require the PIN/password on the next unlock (biometrics disabled), i.e. the
+ * power-menu "Lockdown". Uses our Device Admin: tries `lockNow(FLAG_EVICT_CREDENTIAL_ENCRYPTION_KEY)`
+ * (forces credential where the OS allows it for the admin) and falls back to a plain `lockNow()`.
+ * Requires the user to have enabled 白い熊 自由作業盤 as a Device Admin.
+ */
+class LockdownAction : Action {
+    override val id = "screen.lockdown"
+    override val category = ActionCategory.SYSTEM
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val dpm = ctx.app.getSystemService(android.app.admin.DevicePolicyManager::class.java)
+            ?: return ActionResult.Failure("DevicePolicyManager unavailable")
+        val admin = android.content.ComponentName(ctx.app, com.opentasker.core.admin.DeviceAdmin::class.java)
+        if (!dpm.isAdminActive(admin)) {
+            return ActionResult.Failure("Enable Device Admin first (Permissions → Device admin / lockdown)")
+        }
+        return try {
+            try {
+                dpm.lockNow(android.app.admin.DevicePolicyManager.FLAG_EVICT_CREDENTIAL_ENCRYPTION_KEY)
+            } catch (e: SecurityException) {
+                dpm.lockNow() // non-managed admin can't evict the CE key → plain immediate lock
+            }
+            ctx.logger("Lockdown")
+            ActionResult.Success
+        } catch (e: Exception) {
+            ActionResult.Failure("lockdown failed: ${e.message}")
+        }
+    }
+}
+
+/**
+ * Power off the device via Shizuku (shell `svc power shutdown`, falling back to `reboot -p`).
+ * Requires Shizuku running + granted.
+ */
+class PowerOffAction : Action {
+    override val id = "power.off"
+    override val category = ActionCategory.SYSTEM
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        if (!ShizukuShell.available()) {
+            return ActionResult.Failure("power off needs Shizuku running + access granted")
+        }
+        return withContext(Dispatchers.IO) {
+            val ok = runCatching { ShizukuShell.exec("svc power shutdown").exitCode == 0 }.getOrDefault(false) ||
+                runCatching { ShizukuShell.exec("reboot -p").exitCode == 0 }.getOrDefault(false)
+            if (ok) {
+                ctx.logger("Power off")
+                ActionResult.Success
+            } else {
+                ActionResult.Failure("power off command failed")
+            }
+        }
+    }
+}
+
+/**
  * Turn off screen.
  */
 class ScreenOffAction : Action {
     override val id = "screen.off"
     override val category = ActionCategory.SETTINGS
 
-    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        ctx.logger("Screen off")
-        return ActionResult.Failure("Screen-off requires privileged power management access")
-    }
+    // Accessibility GLOBAL_ACTION_LOCK_SCREEN first (no Shizuku needed — but it also LOCKS the device),
+    // then fall back to the Shizuku KEYCODE_SLEEP keyevent (pure sleep, no lock). globalAction() does the
+    // hybrid (in-process accessibility action, else the key event when keyCode != 0).
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult =
+        globalAction(ctx, AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN, "Turn screen off", keyCode = 223)
 }
 
 /**
@@ -104,9 +165,12 @@ class WakeAction : Action {
     override val category = ActionCategory.SETTINGS
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val dur = args["duration_sec"]?.toLongOrNull() ?: 10L
-        ctx.logger("Wake (${dur}s)")
-        return ActionResult.Failure("Screen wake requires a foreground activity or privileged wake flow")
+        if (!ShizukuShell.available()) return ActionResult.Failure("Screen wake needs Shizuku")
+        val ok = runCatching {
+            withContext(Dispatchers.IO) { ShizukuShell.exec("input keyevent 224").exitCode == 0 } // KEYCODE_WAKEUP
+        }.getOrDefault(false)
+        ctx.logger(if (ok) "Wake (Shizuku)" else "Wake failed")
+        return if (ok) ActionResult.Success else ActionResult.Failure("Wake keyevent failed")
     }
 }
 

@@ -86,6 +86,12 @@ object ContextMatchEvaluator {
     private fun matchesEvent(spec: ContextSpec, event: ContextEvent): Boolean {
         val actualEvent = event.metadata["event"].orEmpty()
         val expectedEvent = spec.config["event"]?.trim().orEmpty()
+        if (expectedEvent.isMinuteTick()) {
+            return matchesMinuteTick(spec, event)
+        }
+        if (expectedEvent.equals("sec_tick", ignoreCase = true)) {
+            return matchesSecTick(spec, event)
+        }
         if (expectedEvent.isSunEvent()) {
             return matchesSunEvent(spec, event, expectedEvent)
         }
@@ -131,6 +137,46 @@ object ContextMatchEvaluator {
             if (actualPackage !in packageAllowlist) return false
         }
 
+        // Device-orientation trigger: optionally narrow to specific quadrant(s) (portrait / landscape /
+        // reverse-portrait / reverse-landscape). Omit to fire on any orientation change.
+        val expectedOrientations = firstConfig(spec, "orientation", "orientations")
+            .splitCsv()
+            .map { it.lowercase(Locale.US) }
+            .toSet()
+        if (expectedOrientations.isNotEmpty()) {
+            val actualOrientation = event.metadata["orientation"].orEmpty().lowercase(Locale.US)
+            if (actualOrientation !in expectedOrientations) return false
+        }
+
+        // Hardware-key trigger (event=hardware_key): narrow by key (volume_up / volume_down / power)
+        // and/or press type (short / long / double). Omit either to fire on any value.
+        val expectedKeys = firstConfig(spec, "key", "keys")
+            .splitCsv()
+            .map { it.lowercase(Locale.US) }
+            .toSet()
+        if (expectedKeys.isNotEmpty()) {
+            val actualKey = event.metadata["key"].orEmpty().lowercase(Locale.US)
+            if (actualKey !in expectedKeys) return false
+        }
+        val expectedPresses = firstConfig(spec, "press", "presses")
+            .splitCsv()
+            .map { it.lowercase(Locale.US) }
+            .toSet()
+        if (expectedPresses.isNotEmpty()) {
+            val actualPress = event.metadata["press"].orEmpty().lowercase(Locale.US)
+            if (actualPress !in expectedPresses) return false
+        }
+
+        // Broadcast (Intent Received) trigger: narrow by the intent action(s). Case-sensitive.
+        val configuredActions = firstConfig(spec, "action", "actions")
+            .splitCsv()
+            .filter { it.isNotBlank() }
+            .toSet()
+        if (configuredActions.isNotEmpty()) {
+            val actualAction = event.metadata["action"].orEmpty()
+            if (actualAction !in configuredActions) return false
+        }
+
         val configuredTagIds = firstConfig(spec, "tagId", "tagIds", "tag")
             .splitCsv()
             .map(NfcContextEvents::normalizeTagId)
@@ -165,6 +211,32 @@ object ContextMatchEvaluator {
         val actualBundle = event.metadata["bundleJson"].orEmpty().ifBlank { "{}" }
         if (expectedBundle != actualBundle) return false
         return event.metadata["state"].equals("satisfied", ignoreCase = true)
+    }
+
+    /**
+     * A periodic clock tick. Rides the internal per-minute `sun_tick` pulse, so it fires once every
+     * minute (the natural cadence for a clock widget); an optional `everyMinutes`/`interval` config
+     * fires only every N minutes, aligned to the top of the hour.
+     */
+    private fun matchesMinuteTick(spec: ContextSpec, event: ContextEvent): Boolean {
+        if (!event.metadata["event"].orEmpty().equals("sun_tick", ignoreCase = true)) return false
+        val every = firstConfig(spec, "everyMinutes", "interval", "minutes").toIntOrNull()?.coerceAtLeast(1) ?: 1
+        if (every <= 1) return true  // every-minute consumers (clock, battery line) also take the one-shot refresh tick
+        // Interval profiles (everyMinutes>1, e.g. 話す時計) fire ONLY on a real minute boundary — never on the
+        // one-shot refresh tick the engine emits on each (re)subscription, which would double-fire them at :00/:30.
+        if (event.metadata["refresh"] == "true") return false
+        val minute = event.metadata["time"]?.let(::parseClockMinutes) ?: currentMinuteOfDay()
+        return minute % every == 0
+    }
+
+    /** Sub-minute periodic trigger: fires every `interval` seconds (config `interval`/`everySeconds`/
+     *  `seconds`), riding the per-second `sec_tick`. Used by the notification wakedance. */
+    private fun matchesSecTick(spec: ContextSpec, event: ContextEvent): Boolean {
+        if (!event.metadata["event"].orEmpty().equals("sec_tick", ignoreCase = true)) return false
+        val every = firstConfig(spec, "everySeconds", "interval", "seconds").toIntOrNull()?.coerceAtLeast(1) ?: 1
+        if (every <= 1) return true
+        val epochSec = event.metadata["epochSecond"]?.toLongOrNull() ?: return false
+        return epochSec % every == 0L
     }
 
     private fun matchesSunEvent(spec: ContextSpec, event: ContextEvent, expectedEvent: String): Boolean {
@@ -225,3 +297,7 @@ object ContextMatchEvaluator {
 
 private fun String.isSunEvent(): Boolean =
     equals("sunrise", ignoreCase = true) || equals("sunset", ignoreCase = true)
+
+private fun String.isMinuteTick(): Boolean =
+    equals("minute", ignoreCase = true) || equals("clock", ignoreCase = true) ||
+        equals("clock_tick", ignoreCase = true) || equals("tick", ignoreCase = true)

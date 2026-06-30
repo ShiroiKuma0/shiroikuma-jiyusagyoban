@@ -27,7 +27,7 @@
             android:id="@+id/widget_task_name"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="OpenTasker"
+            android:text="白い熊 自由作業盤"
             android:textColor="@color/widget_text_primary"
             android:textSize="15sp"
             android:textStyle="bold"

@@ -7,9 +7,15 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission
         android:name="android.permission.SCHEDULE_EXACT_ALARM"
         tools:ignore="ProtectedPermissions" />
@@ -35,6 +41,12 @@
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
 
     <uses-feature
         android:name="android.hardware.telephony"
@@ -50,6 +62,20 @@
         android:protectionLevel="signature" />
 
     <queries>
+        <!-- Sister app: token-gated automation intents driven by the Send Intent action. -->
+        <package android:name="shiroikuma.jami" />
+        <!--
+          Broad visibility for the generic Send Intent action. Package visibility is
+          all-or-nothing per package, so matching any launchable app's MAIN/LAUNCHER
+          entry exposes every component of that package — letting Send Intent dispatch
+          to any normal app's activities/services/receivers on Android 11+. Targets
+          with no launcher entry, or reachable only by a custom action string, still
+          need their own <package> pin (e.g. shiroikuma.jami above).
+        -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
         <package android:name="com.termux" />
         <package android:name="com.termux.tasker" />
         <package android:name="moe.shizuku.privileged.api" />
@@ -73,6 +99,7 @@
     <application
         android:name=".OpenTaskerApp_NoHilt"
         android:label="@string/app_name"
+        android:extractNativeLibs="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/Theme.OpenTasker"
@@ -87,6 +114,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
             android:theme="@style/Theme.OpenTasker">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -101,10 +129,10 @@
         <service
             android:name="com.opentasker.core.engine.AutomationService"
             android:exported="false"
-            android:foregroundServiceType="specialUse|location">
+            android:foregroundServiceType="specialUse|location|microphone">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="OpenTasker automation engine — runs user-defined profiles when their contexts match" />
+                android:value="白い熊 自由作業盤 automation engine — runs user-defined profiles when their contexts match" />
         </service>
 
         <service
@@ -122,6 +150,18 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.opentasker.core.admin.DeviceAdmin"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:exported="true">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
             </intent-filter>
         </receiver>
 
@@ -154,12 +194,40 @@
             </intent-filter>
         </service>
 
+        <!-- exported: a third-party launcher (e.g. 白い熊 雷起動盤) fires the raw shortcut intent itself,
+             so the run-task trampoline must be startable from another app. -->
         <activity
             android:name="com.opentasker.widget.TaskRunActivity"
-            android:exported="false"
+            android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:excludeFromRecents="true"
             android:noHistory="true"
+            android:taskAffinity="" />
+
+        <!-- Launcher "add a shortcut" entry: picks a task, returns a home-screen shortcut that runs it. -->
+        <activity
+            android:name="com.opentasker.widget.CreateTaskShortcutActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.CREATE_SHORTCUT" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name="com.opentasker.scenes.SceneActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:taskAffinity="" />
+
+        <activity
+            android:name="com.opentasker.scenes.WakedanceActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+            android:excludeFromRecents="true"
             android:taskAffinity="" />
 
         <activity
@@ -173,13 +241,53 @@
 
         <receiver
             android:name="com.opentasker.widget.TaskWidgetProvider"
-            android:exported="false">
+            android:exported="false"
+            android:label="@string/widget_task_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_task_info" />
+        </receiver>
+
+        <receiver
+            android:name="com.opentasker.widget.StyledWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_styled_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/styled_widget_info" />
+        </receiver>
+
+        <activity
+            android:name="com.opentasker.widget.StyledWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.OpenTasker">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <!-- External "name this widget" bridge for sister apps (e.g. the raikidoban launcher). Explicit
+             ordered broadcast, no permission: senders may use a different signing key. -->
+        <receiver
+            android:name="com.opentasker.widget.SetWidgetNameReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="shiroikuma.jiyusagyoban.action.SET_WIDGET_NAME" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.opentasker.widget.GetWidgetBindingReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="shiroikuma.jiyusagyoban.action.GET_WIDGET_BINDING" />
+            </intent-filter>
         </receiver>
 
         <receiver
@@ -219,5 +327,44 @@
                 <action android:name="com.twofortyfouram.locale.intent.action.FIRE_SETTING" />
             </intent-filter>
         </receiver>
+
+        <activity
+            android:name="com.opentasker.core.dialog.DialogActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:enabled="true"
+            android:exported="true"
+            android:multiprocess="false"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
+        <service
+            android:name="com.opentasker.core.accessibility.ShiroiKumaAccessibilityService"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
     </application>
 </manifest>

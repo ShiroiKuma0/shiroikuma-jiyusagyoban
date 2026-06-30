@@ -81,6 +81,9 @@ internal fun RunLogScreenContent(
     val filteredLogs = remember(logs, statusFilter, taskIdFilter, query) {
         filterRunLogs(logs, RunLogFilterState(status = statusFilter, taskId = taskIdFilter, query = query))
     }
+    // The latest failure (logs are timestamp-DESC) gets a banner atop the Log tab — this is where
+    // run failures surface now that the Profiles workspace card is gone.
+    val latestFailure = logs.firstOrNull { !it.success }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -88,6 +91,15 @@ internal fun RunLogScreenContent(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
     ) {
+        if (latestFailure != null) {
+            item {
+                InlineNotice(
+                    title = "Last failure: ${latestFailure.taskName}",
+                    body = latestFailure.message.ifBlank { "Tap the matching entry below for the full trace." },
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
         if (logs.isEmpty()) {
             item {
                 InlineNotice(

@@ -3,14 +3,16 @@ package com.opentasker.core.model
 import kotlinx.serialization.Serializable
 
 /**
- * Variables are %name slots, expanded at action runtime.
+ * Variables are `%name` slots, expanded at action runtime. Scope follows the name's casing:
+ *   - `%ALLCAPS`   → super-global, app-wide, persistent ([projectId] == 0).
+ *   - `%MixedCase` → project-global, persistent, owned by one project ([projectId] > 0).
+ *   - `%lowercase` → task-local, ephemeral (never persisted, so never a [Variable]).
  *
- * Globals are uppercase (%MYVAR) and persist; locals are lowercase (%myvar) and live
- * only for the duration of a task invocation. This matches Tasker's convention.
+ * Only persisted (global) variables are represented here; [projectId] 0 means super-global.
  */
 @Serializable
 data class Variable(
     val name: String,
     val value: String,
-    val isGlobal: Boolean,
+    val projectId: Long = 0,
 )

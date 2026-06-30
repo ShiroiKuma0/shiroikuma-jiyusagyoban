@@ -1,7 +1,7 @@
 package com.opentasker.core.engine
 
 import android.content.Context
-import com.opentasker.core.logging.AppLogger
+import android.util.Log
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.AppDatabase
@@ -19,14 +19,22 @@ suspend fun executeAndLogTask(
     source: String,
     metadata: List<String> = emptyList(),
     initialVariables: Map<String, String> = emptyMap(),
+    eventLocals: Map<String, String> = emptyMap(),
     logTag: String = TAG,
 ): TaskExecutionResult {
-    val variables = VariableStore()
+    val variables = VariableStore(com.opentasker.core.engine.variables.PersistentGlobalScope, task.projectId)
     initialVariables.forEach { (name, value) -> variables.set(name, value) }
-    val ctx = ActionContext(appContext, variables) { msg -> AppLogger.info(logTag, msg) }
-    val runner = TaskRunner(ctx, resolveTask = dbSubTaskResolver(db))
+    // Force-local so this invocation's event snapshot shadows the (possibly since-overwritten) super-global.
+    eventLocals.forEach { (name, value) -> variables.setLocal(name, value) }
+    val ctx = ActionContext(appContext, variables) { msg -> Log.i(logTag, msg) }
+    val runner = TaskRunner(
+        ctx,
+        resolveTask = dbSubTaskResolver(db),
+        projectNameResolver = { pid -> pid?.let { db.projectDao().getById(it)?.name } },
+    )
     val report = runner.run(task)
-    AppLogger.info(logTag, "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)")
+    Log.i(logTag, "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)")
+    maybeQueueFreezeBubble(appContext, task, variables)
     val classified = RunLogSource.classify(source)
     val logEntry = RunLogEntry(
         taskId = task.id,
@@ -44,6 +52,25 @@ suspend fun executeAndLogTask(
     )
     val inserted = insertRunLog(db, logEntry)
     return TaskExecutionResult(report, inserted)
+}
+
+/**
+ * If [task] is freeze-enabled, queue a re-freeze bubble for the app it launches/unfreezes. The package is
+ * read from the task's `app.launch` (preferred) or `app.unfreeze` action, expanded against the run's
+ * variables; an unresolved (`%var`-still-present) or blank package is skipped.
+ */
+private fun maybeQueueFreezeBubble(appContext: Context, task: Task, variables: VariableStore) {
+    if (!task.freezeBubble) return
+    val pkgRaw = task.actions.firstOrNull { it.type == "app.launch" }?.args?.get("package")
+        ?: task.actions.firstOrNull { it.type == "app.unfreeze" }?.args?.get("package")
+        ?: return
+    val pkg = variables.expand(pkgRaw).trim()
+    if (pkg.isEmpty() || pkg.contains('%')) return
+    val label = runCatching {
+        val pm = appContext.packageManager
+        pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+    }.getOrNull()?.takeIf { it.isNotBlank() } ?: task.name
+    com.opentasker.core.bubbles.FreezeBubbleStore.enqueue(pkg, label, task.iconPath)
 }
 
 suspend fun logSkippedRun(
@@ -73,19 +100,39 @@ suspend fun logSkippedRun(
 }
 
 /**
- * Resolves a sub-task by numeric id first, then by exact name (case-insensitive), for `task.run`.
+ * Resolve a task reference NAME-first (the id is only a legacy fallback), scoped to [projectId] when
+ * given — a `(project, name)` match wins, then any-project name match (deterministic: lowest position
+ * then id), then the numeric id. Used by scene elements (tap / long-press / gesture) so a link survives
+ * re-imports that re-id the task and disambiguates same-name tasks across projects. Mirrors the scene
+ * resolver in SceneActions. (Distinct from [dbSubTaskResolver], which stays id-first for `task.run`.)
+ */
+suspend fun resolveTaskByName(db: AppDatabase, ref: String, projectId: Long?): Task? {
+    if (ref.isBlank()) return null
+    val all = db.taskDao().getAll()
+    if (projectId != null) {
+        all.firstOrNull { (it.projectId ?: 0L) == projectId && it.name.equals(ref, ignoreCase = true) }
+            ?.let { return it.toDomain() }
+    }
+    all.filter { it.name.equals(ref, ignoreCase = true) }
+        .minByOrNull { it.position.toLong() * 10_000_000L + it.id }
+        ?.let { return it.toDomain() }
+    return ref.toLongOrNull()?.let { id -> all.firstOrNull { it.id == id }?.toDomain() }
+}
+
+/**
+ * Resolves a sub-task by NAME first (exact, then case-insensitive); the numeric id is only a legacy
+ * fallback. Used by `task.run` — matches the name-first resolution scenes use, so re-imports that re-id
+ * a task don't strand callers that reference it.
  */
 fun dbSubTaskResolver(db: AppDatabase): SubTaskResolver = resolver@{ ref ->
-    val byId = ref.toLongOrNull()?.let { db.taskDao().getById(it) }
-    if (byId != null) return@resolver byId.toDomain()
-    val exact = db.taskDao().getByName(ref)
-    if (exact != null) return@resolver exact.toDomain()
-    db.taskDao().getAll().firstOrNull { it.name.equals(ref, ignoreCase = true) }?.toDomain()
+    db.taskDao().getByName(ref)?.let { return@resolver it.toDomain() }
+    db.taskDao().getAll().firstOrNull { it.name.equals(ref, ignoreCase = true) }?.let { return@resolver it.toDomain() }
+    ref.toLongOrNull()?.let { db.taskDao().getById(it) }?.toDomain()
 }
 
 suspend fun insertRunLog(db: AppDatabase, entry: RunLogEntry): Boolean =
     runCatching { db.runLogDao().insert(entry.toEntity()) }
-        .onFailure { e -> AppLogger.error(TAG, "Failed to write run log for task ${entry.taskId}", e) }
+        .onFailure { e -> Log.e(TAG, "Failed to write run log for task ${entry.taskId}", e) }
         .isSuccess
 
 private const val TAG = "OpenTasker"

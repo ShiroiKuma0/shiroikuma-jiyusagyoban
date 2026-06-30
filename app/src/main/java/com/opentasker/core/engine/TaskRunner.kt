@@ -1,5 +1,8 @@
 package com.opentasker.core.engine
 
+import com.opentasker.core.capabilities.CapabilityState
+import com.opentasker.core.dialog.DialogActivity
+import com.opentasker.core.dialog.DialogBridge
 import com.opentasker.core.expressions.TemplateExpansionTrace
 import com.opentasker.core.expressions.TemplateExpressionEngine
 import com.opentasker.core.model.ActionSpec
@@ -7,6 +10,7 @@ import com.opentasker.core.model.Task
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Resolves a sub-task by id or name for the `task.run` action. */
 typealias SubTaskResolver = suspend (ref: String) -> Task?
@@ -23,6 +27,8 @@ class TaskRunner(
     private val templateExpressionEngine: TemplateExpressionEngine = TemplateExpressionEngine(),
     private val resolveTask: SubTaskResolver? = null,
     private val depth: Int = 0,
+    /** Resolves a projectId → project name, for the permission-block dialog. Null → "Unfiled". */
+    private val projectNameResolver: (suspend (Long?) -> String?)? = null,
 ) {
     /** A live `flow.foreach` iteration in progress. */
     private class LoopFrame(
@@ -33,6 +39,35 @@ class TaskRunner(
     )
 
     suspend fun run(task: Task): TaskRunReport {
+        // Pre-flight permission gate: if the task uses an action whose special access isn't granted,
+        // DON'T run any action — show a modal OK dialog naming the task, project, and missing permission(s).
+        val missing = CapabilityState.missingForTask(task, ctx.app)
+        if (missing.isNotEmpty()) {
+            val preStart = System.currentTimeMillis()
+            val project = runCatching { projectNameResolver?.invoke(task.projectId) }.getOrNull() ?: "Unfiled"
+            showPermissionBlockDialog(project, task.name, missing)
+            val summary = missing.joinToString(", ") { CapabilityState.shortLabel(it.requirement) }
+            val failure = ActionResult.Failure("Not run — missing permission(s): $summary")
+            return TaskRunReport(
+                taskId = task.id,
+                taskName = task.name,
+                startedAt = preStart,
+                durationMs = System.currentTimeMillis() - preStart,
+                results = listOf(failure),
+                traces = listOf(
+                    ActionExecutionTrace(
+                        index = 0,
+                        actionType = "permission",
+                        label = "permission check",
+                        durationMs = 0,
+                        status = ActionTraceStatus.FAILURE,
+                        message = failure.message,
+                    ),
+                ),
+                success = false,
+            )
+        }
+
         ctx.variables.pushScope()
         val started = System.currentTimeMillis()
         val results = mutableListOf<ActionResult>()
@@ -246,19 +281,64 @@ class TaskRunner(
             ?: return fail("task.run requires a 'task' (id or name)")
         val target = resolver(ref) ?: return fail("sub-task not found: $ref")
 
-        // Pass any extra args as input variables; the shared store lets global outputs flow back.
-        args.forEach { (key, value) ->
-            if (key !in SUB_TASK_REF_KEYS) ctx.variables.set(key, value)
+        // Named parameters (param:<name>); values are already expanded in the caller's scope.
+        val parameters = buildMap {
+            args.forEach { (key, value) ->
+                if (key.startsWith(SUB_TASK_PARAM_PREFIX)) put(key.removePrefix(SUB_TASK_PARAM_PREFIX), value)
+            }
         }
+        val resultsPrefix = args[SUB_TASK_RESULTS_PREFIX_KEY]?.trim().orEmpty()
 
-        val child = TaskRunner(ctx, templateExpressionEngine, resolveTask, depth + 1)
+        // Isolated child: shares globals + arrays, fresh locals, read-only params, its own returns.
+        // The child resolves its %MixedCase project-globals against ITS OWN project.
+        val childCtx = ActionContext(
+            app = ctx.app,
+            variables = ctx.variables.childScope(target.projectId),
+            eventVariables = emptyMap(),
+            parameters = parameters,
+            returns = mutableMapOf(),
+            logger = ctx.logger,
+        )
+        val child = TaskRunner(childCtx, templateExpressionEngine, resolveTask, depth + 1, projectNameResolver)
         val report = child.run(target)
+
+        // Surface the sub-task's named results and status back to the caller as variables.
+        childCtx.returns.forEach { (name, value) -> ctx.variables.set("$resultsPrefix$name", value) }
+        ctx.variables.set("${resultsPrefix}ok", report.success.toString())
+        val errorMessage = report.results.firstNotNullOfOrNull { (it as? ActionResult.Failure)?.message } ?: ""
+        ctx.variables.set("${resultsPrefix}error", errorMessage)
+
         val result = if (report.success) {
             ActionResult.Success
         } else {
-            ActionResult.Failure("sub-task '${target.name}' failed")
+            ActionResult.Failure(errorMessage.ifBlank { "sub-task '${target.name}' failed" })
         }
         return result to traceFor(index, spec, started, result, expansionReport)
+    }
+
+    /** Modal OK dialog (via DialogActivity) naming the task, project, and each missing permission. */
+    private suspend fun showPermissionBlockDialog(
+        project: String,
+        taskName: String,
+        missing: List<CapabilityState.MissingCapability>,
+    ) {
+        val lines = missing.joinToString("\n") { m ->
+            "• ${CapabilityState.shortLabel(m.requirement)} — needed by: ${m.actionTypes.joinToString(", ")}"
+        }
+        val text = "Can't run “$taskName” (project “$project”).\n\nMissing permission(s):\n$lines\n\n" +
+            "Grant it in Settings, then run again."
+        val id = java.util.UUID.randomUUID().toString()
+        val deferred = DialogBridge.register(id)
+        val intent = android.content.Intent(ctx.app, DialogActivity::class.java).apply {
+            putExtra(DialogActivity.EXTRA_ID, id)
+            putExtra(DialogActivity.EXTRA_TYPE, DialogActivity.TYPE_TEXT)
+            putExtra(DialogActivity.EXTRA_TITLE, "Permission required")
+            putExtra(DialogActivity.EXTRA_TEXT, text)
+            putExtra(DialogActivity.EXTRA_OK, "OK")
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val shown = runCatching { ctx.app.startActivity(intent); true }.getOrDefault(false)
+        if (shown) runCatching { withTimeoutOrNull(120_000L) { deferred.await() } } else DialogBridge.cancel(id)
     }
 
     private fun shouldRun(spec: ActionSpec): Boolean {
@@ -268,10 +348,10 @@ class TaskRunner(
 
     /** Evaluates a condition string with legacy `%var` then bounded `{{ ... }}` expansion. */
     private fun evaluateConditionString(condition: String): Boolean {
-        val legacyExpanded = ctx.variables.expand(condition)
+        val legacyExpanded = ctx.variables.expand(rewriteParamSugar(condition))
         if (!legacyExpanded.contains("{{")) return ctx.variables.evaluateCondition(legacyExpanded)
 
-        val expanded = templateExpressionEngine.expand(legacyExpanded, ctx.variables.toTemplateScope(ctx.eventVariables))
+        val expanded = templateExpressionEngine.expand(legacyExpanded, ctx.variables.toTemplateScope(ctx.eventVariables, ctx.parameters))
         if (expanded.warnings.isNotEmpty()) return false
         return ctx.variables.evaluateCondition(expanded.value)
     }
@@ -305,10 +385,10 @@ class TaskRunner(
     private fun expandArgs(args: Map<String, String>): ActionArgumentExpansionReport {
         if (args.isEmpty()) return ActionArgumentExpansionReport.Empty
 
-        val templateScope = ctx.variables.toTemplateScope(ctx.eventVariables)
+        val templateScope = ctx.variables.toTemplateScope(ctx.eventVariables, ctx.parameters)
         val expansions = mutableListOf<ActionArgumentExpansionTrace>()
         val expandedArgs = args.mapValues { (name, rawValue) ->
-            val legacyExpanded = ctx.variables.expand(rawValue)
+            val legacyExpanded = ctx.variables.expand(rewriteParamSugar(rawValue))
             if (!legacyExpanded.contains("{{")) return@mapValues legacyExpanded
 
             val result = templateExpressionEngine.expand(legacyExpanded, templateScope)
@@ -357,6 +437,16 @@ private const val MAX_WAIT_TIMEOUT_MS = 1_800_000L // 30 minutes
 const val SUB_TASK_ACTION_ID = "task.run"
 const val MAX_SUBTASK_DEPTH = 8
 private val SUB_TASK_REF_KEYS = listOf("task", "name", "id")
+
+/** Run Task arg keys: each `param:<name>` is a named parameter; results land under this prefix. */
+const val SUB_TASK_PARAM_PREFIX = "param:"
+const val SUB_TASK_RESULTS_PREFIX_KEY = "results_prefix"
+
+private val PARAM_SUGAR_REGEX = Regex("%@([A-Za-z_][A-Za-z0-9_]*)")
+
+/** Rewrites the terse `%@name` parameter reference into the canonical `{{ param.name }}`. */
+private fun rewriteParamSugar(text: String): String =
+    if (text.contains("%@")) text.replace(PARAM_SUGAR_REGEX) { "{{ param.${it.groupValues[1]} }}" } else text
 
 /** Safety cap on total interpreted steps to bound pathological flow.foreach loops. */
 private const val MAX_FLOW_STEPS = 100_000

@@ -426,8 +426,8 @@ class ArrayStore {
         arrays.clear()
     }
 
-    companion object {
-        private const val MAX_ARRAYS = 500
+    fun remove(name: String) {
+        arrays.remove(name)
     }
 
     fun get(name: String, index: Int): String {
@@ -448,4 +448,8 @@ class ArrayStore {
 
     fun snapshot(): Map<String, List<String>> =
         HashMap(arrays).mapValues { (_, values) -> values.toList() }
+
+    companion object {
+        private const val MAX_ARRAYS = 500
+    }
 }

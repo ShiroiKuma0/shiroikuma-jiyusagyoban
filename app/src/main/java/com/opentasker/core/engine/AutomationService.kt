@@ -1,45 +1,56 @@
 package com.opentasker.core.engine
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.location.LocationManager
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.opentasker.app.MainActivity
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.core.bubbles.FreezeBubbleOverlayManager
 import com.opentasker.automation.app.AppUsageMonitor
 import com.opentasker.automation.network.ConnectivityMonitor
 import com.opentasker.automation.network.WiFiNetworkMonitor
+import com.opentasker.automation.sensor.OrientationDetector
 import com.opentasker.automation.sensor.ShakeDetector
 import com.opentasker.automation.scheduler.TimeEventScheduler
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.contexts.BluetoothContextEvents
 import com.opentasker.core.contexts.BootContextEvents
+import com.opentasker.core.contexts.BroadcastContextEvents
 import com.opentasker.core.contexts.CameraMicContextEvents
 import com.opentasker.core.contexts.PackageContextEvents
 import com.opentasker.core.contexts.PluginConditionSubscription
 import com.opentasker.core.contexts.PluginConditionSubscriptions
 import com.opentasker.core.model.AutomationMode
+import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
+import com.opentasker.core.storage.AutoStartSettings
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.minimumTimestamp
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.ArrayDeque
@@ -53,7 +64,10 @@ import java.util.Collections
  * automation engine to evaluate triggers reliably.
  */
 class AutomationService : Service() {
-    private val job = Job()
+    // SupervisorJob: a failing child coroutine (a matcher, the reload collector, a prune) must NOT cancel
+    // the parent and take down every engine coroutine with it — that froze the clock while the process
+    // stayed alive. Children now fail in isolation; the heartbeat re-arms anything that does die.
+    private val job = SupervisorJob()
     private val scope = CoroutineScope(Dispatchers.Main + job)
     private val db by lazy { OpenTaskerApp_NoHilt.db }
     private val timeEventScheduler by lazy { TimeEventScheduler(this) }
@@ -61,6 +75,8 @@ class AutomationService : Service() {
     private val connectivityMonitor by lazy { ConnectivityMonitor(this) }
     private val appUsageMonitor by lazy { AppUsageMonitor(this) }
     private val shakeDetector by lazy { ShakeDetector(this) }
+    private val orientationDetector by lazy { OrientationDetector(this) }
+    private val hardwareKeyListener by lazy { com.opentasker.core.input.ShizukuKeyEventListener() }
     private val runLogRetentionSettings by lazy { RunLogRetentionSettings(this) }
     
     private val cooldownStore by lazy { CooldownStore(this) }
@@ -68,19 +84,27 @@ class AutomationService : Service() {
     private val profileCooldowns = Collections.synchronizedMap(mutableMapOf<Long, Long>()) // profileId -> cooldownUntilMs
     private val matcherJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>()) // Track jobs for cleanup
     private val profileTaskJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>())
-    private val queuedProfileTasks = Collections.synchronizedMap(mutableMapOf<Long, ArrayDeque<Task>>())
+    // Each queued run carries its own event snapshot, so a burst of different-source events (e.g.
+    // notifications from different apps) each runs with ITS values, not the latest one's.
+    private data class QueuedRun(val task: Task, val eventVars: Map<String, String>)
+    private val queuedProfileTasks = Collections.synchronizedMap(mutableMapOf<Long, ArrayDeque<QueuedRun>>())
     private var lastRunLogPruneAt = 0L
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var autoStartDone = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         startForegroundCompat()
+        acquireWakeLock()
         timeEventScheduler.scheduleNextMinute()
         wifiNetworkMonitor.start()
         connectivityMonitor.start()
         appUsageMonitor.start(scope)
         shakeDetector.start()
+        orientationDetector.start()
+        hardwareKeyListener.start(this, scope)
         ContextCompat.registerReceiver(
             this,
             PackageContextEvents.receiver,
@@ -94,16 +118,40 @@ class AutomationService : Service() {
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
         CameraMicContextEvents.start(this)
+        // Freeze bubbles: render pending re-freeze bubbles, gated to the Desktop launcher being foreground.
+        FreezeBubbleOverlayManager.start(this, scope)
         profileCooldowns.putAll(cooldownStore.loadAll())
         scope.launch { pruneRunLogs(force = true) }
+        // Re-arm matchers (and dynamic receivers like the broadcast trigger) whenever profiles change,
+        // so enabling/importing a profile takes effect without relaunching the app. drop(1) skips the
+        // initial emission — onStartCommand does the first load.
+        scope.launch {
+            db.profileDao().getAllAsFlow().drop(1).collect { reloadProfiles() }
+        }
+        isRunning = true
+        EngineHeartbeat.markEngineStart()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val bootCompletedTrigger = intent?.action == ACTION_BOOT_COMPLETED_TRIGGER
+        val rearm = intent?.action == ACTION_REARM
         scope.launch {
-            reloadProfiles()
-            if (bootCompletedTrigger) {
-                BootContextEvents.publishBootCompleted()
+            if (rearm) {
+                // The per-minute alarm found the tick stale (engine coroutines died while the process
+                // lived). Re-arm the matchers, which relaunches the tick loop.
+                if (EngineHeartbeat.isStale()) {
+                    EngineHeartbeat.markRearm()
+                    reloadProfiles()
+                }
+            } else {
+                reloadProfiles()
+                if (!autoStartDone) {
+                    autoStartDone = true
+                    runAutoStartTasks()
+                }
+                if (bootCompletedTrigger) {
+                    BootContextEvents.publishBootCompleted()
+                }
             }
         }
         return START_STICKY
@@ -142,10 +190,15 @@ class AutomationService : Service() {
         connectivityMonitor.stop()
         appUsageMonitor.stop()
         shakeDetector.stop()
+        orientationDetector.stop()
+        hardwareKeyListener.stop()
         runCatching { unregisterReceiver(PackageContextEvents.receiver) }
         runCatching { unregisterReceiver(BluetoothContextEvents.receiver) }
         CameraMicContextEvents.stop(this)
         PluginConditionSubscriptions.clear()
+        BroadcastContextEvents.stop(this)
+        releaseWakeLock()
+        isRunning = false
         job.cancel()
         super.onDestroy()
     }
@@ -162,29 +215,49 @@ class AutomationService : Service() {
         synchronized(queuedProfileTasks) {
             queuedProfileTasks.keys.removeAll { it !in activeIds }
         }
-        registerPluginSubscriptions(profiles.map { it.toDomain() })
-        for (profile in profiles) {
-            val domain = profile.toDomain()
+        val domains = profiles.map { it.toDomain() }
+        registerPluginSubscriptions(domains)
+        // Keep the broadcast (Intent Received) receiver listening for exactly the actions in use.
+        val broadcastActions = domains
+            .flatMap { it.contexts }
+            .filter { it.type == ContextType.EVENT && it.config["event"]?.trim().equals("broadcast", ignoreCase = true) }
+            .flatMap { (it.config["action"] ?: it.config["actions"] ?: "").split(",") }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toSet()
+        BroadcastContextEvents.setActions(this, broadcastActions)
+        for (domain in domains) {
             val matcher = ProfileMatcher(this, domain)
 
             val matcherJob = scope.launch {
-                try {
-                    matcher.stateChanges().collect { change ->
-                        try {
-                            when (change) {
-                                is ProfileStateChange.Activated -> onProfileActivated(domain)
-                                is ProfileStateChange.Deactivated -> onProfileDeactivated(domain)
+                // Self-healing: if a matcher's flow ever errors, re-collect after a short backoff
+                // instead of dying permanently. A dead matcher used to freeze the clock/battery tick and
+                // the 電池線 charging state for hours; now it recovers within seconds, independent of the
+                // alarm re-arm. (A clean completion — e.g. a profile with no contexts — just stops.)
+                while (isActive) {
+                    val errored = try {
+                        matcher.stateChanges().collect { change ->
+                            try {
+                                when (change) {
+                                    is ProfileStateChange.Activated -> onProfileActivated(domain, change.vars)
+                                    is ProfileStateChange.Deactivated -> onProfileDeactivated(domain)
+                                }
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                android.util.Log.e("OpenTasker", "Failed handling state change for ${domain.name}", e)
                             }
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            AppLogger.error(TAG, "Failed handling state change for ${domain.name}", e)
                         }
+                        false
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        android.util.Log.e("OpenTasker", "Profile matcher errored for ${domain.name}; restarting", e)
+                        EngineHeartbeat.markMatcherRestart(domain.name)
+                        true
                     }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    AppLogger.error(TAG, "Profile matcher stopped for ${domain.name}", e)
+                    if (!errored) break
+                    if (isActive) delay(3_000)
                 }
             }
             
@@ -210,32 +283,41 @@ class AutomationService : Service() {
         PluginConditionSubscriptions.replaceAll(subs)
     }
 
-    private suspend fun onProfileActivated(profile: com.opentasker.core.model.Profile) {
-        if (profile.enterTaskId <= 0) return
-        
-        val task = db.taskDao().getById(profile.enterTaskId)
-        if (task == null) {
-            AppLogger.warn(TAG, "Enter task ${profile.enterTaskId} not found for profile ${profile.name}")
+    /**
+     * Resolve a profile's task by NAME first (survives bundle re-imports that re-id tasks), with the id
+     * as the fallback. A rename leaves the stored name stale → the name misses → the id fallback still
+     * works; a re-import re-ids the task → the id is stale → the name still resolves it.
+     */
+    private suspend fun resolveTask(name: String, fallbackId: Long): com.opentasker.core.model.Task? {
+        val entity = (if (name.isNotBlank()) db.taskDao().getByName(name) else null)
+            ?: (if (fallbackId > 0) db.taskDao().getById(fallbackId) else null)
+        return entity?.toDomain()
+    }
+
+    private suspend fun onProfileActivated(profile: com.opentasker.core.model.Profile, eventVars: Map<String, String>) {
+        if (profile.enterTaskName.isBlank() && profile.enterTaskId <= 0) return
+        val domain = resolveTask(profile.enterTaskName, profile.enterTaskId)
+        if (domain == null) {
+            android.util.Log.w("OpenTasker", "Enter task not found for profile ${profile.name} (name='${profile.enterTaskName}', id=${profile.enterTaskId})")
             return
         }
-        val domain = task.toDomain()
-        dispatchTask(profile, domain)
+        dispatchTask(profile, domain, eventVars)
     }
 
     private suspend fun onProfileDeactivated(profile: com.opentasker.core.model.Profile) {
-        if (profile.exitTaskId == null || profile.exitTaskId <= 0) return
-        val task = db.taskDao().getById(profile.exitTaskId)
-        if (task == null) {
-            AppLogger.warn(TAG, "Exit task ${profile.exitTaskId} not found for profile ${profile.name}")
+        if (profile.exitTaskName.isBlank() && (profile.exitTaskId == null || profile.exitTaskId <= 0)) return
+        val domain = resolveTask(profile.exitTaskName, profile.exitTaskId ?: 0L)
+        if (domain == null) {
+            android.util.Log.w("OpenTasker", "Exit task not found for profile ${profile.name} (name='${profile.exitTaskName}', id=${profile.exitTaskId})")
             return
         }
-        val domain = task.toDomain()
-        dispatchTask(profile, domain)
+        dispatchTask(profile, domain, emptyMap())
     }
 
     private fun dispatchTask(
         profile: Profile,
         task: Task,
+        eventVars: Map<String, String>,
     ) {
         when (profile.automationMode) {
             AutomationMode.SINGLE -> {
@@ -249,7 +331,7 @@ class AutomationService : Service() {
                     logCooldownSkip(profile, task, reservation.remainingMs)
                     return
                 }
-                profileTaskJobs[profile.id] = launchTrackedTask(profile, task)
+                profileTaskJobs[profile.id] = launchTrackedTask(profile, task, eventVars)
             }
 
             AutomationMode.RESTART -> {
@@ -259,7 +341,7 @@ class AutomationService : Service() {
                     return
                 }
                 profileTaskJobs[profile.id]?.cancel()
-                profileTaskJobs[profile.id] = launchTrackedTask(profile, task)
+                profileTaskJobs[profile.id] = launchTrackedTask(profile, task, eventVars)
             }
 
             AutomationMode.QUEUED -> {
@@ -276,12 +358,12 @@ class AutomationService : Service() {
                             logProfileSkippedRun(profile, task, "Task queue is full ($MAX_QUEUED_TASKS pending).")
                             return
                         }
-                        queue.add(task)
+                        queue.add(QueuedRun(task, eventVars))
                     }
                     AppLogger.info(TAG, "Profile ${profile.id} queued retrigger")
                     return
                 }
-                profileTaskJobs[profile.id] = launchQueuedTasks(profile, task)
+                profileTaskJobs[profile.id] = launchQueuedTasks(profile, task, eventVars)
             }
 
             AutomationMode.PARALLEL -> {
@@ -290,16 +372,16 @@ class AutomationService : Service() {
                     logCooldownSkip(profile, task, reservation.remainingMs)
                     return
                 }
-                scope.launch { runTask(task, profile) }
+                scope.launch { runTask(task, profile, eventVars) }
             }
         }
     }
 
-    private fun launchTrackedTask(profile: Profile, task: Task): Job =
+    private fun launchTrackedTask(profile: Profile, task: Task, eventVars: Map<String, String>): Job =
         scope.launch(start = CoroutineStart.DEFAULT) {
             val thisJob = currentCoroutineContext()[Job]
             try {
-                runTask(task, profile)
+                runTask(task, profile, eventVars)
             } finally {
                 synchronized(profileTaskJobs) {
                     if (profileTaskJobs[profile.id] == thisJob) {
@@ -309,14 +391,15 @@ class AutomationService : Service() {
             }
         }
 
-    private fun launchQueuedTasks(profile: Profile, firstTask: Task): Job =
+    private fun launchQueuedTasks(profile: Profile, firstTask: Task, firstEventVars: Map<String, String>): Job =
         scope.launch(start = CoroutineStart.DEFAULT) {
             val thisJob = currentCoroutineContext()[Job]
-            var nextTask: Task? = firstTask
+            var nextRun: QueuedRun? = QueuedRun(firstTask, firstEventVars)
             try {
-                while (isActive && nextTask != null) {
-                    runTask(requireNotNull(nextTask), profile)
-                    nextTask = synchronized(queuedProfileTasks) {
+                while (isActive && nextRun != null) {
+                    val run = requireNotNull(nextRun)
+                    runTask(run.task, profile, run.eventVars)
+                    nextRun = synchronized(queuedProfileTasks) {
                         queuedProfileTasks[profile.id]?.poll()?.also {
                             if (queuedProfileTasks[profile.id]?.isEmpty() == true) {
                                 queuedProfileTasks.remove(profile.id)
@@ -336,6 +419,7 @@ class AutomationService : Service() {
     private suspend fun runTask(
         task: Task,
         profile: Profile,
+        eventVars: Map<String, String> = emptyMap(),
     ) {
         val result = executeAndLogTask(
             appContext = this,
@@ -343,6 +427,7 @@ class AutomationService : Service() {
             task = task,
             source = "Profile: ${profile.name}",
             metadata = profileRunMetadata(profile),
+            eventLocals = eventVars,
         )
         if (result.logInserted) {
             pruneRunLogs(force = false)
@@ -416,9 +501,40 @@ class AutomationService : Service() {
         return if (seconds == 1L) "1 second" else "$seconds seconds"
     }
 
+    /** Run the user's configured auto-start tasks once per process (after a fresh start / resurrect),
+     *  so overlays and state come back without manually running the master "起動" task. */
+    private fun runAutoStartTasks() {
+        scope.launch {
+            delay(2_000) // let the engine + context sources settle before re-establishing state
+            for (id in AutoStartSettings.taskIds(this@AutomationService)) {
+                val task = db.taskDao().getById(id)?.toDomain() ?: continue
+                runCatching { executeAndLogTask(this@AutomationService, db, task, source = "Auto-start") }
+            }
+        }
+    }
+
+    @SuppressLint("WakelockTimeout")
+    private fun acquireWakeLock() {
+        // EMUI freezes/reaps even a foreground service under Doze/standby, which tears down overlays
+        // (the battery line) and stalls the per-minute clock pulse. A held partial wakelock keeps the
+        // process running so triggers and widget refreshes keep firing with the screen off.
+        runCatching {
+            val pm = getSystemService(PowerManager::class.java)
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG).apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+        }
+    }
+
+    private fun releaseWakeLock() {
+        runCatching { wakeLock?.takeIf { it.isHeld }?.release() }
+        wakeLock = null
+    }
+
     private fun startForegroundCompat() {
         val nm = getSystemService(NotificationManager::class.java)
-        val channel = NotificationChannel(CHANNEL, "OpenTasker engine", NotificationManager.IMPORTANCE_MIN)
+        val channel = NotificationChannel(CHANNEL, "白い熊 自由作業盤 engine", NotificationManager.IMPORTANCE_MIN)
         nm.createNotificationChannel(channel)
         val pendingIntent = PendingIntent.getActivity(
             this,
@@ -427,7 +543,7 @@ class AutomationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val n: Notification = NotificationCompat.Builder(this, CHANNEL)
-            .setContentTitle("OpenTasker is running")
+            .setContentTitle("白い熊 自由作業盤 is running")
             .setContentText("Tap to open automation status")
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setContentIntent(pendingIntent)
@@ -470,9 +586,29 @@ class AutomationService : Service() {
     companion object {
         private const val TAG = "AutomationService"
         const val ACTION_BOOT_COMPLETED_TRIGGER = "com.opentasker.action.BOOT_COMPLETED_TRIGGER"
+        const val ACTION_REARM = "com.opentasker.action.ENGINE_REARM"
         private const val CHANNEL = "opentasker.engine"
         private const val NOTIF_ID = 1001
         private const val MAX_QUEUED_TASKS = 50
+        private const val WAKELOCK_TAG = "shiroikuma_jiyusagyoban:engine"
+
+        /** True while the engine service is alive in this process — lets the per-minute tick resurrect it if EMUI reaped it. */
+        @Volatile
+        var isRunning = false
+            private set
+
+        /** (Re)start the foreground engine service. Safe to call when it is already running. */
+        fun start(context: Context) {
+            ContextCompat.startForegroundService(context, Intent(context, AutomationService::class.java))
+        }
+
+        /** Ask a running engine to re-arm its matchers — used by the heartbeat when the tick went stale. */
+        fun rearm(context: Context) {
+            ContextCompat.startForegroundService(
+                context,
+                Intent(context, AutomationService::class.java).setAction(ACTION_REARM),
+            )
+        }
         private val RUN_LOG_PRUNE_INTERVAL_MS = TimeUnit.HOURS.toMillis(1)
     }
 }

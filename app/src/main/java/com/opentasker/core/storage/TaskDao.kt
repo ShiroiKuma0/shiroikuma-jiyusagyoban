@@ -3,6 +3,7 @@ package com.opentasker.core.storage
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
@@ -14,13 +15,19 @@ import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.Task
 
-@Entity("tasks")
+// Unique (projectId, name): a task name is unique within its project (SQLite treats NULL projectId —
+// Unfiled — as distinct, so the editor's UI check covers Unfiled).
+@Entity("tasks", indices = [Index(value = ["projectId", "name"], unique = true)])
 data class TaskEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val priority: Int,
     val collisionMode: String,
     val actionsJson: String,
+    val projectId: Long? = null,
+    val position: Int = 0,
+    val iconPath: String? = null,
+    val freezeBubble: Boolean = false,
 ) {
     fun toDomain(): Task {
         val result = toDomainDecodeResult()
@@ -34,7 +41,7 @@ data class TaskEntity(
         val mode = runCatching { CollisionMode.valueOf(collisionMode) }
             .getOrElse { error ->
                 return StorageDecodeResult(
-                    value = Task(id, name, priority, CollisionMode.ABORT_NEW, emptyList()),
+                    value = Task(id, name, priority, CollisionMode.ABORT_NEW, emptyList(), projectId, position, iconPath, freezeBubble),
                     issue = StorageDecodeIssue(
                         recordType = StorageRecordType.TASK,
                         recordId = id,
@@ -48,7 +55,7 @@ data class TaskEntity(
         val actions = runCatching { Json.decodeFromString<List<ActionSpec>>(actionsJson) }
             .getOrElse { error ->
                 return StorageDecodeResult(
-                    value = Task(id, name, priority, mode, emptyList()),
+                    value = Task(id, name, priority, mode, emptyList(), projectId, position, iconPath, freezeBubble),
                     issue = StorageDecodeIssue(
                         recordType = StorageRecordType.TASK,
                         recordId = id,
@@ -60,13 +67,13 @@ data class TaskEntity(
             }
 
         return StorageDecodeResult(
-            value = Task(id, name, priority, mode, actions),
+            value = Task(id, name, priority, mode, actions, projectId, position, iconPath, freezeBubble),
         )
     }
 }
 
 fun Task.toEntity() = TaskEntity(
-    id, name, priority, collisionMode.name, Json.encodeToString(actions)
+    id, name, priority, collisionMode.name, Json.encodeToString(actions), projectId, position, iconPath, freezeBubble
 )
 
 @Dao
@@ -75,7 +82,9 @@ interface TaskDao {
     @Update suspend fun update(t: TaskEntity)
     @Delete suspend fun delete(t: TaskEntity)
     @Query("SELECT * FROM tasks WHERE id = :id") suspend fun getById(id: Long): TaskEntity?
-    @Query("SELECT * FROM tasks") suspend fun getAll(): List<TaskEntity>
-    @Query("SELECT * FROM tasks") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<TaskEntity>>
+    @Query("SELECT * FROM tasks ORDER BY position, id") suspend fun getAll(): List<TaskEntity>
+    @Query("SELECT * FROM tasks ORDER BY position, id") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<TaskEntity>>
     @Query("SELECT * FROM tasks WHERE name = :name LIMIT 1") suspend fun getByName(name: String): TaskEntity?
+    @Query("UPDATE tasks SET position = :position WHERE id = :id") suspend fun setPosition(id: Long, position: Int)
+    @Query("SELECT COALESCE(MAX(position), -1) + 1 FROM tasks") suspend fun nextPosition(): Int
 }
