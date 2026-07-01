@@ -324,6 +324,7 @@ internal fun ProfilesScreen(
                             selectedGroupIds = selectedGroupIds,
                             onLongPressGroup = { selectedGroupIds = selectedGroupIds + it.id },
                             onToggleSelectGroup = { g -> selectedGroupIds = if (g.id in selectedGroupIds) selectedGroupIds - g.id else selectedGroupIds + g.id },
+                            onReorder = { movedKey, gid, ordered -> groupOps.reorder(movedKey, gid, ordered) },
                         ) { profile -> profileCard(profile) }
                     }
                 }
@@ -801,6 +802,7 @@ internal fun TasksScreen(
                         selectedGroupIds = selectedGroupIds,
                         onLongPressGroup = { selectedGroupIds = selectedGroupIds + it.id },
                         onToggleSelectGroup = { g -> selectedGroupIds = if (g.id in selectedGroupIds) selectedGroupIds - g.id else selectedGroupIds + g.id },
+                        onReorder = { movedKey, gid, ordered -> groupOps.reorder(movedKey, gid, ordered) },
                     ) { task -> taskCard(task) }
                 }
             }

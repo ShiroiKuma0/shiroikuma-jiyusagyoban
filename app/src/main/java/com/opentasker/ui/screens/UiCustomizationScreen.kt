@@ -34,6 +34,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import com.opentasker.ui.components.ThemedDropdownMenu
+import com.opentasker.ui.components.ThemedSnackbarHost
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -120,7 +121,7 @@ fun UiCustomizationScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { ThemedSnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("白い熊 自由作業盤 UI") },
@@ -377,6 +378,50 @@ fun UiCustomizationScreen(
                 )
             }
             item { FontRow(level = 1, fileName = prefs.pickerFontFileName, onClick = { showPickerFontPicker = true }) }
+
+            item { SectionHeader("Import review") }
+            item { ImportReviewPreview(level = 1, prefs = prefs) }
+            item {
+                SliderRow(
+                    level = 1, label = "Header & stats size",
+                    value = prefs.importHeaderSp, valueText = "${prefs.importHeaderSp} sp",
+                    range = 12f..ThemePrefs.IMPORT_TEXT_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(importHeaderSp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Section title size",
+                    value = prefs.importSectionSp, valueText = "${prefs.importSectionSp} sp",
+                    range = 12f..ThemePrefs.IMPORT_TEXT_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(importSectionSp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Item row size",
+                    value = prefs.importItemSp, valueText = "${prefs.importItemSp} sp",
+                    range = 12f..ThemePrefs.IMPORT_TEXT_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(importItemSp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Warnings size",
+                    value = prefs.importWarnSp, valueText = "${prefs.importWarnSp} sp",
+                    range = 12f..ThemePrefs.IMPORT_TEXT_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(importWarnSp = v) } },
+                )
+            }
+            item { ColorRow(1, "Conflict colour", prefs.importConflictColor, ColorTarget.ImportConflict) { colorTarget = it } }
+            item {
+                SliderRow(
+                    level = 1, label = "Row spacing",
+                    value = prefs.importRowPadDp, valueText = "${prefs.importRowPadDp} dp",
+                    range = 0f..ThemePrefs.IMPORT_ROW_PAD_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(importRowPadDp = v) } },
+                )
+            }
         }
     }
 
@@ -726,6 +771,88 @@ private fun FreezeBubblePreview(level: Int, prefs: ThemePrefs) {
     }
 }
 
+/** Live preview of the Review-import screen: header + stats, a warning, a section title, a normal item
+ *  row and a CONFLICT row (name in the conflict colour + a yellow-bordered "⚠ Overwrite ▾" pill). */
+@Composable
+private fun ImportReviewPreview(level: Int, prefs: ThemePrefs) {
+    val conflictColor = Color(prefs.importConflictColor)
+    Column(
+        Modifier.fillMaxWidth().padding(start = rowStartPadding(level), end = 16.dp, top = 8.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("Live preview", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+        ) {
+            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    "Review import",
+                    fontSize = prefs.importHeaderSp.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    "2 tasks · 1 profile — 1 already exist",
+                    fontSize = prefs.importHeaderSp.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    "⚠ Warnings appear here.",
+                    fontSize = prefs.importWarnSp.sp,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Text(
+                    "Tasks (2)",
+                    fontSize = prefs.importSectionSp.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = prefs.importRowPadDp.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "New task",
+                        fontSize = prefs.importItemSp.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text("New", fontSize = prefs.importItemSp.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = prefs.importRowPadDp.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Existing task",
+                        fontSize = prefs.importItemSp.sp,
+                        color = conflictColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Row(
+                        modifier = Modifier
+                            .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(50))
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    ) {
+                        Text("⚠", fontSize = prefs.importItemSp.sp, color = conflictColor)
+                        Text("Overwrite", fontSize = prefs.importItemSp.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Text("▾", fontSize = prefs.importItemSp.sp, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun ActionRow(level: Int, label: String, description: String, actionLabel: String, onAction: () -> Unit) {
     RowScaffold(level) {
@@ -891,7 +1018,8 @@ private enum class ColorTarget(val label: String, val default: Int) {
     Border("Border", ThemePrefs.DEFAULT.border),
     FlashBackground("Flash background", ThemePrefs.DEFAULT.flashBackground),
     FlashText("Flash text", ThemePrefs.DEFAULT.flashText),
-    FlashBorder("Flash border", ThemePrefs.DEFAULT.flashBorder);
+    FlashBorder("Flash border", ThemePrefs.DEFAULT.flashBorder),
+    ImportConflict("Conflict colour", ThemePrefs.DEFAULT.importConflictColor);
 
     fun get(p: ThemePrefs): Int = when (this) {
         Background -> p.background
@@ -903,6 +1031,7 @@ private enum class ColorTarget(val label: String, val default: Int) {
         FlashBackground -> p.flashBackground
         FlashText -> p.flashText
         FlashBorder -> p.flashBorder
+        ImportConflict -> p.importConflictColor
     }
 
     fun set(p: ThemePrefs, value: Int): ThemePrefs = when (this) {
@@ -915,6 +1044,7 @@ private enum class ColorTarget(val label: String, val default: Int) {
         FlashBackground -> p.copy(flashBackground = value)
         FlashText -> p.copy(flashText = value)
         FlashBorder -> p.copy(flashBorder = value)
+        ImportConflict -> p.copy(importConflictColor = value)
     }
 }
 

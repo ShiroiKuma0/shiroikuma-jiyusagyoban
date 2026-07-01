@@ -281,10 +281,15 @@ private fun VariableRow(
                         style = MaterialTheme.typography.titleSmall,
                         fontFamily = FontFamily.Monospace,
                     )
+                    // Folded second line = the value (a one-line preview); the scope/type moves to the
+                    // expanded view below (白い熊).
                     Text(
-                        text = if (variable.projectId == 0L) "super-global" else "project-global",
+                        text = if (isSensitive(variable.name)) "***" else variable.value,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 Icon(
@@ -295,10 +300,17 @@ private fun VariableRow(
             }
             if (expanded) {
                 ItemNoteSection("vars", "${variable.projectId}:${variable.name}")
+                // Full value (multi-line — the folded preview above is truncated to one line).
                 Text(
                     text = if (isSensitive(variable.name)) "***" else variable.value,
                     style = MaterialTheme.typography.bodyMedium,
                     fontFamily = FontFamily.Monospace,
+                )
+                // The scope/type, shown only when unfolded (under the value).
+                Text(
+                    text = if (variable.projectId == 0L) "super-global" else "project-global",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),

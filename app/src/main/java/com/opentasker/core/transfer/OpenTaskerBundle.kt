@@ -120,6 +120,23 @@ enum class ProjectConflictStrategy {
     RENAME,
 }
 
+/**
+ * The per-project decision made in the review's folder tree — one choice per project the import
+ * references, keyed by lowercased project name. When the review passes such a map it supersedes the
+ * single global [ProjectConflictStrategy]; that strategy stays the fallback for a bundle project the
+ * map doesn't mention (and for callers that pass no map at all).
+ */
+enum class ProjectImportChoice {
+    /** File items under the existing same-name local project (as MERGE does). */
+    INTO_EXISTING,
+
+    /** Create the project (uniquifying the name if it already exists locally, like RENAME) and file items under it. */
+    CREATE,
+
+    /** Don't create/resolve the project — its items import as Unfiled (projectId null). */
+    UNFILED,
+}
+
 /** How to handle a bundle item (task/profile/scene/template) whose name already exists. */
 enum class ItemConflictStrategy {
     /** Keep both — the incoming item gets a uniquified name (e.g. "Foo (2)"). */
@@ -234,20 +251,17 @@ object OpenTaskerBundleCodec {
             warnings += "Bundle has duplicate variable names: ${duplicates.joinToString()}."
         }
 
-        val projectIds = bundle.projects.map { it.id }.toSet()
-        (bundle.profiles.mapNotNull { it.projectId } + bundle.tasks.mapNotNull { it.projectId } + bundle.scenes.mapNotNull { it.projectId })
-            .filter { it !in projectIds }
-            .distinct()
-            .forEach { lossyWarnings += "An item references project $it which is not in this bundle; it will become Unfiled." }
+        // (The "project isn't part of this import → Unfiled" notice is gone: the review's folder tree now
+        //  shows each item's project folder + a Create/Unfiled pill, so the text was redundant.)
 
         val taskIds = bundle.tasks.map { it.id }.toSet()
         bundle.profiles.forEach { profile ->
             if (profile.enterTaskId !in taskIds) {
-                lossyWarnings += "Profile '${profile.name}' references missing enter task ${profile.enterTaskId} and will be skipped."
+                lossyWarnings += "Profile “${profile.name}” points to a task that isn't part of this import and will be skipped."
             }
             val exitTaskId = profile.exitTaskId
             if (exitTaskId != null && exitTaskId !in taskIds) {
-                lossyWarnings += "Profile '${profile.name}' references missing exit task $exitTaskId; the exit task will be dropped."
+                lossyWarnings += "Profile “${profile.name}” has an exit task that isn't part of this import; that link will be dropped."
             }
         }
 
@@ -257,10 +271,10 @@ object OpenTaskerBundleCodec {
         bundle.scenes.forEach { scene ->
             scene.elements.forEach { element ->
                 if (element.tapTaskId != null && element.tapTaskId !in taskIds && element.tapTaskName.isBlank()) {
-                    lossyWarnings += "Scene '${scene.name}' element ${element.id} references missing tap task ${element.tapTaskId} (no name to re-bind); the link will be dropped."
+                    lossyWarnings += "Scene “${scene.name}” has an element whose tap task isn't part of this import (and no name to re-bind); the link will be dropped."
                 }
                 if (element.longPressTaskId != null && element.longPressTaskId !in taskIds && element.longPressTaskName.isBlank()) {
-                    lossyWarnings += "Scene '${scene.name}' element ${element.id} references missing long-press task ${element.longPressTaskId} (no name to re-bind); the link will be dropped."
+                    lossyWarnings += "Scene “${scene.name}” has an element whose long-press task isn't part of this import (and no name to re-bind); the link will be dropped."
                 }
             }
         }
@@ -424,9 +438,20 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
         projectConflictStrategy: ProjectConflictStrategy = ProjectConflictStrategy.MERGE,
         // Default: overwrite a same-name item IN PLACE (reuse its row id, so groups/notes/links survive).
         itemConflictStrategy: ItemConflictStrategy = ItemConflictStrategy.OVERWRITE_DELETE,
+        // Per-item overrides keyed "<tab>:<lowercased name>" (tab ∈ tasks/profiles/scenes/templates/
+        // variables). A conflicting item uses its override if present, else [itemConflictStrategy].
+        itemStrategyOverrides: Map<String, ItemConflictStrategy> = emptyMap(),
+        // Per-project decision from the review's folder tree, keyed by lowercased project name. A bundle
+        // project the map mentions follows its choice; one it doesn't falls back to [projectConflictStrategy].
+        projectChoices: Map<String, ProjectImportChoice> = emptyMap(),
     ): BundleImportReport {
         val plan = OpenTaskerBundleCodec.validate(bundle)
         require(plan.canImport) { plan.warnings.joinToString() }
+
+        // Resolve the effective conflict strategy for one item: its per-item override, else the global one.
+        // [lowercaseName] is already lowercased (matches the review screen's key + the grouping keys below).
+        fun strategyFor(tab: String, lowercaseName: String): ItemConflictStrategy =
+            itemStrategyOverrides["$tab:$lowercaseName"] ?: itemConflictStrategy
 
         // Suffix for OVERWRITE_BACKUP — the existing same-name item is renamed "<name>.<stamp>.bak".
         val backupStamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
@@ -445,24 +470,52 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
 
         db.withTransaction {
             // Resolve each bundle project against existing names per the chosen strategy: MERGE
-            // reuses the existing project; RENAME inserts a separate, uniquely-named one.
-            val existingByName = db.projectDao().getAll().associateTo(mutableMapOf()) { it.name.lowercase() to it.id }
+            // reuses the existing project; RENAME inserts a separate, uniquely-named one. The item→project
+            // link is thus resolved BY NAME: a bundle item's projectId maps to its bundle project's NAME
+            // (projects[]), which is matched (case-insensitively) to the local project of the same name.
+            val existingProjects = db.projectDao().getAll()
+            val existingByName = existingProjects.associateTo(mutableMapOf()) { it.name.lowercase() to it.id }
+            val existingProjectIds = existingProjects.mapTo(mutableSetOf()) { it.id }
             val takenNames = existingByName.keys.toMutableSet()
             val projectIdMap = mutableMapOf<Long, Long>()
+            // Bundle project ids the review explicitly sent to Unfiled — their items resolve to projectId null.
+            val unfiledProjectIds = mutableSetOf<Long>()
+
+            // Helper: create the project under a free (uniquified) name and map the bundle id to it.
+            suspend fun createProject(project: Project) {
+                val newName = uniqueName(project.name, takenNames)
+                val newId = db.projectDao().insert(project.copy(id = 0, name = newName).toEntity())
+                projectIdMap[project.id] = newId
+                takenNames += newName.lowercase()
+                existingByName[newName.lowercase()] = newId
+                insertedProjects++
+            }
+
             bundle.projects.sortedWith(compareBy<Project> { it.sortOrder }.thenBy { it.name.lowercase() }).forEach { project ->
                 val existingId = existingByName[project.name.lowercase()]
-                if (existingId != null && projectConflictStrategy == ProjectConflictStrategy.MERGE) {
-                    projectIdMap[project.id] = existingId
-                } else {
-                    val newName = uniqueName(project.name, takenNames)
-                    val newId = db.projectDao().insert(project.copy(id = 0, name = newName).toEntity())
-                    projectIdMap[project.id] = newId
-                    takenNames += newName.lowercase()
-                    existingByName[newName.lowercase()] = newId
-                    insertedProjects++
+                // The review decides per project (by lowercased name). For a project the map doesn't mention
+                // fall back to the global strategy: MERGE over an existing name → INTO_EXISTING, else CREATE.
+                val choice = projectChoices[project.name.lowercase()] ?: when {
+                    existingId != null && projectConflictStrategy == ProjectConflictStrategy.MERGE -> ProjectImportChoice.INTO_EXISTING
+                    else -> ProjectImportChoice.CREATE
+                }
+                when (choice) {
+                    ProjectImportChoice.UNFILED -> unfiledProjectIds += project.id
+                    ProjectImportChoice.INTO_EXISTING ->
+                        if (existingId != null) projectIdMap[project.id] = existingId else createProject(project)
+                    ProjectImportChoice.CREATE -> createProject(project)
                 }
             }
-            fun remapProjectId(projectId: Long?): Long? = projectId?.let { projectIdMap[it] }
+            // Map a bundle projectId to the resolved local id: Unfiled-chosen projects → null; else via
+            // projects[] (name-resolved above); else the legacy raw id, but ONLY if a local project already
+            // carries that id (so a stray id whose project wasn't in the bundle doesn't mis-file — it falls
+            // through to Unfiled instead).
+            fun remapProjectId(projectId: Long?): Long? {
+                if (projectId == null) return null
+                if (projectId in unfiledProjectIds) return null
+                projectIdMap[projectId]?.let { return it }
+                return projectId.takeIf { it in existingProjectIds }
+            }
 
             // Resolve incoming-vs-existing name clashes per [itemConflictStrategy] before inserting:
             // OVERWRITE_DELETE updates the existing same-name task IN PLACE (keeps its db id, so a
@@ -474,7 +527,7 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             db.taskDao().getAll().filter { it.name.lowercase() in incomingTaskNames }
                 .groupBy { it.name.lowercase() }
                 .forEach { (name, existing) ->
-                    when (itemConflictStrategy) {
+                    when (strategyFor("tasks", name)) {
                         ItemConflictStrategy.OVERWRITE_DELETE -> {
                             reusableTaskIds[name] = existing.first().id            // keep one row's id to overwrite in place
                             existing.drop(1).forEach { db.taskDao().delete(it) }  // collapse any same-name duplicates
@@ -515,11 +568,40 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
                 insertedTasks++
             }
 
+            // Variables are keyed by (scope projectId, name); insert REPLACEs on that key. Honour the
+            // per-item strategy: OVERWRITE_DELETE replaces in place (the historical behaviour); RENAME
+            // keeps both by uniquifying the incoming name within its scope; OVERWRITE_BACKUP copies the
+            // existing value aside to "<name>.<stamp>.bak" first, then replaces.
+            val existingVars = db.variableDao().getAll()
+            val takenVarNamesByScope = mutableMapOf<Long, MutableSet<String>>()
+            existingVars.forEach { takenVarNamesByScope.getOrPut(it.projectId) { mutableSetOf() }.add(it.name.lowercase()) }
             bundle.variables.sortedWith(compareBy<Variable> { it.name.lowercase() }.thenBy { it.name }).forEach { variable ->
                 // Super-globals (projectId 0) stay super; project-globals remap to the resolved project
-                // (or fall back to super if the bundle didn't carry that project). insert REPLACEs.
+                // (or fall back to super if the bundle didn't carry that project).
                 val pid = if (variable.projectId == 0L) 0L else (projectIdMap[variable.projectId] ?: 0L)
-                db.variableDao().insert(VariableEntity(pid, variable.name, variable.value))
+                val taken = takenVarNamesByScope.getOrPut(pid) { mutableSetOf() }
+                val collides = variable.name.lowercase() in taken
+                when (strategyFor("variables", variable.name.lowercase())) {
+                    ItemConflictStrategy.RENAME -> {
+                        val newName = if (collides) uniqueName(variable.name, taken) else variable.name
+                        db.variableDao().insert(VariableEntity(pid, newName, variable.value))
+                        taken += newName.lowercase()
+                    }
+                    ItemConflictStrategy.OVERWRITE_BACKUP -> {
+                        if (collides) {
+                            existingVars.firstOrNull { it.projectId == pid && it.name.equals(variable.name, ignoreCase = true) }?.let { old ->
+                                db.variableDao().insert(VariableEntity(pid, backupName(old.name), old.value))
+                                taken += backupName(old.name).lowercase()
+                            }
+                        }
+                        db.variableDao().insert(VariableEntity(pid, variable.name, variable.value))
+                        taken += variable.name.lowercase()
+                    }
+                    ItemConflictStrategy.OVERWRITE_DELETE -> {
+                        db.variableDao().insert(VariableEntity(pid, variable.name, variable.value))
+                        taken += variable.name.lowercase()
+                    }
+                }
                 insertedVariables++
             }
 
@@ -531,7 +613,7 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             db.profileDao().getAll().filter { it.name.lowercase() in incomingProfileNames }
                 .groupBy { it.name.lowercase() }
                 .forEach { (name, existing) ->
-                    when (itemConflictStrategy) {
+                    when (strategyFor("profiles", name)) {
                         ItemConflictStrategy.OVERWRITE_DELETE -> {
                             reusableProfileIds[name] = existing.first().id
                             reusedProfileEnabled[name] = existing.first().enabled
@@ -583,7 +665,7 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             db.sceneDao().getAll().filter { it.name.lowercase() in incomingSceneNames }
                 .groupBy { it.name.lowercase() }
                 .forEach { (name, existing) ->
-                    when (itemConflictStrategy) {
+                    when (strategyFor("scenes", name)) {
                         ItemConflictStrategy.OVERWRITE_DELETE -> {
                             reusableSceneIds[name] = existing.first().id
                             existing.drop(1).forEach { db.sceneDao().delete(it) }
@@ -671,12 +753,13 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
         val takenTemplateNames = TemplateStore.names().mapTo(mutableSetOf()) { it.lowercase() }
         val templateNameMap = mutableMapOf<String, String>()
         bundle.templates.forEach { tpl ->
+            val strat = strategyFor("templates", tpl.name.lowercase())
             val collides = tpl.name.lowercase() in takenTemplateNames
-            if (collides && itemConflictStrategy == ItemConflictStrategy.OVERWRITE_BACKUP) {
+            if (collides && strat == ItemConflictStrategy.OVERWRITE_BACKUP) {
                 TemplateStore.get(tpl.name)?.let { TemplateStore.put(backupName(tpl.name), it) }
                 takenTemplateNames += backupName(tpl.name).lowercase()
             }
-            val targetName = if (collides && itemConflictStrategy == ItemConflictStrategy.RENAME) {
+            val targetName = if (collides && strat == ItemConflictStrategy.RENAME) {
                 uniqueName(tpl.name, takenTemplateNames)
             } else {
                 tpl.name // OVERWRITE_DELETE / OVERWRITE_BACKUP / no clash → original name (put replaces)

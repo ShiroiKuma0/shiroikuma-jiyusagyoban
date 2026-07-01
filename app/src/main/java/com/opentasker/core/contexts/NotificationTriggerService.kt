@@ -38,12 +38,18 @@ class NotificationTriggerService : NotificationListenerService() {
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)
         val body = extras.getCharSequence(Notification.EXTRA_TEXT)
             ?: extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
+        // Marker set by a sister app on a protected-contact "vague" notification — the key is PER-PACKAGE
+        // ("<pkg>.protected", e.g. shiroikuma.jami.protected / shiroikuma.arcanechat.protected), so every
+        // sister app that adopts the convention works with no per-app change here. 通知明滅 reads it via
+        // %NOTIF_PROTECTED to blink for it without any visible content.
+        val isProtected = extras.getBoolean("${sbn.packageName}.protected", false)
 
         val accepted = NotificationContextEvents.publish(
             packageName = sbn.packageName.orEmpty(),
             title = title,
             body = body,
             ongoing = sbn.isOngoing,
+            isProtected = isProtected,
         )
         AppLogger.debug(
             TAG,
