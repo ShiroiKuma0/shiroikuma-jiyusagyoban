@@ -51,5 +51,23 @@ bare identifier/value with nothing to translate.
 - In the generator, make `label`/`note` first-class (e.g. `act(type, label=None, **args)`,
   `im(id, gid, pos, note=None)`) so commenting is the default path, not an afterthought.
 
+## Ship every item in its group (never orphan it)
+白い熊 (2026-07-01): when a bundle carries a task/profile/scene that lives in a **group**, the bundle MUST
+carry that group so import files the item into its group — not into "Unfiled". (e.g. the 71/01/37 trio
+belongs in 起動無効; a bundle shipping task 71 alone dropped it to Unfiled.)
+
+Two parts, **both required**:
+- **`groups[]`** — an `ItemGroupSpec` for each group an included item belongs to (`id` [bundle-local],
+  `tab`, `projectId`, `name`, `position`, `expanded`, `parentGroupId`). Import MERGES groups by
+  (tab, project, name), so shipping an existing group re-uses it in place (no duplicate, fold state kept).
+- **`itemMeta[]`** — for each item, its `groupId` set to that group's bundle-local id (alongside the note).
+  **Critical trap:** import UPSERTS itemMeta, so it CLOBBERS `groupId`. Every item already needs an
+  itemMeta row for its note (above) — and an itemMeta emitted **without** a `groupId` sets the item's group
+  to null → it jumps to Unfiled on import. So whenever you emit a note, set that item's `groupId` too.
+
+Source the group + membership from the workspace mirror (`_globals/groups.json` + `_globals/item-meta.json`);
+if the mirror is stale for the item, infer the group by name within its project (match the on-device group).
+See [[trio-group-convention]].
+
 See [[literate-bundles-rule]], the `task-spec` skill (action field order incl. Action label), and
 [[clear-import-instructions]].

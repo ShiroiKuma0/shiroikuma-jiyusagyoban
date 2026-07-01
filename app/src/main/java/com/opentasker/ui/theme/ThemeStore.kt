@@ -61,6 +61,13 @@ data class ThemePrefs(
     val pickerGroupCornerDp: Int = 12,           // group folder-box corner radius [0, PICKER_CORNER_MAX]
     val pickerGroupBorderDp: Int = 1,            // group folder-box border width; 0 = no box [0, PICKER_BORDER_MAX]
     val pickerFontFileName: String = "",         // "" = follow the app font; else MONOSPACE / a .ttf/.otf file
+    // ---- Review-import screen ---------------------------------------------------------------------
+    val importHeaderSp: Int = 20,                // header title + stats line [IMPORT_TEXT_MIN, IMPORT_TEXT_MAX]
+    val importSectionSp: Int = 16,               // section titles + the radio-group labels
+    val importItemSp: Int = 15,                  // item rows in the tree
+    val importWarnSp: Int = 17,                  // the Warnings text — bigger than body by default
+    val importRowPadDp: Int = 2,                 // vertical padding between tree rows; 2 = tight [0, IMPORT_ROW_PAD_MAX]
+    val importConflictColor: Int = 0xFF87CEEB.toInt(),  // readable sky blue (replaces the unreadable 0xFF0000FF)
 ) {
     companion object {
         const val BLACK = 0xFF000000.toInt()
@@ -98,6 +105,10 @@ data class ThemePrefs(
         const val PICKER_INDENT_MAX = 40
         const val PICKER_CORNER_MAX = 28
         const val PICKER_BORDER_MAX = 4
+
+        const val IMPORT_TEXT_MIN = 12
+        const val IMPORT_TEXT_MAX = 34
+        const val IMPORT_ROW_PAD_MAX = 24
 
         val DEFAULT = ThemePrefs()
     }
@@ -150,6 +161,12 @@ object ThemeStore {
     private const val K_PICKER_GROUP_CORNER = "picker_group_corner"
     private const val K_PICKER_GROUP_BORDER = "picker_group_border"
     private const val K_PICKER_FONT = "picker_font"
+    private const val K_IMPORT_HEADER_SP = "import_header_sp"
+    private const val K_IMPORT_SECTION_SP = "import_section_sp"
+    private const val K_IMPORT_ITEM_SP = "import_item_sp"
+    private const val K_IMPORT_WARN_SP = "import_warn_sp"
+    private const val K_IMPORT_ROW_PAD = "import_row_pad"
+    private const val K_IMPORT_CONFLICT_COLOR = "import_conflict_color"
 
     private lateinit var appContext: Context
     private lateinit var prefs: SharedPreferences
@@ -199,6 +216,11 @@ object ThemeStore {
         pickerIndentDp = pickerIndentDp.coerceIn(0, ThemePrefs.PICKER_INDENT_MAX),
         pickerGroupCornerDp = pickerGroupCornerDp.coerceIn(0, ThemePrefs.PICKER_CORNER_MAX),
         pickerGroupBorderDp = pickerGroupBorderDp.coerceIn(0, ThemePrefs.PICKER_BORDER_MAX),
+        importHeaderSp = importHeaderSp.coerceIn(ThemePrefs.IMPORT_TEXT_MIN, ThemePrefs.IMPORT_TEXT_MAX),
+        importSectionSp = importSectionSp.coerceIn(ThemePrefs.IMPORT_TEXT_MIN, ThemePrefs.IMPORT_TEXT_MAX),
+        importItemSp = importItemSp.coerceIn(ThemePrefs.IMPORT_TEXT_MIN, ThemePrefs.IMPORT_TEXT_MAX),
+        importWarnSp = importWarnSp.coerceIn(ThemePrefs.IMPORT_TEXT_MIN, ThemePrefs.IMPORT_TEXT_MAX),
+        importRowPadDp = importRowPadDp.coerceIn(0, ThemePrefs.IMPORT_ROW_PAD_MAX),
     )
 
     private fun load(): ThemePrefs {
@@ -238,6 +260,12 @@ object ThemeStore {
             pickerGroupCornerDp = prefs.getInt(K_PICKER_GROUP_CORNER, d.pickerGroupCornerDp),
             pickerGroupBorderDp = prefs.getInt(K_PICKER_GROUP_BORDER, d.pickerGroupBorderDp),
             pickerFontFileName = prefs.getString(K_PICKER_FONT, d.pickerFontFileName) ?: d.pickerFontFileName,
+            importHeaderSp = prefs.getInt(K_IMPORT_HEADER_SP, d.importHeaderSp),
+            importSectionSp = prefs.getInt(K_IMPORT_SECTION_SP, d.importSectionSp),
+            importItemSp = prefs.getInt(K_IMPORT_ITEM_SP, d.importItemSp),
+            importWarnSp = prefs.getInt(K_IMPORT_WARN_SP, d.importWarnSp),
+            importRowPadDp = prefs.getInt(K_IMPORT_ROW_PAD, d.importRowPadDp),
+            importConflictColor = prefs.getInt(K_IMPORT_CONFLICT_COLOR, d.importConflictColor),
         ).normalized()
     }
 
@@ -277,6 +305,12 @@ object ThemeStore {
             putInt(K_PICKER_GROUP_CORNER, p.pickerGroupCornerDp)
             putInt(K_PICKER_GROUP_BORDER, p.pickerGroupBorderDp)
             putString(K_PICKER_FONT, p.pickerFontFileName)
+            putInt(K_IMPORT_HEADER_SP, p.importHeaderSp)
+            putInt(K_IMPORT_SECTION_SP, p.importSectionSp)
+            putInt(K_IMPORT_ITEM_SP, p.importItemSp)
+            putInt(K_IMPORT_WARN_SP, p.importWarnSp)
+            putInt(K_IMPORT_ROW_PAD, p.importRowPadDp)
+            putInt(K_IMPORT_CONFLICT_COLOR, p.importConflictColor)
         }
     }
 

@@ -82,7 +82,7 @@
     <string name="dialog_add_action">Add action</string>
     <string name="dialog_add_context">Add context</string>
     <string name="dialog_delete_variable">Delete %%%1$s?</string>
-    <string name="dialog_review_bundle">Review bundle</string>
+    <string name="dialog_review_bundle">Review import</string>
     <string name="dialog_review_tasker">Review Tasker import</string>
 
     <!-- Profile editor -->
@@ -207,7 +207,7 @@
     <string name="import_disabled_notice">Imported profiles will be created disabled for review.</string>
     <string name="import_schema_info">Schema %1$d</string>
     <string name="import_incompatible">Cannot import</string>
-    <string name="import_incompatible_body">Bundle schema is not compatible with this version of 白い熊 自由作業盤.</string>
+    <string name="import_incompatible_body">Import schema is not compatible with this version of 白い熊 自由作業盤.</string>
     <string name="import_capability_review">Capability review</string>
     <string name="import_warnings">Import warnings</string>
     <string name="import_migration_warnings">Migration warnings</string>
@@ -220,7 +220,7 @@
     <string name="import_reading_json">Reading JSON</string>
     <string name="import_export_json">Export JSON</string>
     <string name="import_import_json">Import JSON</string>
-    <string name="import_opentasker_bundle">Bundle</string>
+    <string name="import_opentasker_bundle">Import</string>
     <string name="import_count_tasks">Tasks</string>
     <string name="import_count_profiles">Profiles</string>
     <string name="import_count_variables">Variables</string>
@@ -332,7 +332,7 @@
     <string name="inspector_unavailable_title">Context inspector unavailable</string>
     <string name="inspector_waiting_for_sources">Waiting for sources</string>
 
-    <string name="import_reading_bundle">Reading Bundle...</string>
+    <string name="import_reading_bundle">Reading import...</string>
 
     <string name="workspace_review_readiness_templates">Review readiness before enabling profiles. Templates stay disabled until you approve them.</string>
     <string name="workspace_task_library_ready_body">Build reusable action sequences, then attach them to profiles when the order and permissions are ready.</string>

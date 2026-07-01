@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
@@ -45,9 +46,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.opentasker.core.storage.ItemGroupEntity
 import com.opentasker.ui.theme.ThemeStore
 
@@ -123,6 +124,9 @@ class GroupOps(
     val toggleGroup: (ItemGroupEntity) -> Unit,
     val renameGroup: (ItemGroupEntity, String) -> Unit,
     val deleteGroup: (ItemGroupEntity) -> Unit,
+    // Drag-to-REORDER: persist the moved item's group + the tab's whole new member order. Defaulted so the
+    // widgets/vars tabs (which don't wire it) still construct a GroupOps. Wired by groupOpsFor → the VM.
+    val reorder: (movedKey: String, targetGroupId: Long?, orderedKeys: List<String>) -> Unit = { _, _, _ -> },
 )
 
 /**
@@ -141,15 +145,63 @@ fun <T> LazyListScope.groupedItems(
     selectedGroupIds: Set<Long> = emptySet(),
     onLongPressGroup: (ItemGroupEntity) -> Unit = {},
     onToggleSelectGroup: (ItemGroupEntity) -> Unit = {},
+    // Drag-to-reorder commit: moved item-key, the group it was dropped into, and the tab's whole new member
+    // order (Members only). Defaulted to no-op so tabs that don't wire it (widgets/vars) still compile.
+    onReorder: (movedKey: String, targetGroupId: Long?, orderedKeys: List<String>) -> Unit = { _, _, _ -> },
     itemContent: @Composable (T) -> Unit,
 ) {
     val rows = buildGroupRows(items, keyOf, ops.groups, ops.groupIdOf, dragActive = drag.draggingKey != null)
+    // The visual Member order (all members, top to bottom) — the basis for the persisted reorder.
+    val orderedMemberKeys = rows.mapNotNull { (it as? GroupRow.Member<T>)?.let { m -> keyOf(m.item) } }
+    val moved = drag.draggingKey
+    // Members minus the one being dragged: the target insertion index is expressed against THIS list.
+    val others = orderedMemberKeys.filter { it != moved }
+    // Which group each member is filed under (null = top level) — from stored meta, filtered to live groups.
+    val liveGroupIds = ops.groups.mapTo(mutableSetOf()) { it.id }
+    fun memberGroupId(key: String): Long? = ops.groupIdOf(key)?.takeIf { it in liveGroupIds }
+
+    // Ordered drop anchors used to translate the lifted row's center Y into (targetGroup, insertionIndex).
+    // Each header contributes "first slot in its group"; each (non-moved) member contributes "after me".
+    val anchors = ArrayList<DropAnchor>()
+    var cursor = 0
+    rows.forEach { r ->
+        when (r) {
+            is GroupRow.Header -> anchors += DropAnchor(isHeader = true, gid = r.group.id, key = null, index = cursor)
+            is GroupRow.UngroupedHeader -> anchors += DropAnchor(isHeader = true, gid = null, key = null, index = cursor)
+            is GroupRow.Member -> {
+                val k = keyOf(r.item)
+                if (k != moved) {
+                    anchors += DropAnchor(isHeader = false, gid = memberGroupId(k), key = k, index = cursor)
+                    cursor++
+                }
+            }
+        }
+    }
+    // Live drop-slot computation: pick the lowest anchor whose threshold the center has crossed. A header's
+    // threshold is its bottom (→ first slot in that group); a member's is its midline (→ inserted after it).
+    drag.setDropComputer computer@{ centerY ->
+        if (anchors.isEmpty()) return@computer null
+        var best: Pair<Long?, Int>? = null
+        anchors.forEach { a ->
+            if (a.isHeader) {
+                val b = drag.headerBounds[a.gid ?: UNGROUP_TARGET] ?: return@forEach
+                if (centerY >= b.endInclusive) best = a.gid to a.index
+            } else {
+                val b = drag.rowBounds[a.key] ?: return@forEach
+                val mid = (b.start + b.endInclusive) / 2f
+                if (centerY >= mid) best = a.gid to (a.index + 1)
+            }
+        }
+        // Above every threshold → land in the first slot of the first (topmost) group/region.
+        best ?: (anchors.first().gid to 0)
+    }
+
     rows.forEach { row ->
         when (row) {
             is GroupRow.UngroupedHeader -> item(key = "ungrouped") {
                 UngroupedDropZone(
                     memberCount = row.memberCount,
-                    highlighted = drag.targetGroupId() == UNGROUP_TARGET,
+                    highlighted = drag.draggingKey != null && drag.dropGroupId == null,
                     modifier = Modifier.onGloballyPositioned {
                         val b = it.boundsInWindow()
                         drag.headerBounds[UNGROUP_TARGET] = b.top..b.bottom
@@ -161,7 +213,7 @@ fun <T> LazyListScope.groupedItems(
                     group = row.group,
                     memberCount = row.memberCount,
                     depth = row.depth,
-                    highlighted = drag.targetGroupId() == row.group.id,
+                    highlighted = drag.draggingKey != null && drag.dropGroupId == row.group.id,
                     selected = row.group.id in selectedGroupIds,
                     selectionActive = selectedGroupIds.isNotEmpty(),
                     onToggleSelect = { onToggleSelectGroup(row.group) },
@@ -181,64 +233,96 @@ fun <T> LazyListScope.groupedItems(
             is GroupRow.Member -> item(key = "itm:${keyOf(row.item)}") {
                 val key = keyOf(row.item)
                 val isDragging = drag.draggingKey == key
-                Row(
-                    modifier = Modifier
-                        .padding(start = (row.depth * GROUP_INDENT_DP).dp)
-                        .graphicsLayer {
-                            if (isDragging) {
-                                translationY = drag.offsetY
-                                shadowElevation = 12f
-                                alpha = 0.95f
-                            }
-                        },
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    Box(Modifier.weight(1f)) { itemContent(row.item) }
-                    // Drag handle: press and drag onto a group header to file the item there. A dedicated
-                    // handle avoids clashing with the card's own long-press (multi-select).
-                    Icon(
-                        Icons.Filled.DragIndicator,
-                        contentDescription = "Drag into a group",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                // Drop-indicator placement: a line ABOVE the member currently sitting at the target slot, or
+                // BELOW the last member when the target is the very end of the list.
+                val myOtherIndex = others.indexOf(key)
+                val showTopIndicator = drag.draggingKey != null && myOtherIndex >= 0 && drag.dropIndex == myOtherIndex
+                val showBottomIndicator = drag.draggingKey != null && key == others.lastOrNull() && drag.dropIndex == others.size
+                Column(Modifier.zIndex(if (isDragging) 1f else 0f)) {
+                    if (showTopIndicator) DropIndicator(row.depth)
+                    Row(
                         modifier = Modifier
-                            .onGloballyPositioned { drag.recordRowTop(key, it.positionInWindow().y) }
-                            .pointerInput(key) {
-                                detectDragGestures(
-                                    onDragStart = { offset -> drag.start(key, offset.y) },
-                                    onDrag = { change, amount -> change.consume(); drag.move(amount.y) },
-                                    onDragEnd = {
-                                        drag.end { target ->
-                                            when (target) {
-                                                null -> Unit
-                                                UNGROUP_TARGET -> ops.setItemGroup(key, null)
-                                                else -> ops.setItemGroup(key, target)
-                                            }
-                                        }
-                                    },
-                                    onDragCancel = { drag.cancel() },
-                                )
+                            .padding(start = (row.depth * GROUP_INDENT_DP).dp)
+                            // Record untranslated window bounds (this sits BEFORE graphicsLayer, so the lifted
+                            // row's drag offset doesn't corrupt the geometry used to pick the drop slot).
+                            .onGloballyPositioned {
+                                val b = it.boundsInWindow()
+                                drag.recordRowBounds(key, b.top, b.bottom)
+                            }
+                            .graphicsLayer {
+                                if (isDragging) {
+                                    translationY = drag.offsetY
+                                    shadowElevation = 12f
+                                    alpha = 0.95f
+                                }
                             },
-                    )
-                    var menu by remember { mutableStateOf(false) }
-                    IconButton(onClick = { menu = true }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = "Group")
-                        ThemedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            DropdownMenuItem(
-                                text = { Text("Move into group…") },
-                                onClick = { menu = false; onMoveItem(key) },
-                            )
-                            if (ops.groupIdOf(key) != null) {
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Box(Modifier.weight(1f)) { itemContent(row.item) }
+                        // Drag handle: press and drag to REPOSITION the item anywhere (up/down, first slot in a
+                        // group, any lower slot); dropping within a group's region also files it there. A
+                        // dedicated handle avoids clashing with the card's own long-press (multi-select).
+                        Icon(
+                            Icons.Filled.DragIndicator,
+                            contentDescription = "Drag to reorder",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .pointerInput(key) {
+                                    detectDragGestures(
+                                        onDragStart = { drag.start(key) },
+                                        onDrag = { change, amount -> change.consume(); drag.move(amount.y) },
+                                        onDragEnd = {
+                                            val res = drag.endDrag()
+                                            if (res != null) {
+                                                val (gid, idx) = res
+                                                val remaining = orderedMemberKeys.filter { it != key }
+                                                val insertAt = idx.coerceIn(0, remaining.size)
+                                                val ordered = remaining.toMutableList().apply { add(insertAt, key) }
+                                                onReorder(key, gid, ordered)
+                                            }
+                                        },
+                                        onDragCancel = { drag.cancel() },
+                                    )
+                                },
+                        )
+                        var menu by remember { mutableStateOf(false) }
+                        IconButton(onClick = { menu = true }) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = "Group")
+                            ThemedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                                 DropdownMenuItem(
-                                    text = { Text("Move out of group") },
-                                    onClick = { menu = false; ops.setItemGroup(key, null) },
+                                    text = { Text("Move into group…") },
+                                    onClick = { menu = false; onMoveItem(key) },
                                 )
+                                if (ops.groupIdOf(key) != null) {
+                                    DropdownMenuItem(
+                                        text = { Text("Move out of group") },
+                                        onClick = { menu = false; ops.setItemGroup(key, null) },
+                                    )
+                                }
                             }
                         }
                     }
+                    if (showBottomIndicator) DropIndicator(row.depth)
                 }
             }
         }
     }
+}
+
+/** One candidate drop position: a group header ("first slot in this group") or a member ("insert after me"). */
+private class DropAnchor(val isHeader: Boolean, val gid: Long?, val key: String?, val index: Int)
+
+/** A thin primary-color line marking where a dragged member will land, indented to the target depth. */
+@Composable
+private fun DropIndicator(depth: Int) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = (depth * GROUP_INDENT_DP).dp, top = 2.dp, bottom = 2.dp)
+            .height(3.dp)
+            .clip(RoundedCornerShape(2.dp))
+            .background(MaterialTheme.colorScheme.primary),
+    )
 }
 
 /** Foldable group header — chevron + name + member count + an overflow menu (rename / delete / nest). */
@@ -374,27 +458,68 @@ class GroupMoveHost {
 fun rememberGroupMoveHost(): GroupMoveHost = remember { GroupMoveHost() }
 
 /**
- * Drag-to-file state for one grouped list: the lifted item's key, its live drag offset, and the window
- * bounds of each group header (the drop targets). Long-press a member to lift it; drop over a header to
- * file it there; drop elsewhere cancels (the ⋮ menu remains the way to un-group).
+ * Drag-to-REORDER state for one grouped list: the lifted item's key, its live drag offset, the window bounds
+ * of every group header and member row (the geometry), and the currently computed drop slot ([dropGroupId] +
+ * [dropIndex]). Drag a member's handle to lift it; the row floats on top (zIndex) and a drop indicator shows
+ * where it will land; releasing repositions it (and files it into whatever group it was dropped in). The ⋮
+ * menu remains the explicit way to file/un-group.
  */
 class GroupDragState {
     var draggingKey by mutableStateOf<String?>(null)
         private set
     var offsetY by mutableStateOf(0f)
         private set
-    private var pointerY by mutableStateOf(0f)
-    val headerBounds = mutableStateMapOf<Long, ClosedFloatingPointRange<Float>>()
-    private val rowTop = mutableStateMapOf<String, Float>()
+    // The live drop slot, recomputed as the row is dragged. dropIndex is an insertion index into the member
+    // list with the dragged item removed (0..size); -1 = no valid target. dropGroupId = the target group.
+    var dropIndex by mutableStateOf(-1)
+        private set
+    var dropGroupId by mutableStateOf<Long?>(null)
+        private set
 
-    fun recordRowTop(key: String, top: Float) { rowTop[key] = top }
-    fun start(key: String, localY: Float) { draggingKey = key; pointerY = (rowTop[key] ?: 0f) + localY; offsetY = 0f }
-    fun move(dy: Float) { offsetY += dy; pointerY += dy }
-    fun targetGroupId(): Long? =
-        if (draggingKey == null) null else headerBounds.entries.firstOrNull { pointerY in it.value }?.key
-    fun end(drop: (target: Long?) -> Unit) { drop(targetGroupId()); reset() }
+    // Window bounds of each group header (real group id) + the ungrouped zone (UNGROUP_TARGET) — drop regions.
+    val headerBounds = mutableStateMapOf<Long, ClosedFloatingPointRange<Float>>()
+    // Window bounds (untranslated) of each member row, keyed by item key.
+    val rowBounds = mutableStateMapOf<String, ClosedFloatingPointRange<Float>>()
+
+    // Window-Y of the lifted row's center at the moment the drag started (offsetY is added to it live).
+    private var startCenterY = 0f
+    // Set each composition by groupedItems: maps a center-Y to (targetGroupId, insertionIndex) or null.
+    private var dropComputer: ((Float) -> Pair<Long?, Int>?)? = null
+
+    fun recordRowBounds(key: String, top: Float, bottom: Float) { rowBounds[key] = top..bottom }
+    fun setDropComputer(f: (Float) -> Pair<Long?, Int>?) { dropComputer = f }
+
+    fun start(key: String) {
+        draggingKey = key
+        offsetY = 0f
+        val b = rowBounds[key]
+        startCenterY = if (b != null) (b.start + b.endInclusive) / 2f else 0f
+        recompute()
+    }
+
+    fun move(dy: Float) { offsetY += dy; recompute() }
+
+    private fun centerY(): Float = startCenterY + offsetY
+
+    private fun recompute() {
+        val target = dropComputer?.invoke(centerY())
+        if (target == null) {
+            dropIndex = -1; dropGroupId = null
+        } else {
+            dropGroupId = target.first; dropIndex = target.second
+        }
+    }
+
+    /** End the drag, returning the committed (targetGroupId, insertionIndex) or null if there's no valid slot. */
+    fun endDrag(): Pair<Long?, Int>? {
+        val result = if (draggingKey != null && dropIndex >= 0) dropGroupId to dropIndex else null
+        reset()
+        return result
+    }
+
     fun cancel() = reset()
-    private fun reset() { draggingKey = null; offsetY = 0f }
+
+    private fun reset() { draggingKey = null; offsetY = 0f; dropIndex = -1; dropGroupId = null }
 }
 
 @Composable

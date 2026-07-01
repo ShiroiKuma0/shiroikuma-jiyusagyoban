@@ -31,6 +31,7 @@ import com.opentasker.core.storage.ItemMetaEntity
 import com.opentasker.core.storage.ListSortStore
 import com.opentasker.core.storage.ProjectSelectionStore
 import com.opentasker.core.storage.SortMethod
+import com.opentasker.core.storage.SortTab
 import com.opentasker.core.storage.RunLogRetentionPolicy
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.StorageDecodeIssue
@@ -45,6 +46,7 @@ import com.opentasker.core.transfer.OpenTaskerBundle
 import com.opentasker.core.transfer.OpenTaskerBundleCodec
 import com.opentasker.core.transfer.OpenTaskerBundleRepository
 import com.opentasker.core.transfer.ProjectConflictStrategy
+import com.opentasker.core.transfer.ProjectImportChoice
 import com.opentasker.core.transfer.TaskerImportPlanner
 import com.opentasker.core.transfer.TaskerImportPreview
 import com.opentasker.core.transfer.TaskerXmlImportReport
@@ -188,6 +190,12 @@ class ActiveAutomationViewModel(
     var projectFilter by mutableStateOf<ProjectFilter>(projectSelectionStore.load())
         private set
 
+    // The last-open tab persists across restarts too — stored by enum NAME (robust to tab reordering), so
+    // re-entering the app after it's been killed returns to where 白い熊 was, not always Profiles.
+    private val uiPrefs = appContext.getSharedPreferences("ui_state", android.content.Context.MODE_PRIVATE)
+    fun loadLastScreen(): String = uiPrefs.getString("last_screen", "").orEmpty()
+    fun saveLastScreen(name: String) { uiPrefs.edit().putString("last_screen", name).apply() }
+
     val projects: StateFlow<ImmutableList<Project>> =
         combine(db.projectDao().getAllAsFlow(), ListSortStore.state) { entities, sort ->
             val items = entities.map { it.toDomain() }
@@ -287,6 +295,41 @@ class ActiveAutomationViewModel(
     fun setItemGroup(tab: String, itemKey: String, groupId: Long?) = viewModelScope.launch {
         val cur = db.itemMetaDao().get(tab, itemKey) ?: ItemMetaEntity(tab = tab, itemKey = itemKey)
         db.itemMetaDao().upsert(cur.copy(groupId = groupId))
+    }
+
+    /**
+     * Persist a drag-to-reorder from a grouped list. [movedKey] is filed into [targetGroupId] (null = top
+     * level), then every visible member's `position` is rewritten to match [orderedKeys] — the tab's members
+     * in their NEW visual order (Members only). Finally the tab is forced to MANUAL sort so the new order is
+     * honoured (Alphabetical would ignore `position`). Unknown tab → no-op; a key with no live row → skipped.
+     */
+    fun reorderItem(tab: String, movedKey: String, targetGroupId: Long?, orderedKeys: List<String>) {
+        val sortTab = when (tab) {
+            "tasks" -> SortTab.TASKS
+            "profiles" -> SortTab.PROFILES
+            "scenes" -> SortTab.SCENES
+            else -> return // unknown tab: nothing to reorder
+        }
+        viewModelScope.launch {
+            runCatching {
+                db.withTransaction {
+                    // 1. File the moved item into the drop target's group (get-or-create its meta row).
+                    val cur = db.itemMetaDao().get(tab, movedKey) ?: ItemMetaEntity(tab = tab, itemKey = movedKey)
+                    db.itemMetaDao().upsert(cur.copy(groupId = targetGroupId))
+                    // 2. Rewrite each member's position to its new index (only when it actually changed).
+                    orderedKeys.forEachIndexed { i, key ->
+                        val id = key.toLongOrNull() ?: return@forEachIndexed
+                        when (tab) {
+                            "tasks" -> db.taskDao().getById(id)?.let { if (it.position != i) db.taskDao().setPosition(id, i) }
+                            "profiles" -> db.profileDao().getById(id)?.let { if (it.position != i) db.profileDao().setPosition(id, i) }
+                            "scenes" -> db.sceneDao().getById(id)?.let { if (it.position != i) db.sceneDao().setPosition(id, i) }
+                        }
+                    }
+                }
+                // 3. Force MANUAL sort so the freshly written positions drive the tab's order.
+                ListSortStore.set(sortTab, SortMethod.MANUAL)
+            }.onFailure { events.send("Error: ${it.message ?: "Reorder failed"}") }
+        }
     }
 
     fun moveItemToNewGroup(tab: String, projectId: Long?, name: String, itemKey: String) = viewModelScope.launch {
@@ -564,7 +607,7 @@ class ActiveAutomationViewModel(
                             "${bundle.scenes.size} scene${plural(bundle.scenes.size)}"
                     )
                 }
-                .onFailure { events.send("Error: ${it.message ?: "bundle export failed"}") }
+                .onFailure { events.send("Error: ${it.message ?: "export failed"}") }
             _openTaskerBundleBusy.value = false
         }
     }
@@ -635,9 +678,9 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess {
                     _openTaskerBundleReview.value = it
-                    events.send("Bundle ready for review")
+                    events.send("Import ready to review")
                 }
-                .onFailure { events.send("Error: ${it.message ?: "bundle preview failed"}") }
+                .onFailure { events.send("Error: ${it.message ?: "import preview failed"}") }
             _openTaskerBundleBusy.value = false
         }
     }
@@ -652,13 +695,17 @@ class ActiveAutomationViewModel(
         bundle: OpenTaskerBundle,
         projectConflictStrategy: ProjectConflictStrategy = ProjectConflictStrategy.MERGE,
         itemConflictStrategy: ItemConflictStrategy = ItemConflictStrategy.OVERWRITE_DELETE,
+        itemStrategyOverrides: Map<String, ItemConflictStrategy> = emptyMap(),
+        projectChoices: Map<String, ProjectImportChoice> = emptyMap(),
     ) {
         viewModelScope.launch {
             if (_openTaskerBundleBusy.value) return@launch
             _openTaskerBundleBusy.value = true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    bundleRepository.importBundle(bundle, projectConflictStrategy, itemConflictStrategy)
+                    bundleRepository.importBundle(
+                        bundle, projectConflictStrategy, itemConflictStrategy, itemStrategyOverrides, projectChoices,
+                    )
                 }
             }
                 .onSuccess { importReport ->
@@ -669,7 +716,7 @@ class ActiveAutomationViewModel(
                             "${importReport.insertedScenes} scene${plural(importReport.insertedScenes)}"
                     )
                 }
-                .onFailure { events.send("Error: ${it.message ?: "bundle import failed"}") }
+                .onFailure { events.send("Error: ${it.message ?: "import failed"}") }
             _openTaskerBundleBusy.value = false
         }
     }
@@ -859,7 +906,7 @@ internal fun readBoundedOpenTaskerBundle(context: Context, uri: Uri): String {
         context = context,
         uri = uri,
         maxBytes = OPEN_TASKER_BUNDLE_IMPORT_MAX_BYTES,
-        label = "bundle",
+        label = "import",
     )
 }
 

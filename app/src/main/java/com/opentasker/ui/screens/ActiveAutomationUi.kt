@@ -107,6 +107,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.opentasker.ui.components.GroupOps
 import com.opentasker.ui.components.TabAction
+import com.opentasker.ui.components.ThemedSnackbarHost
 import com.opentasker.ui.components.TabActionsFab
 import com.opentasker.ui.components.ThemedDropdownMenu
 import com.opentasker.ui.theme.DesignSystem
@@ -158,11 +159,8 @@ import com.opentasker.core.storage.minimumTimestamp
 import com.opentasker.core.storage.normalized
 import com.opentasker.core.storage.toEntity
 import com.opentasker.core.transfer.BundleImportPlan
-import com.opentasker.core.transfer.ItemConflictStrategy
-import com.opentasker.core.transfer.OpenTaskerBundle
 import com.opentasker.core.transfer.OpenTaskerBundleCodec
 import com.opentasker.core.transfer.OpenTaskerBundleRepository
-import com.opentasker.core.transfer.ProjectConflictStrategy
 import com.opentasker.core.transfer.TaskerImportPlanner
 import com.opentasker.core.transfer.TaskerImportPreview
 import com.opentasker.core.transfer.TaskerXmlImportReport
@@ -321,6 +319,8 @@ fun ActiveAutomationUi(
         toggleGroup = { viewModel.toggleGroupExpanded(it) },
         renameGroup = { g, n -> viewModel.renameGroup(g, n) },
         deleteGroup = { viewModel.deleteGroup(it) },
+        // Drag-to-reorder from the list: file the moved item into its drop group + rewrite the tab's order.
+        reorder = { key, gid, ordered -> viewModel.reorderItem(tab, key, gid, ordered) },
     )
     val visibleProfiles = when (val f = projectFilter) {
         ProjectFilter.All -> profiles
@@ -390,16 +390,21 @@ fun ActiveAutomationUi(
     val scope = rememberCoroutineScope()
     // Monitor is the leftmost tab (ordinal 0) but the app should still LAND on Profiles, so seed the
     // initial selection with Profiles' ordinal rather than 0.
-    var screenOrdinal by rememberSaveable { mutableIntStateOf(OpenTaskerScreen.Profiles.ordinal) }
+    // Restore the last-open tab durably (by enum name via the ViewModel store); falls back to Profiles.
+    var screenOrdinal by rememberSaveable {
+        mutableIntStateOf(
+            runCatching { OpenTaskerScreen.valueOf(viewModel.loadLastScreen()).ordinal }
+                .getOrDefault(OpenTaskerScreen.Profiles.ordinal)
+        )
+    }
     val screen = OpenTaskerScreen.entries.getOrElse(screenOrdinal) { OpenTaskerScreen.Profiles }
+    LaunchedEffect(screenOrdinal) {
+        viewModel.saveLastScreen(OpenTaskerScreen.entries.getOrNull(screenOrdinal)?.name ?: OpenTaskerScreen.Profiles.name)
+    }
     var taskDialogId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var showCreateTaskDialog by rememberSaveable { mutableStateOf(false) }
     // Quick icon picker invoked by tapping a task card's icon (or its "add icon" affordance).
     var iconPickerTask by remember { mutableStateOf<Task?>(null) }
-    // Import-conflict chooser: after the review confirm, ask how to handle project / item name clashes.
-    var importConflict by remember { mutableStateOf<OpenTaskerBundle?>(null) }
-    var importItemConflict by remember { mutableStateOf<OpenTaskerBundle?>(null) }
-    var pendingProjectStrategy by remember { mutableStateOf(ProjectConflictStrategy.MERGE) }
     var profileDialogId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var showCreateProfileDialog by rememberSaveable { mutableStateOf(false) }
     var showTemplateDialog by rememberSaveable { mutableStateOf(false) }
@@ -659,7 +664,7 @@ fun ActiveAutomationUi(
         modifier = modifier
             .fillMaxSize()
             .imePadding(),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { ThemedSnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -1171,83 +1176,27 @@ fun ActiveAutomationUi(
         )
     }
 
-    // The names already present in the workspace that an incoming bundle would clash with.
-    val itemCollisions: (OpenTaskerBundle) -> List<String> = { b ->
-        val taskNames = tasks.mapTo(HashSet()) { it.name.lowercase() }
-        val profileNames = profiles.mapTo(HashSet()) { it.name.lowercase() }
-        val sceneNames = scenes.mapTo(HashSet()) { it.name.lowercase() }
-        val templateNames = widgetTemplates.mapTo(HashSet()) { it.name.lowercase() }
-        buildList {
-            b.tasks.filter { it.name.lowercase() in taskNames }.forEach { add("Task “${it.name}”") }
-            b.profiles.filter { it.name.lowercase() in profileNames }.forEach { add("Profile “${it.name}”") }
-            b.scenes.filter { it.name.lowercase() in sceneNames }.forEach { add("Scene “${it.name}”") }
-            b.templates.filter { it.name.lowercase() in templateNames }.forEach { add("Widget template “${it.name}”") }
-        }
-    }
-    // After the project choice, ask the item-conflict question if any names clash; else import directly.
-    val startBundleImport: (OpenTaskerBundle, ProjectConflictStrategy) -> Unit = { b, projStrat ->
-        if (itemCollisions(b).isNotEmpty()) {
-            pendingProjectStrategy = projStrat
-            importItemConflict = b
-        } else {
-            // No name clashes → strategy is moot; default to overwrite for consistency.
-            viewModel.confirmOpenTaskerBundleImport(b, projStrat, ItemConflictStrategy.OVERWRITE_DELETE)
-        }
-    }
-
+    // The consolidated near-full-screen import review: diffs the incoming bundle against the current
+    // workspace BY NAME, marks each conflict, and collects the global + per-item conflict strategies.
     openTaskerBundleReview?.let { state ->
-        OpenTaskerBundleReviewDialog(
+        ImportReviewScreen(
             state = state,
+            projects = projects,
+            tasks = tasks,
+            profiles = profiles,
+            scenes = scenes,
+            widgetTemplates = widgetTemplates,
+            variables = globalVariables,
             busy = openTaskerBundleBusy,
-            onDismiss = viewModel::clearOpenTaskerBundleReview,
-            onConfirm = {
-                val hasProjectCollision = state.bundle.projects.any { incoming ->
-                    projects.any { it.name.equals(incoming.name, ignoreCase = true) }
-                }
-                viewModel.clearOpenTaskerBundleReview()
-                if (hasProjectCollision) {
-                    importConflict = state.bundle
-                } else {
-                    startBundleImport(state.bundle, ProjectConflictStrategy.RENAME)
-                }
+            onCancel = viewModel::clearOpenTaskerBundleReview,
+            onImport = { itemStrategy, overrides, projectChoices ->
+                viewModel.confirmOpenTaskerBundleImport(
+                    state.bundle,
+                    itemConflictStrategy = itemStrategy,
+                    itemStrategyOverrides = overrides,
+                    projectChoices = projectChoices,
+                )
             },
-        )
-    }
-
-    importConflict?.let { bundle ->
-        val conflictingNames = bundle.projects
-            .filter { incoming -> projects.any { it.name.equals(incoming.name, ignoreCase = true) } }
-            .map { it.name }
-        ImportProjectConflictDialog(
-            conflictingNames = conflictingNames,
-            onOverwrite = {
-                importConflict = null
-                startBundleImport(bundle, ProjectConflictStrategy.MERGE)
-            },
-            onKeepBoth = {
-                importConflict = null
-                startBundleImport(bundle, ProjectConflictStrategy.RENAME)
-            },
-            onDismiss = { importConflict = null },
-        )
-    }
-
-    importItemConflict?.let { bundle ->
-        ImportItemConflictDialog(
-            collisions = itemCollisions(bundle),
-            onRename = {
-                importItemConflict = null
-                viewModel.confirmOpenTaskerBundleImport(bundle, pendingProjectStrategy, ItemConflictStrategy.RENAME)
-            },
-            onOverwriteDelete = {
-                importItemConflict = null
-                viewModel.confirmOpenTaskerBundleImport(bundle, pendingProjectStrategy, ItemConflictStrategy.OVERWRITE_DELETE)
-            },
-            onOverwriteBackup = {
-                importItemConflict = null
-                viewModel.confirmOpenTaskerBundleImport(bundle, pendingProjectStrategy, ItemConflictStrategy.OVERWRITE_BACKUP)
-            },
-            onDismiss = { importItemConflict = null },
         )
     }
 

@@ -132,6 +132,9 @@ class ContextInspectorViewModel(
 
     private fun startSourceCollectors() {
         requiredContextSourceKeys().forEach { key ->
+            // Never power on GPS just by opening the Inspector — location is only sampled when a profile
+            // actually needs it (白い熊). The location row shows last-known / setup state, not live updates.
+            if (key == "location") return@forEach
             val source = ContextSourceRegistry.get(key) ?: return@forEach
             viewModelScope.launch {
                 source.events(appContext)

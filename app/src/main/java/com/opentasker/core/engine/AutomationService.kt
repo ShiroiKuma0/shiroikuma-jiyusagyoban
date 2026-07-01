@@ -14,7 +14,6 @@ import android.content.pm.ServiceInfo
 import android.location.LocationManager
 import android.os.Build
 import android.os.IBinder
-import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.opentasker.app.MainActivity
@@ -89,7 +88,11 @@ class AutomationService : Service() {
     private data class QueuedRun(val task: Task, val eventVars: Map<String, String>)
     private val queuedProfileTasks = Collections.synchronizedMap(mutableMapOf<Long, ArrayDeque<QueuedRun>>())
     private var lastRunLogPruneAt = 0L
-    private var wakeLock: PowerManager.WakeLock? = null
+    // Each sensor/usage monitor runs only while an enabled profile needs it — tracked so we start/stop
+    // on transitions (白い熊: no idle CPU drain, no wakelock, phone can deep-sleep).
+    private var shakeOn = false
+    private var orientationOn = false
+    private var appUsageOn = false
     private var autoStartDone = false
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -97,13 +100,13 @@ class AutomationService : Service() {
     override fun onCreate() {
         super.onCreate()
         startForegroundCompat()
-        acquireWakeLock()
+        // No engine wakelock: the per-minute clock rides a Doze-exempt exact alarm and triggers ride
+        // their own event sources, so the CPU is free to deep-sleep when idle (白い熊 freezes Powergenie).
         timeEventScheduler.scheduleNextMinute()
         wifiNetworkMonitor.start()
         connectivityMonitor.start()
-        appUsageMonitor.start(scope)
-        shakeDetector.start()
-        orientationDetector.start()
+        // Shake / orientation / app-foreground monitors are NOT started here — reloadProfiles() gates
+        // them on whether an enabled profile actually uses them (applyContextSourceGating).
         hardwareKeyListener.start(this, scope)
         ContextCompat.registerReceiver(
             this,
@@ -197,7 +200,9 @@ class AutomationService : Service() {
         CameraMicContextEvents.stop(this)
         PluginConditionSubscriptions.clear()
         BroadcastContextEvents.stop(this)
-        releaseWakeLock()
+        shakeOn = false
+        orientationOn = false
+        appUsageOn = false
         isRunning = false
         job.cancel()
         super.onDestroy()
@@ -226,6 +231,7 @@ class AutomationService : Service() {
             .filter { it.isNotEmpty() }
             .toSet()
         BroadcastContextEvents.setActions(this, broadcastActions)
+        applyContextSourceGating(domains)
         for (domain in domains) {
             val matcher = ProfileMatcher(this, domain)
 
@@ -513,23 +519,23 @@ class AutomationService : Service() {
         }
     }
 
-    @SuppressLint("WakelockTimeout")
-    private fun acquireWakeLock() {
-        // EMUI freezes/reaps even a foreground service under Doze/standby, which tears down overlays
-        // (the battery line) and stalls the per-minute clock pulse. A held partial wakelock keeps the
-        // process running so triggers and widget refreshes keep firing with the screen off.
-        runCatching {
-            val pm = getSystemService(PowerManager::class.java)
-            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG).apply {
-                setReferenceCounted(false)
-                acquire()
-            }
+    /** Start each sensor/usage monitor ONLY while an enabled profile actually uses it. Shake &
+     *  orientation are accelerometer listeners; app-foreground is a 2-second usage poll — running them
+     *  for the whole service life kept the CPU busy and blocked deep sleep even when nothing used them.
+     *  Transition-guarded (the flags) so we never double-register a sensor listener. */
+    private fun applyContextSourceGating(domains: List<Profile>) {
+        val contexts = domains.flatMap { it.contexts }
+        fun usesEvent(key: String) = contexts.any {
+            it.type == ContextType.EVENT && it.config["event"]?.trim().equals(key, ignoreCase = true)
         }
-    }
-
-    private fun releaseWakeLock() {
-        runCatching { wakeLock?.takeIf { it.isHeld }?.release() }
-        wakeLock = null
+        val needShake = usesEvent("shake")
+        val needOrientation = usesEvent("orientation")
+        // AppUsageMonitor drives BOTH the APPLICATION context type (音楽端灯・前面) AND the "app_foreground"
+        // EVENT (通知明滅・前面) — gate on either, or the foreground-clear profile silently stops.
+        val needApp = contexts.any { it.type == ContextType.APPLICATION } || usesEvent("app_foreground")
+        if (needShake != shakeOn) { if (needShake) shakeDetector.start() else shakeDetector.stop(); shakeOn = needShake }
+        if (needOrientation != orientationOn) { if (needOrientation) orientationDetector.start() else orientationDetector.stop(); orientationOn = needOrientation }
+        if (needApp != appUsageOn) { if (needApp) appUsageMonitor.start(scope) else appUsageMonitor.stop(); appUsageOn = needApp }
     }
 
     private fun startForegroundCompat() {
@@ -590,7 +596,6 @@ class AutomationService : Service() {
         private const val CHANNEL = "opentasker.engine"
         private const val NOTIF_ID = 1001
         private const val MAX_QUEUED_TASKS = 50
-        private const val WAKELOCK_TAG = "shiroikuma_jiyusagyoban:engine"
 
         /** True while the engine service is alive in this process — lets the per-minute tick resurrect it if EMUI reaped it. */
         @Volatile

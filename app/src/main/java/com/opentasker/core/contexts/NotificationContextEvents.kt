@@ -18,6 +18,7 @@ object NotificationContextEvents {
         title: CharSequence?,
         body: CharSequence?,
         ongoing: Boolean = false,
+        isProtected: Boolean = false,
     ): Boolean {
         // Expose the latest notification's fields as super-globals so an enter task can read them
         // (e.g. pick the edge-blink colour by %NOTIF_PACKAGE, skip ongoing ones via %NOTIF_ONGOING),
@@ -27,7 +28,10 @@ object NotificationContextEvents {
         PersistentGlobalScope.set(0L, "NOTIF_TITLE", sanitizeText(title))
         PersistentGlobalScope.set(0L, "NOTIF_BODY", sanitizeText(body))
         PersistentGlobalScope.set(0L, "NOTIF_ONGOING", ongoing.toString())
-        return notifications.tryEmit(buildEvent(pkg, title, body, ongoing))
+        // %NOTIF_PROTECTED — true on a 白い熊 GNU Jami "protected contact" vague notification (marker extra
+        // shiroikuma.jami.protected); lets 通知明滅 blink for it even though it carries no visible content.
+        PersistentGlobalScope.set(0L, "NOTIF_PROTECTED", isProtected.toString())
+        return notifications.tryEmit(buildEvent(pkg, title, body, ongoing, isProtected))
     }
 
     fun buildEvent(
@@ -35,6 +39,7 @@ object NotificationContextEvents {
         title: CharSequence?,
         body: CharSequence?,
         ongoing: Boolean = false,
+        isProtected: Boolean = false,
     ): ContextEvent = ContextEvent(
         type = "event",
         matched = true,
@@ -44,6 +49,7 @@ object NotificationContextEvents {
             "title" to sanitizeText(title),
             "body" to sanitizeText(body),
             "ongoing" to ongoing.toString(),
+            "protected" to isProtected.toString(),
         ),
         // Per-invocation snapshot under the SAME names as the published super-globals, so a queued
         // task (e.g. 通知明滅 in QUEUED mode) reads THIS notification's values, not a later one's.
@@ -52,6 +58,7 @@ object NotificationContextEvents {
             "NOTIF_TITLE" to sanitizeText(title),
             "NOTIF_BODY" to sanitizeText(body),
             "NOTIF_ONGOING" to ongoing.toString(),
+            "NOTIF_PROTECTED" to isProtected.toString(),
         ),
     )
 
