@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Release**: refreshed the draft F-Droid metadata pin and local fdroidserver lint/build evidence for `0.2.75`/`77`.
 - **Release**: added the Kotlin/Gradle dependency verification hashes needed by clean fdroidserver source checkouts.
 - **Reliability**: hardened database backup creation so local backups wait for a complete WAL checkpoint, publish only schema-validated copies, clean up failed temporary files, and keep backup UI state from getting stuck after failures.
 - **Testing**: added Compose instrumentation coverage for setup onboarding, task/profile editor validation, action/context required-field validation, scene creation, and incompatible import review states.
