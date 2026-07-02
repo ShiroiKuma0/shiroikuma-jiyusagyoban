@@ -378,6 +378,8 @@ internal fun SceneElementView(
     // shared revision, so any var change re-ran every on-screen overlay at once — a real idle CPU cost
     // with many overlays up.) "html" stays raw (it's large and the WebView reads/expands it itself).
     val revisionState = PersistentGlobalScope.revision.collectAsState()
+    // Global appearance (used for oval-bar defaults when the element has no per-element override).
+    val prefs by ThemeStore.state.collectAsState()
     val expandedCfg by remember(cfg) {
         derivedStateOf {
             revisionState.value // re-derive on any var change…
@@ -547,12 +549,18 @@ internal fun SceneElementView(
                 val iconColor = sceneColor(v("iconColor")) ?: trackColor
                 val iconSz = cfg["iconSize"]?.toFloatOrNull() ?: 22f
                 val frac = ((value - min) / (max - min)).coerceIn(0f, 1f)
+                // Oval-bar outline (白い熊): each volume/brightness capsule gets a border whose default
+                // width/colour come from the global UI settings (ovalBarBorderWidthDp/ovalBarBorderColor);
+                // a per-element borderWidth/borderColor overrides them. Width 0 = no border.
+                val barBorderW = if (styleBorderW > 0) styleBorderW else prefs.ovalBarBorderWidthDp
+                val barBorderColor = styleBorderColor ?: Color(prefs.ovalBarBorderColor)
                 fun valueAtY(y: Float, hPx: Int): Float =
                     min + (1f - (y / hPx.toFloat()).coerceIn(0f, 1f)) * (max - min)
                 Box(
                     Modifier.fillMaxSize()
                         .clip(RoundedCornerShape(percent = 50))
                         .background(trackColor)
+                        .then(if (barBorderW > 0) Modifier.border(barBorderW.dp, barBorderColor, RoundedCornerShape(percent = 50)) else Modifier)
                         .pointerInput(element.id) {
                             detectTapGestures { off -> onChange(valueAtY(off.y, size.height)); onFinished() }
                         }

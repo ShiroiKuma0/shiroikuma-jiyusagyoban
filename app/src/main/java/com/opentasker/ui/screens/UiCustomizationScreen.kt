@@ -295,6 +295,17 @@ fun UiCustomizationScreen(
                 )
             }
 
+            item { SectionHeader("Panel bars") }
+            item {
+                SliderRow(
+                    level = 1, label = "Oval bar border width",
+                    value = prefs.ovalBarBorderWidthDp, valueText = "${prefs.ovalBarBorderWidthDp} dp",
+                    range = 0f..ThemePrefs.OVAL_BAR_BORDER_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(ovalBarBorderWidthDp = v) } },
+                )
+            }
+            item { ColorRow(1, "Oval bar border colour", prefs.ovalBarBorderColor, ColorTarget.OvalBarBorder) { colorTarget = it } }
+
             item { SectionHeader("Freeze bubbles") }
             item { FreezeBubblePreview(level = 1, prefs = prefs) }
             item {
@@ -1019,7 +1030,8 @@ private enum class ColorTarget(val label: String, val default: Int) {
     FlashBackground("Flash background", ThemePrefs.DEFAULT.flashBackground),
     FlashText("Flash text", ThemePrefs.DEFAULT.flashText),
     FlashBorder("Flash border", ThemePrefs.DEFAULT.flashBorder),
-    ImportConflict("Conflict colour", ThemePrefs.DEFAULT.importConflictColor);
+    ImportConflict("Conflict colour", ThemePrefs.DEFAULT.importConflictColor),
+    OvalBarBorder("Oval bar border", ThemePrefs.DEFAULT.ovalBarBorderColor);
 
     fun get(p: ThemePrefs): Int = when (this) {
         Background -> p.background
@@ -1032,6 +1044,7 @@ private enum class ColorTarget(val label: String, val default: Int) {
         FlashText -> p.flashText
         FlashBorder -> p.flashBorder
         ImportConflict -> p.importConflictColor
+        OvalBarBorder -> p.ovalBarBorderColor
     }
 
     fun set(p: ThemePrefs, value: Int): ThemePrefs = when (this) {
@@ -1045,6 +1058,7 @@ private enum class ColorTarget(val label: String, val default: Int) {
         FlashText -> p.copy(flashText = value)
         FlashBorder -> p.copy(flashBorder = value)
         ImportConflict -> p.copy(importConflictColor = value)
+        OvalBarBorder -> p.copy(ovalBarBorderColor = value)
     }
 }
 
