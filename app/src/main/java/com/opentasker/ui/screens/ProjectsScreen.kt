@@ -3,6 +3,14 @@ package com.opentasker.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.material.icons.filled.DragIndicator
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.zIndex
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,6 +57,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.model.Project
@@ -146,9 +155,10 @@ fun ProjectsManagementScreen(
     onCreate: (String, Int?) -> Unit,
     onUpdate: (Project) -> Unit,
     onDelete: (Project, Boolean) -> Unit,
-    onMoveUp: (Project) -> Unit,
-    onMoveDown: (Project) -> Unit,
+    onReorder: (List<Long>) -> Unit,
     onExportProject: (Project) -> Unit,
+    currentProjectId: Long? = null,
+    onSelectProject: (Long) -> Unit = {},
 ) {
     val manual = sortMethod == SortMethod.MANUAL
     var editing by remember { mutableStateOf<Project?>(null) }
@@ -182,25 +192,62 @@ fun ProjectsManagementScreen(
                 )
             }
         } else {
+            // Drag-to-reorder (manual sort only): a per-row handle lifts the row; it swaps with its
+            // neighbour once dragged past half a slot, and the new order persists on drop. Replaces the
+            // old up/down arrows. 白い熊
+            val order = remember(projects) { mutableStateListOf<Project>().also { it.addAll(projects) } }
+            var dragId by remember { mutableStateOf<Long?>(null) }
+            var dragOffsetY by remember { mutableFloatStateOf(0f) }
+            var rowH by remember { mutableFloatStateOf(0f) }
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(projects, key = { it.id }) { project ->
-                    val isFirst = project.id == projects.first().id
-                    val isLast = project.id == projects.last().id
+                items(order, key = { it.id }) { project ->
+                    val isDragging = project.id == dragId
                     ProjectManagementRow(
                         project = project,
                         members = memberCount(project.id),
                         reorderable = manual,
-                        isFirst = isFirst,
-                        isLast = isLast,
-                        onMoveUp = { onMoveUp(project) },
-                        onMoveDown = { onMoveDown(project) },
+                        isCurrent = project.id == currentProjectId,
+                        isDragging = isDragging,
+                        dragOffsetY = if (isDragging) dragOffsetY else 0f,
+                        onMeasureHeight = { rowH = it },
+                        onSelect = { onSelectProject(project.id) },
                         onEdit = { editing = project },
                         onDelete = { deleting = project },
                         onExport = { onExportProject(project) },
+                        dragHandle = {
+                            Icon(
+                                Icons.Filled.DragIndicator,
+                                contentDescription = "Drag to reorder",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.pointerInput(project.id) {
+                                    detectDragGestures(
+                                        onDragStart = { dragId = project.id; dragOffsetY = 0f },
+                                        onDrag = { change, amount ->
+                                            change.consume()
+                                            dragOffsetY += amount.y
+                                            val di = order.indexOfFirst { it.id == dragId }
+                                            val step = rowH + 8.dp.toPx()  // row height + list spacing
+                                            if (di >= 0 && rowH > 0f) {
+                                                when {
+                                                    dragOffsetY > step / 2 && di < order.lastIndex -> {
+                                                        order.add(di + 1, order.removeAt(di)); dragOffsetY -= step
+                                                    }
+                                                    dragOffsetY < -step / 2 && di > 0 -> {
+                                                        order.add(di - 1, order.removeAt(di)); dragOffsetY += step
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        onDragEnd = { onReorder(order.map { it.id }); dragId = null; dragOffsetY = 0f },
+                                        onDragCancel = { dragId = null; dragOffsetY = 0f },
+                                    )
+                                },
+                            )
+                        },
                     )
                 }
             }
@@ -242,25 +289,52 @@ private fun ProjectManagementRow(
     project: Project,
     members: Int,
     reorderable: Boolean,
-    isFirst: Boolean,
-    isLast: Boolean,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
+    isCurrent: Boolean,
+    isDragging: Boolean,
+    dragOffsetY: Float,
+    onMeasureHeight: (Float) -> Unit,
+    onSelect: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onExport: () -> Unit,
+    dragHandle: @Composable () -> Unit,
 ) {
+    // Tapping the row makes this the active project (filter). The current one is clearly highlighted with an
+    // accent border + tint. In manual sort the drag handle lifts the row (translationY) to reorder. 白い熊
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+            .onGloballyPositioned { onMeasureHeight(it.size.height.toFloat()) }
+            .zIndex(if (isDragging) 1f else 0f)
+            .graphicsLayer {
+                translationY = dragOffsetY
+                if (isDragging) { shadowElevation = 12f; alpha = 0.95f }
+            }
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onSelect)
+            .then(
+                if (isCurrent) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                else Modifier,
+            )
+            .border(
+                if (isCurrent) 2.dp else 1.dp,
+                if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                RoundedCornerShape(12.dp),
+            )
             .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         ColorDot(project.color)
         Column(Modifier.weight(1f)) {
-            Text(project.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                project.name,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = if (isCurrent) FontWeight.Bold else null,
+                color = if (isCurrent) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             Text(
                 "$members item${if (members == 1) "" else "s"}",
                 style = MaterialTheme.typography.labelSmall,
@@ -268,12 +342,7 @@ private fun ProjectManagementRow(
             )
         }
         if (reorderable) {
-            IconButton(onClick = onMoveUp, enabled = !isFirst) {
-                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up")
-            }
-            IconButton(onClick = onMoveDown, enabled = !isLast) {
-                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down")
-            }
+            dragHandle()
         }
         IconButton(onClick = onExport) { Icon(Icons.Filled.Upload, contentDescription = "Export project") }
         IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = "Edit") }

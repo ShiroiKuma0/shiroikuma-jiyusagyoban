@@ -107,6 +107,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.opentasker.ui.components.GroupOps
 import com.opentasker.ui.components.TabAction
+import com.opentasker.ui.theme.ThemeStore
 import com.opentasker.ui.components.ThemedSnackbarHost
 import com.opentasker.ui.components.TabActionsFab
 import com.opentasker.ui.components.ThemedDropdownMenu
@@ -288,6 +289,7 @@ fun ActiveAutomationUi(
     val projectFilter = viewModel.projectFilter
     val currentProjectId = (projectFilter as? ProjectFilter.Of)?.projectId
     val itemGroups by viewModel.itemGroups.collectAsState()
+    val prefs by ThemeStore.state.collectAsState()
     val itemMeta by viewModel.itemMeta.collectAsState()
     // Build the GroupOps a list tab needs, pre-filtered to that tab + the active project filter. Groups
     // are scoped to the SAME project filter as their items, so they appear whenever their members do.
@@ -911,8 +913,7 @@ fun ActiveAutomationUi(
                 onCreate = { name, color -> viewModel.createProject(name, color) },
                 onUpdate = { viewModel.updateProject(it) },
                 onDelete = { project, deleteItems -> viewModel.deleteProject(project, deleteItems) },
-                onMoveUp = { viewModel.moveProject(it, up = true) },
-                onMoveDown = { viewModel.moveProject(it, up = false) },
+                onReorder = { orderedIds -> viewModel.reorderProjects(orderedIds) },
                 onExportProject = { project ->
                     startSelectionExport(
                         PendingExport(
@@ -924,6 +925,8 @@ fun ActiveAutomationUi(
                         ),
                     )
                 },
+                currentProjectId = currentProjectId,
+                onSelectProject = { viewModel.selectProject(ProjectFilter.Of(it)) },
             )
 
             OpenTaskerScreen.Profiles -> ProfilesScreen(
@@ -936,6 +939,7 @@ fun ActiveAutomationUi(
                 projectFilter = projectFilter,
                 currentProjectId = currentProjectId,
                 onSelectProject = viewModel::selectProject,
+                onReorderProjects = viewModel::reorderProjects,
                 groupOps = groupOpsFor("profiles"),
                 onMoveProfilesToProject = viewModel::moveProfilesToProject,
                 onDeleteProfiles = viewModel::deleteProfiles,
@@ -974,6 +978,7 @@ fun ActiveAutomationUi(
                 projectFilter = projectFilter,
                 currentProjectId = currentProjectId,
                 onSelectProject = viewModel::selectProject,
+                onReorderProjects = viewModel::reorderProjects,
                 groupOps = groupOpsFor("tasks"),
                 onMoveTasksToProject = viewModel::moveTasksToProject,
                 onDeleteTasks = viewModel::deleteTasks,
@@ -1060,6 +1065,7 @@ fun ActiveAutomationUi(
                 projectFilter = projectFilter,
                 currentProjectId = currentProjectId,
                 onSelectProject = viewModel::selectProject,
+                onReorderProjects = viewModel::reorderProjects,
                 groupOps = groupOpsFor("scenes"),
                 onMoveScenesToProject = viewModel::moveScenesToProject,
                 onDeleteScenes = viewModel::deleteScenes,
@@ -1298,13 +1304,18 @@ fun ActiveAutomationUi(
     }
 
     actionPickerTask?.let { task ->
-        ActionPickerDialog(
-            onDismiss = { clearActionPicker() },
-            onSelect = { metadata ->
-                clearActionPicker()
-                openActionEdit(task, metadata)
-            },
-        )
+        // Fork's full-screen, category-foldable action picker when enabled (the default) — upstream's
+        // small dialog otherwise. The upstream resync dropped this branch, falling back to the limited
+        // dialog (白い熊: "adding actions uses the upstream small dialog").
+        val onSelectAction: (ActionMetadata) -> Unit = { metadata ->
+            clearActionPicker()
+            openActionEdit(task, metadata)
+        }
+        if (prefs.advancedActionPicker) {
+            AdvancedActionPickerScreen(onDismiss = { clearActionPicker() }, onSelect = onSelectAction)
+        } else {
+            ActionPickerDialog(onDismiss = { clearActionPicker() }, onSelect = onSelectAction)
+        }
     }
 
     actionEdit?.let { state ->

@@ -262,7 +262,7 @@ fun UiCustomizationScreen(
             item { SectionHeader("Tasks") }
             item {
                 SliderRow(
-                    level = 1, label = "Gap between cards",
+                    level = 1, label = "Padding between cards",
                     value = prefs.taskCardGapDp, valueText = "${prefs.taskCardGapDp} dp",
                     range = 0f..ThemePrefs.TASK_CARD_GAP_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(taskCardGapDp = v) } },
@@ -282,6 +282,16 @@ fun UiCustomizationScreen(
                     value = prefs.groupHeaderVPadDp, valueText = "${prefs.groupHeaderVPadDp} dp",
                     range = 0f..ThemePrefs.GROUP_HEADER_VPAD_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(groupHeaderVPadDp = v) } },
+                )
+            }
+            item { ColorRow(1, "Group header colour", prefs.groupHeaderColor, ColorTarget.GroupHeader) { colorTarget = it } }
+            item { ColorRow(1, "Group header border colour", prefs.groupHeaderBorderColor, ColorTarget.GroupHeaderBorder) { colorTarget = it } }
+            item {
+                SliderRow(
+                    level = 1, label = "Group header border width",
+                    value = prefs.groupHeaderBorderWidthDp, valueText = "${prefs.groupHeaderBorderWidthDp} dp",
+                    range = 0f..ThemePrefs.GROUP_HEADER_BORDER_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(groupHeaderBorderWidthDp = v) } },
                 )
             }
 
@@ -1031,7 +1041,9 @@ private enum class ColorTarget(val label: String, val default: Int) {
     FlashText("Flash text", ThemePrefs.DEFAULT.flashText),
     FlashBorder("Flash border", ThemePrefs.DEFAULT.flashBorder),
     ImportConflict("Conflict colour", ThemePrefs.DEFAULT.importConflictColor),
-    OvalBarBorder("Oval bar border", ThemePrefs.DEFAULT.ovalBarBorderColor);
+    OvalBarBorder("Oval bar border", ThemePrefs.DEFAULT.ovalBarBorderColor),
+    GroupHeader("Group header colour", ThemePrefs.DEFAULT.groupHeaderColor),
+    GroupHeaderBorder("Group header border", ThemePrefs.DEFAULT.groupHeaderBorderColor);
 
     fun get(p: ThemePrefs): Int = when (this) {
         Background -> p.background
@@ -1045,6 +1057,8 @@ private enum class ColorTarget(val label: String, val default: Int) {
         FlashBorder -> p.flashBorder
         ImportConflict -> p.importConflictColor
         OvalBarBorder -> p.ovalBarBorderColor
+        GroupHeader -> p.groupHeaderColor
+        GroupHeaderBorder -> p.groupHeaderBorderColor
     }
 
     fun set(p: ThemePrefs, value: Int): ThemePrefs = when (this) {
@@ -1059,6 +1073,8 @@ private enum class ColorTarget(val label: String, val default: Int) {
         FlashBorder -> p.copy(flashBorder = value)
         ImportConflict -> p.copy(importConflictColor = value)
         OvalBarBorder -> p.copy(ovalBarBorderColor = value)
+        GroupHeader -> p.copy(groupHeaderColor = value)
+        GroupHeaderBorder -> p.copy(groupHeaderBorderColor = value)
     }
 }
 

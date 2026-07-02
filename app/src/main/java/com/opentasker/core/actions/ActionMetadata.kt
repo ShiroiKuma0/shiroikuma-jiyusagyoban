@@ -99,7 +99,7 @@ fun registerActionMetadata() {
             description = "Cancel another app's notifications by package (needs notification access)",
             category = "Notification",
             fields = listOf(
-                ActionField("package", "Package", required = true, hint = "App package to dismiss notifications from"),
+                ActionField("package", "App", FieldType.APP_PACKAGE, required = true, hint = "pick an app whose notifications to dismiss, or type a package / %var"),
             )
         )
     )
@@ -452,6 +452,7 @@ fun registerActionMetadata() {
             category = "System",
         )
     )
+
 
     ActionMetadataRegistry.register(
         ActionMetadata(
@@ -870,7 +871,7 @@ fun registerActionMetadata() {
             description = "Launch an activity or service via intent",
             category = "App",
             fields = listOf(
-                ActionField("package", "Package name", required = true, hint = "com.example.app"),
+                ActionField("package", "App", FieldType.APP_PACKAGE, required = true, hint = "pick an app, or type a package / %var"),
                 ActionField("action", "Intent action", hint = "MAIN, VIEW, etc."),
                 ActionField("category", "Intent category", hint = "Optional"),
             )
@@ -885,7 +886,7 @@ fun registerActionMetadata() {
             category = "App",
             fields = listOf(
                 ActionField("action", "Intent action", hint = "shiroikuma.jami.action.SEND_MESSAGE or android.intent.action.VIEW"),
-                ActionField("package", "Target package", hint = "shiroikuma.jami"),
+                ActionField("package", "Target app", FieldType.APP_PACKAGE, hint = "pick an app, or type a package / %var (e.g. shiroikuma.jami)"),
                 ActionField("class", "Component class (fully-qualified)", hint = "cx.ring.automation.AutomationActivity"),
                 ActionField("data", "Data URI", hint = "jami-cmd://send/default/<hex>?text=hi&token=…"),
                 ActionField("mime", "MIME type", hint = "text/plain (optional)"),
@@ -1143,7 +1144,7 @@ fun registerActionMetadata() {
             description = "Launch an installed application",
             category = "App",
             fields = listOf(
-                ActionField("package", "Package name", required = true, hint = "com.example.app"),
+                ActionField("package", "App", FieldType.APP_PACKAGE, required = true, hint = "pick an app, or type a package / %var"),
             )
         )
     )
@@ -1155,7 +1156,7 @@ fun registerActionMetadata() {
             description = "Force close an app",
             category = "App",
             fields = listOf(
-                ActionField("package", "Package name", required = true),
+                ActionField("package", "App", FieldType.APP_PACKAGE, required = true, hint = "pick an app, or type a package / %var"),
             )
         )
     )

@@ -2,6 +2,7 @@ package com.opentasker.ui.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -42,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
@@ -286,7 +288,10 @@ fun <T> LazyListScope.groupedItems(
                                 },
                         )
                         var menu by remember { mutableStateOf(false) }
-                        IconButton(onClick = { menu = true }) {
+                        // Compact (32dp, not the 48dp default) so the ⋮ doesn't inflate the member row above the
+                        // card height — that leftover was the phantom card-to-card gap the gap setting couldn't
+                        // reach (白い熊). Row stays verticalAlignment=Top so it's tidy when a card is expanded.
+                        IconButton(onClick = { menu = true }, modifier = Modifier.size(32.dp)) {
                             Icon(Icons.Filled.MoreVert, contentDescription = "Group")
                             ThemedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                                 DropdownMenuItem(
@@ -355,9 +360,23 @@ fun GroupHeaderRow(
             .padding(start = (depth * GROUP_INDENT_DP).dp)
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
+            // Normal header colour is user-settable (ARGB); selection/highlight keep the accent tints so
+            // multi-select stays visible. Optional user border (default a thin yellow). 白い熊
             .background(
-                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
-                else MaterialTheme.colorScheme.primary.copy(alpha = if (highlighted) 0.42f else 0.16f),
+                when {
+                    selected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
+                    highlighted -> MaterialTheme.colorScheme.primary.copy(alpha = 0.42f)
+                    else -> Color(themePrefs.groupHeaderColor)
+                },
+            )
+            .then(
+                if (themePrefs.groupHeaderBorderWidthDp > 0) {
+                    Modifier.border(
+                        themePrefs.groupHeaderBorderWidthDp.dp,
+                        Color(themePrefs.groupHeaderBorderColor),
+                        RoundedCornerShape(12.dp),
+                    )
+                } else Modifier,
             )
             // Tap = fold (or toggle selection while selecting); long-press = start/extend a group selection.
             .combinedClickable(
@@ -384,7 +403,8 @@ fun GroupHeaderRow(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        IconButton(onClick = { menuOpen = true }) {
+        // Compact (32dp) so the ⋮ doesn't force the header taller than its padding setting (白い熊).
+        IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(32.dp)) {
             Icon(Icons.Filled.MoreVert, contentDescription = "Group actions")
             ThemedDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(

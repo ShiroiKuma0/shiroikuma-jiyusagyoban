@@ -32,7 +32,7 @@ data class ThemePrefs(
     val fontFileName: String = "",
     val fontWeight: Int = 0,        // 0 = leave each text style's own weight; else 100..900
     val fontScalePct: Int = 100,    // 100 = 1.0x; clamped to [SCALE_MIN, SCALE_MAX]
-    val advancedActionPicker: Boolean = false,  // full-screen, category-foldable action picker
+    val advancedActionPicker: Boolean = true,   // full-screen, category-foldable action picker (fork default)
     // ---- Flash / toast (the transient snackbar that reports task results) -----------------------
     val flashBackground: Int = BLACK,            // opaque so content never shows through
     val flashText: Int = YELLOW,
@@ -46,6 +46,9 @@ data class ThemePrefs(
     val taskCardGapDp: Int = 6,                  // gap BETWEEN task cards (Tasks tab) [0, TASK_CARD_GAP_MAX]
     val taskCardVPadDp: Int = 8,                 // vertical padding INSIDE a task pill (Tasks tab) [0, TASK_CARD_VPAD_MAX]
     val groupHeaderVPadDp: Int = 8,              // vertical padding INSIDE a group header (lists) [0, GROUP_HEADER_VPAD_MAX]
+    val groupHeaderColor: Int = 0x29FFFF00.toInt(), // group-header background (ARGB); default translucent yellow
+    val groupHeaderBorderColor: Int = YELLOW,    // group-header border colour (default yellow)
+    val groupHeaderBorderWidthDp: Int = 1,       // group-header border width; 0 = none [0, GROUP_HEADER_BORDER_MAX]
     // ---- Monitor ---------------------------------------------------------------------------------
     val monitorRowPadDp: Int = 2,                // vertical padding per Monitor task-activity row; 2 = tight [0, MONITOR_PAD_MAX]
     // ---- Freeze bubbles (Desktop re-freeze overlays) ---------------------------------------------
@@ -93,6 +96,7 @@ data class ThemePrefs(
         const val TASK_CARD_GAP_MAX = 24
         const val TASK_CARD_VPAD_MAX = 24
         const val GROUP_HEADER_VPAD_MAX = 24
+        const val GROUP_HEADER_BORDER_MAX = 8
 
         const val MONITOR_PAD_MAX = 24
 
@@ -154,6 +158,9 @@ object ThemeStore {
     private const val K_TASK_CARD_GAP = "task_card_gap"
     private const val K_TASK_CARD_VPAD = "task_card_vpad"
     private const val K_GROUP_HEADER_VPAD = "group_header_vpad"
+    private const val K_GROUP_HEADER_COLOR = "group_header_color"
+    private const val K_GROUP_HEADER_BORDER_COLOR = "group_header_border_color"
+    private const val K_GROUP_HEADER_BORDER_WIDTH = "group_header_border_width"
     private const val K_MONITOR_PAD = "monitor_row_pad"
     private const val K_BUBBLE_ICON_SIZE = "bubble_icon_size"
     private const val K_BUBBLE_ICON_CORNER = "bubble_icon_corner"
@@ -213,6 +220,7 @@ object ThemeStore {
         taskCardGapDp = taskCardGapDp.coerceIn(0, ThemePrefs.TASK_CARD_GAP_MAX),
         taskCardVPadDp = taskCardVPadDp.coerceIn(0, ThemePrefs.TASK_CARD_VPAD_MAX),
         groupHeaderVPadDp = groupHeaderVPadDp.coerceIn(0, ThemePrefs.GROUP_HEADER_VPAD_MAX),
+        groupHeaderBorderWidthDp = groupHeaderBorderWidthDp.coerceIn(0, ThemePrefs.GROUP_HEADER_BORDER_MAX),
         monitorRowPadDp = monitorRowPadDp.coerceIn(0, ThemePrefs.MONITOR_PAD_MAX),
         bubbleIconSizeDp = bubbleIconSizeDp.coerceIn(ThemePrefs.BUBBLE_ICON_MIN, ThemePrefs.BUBBLE_ICON_MAX),
         bubbleIconCornerDp = bubbleIconCornerDp.coerceIn(0, ThemePrefs.BUBBLE_ICON_CORNER_MAX),
@@ -256,6 +264,9 @@ object ThemeStore {
             taskCardGapDp = prefs.getInt(K_TASK_CARD_GAP, d.taskCardGapDp),
             taskCardVPadDp = prefs.getInt(K_TASK_CARD_VPAD, d.taskCardVPadDp),
             groupHeaderVPadDp = prefs.getInt(K_GROUP_HEADER_VPAD, d.groupHeaderVPadDp),
+            groupHeaderColor = prefs.getInt(K_GROUP_HEADER_COLOR, d.groupHeaderColor),
+            groupHeaderBorderColor = prefs.getInt(K_GROUP_HEADER_BORDER_COLOR, d.groupHeaderBorderColor),
+            groupHeaderBorderWidthDp = prefs.getInt(K_GROUP_HEADER_BORDER_WIDTH, d.groupHeaderBorderWidthDp),
             monitorRowPadDp = prefs.getInt(K_MONITOR_PAD, d.monitorRowPadDp),
             ovalBarBorderWidthDp = prefs.getInt(K_OVAL_BAR_BORDER_WIDTH, d.ovalBarBorderWidthDp),
             ovalBarBorderColor = prefs.getInt(K_OVAL_BAR_BORDER_COLOR, d.ovalBarBorderColor),
@@ -303,6 +314,9 @@ object ThemeStore {
             putInt(K_TASK_CARD_GAP, p.taskCardGapDp)
             putInt(K_TASK_CARD_VPAD, p.taskCardVPadDp)
             putInt(K_GROUP_HEADER_VPAD, p.groupHeaderVPadDp)
+            putInt(K_GROUP_HEADER_COLOR, p.groupHeaderColor)
+            putInt(K_GROUP_HEADER_BORDER_COLOR, p.groupHeaderBorderColor)
+            putInt(K_GROUP_HEADER_BORDER_WIDTH, p.groupHeaderBorderWidthDp)
             putInt(K_MONITOR_PAD, p.monitorRowPadDp)
             putInt(K_OVAL_BAR_BORDER_WIDTH, p.ovalBarBorderWidthDp)
             putInt(K_OVAL_BAR_BORDER_COLOR, p.ovalBarBorderColor)

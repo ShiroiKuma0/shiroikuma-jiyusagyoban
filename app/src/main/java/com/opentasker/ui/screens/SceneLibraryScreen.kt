@@ -120,6 +120,7 @@ fun SceneLibraryScreen(
     projectFilter: ProjectFilter,
     currentProjectId: Long?,
     onSelectProject: (ProjectFilter) -> Unit,
+    onReorderProjects: (List<Long>) -> Unit,
     groupOps: GroupOps,
     onMoveScenesToProject: (List<Scene>, Long?) -> Unit,
     onDeleteScenes: (List<Scene>) -> Unit,
@@ -252,7 +253,7 @@ fun SceneLibraryScreen(
 
     Column(Modifier.fillMaxSize().padding(contentPadding)) {
         if (projects.isNotEmpty()) {
-            ProjectFilterChips(projects, projectFilter, onSelectProject, Modifier.padding(vertical = 8.dp))
+            ProjectFilterChips(projects, projectFilter, onSelectProject, onReorderProjects, Modifier.padding(vertical = 8.dp))
         }
         if (selectionActive) {
             SelectionBar(

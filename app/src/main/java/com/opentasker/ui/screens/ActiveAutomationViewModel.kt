@@ -269,6 +269,22 @@ class ActiveAutomationViewModel(
         }
     }
 
+    /**
+     * Persist a full drag order: reassign contiguous sortOrder to match [orderedIds] and switch the Projects
+     * tab to MANUAL so the dragged order sticks (a drag implies manual, like tasks). Backs both the Projects
+     * tab list and the top project-tabs drag-reorder.
+     */
+    fun reorderProjects(orderedIds: List<Long>) = launchWithMessage("Projects reordered") {
+        val byId = db.projectDao().getAll().associateBy { it.id }
+        db.withTransaction {
+            orderedIds.forEachIndexed { position, id ->
+                val row = byId[id] ?: return@forEachIndexed
+                if (row.sortOrder != position) db.projectDao().update(row.copy(sortOrder = position))
+            }
+        }
+        ListSortStore.set(SortTab.PROJECTS, SortMethod.MANUAL)
+    }
+
     fun createGroup(tab: String, projectId: Long?, name: String, parentId: Long? = null) = viewModelScope.launch {
         val pos = db.itemGroupDao().getForTab(tab).size
         db.itemGroupDao().upsert(

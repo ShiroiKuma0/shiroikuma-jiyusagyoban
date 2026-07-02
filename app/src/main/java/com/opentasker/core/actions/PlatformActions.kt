@@ -191,3 +191,6 @@ class ImePickerAction : Action {
         return ActionResult.Success
     }
 }
+
+// (Removed ShowKeyboardAction / keyboard.show — Android won't let one app force another app's IME to show;
+// the edge-bar up-swipe re-focuses Termux instead. See the キーボード表示 task. 白い熊)

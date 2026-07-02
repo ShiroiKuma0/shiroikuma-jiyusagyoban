@@ -20,7 +20,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.zIndex
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -101,8 +112,18 @@ internal fun ProjectFilterChips(
     projects: List<Project>,
     filter: ProjectFilter,
     onSelect: (ProjectFilter) -> Unit,
+    onReorder: (List<Long>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Tap a chip to filter; LONG-PRESS a project chip then drag left/right to reorder — it swaps with its
+    // neighbour once dragged past half that neighbour's width, and the order persists on drop (switching the
+    // Projects sort to Manual). All / Unfiled stay pinned at the front. 白い熊
+    val order = remember(projects) { mutableStateListOf<Project>().also { it.addAll(projects) } }
+    var dragId by remember { mutableStateOf<Long?>(null) }
+    var dragOffsetX by remember { mutableFloatStateOf(0f) }
+    val widths = remember { mutableStateMapOf<Long, Float>() }
+    val spacingPx = with(LocalDensity.current) { DesignSystem.Spacing.sm.toPx() }
+    val haptic = LocalHapticFeedback.current
     LazyRow(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
@@ -122,11 +143,47 @@ internal fun ProjectFilterChips(
                 label = { Text("Unfiled") },
             )
         }
-        items(projects, key = { it.id }) { project ->
+        items(order, key = { it.id }) { project ->
+            val isDragging = project.id == dragId
             FilterChip(
                 selected = filter is ProjectFilter.Of && filter.projectId == project.id,
                 onClick = { onSelect(ProjectFilter.Of(project.id)) },
                 label = { Text(project.name) },
+                modifier = Modifier
+                    .onGloballyPositioned { widths[project.id] = it.size.width.toFloat() }
+                    .zIndex(if (isDragging) 1f else 0f)
+                    .graphicsLayer {
+                        translationX = if (isDragging) dragOffsetX else 0f
+                        if (isDragging) { shadowElevation = 12f; alpha = 0.95f }
+                    }
+                    .pointerInput(project.id) {
+                        detectDragGesturesAfterLongPress(
+                            // Haptic the instant the long-press latches → "grabbed, you can drag now". 白い熊
+                            onDragStart = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); dragId = project.id; dragOffsetX = 0f },
+                            onDrag = { change, amount ->
+                                change.consume()
+                                dragOffsetX += amount.x
+                                val di = order.indexOfFirst { it.id == dragId }
+                                if (di in order.indices) {
+                                    if (dragOffsetX > 0 && di < order.lastIndex) {
+                                        val nw = widths[order[di + 1].id]
+                                        if (nw != null) {
+                                            val step = nw + spacingPx
+                                            if (dragOffsetX > step / 2) { order.add(di + 1, order.removeAt(di)); dragOffsetX -= step }
+                                        }
+                                    } else if (dragOffsetX < 0 && di > 0) {
+                                        val nw = widths[order[di - 1].id]
+                                        if (nw != null) {
+                                            val step = nw + spacingPx
+                                            if (dragOffsetX < -step / 2) { order.add(di - 1, order.removeAt(di)); dragOffsetX += step }
+                                        }
+                                    }
+                                }
+                            },
+                            onDragEnd = { onReorder(order.map { it.id }); dragId = null; dragOffsetX = 0f },
+                            onDragCancel = { dragId = null; dragOffsetX = 0f },
+                        )
+                    },
             )
         }
     }
@@ -143,6 +200,7 @@ internal fun ProfilesScreen(
     projectFilter: ProjectFilter,
     currentProjectId: Long?,
     onSelectProject: (ProjectFilter) -> Unit,
+    onReorderProjects: (List<Long>) -> Unit,
     groupOps: GroupOps,
     onMoveProfilesToProject: (List<Profile>, Long?) -> Unit,
     onDeleteProfiles: (List<Profile>) -> Unit,
@@ -175,7 +233,7 @@ internal fun ProfilesScreen(
 
     Column(Modifier.fillMaxSize().padding(contentPadding)) {
         if (projects.isNotEmpty()) {
-            ProjectFilterChips(projects, projectFilter, onSelectProject, Modifier.padding(vertical = 8.dp))
+            ProjectFilterChips(projects, projectFilter, onSelectProject, onReorderProjects, Modifier.padding(vertical = 8.dp))
         }
         if (selectionActive) {
             SelectionBar(
@@ -671,6 +729,7 @@ internal fun TasksScreen(
     projectFilter: ProjectFilter,
     currentProjectId: Long?,
     onSelectProject: (ProjectFilter) -> Unit,
+    onReorderProjects: (List<Long>) -> Unit,
     groupOps: GroupOps,
     onMoveTasksToProject: (List<Task>, Long?) -> Unit,
     onDeleteTasks: (List<Task>) -> Unit,
@@ -699,7 +758,7 @@ internal fun TasksScreen(
 
     Column(Modifier.fillMaxSize().padding(contentPadding)) {
         if (projects.isNotEmpty()) {
-            ProjectFilterChips(projects, projectFilter, onSelectProject, Modifier.padding(vertical = 8.dp))
+            ProjectFilterChips(projects, projectFilter, onSelectProject, onReorderProjects, Modifier.padding(vertical = 8.dp))
         }
         if (selectionActive) {
             SelectionBar(
@@ -927,7 +986,7 @@ private fun TaskCard(
                     // sides (白い熊): a 32dp box centers the icon at card-pad + 16dp, then a 16dp spacer keeps
                     // the app icon at its original indent.
                     Box(
-                        modifier = Modifier.size(width = 32.dp, height = 40.dp).clickable(onClick = onRun),
+                        modifier = Modifier.size(width = 32.dp, height = 36.dp).clickable(onClick = onRun),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
@@ -937,12 +996,15 @@ private fun TaskCard(
                         )
                     }
                     Spacer(Modifier.width(16.dp))
+                    // Icon size honours the UI "task icon size" setting (was hardcoded 28dp — the rebase
+                    // left the slider wired to nothing; 白い熊 regression audit).
+                    val taskIconDp = themePrefs.taskIconSizeDp.dp
                     if (listIcon != null) {
                         Image(
                             bitmap = listIcon.asImageBitmap(),
                             contentDescription = null,
                             modifier = Modifier
-                                .size(28.dp)
+                                .size(taskIconDp)
                                 .clip(RoundedCornerShape(6.dp))
                                 .clickable { onPickIcon() },
                         )
@@ -951,16 +1013,21 @@ private fun TaskCard(
                         // No icon yet → a tappable "add icon" affordance (thin outline + small +).
                         Box(
                             modifier = Modifier
+                                // Empty "add icon" affordance stays compact + fixed so an icon-less task honours
+                                // the card padding — the icon-SIZE slider sizes ACTUAL icons, not this placeholder
+                                // (白い熊: a large icon size was inflating every icon-less card to a giant box).
                                 .size(28.dp)
                                 .clip(RoundedCornerShape(6.dp))
-                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp))
+                                // Subdued: the empty placeholder's border + "+" are more transparent than the
+                                // card's own border, so an icon-less task's affordance recedes (白い熊).
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.30f), RoundedCornerShape(6.dp))
                                 .clickable { onPickIcon() },
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(
                                 Icons.Filled.Add,
                                 contentDescription = "Add task icon",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
                                 modifier = Modifier.size(16.dp),
                             )
                         }
