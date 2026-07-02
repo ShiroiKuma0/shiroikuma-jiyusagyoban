@@ -69,11 +69,21 @@ private const val VARIABLES_FOLDER = "Variables"
 /** One incoming item as shown in the tree: its name and whether that name already exists locally. */
 private data class ReviewRow(val name: String, val conflict: Boolean)
 
-/** A per-type sub-list inside a folder. [tab] is the override-key tab (tasks/profiles/scenes/templates/variables). */
+/**
+ * A group node between a TypeGroup and its rows: the (bundle) group the items file into. [name] == null is
+ * the synthetic "ungrouped" node (rows with no group — rendered header-less). [isNew] marks a group that
+ * does not yet exist locally, so it'll be created on import (drawn like a new project).
+ */
+private data class GroupNode(val name: String?, val isNew: Boolean, val rows: List<ReviewRow>)
+
+/**
+ * A per-type sub-list inside a folder, split into group [nodes]. [tab] is the override-key tab
+ * (tasks/profiles/scenes/templates/variables).
+ */
 private data class TypeGroup(
     val tab: String,
     val label: String,
-    val rows: List<ReviewRow>,
+    val nodes: List<GroupNode>,
 )
 
 /** What kind of top-level folder this is — drives the header colour + which pill (if any) it shows. */
@@ -107,6 +117,7 @@ internal fun ImportReviewScreen(
     scenes: List<Scene>,
     widgetTemplates: List<WidgetTemplate>,
     variables: List<Variable>,
+    localGroups: List<com.opentasker.core.storage.ItemGroupEntity> = emptyList(),
     busy: Boolean,
     onCancel: () -> Unit,
     onImport: (ItemConflictStrategy, Map<String, ItemConflictStrategy>, Map<String, ProjectImportChoice>) -> Unit,
@@ -133,23 +144,80 @@ internal fun ImportReviewScreen(
     val profilesByFolder = bundle.profiles.groupBy { folderNameFor(it.projectId) }
     val scenesByFolder = bundle.scenes.groupBy { folderNameFor(it.projectId) }
 
-    fun taskRows(list: List<Task>) = list.map { ReviewRow(it.name, it.name.lowercase() in existingTaskNames) }
-    fun profileRows(list: List<Profile>) = list.map { ReviewRow(it.name, it.name.lowercase() in existingProfileNames) }
-    fun sceneRows(list: List<Scene>) = list.map { ReviewRow(it.name, it.name.lowercase() in existingSceneNames) }
-
-    // The Tasks/Profiles/Scenes sub-lists that live under a folder (a project name, or Unfiled).
-    fun typeGroupsFor(folderName: String): List<TypeGroup> = buildList {
-        tasksByFolder[folderName].orEmpty().takeIf { it.isNotEmpty() }?.let { add(TypeGroup("tasks", "Tasks", taskRows(it))) }
-        profilesByFolder[folderName].orEmpty().takeIf { it.isNotEmpty() }?.let { add(TypeGroup("profiles", "Profiles", profileRows(it))) }
-        scenesByFolder[folderName].orEmpty().takeIf { it.isNotEmpty() }?.let { add(TypeGroup("scenes", "Scenes", sceneRows(it))) }
+    // --- Group resolution (display only) --------------------------------------------------------
+    // An item's bundle group NAME: itemMeta (tab,itemKey→groupId) → groups (id,tab→name). itemKey for
+    // tasks/profiles/scenes is the entity id as text.
+    fun bundleGroupName(tab: String, itemKey: String): String? {
+        val gid = bundle.itemMeta.firstOrNull { it.tab == tab && it.itemKey == itemKey }?.groupId ?: return null
+        return bundle.groups.firstOrNull { it.id == gid && it.tab == tab }?.name
     }
+    // A bundle group already EXISTS locally iff a local group shares its (tab, case-insensitive name) AND
+    // lives under a local project whose name matches this folder's project (null == null for synthetic folders).
+    val localProjectNameById = projects.associate { it.id to it.name }
+    fun groupExistsLocally(tab: String, groupName: String, folderProjectName: String?): Boolean =
+        localGroups.any {
+            it.tab == tab && it.name.equals(groupName, true) &&
+                localProjectNameById[it.projectId].equals(folderProjectName, true)
+        }
+
+    // Split a type's items into GroupNodes: named groups first (in bundle.groups position order, else stable
+    // insertion order), the ungrouped node last. [folderProjectName] is null for the synthetic folders.
+    fun <T> nodesFor(
+        items: List<T>,
+        tab: String,
+        folderProjectName: String?,
+        idOf: (T) -> Long,
+        nameOf: (T) -> String,
+        existsSet: HashSet<String>,
+    ): List<GroupNode> {
+        val grouped = LinkedHashMap<String?, MutableList<ReviewRow>>()
+        items.forEach { item ->
+            val gName = bundleGroupName(tab, idOf(item).toString())
+            grouped.getOrPut(gName) { mutableListOf() }
+                .add(ReviewRow(nameOf(item), nameOf(item).lowercase() in existsSet))
+        }
+        val nodes = mutableListOf<GroupNode>()
+        val emitted = HashSet<String>()
+        fun emit(name: String) {
+            if (!emitted.add(name)) return
+            val rows = grouped[name] ?: return
+            nodes.add(GroupNode(name, isNew = !groupExistsLocally(tab, name, folderProjectName), rows))
+        }
+        // Named groups in bundle order (by position within tab)…
+        bundle.groups.filter { it.tab == tab && grouped.containsKey(it.name) }
+            .sortedBy { it.position }
+            .forEach { emit(it.name) }
+        // …then any named groups not covered above (stable insertion order).
+        grouped.keys.filterNotNull().forEach { emit(it) }
+        // Ungrouped node last (no header when rendered).
+        grouped[null]?.let { nodes.add(GroupNode(null, isNew = false, it)) }
+        return nodes
+    }
+
+    // The Tasks/Profiles/Scenes sub-lists under a folder ([folderName] = the byFolder key; [folderProjectName]
+    // = the real project name, or null for the synthetic Unfiled/Variables folders).
+    fun typeGroupsFor(folderName: String, folderProjectName: String?): List<TypeGroup> = buildList {
+        tasksByFolder[folderName].orEmpty().takeIf { it.isNotEmpty() }?.let {
+            add(TypeGroup("tasks", "Tasks", nodesFor(it, "tasks", folderProjectName, { t -> t.id }, { t -> t.name }, existingTaskNames)))
+        }
+        profilesByFolder[folderName].orEmpty().takeIf { it.isNotEmpty() }?.let {
+            add(TypeGroup("profiles", "Profiles", nodesFor(it, "profiles", folderProjectName, { p -> p.id }, { p -> p.name }, existingProfileNames)))
+        }
+        scenesByFolder[folderName].orEmpty().takeIf { it.isNotEmpty() }?.let {
+            add(TypeGroup("scenes", "Scenes", nodesFor(it, "scenes", folderProjectName, { s -> s.id }, { s -> s.name }, existingSceneNames)))
+        }
+    }
+
+    // Widgets/Variables carry no groups → a single ungrouped GroupNode.
+    fun ungroupedType(tab: String, label: String, rows: List<ReviewRow>) =
+        TypeGroup(tab, label, listOf(GroupNode(null, false, rows)))
 
     val folders = buildList {
         // One folder per project the import references, in bundle order (dedup same-name projects).
         val seen = HashSet<String>()
         bundle.projects.forEach { p ->
             if (!seen.add(p.name.lowercase())) return@forEach
-            val groups = typeGroupsFor(p.name)
+            val groups = typeGroupsFor(p.name, p.name)
             if (groups.isNotEmpty()) {
                 val kind = if (p.name.lowercase() in existingProjectNames) FolderKind.EXISTING else FolderKind.NEW
                 add(ProjectFolder(p.name, kind, groups))
@@ -157,9 +225,9 @@ internal fun ImportReviewScreen(
         }
         // Unfiled: project-less tasks/profiles/scenes + all widgets (templates carry no project).
         val unfiledGroups = buildList {
-            addAll(typeGroupsFor(UNFILED_FOLDER))
+            addAll(typeGroupsFor(UNFILED_FOLDER, null))
             if (bundle.templates.isNotEmpty()) {
-                add(TypeGroup("templates", "Widgets",
+                add(ungroupedType("templates", "Widgets",
                     bundle.templates.map { ReviewRow(it.name, it.name.lowercase() in existingTemplateNames) }))
             }
         }
@@ -167,11 +235,11 @@ internal fun ImportReviewScreen(
         // Variables have no project → their own top-level folder.
         if (bundle.variables.isNotEmpty()) {
             add(ProjectFolder(VARIABLES_FOLDER, FolderKind.SPECIAL, listOf(
-                TypeGroup("variables", "Variables",
+                ungroupedType("variables", "Variables",
                     bundle.variables.map { ReviewRow(it.name, it.name.lowercase() in existingVariableNames) }))))
         }
     }
-    val totalConflicts = folders.sumOf { f -> f.groups.sumOf { g -> g.rows.count { it.conflict } } }
+    val totalConflicts = folders.sumOf { f -> f.groups.sumOf { g -> g.nodes.sumOf { n -> n.rows.count { it.conflict } } } }
 
     // Per-category stats as separate, column-aligned "Label: count [⚠ N exists]" lines (non-empty only).
     val statRows = listOf(
@@ -288,26 +356,42 @@ internal fun ImportReviewScreen(
                         }
                         if (isOpen) {
                             folder.groups.forEach { group ->
-                                val conflicts = group.rows.count { it.conflict }
+                                val groupCount = group.nodes.sumOf { it.rows.size }
+                                val conflicts = group.nodes.sumOf { n -> n.rows.count { it.conflict } }
                                 item(key = "grp-${folder.name}-${group.tab}") {
                                     TypeSubHeader(
                                         label = group.label,
-                                        count = group.rows.size,
+                                        count = groupCount,
                                         conflicts = conflicts,
                                         conflictColor = conflictColor,
                                         sectionSp = prefs.importSectionSp,
                                     )
                                 }
-                                items(group.rows) { row ->
-                                    ReviewItemRow(
-                                        row = row,
-                                        tab = group.tab,
-                                        globalItemStrategy = itemStrategy,
-                                        overrides = overrides,
-                                        conflictColor = conflictColor,
-                                        itemSp = prefs.importItemSp,
-                                        rowPadDp = prefs.importRowPadDp,
-                                    )
+                                group.nodes.forEach { node ->
+                                    // A named group gets a folder-icon header (NEW ones marked sky-blue);
+                                    // the ungrouped node (name == null) renders its rows header-less as before.
+                                    if (node.name != null) {
+                                        item(key = "gnode-${folder.name}-${group.tab}-${node.name}") {
+                                            GroupNodeHeader(
+                                                name = node.name,
+                                                isNew = node.isNew,
+                                                conflictColor = conflictColor,
+                                                sectionSp = prefs.importSectionSp,
+                                            )
+                                        }
+                                    }
+                                    items(node.rows) { row ->
+                                        ReviewItemRow(
+                                            row = row,
+                                            tab = group.tab,
+                                            globalItemStrategy = itemStrategy,
+                                            overrides = overrides,
+                                            conflictColor = conflictColor,
+                                            itemSp = prefs.importItemSp,
+                                            rowPadDp = prefs.importRowPadDp,
+                                            extraIndent = node.name != null,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -512,6 +596,48 @@ private fun TypeSubHeader(
     }
 }
 
+/**
+ * A group node header under a type sub-header: a folder icon + the group name + a status hint. A NEW group
+ * (not present locally) is drawn in the conflict colour with "will be created", like a new project; an
+ * EXISTING one is dimmed.
+ */
+@Composable
+private fun GroupNodeHeader(
+    name: String,
+    isNew: Boolean,
+    conflictColor: Color,
+    sectionSp: Int,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 44.dp, top = 3.dp, bottom = 1.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Filled.Folder,
+            contentDescription = null,
+            tint = if (isNew) conflictColor else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size((sectionSp).dp),
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            name,
+            style = MaterialTheme.typography.labelLarge,
+            fontSize = (sectionSp - 1).coerceAtLeast(10).sp,
+            // A group not present locally is highlighted in the conflict colour (it'll be created).
+            color = if (isNew) conflictColor else MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            if (isNew) "new group · will be created" else "existing group",
+            style = MaterialTheme.typography.labelSmall,
+            color = if (isNew) conflictColor else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+    }
+}
+
 @Composable
 private fun ReviewItemRow(
     row: ReviewRow,
@@ -521,10 +647,13 @@ private fun ReviewItemRow(
     conflictColor: Color,
     itemSp: Int,
     rowPadDp: Int,
+    extraIndent: Boolean = false,
 ) {
     val key = "$tab:${row.name.lowercase()}"
+    // Rows under a named group indent one step further than the ungrouped/normal rows.
+    val startPad = if (extraIndent) 60.dp else 44.dp
     Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 44.dp, top = rowPadDp.dp, bottom = rowPadDp.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = startPad, top = rowPadDp.dp, bottom = rowPadDp.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(

@@ -778,9 +778,22 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             )
         }
 
-        // Restore the per-category sort method the bundle was exported with (v3+; older bundles
-        // default to Alphabetical).
-        ListSortStore.setAll(bundle.sort.toPrefs())
+        // Restore the per-category sort the bundle carried — but NEVER downgrade a tab the user has set
+        // to MANUAL (their intentional drag order). A partial import (a few tasks) must not silently
+        // re-sort an untouched group: its `sort` decodes to the Alphabetical default and would otherwise
+        // flip the whole tab off Manual (白い熊: importing scrambled the re-sorted 起動無効 group).
+        val curSort = ListSortStore.state.value
+        val incSort = bundle.sort.toPrefs()
+        fun keepManual(current: SortMethod, incoming: SortMethod) =
+            if (current == SortMethod.MANUAL) SortMethod.MANUAL else incoming
+        ListSortStore.setAll(
+            SortPrefs(
+                profiles = keepManual(curSort.profiles, incSort.profiles),
+                tasks = keepManual(curSort.tasks, incSort.tasks),
+                scenes = keepManual(curSort.scenes, incSort.scenes),
+                projects = keepManual(curSort.projects, incSort.projects),
+            ),
+        )
 
         // Resolve the target project ids to names for the import-result dialog.
         val projectNamesById = db.projectDao().getAll().associate { it.id to it.name }

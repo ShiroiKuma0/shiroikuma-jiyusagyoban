@@ -1187,6 +1187,7 @@ fun ActiveAutomationUi(
             scenes = scenes,
             widgetTemplates = widgetTemplates,
             variables = globalVariables,
+            localGroups = itemGroups,
             busy = openTaskerBundleBusy,
             onCancel = viewModel::clearOpenTaskerBundleReview,
             onImport = { itemStrategy, overrides, projectChoices ->
