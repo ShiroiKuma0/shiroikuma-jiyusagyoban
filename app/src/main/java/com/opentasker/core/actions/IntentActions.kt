@@ -1,12 +1,17 @@
 package com.opentasker.core.actions
 
+import android.content.BroadcastReceiver
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.resume
 
 /**
  * Generic "Send Intent" action — fire an arbitrary Android intent with a custom
@@ -29,6 +34,11 @@ import com.opentasker.core.engine.ActionResult
  *   - "target":  "activity" (default) / "foreground-service" / "service" / "broadcast".
  *   - "flags":   optional extra intent flags, decimal or 0x-hex, OR'd into the intent.
  *   - "extra1_key"/"extra1_value" … "extra6_key"/"extra6_value": string extras.
+ *   - "result_var": (broadcast only) send as an ORDERED broadcast and store the receiver's
+ *                 result data into this variable — the query channel for sister-app round-trips
+ *                 (e.g. GET_PROTECTED_CONTACTS returns the app's stored protected list). Empty
+ *                 when nobody answered within the timeout.
+ *   - "result_timeout": seconds to wait for the ordered-broadcast result (default 5).
  *
  * All extras are sent as String extras. Android's boolean-extra caveat (a string
  * "true" reads back as false) doesn't bite here: the Jami video flag travels via
@@ -102,7 +112,36 @@ class SendIntentAction : Action {
                 }
                 TARGET_FOREGROUND_SERVICE -> ctx.app.startForegroundService(intent)
                 TARGET_SERVICE -> ctx.app.startService(intent)
-                TARGET_BROADCAST -> ctx.app.sendBroadcast(intent)
+                TARGET_BROADCAST -> {
+                    val resultVar = args["result_var"]?.trim()?.ifBlank { null }
+                    if (resultVar != null) {
+                        // Ordered broadcast with a result: the receiver's setResultData() comes back to
+                        // us — the round-trip that lets a task VERIFY a sister app's state (e.g. its
+                        // stored protected-contacts list) instead of fire-and-forget.
+                        val timeoutSec = args["result_timeout"]?.trim()?.toIntOrNull()?.coerceIn(1, 60) ?: 5
+                        val resultData = withTimeoutOrNull(timeoutSec * 1000L) {
+                            suspendCancellableCoroutine { cont ->
+                                ctx.app.sendOrderedBroadcast(
+                                    intent,
+                                    null,
+                                    object : BroadcastReceiver() {
+                                        override fun onReceive(c: Context?, i: Intent?) {
+                                            if (cont.isActive) cont.resume(this.resultData.orEmpty())
+                                        }
+                                    },
+                                    null,
+                                    0,      // initial code — a responding receiver overrides it
+                                    null,   // initial data — null so "" is distinguishable as "answered empty"
+                                    null,
+                                )
+                            }
+                        }
+                        ctx.variables.set(resultVar, resultData ?: "")
+                        ctx.logger("Send intent (ordered): ${action ?: cls ?: pkg} → %$resultVar = ${(resultData ?: "").take(80)}")
+                        return ActionResult.Success
+                    }
+                    ctx.app.sendBroadcast(intent)
+                }
                 else -> return ActionResult.Failure(
                     "unknown target: $target (use activity / foreground-service / service / broadcast)"
                 )

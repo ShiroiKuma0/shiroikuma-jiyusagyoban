@@ -68,6 +68,9 @@ data class ThemePrefs(
     val importWarnSp: Int = 17,                  // the Warnings text — bigger than body by default
     val importRowPadDp: Int = 2,                 // vertical padding between tree rows; 2 = tight [0, IMPORT_ROW_PAD_MAX]
     val importConflictColor: Int = 0xFF87CEEB.toInt(),  // readable sky blue (replaces the unreadable 0xFF0000FF)
+    // ---- Panel bars (the oval volume/brightness capsule slider — style:fill) ---------------------
+    val ovalBarBorderWidthDp: Int = 2,           // default oval-bar border width; 0 = no border [0, OVAL_BAR_BORDER_MAX]
+    val ovalBarBorderColor: Int = BLACK,         // default oval-bar border colour
 ) {
     companion object {
         const val BLACK = 0xFF000000.toInt()
@@ -109,6 +112,8 @@ data class ThemePrefs(
         const val IMPORT_TEXT_MIN = 12
         const val IMPORT_TEXT_MAX = 34
         const val IMPORT_ROW_PAD_MAX = 24
+
+        const val OVAL_BAR_BORDER_MAX = 16
 
         val DEFAULT = ThemePrefs()
     }
@@ -167,6 +172,8 @@ object ThemeStore {
     private const val K_IMPORT_WARN_SP = "import_warn_sp"
     private const val K_IMPORT_ROW_PAD = "import_row_pad"
     private const val K_IMPORT_CONFLICT_COLOR = "import_conflict_color"
+    private const val K_OVAL_BAR_BORDER_WIDTH = "oval_bar_border_width"
+    private const val K_OVAL_BAR_BORDER_COLOR = "oval_bar_border_color"
 
     private lateinit var appContext: Context
     private lateinit var prefs: SharedPreferences
@@ -221,6 +228,7 @@ object ThemeStore {
         importItemSp = importItemSp.coerceIn(ThemePrefs.IMPORT_TEXT_MIN, ThemePrefs.IMPORT_TEXT_MAX),
         importWarnSp = importWarnSp.coerceIn(ThemePrefs.IMPORT_TEXT_MIN, ThemePrefs.IMPORT_TEXT_MAX),
         importRowPadDp = importRowPadDp.coerceIn(0, ThemePrefs.IMPORT_ROW_PAD_MAX),
+        ovalBarBorderWidthDp = ovalBarBorderWidthDp.coerceIn(0, ThemePrefs.OVAL_BAR_BORDER_MAX),
     )
 
     private fun load(): ThemePrefs {
@@ -249,6 +257,8 @@ object ThemeStore {
             taskCardVPadDp = prefs.getInt(K_TASK_CARD_VPAD, d.taskCardVPadDp),
             groupHeaderVPadDp = prefs.getInt(K_GROUP_HEADER_VPAD, d.groupHeaderVPadDp),
             monitorRowPadDp = prefs.getInt(K_MONITOR_PAD, d.monitorRowPadDp),
+            ovalBarBorderWidthDp = prefs.getInt(K_OVAL_BAR_BORDER_WIDTH, d.ovalBarBorderWidthDp),
+            ovalBarBorderColor = prefs.getInt(K_OVAL_BAR_BORDER_COLOR, d.ovalBarBorderColor),
             bubbleIconSizeDp = prefs.getInt(K_BUBBLE_ICON_SIZE, d.bubbleIconSizeDp),
             bubbleIconCornerDp = prefs.getInt(K_BUBBLE_ICON_CORNER, d.bubbleIconCornerDp),
             bubbleLabelSizeSp = prefs.getInt(K_BUBBLE_LABEL_SIZE, d.bubbleLabelSizeSp),
@@ -294,6 +304,8 @@ object ThemeStore {
             putInt(K_TASK_CARD_VPAD, p.taskCardVPadDp)
             putInt(K_GROUP_HEADER_VPAD, p.groupHeaderVPadDp)
             putInt(K_MONITOR_PAD, p.monitorRowPadDp)
+            putInt(K_OVAL_BAR_BORDER_WIDTH, p.ovalBarBorderWidthDp)
+            putInt(K_OVAL_BAR_BORDER_COLOR, p.ovalBarBorderColor)
             putInt(K_BUBBLE_ICON_SIZE, p.bubbleIconSizeDp)
             putInt(K_BUBBLE_ICON_CORNER, p.bubbleIconCornerDp)
             putInt(K_BUBBLE_LABEL_SIZE, p.bubbleLabelSizeSp)

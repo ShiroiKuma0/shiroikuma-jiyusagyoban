@@ -22,7 +22,9 @@ import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.StorageJson
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.EditHistoryDao
 import com.opentasker.core.storage.EditHistoryEntity
@@ -420,6 +422,25 @@ class ActiveAutomationViewModel(
     fun updateTask(task: Task, message: String = "Task updated") = launchWithMessage(message) {
         val previous = db.taskDao().getById(task.id)
         if (previous != null) {
+            // DATA-LOSS GUARD (白い熊 critical): if the STORED actions currently fail to decode, the
+            // in-memory task was built from an empty fallback — writing it would clobber recoverable JSON.
+            // Refuse rather than persist a silent wipe. (Genuine "delete all actions" decodes cleanly →
+            // no issue → allowed.)
+            val prevIssue = previous.toDomainDecodeResult().issue
+            if (prevIssue != null && task.actions.isEmpty() &&
+                previous.actionsJson.isNotBlank() && previous.actionsJson.trim() != "[]") {
+                AppLogger.error(
+                    "ActiveAutomationVM",
+                    "BLOCKED save of task ${task.id} '${task.name}': stored actions unreadable (${prevIssue.message}); not overwriting with empty",
+                )
+                events.send("Save blocked: this task's stored actions couldn't be read — not overwriting them")
+                return@launchWithMessage
+            }
+            // Trace every task write so a rogue overwriter (dropping actions) is identifiable in logcat.
+            AppLogger.info(
+                "ActiveAutomationVM",
+                "updateTask id=${task.id} '${task.name}' actions ${previous.let { runCatching { StorageJson.decodeFromString<List<com.opentasker.core.model.ActionSpec>>(it.actionsJson).size }.getOrDefault(-1) }} -> ${task.actions.size}",
+            )
             db.editHistoryDao().insert(
                 EditHistoryEntity(
                     entityType = EditHistoryDao.TYPE_TASK,

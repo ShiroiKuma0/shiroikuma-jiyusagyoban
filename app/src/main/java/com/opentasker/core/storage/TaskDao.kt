@@ -52,7 +52,7 @@ data class TaskEntity(
                 )
             }
 
-        val actions = runCatching { Json.decodeFromString<List<ActionSpec>>(actionsJson) }
+        val actions = runCatching { StorageJson.decodeFromString<List<ActionSpec>>(actionsJson) }
             .getOrElse { error ->
                 return StorageDecodeResult(
                     value = Task(id, name, priority, mode, emptyList(), projectId, position, iconPath, freezeBubble),
@@ -73,7 +73,7 @@ data class TaskEntity(
 }
 
 fun Task.toEntity() = TaskEntity(
-    id, name, priority, collisionMode.name, Json.encodeToString(actions), projectId, position, iconPath, freezeBubble
+    id, name, priority, collisionMode.name, StorageJson.encodeToString(actions), projectId, position, iconPath, freezeBubble
 )
 
 @Dao

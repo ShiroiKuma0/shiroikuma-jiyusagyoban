@@ -40,7 +40,7 @@ data class ProfileEntity(
 
     fun toDomainDecodeResult(): StorageDecodeResult<Profile> {
         val mode = runCatching { AutomationMode.valueOf(automationMode) }.getOrDefault(AutomationMode.SINGLE)
-        val contexts = runCatching { Json.decodeFromString<List<ContextSpec>>(contextsJson) }
+        val contexts = runCatching { StorageJson.decodeFromString<List<ContextSpec>>(contextsJson) }
             .getOrElse { error ->
                 return StorageDecodeResult(
                     value = Profile(id, name, enabled, emptyList(), enterTaskId, exitTaskId, cooldownSec, mode, projectId, position, enterTaskName, exitTaskName),
@@ -74,7 +74,7 @@ data class ProfileEntity(
 }
 
 fun Profile.toEntity() = ProfileEntity(
-    id, name, enabled, enterTaskId, exitTaskId, cooldownSec, Json.encodeToString(contexts), automationMode.name, projectId, position, enterTaskName, exitTaskName
+    id, name, enabled, enterTaskId, exitTaskId, cooldownSec, StorageJson.encodeToString(contexts), automationMode.name, projectId, position, enterTaskName, exitTaskName
 )
 
 @Dao

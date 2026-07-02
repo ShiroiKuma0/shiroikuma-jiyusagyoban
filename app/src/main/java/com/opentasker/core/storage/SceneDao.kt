@@ -33,7 +33,7 @@ data class SceneEntity(
     val defaultDismissOnOutside: Boolean = true,
 ) {
     fun toDomain() = try {
-        Scene(id, name, widthDp, heightDp, Json.decodeFromString(elementsJson), projectId, position, bgColor, cornerRadiusDp, scrimAlpha, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside)
+        Scene(id, name, widthDp, heightDp, StorageJson.decodeFromString(elementsJson), projectId, position, bgColor, cornerRadiusDp, scrimAlpha, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside)
     } catch (e: Exception) {
         AppLogger.error("SceneDao", "Failed to deserialize scene $id: ${e.message}", e)
         // Return scene with empty elements as fallback
@@ -41,7 +41,7 @@ data class SceneEntity(
     }
 }
 
-fun Scene.toEntity() = SceneEntity(id, name, widthDp, heightDp, Json.encodeToString(elements), projectId, position, bgColor, cornerRadiusDp, scrimAlpha, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside)
+fun Scene.toEntity() = SceneEntity(id, name, widthDp, heightDp, StorageJson.encodeToString(elements), projectId, position, bgColor, cornerRadiusDp, scrimAlpha, borderColor, borderWidth, defaultPosition, defaultModal, defaultDismissOnOutside)
 
 @Dao
 interface SceneDao {

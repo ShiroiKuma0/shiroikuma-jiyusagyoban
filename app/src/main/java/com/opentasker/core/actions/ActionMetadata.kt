@@ -903,6 +903,8 @@ fun registerActionMetadata() {
                 ActionField("extra6_key", "Extra 6 key"),
                 ActionField("extra6_value", "Extra 6 value"),
                 ActionField("flags", "Intent flags", hint = "optional; decimal or 0x-hex, OR'd in"),
+                ActionField("result_var", "Result variable (broadcast)", hint = "ordered broadcast; stores the receiver's result data"),
+                ActionField("result_timeout", "Result timeout (s)", FieldType.NUMBER, hint = "default 5"),
             )
         )
     )
