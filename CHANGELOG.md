@@ -3,6 +3,13 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.75+127 — 2026-07-03
+
+A point release over 0.2.75+122 — one targeted fix.
+
+### Fixes
+- **Huawei Mate XT foldable**: restored the folded-portrait wakedance fold-compensation the upstream reconcile had dropped. On the folded cover panel held in portrait, EMUI reserves a 105px top system-bar strip and confines the over-lockscreen wakedance Activity below it, clipping the 通知明滅 black mask + edge-light. The fix pulls that window up 105px so the blink covers the full panel again — applied **only** in that one state (folded landscape, semi-folded, unfolded, and the screen-on overlay blink are all untouched).
+
 ## 0.2.75+122 — 2026-07-03
 
 A large update over 0.2.75+36: cross-app **protected contacts**, a **drag-reorder** pass across the app, a **Review Import** overhaul, **critical data-loss hardening**, task-card & group-header **styling controls**, a **Termux keyboard** trick, and a resync onto the latest OpenTasker.
