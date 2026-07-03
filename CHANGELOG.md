@@ -3,6 +3,43 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.75+122 — 2026-07-03
+
+A large update over 0.2.75+36: cross-app **protected contacts**, a **drag-reorder** pass across the app, a **Review Import** overhaul, **critical data-loss hardening**, task-card & group-header **styling controls**, a **Termux keyboard** trick, and a resync onto the latest OpenTasker.
+
+### Protected contacts (cross-app privacy)
+- Companion feature with the sister apps (白い熊 GNU Jami, 白い熊 Arcane Chat): for a marked contact, the messenger posts a **content-free notification** (a fixed “着信あり：新着伝言。” body) instead of the sender name / message text, so lock-screen and Android-Auto read-outs stay private. A per-package marker keeps it opt-in per messenger.
+- 自由作業盤 pushes the protected-contact list to each messenger over an ordered broadcast, and can **read it back** (a `GET_PROTECTED_CONTACTS` query channel) to verify state.
+- A **保護試験** test group (per-messenger checks + a cumulative check) confirms each messenger's stored list with a 🟢/🔴 dialog.
+
+### Review Import
+- Importing a JSON bundle now opens a near-full-screen **Review import**: per-category counts (“Tasks: N”, with “N exists” flagged), a **folder tree** (project → type → group → items) showing exactly where each item lands (and marking projects/groups that will be created), a **global conflict strategy** with per-item overrides (Overwrite / Overwrite + backup / Keep both), and Cancel/Import.
+- Review typography (per-text sizes, a readable sky-blue conflict colour, row padding) is UI-settable.
+- **An import never downgrades a Manual-sorted tab** — a partial import no longer silently re-sorts untouched groups.
+
+### Drag-reorder & projects
+- **Tasks, the Projects tab, and the top project-tabs** all support drag-to-reorder (the Projects tab's up/down arrows are gone; a long-press on a project tab gives a grab haptic).
+- **Projects tab**: tap a project to make it active; the current project is clearly highlighted (accent border + tint).
+
+### Task list & group-header styling
+- Icon-less task cards stay **compact** and honour the padding settings; the empty “add icon” placeholder is small and visually subdued.
+- Shrunk the ⋮ menu buttons so they no longer inflate rows/headers — **“Padding between cards”** and **“Padding inside group headers”** are now actually respected.
+- **Group-header background** is a settable ARGB, with a settable **header border** (thin yellow by default).
+- The **task-icon-size** slider now works; the **advanced full-screen, category-foldable action picker** is restored and default-on; an **app-picker** (choose from installed apps) is on app.kill / app.launch / intent.launch / intent.send / notify.dismiss.
+
+### Reliability & engine
+- **Critical data-loss fix**: hardened task-action persistence against a strict-decode landmine that could blank a task's whole action list after an app update (tolerant storage codec + an overwrite guard + write logging).
+- **Battery**: removed the engine's permanent partial wake-lock, gated the shake / orientation / app-usage sensors to run only when a profile needs them, and stopped eager high-accuracy GPS.
+- Generic **Send Intent** gained ordered-broadcast **result capture** (`result_var`).
+
+### More
+- **Termux keyboard**: an edge-bar up-swipe re-focuses Termux to bring its IME back (for mosh/emacs sessions where a screen tap won't).
+- Themed black/yellow **snackbar & flash** everywhere; **oval-bar borders** (settable width + colour) on the volume/brightness panels; the **Variables** tab's folded rows now show each variable's value.
+- The open tab + active project **persist across app exit**.
+
+### Upstream
+- Resynced onto **OpenTasker 0.2.75 / code 77**, including upstream's hardened database-backup publishing (WAL-checkpointed, schema-validated backups).
+
 ## 0.2.75+36 — 2026-06-27
 
 **Pure-black, yellow-framed popups everywhere**, a task **icon from a song's album art**, and a **redesigned launcher shortcut picker** — now a tall floating dialog whose tasks are organised into bordered folder-boxes, with its own UI-customization controls.
