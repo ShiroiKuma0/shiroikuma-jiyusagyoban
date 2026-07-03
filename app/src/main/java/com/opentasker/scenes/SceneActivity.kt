@@ -4,6 +4,7 @@ import android.graphics.BitmapFactory
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
+import android.view.Gravity
 import android.view.WindowManager
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -169,6 +170,29 @@ open class SceneActivity : ComponentActivity() {
             window.decorView.postDelayed({
                 runCatching { wakeLock?.acquire(holdMs) }
             }, 450) // let the black scene draw over the keyguard before the wakelock lights it → no flash
+        }
+        // Huawei Mate XT: ONLY on the folded cover panel held in PORTRAIT, EMUI reserves a 105px system-bar
+        // strip at the top and confines the wakedance mask/edge-light below it (real 1008x2232 but the app
+        // area starts 105px down). Folded LANDSCAPE (2232x1008) is reported correctly; semi-folded (short
+        // side 2048) and unfolded (2232) too — all excluded below. The window metrics already report the
+        // real 2232 height, so we just pull the window UP 105px into the strip (no height change). Applied
+        // only to the wakedance (showWhenLocked+fullscreen) so the screen-ON overlay blink is untouched. 白い熊
+        if (showWhenLocked && fullscreen && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val b = windowManager.currentWindowMetrics.bounds
+            val w = b.width()
+            val h = b.height()
+            val foldedCover = minOf(w, h) < 1500   // folded cover ≈ 1008; semi-folded 2048; unfolded 2232
+            val portrait = h > w                    // folded LANDSCAPE is not misreported → skip
+            if (foldedCover && portrait) {
+                window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+                window.attributes = window.attributes.apply {
+                    gravity = Gravity.TOP or Gravity.START
+                    x = 0
+                    y = -105
+                    width = w
+                    height = h
+                }
+            }
         }
         open.add(WeakReference(this))
         val sceneId = intent.getLongExtra(EXTRA_SCENE_ID, -1L)
