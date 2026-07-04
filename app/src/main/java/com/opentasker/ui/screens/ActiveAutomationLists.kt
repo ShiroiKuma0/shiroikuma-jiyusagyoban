@@ -70,6 +70,28 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.runtime.rememberCoroutineScope
+import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.core.storage.ItemMetaEntity
+import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
@@ -735,6 +757,9 @@ internal fun TasksScreen(
     onDeleteTasks: (List<Task>) -> Unit,
     onCreateTask: () -> Unit,
     onEditTask: (Task) -> Unit,
+    onRenameTask: (Task, String) -> Unit,
+    onDuplicateTasks: (List<Task>) -> Unit,
+    onPasteTasks: (List<Task>, Long?, List<Long>) -> Unit,
     onDeleteTask: (Task) -> Unit,
     onRunTask: (Task) -> Unit,
     onSetTaskFreeze: (Task, Boolean) -> Unit,
@@ -748,6 +773,7 @@ internal fun TasksScreen(
     loaded: Boolean,
 ) {
     val themePrefs by ThemeStore.state.collectAsState()
+    val focusManager = LocalFocusManager.current
     var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var selectedGroupIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var showMoveDialog by remember { mutableStateOf(false) }
@@ -756,11 +782,16 @@ internal fun TasksScreen(
     val selectionActive = selectedIds.isNotEmpty()
     val groupSelectionActive = selectedGroupIds.isNotEmpty()
 
-    Column(Modifier.fillMaxSize().padding(contentPadding)) {
+    Column(
+        Modifier.fillMaxSize().padding(contentPadding)
+            // A tap on empty space (outside any card) clears text-field focus, closing an open inline edit.
+            .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } },
+    ) {
         if (projects.isNotEmpty()) {
             ProjectFilterChips(projects, projectFilter, onSelectProject, onReorderProjects, Modifier.padding(vertical = 8.dp))
         }
         if (selectionActive) {
+            val clipboardTasks by TaskClipboard.tasks.collectAsState()
             SelectionBar(
                 count = selectedIds.size,
                 total = tasks.size,
@@ -768,6 +799,14 @@ internal fun TasksScreen(
                 onClear = { selectedIds = emptySet() },
                 onDelete = { confirmDeleteItems = true },
                 onMoveToProject = if (projects.isNotEmpty()) ({ showMoveDialog = true }) else null,
+                onClone = { onDuplicateTasks(tasks.filter { it.id in selectedIds }); selectedIds = emptySet() },
+                onCopy = { TaskClipboard.copy(tasks.filter { it.id in selectedIds }); selectedIds = emptySet() },
+                onCut = { TaskClipboard.cut(tasks.filter { it.id in selectedIds }); selectedIds = emptySet() },
+                onPaste = if (clipboardTasks.isNotEmpty()) ({
+                    onPasteTasks(clipboardTasks, currentProjectId, TaskClipboard.cutIds)
+                    if (TaskClipboard.cutIds.isNotEmpty()) TaskClipboard.clear()
+                    selectedIds = emptySet()
+                }) else null,
             )
         }
         if (groupSelectionActive) {
@@ -808,6 +847,7 @@ internal fun TasksScreen(
                     onLongPress = { selectedIds = selectedIds + task.id },
                     onToggleSelect = { selectedIds = if (task.id in selectedIds) selectedIds - task.id else selectedIds + task.id },
                     onEdit = { onEditTask(task) },
+                    onRename = { newName -> onRenameTask(task, newName) },
                     onDelete = { onDeleteTask(task) },
                     onRun = { onRunTask(task) },
                     onToggleFreeze = { onSetTaskFreeze(task, it) },
@@ -918,6 +958,19 @@ object ActionClipboard {
     fun put(items: List<ActionSpec>) { _actions.value = items.map { it.copy() } }
 }
 
+/**
+ * App-wide task clipboard for the Tasks-tab multiselect Copy/Cut → Paste. Holds Task copies; a Cut also
+ * remembers the original ids so Paste can complete the move by deleting them.
+ */
+object TaskClipboard {
+    private val _tasks = MutableStateFlow<List<Task>>(emptyList())
+    val tasks: StateFlow<List<Task>> = _tasks.asStateFlow()
+    var cutIds: List<Long> = emptyList(); private set
+    fun copy(items: List<Task>) { _tasks.value = items.map { it.copy() }; cutIds = emptyList() }
+    fun cut(items: List<Task>) { _tasks.value = items.map { it.copy() }; cutIds = items.map { it.id } }
+    fun clear() { _tasks.value = emptyList(); cutIds = emptyList() }
+}
+
 @Composable
 private fun TaskCard(
     task: Task,
@@ -928,6 +981,7 @@ private fun TaskCard(
     onLongPress: () -> Unit,
     onToggleSelect: () -> Unit,
     onEdit: () -> Unit,
+    onRename: (String) -> Unit,
     onDelete: () -> Unit,
     onRun: () -> Unit,
     onToggleFreeze: (Boolean) -> Unit,
@@ -954,12 +1008,14 @@ private fun TaskCard(
         (if (selectedActions.isEmpty()) listOf(i) else selectedActions.toList()).sorted().filter { it in task.actions.indices }
     }
     val listIcon = remember(task.iconPath) { TaskIconStore.loadBitmap(task.iconPath) }
+    var taskMenu by remember { mutableStateOf(false) }
+    var showRename by remember { mutableStateOf(false) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(),
         colors = CardDefaults.cardColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+            containerColor = if (selected) Color(themePrefs.selectionColor)
             else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
         ),
         border = BorderStroke(
@@ -1047,10 +1103,32 @@ private fun TaskCard(
                         )
                     }
                 }
+                if (!selectionActive) {
+                    Box {
+                        IconButton(onClick = { taskMenu = true }, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = "Task menu", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        ThemedDropdownMenu(expanded = taskMenu, onDismissRequest = { taskMenu = false }) {
+                            DropdownMenuItem(text = { Text("Rename") }, onClick = { taskMenu = false; showRename = true })
+                            DropdownMenuItem(text = { Text("Edit") }, onClick = { taskMenu = false; onEdit() })
+                        }
+                    }
+                }
                 Icon(
                     if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
                     contentDescription = if (expanded) "Collapse task" else "Expand task",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (showRename) {
+                var name by remember { mutableStateOf(task.name) }
+                AlertDialog(
+                    modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+                    onDismissRequest = { showRename = false },
+                    title = { Text("Rename task") },
+                    text = { OutlinedTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth(), singleLine = true) },
+                    confirmButton = { TextButton(onClick = { onRename(name); showRename = false }) { Text("Save") } },
+                    dismissButton = { TextButton(onClick = { showRename = false }) { Text("Cancel") } },
                 )
             }
             if (expanded) {
@@ -1075,7 +1153,13 @@ private fun TaskCard(
                 task.actions.forEachIndexed { index, action ->
                     ActionRow(
                         index = index,
+                        taskId = task.id,
                         action = action,
+                        // Inline pill edit: replace one arg's value and persist the whole action list in
+                        // place (applyActions saves directly; onEditAction would re-open the full dialog).
+                        onSetArg = { key, value ->
+                            applyActions(task.actions.toMutableList().apply { this[index] = action.copy(args = action.args + (key to value)) })
+                        },
                         selected = index in selectedActions,
                         selectionActive = actionSelectionActive,
                         menuExpanded = actionMenuIndex == index,
@@ -1149,7 +1233,9 @@ private fun TaskCard(
 @Composable
 private fun ActionRow(
     index: Int,
+    taskId: Long,
     action: ActionSpec,
+    onSetArg: (String, String) -> Unit,
     selected: Boolean,
     selectionActive: Boolean,
     menuExpanded: Boolean,
@@ -1168,58 +1254,111 @@ private fun ActionRow(
 ) {
     val metadata = ActionMetadataRegistry.get(action.type)
     val capability = ActionCapabilityRegistry.get(action.type)
+    val themePrefs by ThemeStore.state.collectAsState()
+    // Per-action label fold, persisted in item_meta (tab "action_label", key "<taskId>:<index>") — reuses
+    // the Note fold's store + noteExpanded boolean. Default folded: only the first line of the label shows.
+    val dao = remember { OpenTaskerApp_NoHilt.db.itemMetaDao() }
+    val foldKey = "$taskId:$index"
+    val foldMeta by remember(foldKey) { dao.getAsFlow("action_label", foldKey) }.collectAsState(initial = null)
+    val labelExpanded = foldMeta?.noteExpanded ?: false
+    val scope = rememberCoroutineScope()
+    val toggleFold: () -> Unit = {
+        scope.launch {
+            val cur = dao.get("action_label", foldKey) ?: ItemMetaEntity(tab = "action_label", itemKey = foldKey)
+            dao.upsert(cur.copy(noteExpanded = !labelExpanded))
+        }
+    }
+    var editingKey by remember(action) { mutableStateOf<String?>(null) }
     Surface(
-        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+        color = if (selected) Color(themePrefs.selectionColor)
                 else MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
         shape = RoundedCornerShape(DesignSystem.Radii.lg),
         modifier = Modifier.fillMaxWidth(),
         border = BorderStroke(
-            if (selected) 2.dp else 1.dp,
-            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+            if (selected) 2.dp else themePrefs.actionBorderWidthDp.dp,
+            if (selected) MaterialTheme.colorScheme.primary else Color(themePrefs.actionBorderColor),
         ),
     ) {
         Box {
-            Row(
+            Column(
                 // Tap selects (while selecting); long-press selects + opens the clone/copy/cut/paste menu.
-                // The Edit/Delete icon buttons keep their own taps (children intercept the combined click).
+                // Children (label frame, arg values, icon buttons) intercept their own taps. The vertical
+                // padding + the label↔args gap are the settable "Padding inside action rows" (default 2 dp).
                 modifier = Modifier
                     .fillMaxWidth()
                     .combinedClickable(onClick = onTap, onLongClick = onLongPress)
-                    .padding(12.dp),
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+                    .padding(horizontal = 12.dp, vertical = themePrefs.actionRowPadDp.dp),
+                verticalArrangement = Arrangement.spacedBy(themePrefs.actionRowPadDp.dp),
             ) {
-                if (selectionActive && selected) {
-                    Icon(
-                        Icons.Filled.CheckCircle,
-                        contentDescription = stringResource(R.string.label_selected),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                } else {
-                    StatusPill("#${index + 1}", MaterialTheme.colorScheme.secondary)
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(action.label ?: metadata?.name ?: action.type, style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        action.args.entries.joinToString { "${it.key}=${it.value}" }.ifBlank { metadata?.description ?: stringResource(R.string.workspace_no_arguments) },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (capability.level != CapabilityLevel.Supported) {
-                        Spacer(Modifier.height(6.dp))
-                        StatusPill(
-                            if (capability.level == CapabilityLevel.Unsupported) stringResource(R.string.label_unsupported) else stringResource(R.string.status_needs_setup),
-                            if (capability.level == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                // Header: index · the folded label in a (yellow) rounded frame · edit / delete.
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
+                    if (selectionActive && selected) {
+                        Icon(Icons.Filled.CheckCircle, contentDescription = stringResource(R.string.label_selected), tint = MaterialTheme.colorScheme.primary)
+                    } else {
+                        StatusPill("#${index + 1}", MaterialTheme.colorScheme.secondary)
+                    }
+                    Row(
+                        Modifier.weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .border(themePrefs.actionLabelFrameWidthDp.dp, Color(themePrefs.actionLabelFrameColor), RoundedCornerShape(8.dp))
+                            // In selection mode a tap toggles this action's selection; otherwise it folds.
+                            // Long-press always (de)selects + opens the clone/copy/cut/paste menu.
+                            .combinedClickable(onClick = { if (selectionActive) onTap() else toggleFold() }, onLongClick = onLongPress)
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            action.label ?: metadata?.name ?: action.type,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = themePrefs.actionLabelSizeSp.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = if (labelExpanded) Int.MAX_VALUE else 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Icon(
+                            if (labelExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                            contentDescription = if (labelExpanded) "Collapse label" else "Expand label",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
                         )
                     }
+                    IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) { Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit)) }
+                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete), tint = MaterialTheme.colorScheme.error) }
                 }
-                IconButton(onClick = onEdit) {
-                    Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit))
+                // Args — flush-left with the index. Label expanded → all args on ONE line (flow); folded →
+                // TWO lines (stacked). Tap a value to edit it in place.
+                if (action.args.isEmpty()) {
+                    Text(
+                        metadata?.description ?: stringResource(R.string.workspace_no_arguments),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    )
+                } else {
+                    // name + value (every arg) on ONE line: each (key) pill + its value. The last value
+                    // takes the remaining width and ellipsises — tap it to edit / see the whole thing.
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val entries = action.args.entries.toList()
+                        entries.forEachIndexed { i, e ->
+                            ArgPill(
+                                argKey = e.key, value = e.value, valueWeight = i == entries.lastIndex,
+                                editing = editingKey == e.key,
+                                selectionActive = selectionActive,
+                                onStartEdit = { editingKey = e.key },
+                                onSelectToggle = onTap,
+                                onLongPress = onLongPress,
+                                onCommit = { nv -> onSetArg(e.key, nv); editingKey = null },
+                                onCancel = { editingKey = null },
+                            )
+                        }
+                    }
                 }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete), tint = MaterialTheme.colorScheme.error)
+                if (capability.level != CapabilityLevel.Supported) {
+                    StatusPill(
+                        if (capability.level == CapabilityLevel.Unsupported) stringResource(R.string.label_unsupported) else stringResource(R.string.status_needs_setup),
+                        if (capability.level == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    )
                 }
             }
             // Long-press menu — Clone/Copy/Cut/Delete act on the whole selection; Paste drops the
@@ -1235,6 +1374,96 @@ private fun ActionRow(
                 }
             }
         }
+    }
+}
+
+/**
+ * One action arg emitted INTO a Row (RowScope) so name + value share one line: a rounded (key) pill in a
+ * muted grey-blue + its value (the variable NAME blue, values bold, bigger than the folded label).
+ * [valueWeight] makes the value fill the remaining width (the last arg) vs a natural cap. Tap a value to
+ * edit it in place — ✓ / keyboard-Done saves; tapping away closes if unchanged, else asks to Save/Discard.
+ * (Colours/sizes/the label frame become UI-customization settings in the next step.)
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun RowScope.ArgPill(
+    argKey: String,
+    value: String,
+    valueWeight: Boolean,
+    editing: Boolean,
+    selectionActive: Boolean,
+    onStartEdit: () -> Unit,
+    onSelectToggle: () -> Unit,
+    onLongPress: () -> Unit,
+    onCommit: (String) -> Unit,
+    onCancel: () -> Unit,
+) {
+    val themePrefs by ThemeStore.state.collectAsState()
+    val nameColor = Color(themePrefs.actionNameColor)   // the variable name (settable)
+    val valueColor = Color(themePrefs.actionValueColor) // action value (settable)
+    val dataSize = themePrefs.actionValueSizeSp.sp
+    val pillColor = Color(0xFF9AA7B4)   // the (key) pill — muted (pill colour moves to the theme step)
+    Text(
+        argKey,
+        style = MaterialTheme.typography.labelMedium,
+        color = pillColor,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(pillColor.copy(alpha = 0.14f))
+            .border(1.dp, pillColor.copy(alpha = 0.40f), RoundedCornerShape(50))
+            .padding(horizontal = 10.dp, vertical = 2.dp),
+    )
+    if (editing) {
+        var text by remember(value) { mutableStateOf(value) }
+        var showConfirm by remember { mutableStateOf(false) }
+        var committing by remember { mutableStateOf(false) }
+        var hadFocus by remember { mutableStateOf(false) }
+        val focusRequester = remember { FocusRequester() }
+        LaunchedEffect(Unit) { focusRequester.requestFocus() }
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = dataSize),
+            maxLines = 6,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { committing = true; onCommit(text) }),
+            trailingIcon = { IconButton(onClick = { committing = true; onCommit(text) }) { Icon(Icons.Filled.Check, contentDescription = "Save") } },
+            modifier = (if (valueWeight) Modifier.weight(1f) else Modifier.widthIn(min = 120.dp, max = 220.dp))
+                .focusRequester(focusRequester)
+                .onFocusChanged { fs ->
+                    // Tapped away (not via ✓/Done): unchanged → just close; changed → ask Save/Discard.
+                    if (fs.isFocused) hadFocus = true
+                    else if (hadFocus && !committing) {
+                        if (text == value) onCancel() else showConfirm = true
+                    }
+                },
+        )
+        if (showConfirm) {
+            AlertDialog(
+                modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+                onDismissRequest = { showConfirm = false; onCancel() },
+                title = { Text("Save changes?") },
+                text = { Text("“$argKey” was edited but not saved.") },
+                confirmButton = { TextButton(onClick = { showConfirm = false; onCommit(text) }) { Text("Save") } },
+                dismissButton = { TextButton(onClick = { showConfirm = false; onCancel() }) { Text("Discard") } },
+            )
+        }
+    } else {
+        Text(
+            value.ifBlank { "—" },
+            style = MaterialTheme.typography.bodyLarge,
+            fontSize = dataSize,
+            fontWeight = FontWeight.Bold,
+            color = if (argKey == "name") nameColor else valueColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = (if (valueWeight) Modifier.weight(1f) else Modifier.widthIn(max = 160.dp))
+                .clip(RoundedCornerShape(6.dp))
+                // In selection mode a tap toggles this action; otherwise it edits the value. Long-press
+                // always (de)selects + opens the menu.
+                .combinedClickable(onClick = { if (selectionActive) onSelectToggle() else onStartEdit() }, onLongClick = onLongPress)
+                .padding(vertical = 1.dp, horizontal = 2.dp),
+        )
     }
 }
 

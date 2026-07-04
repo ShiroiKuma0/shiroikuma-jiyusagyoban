@@ -182,11 +182,15 @@ internal fun ActionConfigDialog(
     val missingRequired = state.metadata.fields.any { it.required && values[it.key].isNullOrBlank() }
 
     AlertDialog(
+        // Yellow edge + more height: this is the full editor, so give it room without being a full page.
+        modifier = Modifier
+            .fillMaxWidth(0.96f)
+            .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text(state.metadata.name) },
         text = {
             LazyColumn(
-                modifier = Modifier.heightIn(max = 420.dp),
+                modifier = Modifier.heightIn(max = 620.dp),
                 verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
             ) {
                 item {
@@ -215,7 +219,10 @@ internal fun ActionConfigDialog(
                         onValueChange = { label = it },
                         label = { Text(stringResource(R.string.action_label_field)) },
                         supportingText = { Text(stringResource(R.string.action_label_hint)) },
-                        singleLine = true,
+                        // Labels are frequently multi-line (bilingual notes) — a single line hid the rest and
+                        // made them uneditable. Grow with the text; there's plenty of dialog height.
+                        minLines = 3,
+                        maxLines = 12,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -437,7 +444,9 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
             label = { Text(label) },
             placeholder = field.hint?.let { { Text(it) } },
             supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
-            singleLine = true,
+            // Not single-line: short values stay compact but long ones (a font name, a path, a message)
+            // wrap and grow so they stay fully editable rather than scrolling inside one hidden line.
+            maxLines = 8,
             modifier = Modifier.fillMaxWidth(),
         )
     }

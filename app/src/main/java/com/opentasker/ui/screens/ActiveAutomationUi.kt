@@ -875,7 +875,7 @@ fun ActiveAutomationUi(
                                 .widthIn(min = 64.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .then(tapModifier)
-                                .background(if (selected) primary.copy(alpha = 0.16f) else androidx.compose.ui.graphics.Color.Transparent)
+                                .background(if (selected) androidx.compose.ui.graphics.Color.White.copy(alpha = 0.13f) else androidx.compose.ui.graphics.Color.Transparent)
                                 .padding(horizontal = 10.dp, vertical = 8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -984,6 +984,9 @@ fun ActiveAutomationUi(
                 onDeleteTasks = viewModel::deleteTasks,
                 onCreateTask = { showCreateTaskDialog = true },
                 onEditTask = { openTaskDialog(it) },
+                onRenameTask = viewModel::renameTask,
+                onDuplicateTasks = viewModel::duplicateTasks,
+                onPasteTasks = viewModel::pasteTasks,
                 onDeleteTask = { openDeleteTask(it) },
                 onRunTask = { viewModel.runTaskNow(it) },
                 onSetTaskFreeze = { t, on -> viewModel.updateTask(t.copy(freezeBubble = on), if (on) "Freeze bubble on" else "Freeze bubble off") },
@@ -1441,7 +1444,9 @@ internal fun StatusPill(
 ) {
     Surface(
         modifier = modifier,
-        color = color.copy(alpha = 0.14f),
+        // Neutral grey fill (was the accent at low alpha → olive over black); the accent stays as the
+        // border + text so the pill still reads as accented without the olive tint.
+        color = Color.White.copy(alpha = 0.09f),
         shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, color.copy(alpha = 0.34f)),
     ) {
@@ -1461,7 +1466,8 @@ internal fun InlineNotice(title: String, body: String, color: Color) {
     val isError = color == MaterialTheme.colorScheme.error
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = color.copy(alpha = 0.12f),
+        // Error notices keep their red wash; others use a neutral grey fill (no olive).
+        color = if (isError) color.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.07f),
         shape = RoundedCornerShape(DesignSystem.Radii.lg),
         border = BorderStroke(1.dp, color.copy(alpha = 0.26f)),
     ) {

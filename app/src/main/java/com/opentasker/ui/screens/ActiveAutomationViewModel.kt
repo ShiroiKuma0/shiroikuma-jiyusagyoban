@@ -435,6 +435,41 @@ class ActiveAutomationViewModel(
         db.taskDao().insert(Task(name = name.trim(), priority = priority.coerceIn(0, 10), projectId = projectId, iconPath = iconPath, freezeBubble = freezeBubble).toEntity())
     }
 
+    fun renameTask(task: Task, name: String) = launchWithMessage("Renamed") {
+        val n = name.trim()
+        if (n.isNotEmpty() && n != task.name) db.taskDao().update(task.copy(name = n).toEntity())
+    }
+
+    /** A name not already taken by another task — "<base>", then "<base> (2)", "<base> (3)"… */
+    private fun uniqueTaskName(base: String, taken: Set<String>): String {
+        if (base !in taken) return base
+        var i = 2
+        while ("$base ($i)" in taken) i++
+        return "$base ($i)"
+    }
+
+    /** Clone tasks in place (same project), each "<name> (copy)". */
+    fun duplicateTasks(items: List<Task>) = launchWithMessage("Duplicated ${items.size} task${plural(items.size)}") {
+        val taken = db.taskDao().getAll().map { it.name }.toMutableSet()
+        items.forEach { t ->
+            val name = uniqueTaskName("${t.name} (copy)", taken)
+            taken += name
+            db.taskDao().insert(t.copy(id = 0, name = name, iconPath = null).toEntity())
+        }
+    }
+
+    /** Paste clipboard tasks into [projectId]. On a Cut, [cutIds] are deleted first so a move keeps its
+     *  original name; on a Copy [cutIds] is empty and same-named pastes get a " (2)" suffix. */
+    fun pasteTasks(items: List<Task>, projectId: Long?, cutIds: List<Long>) = launchWithMessage("Pasted ${items.size} task${plural(items.size)}") {
+        cutIds.forEach { id -> db.taskDao().getById(id)?.let { db.taskDao().delete(it) } }
+        val taken = db.taskDao().getAll().map { it.name }.toMutableSet()
+        items.forEach { t ->
+            val name = uniqueTaskName(t.name, taken)
+            taken += name
+            db.taskDao().insert(t.copy(id = 0, name = name, projectId = projectId, iconPath = null).toEntity())
+        }
+    }
+
     fun updateTask(task: Task, message: String = "Task updated") = launchWithMessage(message) {
         val previous = db.taskDao().getById(task.id)
         if (previous != null) {

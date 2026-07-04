@@ -45,8 +45,18 @@ data class ThemePrefs(
     val taskIconSizeDp: Int = 32,                // size of a task's custom icon on its card [TASK_ICON_MIN, TASK_ICON_MAX]
     val taskCardGapDp: Int = 6,                  // gap BETWEEN task cards (Tasks tab) [0, TASK_CARD_GAP_MAX]
     val taskCardVPadDp: Int = 8,                 // vertical padding INSIDE a task pill (Tasks tab) [0, TASK_CARD_VPAD_MAX]
+    val actionRowPadDp: Int = 2,                 // padding INSIDE an action row: label↔args gap + top/bottom [0, ACTION_ROW_PAD_MAX]
+    val actionLabelSizeSp: Int = 13,             // folded action-label text size [ACTION_LABEL_MIN, ACTION_LABEL_MAX]
+    val actionValueSizeSp: Int = 16,             // action name/value (the data) text size [ACTION_VALUE_MIN, ACTION_VALUE_MAX]
+    val actionNameColor: Int = 0xFF7FB4FF.toInt(),   // the variable NAME colour (blue)
+    val actionValueColor: Int = 0xFFFFFFFF.toInt(),  // action value colour
+    val actionLabelFrameColor: Int = 0x4DFFFF00,     // folded-label frame border (dim yellow), ARGB incl. alpha
+    val actionLabelFrameWidthDp: Int = 1,        // folded-label frame width; 0 = none [0, BORDER_WIDTH_MAX]
+    val actionBorderColor: Int = 0x8CFFFF00.toInt(), // action card border (yellow ~55%), ARGB incl. alpha
+    val actionBorderWidthDp: Int = 1,            // action card border width; 0 = none [0, BORDER_WIDTH_MAX]
+    val selectionColor: Int = 0x33FFFF00,        // multi-select highlight fill (ARGB); yellow ~20%
     val groupHeaderVPadDp: Int = 8,              // vertical padding INSIDE a group header (lists) [0, GROUP_HEADER_VPAD_MAX]
-    val groupHeaderColor: Int = 0x29FFFF00.toInt(), // group-header background (ARGB); default translucent yellow
+    val groupHeaderColor: Int = 0x1AFFFF00,      // group-header background (ARGB); a slight yellow (~10%) — subtler than a selection, marks a group vs ungrouped
     val groupHeaderBorderColor: Int = YELLOW,    // group-header border colour (default yellow)
     val groupHeaderBorderWidthDp: Int = 1,       // group-header border width; 0 = none [0, GROUP_HEADER_BORDER_MAX]
     // ---- Monitor ---------------------------------------------------------------------------------
@@ -95,6 +105,11 @@ data class ThemePrefs(
         const val TASK_ICON_MAX = 96
         const val TASK_CARD_GAP_MAX = 24
         const val TASK_CARD_VPAD_MAX = 24
+        const val ACTION_ROW_PAD_MAX = 24
+        const val ACTION_LABEL_MIN = 8
+        const val ACTION_LABEL_MAX = 24
+        const val ACTION_VALUE_MIN = 10
+        const val ACTION_VALUE_MAX = 30
         const val GROUP_HEADER_VPAD_MAX = 24
         const val GROUP_HEADER_BORDER_MAX = 8
 
@@ -157,6 +172,17 @@ object ThemeStore {
     private const val K_TASK_ICON_SIZE = "task_icon_size"
     private const val K_TASK_CARD_GAP = "task_card_gap"
     private const val K_TASK_CARD_VPAD = "task_card_vpad"
+    private const val K_ACTION_ROW_PAD = "action_row_pad"
+    private const val K_ACTION_LABEL_SIZE = "action_label_size"
+    private const val K_ACTION_VALUE_SIZE = "action_value_size"
+    private const val K_ACTION_NAME_COLOR = "action_name_color"
+    private const val K_ACTION_VALUE_COLOR = "action_value_color"
+    private const val K_ACTION_LABEL_FRAME_COLOR = "action_label_frame_color"
+    private const val K_ACTION_LABEL_FRAME_WIDTH = "action_label_frame_width"
+    private const val K_ACTION_BORDER_COLOR = "action_border_color"
+    private const val K_ACTION_BORDER_WIDTH = "action_border_width"
+    private const val K_SELECTION_COLOR = "selection_color"
+    private const val K_GH_MIGRATED = "gh_default_migrated"   // one-time move of the old group-header defaults
     private const val K_GROUP_HEADER_VPAD = "group_header_vpad"
     private const val K_GROUP_HEADER_COLOR = "group_header_color"
     private const val K_GROUP_HEADER_BORDER_COLOR = "group_header_border_color"
@@ -198,6 +224,16 @@ object ThemeStore {
             persist(ThemePrefs.DEFAULT)
             prefs.edit { putBoolean(K_SEEDED, true) }
         }
+        // One-time: bump the earlier group-header defaults (olive / interim grey / black) to the current
+        // default, then flag it done so load() reads the colour verbatim — it stays freely settable
+        // afterwards (including deliberately to black or grey).
+        if (!prefs.getBoolean(K_GH_MIGRATED, false)) {
+            val gh = prefs.getInt(K_GROUP_HEADER_COLOR, ThemePrefs.DEFAULT.groupHeaderColor)
+            if (gh == 0x29FFFF00 || gh == 0x1FFFFFFF || gh == 0xFF000000.toInt()) {
+                prefs.edit { putInt(K_GROUP_HEADER_COLOR, ThemePrefs.DEFAULT.groupHeaderColor) }
+            }
+            prefs.edit { putBoolean(K_GH_MIGRATED, true) }
+        }
         _state.value = load()
     }
 
@@ -219,6 +255,11 @@ object ThemeStore {
         taskIconSizeDp = taskIconSizeDp.coerceIn(ThemePrefs.TASK_ICON_MIN, ThemePrefs.TASK_ICON_MAX),
         taskCardGapDp = taskCardGapDp.coerceIn(0, ThemePrefs.TASK_CARD_GAP_MAX),
         taskCardVPadDp = taskCardVPadDp.coerceIn(0, ThemePrefs.TASK_CARD_VPAD_MAX),
+        actionRowPadDp = actionRowPadDp.coerceIn(0, ThemePrefs.ACTION_ROW_PAD_MAX),
+        actionLabelSizeSp = actionLabelSizeSp.coerceIn(ThemePrefs.ACTION_LABEL_MIN, ThemePrefs.ACTION_LABEL_MAX),
+        actionValueSizeSp = actionValueSizeSp.coerceIn(ThemePrefs.ACTION_VALUE_MIN, ThemePrefs.ACTION_VALUE_MAX),
+        actionLabelFrameWidthDp = actionLabelFrameWidthDp.coerceIn(0, ThemePrefs.BORDER_WIDTH_MAX),
+        actionBorderWidthDp = actionBorderWidthDp.coerceIn(0, ThemePrefs.BORDER_WIDTH_MAX),
         groupHeaderVPadDp = groupHeaderVPadDp.coerceIn(0, ThemePrefs.GROUP_HEADER_VPAD_MAX),
         groupHeaderBorderWidthDp = groupHeaderBorderWidthDp.coerceIn(0, ThemePrefs.GROUP_HEADER_BORDER_MAX),
         monitorRowPadDp = monitorRowPadDp.coerceIn(0, ThemePrefs.MONITOR_PAD_MAX),
@@ -263,6 +304,16 @@ object ThemeStore {
             taskIconSizeDp = prefs.getInt(K_TASK_ICON_SIZE, d.taskIconSizeDp),
             taskCardGapDp = prefs.getInt(K_TASK_CARD_GAP, d.taskCardGapDp),
             taskCardVPadDp = prefs.getInt(K_TASK_CARD_VPAD, d.taskCardVPadDp),
+            actionRowPadDp = prefs.getInt(K_ACTION_ROW_PAD, d.actionRowPadDp),
+            actionLabelSizeSp = prefs.getInt(K_ACTION_LABEL_SIZE, d.actionLabelSizeSp),
+            actionValueSizeSp = prefs.getInt(K_ACTION_VALUE_SIZE, d.actionValueSizeSp),
+            actionNameColor = prefs.getInt(K_ACTION_NAME_COLOR, d.actionNameColor),
+            actionValueColor = prefs.getInt(K_ACTION_VALUE_COLOR, d.actionValueColor),
+            actionLabelFrameColor = prefs.getInt(K_ACTION_LABEL_FRAME_COLOR, d.actionLabelFrameColor),
+            actionLabelFrameWidthDp = prefs.getInt(K_ACTION_LABEL_FRAME_WIDTH, d.actionLabelFrameWidthDp),
+            actionBorderColor = prefs.getInt(K_ACTION_BORDER_COLOR, d.actionBorderColor),
+            actionBorderWidthDp = prefs.getInt(K_ACTION_BORDER_WIDTH, d.actionBorderWidthDp),
+            selectionColor = prefs.getInt(K_SELECTION_COLOR, d.selectionColor),
             groupHeaderVPadDp = prefs.getInt(K_GROUP_HEADER_VPAD, d.groupHeaderVPadDp),
             groupHeaderColor = prefs.getInt(K_GROUP_HEADER_COLOR, d.groupHeaderColor),
             groupHeaderBorderColor = prefs.getInt(K_GROUP_HEADER_BORDER_COLOR, d.groupHeaderBorderColor),
@@ -313,6 +364,16 @@ object ThemeStore {
             putInt(K_TASK_ICON_SIZE, p.taskIconSizeDp)
             putInt(K_TASK_CARD_GAP, p.taskCardGapDp)
             putInt(K_TASK_CARD_VPAD, p.taskCardVPadDp)
+            putInt(K_ACTION_ROW_PAD, p.actionRowPadDp)
+            putInt(K_ACTION_LABEL_SIZE, p.actionLabelSizeSp)
+            putInt(K_ACTION_VALUE_SIZE, p.actionValueSizeSp)
+            putInt(K_ACTION_NAME_COLOR, p.actionNameColor)
+            putInt(K_ACTION_VALUE_COLOR, p.actionValueColor)
+            putInt(K_ACTION_LABEL_FRAME_COLOR, p.actionLabelFrameColor)
+            putInt(K_ACTION_LABEL_FRAME_WIDTH, p.actionLabelFrameWidthDp)
+            putInt(K_ACTION_BORDER_COLOR, p.actionBorderColor)
+            putInt(K_ACTION_BORDER_WIDTH, p.actionBorderWidthDp)
+            putInt(K_SELECTION_COLOR, p.selectionColor)
             putInt(K_GROUP_HEADER_VPAD, p.groupHeaderVPadDp)
             putInt(K_GROUP_HEADER_COLOR, p.groupHeaderColor)
             putInt(K_GROUP_HEADER_BORDER_COLOR, p.groupHeaderBorderColor)

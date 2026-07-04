@@ -278,6 +278,51 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
+                    level = 1, label = "Padding inside action rows",
+                    value = prefs.actionRowPadDp, valueText = "${prefs.actionRowPadDp} dp",
+                    range = 0f..ThemePrefs.ACTION_ROW_PAD_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(actionRowPadDp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Action label text size",
+                    value = prefs.actionLabelSizeSp, valueText = "${prefs.actionLabelSizeSp} sp",
+                    range = ThemePrefs.ACTION_LABEL_MIN.toFloat()..ThemePrefs.ACTION_LABEL_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(actionLabelSizeSp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Action name/value text size",
+                    value = prefs.actionValueSizeSp, valueText = "${prefs.actionValueSizeSp} sp",
+                    range = ThemePrefs.ACTION_VALUE_MIN.toFloat()..ThemePrefs.ACTION_VALUE_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(actionValueSizeSp = v) } },
+                )
+            }
+            item { ColorRow(1, "Action name colour", prefs.actionNameColor, ColorTarget.ActionName) { colorTarget = it } }
+            item { ColorRow(1, "Action value colour", prefs.actionValueColor, ColorTarget.ActionValue) { colorTarget = it } }
+            item { ColorRow(1, "Action label frame colour", prefs.actionLabelFrameColor, ColorTarget.ActionLabelFrame) { colorTarget = it } }
+            item {
+                SliderRow(
+                    level = 1, label = "Action label frame width",
+                    value = prefs.actionLabelFrameWidthDp, valueText = "${prefs.actionLabelFrameWidthDp} dp",
+                    range = 0f..ThemePrefs.BORDER_WIDTH_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(actionLabelFrameWidthDp = v) } },
+                )
+            }
+            item { ColorRow(1, "Action border colour", prefs.actionBorderColor, ColorTarget.ActionBorder) { colorTarget = it } }
+            item {
+                SliderRow(
+                    level = 1, label = "Action border width",
+                    value = prefs.actionBorderWidthDp, valueText = "${prefs.actionBorderWidthDp} dp",
+                    range = 0f..ThemePrefs.BORDER_WIDTH_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(actionBorderWidthDp = v) } },
+                )
+            }
+            item { ColorRow(1, "Selection highlight colour", prefs.selectionColor, ColorTarget.Selection) { colorTarget = it } }
+            item {
+                SliderRow(
                     level = 1, label = "Padding inside group headers",
                     value = prefs.groupHeaderVPadDp, valueText = "${prefs.groupHeaderVPadDp} dp",
                     range = 0f..ThemePrefs.GROUP_HEADER_VPAD_MAX.toFloat(),
@@ -1043,7 +1088,12 @@ private enum class ColorTarget(val label: String, val default: Int) {
     ImportConflict("Conflict colour", ThemePrefs.DEFAULT.importConflictColor),
     OvalBarBorder("Oval bar border", ThemePrefs.DEFAULT.ovalBarBorderColor),
     GroupHeader("Group header colour", ThemePrefs.DEFAULT.groupHeaderColor),
-    GroupHeaderBorder("Group header border", ThemePrefs.DEFAULT.groupHeaderBorderColor);
+    GroupHeaderBorder("Group header border", ThemePrefs.DEFAULT.groupHeaderBorderColor),
+    ActionName("Action name colour", ThemePrefs.DEFAULT.actionNameColor),
+    ActionValue("Action value colour", ThemePrefs.DEFAULT.actionValueColor),
+    ActionLabelFrame("Action label frame", ThemePrefs.DEFAULT.actionLabelFrameColor),
+    ActionBorder("Action border", ThemePrefs.DEFAULT.actionBorderColor),
+    Selection("Selection highlight", ThemePrefs.DEFAULT.selectionColor);
 
     fun get(p: ThemePrefs): Int = when (this) {
         Background -> p.background
@@ -1059,6 +1109,11 @@ private enum class ColorTarget(val label: String, val default: Int) {
         OvalBarBorder -> p.ovalBarBorderColor
         GroupHeader -> p.groupHeaderColor
         GroupHeaderBorder -> p.groupHeaderBorderColor
+        ActionName -> p.actionNameColor
+        ActionValue -> p.actionValueColor
+        ActionLabelFrame -> p.actionLabelFrameColor
+        ActionBorder -> p.actionBorderColor
+        Selection -> p.selectionColor
     }
 
     fun set(p: ThemePrefs, value: Int): ThemePrefs = when (this) {
@@ -1075,6 +1130,11 @@ private enum class ColorTarget(val label: String, val default: Int) {
         OvalBarBorder -> p.copy(ovalBarBorderColor = value)
         GroupHeader -> p.copy(groupHeaderColor = value)
         GroupHeaderBorder -> p.copy(groupHeaderBorderColor = value)
+        ActionName -> p.copy(actionNameColor = value)
+        ActionValue -> p.copy(actionValueColor = value)
+        ActionLabelFrame -> p.copy(actionLabelFrameColor = value)
+        ActionBorder -> p.copy(actionBorderColor = value)
+        Selection -> p.copy(selectionColor = value)
     }
 }
 

@@ -3,7 +3,15 @@ package com.opentasker.ui.components
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,8 +30,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import com.opentasker.ui.theme.ThemeStore
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 
@@ -39,10 +50,17 @@ fun SelectionBar(
     onClear: () -> Unit,
     onDelete: () -> Unit,
     onMoveToProject: (() -> Unit)? = null,
+    // Clipboard actions (Tasks tab only): a ⋮-style copy menu is shown when [onCopy] is provided. Paste is
+    // listed only when [onPaste] != null (something is on the clipboard).
+    onClone: (() -> Unit)? = null,
+    onCopy: (() -> Unit)? = null,
+    onCut: (() -> Unit)? = null,
+    onPaste: (() -> Unit)? = null,
     // Shown as "$count $noun" — defaults to the item wording; the group bar passes "groups".
     noun: String = "selected",
 ) {
-    Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)) {
+    val prefs by ThemeStore.state.collectAsState()
+    Surface(color = Color(prefs.selectionColor)) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -51,6 +69,18 @@ fun SelectionBar(
             IconButton(onClick = onClear) { Icon(Icons.Filled.Close, contentDescription = "Clear selection") }
             Text("$count $noun", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             TextButton(onClick = onSelectAll, enabled = count < total) { Text("Select all") }
+            if (onCopy != null) {
+                var menu by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Filled.ContentCopy, contentDescription = "Copy / cut / clone / paste") }
+                    ThemedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        onClone?.let { act -> DropdownMenuItem(text = { Text("Clone") }, onClick = { menu = false; act() }) }
+                        DropdownMenuItem(text = { Text("Copy") }, onClick = { menu = false; onCopy() })
+                        onCut?.let { act -> DropdownMenuItem(text = { Text("Cut") }, onClick = { menu = false; act() }) }
+                        onPaste?.let { act -> DropdownMenuItem(text = { Text("Paste") }, onClick = { menu = false; act() }) }
+                    }
+                }
+            }
             if (onMoveToProject != null) {
                 IconButton(onClick = onMoveToProject) { Icon(Icons.AutoMirrored.Filled.DriveFileMove, contentDescription = "Move selected to project") }
             }

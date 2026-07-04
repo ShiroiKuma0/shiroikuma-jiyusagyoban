@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -264,45 +265,39 @@ fun <T> LazyListScope.groupedItems(
                         // Drag handle: press and drag to REPOSITION the item anywhere (up/down, first slot in a
                         // group, any lower slot); dropping within a group's region also files it there. A
                         // dedicated handle avoids clashing with the card's own long-press (multi-select).
-                        Icon(
-                            Icons.Filled.DragIndicator,
-                            contentDescription = "Drag to reorder",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .pointerInput(key) {
-                                    detectDragGestures(
-                                        onDragStart = { drag.start(key) },
-                                        onDrag = { change, amount -> change.consume(); drag.move(amount.y) },
-                                        onDragEnd = {
-                                            val res = drag.endDrag()
-                                            if (res != null) {
-                                                val (gid, idx) = res
-                                                val remaining = orderedMemberKeys.filter { it != key }
-                                                val insertAt = idx.coerceIn(0, remaining.size)
-                                                val ordered = remaining.toMutableList().apply { add(insertAt, key) }
-                                                onReorder(key, gid, ordered)
-                                            }
-                                        },
-                                        onDragCancel = { drag.cancel() },
-                                    )
-                                },
-                        )
+                        // The drag handle doubles as the group menu (白い熊): TAP shows Move in/out of group,
+                        // DRAG reorders. Merged from a separate ⋮ so the row isn't cluttered with two menus.
                         var menu by remember { mutableStateOf(false) }
-                        // Compact (32dp, not the 48dp default) so the ⋮ doesn't inflate the member row above the
-                        // card height — that leftover was the phantom card-to-card gap the gap setting couldn't
-                        // reach (白い熊). Row stays verticalAlignment=Top so it's tidy when a card is expanded.
-                        IconButton(onClick = { menu = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Filled.MoreVert, contentDescription = "Group")
+                        Box {
+                            Icon(
+                                Icons.Filled.DragIndicator,
+                                contentDescription = "Drag to reorder; tap for group options",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .pointerInput(key) { detectTapGestures(onTap = { menu = true }) }
+                                    .pointerInput(key) {
+                                        detectDragGestures(
+                                            onDragStart = { drag.start(key) },
+                                            onDrag = { change, amount -> change.consume(); drag.move(amount.y) },
+                                            onDragEnd = {
+                                                val res = drag.endDrag()
+                                                if (res != null) {
+                                                    val (gid, idx) = res
+                                                    val remaining = orderedMemberKeys.filter { it != key }
+                                                    val insertAt = idx.coerceIn(0, remaining.size)
+                                                    val ordered = remaining.toMutableList().apply { add(insertAt, key) }
+                                                    onReorder(key, gid, ordered)
+                                                }
+                                            },
+                                            onDragCancel = { drag.cancel() },
+                                        )
+                                    },
+                            )
                             ThemedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                                DropdownMenuItem(
-                                    text = { Text("Move into group…") },
-                                    onClick = { menu = false; onMoveItem(key) },
-                                )
+                                DropdownMenuItem(text = { Text("Move into group…") }, onClick = { menu = false; onMoveItem(key) })
                                 if (ops.groupIdOf(key) != null) {
-                                    DropdownMenuItem(
-                                        text = { Text("Move out of group") },
-                                        onClick = { menu = false; ops.setItemGroup(key, null) },
-                                    )
+                                    DropdownMenuItem(text = { Text("Move out of group") }, onClick = { menu = false; ops.setItemGroup(key, null) })
                                 }
                             }
                         }
