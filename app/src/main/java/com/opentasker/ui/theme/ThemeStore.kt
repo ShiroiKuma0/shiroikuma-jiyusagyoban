@@ -393,15 +393,24 @@ object ThemeStore {
         return deleted
     }
 
-    /** The Compose FontFamily for a selection, or null for the platform default. Cached by name. */
+    /** The Compose FontFamily for a selection, or null for the platform default. Cached by name.
+     *  Accepts an imported .ttf/.otf filename, or a built-in family keyword (serif/mincho/明朝 → Noto Serif
+     *  CJK = Minchō; sans/gothic/ゴシック → the gothic default) — the same keywords [typeface] honours, so a
+     *  scene can pick Minchō without importing a font. */
     fun fontFamily(fileName: String): FontFamily? = when {
         fileName.isEmpty() -> null
         fileName == MONOSPACE -> FontFamily.Monospace
         else -> fontFamilyCache.getOrPut(fileName) {
-            runCatching {
-                val file = File(fontsDir(), fileName)
-                if (file.exists()) FontFamily(Font(file)) else null
-            }.getOrNull()
+            when (fileName.trim().lowercase()) {
+                "serif", "mincho", "minchō", "明朝" ->
+                    FontFamily(androidx.compose.ui.text.font.Typeface(android.graphics.Typeface.SERIF))
+                "sans", "sans-serif", "gothic", "ゴシック" ->
+                    FontFamily(androidx.compose.ui.text.font.Typeface(android.graphics.Typeface.SANS_SERIF))
+                else -> runCatching {
+                    val file = File(fontsDir(), fileName)
+                    if (file.exists()) FontFamily(Font(file)) else null
+                }.getOrNull()
+            }
         }
     }
 

@@ -148,6 +148,17 @@ object ContextMatchEvaluator {
             if (actualOrientation !in expectedOrientations) return false
         }
 
+        // Fold-posture trigger (event=fold): optionally narrow to specific posture(s) (folded / semi /
+        // unfolded). Omit to fire on any fold change.
+        val expectedFolds = firstConfig(spec, "fold", "folds")
+            .splitCsv()
+            .map { it.lowercase(Locale.US) }
+            .toSet()
+        if (expectedFolds.isNotEmpty()) {
+            val actualFold = event.metadata["fold"].orEmpty().lowercase(Locale.US)
+            if (actualFold !in expectedFolds) return false
+        }
+
         // Hardware-key trigger (event=hardware_key): narrow by key (volume_up / volume_down / power)
         // and/or press type (short / long / double). Omit either to fire on any value.
         val expectedKeys = firstConfig(spec, "key", "keys")

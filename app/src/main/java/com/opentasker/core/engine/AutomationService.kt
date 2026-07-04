@@ -22,6 +22,7 @@ import com.opentasker.core.bubbles.FreezeBubbleOverlayManager
 import com.opentasker.automation.app.AppUsageMonitor
 import com.opentasker.automation.network.ConnectivityMonitor
 import com.opentasker.automation.network.WiFiNetworkMonitor
+import com.opentasker.automation.sensor.FoldDetector
 import com.opentasker.automation.sensor.OrientationDetector
 import com.opentasker.automation.sensor.ShakeDetector
 import com.opentasker.automation.scheduler.TimeEventScheduler
@@ -75,6 +76,7 @@ class AutomationService : Service() {
     private val appUsageMonitor by lazy { AppUsageMonitor(this) }
     private val shakeDetector by lazy { ShakeDetector(this) }
     private val orientationDetector by lazy { OrientationDetector(this) }
+    private val foldDetector by lazy { FoldDetector(this) }
     private val hardwareKeyListener by lazy { com.opentasker.core.input.ShizukuKeyEventListener() }
     private val runLogRetentionSettings by lazy { RunLogRetentionSettings(this) }
     
@@ -92,6 +94,7 @@ class AutomationService : Service() {
     // on transitions (白い熊: no idle CPU drain, no wakelock, phone can deep-sleep).
     private var shakeOn = false
     private var orientationOn = false
+    private var foldOn = false
     private var appUsageOn = false
     private var autoStartDone = false
 
@@ -194,6 +197,7 @@ class AutomationService : Service() {
         appUsageMonitor.stop()
         shakeDetector.stop()
         orientationDetector.stop()
+        foldDetector.stop()
         hardwareKeyListener.stop()
         runCatching { unregisterReceiver(PackageContextEvents.receiver) }
         runCatching { unregisterReceiver(BluetoothContextEvents.receiver) }
@@ -202,6 +206,7 @@ class AutomationService : Service() {
         BroadcastContextEvents.stop(this)
         shakeOn = false
         orientationOn = false
+        foldOn = false
         appUsageOn = false
         isRunning = false
         job.cancel()
@@ -530,11 +535,13 @@ class AutomationService : Service() {
         }
         val needShake = usesEvent("shake")
         val needOrientation = usesEvent("orientation")
+        val needFold = usesEvent("fold")
         // AppUsageMonitor drives BOTH the APPLICATION context type (音楽端灯・前面) AND the "app_foreground"
         // EVENT (通知明滅・前面) — gate on either, or the foreground-clear profile silently stops.
         val needApp = contexts.any { it.type == ContextType.APPLICATION } || usesEvent("app_foreground")
         if (needShake != shakeOn) { if (needShake) shakeDetector.start() else shakeDetector.stop(); shakeOn = needShake }
         if (needOrientation != orientationOn) { if (needOrientation) orientationDetector.start() else orientationDetector.stop(); orientationOn = needOrientation }
+        if (needFold != foldOn) { if (needFold) foldDetector.start() else foldDetector.stop(); foldOn = needFold }
         if (needApp != appUsageOn) { if (needApp) appUsageMonitor.start(scope) else appUsageMonitor.stop(); appUsageOn = needApp }
     }
 

@@ -91,6 +91,38 @@ class ListDialogAction : Action {
     }
 }
 
+/**
+ * Pick apps with the multi-select grid, PRE-TICKING the packages already in [variable] (shown first),
+ * then write the chosen packages back to [variable], joined by [separator] (default a space). Cancel
+ * leaves the variable untouched. Handy for editing an app list like a clock blacklist in one tap.
+ */
+class PickAppsToVariableAction : Action {
+    override val id = "app.pickmulti"
+    override val category = ActionCategory.APP
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val name = args["variable"]?.trim()?.removePrefix("%")?.takeIf { it.isNotEmpty() }
+            ?: return ActionResult.Failure("variable name is required")
+        val separator = args["separator"]?.takeUnless { it.isNullOrEmpty() } ?: " "
+        val current = ctx.variables.get(name).orEmpty()
+        val preselected = current.split(Regex("\\s+")).map { it.trim() }.filter { it.isNotEmpty() }
+        val outcome = showDialog(ctx, args["timeout"]?.toIntOrNull()) {
+            putExtra(DialogActivity.EXTRA_TYPE, DialogActivity.TYPE_APP_MULTISELECT)
+            putExtra(DialogActivity.EXTRA_TITLE, args["title"].orEmpty())
+            putExtra(DialogActivity.EXTRA_PRESELECTED, preselected.joinToString("\n"))
+        }
+        when (outcome) {
+            is DialogOutcome.Confirmed -> {
+                val pkgs = outcome.value.split("\n").filter { it.isNotBlank() }
+                    .map { it.split("\t", limit = 2)[0].trim() }.filter { it.isNotEmpty() }
+                ctx.variables.set(name, pkgs.joinToString(separator))
+                ctx.logger("Picked ${pkgs.size} apps → %$name")
+            }
+            DialogOutcome.Cancelled -> ctx.logger("App pick cancelled; %$name unchanged")
+        }
+        return ActionResult.Success
+    }
+}
+
 /** `Text Dialog` (Tasker 377) — show text with OK/Cancel; store which was pressed. */
 class TextDialogAction : Action {
     override val id = "dialog.text"

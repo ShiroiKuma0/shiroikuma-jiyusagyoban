@@ -226,8 +226,9 @@ private fun contextFields(type: ContextType): List<ActionField> = when (type) {
         ActionField("value", "Expected value", required = true, hint = "true/false, connected/disconnected, on/off, 80"),
     )
     ContextType.EVENT -> listOf(
-        ActionField("event", "Event type", required = true, hint = "boot_completed, notification, nfc, bluetooth, calendar, sunrise, sunset, shake, package_added, package_removed, package_replaced, orientation, app_foreground, hardware_key"),
+        ActionField("event", "Event type", required = true, hint = "boot_completed, notification, nfc, bluetooth, calendar, sunrise, sunset, shake, package_added, package_removed, package_replaced, orientation, fold, app_foreground, hardware_key"),
         ActionField("state", "Event state", hint = "during, upcoming, connected, disconnected"),
+        ActionField("fold", "Fold posture", hint = "for event=fold: folded, semi, unfolded"),
         ActionField("key", "Hardware key", hint = "for event=hardware_key: volume_up, volume_down, power"),
         ActionField("press", "Press type", hint = "for event=hardware_key: short, long"),
         ActionField("calendar", "Calendar name", hint = "Work"),

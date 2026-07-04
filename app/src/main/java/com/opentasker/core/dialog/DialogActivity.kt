@@ -60,6 +60,8 @@ class DialogActivity : ComponentActivity() {
         val inputType = intent.getStringExtra(EXTRA_INPUT_TYPE).orEmpty()
         val okLabel = intent.getStringExtra(EXTRA_OK)?.takeIf { it.isNotBlank() } ?: "OK"
         val cancelLabel = intent.getStringExtra(EXTRA_CANCEL)?.takeIf { it.isNotBlank() } ?: "Cancel"
+        val preselected = intent.getStringExtra(EXTRA_PRESELECTED).orEmpty()
+            .split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
 
         setContent {
             val prefs by ThemeStore.state.collectAsState()
@@ -71,7 +73,7 @@ class DialogActivity : ComponentActivity() {
                     TYPE_LIST -> ListDialog(title, items, cancelLabel,
                         onPick = { index -> settle(DialogOutcome.Confirmed(items[index], index)) },
                         onCancel = { settle(DialogOutcome.Cancelled) })
-                    TYPE_APP_MULTISELECT -> AppMultiSelectDialog(title,
+                    TYPE_APP_MULTISELECT -> AppMultiSelectDialog(title, preselected,
                         onConfirm = { picked ->
                             // One app per line, "<package>\t<label>".
                             val value = picked.joinToString("\n") { (pkg, label) -> "$pkg\t$label" }
@@ -110,6 +112,7 @@ class DialogActivity : ComponentActivity() {
         const val EXTRA_TEXT = "text"
         const val EXTRA_DEFAULT = "default"
         const val EXTRA_ITEMS = "items"
+        const val EXTRA_PRESELECTED = "preselected"
         const val EXTRA_INPUT_TYPE = "input_type"
         const val EXTRA_OK = "ok"
         const val EXTRA_CANCEL = "cancel"

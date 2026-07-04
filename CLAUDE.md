@@ -92,8 +92,10 @@ default **`standard`**.
   phone must carry a `yyyy-MM-dd_HH-mm-ss` stamp (our format — `date +%Y-%m-%d_%H-%M-%S`, to the
   SECOND) in its FILENAME, e.g. `volume-panel-reorder_2026-06-26_12-56-22.json`. Date-only (or a
   `b`/`(2)` suffix) is **not** enough — a same-day re-push must get a fresh stamp so it never collides
-  and 白い熊 always knows which is current. Prune the older copies; state the exact filename in the
-  handover. (See the `version-pushed-files` memory.)
+  and 白い熊 always knows which is current. **Never delete/prune older copies from the phone** — 白い熊
+  keeps them; the unique timestamp is what avoids confusion, so leave every prior JSON in place (a
+  `ssh skhw 'rm …'` / `adb shell rm …` before a push counts as pruning — don't). Just state the exact
+  current filename in the handover. (See the `version-pushed-files` memory.)
 - **Always ask 白い熊 to confirm a shipped bundle, then sync the mirror.** Whenever you hand over a JSON
   bundle, explicitly **request confirmation** that it imported / works. The moment 白い熊 OKs it, update
   the workspace mirror (`~/〇/[666] 私資料/[666][60792] …`) to match and **commit it** — see the

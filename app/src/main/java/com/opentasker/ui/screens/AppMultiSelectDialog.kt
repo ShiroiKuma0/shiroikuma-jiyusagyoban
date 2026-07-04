@@ -65,6 +65,7 @@ private data class PickableApp(val label: String, val pkg: String)
 @Composable
 internal fun AppMultiSelectDialog(
     title: String,
+    preselected: Set<String> = emptySet(),
     onConfirm: (List<Pair<String, String>>) -> Unit,
     onCancel: () -> Unit,
 ) {
@@ -75,7 +76,7 @@ internal fun AppMultiSelectDialog(
     val selected = remember { mutableStateMapOf<String, String>() }
 
     LaunchedEffect(Unit) {
-        apps = withContext(Dispatchers.IO) {
+        val loaded = withContext(Dispatchers.IO) {
             val pm = context.packageManager
             val ownPkg = context.packageName
             runCatching {
@@ -100,10 +101,17 @@ internal fun AppMultiSelectDialog(
                     .filter { it.packageName != ownPkg }
                     .map { PickableApp(pm.getApplicationLabel(it).toString(), it.packageName) }
                     .distinctBy { it.pkg }
-                    .sortedBy { it.label.lowercase() }
                     .toList()
             }.getOrDefault(emptyList())
         }
+        // Pre-tick the packages already in the list, and show them FIRST (each group alphabetical), so the
+        // current selection is visible up top and easy to amend. Ordering keys off the INITIAL set so
+        // toggling a tile doesn't make the grid jump around.
+        val byPkg = loaded.associateBy { it.pkg }
+        preselected.forEach { pkg -> selected[pkg] = byPkg[pkg]?.label ?: pkg }
+        apps = loaded.sortedWith(
+            compareByDescending<PickableApp> { it.pkg in preselected }.thenBy { it.label.lowercase() },
+        )
     }
 
     Dialog(onDismissRequest = onCancel) {

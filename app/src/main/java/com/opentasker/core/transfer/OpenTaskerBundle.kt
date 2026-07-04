@@ -30,12 +30,15 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 
-// v4 adds `templates` (widget-layout templates, previously a separate processor). v3 added per-item
-// `position` + per-category `sort`; v2 added `projects` + projectId. Older bundles still import (missing
-// fields default), so the version is a floor on what THIS build can read, not a gate.
-// Tasks may also carry an optional base64 `iconData` (embedded icon PNG, for cross-device imports); it's
-// purely additive — older builds ignore the unknown key — so the schema version stays 4.
-const val OPEN_TASKER_BUNDLE_SCHEMA_VERSION = 4
+// v5 is a NAME-ONLY on-disk format ([BundleFile]) that carries ZERO numeric ids — every reference is by
+// name (item→project, profile→task, scene-element→task, group→parent, note→item/group). This is a HARD
+// CUT: v5 no longer reads id-bearing v1–v4 files (re-export them from an up-to-date build). The domain
+// [OpenTaskerBundle] below is still id-bearing and drives the (unchanged) import/review machinery; the
+// codec bridges the two via [BundleFile.fromDomain]/[BundleFile.toDomain], so ids never touch a file.
+// v4 added `templates`; v3 per-item `position` + `sort`; v2 `projects` + projectId.
+const val OPEN_TASKER_BUNDLE_SCHEMA_VERSION = 5
+// The oldest on-disk schema this build still reads. Below this we reject with a re-export prompt.
+const val MIN_READABLE_BUNDLE_SCHEMA_VERSION = 5
 
 @Serializable
 data class OpenTaskerBundle(
@@ -224,15 +227,28 @@ object OpenTaskerBundleCodec {
         )
     }
 
-    fun encode(bundle: OpenTaskerBundle): String = json.encodeToString(bundle)
+    // Export writes the NAME-ONLY [BundleFile] (no ids), converted from the freshly-built domain bundle.
+    fun encode(bundle: OpenTaskerBundle): String = json.encodeToString(BundleFile.fromDomain(bundle))
 
     @Throws(SerializationException::class, IllegalArgumentException::class)
     fun decode(rawJson: String): OpenTaskerBundle {
         require(rawJson.length <= MAX_BUNDLE_JSON_CHARS) {
             "Bundle JSON exceeds ${MAX_BUNDLE_JSON_CHARS / 1024 / 1024} MB size limit"
         }
-        return json.decodeFromString(rawJson)
+        // HARD CUT: only the id-free name-based format (schema >= 5) is readable. An older id-bearing
+        // backup must be re-exported from an up-to-date build — we never fall back to reading ids.
+        val version = runCatching { json.decodeFromString<SchemaProbe>(rawJson).schemaVersion }.getOrDefault(1)
+        require(version >= MIN_READABLE_BUNDLE_SCHEMA_VERSION) {
+            "This backup is an older format (v$version). Re-export it from an up-to-date 白い熊 自由作業盤 " +
+                "(the format is now name-based and carries no ids)."
+        }
+        // Parse the name-only file, then rebuild the id-bearing domain bundle from the names.
+        return json.decodeFromString<BundleFile>(rawJson).toDomain()
     }
+
+    /** Tiny header probe to read just the schema version before committing to the full parse. */
+    @Serializable
+    private data class SchemaProbe(val schemaVersion: Int = 1)
 
     private const val MAX_BUNDLE_JSON_CHARS = 16 * 1024 * 1024
 
@@ -244,12 +260,20 @@ object OpenTaskerBundleCodec {
             warnings += "Unsupported schema version ${bundle.schemaVersion}; this build reads up to $OPEN_TASKER_BUNDLE_SCHEMA_VERSION."
         }
 
-        duplicateLongs(bundle.tasks.map { it.id }).takeIf { it.isNotEmpty() }?.let { duplicates ->
-            warnings += "Bundle has duplicate task ids: ${duplicates.joinToString()}."
+        // Names are the identity now (the format carries no ids), so duplicate NAMES are the blocking
+        // clash — two same-named tasks can't both name-resolve. (Scene/profile same-name overwrite in
+        // place, but a task name is a link target for profiles/scenes, so it must be unique in a bundle.)
+        duplicateStrings(bundle.tasks.map { it.name }).takeIf { it.isNotEmpty() }?.let { duplicates ->
+            warnings += "Bundle has duplicate task names: ${duplicates.joinToString()}."
         }
-        duplicateStrings(bundle.variables.map { it.name }).takeIf { it.isNotEmpty() }?.let { duplicates ->
-            warnings += "Bundle has duplicate variable names: ${duplicates.joinToString()}."
-        }
+        // A variable's identity is (name, SCOPE): a super-global %DT_Ampmn and 時間と日付's own project-
+        // scoped %DT_Ampmn are DISTINCT and both legitimately appear in a full export. Only a true clash —
+        // same name AND same scope — blocks. Keying on name alone wrongly rejected the app's own export.
+        bundle.variables.groupingBy { it.name to it.projectId }.eachCount()
+            .filterValues { count -> count > 1 }.keys.map { it.first }.distinct()
+            .takeIf { it.isNotEmpty() }?.let { duplicates ->
+                warnings += "Bundle has duplicate variable names: ${duplicates.joinToString()}."
+            }
 
         // (The "project isn't part of this import → Unfiled" notice is gone: the review's folder tree now
         //  shows each item's project folder + a Create/Unfiled pill, so the text was redundant.)
@@ -295,15 +319,8 @@ object OpenTaskerBundleCodec {
 
     private fun String.isBlockingImportWarning(): Boolean =
         startsWith("Unsupported schema version") ||
-            startsWith("Bundle has duplicate task ids") ||
+            startsWith("Bundle has duplicate task names") ||
             startsWith("Bundle has duplicate variable names")
-
-    private fun duplicateLongs(values: List<Long>): List<Long> =
-        values.groupingBy { it }
-            .eachCount()
-            .filterValues { count -> count > 1 }
-            .keys
-            .sorted()
 
     private fun duplicateStrings(values: List<String>): List<String> =
         values.groupingBy { it }

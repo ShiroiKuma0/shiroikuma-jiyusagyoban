@@ -98,7 +98,15 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.BaselineShift
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -369,7 +377,22 @@ private fun SceneCard(
                 // fixed-width cluster hug the right of a full-width card, so it FILLS a folded screen and sits
                 // at the right ~half of a wider one — without depending on the (foldable-broken) window gravity.
                 val xr = element.config["xr"]?.trim()?.toFloatOrNull()
-                val xOffDp = if (xr != null) (cardWidthDp - xr) else (element.xDp * scale)
+                // `xc` = position the element's align-anchor at (card CENTRE + xc), independent of card width.
+                // With align=end the content's RIGHT edge lands at centre+xc; align=start its LEFT edge; else
+                // its centre. Lets two halves straddle a fixed centre gap (e.g. a camera hole between 時/分).
+                val xc = element.config["xc"]?.trim()?.toFloatOrNull()
+                val xOffDp = when {
+                    xc != null -> {
+                        val half = cardWidthDp / 2f
+                        when (element.config["align"]?.trim()?.lowercase()) {
+                            "end", "right" -> -half + xc   // full-width box: content right edge = xOff + card = centre+xc
+                            "center" -> xc                 // content centre = xOff + half = centre+xc
+                            else -> half + xc              // start/default: content left edge = xOff = centre+xc
+                        }
+                    }
+                    xr != null -> (cardWidthDp - xr)
+                    else -> (element.xDp * scale)
+                }
                 // widthDp/heightDp <= 0 means "fill the card" — lets an element span a full-width bar scene.
                 Box(
                     Modifier
@@ -411,32 +434,53 @@ internal fun SceneElementView(
         }
     }
     fun v(key: String, fallback: String = ""): String = expandedCfg[key] ?: expandAgainstGlobals(fallback)
-    // Shared styling (see the element editor's Style section).
-    val styleSize = cfg["textSize"]?.toIntOrNull()?.sp ?: TextUnit.Unspecified
-    val styleWeight = if (sceneBool(cfg["bold"] ?: "")) FontWeight.Bold else FontWeight.Normal
+    // Shared styling (see the element editor's Style section). Read via v() so it is %var-EXPANDED — font,
+    // size, colour, alignment, border can all be driven by variables (e.g. a clock's %SC_* settings), not
+    // just literals. A literal value expands to itself, so existing scenes are unaffected.
+    val styleSize = v("textSize").toIntOrNull()?.sp ?: TextUnit.Unspecified
+    val styleWeight = if (sceneBool(v("bold"))) FontWeight.Bold else FontWeight.Normal
     // For elements with a styled label (slider/checkbox/toggle) keep the label's own weight unless bold.
-    val styleWeightOrNull = if (sceneBool(cfg["bold"] ?: "")) FontWeight.Bold else null
-    val styleLabelColor = sceneColor(cfg["textColor"])
-    val styleAlign = sceneAlign(cfg["align"])
-    val styleBorderW = cfg["borderWidth"]?.toIntOrNull() ?: 0
-    val styleBorderColor = sceneColor(cfg["borderColor"])
-    // Optional custom font: an imported .ttf/.otf filename (same library the widgets/clock use).
-    val styleFont = cfg["font"]?.trim()?.takeIf { it.isNotEmpty() }?.let { ThemeStore.fontFamily(it) }
+    val styleWeightOrNull = if (sceneBool(v("bold"))) FontWeight.Bold else null
+    val styleLabelColor = sceneColor(v("textColor"))
+    val styleAlign = sceneAlign(v("align"))
+    val styleBorderW = v("borderWidth").toIntOrNull() ?: 0
+    val styleBorderColor = sceneColor(v("borderColor"))
+    // Optional custom font: an imported .ttf/.otf filename, OR a built-in keyword (serif/明朝, sans/ゴシック).
+    val styleFont = v("font").trim().takeIf { it.isNotEmpty() }?.let { ThemeStore.fontFamily(it) }
     // Optional swipe target: a task id run when the element is dragged/slid (e.g. an edge-bar strip).
     val swipeTask = cfg["swipeTask"]?.trim()?.toLongOrNull()
     when (element.type) {
         SceneElementType.TEXT -> {
-            val bg = sceneColor(cfg["bgColor"])
+            val bg = sceneColor(v("bgColor"))
             val shape = RoundedCornerShape(8.dp)
+            val annotated = sceneSpans(v("text"))
+            val fillColor = sceneColor(v("textColor")) ?: MaterialTheme.colorScheme.onSurface
+            // Optional per-character outline: a stroked copy drawn UNDER the fill so the glyph edges get a
+            // border (e.g. 3px black), keeping yellow text legible over a yellow background. strokeWidth is
+            // in PIXELS; the stroke is centred on the glyph path, so ~half shows outside.
+            val strokeColor = sceneColor(v("strokeColor"))
+            val strokeWpx = v("strokeWidth").toFloatOrNull()?.takeIf { it > 0f }
             Box(
                 Modifier.fillMaxSize()
                     .then(if (bg != null) Modifier.background(bg, shape) else Modifier)
                     .then(if (styleBorderW > 0) Modifier.border(styleBorderW.dp, styleBorderColor ?: MaterialTheme.colorScheme.outline, shape) else Modifier),
                 contentAlignment = Alignment.Center,
             ) {
+                if (strokeColor != null && strokeWpx != null) {
+                    Text(
+                        annotated,
+                        color = strokeColor,
+                        fontFamily = styleFont,
+                        fontSize = styleSize,
+                        fontWeight = styleWeight,
+                        textAlign = styleAlign ?: TextAlign.Start,
+                        modifier = Modifier.fillMaxWidth(),
+                        style = TextStyle(drawStyle = Stroke(width = strokeWpx, join = StrokeJoin.Round)),
+                    )
+                }
                 Text(
-                    v("text"),
-                    color = sceneColor(cfg["textColor"]) ?: MaterialTheme.colorScheme.onSurface,
+                    annotated,
+                    color = fillColor,
                     fontFamily = styleFont,
                     fontSize = styleSize,
                     fontWeight = styleWeight,
@@ -1014,6 +1058,37 @@ internal fun sceneAlignment(position: String?): Alignment = when (position?.trim
 }
 
 /** Parse a "#AARRGGBB"/"#RRGGBB" scene colour, or null (use the element's default). */
+// Inline font/size/rise spans for a scene TEXT: `⟦font|size|rise⟧text⟦/⟧` sets font (imported name or a
+// serif/明朝 · sans keyword), size, and an optional baseline RISE for the wrapped run; text outside spans
+// keeps the element's own font/size. `rise` (fraction, e.g. 0.35) lifts a smaller span so its TOP lines up
+// with a bigger neighbour instead of sitting on the shared baseline (top-align vs baseline-align). Any
+// field may be blank to inherit; the third is optional. A plain string with no ⟦ is returned as-is.
+private val SCENE_SPAN_RE = Regex("⟦([^|⟧]*)\\|([^|⟧]*)(?:\\|([^⟧]*))?⟧(.*?)⟦/⟧", RegexOption.DOT_MATCHES_ALL)
+
+private fun sceneSpans(text: String): AnnotatedString {
+    if ('⟦' !in text) return AnnotatedString(text)
+    return buildAnnotatedString {
+        var last = 0
+        for (m in SCENE_SPAN_RE.findAll(text)) {
+            if (m.range.first > last) append(text.substring(last, m.range.first))
+            val fam = m.groupValues[1].trim().takeIf { it.isNotEmpty() }?.let { ThemeStore.fontFamily(it) }
+            val size = m.groupValues[2].trim().toFloatOrNull()
+            val rise = m.groupValues[3].trim().toFloatOrNull()
+            withStyle(
+                SpanStyle(
+                    fontFamily = fam,
+                    fontSize = size?.sp ?: TextUnit.Unspecified,
+                    baselineShift = rise?.let { BaselineShift(it) } ?: BaselineShift.None,
+                )
+            ) {
+                append(m.groupValues[4])
+            }
+            last = m.range.last + 1
+        }
+        if (last < text.length) append(text.substring(last))
+    }
+}
+
 private fun sceneColor(s: String?): Color? =
     s?.trim()?.takeIf { it.isNotBlank() }?.let {
         runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull()

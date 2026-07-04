@@ -1201,6 +1201,20 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "app.pickmulti",
+            name = "Pick Apps → Variable",
+            description = "Multi-select apps (the variable's current packages pre-ticked and shown first); write the chosen packages back to the variable.",
+            category = "App",
+            fields = listOf(
+                ActionField("variable", "Variable", required = true, hint = "read pre-selection from + write back, e.g. SC_Blacklist"),
+                ActionField("title", "Title", hint = "dialog title"),
+                ActionField("separator", "Separator", hint = "joins the packages (default: space)"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "home.go",
             name = "Go Home",
             description = "Return to launcher home screen",

@@ -204,19 +204,28 @@ object SceneOverlayManager {
                 // placed by window gravity.
                 // fullscreen: cover the whole screen and pass ALL touches through (a purely visual
                 // edge-light); fullWidth: span the screen over the status bar; else wrap the card.
+                // A non-modal overlay with NO tappable elements (and no outside-dismiss) is a pure DISPLAY —
+                // e.g. the clock strip / battery line — so it must pass ALL taps and swipes through to
+                // whatever's underneath. Edge strips (fraction) stay touchable on purpose: they catch swipe
+                // gestures. dismissOnOutside must stay touchable too (it needs ACTION_OUTSIDE).
+                val displayOnly = !dismissOnOutside && scene.elements.none { el ->
+                    el.tapTaskId != null || el.tapTaskName.isNotBlank() ||
+                        el.longPressTaskId != null || el.longPressTaskName.isNotBlank()
+                }
+                val through = if (displayOnly) WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE else 0
                 val edgeFlags = when {
                     fullscreen -> WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                         WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                         WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
                     fullWidth -> WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or through
                     // Edge strips (fraction-height side / fraction-width bottom) extend to the TRUE
                     // screen edge — over the status/nav-bar insets — so a swipe right on the edge lands
                     // on the strip, not the app behind it (no mini-gap).
                     heightFraction > 0f || widthFraction > 0f ->
                         WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-                    else -> 0
+                    else -> through
                 }
                 // For fullscreen, size to the REAL physical display at (0,0): MATCH_PARENT gives the
                 // (mis)reported content area on some foldables (Huawei folded), leaving a gap under the

@@ -69,5 +69,22 @@ Source the group + membership from the workspace mirror (`_globals/groups.json` 
 if the mirror is stale for the item, infer the group by name within its project (match the on-device group).
 See [[trio-group-convention]].
 
-See [[literate-bundles-rule]], the `task-spec` skill (action field order incl. Action label), and
-[[clear-import-instructions]].
+## Reference everything by NAME, never by id (hard rule)
+
+白い熊 (2026-07-04): a bundle references every item **by its unique name**, never by a numeric id — and
+the export format is being changed to emit **no ids at all**. Rules when authoring:
+
+- **Never rely on a numeric id matching the device.** Ids in a bundle are Room primary keys that leak
+  from storage; on import they're bundle-local and remapped. Setting `projectId: 15` and *hoping* the
+  device's project is #15 silently drops every item to **Unfiled** (this happened on the 相撲字時計 scenes).
+- **Always ship `projects[]`** for any project your items belong to, so `projectId`→project **name**
+  resolves against the on-device project of that name. The item→project link is name-resolved, not numeric.
+- **Link by name fields:** profile→task via `enterTaskName`/`exitTaskName`; scene-element tasks via
+  `tapTaskName`/`longPressTaskName`; `scene.show`/`scene.hide` by scene name. The numeric twins
+  (`enterTaskId`, `tapTaskId`, …) are legacy fallbacks — don't depend on them.
+- After the **id-free format** lands (export writes zero ids, import resolves purely by name), treat any
+  id you emit in a bundle as a bug. See [[reference-by-name-not-id]] and [[bundle-required-fields]]
+  (its "every task needs a unique numeric id" note is superseded once the id-free format ships).
+
+See [[literate-bundles-rule]], [[reference-by-name-not-id]], the `task-spec` skill (action field order incl.
+Action label), and [[clear-import-instructions]].
