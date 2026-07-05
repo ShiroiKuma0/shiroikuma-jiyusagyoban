@@ -340,6 +340,28 @@ fun UiCustomizationScreen(
                 )
             }
 
+            // Variables tab — the folded row's name/value styling. Defaults equal the action-view data
+            // styling (blue name / white value, 16 sp); name and value colour + size are independent.
+            item { SectionHeader("Variables") }
+            item {
+                SliderRow(
+                    level = 1, label = "Variable name text size",
+                    value = prefs.varNameSizeSp, valueText = "${prefs.varNameSizeSp} sp",
+                    range = ThemePrefs.ACTION_VALUE_MIN.toFloat()..ThemePrefs.ACTION_VALUE_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(varNameSizeSp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Variable value text size",
+                    value = prefs.varValueSizeSp, valueText = "${prefs.varValueSizeSp} sp",
+                    range = ThemePrefs.ACTION_VALUE_MIN.toFloat()..ThemePrefs.ACTION_VALUE_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(varValueSizeSp = v) } },
+                )
+            }
+            item { ColorRow(1, "Variable name colour", prefs.varNameColor, ColorTarget.VarName) { colorTarget = it } }
+            item { ColorRow(1, "Variable value colour", prefs.varValueColor, ColorTarget.VarValue) { colorTarget = it } }
+
             item { SectionHeader("Monitor") }
             item {
                 SliderRow(
@@ -1093,7 +1115,9 @@ private enum class ColorTarget(val label: String, val default: Int) {
     ActionValue("Action value colour", ThemePrefs.DEFAULT.actionValueColor),
     ActionLabelFrame("Action label frame", ThemePrefs.DEFAULT.actionLabelFrameColor),
     ActionBorder("Action border", ThemePrefs.DEFAULT.actionBorderColor),
-    Selection("Selection highlight", ThemePrefs.DEFAULT.selectionColor);
+    Selection("Selection highlight", ThemePrefs.DEFAULT.selectionColor),
+    VarName("Variable name colour", ThemePrefs.DEFAULT.varNameColor),
+    VarValue("Variable value colour", ThemePrefs.DEFAULT.varValueColor);
 
     fun get(p: ThemePrefs): Int = when (this) {
         Background -> p.background
@@ -1114,6 +1138,8 @@ private enum class ColorTarget(val label: String, val default: Int) {
         ActionLabelFrame -> p.actionLabelFrameColor
         ActionBorder -> p.actionBorderColor
         Selection -> p.selectionColor
+        VarName -> p.varNameColor
+        VarValue -> p.varValueColor
     }
 
     fun set(p: ThemePrefs, value: Int): ThemePrefs = when (this) {
@@ -1135,6 +1161,8 @@ private enum class ColorTarget(val label: String, val default: Int) {
         ActionLabelFrame -> p.copy(actionLabelFrameColor = value)
         ActionBorder -> p.copy(actionBorderColor = value)
         Selection -> p.copy(selectionColor = value)
+        VarName -> p.copy(varNameColor = value)
+        VarValue -> p.copy(varValueColor = value)
     }
 }
 

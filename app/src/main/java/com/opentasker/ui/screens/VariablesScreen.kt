@@ -34,6 +34,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,9 +44,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.opentasker.app.R
 import com.opentasker.core.model.Variable
 import com.opentasker.ui.components.GroupMoveDialogs
@@ -58,6 +61,7 @@ import com.opentasker.ui.components.SelectionBar
 import com.opentasker.ui.components.SelectionCheck
 import com.opentasker.ui.components.selectableItem
 import com.opentasker.ui.theme.DesignSystem
+import com.opentasker.ui.theme.ThemeStore
 
 private val SENSITIVE_NAMES = setOf("password", "token", "secret", "key", "credential", "auth")
 
@@ -253,6 +257,7 @@ private fun VariableRow(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val themePrefs by ThemeStore.state.collectAsState()
     Card(
         border = BorderStroke(
             if (selected) 2.dp else 1.dp,
@@ -275,21 +280,34 @@ private fun VariableRow(
                 if (selectionActive) {
                     SelectionCheck(selected)
                 }
-                Column(modifier = Modifier.weight(1f)) {
+                // Name + value on ONE line, styled like the action view (name blue, value bold). Colours
+                // and sizes come from ThemePrefs (default = the action-view data styling) and are each
+                // independently settable in UI Customization. The scope/type moves to the expanded view.
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
                         text = "%${variable.name}",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontFamily = FontFamily.Monospace,
-                    )
-                    // Folded second line = the value (a one-line preview); the scope/type moves to the
-                    // expanded view below (白い熊).
-                    Text(
-                        text = if (isSensitive(variable.name)) "***" else variable.value,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontSize = themePrefs.varNameSizeSp.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(themePrefs.varNameColor),
                         fontFamily = FontFamily.Monospace,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = if (isSensitive(variable.name)) "***" else variable.value.ifBlank { "—" },
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontSize = themePrefs.varValueSizeSp.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(themePrefs.varValueColor),
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
                     )
                 }
                 Icon(

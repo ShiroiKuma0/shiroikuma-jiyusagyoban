@@ -86,5 +86,26 @@ the export format is being changed to emit **no ids at all**. Rules when authori
   id you emit in a bundle as a bug. See [[reference-by-name-not-id]] and [[bundle-required-fields]]
   (its "every task needs a unique numeric id" note is superseded once the id-free format ships).
 
-See [[literate-bundles-rule]], [[reference-by-name-not-id]], the `task-spec` skill (action field order incl.
-Action label), and [[clear-import-instructions]].
+## Ship the minimal update set for reimport — not the whole project (hard rule)
+
+白い熊 (2026-07-05): when a change touches only part of a project, ship **only the items that changed**,
+never the whole-project bundle by default. Re-importing 154 tasks to fix one scene's `xc` is waste and
+noise. But "minimal" means the **smallest set that reimports cleanly and dangles nothing** — not blindly
+one item:
+
+- **Scene(s) only** → ship just the changed scenes. Safe alone: scenes are referenced by NAME
+  (`scene.show`/`scene.hide` resolve `(project,name)`), so overwriting one dangles nothing. (This was the
+  相撲字時計 time-centre fix — a 6 KB `scenes:[semi,unfolded]` patch, not the 36 KB project.)
+- **Task(s)** → ship the task **plus any profile whose `enterTaskName`/`exitTaskName` points at it**;
+  re-importing a task alone re-IDs it and dangles the profile link ([[task-overwrite-breaks-profile-link]]).
+- **Grouped item** → still ship its `groups[]` + the item's `itemMeta` with `groupId` (the group rule
+  above), else it jumps to Unfiled.
+- **Always** ship `projects[]` (name resolution) + the required top-level fields (`schemaVersion`,
+  `appVersion`, `exportedAtEpochMs`) — [[bundle-required-fields]].
+
+Give the generator a flag that emits the minimal slice (e.g. `gen_sumo_clock.py --scenes-only`) so the
+narrow patch is reproducible, not hand-carved. The full-project bundle is only the fallback — a first
+install, or a cross-cutting change that really touches everything.
+
+See [[literate-bundles-rule]], [[minimal-reimport-set]], [[reference-by-name-not-id]], the `task-spec`
+skill (action field order incl. Action label), and [[clear-import-instructions]].
