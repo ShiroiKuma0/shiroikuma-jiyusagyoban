@@ -3,6 +3,48 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.75+164 — 2026-07-05
+
+A large feature release over 0.2.75+127: the **相撲字時計** fold-aware over-lockscreen clock, a **task & action UI overhaul**, a full **Variables-tab redesign** with an in-app **dead-globals analyzer** and hard guards against scope leaks, a new **Edit Action** action, tap-through **permission deep-links**, and a switch to **event-local** notification/broadcast variables.
+
+### 相撲字時計 — fold-aware overlay clock
+- A new over-lockscreen overlay clock rendered in **相撲字 (sumo-script)** style, ported from the Tasker 時間と日付 project and driven entirely by the app. Three layouts — **folded / semi-folded / unfolded** — swap automatically with the device's fold state.
+- **`%FOLD` via the HALL sensor**: a `fold` event context reads the hinge/HALL sensor and publishes the fold state, so the clock (and any task) can branch on `%FOLD`.
+- The wide (semi/unfolded) layout **centres the time itself** on screen, with 午前/午後 and the weekday placed relative to it (center-anchored scene positioning, `xc`).
+- Scenes are **touch-through** — the overlay passes taps to whatever is beneath it.
+- An **app-multiselect picker** dialog chooses which apps hide the clock; the selection is committed to the blacklist variable *and* written back into the 設定 task so it survives the next startup.
+- Bundles are **id-free / name-based** (zero ids; everything referenced by unique name), so a re-import can't dangle a profile→task link.
+
+### Task & action UI overhaul
+- Redesigned **action rows** with UI-settable styling.
+- **Per-task and per-action menus** with **clipboards** — copy/cut/paste actions between tasks and duplicate tasks.
+- Removed the olive accent throughout (**olive-free theme**).
+
+### Variables tab — redesign
+- Variable **name in blue, value bold**, both at action-view sizes — colours and sizes independently **UI-settable** (defaulting to parity with the action editor). Name and value share **one line**; the folded view is a single line.
+- **Row padding** defaults to 2px and is settable.
+- A yellow **magnifying-glass** icon sits to the right of the search bar.
+- **Foldable scope sections** (Global, Project-global, …) with larger underlined headings, a fold triangle to the right of each heading, slight indentation, and a **live count** in parentheses.
+- **Project-filter pills** in the top bar scope the list (and the project-global counts) to the selected project; a pill expands with a wrap-around rounded border around its members when unfolded.
+
+### Dead-globals analyzer + scope guards
+- A **"Clean up dead globals"** analyzer folds into the Variables tab. It classifies every persisted global and lists — per category, expandable — exactly what will be deleted and where:
+  - **Shadow-copies** — a super-global duplicating a live project-global (with the twin project named).
+  - **Orphans** — globals referenced by no task, profile, scene, or widget template.
+  - **Dangling project-globals** — rows whose `projectId` points to a deleted/re-created project (previously invisible to both the analyzer and the Var tab).
+- Deletion is **cache-consistent** (the in-memory global cache updates in lockstep with the DB).
+- **Hard guards against the root cause** of scope leaks:
+  - Deleting a project now **cascades to its variables** (they can't re-home to a dead project id).
+  - Startup **sweeps dangling** project-globals before warming the cache.
+  - `set()` redirects a MixedCase name written at projectId 0 to **task-local**, and import **skips** MixedCase-at-0 — so a project-scoped name can never land in the super-global bucket.
+
+### New action
+- **Edit Action** (`task.editaction`) — programmatically edit another task's action: locate it by index or by `matchType`/`matchName`, set one arg, and persist. Used by the clock's blacklist picker to keep its 設定 task in sync.
+
+### Engine & permissions
+- **Tap-through permission deep-links**: the permission block/warning dialog shows an **"Open &lt;permission&gt; settings →"** pill per missing permission, deep-linking straight to the correct System settings page (via `CapabilityState.settingsIntent`), on the shared dialog host and the task pre-flight block.
+- **Event-local notification/broadcast variables**: `%NOTIF_*` (notification listener) and `%INTENT_*` (broadcast receiver — e.g. Poweramp's ~30 `TRACK_CHANGED` extras) are **no longer persisted as super-globals**. They're threaded per-invocation to the triggered enter task via the event's `vars`, and a startup sweep clears any stale copies — keeping the global namespace to genuine app/engine state.
+
 ## 0.2.75+127 — 2026-07-03
 
 A point release over 0.2.75+122 — one targeted fix.
