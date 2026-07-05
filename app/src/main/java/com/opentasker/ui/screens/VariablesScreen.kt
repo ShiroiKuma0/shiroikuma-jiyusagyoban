@@ -3,6 +3,7 @@ package com.opentasker.ui.screens
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,6 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.automirrored.filled.ArrowRight
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -36,6 +39,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -46,16 +50,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.opentasker.app.R
+import com.opentasker.core.model.Project
+import com.opentasker.core.model.ProjectFilter
 import com.opentasker.core.model.Variable
-import com.opentasker.ui.components.GroupMoveDialogs
-import com.opentasker.ui.components.GroupOps
-import com.opentasker.ui.components.groupedItems
-import com.opentasker.ui.components.rememberGroupDragState
-import com.opentasker.ui.components.rememberGroupMoveHost
 import com.opentasker.ui.components.ItemNoteSection
 import com.opentasker.ui.components.SelectionBar
 import com.opentasker.ui.components.SelectionCheck
@@ -75,6 +77,10 @@ fun variableKey(v: Variable): String = "${v.projectId}:${v.name}"
 fun VariablesScreen(
     variables: List<Variable>,
     contentPadding: PaddingValues,
+    projects: List<Project>,
+    projectFilter: ProjectFilter,
+    onSelectProject: (ProjectFilter) -> Unit,
+    onReorderProjects: (List<Long>) -> Unit,
     onUpdate: (projectId: Long, name: String, value: String) -> Unit,
     onDelete: (projectId: Long, name: String) -> Unit,
     onMessage: (String) -> Unit,
@@ -85,7 +91,6 @@ fun VariablesScreen(
     onSelectAllVars: () -> Unit,
     onClearVarSelection: () -> Unit,
     onDeleteSelectedVars: () -> Unit,
-    groupOps: GroupOps,
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var editTarget by remember { mutableStateOf<Variable?>(null) }
@@ -100,6 +105,9 @@ fun VariablesScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
+        if (projects.isNotEmpty()) {
+            ProjectFilterChips(projects, projectFilter, onSelectProject, onReorderProjects, Modifier.padding(vertical = 8.dp))
+        }
         if (selectionActive) {
             SelectionBar(
                 count = selectedKeys.size,
@@ -114,6 +122,9 @@ fun VariablesScreen(
             onValueChange = { searchQuery = it },
             label = { Text("Search variables") },
             singleLine = true,
+            trailingIcon = {
+                Icon(Icons.Filled.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary)
+            },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         )
 
@@ -125,8 +136,6 @@ fun VariablesScreen(
             )
         }
 
-        val moveHost = rememberGroupMoveHost()
-        val dragState = rememberGroupDragState()
         val variableRow: @Composable (Variable) -> Unit = { variable ->
             val key = variableKey(variable)
             VariableRow(
@@ -141,18 +150,31 @@ fun VariablesScreen(
                 onDelete = { onDelete(variable.projectId, variable.name) },
             )
         }
+        // Foldable sections by SCOPE: "Global" (super-global) then "Project-global". Each heading is
+        // larger + underlined with a fold triangle to its right, slightly indented; folding hides that
+        // scope's rows. Section fold state is per-scope (default open).
+        val sectionExpanded = remember { mutableStateMapOf<String, Boolean>() }
+        val sections = remember(filtered) {
+            filtered.groupBy { if (it.projectId == 0L) "Global" else "Project-global" }
+                .toList()
+                .sortedBy { (label, _) -> if (label == "Global") 0 else 1 }
+        }
         LazyColumn(modifier = Modifier.fillMaxSize()) {
-            if (groupOps.groups.isEmpty()) {
-                items(filtered, key = { variableKey(it) }) { variable -> variableRow(variable) }
-            } else {
-                groupedItems(
-                    filtered, { variableKey(it) }, groupOps, dragState,
-                    onMoveItem = { moveHost.movingItemKey = it },
-                    onMoveGroup = { moveHost.movingGroup = it },
-                ) { variable -> variableRow(variable) }
+            sections.forEach { (label, vars) ->
+                val open = sectionExpanded[label] != false
+                item(key = "scope:$label") {
+                    ScopeSectionHeader(
+                        label = label,
+                        count = vars.size,
+                        expanded = open,
+                        onToggle = { sectionExpanded[label] = sectionExpanded[label] == false },
+                    )
+                }
+                if (open) {
+                    items(vars, key = { variableKey(it) }) { variable -> variableRow(variable) }
+                }
             }
         }
-        GroupMoveDialogs(groupOps, moveHost)
     }
 
     editTarget?.let { target ->
@@ -245,6 +267,36 @@ private fun VariableEmptyState(title: String, body: String) {
     }
 }
 
+/**
+ * Foldable scope-section heading (e.g. "Global", "Project-global"). Heading-style: larger + bold +
+ * underlined, slightly indented, with a fold triangle immediately to its right. Tapping anywhere on the
+ * row toggles the section.
+ */
+@Composable
+private fun ScopeSectionHeader(label: String, count: Int, expanded: Boolean, onToggle: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(start = 24.dp, end = 16.dp, top = 14.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = "$label ($count)",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            textDecoration = TextDecoration.Underline,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Icon(
+            if (expanded) Icons.Filled.ArrowDropDown else Icons.AutoMirrored.Filled.ArrowRight,
+            contentDescription = if (expanded) "Collapse $label" else "Expand $label",
+            tint = MaterialTheme.colorScheme.primary,
+        )
+    }
+}
+
 @Composable
 private fun VariableRow(
     variable: Variable,
@@ -271,7 +323,10 @@ private fun VariableRow(
             onTapNormal = onToggleExpanded,
         ),
     ) {
-        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = themePrefs.varRowPadDp.dp),
+            verticalArrangement = Arrangement.spacedBy(themePrefs.varRowPadDp.dp),
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),

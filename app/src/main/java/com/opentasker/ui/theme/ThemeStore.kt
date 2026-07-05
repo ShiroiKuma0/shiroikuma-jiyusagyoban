@@ -62,6 +62,7 @@ data class ThemePrefs(
     // ---- Variables tab ---------------------------------------------------------------------------
     // Mirrors the action-view name/value styling: defaults equal the action-view colours (blue name /
     // white value) and data size (16sp). Name and value colour + size are each independently settable.
+    val varRowPadDp: Int = 2,                    // padding INSIDE a variable row: vertical + row spacing [0, ACTION_ROW_PAD_MAX]
     val varNameColor: Int = 0xFF7FB4FF.toInt(),  // var NAME colour (default = actionNameColor blue)
     val varValueColor: Int = 0xFFFFFFFF.toInt(), // var VALUE colour (default = actionValueColor white)
     val varNameSizeSp: Int = 16,                 // var NAME size (sp) [ACTION_VALUE_MIN, ACTION_VALUE_MAX]
@@ -189,6 +190,7 @@ object ThemeStore {
     private const val K_ACTION_BORDER_COLOR = "action_border_color"
     private const val K_ACTION_BORDER_WIDTH = "action_border_width"
     private const val K_SELECTION_COLOR = "selection_color"
+    private const val K_VAR_ROW_PAD = "var_row_pad"
     private const val K_VAR_NAME_COLOR = "var_name_color"
     private const val K_VAR_VALUE_COLOR = "var_value_color"
     private const val K_VAR_NAME_SIZE = "var_name_size"
@@ -269,6 +271,7 @@ object ThemeStore {
         actionRowPadDp = actionRowPadDp.coerceIn(0, ThemePrefs.ACTION_ROW_PAD_MAX),
         actionLabelSizeSp = actionLabelSizeSp.coerceIn(ThemePrefs.ACTION_LABEL_MIN, ThemePrefs.ACTION_LABEL_MAX),
         actionValueSizeSp = actionValueSizeSp.coerceIn(ThemePrefs.ACTION_VALUE_MIN, ThemePrefs.ACTION_VALUE_MAX),
+        varRowPadDp = varRowPadDp.coerceIn(0, ThemePrefs.ACTION_ROW_PAD_MAX),
         varNameSizeSp = varNameSizeSp.coerceIn(ThemePrefs.ACTION_VALUE_MIN, ThemePrefs.ACTION_VALUE_MAX),
         varValueSizeSp = varValueSizeSp.coerceIn(ThemePrefs.ACTION_VALUE_MIN, ThemePrefs.ACTION_VALUE_MAX),
         actionLabelFrameWidthDp = actionLabelFrameWidthDp.coerceIn(0, ThemePrefs.BORDER_WIDTH_MAX),
@@ -327,6 +330,7 @@ object ThemeStore {
             actionBorderColor = prefs.getInt(K_ACTION_BORDER_COLOR, d.actionBorderColor),
             actionBorderWidthDp = prefs.getInt(K_ACTION_BORDER_WIDTH, d.actionBorderWidthDp),
             selectionColor = prefs.getInt(K_SELECTION_COLOR, d.selectionColor),
+            varRowPadDp = prefs.getInt(K_VAR_ROW_PAD, d.varRowPadDp),
             varNameColor = prefs.getInt(K_VAR_NAME_COLOR, d.varNameColor),
             varValueColor = prefs.getInt(K_VAR_VALUE_COLOR, d.varValueColor),
             varNameSizeSp = prefs.getInt(K_VAR_NAME_SIZE, d.varNameSizeSp),
@@ -391,6 +395,7 @@ object ThemeStore {
             putInt(K_ACTION_BORDER_COLOR, p.actionBorderColor)
             putInt(K_ACTION_BORDER_WIDTH, p.actionBorderWidthDp)
             putInt(K_SELECTION_COLOR, p.selectionColor)
+            putInt(K_VAR_ROW_PAD, p.varRowPadDp)
             putInt(K_VAR_NAME_COLOR, p.varNameColor)
             putInt(K_VAR_VALUE_COLOR, p.varValueColor)
             putInt(K_VAR_NAME_SIZE, p.varNameSizeSp)

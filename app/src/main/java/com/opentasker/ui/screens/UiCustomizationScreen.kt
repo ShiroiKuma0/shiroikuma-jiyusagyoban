@@ -345,6 +345,14 @@ fun UiCustomizationScreen(
             item { SectionHeader("Variables") }
             item {
                 SliderRow(
+                    level = 1, label = "Padding inside variable rows",
+                    value = prefs.varRowPadDp, valueText = "${prefs.varRowPadDp} dp",
+                    range = 0f..ThemePrefs.ACTION_ROW_PAD_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(varRowPadDp = v) } },
+                )
+            }
+            item {
+                SliderRow(
                     level = 1, label = "Variable name text size",
                     value = prefs.varNameSizeSp, valueText = "${prefs.varNameSizeSp} sp",
                     range = ThemePrefs.ACTION_VALUE_MIN.toFloat()..ThemePrefs.ACTION_VALUE_MAX.toFloat(),

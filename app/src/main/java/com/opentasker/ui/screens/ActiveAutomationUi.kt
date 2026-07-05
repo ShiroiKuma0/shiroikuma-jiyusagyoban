@@ -341,6 +341,13 @@ fun ActiveAutomationUi(
     }
     val runLogs by viewModel.runLogs.collectAsState()
     val globalVariables by viewModel.globalVariables.collectAsState()
+    // Vars tab is project-scoped like the others: super-globals (projectId 0) always show (they're visible
+    // in every project); project-globals only for the selected project. "All" shows every scope.
+    val visibleVariables = when (val f = projectFilter) {
+        ProjectFilter.All -> globalVariables
+        ProjectFilter.Unfiled -> globalVariables.filter { it.projectId == 0L }
+        is ProjectFilter.Of -> globalVariables.filter { it.projectId == 0L || it.projectId == f.projectId }
+    }
     // Variables tab: expand/collapse + multi-select are local Compose state (the fork's VariablesScreen
     // owns the rest). An empty GroupOps disables variable grouping — the grouping backend wiring
     // (itemGroupDao + groupOpsFor) was dropped when the ViewModel/UI were taken from upstream; restoring
@@ -355,20 +362,6 @@ fun ActiveAutomationUi(
     // Flow tab: per-card fold state keyed by profileId (the graph key). Default collapsed, like the others.
     val expandedFlows = remember { mutableStateMapOf<Long, Boolean>() }
     var selectedVarKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
-    val emptyVarGroupOps = remember {
-        GroupOps(
-            groups = emptyList(),
-            groupIdOf = { null },
-            projectId = null,
-            setItemGroup = { _, _ -> },
-            createGroupForItem = { _, _ -> },
-            createSubgroup = { _, _ -> },
-            setGroupParent = { _, _ -> },
-            toggleGroup = { },
-            renameGroup = { _, _ -> },
-            deleteGroup = { },
-        )
-    }
     // Widget templates (the re-wired Widgets tab) + its expand/select state. Templates live in the
     // device-local TemplateStore, not the DB, so they're read directly from its StateFlow.
     val widgetTemplates by com.opentasker.widget.TemplateStore.state.collectAsState()
@@ -645,7 +638,7 @@ fun ActiveAutomationUi(
     val headerDetail = when (screen) {
         OpenTaskerScreen.Profiles -> "${profiles.count { it.enabled }} enabled - ${profiles.size} total"
         OpenTaskerScreen.Tasks -> "${tasks.sumOf { it.actions.size }} actions - ${tasks.size} tasks"
-        OpenTaskerScreen.Vars -> "${globalVariables.size} global variables"
+        OpenTaskerScreen.Vars -> "${visibleVariables.size} variables"
         OpenTaskerScreen.Flow -> "${profiles.size} profiles - ${tasks.size} tasks"
         OpenTaskerScreen.Scenes -> "${scenes.sumOf { it.elements.size }} elements - ${scenes.size} scenes"
         OpenTaskerScreen.Widgets -> "${widgetTemplates.size} widget templates"
@@ -692,7 +685,7 @@ fun ActiveAutomationUi(
                         OpenTaskerScreen.Flow -> expandAllControl(expandedFlows, profiles.map { it.id })
                         OpenTaskerScreen.Scenes -> expandAllControl(expandedScenes, visibleScenes.map { it.id })
                         OpenTaskerScreen.Widgets -> expandAllControl(expandedTemplates, widgetTemplates.map { it.name })
-                        OpenTaskerScreen.Vars -> expandAllControl(expandedVars, globalVariables.map { variableKey(it) })
+                        OpenTaskerScreen.Vars -> expandAllControl(expandedVars, visibleVariables.map { variableKey(it) })
                         else -> null
                     }
                     if (expandAll != null) {
@@ -797,8 +790,8 @@ fun ActiveAutomationUi(
                         startSelectionExport(
                             PendingExport(
                                 fileName = exportFileName("variables"),
-                                name = "All variables (${globalVariables.size})",
-                                variableKeys = globalVariables.map { variableKey(it) }.toSet(),
+                                name = "All variables (${visibleVariables.size})",
+                                variableKeys = visibleVariables.map { variableKey(it) }.toSet(),
                             ),
                         )
                     },
@@ -1035,8 +1028,12 @@ fun ActiveAutomationUi(
             )
 
             OpenTaskerScreen.Vars -> VariablesScreen(
-                variables = globalVariables,
+                variables = visibleVariables,
                 contentPadding = innerPadding,
+                projects = projects,
+                projectFilter = projectFilter,
+                onSelectProject = viewModel::selectProject,
+                onReorderProjects = viewModel::reorderProjects,
                 onUpdate = viewModel::updateVariable,
                 onDelete = viewModel::deleteVariable,
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
@@ -1047,14 +1044,13 @@ fun ActiveAutomationUi(
                     val k = variableKey(it)
                     selectedVarKeys = if (k in selectedVarKeys) selectedVarKeys - k else selectedVarKeys + k
                 },
-                onSelectAllVars = { selectedVarKeys = globalVariables.map { variableKey(it) }.toSet() },
+                onSelectAllVars = { selectedVarKeys = visibleVariables.map { variableKey(it) }.toSet() },
                 onClearVarSelection = { selectedVarKeys = emptySet() },
                 onDeleteSelectedVars = {
-                    globalVariables.filter { variableKey(it) in selectedVarKeys }
+                    visibleVariables.filter { variableKey(it) in selectedVarKeys }
                         .forEach { viewModel.deleteVariable(it.projectId, it.name) }
                     selectedVarKeys = emptySet()
                 },
-                groupOps = emptyVarGroupOps,
             )
 
             // Scenes: the scene LIST has the fork's folding + multi-select (move-to-project / bulk-delete),
