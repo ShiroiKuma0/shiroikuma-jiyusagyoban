@@ -119,6 +119,23 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "task.editaction",
+            name = "Set Action Field",
+            description = "Write a value into another task's action argument (e.g. bake a picker's result into a config task's var.set value so it survives startup)",
+            category = "Tasks",
+            fields = listOf(
+                ActionField("task", "Target task name", required = true, hint = "the task to edit"),
+                ActionField("matchType", "Match action type", hint = "e.g. var.set (first match wins)"),
+                ActionField("matchName", "Match name arg", hint = "the variable a var.set writes, e.g. SC_Blacklist"),
+                ActionField("index", "Or action index", hint = "0-based; used instead of the matchers"),
+                ActionField("key", "Field to set", hint = "arg key; default 'value'"),
+                ActionField("value", "New value", required = true, hint = "%-expanded before writing"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "var.persist",
             name = "Persist Variable",
             description = "Copy a variable's current value into the global scope so it survives across task runs",

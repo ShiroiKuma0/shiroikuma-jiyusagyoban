@@ -73,8 +73,21 @@ class VariableStore private constructor(
         return if (allCaps) SUPER_GLOBAL_PROJECT_ID else projectId           // super vs project
     }
 
+    /** A "project-scoped" name — MixedCase (uppercase-initial with ≥1 lowercase letter). Such a name is
+     *  routed to the running project by [bucketOf]; it must never persist in the super bucket. */
+    private fun isProjectScopedName(name: String): Boolean =
+        name.isNotEmpty() && name[0].isUpperCase() && name.any { it.isLowerCase() }
+
     fun set(name: String, value: String) {
         val bucket = bucketOf(name)
+        // Invariant: a project-scoped (MixedCase) name has no home in the super bucket. Set outside any
+        // project (projectId 0 — an unfiled task), it would become a dead shadow-copy of the real
+        // project-global, so keep it task-local instead of promoting it to super. ALL-CAPS super-globals
+        // and in-project MixedCase sets are unaffected. (Guard #1 of the "no MixedCase in super" invariant.)
+        if (bucket == SUPER_GLOBAL_PROJECT_ID && isProjectScopedName(name)) {
+            synchronized(localStack) { (localStack.lastOrNull() ?: baseScope)[name] = value }
+            return
+        }
         if (bucket == null) {
             synchronized(localStack) { (localStack.lastOrNull() ?: baseScope)[name] = value }
         } else {

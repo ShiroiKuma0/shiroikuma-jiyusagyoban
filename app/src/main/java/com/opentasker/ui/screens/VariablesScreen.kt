@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -91,6 +92,8 @@ fun VariablesScreen(
     onSelectAllVars: () -> Unit,
     onClearVarSelection: () -> Unit,
     onDeleteSelectedVars: () -> Unit,
+    deadGlobals: DeadGlobalsReport,
+    onCleanupDeadGlobals: () -> Unit,
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var editTarget by remember { mutableStateOf<Variable?>(null) }
@@ -105,6 +108,8 @@ fun VariablesScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
+        // Cleanup analyzer — global to the tab (not project-filtered), folded by default, sits atop everything.
+        DeadGlobalsSection(deadGlobals, onCleanupDeadGlobals)
         if (projects.isNotEmpty()) {
             ProjectFilterChips(projects, projectFilter, onSelectProject, onReorderProjects, Modifier.padding(vertical = 8.dp))
         }
@@ -264,6 +269,78 @@ private fun VariableEmptyState(title: String, body: String) {
                 Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+    }
+}
+
+/**
+ * Foldable "Clean up dead globals" analyzer atop the Var tab: a live table of the super-global namespace —
+ * shadow-copies (dup of a project-global) and orphans (referenced nowhere) to delete, proper globals kept.
+ * Recomputes from [report] (derived from the live workspace), so once cleaned it reads 0 / 0. Delete removes
+ * only the exact super-global rows; every project's live copy is untouched.
+ */
+@Composable
+private fun DeadGlobalsSection(report: DeadGlobalsReport, onCleanup: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    var confirm by remember { mutableStateOf(false) }
+    val dead = report.deadCount
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Clean up dead globals" + if (dead > 0) " ($dead)" else "",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                if (expanded) Icons.Filled.ArrowDropDown else Icons.AutoMirrored.Filled.ArrowRight,
+                contentDescription = if (expanded) "Collapse cleanup" else "Expand cleanup",
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
+        if (expanded) {
+            Column(Modifier.padding(start = 8.dp, top = 6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                DeadRow("Shadow-copies (dup of a project-global)", report.shadowCopies.size, "delete", report.shadowCopies.isNotEmpty())
+                DeadRow("Orphans (referenced nowhere)", report.orphans.size, "delete", report.orphans.isNotEmpty())
+                DeadRow("Proper globals (in use)", report.properCount, "keep", false)
+                Button(
+                    onClick = { confirm = true },
+                    enabled = dead > 0,
+                    modifier = Modifier.padding(top = 8.dp),
+                ) { Text(if (dead > 0) "Delete $dead dead global${if (dead == 1) "" else "s"}" else "Nothing to clean") }
+            }
+        }
+    }
+    if (confirm) {
+        AlertDialog(
+            modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+            onDismissRequest = { confirm = false },
+            title = { Text("Delete $dead dead global${if (dead == 1) "" else "s"}?") },
+            text = { Text("${report.shadowCopies.size} shadow-copies + ${report.orphans.size} orphans. ${report.properCount} proper globals stay, and every project's live copy is untouched.") },
+            confirmButton = { TextButton(onClick = { confirm = false; onCleanup() }) { Text("Delete") } },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } },
+        )
+    }
+}
+
+@Composable
+private fun DeadRow(label: String, count: Int, action: String, highlight: Boolean) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            "$count  $action",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = if (highlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

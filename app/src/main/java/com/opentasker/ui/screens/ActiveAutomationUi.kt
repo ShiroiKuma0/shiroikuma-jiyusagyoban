@@ -365,6 +365,11 @@ fun ActiveAutomationUi(
     // Widget templates (the re-wired Widgets tab) + its expand/select state. Templates live in the
     // device-local TemplateStore, not the DB, so they're read directly from its StateFlow.
     val widgetTemplates by com.opentasker.widget.TemplateStore.state.collectAsState()
+    // Live dead-super-global analysis for the Var tab's cleanup section: recomputed whenever the workspace
+    // (vars/tasks/profiles/scenes/widget templates) changes, so it self-corrects to 0/0 after a cleanup.
+    val deadGlobalsReport = remember(globalVariables, tasks, profiles, scenes, widgetTemplates) {
+        analyzeDeadGlobals(globalVariables, tasks, profiles, scenes, widgetTemplates.map { it.layout })
+    }
     val expandedTemplates = remember { mutableStateMapOf<String, Boolean>() }
     var selectedTemplateNames by remember { mutableStateOf<Set<String>>(emptySet()) }
     var widgetCreateSignal by remember { mutableIntStateOf(0) }
@@ -1051,6 +1056,8 @@ fun ActiveAutomationUi(
                         .forEach { viewModel.deleteVariable(it.projectId, it.name) }
                     selectedVarKeys = emptySet()
                 },
+                deadGlobals = deadGlobalsReport,
+                onCleanupDeadGlobals = { viewModel.deleteDeadGlobals(deadGlobalsReport.deletable) },
             )
 
             // Scenes: the scene LIST has the fork's folding + multi-select (move-to-project / bulk-delete),

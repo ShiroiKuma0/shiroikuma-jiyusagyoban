@@ -596,6 +596,11 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
                 // Super-globals (projectId 0) stay super; project-globals remap to the resolved project
                 // (or fall back to super if the bundle didn't carry that project).
                 val pid = if (variable.projectId == 0L) 0L else (projectIdMap[variable.projectId] ?: 0L)
+                // Guard #2 of the "no MixedCase in super" invariant: a project-scoped (MixedCase) name that
+                // resolves to the super bucket (explicit projectId 0, or an unresolved project) would be a
+                // dead shadow-copy of the real project-global — skip it rather than seed one.
+                val n = variable.name
+                if (pid == 0L && n.isNotEmpty() && n[0].isUpperCase() && n.any { it.isLowerCase() }) return@forEach
                 val taken = takenVarNamesByScope.getOrPut(pid) { mutableSetOf() }
                 val collides = variable.name.lowercase() in taken
                 when (strategyFor("variables", variable.name.lowercase())) {

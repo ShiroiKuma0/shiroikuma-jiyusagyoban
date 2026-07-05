@@ -946,6 +946,13 @@ class ActiveAutomationViewModel(
         }
     }
 
+    /** Remove the dead super-globals the Variables-tab analyzer found (shadow-copies + orphans). Each is a
+     *  super-global (projectId 0); deleting the exact row leaves every project's live copy untouched. */
+    fun deleteDeadGlobals(vars: List<com.opentasker.core.model.Variable>) =
+        launchWithMessage("Removed ${vars.size} dead global${plural(vars.size)}") {
+            vars.forEach { db.variableDao().delete(it.projectId, it.name) }
+        }
+
     private fun launchWithMessage(successMessage: String, block: suspend () -> Unit) {
         viewModelScope.launch {
             runCatching { block() }

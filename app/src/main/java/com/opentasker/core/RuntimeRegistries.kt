@@ -66,6 +66,7 @@ import com.opentasker.core.actions.WakeOnLanAction
 import com.opentasker.core.actions.WiFiToggleAction
 import com.opentasker.core.actions.WriteFileAction
 import com.opentasker.core.actions.ClearVariableAction
+import com.opentasker.core.actions.EditActionAction
 import com.opentasker.core.actions.SplitVariableAction
 import com.opentasker.core.actions.JoinVariableAction
 import com.opentasker.core.actions.SearchReplaceVariableAction
@@ -161,6 +162,7 @@ private fun registerBuiltInActions() {
         FreezeAppAction(),
         UnfreezeAppAction(),
         MakeLauncherTasksAction(),
+        EditActionAction(),
         GoHomeAction(),
         PreviousAppAction(),
         NextAppAction(),
