@@ -33,6 +33,15 @@ interface VariableDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insert(v: VariableEntity)
     @Query("DELETE FROM variables WHERE projectId = :projectId AND name = :name")
     suspend fun delete(projectId: Long, name: String)
+    /** Drop project-globals whose projectId matches NO current project (dangling after a project was
+     *  deleted/re-created) — they're dead, frozen-stale, and unreachable. Swept at startup. */
+    @Query("DELETE FROM variables WHERE projectId != 0 AND projectId NOT IN (SELECT id FROM projects)")
+    suspend fun deleteDangling(): Int
+    /** Drop stale super-global copies of engine event vars (`INTENT_*` / `NOTIF_*`). These are now threaded
+     *  per-invocation (event-local) to the triggered task, so any persisted copy is dead residue that only
+     *  clutters the global namespace. Swept at startup. */
+    @Query("DELETE FROM variables WHERE projectId = 0 AND (name GLOB 'INTENT_*' OR name GLOB 'NOTIF_*')")
+    suspend fun deleteStaleEventVars(): Int
     @Query("SELECT * FROM variables WHERE projectId = :projectId AND name = :name")
     suspend fun get(projectId: Long, name: String): VariableEntity?
     @Query("SELECT * FROM variables") suspend fun getAll(): List<VariableEntity>

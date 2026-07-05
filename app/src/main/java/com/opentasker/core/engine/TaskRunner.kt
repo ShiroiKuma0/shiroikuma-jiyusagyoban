@@ -326,7 +326,10 @@ class TaskRunner(
             "• ${CapabilityState.shortLabel(m.requirement)} — needed by: ${m.actionTypes.joinToString(", ")}"
         }
         val text = "Can't run “$taskName” (project “$project”).\n\nMissing permission(s):\n$lines\n\n" +
-            "Grant it in Settings, then run again."
+            "Grant it below, then run again."
+        // Only offer a deep-link pill for a permission that actually has a System settings page to open.
+        val grantable = missing.distinctBy { it.requirement }
+            .filter { CapabilityState.settingsIntent(it.requirement, ctx.app) != null }
         val id = java.util.UUID.randomUUID().toString()
         val deferred = DialogBridge.register(id)
         val intent = android.content.Intent(ctx.app, DialogActivity::class.java).apply {
@@ -335,6 +338,8 @@ class TaskRunner(
             putExtra(DialogActivity.EXTRA_TITLE, "Permission required")
             putExtra(DialogActivity.EXTRA_TEXT, text)
             putExtra(DialogActivity.EXTRA_OK, "OK")
+            putExtra(DialogActivity.EXTRA_SETTINGS_REQS, grantable.map { it.requirement.name }.toTypedArray())
+            putExtra(DialogActivity.EXTRA_SETTINGS_LABELS, grantable.map { CapabilityState.shortLabel(it.requirement) }.toTypedArray())
             addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         val shown = runCatching { ctx.app.startActivity(intent); true }.getOrDefault(false)

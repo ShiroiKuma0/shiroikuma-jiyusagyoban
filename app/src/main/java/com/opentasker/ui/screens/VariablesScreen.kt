@@ -2,16 +2,19 @@ package com.opentasker.ui.screens
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -47,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -109,7 +113,7 @@ fun VariablesScreen(
 
     Column(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
         // Cleanup analyzer — global to the tab (not project-filtered), folded by default, sits atop everything.
-        DeadGlobalsSection(deadGlobals, onCleanupDeadGlobals)
+        DeadGlobalsSection(deadGlobals, projects, onCleanupDeadGlobals)
         if (projects.isNotEmpty()) {
             ProjectFilterChips(projects, projectFilter, onSelectProject, onReorderProjects, Modifier.padding(vertical = 8.dp))
         }
@@ -279,21 +283,36 @@ private fun VariableEmptyState(title: String, body: String) {
  * only the exact super-global rows; every project's live copy is untouched.
  */
 @Composable
-private fun DeadGlobalsSection(report: DeadGlobalsReport, onCleanup: () -> Unit) {
+private fun DeadGlobalsSection(report: DeadGlobalsReport, projects: List<Project>, onCleanup: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    var showShadow by remember { mutableStateOf(false) }
+    var showOrphan by remember { mutableStateOf(false) }
+    var showDangling by remember { mutableStateOf(false) }
     var confirm by remember { mutableStateOf(false) }
+    val projName = remember(projects) { projects.associate { it.id to it.name } }
     val dead = report.deadCount
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+    // The pill border/background lives on the OUTER container so it wraps everything — collapsed it's a
+    // stadium pill (header only); expanded it grows into a rounded card enclosing all the category rows.
+    val pillShape = if (expanded) RoundedCornerShape(20.dp) else RoundedCornerShape(50)
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
+            .clip(pillShape)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.40f), pillShape),
+    ) {
         Row(
-            modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(vertical = 2.dp),
+            modifier = Modifier.fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
+            // Triangle sits just after the label (not pushed to the far edge), with a wide gap between them.
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             Text(
                 text = "Clean up dead globals" + if (dead > 0) " ($dead)" else "",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.weight(1f),
             )
             Icon(
                 if (expanded) Icons.Filled.ArrowDropDown else Icons.AutoMirrored.Filled.ArrowRight,
@@ -302,10 +321,20 @@ private fun DeadGlobalsSection(report: DeadGlobalsReport, onCleanup: () -> Unit)
             )
         }
         if (expanded) {
-            Column(Modifier.padding(start = 8.dp, top = 6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                DeadRow("Shadow-copies (dup of a project-global)", report.shadowCopies.size, "delete", report.shadowCopies.isNotEmpty())
-                DeadRow("Orphans (referenced nowhere)", report.orphans.size, "delete", report.orphans.isNotEmpty())
-                DeadRow("Proper globals (in use)", report.properCount, "keep", false)
+            Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                // Each category is tappable to reveal exactly which variables it covers.
+                DeadCatRow("Shadow-copies (dup of a project-global)", report.shadowCopies.size, "delete",
+                    report.shadowCopies.isNotEmpty(), showShadow) { showShadow = !showShadow }
+                if (showShadow) report.shadowCopies.forEach { s ->
+                    DeadItemRow("%${s.variable.name}", "→ ${projName[s.twinProjectId] ?: "project #${s.twinProjectId}"}", s.variable.value)
+                }
+                DeadCatRow("Orphans (referenced nowhere)", report.orphans.size, "delete",
+                    report.orphans.isNotEmpty(), showOrphan) { showOrphan = !showOrphan }
+                if (showOrphan) report.orphans.forEach { v -> DeadItemRow("%${v.name}", "", v.value) }
+                DeadCatRow("Dangling project-globals (dead project)", report.dangling.size, "delete",
+                    report.dangling.isNotEmpty(), showDangling) { showDangling = !showDangling }
+                if (showDangling) report.dangling.forEach { v -> DeadItemRow("%${v.name}", "✗ proj #${v.projectId}", v.value) }
+                DeadCatRow("Proper globals (in use)", report.proper.size, "keep", false, false, null)
                 Button(
                     onClick = { confirm = true },
                     enabled = dead > 0,
@@ -319,28 +348,52 @@ private fun DeadGlobalsSection(report: DeadGlobalsReport, onCleanup: () -> Unit)
             modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
             onDismissRequest = { confirm = false },
             title = { Text("Delete $dead dead global${if (dead == 1) "" else "s"}?") },
-            text = { Text("${report.shadowCopies.size} shadow-copies + ${report.orphans.size} orphans. ${report.properCount} proper globals stay, and every project's live copy is untouched.") },
+            text = { Text("${report.shadowCopies.size} shadow-copies + ${report.orphans.size} orphans + ${report.dangling.size} dangling (dead-project) globals. ${report.proper.size} proper globals stay; every live project copy is untouched.") },
             confirmButton = { TextButton(onClick = { confirm = false; onCleanup() }) { Text("Delete") } },
             dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } },
         )
     }
 }
 
+/** Category summary: label · count · action, with a fold triangle when it has items to reveal. */
 @Composable
-private fun DeadRow(label: String, count: Int, action: String, highlight: Boolean) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            "$count  $action",
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Bold,
-            color = if (highlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+private fun DeadCatRow(label: String, count: Int, action: String, highlight: Boolean, expanded: Boolean, onToggle: (() -> Unit)?) {
+    val canToggle = onToggle != null && count > 0
+    Row(
+        Modifier.fillMaxWidth()
+            .then(if (canToggle) Modifier.clickable { onToggle!!() } else Modifier)
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (canToggle) {
+            Icon(
+                if (expanded) Icons.Filled.ArrowDropDown else Icons.AutoMirrored.Filled.ArrowRight,
+                contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp),
+            )
+        } else {
+            Spacer(Modifier.width(18.dp))
+        }
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+        Text("$count  $action", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold,
+            color = if (highlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** One dead variable's detail line: `%name` · where (twin project, for a shadow) · value. */
+@Composable
+private fun DeadItemRow(name: String, where: String, value: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 26.dp, top = 1.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(name, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Bold, color = Color(0xFF7FB4FF), maxLines = 1)
+        if (where.isNotEmpty()) {
+            Text(where, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        }
+        Text(value, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
     }
 }
 

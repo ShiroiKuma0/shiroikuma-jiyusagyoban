@@ -9,10 +9,14 @@ This is **shiroikuma-jiyusagyoban** — 白い熊's fork of [OpenTasker](https:/
 renamed to `shiroikuma.jiyusagyoban` ("白い熊 自由作業盤") so it installs side-by-side with upstream. Pure
 Kotlin/Compose, no native code, no Fossify Commons.
 
-> **Never ask whether to build — just build.** When this skill applies (白い熊 asked to build, or
-> you've made changes ready to test), run the build immediately. Do **not** ask "shall I build?".
-> Delivery is automatic too: after a successful build, the APK is sent via the global **/after-build**
-> skill with no transfer prompt.
+> **ALWAYS build, then ALWAYS run /after-build — no asking, no exceptions (白い熊, 2026-07-05).**
+> After ANY functional change you make (anything 白い熊 would want to test on the phone), build
+> **immediately** and deliver. Do **not** stop at a compile-check; do **not** say "compile-verified, say
+> build"; do **not** offer to build or wait for a "build" instruction. Build first (no permission needed),
+> then invoke the global **/after-build** skill (adb-push if a phone is connected, else scp to skhw) with
+> no transfer prompt. This is build-and-**DELIVER** only — it does **not** commit or push; a commit/push
+> still waits for 白い熊's explicit "Push". (Skip the build only for non-functional edits — docs, comments —
+> per the `no-pointless-rebuilds` rule.)
 
 > **Every `adb push` goes ONLY to `/sdcard/tmp/`.** This holds for the APK *and any other
 > file* (import bundles, configs, logs, screenshots) — never `/sdcard/Download/` or anywhere

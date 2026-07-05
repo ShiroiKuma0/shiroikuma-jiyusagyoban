@@ -39,6 +39,11 @@ object PersistentGlobalScope : GlobalVariableScope {
     fun init(dao: VariableDao) {
         this.dao = dao
         runBlocking {
+            // Guard: sweep dangling project-globals (projectId → a deleted/re-created project) before
+            // warming, so a dead-project row can never accumulate or shadow a live twin in rendering.
+            runCatching { dao.deleteDangling() }
+            // Sweep stale INTENT_*/NOTIF_* super copies — those engine event vars are now event-local.
+            runCatching { dao.deleteStaleEventVars() }
             runCatching { dao.getAll() }.getOrDefault(emptyList()).forEach { e ->
                 bucket(e.projectId)[e.name] = e.value
             }

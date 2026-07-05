@@ -5,22 +5,26 @@ import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 
+/** A dead super-global that duplicates a live project-global: its super copy is never read. */
+data class ShadowInfo(val variable: Variable, val twinProjectId: Long)
+
 /**
  * Live classification of the super-global (projectId 0) namespace for the Variables-tab cleanup section.
- *  - [shadowCopies] — a super-global whose NAME also exists as a project-global (its live twin). Reads at
- *    task scope only ever hit the project bucket, and render-scope merges let the project override, so the
- *    super copy is never read: dead.
+ *  - [shadowCopies] — a super-global whose NAME also exists as a project-global (its live twin); the super
+ *    copy is never read, so it's dead. Each carries the twin's projectId (the UI resolves it to a name).
  *  - [orphans] — a super-global referenced/written by NO task, profile, scene, or widget template.
- *  - [properCount] — super-globals genuinely in use, kept untouched (incl. cross-project ones and any
- *    single-project ALL-CAPS still awaiting the rename-demotion).
+ *  - [proper] — super-globals genuinely in use (kept untouched).
  */
 data class DeadGlobalsReport(
-    val shadowCopies: List<Variable> = emptyList(),
+    val shadowCopies: List<ShadowInfo> = emptyList(),
     val orphans: List<Variable> = emptyList(),
-    val properCount: Int = 0,
+    // Project-globals whose projectId matches NO current project (its project was deleted/re-created), so
+    // the row is dead: frozen-stale and invisible under any project chip. Carries the dead projectId.
+    val dangling: List<Variable> = emptyList(),
+    val proper: List<Variable> = emptyList(),
 ) {
-    val deletable: List<Variable> get() = shadowCopies + orphans
-    val deadCount: Int get() = shadowCopies.size + orphans.size
+    val deletable: List<Variable> get() = shadowCopies.map { it.variable } + orphans + dangling
+    val deadCount: Int get() = shadowCopies.size + orphans.size + dangling.size
     val hasDead: Boolean get() = deadCount > 0
 }
 
@@ -29,8 +33,7 @@ private val DG_VAR_REF = Regex("%([A-Za-z_][A-Za-z0-9_]*)")
 /**
  * Compute a [DeadGlobalsReport] from the current workspace. [templateLayouts] are the widget templates'
  * raw layout JSON, scanned as text for `%refs` (so a widget-only variable isn't misflagged as an orphan).
- * A variable a task *writes* (a `var.set`/`var.clear` `name` arg) counts as "in use" too — we never call
- * a still-written global an orphan.
+ * A variable a task *writes* (a `var.set`/`var.clear` `name` arg) counts as "in use" too.
  */
 fun analyzeDeadGlobals(
     variables: List<Variable>,
@@ -38,10 +41,16 @@ fun analyzeDeadGlobals(
     profiles: List<Profile>,
     scenes: List<Scene>,
     templateLayouts: List<String>,
+    validProjectIds: Set<Long>,
 ): DeadGlobalsReport {
     val supers = variables.filter { it.projectId == 0L }
-    if (supers.isEmpty()) return DeadGlobalsReport()
-    val projectNames = variables.asSequence().filter { it.projectId != 0L }.map { it.name }.toHashSet()
+    // A project-global whose projectId matches no current project is dead (its project was deleted/
+    // re-created). It's frozen-stale and unreachable — collect it for cleanup.
+    val dangling = variables.filter { it.projectId != 0L && it.projectId !in validProjectIds }.sortedBy { it.name }
+    if (supers.isEmpty() && dangling.isEmpty()) return DeadGlobalsReport()
+    // name -> projectId of a LIVE project-global with that name; a super whose name is here is a shadow.
+    val twinByName = HashMap<String, Long>()
+    for (v in variables) if (v.projectId != 0L && v.projectId in validProjectIds) twinByName.putIfAbsent(v.name, v.projectId)
 
     val touched = HashSet<String>()
     fun scan(s: String?) { if (!s.isNullOrEmpty()) for (m in DG_VAR_REF.findAll(s)) touched += m.groupValues[1] }
@@ -55,9 +64,10 @@ fun analyzeDeadGlobals(
     for (s in scenes) for (e in s.elements) for (v in e.config.values) scan(v)
     for (layout in templateLayouts) scan(layout)
 
-    val shadow = supers.filter { it.name in projectNames }
-    val shadowSet = shadow.mapTo(HashSet()) { it.name }
-    val rest = supers.filter { it.name !in shadowSet }
-    val orphans = rest.filter { it.name !in touched }
-    return DeadGlobalsReport(shadow, orphans, rest.size - orphans.size)
+    val shadow = supers.filter { it.name in twinByName }.map { ShadowInfo(it, twinByName.getValue(it.name)) }
+    val shadowNames = shadow.mapTo(HashSet()) { it.variable.name }
+    val rest = supers.filter { it.name !in shadowNames }
+    val orphans = rest.filter { it.name !in touched }.sortedBy { it.name }
+    val proper = rest.filter { it.name in touched }
+    return DeadGlobalsReport(shadow.sortedBy { it.variable.name }, orphans, dangling, proper)
 }

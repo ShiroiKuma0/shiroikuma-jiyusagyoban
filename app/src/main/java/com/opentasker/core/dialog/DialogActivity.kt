@@ -3,8 +3,10 @@ package com.opentasker.core.dialog
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -24,6 +26,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -62,6 +66,10 @@ class DialogActivity : ComponentActivity() {
         val cancelLabel = intent.getStringExtra(EXTRA_CANCEL)?.takeIf { it.isNotBlank() } ?: "Cancel"
         val preselected = intent.getStringExtra(EXTRA_PRESELECTED).orEmpty()
             .split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        // Optional deep-link pills for a warning dialog: parallel arrays of CapabilityRequirement names and
+        // their labels; each renders a tap-through pill that opens that permission's System settings page.
+        val settingsTargets = (intent.getStringArrayExtra(EXTRA_SETTINGS_REQS)?.toList() ?: emptyList())
+            .zip(intent.getStringArrayExtra(EXTRA_SETTINGS_LABELS)?.toList() ?: emptyList())
 
         setContent {
             val prefs by ThemeStore.state.collectAsState()
@@ -80,11 +88,20 @@ class DialogActivity : ComponentActivity() {
                             settle(DialogOutcome.Confirmed(value))
                         },
                         onCancel = { settle(DialogOutcome.Cancelled) })
-                    else -> TextDialog(title, text, okLabel, cancelLabel,
+                    else -> TextDialog(title, text, okLabel, cancelLabel, settingsTargets,
+                        onOpenSettings = { req -> openSettingsFor(req) },
                         onConfirm = { settle(DialogOutcome.Confirmed("true")) },
                         onCancel = { settle(DialogOutcome.Cancelled) })
                 }
             }
+        }
+    }
+
+    /** Open the System settings page that grants the named [CapabilityRequirement]. */
+    private fun openSettingsFor(reqName: String) {
+        runCatching {
+            val req = com.opentasker.core.capabilities.CapabilityRequirement.valueOf(reqName)
+            com.opentasker.core.capabilities.CapabilityState.settingsIntent(req, this)?.let { startActivity(it) }
         }
     }
 
@@ -116,6 +133,8 @@ class DialogActivity : ComponentActivity() {
         const val EXTRA_INPUT_TYPE = "input_type"
         const val EXTRA_OK = "ok"
         const val EXTRA_CANCEL = "cancel"
+        const val EXTRA_SETTINGS_REQS = "settings_reqs"     // CapabilityRequirement names → deep-link pills
+        const val EXTRA_SETTINGS_LABELS = "settings_labels" // parallel labels for the pills
 
         const val TYPE_INPUT = "input"
         const val TYPE_LIST = "list"
@@ -208,6 +227,8 @@ private fun TextDialog(
     text: String,
     okLabel: String,
     cancelLabel: String,
+    settingsTargets: List<Pair<String, String>>,
+    onOpenSettings: (String) -> Unit,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
 ) {
@@ -215,8 +236,31 @@ private fun TextDialog(
         modifier = dialogModifier(),
         onDismissRequest = onCancel,
         title = { if (title.isNotBlank()) Text(title) },
-        text = { if (text.isNotBlank()) Text(text, style = MaterialTheme.typography.bodyMedium) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                if (text.isNotBlank()) Text(text, style = MaterialTheme.typography.bodyMedium)
+                // One tap-through pill per missing permission → opens its System settings page.
+                settingsTargets.forEach { (reqName, label) -> SettingsPill(label) { onOpenSettings(reqName) } }
+            }
+        },
         confirmButton = { TextButton(onClick = onConfirm) { Text(okLabel) } },
         dismissButton = { TextButton(onClick = onCancel) { Text(cancelLabel) } },
+    )
+}
+
+/** A rounded, tap-through pill that opens a System settings page. */
+@Composable
+private fun SettingsPill(label: String, onClick: () -> Unit) {
+    Text(
+        "Open $label settings  →",
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+            .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
     )
 }

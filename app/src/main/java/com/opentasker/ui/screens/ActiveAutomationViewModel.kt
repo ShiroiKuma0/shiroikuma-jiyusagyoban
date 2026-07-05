@@ -243,6 +243,13 @@ class ActiveAutomationViewModel(
                 taskRows.forEach { db.taskDao().update(it.copy(projectId = null)) }
                 sceneRows.forEach { db.sceneDao().update(it.copy(projectId = null)) }
             }
+            // Project-globals can't survive their project: they can't move to Unfiled (variables have no
+            // null scope) and must never become super-globals (the "no MixedCase in super" invariant). So
+            // delete them either way — otherwise they'd dangle (dead projectId, frozen-stale, unreachable).
+            db.variableDao().getAll().filter { it.projectId == pid }.forEach {
+                db.variableDao().delete(it.projectId, it.name)
+                com.opentasker.core.engine.variables.PersistentGlobalScope.unset(it.projectId, it.name)
+            }
             // The project's foldable groups are project-scoped — delete them with the project so they don't
             // orphan. (Reassigned items keep their notes; a now-dangling groupId just reads as ungrouped.)
             db.itemGroupDao().deleteForProject(pid)
@@ -937,20 +944,27 @@ class ActiveAutomationViewModel(
     fun updateVariable(projectId: Long, name: String, value: String) {
         viewModelScope.launch {
             db.variableDao().insert(VariableEntity(projectId = projectId, name = name, value = value))
+            // Keep the runtime cache in sync (it warms once at startup; UI edits must route through it too).
+            com.opentasker.core.engine.variables.PersistentGlobalScope.set(projectId, name, value)
         }
     }
 
     fun deleteVariable(projectId: Long, name: String) {
         viewModelScope.launch {
             db.variableDao().delete(projectId, name)
+            com.opentasker.core.engine.variables.PersistentGlobalScope.unset(projectId, name)
         }
     }
 
     /** Remove the dead super-globals the Variables-tab analyzer found (shadow-copies + orphans). Each is a
-     *  super-global (projectId 0); deleting the exact row leaves every project's live copy untouched. */
+     *  super-global (projectId 0); deleting the exact row leaves every project's live copy untouched. The
+     *  runtime cache is unset too, so it never lingers with a stale copy (which diverged the export). */
     fun deleteDeadGlobals(vars: List<com.opentasker.core.model.Variable>) =
         launchWithMessage("Removed ${vars.size} dead global${plural(vars.size)}") {
-            vars.forEach { db.variableDao().delete(it.projectId, it.name) }
+            vars.forEach {
+                db.variableDao().delete(it.projectId, it.name)
+                com.opentasker.core.engine.variables.PersistentGlobalScope.unset(it.projectId, it.name)
+            }
         }
 
     private fun launchWithMessage(successMessage: String, block: suspend () -> Unit) {

@@ -1,6 +1,5 @@
 package com.opentasker.core.contexts
 
-import com.opentasker.core.engine.variables.PersistentGlobalScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -20,17 +19,10 @@ object NotificationContextEvents {
         ongoing: Boolean = false,
         isProtected: Boolean = false,
     ): Boolean {
-        // Expose the latest notification's fields as super-globals so an enter task can read them
-        // (e.g. pick the edge-blink colour by %NOTIF_PACKAGE, skip ongoing ones via %NOTIF_ONGOING),
-        // mirroring %APP_PACKAGE.
+        // The notification's fields are threaded PER-INVOCATION to the enter task via ContextEvent.vars
+        // (see buildEvent) — NOT persisted as super-globals. The only reader is the notification enter task
+        // (通知明滅点灯), which receives these locals; persisting them just cluttered the global namespace.
         val pkg = packageName.trim()
-        PersistentGlobalScope.set(0L, "NOTIF_PACKAGE", pkg)
-        PersistentGlobalScope.set(0L, "NOTIF_TITLE", sanitizeText(title))
-        PersistentGlobalScope.set(0L, "NOTIF_BODY", sanitizeText(body))
-        PersistentGlobalScope.set(0L, "NOTIF_ONGOING", ongoing.toString())
-        // %NOTIF_PROTECTED — true on a 白い熊 GNU Jami "protected contact" vague notification (marker extra
-        // shiroikuma.jami.protected); lets 通知明滅 blink for it even though it carries no visible content.
-        PersistentGlobalScope.set(0L, "NOTIF_PROTECTED", isProtected.toString())
         return notifications.tryEmit(buildEvent(pkg, title, body, ongoing, isProtected))
     }
 

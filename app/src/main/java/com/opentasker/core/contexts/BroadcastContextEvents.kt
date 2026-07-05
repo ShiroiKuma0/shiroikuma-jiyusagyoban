@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import androidx.core.content.ContextCompat
-import com.opentasker.core.engine.variables.PersistentGlobalScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -61,8 +60,11 @@ object BroadcastContextEvents {
     private fun handle(intent: Intent) {
         val action = intent.action ?: return
         val metadata = linkedMapOf("event" to "broadcast", "action" to action)
-        // Publish extras BEFORE emitting, so the triggered task already sees them.
-        PersistentGlobalScope.set(0L, "INTENT_ACTION", action)
+        // `%INTENT_*` are threaded PER-INVOCATION to the triggered enter task via ContextEvent.vars — NOT
+        // persisted as super-globals. Poweramp dumps ~30 extras per TRACK_CHANGED; persisting them all
+        // permanently polluted the global namespace, and the only readers are the broadcast enter tasks,
+        // which already receive these locals.
+        val vars = linkedMapOf("INTENT_ACTION" to action)
 
         fun publish(key: String, raw: Any?) {
             when (raw) {
@@ -72,7 +74,7 @@ object BroadcastContextEvents {
                 else -> {
                     val value = raw.toString()
                     val name = "INTENT_" + key.uppercase(Locale.US).map { if (it.isLetterOrDigit()) it else '_' }.joinToString("")
-                    PersistentGlobalScope.set(0L, name, value)
+                    vars[name] = value
                     metadata[key] = value
                 }
             }
@@ -80,6 +82,6 @@ object BroadcastContextEvents {
         runCatching { intent.extras }.getOrNull()?.let { extras ->
             for (key in extras.keySet() ?: emptySet()) publish(key, runCatching { extras.get(key) }.getOrNull())
         }
-        flow.tryEmit(ContextEvent(type = "event", matched = true, metadata = metadata))
+        flow.tryEmit(ContextEvent(type = "event", matched = true, metadata = metadata, vars = vars))
     }
 }
