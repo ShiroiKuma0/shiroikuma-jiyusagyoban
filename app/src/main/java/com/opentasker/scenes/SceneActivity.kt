@@ -886,6 +886,13 @@ internal fun SceneElementView(
             val charging = sceneBool(v("charging"))
             val screenOn = rememberScreenOn()
             val barThickness = (v("barThickness").toIntOrNull() ?: 3).dp
+            // Charging-effect tunables, all %var-drivable from the scene config (see 電池線の設定 [01]):
+            // flameCycle (s) = one converge-and-return breath; emberCount / glintCount per flame tip;
+            // trailLinger (s) = how long the red heat-tint lingers on the bar (0 = no trail).
+            val flameCycleMs = ((v("flameCycle").toFloatOrNull() ?: 3.8f) * 1000).toInt().coerceIn(800, 20000)
+            val emberCount = (v("emberCount").toIntOrNull() ?: 14).coerceIn(0, 40)
+            val glintCount = (v("glintCount").toIntOrNull() ?: 7).coerceIn(0, 20)
+            val trailLingerMs = ((v("trailLinger").toFloatOrNull() ?: 1.3f) * 1000f).coerceIn(0f, 10000f)
             Box(Modifier.fillMaxSize().background(trackColor)) {
                 // The battery-% column: centred horizontally, spanning the full (tall) height. It holds the
                 // thin coloured bar at its top and the ember effect over the whole column.
@@ -902,7 +909,9 @@ internal fun SceneElementView(
                             .height(barThickness)
                             .background(fillColor),
                     )
-                    if (charging && screenOn) ChargingFlame(Modifier.fillMaxSize(), barThickness)
+                    if (charging && screenOn) {
+                        ChargingFlame(Modifier.fillMaxSize(), barThickness, flameCycleMs, emberCount, glintCount, trailLingerMs)
+                    }
                 }
             }
         }
@@ -1082,16 +1091,25 @@ private suspend fun AwaitPointerEventScope.drainPressed(id: PointerId) {
  * recomputed off-screen. Everything is derived from the animation phases (no state across frames).
  *
  * [barThickness] is the thin visible line's thickness; the comets ride along it (near the top of [modifier]).
+ * [cycleMs] = one converge-and-return breath; [emberCount]/[glintCount] per flame tip; [trailMs] = the
+ * heat-trail's linger time-constant in ms (0 disables the trail). All four map to %Denchi_* settings vars.
  */
 @Composable
-private fun ChargingFlame(modifier: Modifier, barThickness: Dp) {
+private fun ChargingFlame(
+    modifier: Modifier,
+    barThickness: Dp,
+    cycleMs: Int = 3800,
+    emberCount: Int = 14,
+    glintCount: Int = 7,
+    trailMs: Float = 1300f,
+) {
     val tr = rememberInfiniteTransition(label = "denchiFlame")
     // Slow breathing convergence: a single linear phase mapped through a cosine so the ends (comets at the
     // edges) and the middle (comets meeting) are BOTH zero-velocity turnarounds → a seamless loop, no jump.
     val phase by tr.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(3800, easing = LinearEasing), RepeatMode.Restart),
+        animationSpec = infiniteRepeatable(tween(cycleMs, easing = LinearEasing), RepeatMode.Restart),
         label = "breath",
     )
     // A fast phase to flicker the flame brightness.
@@ -1109,17 +1127,17 @@ private fun ChargingFlame(modifier: Modifier, barThickness: Dp) {
         label = "ember",
     )
     // A decaying "heat" field along the line: each comet deposits heat at its current position every frame,
-    // and every bin cools exponentially — so where a comet just ran, the line glows red and lingers ~1.3 s
-    // before fading back. Driven by real frame time in a LaunchedEffect that lives ONLY while composed
-    // (charging && screen-on), so it stops dead off-screen. 64 bins across the line width.
+    // and every bin cools exponentially — so where a comet just ran, the line glows red and lingers for
+    // [trailMs] before fading back. Driven by real frame time in a LaunchedEffect that lives ONLY while
+    // composed (charging && screen-on), so it stops dead off-screen. 64 bins across the line width.
     val heat = remember { FloatArray(64) }
-    LaunchedEffect(Unit) {
+    if (trailMs > 0f) LaunchedEffect(trailMs) {
         var last = 0L
         while (true) {
             withFrameNanos { now ->
                 val dt = if (last == 0L) 16f else ((now - last) / 1_000_000f).coerceIn(0f, 100f)
                 last = now
-                val decay = exp(-dt / 1300f)                   // ~1.3 s heat time-constant (the "lingering")
+                val decay = exp(-dt / trailMs)                 // heat time-constant (the "lingering")
                 for (i in heat.indices) heat[i] *= decay
                 val ss = (0.5 - 0.5 * cos(phase * 2.0 * Math.PI)).toFloat()
                 depositHeat(heat, 0.5f * ss)                   // left comet head fraction
@@ -1154,8 +1172,8 @@ private fun ChargingFlame(modifier: Modifier, barThickness: Dp) {
                 nc.drawRect(i * binW, 0f, (i + 1) * binW + 1f, strip, tint)
             }
             // left comet: head glides 0 → centre; right comet: head glides w → centre (mirror).
-            drawDenchiComet(nc, s * center, 1f, tail, lineCy, lineHalf, fallRange, flicker, ember, 0.0)
-            drawDenchiComet(nc, w - s * center, -1f, tail, lineCy, lineHalf, fallRange, flicker, ember, 3.3)
+            drawDenchiComet(nc, s * center, 1f, tail, lineCy, lineHalf, fallRange, flicker, ember, 0.0, emberCount, glintCount)
+            drawDenchiComet(nc, w - s * center, -1f, tail, lineCy, lineHalf, fallRange, flicker, ember, 3.3, emberCount, glintCount)
             // collision bloom where they meet in the middle (grows as s → 1) — deep-red/orange.
             val meet = s * s
             if (meet > 0.03f) {
@@ -1207,6 +1225,8 @@ private fun drawDenchiComet(
     flicker: Float,
     ember: Float,
     seed: Double,
+    emberCount: Int = 14,
+    glintCount: Int = 7,
 ) {
     val tailX = headX - dir * tail
     val lft = minOf(headX, tailX)
@@ -1248,8 +1268,7 @@ private fun drawDenchiComet(
         strokeWidth = (lineHalf * 0.7f).coerceAtLeast(1.2f)
         style = android.graphics.Paint.Style.STROKE
     }
-    val glints = 7
-    for (i in 0 until glints) {
+    for (i in 0 until glintCount) {
         // Each glint runs its own fast phase (~3 cycles per ember loop, offset per glint) and is only
         // visible near the peak of its cycle → a scatter of brief red flashes around the tip.
         val ph = ((ember * 3.0 + hashUnit(i * 7.31 + seed)) % 1.0).toFloat()
@@ -1270,8 +1289,7 @@ private fun drawDenchiComet(
     //    cooling to deep crimson), then pulled down by "gravity" so they arc and rain below the line.
     val twoPi = 6.2831855f
     val spark = android.graphics.Paint().apply { isAntiAlias = true }
-    val n = 14
-    for (i in 0 until n) {
+    for (i in 0 until emberCount) {
         val la = ((ember + i * 0.6180339887 + seed) % 1.0).toFloat()      // 0..1 life, golden-ratio staggered
         val h1 = hashUnit(i * 12.9898 + seed * 78.233)                    // angle hash
         val h2 = hashUnit(i * 39.425 + seed * 93.7)                       // reach hash

@@ -1457,7 +1457,12 @@ private fun RowScope.ArgPill(
             color = if (argKey == "name") nameColor else valueColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = (if (valueWeight) Modifier.weight(1f) else Modifier.widthIn(max = 160.dp))
+            // Last arg: fill whatever is left (and ellipsise there). Non-last (e.g. a var.set NAME): take
+            // the NATURAL width so the name always shows completely — the hard 160dp cap truncated most
+            // %Ongaku_*-length names on a wide screen (白い熊). fill=false keeps it natural-sized while the
+            // 3:1 weights still guarantee the last value at least ~25% of the flexible width, so a
+            // pathological name ellipsises at ~75% instead of pushing the value off the row.
+            modifier = (if (valueWeight) Modifier.weight(1f) else Modifier.weight(3f, fill = false))
                 .clip(RoundedCornerShape(6.dp))
                 // In selection mode a tap toggles this action; otherwise it edits the value. Long-press
                 // always (de)selects + opens the menu.
