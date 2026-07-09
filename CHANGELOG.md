@@ -3,6 +3,74 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.75+175 — 2026-07-09
+
+The **living-overlay release**: a native **charging-fire animation** on the battery line, a rewritten
+**buttery-smooth music edge-light** canvas, strict **screen-off gating** so no overlay ever computes
+behind a dark screen, a full set of **documented tuning variables** in the projects' `[01]` settings
+tasks, a **task-target bridge** for sister launchers, and an action-row fix so variable names always
+render in full.
+
+### 電池線 — charging fire (native scene renderer)
+- While charging (and only with the screen on), **two fire-comets glide in from both ends of the
+  battery line, meet in the middle** with a red-orange collision bloom, and slide back out — a
+  seamless, breathing loop (cosine-eased turnarounds, so it never jumps or disappears).
+- Each comet has a **blood-red → hot orange-red gradient body** (soft-blurred capsule) and a red head
+  glow — no white anywhere in the flame.
+- **Red star-cross glints** twinkle at each flame tip: tiny `+`-shaped strokes flashing in and out on
+  fast per-glint cycles — a genuine red sparkle instead of a solid dot.
+- An **ember burst** sprays red sparks in all directions from each tip (bright red-orange at birth,
+  cooling to deep crimson), arcing down under gravity into the scene's below-line head-room.
+- A decaying **heat field** tints the bar deep red where a comet just passed — a lingering
+  "residual fire" trail (~1.3 s time-constant) that cools back to the line's own colour.
+- The visible bar itself stays a thin strip (`barThickness` config, default 3 dp) at the top of the
+  now-taller scene; the line keeps its state colours (base / low-battery red / full green) at all
+  times, and the whole overlay stays fully tap-through.
+- **Fully variable-tunable** via the scene config → `電池線の設定 [01]`: `%Denchi_Cycle` (seconds per
+  converge-and-return breath), `%Denchi_Hibana` (ember count), `%Denchi_Kirameki` (glint count),
+  `%Denchi_Nokoribi` (heat-trail linger seconds; `0` disables the trail loop entirely).
+- The effect exists in composition **only while `charging && screen-on`** — unplugging or blanking
+  the screen stops the animation clock dead (zero off-screen CPU).
+
+### 音楽端灯 — smooth, rich, heat-controlled edge-light (scene canvas)
+- The WebView canvas hot loop was rewritten **allocation-free**: no per-frame arrays (the perimeter
+  mapper writes globals), per-ribbon colours resolved once at spawn, in-place particle compaction,
+  and the ribbon core drawn as **one gradient stroke** instead of 24 per-segment strokes — roughly
+  **9× fewer draw calls per frame**. This eliminated the GC-pause stutter ("choppy, interrupted").
+- Runs at the **full display refresh rate** with a settable cap: `%Ongaku_Maxfps`
+  (`0` = uncapped, `60` = default, `30` = power-saver) — the overheating control.
+- **New eye-candy knobs**, all injected as canvas variables: `%Ongaku_Headglow` (a near-white head
+  star melting into the ribbon colour — shooting-star tips), `%Ongaku_Twinkle` (per-ribbon shimmer
+  depth), `%Ongaku_Huedrift` (deg/s — a ribbon's colour slowly walks the colour wheel as it orbits).
+- Palette reworked: the original bright multicolour set **plus blood-reds** (`#ff0000`, `#c00000`,
+  `#ff2a00`) interleaved, so ~1 in 4 meteors runs red among the bright ones.
+
+### Screen-off gating (engine)
+- New opt-in WEB-element config **`pauseWhenScreenOff`**: when the display turns off, the native
+  renderer calls `WebView.onPause()` *and* `window.__scenePlay(false)` (a JS hook the page defines),
+  freezing both the compositor and the rAF loop; both resume on screen-on. **Opt-in by design** so
+  通知明滅's over-lockscreen wakedance scenes — which must draw while the screen is off — are
+  untouched.
+- The battery-line comet effect leaves composition entirely on screen-off (same guarantee, native).
+
+### Settings-task workflow
+- Both projects' `[01]` settings tasks now carry the **complete knob set with a documentation label
+  on every action** — the task doubles as the manual. Re-running the project's `⇨ 起動 [71]` task
+  (which runs `[01]`) idempotently applies any settings change; a live scene reloads with the new
+  values automatically.
+
+### Task-target bridge (sister-launcher integration)
+- New **`GET_TASK_TARGET_PACKAGE`** ordered-broadcast receiver: a sister launcher holding one of our
+  run-task shortcuts can ask *which app the task ultimately opens* (by task name or id) and point its
+  "app info" / "uninstall" menu entries at that app instead of at us. Newer shortcuts additionally
+  bake the target package into the shortcut intent's extras.
+
+### UI fixes
+- **Action rows: variable names always render in full.** The arg renderer's hard 160 dp cap on
+  non-last values (the `var.set` *name*) truncated most real-world names on a wide screen; names now
+  take their natural width, with a 3:1 weight backstop so the value keeps ≥~25% of the row and a
+  pathological name ellipsises at ~75% instead of pushing the value off.
+
 ## 0.2.75+164 — 2026-07-05
 
 A large feature release over 0.2.75+127: the **相撲字時計** fold-aware over-lockscreen clock, a **task & action UI overhaul**, a full **Variables-tab redesign** with an in-app **dead-globals analyzer** and hard guards against scope leaks, a new **Edit Action** action, tap-through **permission deep-links**, and a switch to **event-local** notification/broadcast variables.
