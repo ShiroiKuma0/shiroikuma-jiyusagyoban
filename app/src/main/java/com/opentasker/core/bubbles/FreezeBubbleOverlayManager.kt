@@ -198,6 +198,25 @@ object FreezeBubbleOverlayManager {
             layoutParams = FrameLayout.LayoutParams(badgePx, badgePx).apply { gravity = Gravity.TOP or Gravity.END }
         }
         iconFrame.addView(badge)
+
+        // ↗ launch badge in the bottom-right corner (under the ❄ freeze badge), same size + styling.
+        // It is the only clickable part of the bubble, so a tap here is consumed by the badge and never
+        // reaches the parent's freeze handler → tapping it opens the app; tapping anywhere else freezes.
+        val launchBadge = TextView(ctx).apply {
+            text = "↗"
+            setTextColor(accent)
+            setTextSize(TypedValue.COMPLEX_UNIT_PX, badgePx * 0.6f)
+            gravity = Gravity.CENTER
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(onAccent)
+                setStroke(dp(1), accent)
+            }
+            isClickable = true
+            setOnClickListener { launchApp(entry) }
+            layoutParams = FrameLayout.LayoutParams(badgePx, badgePx).apply { gravity = Gravity.BOTTOM or Gravity.END }
+        }
+        iconFrame.addView(launchBadge)
         column.addView(iconFrame)
 
         val typeface = resolveBubbleTypeface(prefs)
@@ -302,6 +321,20 @@ object FreezeBubbleOverlayManager {
 
     private fun dismissOnly(pkg: String) {
         FreezeBubbleStore.remove(pkg)  // flow → sync() removes the window; app stays thawed
+    }
+
+    /** Open the bubble's target app (reuses the `app.launch` action). The bubble stays put — the app is
+     *  still thawed, so the reminder reappears when you come back to the Desktop to re-freeze it. */
+    private fun launchApp(entry: BubbleEntry) {
+        val ctx = appContext ?: return
+        val s = scope ?: return
+        s.launch(Dispatchers.IO) {
+            val task = Task(
+                name = "Launch ${entry.label}",
+                actions = listOf(ActionSpec(type = "app.launch", args = mapOf("package" to entry.pkg))),
+            )
+            runCatching { executeAndLogTask(ctx, OpenTaskerApp_NoHilt.db, task, source = "FreezeBubble", logTag = TAG) }
+        }
     }
 
     // ---- geometry --------------------------------------------------------------------------------

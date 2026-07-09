@@ -12,6 +12,13 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.opentasker.core.shizuku.ShizukuShell
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -83,6 +90,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalContext
 import android.content.Context
@@ -93,6 +101,7 @@ import android.os.PowerManager
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.focus.onFocusChanged
@@ -100,6 +109,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -110,6 +121,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -133,7 +145,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.lang.ref.WeakReference
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 /**
  * Runtime display of a [Scene]: a modal overlay (scrim + the scene laid out by its elements'
@@ -856,22 +872,38 @@ internal fun SceneElementView(
         }
 
         SceneElementType.PROGRESS -> {
-            // Horizontal fill bar (e.g. the battery line). value=0..100 (a %var); fillColor over trackColor.
-            // While `charging` is truthy the whole filled bar turns SOLID RED — a static, unmistakable
-            // charging indicator (no animation, so it's free to keep up the whole time you're plugged in;
-            // a faint tint was too subtle and a 5 fps sweep cost ~5% CPU in the overlay).
+            // Horizontal battery line. value=0..100 (a %var); the line keeps its state colour at all times
+            // (yellow, or red-low / green-full) over an optional trackColor. The VISIBLE line is a thin strip
+            // at the TOP (`barThickness` dp, default 3); the rest of the — deliberately taller — scene is
+            // head-room for the charging effect's embers to fly into. While `charging` is truthy AND the
+            // screen is on, two fire-comets glide in from both ends, meet in the middle and slide back, raining
+            // red embers below the line (see [ChargingFlame]). It is gated on the screen so it recomputes ONLY
+            // while visible — pulling the charger or blanking the screen drops it out of composition and the
+            // animation clock stops dead (no off-screen CPU).
             val pct = ((v("value").toFloatOrNull() ?: 0f).coerceIn(0f, 100f)) / 100f
             val fillColor = sceneColor(v("fillColor")) ?: MaterialTheme.colorScheme.primary
             val trackColor = sceneColor(v("trackColor")) ?: Color.Transparent
             val charging = sceneBool(v("charging"))
+            val screenOn = rememberScreenOn()
+            val barThickness = (v("barThickness").toIntOrNull() ?: 3).dp
             Box(Modifier.fillMaxSize().background(trackColor)) {
+                // The battery-% column: centred horizontally, spanning the full (tall) height. It holds the
+                // thin coloured bar at its top and the ember effect over the whole column.
                 Box(
                     Modifier
                         .fillMaxHeight()
                         .fillMaxWidth(pct)
-                        .align(Alignment.Center)
-                        .background(if (charging) Color.Red else fillColor),
-                )
+                        .align(Alignment.Center),
+                ) {
+                    Box(
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                            .height(barThickness)
+                            .background(fillColor),
+                    )
+                    if (charging && screenOn) ChargingFlame(Modifier.fillMaxSize(), barThickness)
+                }
             }
         }
 
@@ -895,6 +927,14 @@ internal fun SceneElementView(
                     rawHtml.replaceFirst("</head>", "<script>$inject</script></head>")
                 else -> "<script>$inject</script>$rawHtml"
             }
+            // OPT-IN screen-off pause (config `pauseWhenScreenOff`=true). When set, the whole WebView is
+            // paused while the display is off, so an rAF animation (the music edge-light) stops recomputing
+            // behind a dark screen: WebView.onPause() halts the view's compositor/timers, and
+            // window.__scenePlay(false) (if the page defines it) stops its own rAF loop from re-arming —
+            // belt and suspenders. It is deliberately OPT-IN: the 通知明滅 edge-light and its over-lockscreen
+            // wakedance draw *while the screen is off/waking*, so they must NOT be paused (they omit the flag).
+            val pauseWhenScreenOff = sceneBool(v("pauseWhenScreenOff"))
+            val screenOn = rememberScreenOn()
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
@@ -909,6 +949,17 @@ internal fun SceneElementView(
                     if (wv.tag != html) {
                         wv.tag = html
                         wv.loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
+                    }
+                    // Only scenes that opt in are gated on the screen; every other WEB scene is left exactly
+                    // as before (no onPause/onResume, no JS injected — so 通知明滅 keeps drawing over the lock).
+                    if (pauseWhenScreenOff) {
+                        if (screenOn) {
+                            wv.onResume()
+                            wv.evaluateJavascript("window.__scenePlay&&window.__scenePlay(true)", null)
+                        } else {
+                            wv.evaluateJavascript("window.__scenePlay&&window.__scenePlay(false)", null)
+                            wv.onPause()
+                        }
                     }
                 },
             )
@@ -1016,6 +1067,246 @@ private suspend fun AwaitPointerEventScope.drainPressed(id: PointerId) {
         if (!ch.pressed) return
         ch.consume()
     }
+}
+
+/**
+ * The battery-line "charging" indicator. Two glowing fire-comets glide in from the two ends of the line,
+ * converge and meet in the middle (with a collision bloom), then slide back out — a slow, seamless
+ * breathing cycle that never fully disappears. Each comet has a flickering white-hot head, a deep-red
+ * blurred tail, and a fountain of red embers that spray up-and-out and rain down well below the thin line
+ * (into the scene's deliberately tall head-room). Two out-of-phase flicker sines make it dance like fire.
+ *
+ * It is driven by [rememberInfiniteTransition], whose clock ticks ONLY while this composable is in
+ * composition — and the caller composes it exclusively while `charging && screen-on`. So the moment the
+ * charger is pulled or the screen sleeps, it leaves composition and the animation stops dead: nothing is
+ * recomputed off-screen. Everything is derived from the animation phases (no state across frames).
+ *
+ * [barThickness] is the thin visible line's thickness; the comets ride along it (near the top of [modifier]).
+ */
+@Composable
+private fun ChargingFlame(modifier: Modifier, barThickness: Dp) {
+    val tr = rememberInfiniteTransition(label = "denchiFlame")
+    // Slow breathing convergence: a single linear phase mapped through a cosine so the ends (comets at the
+    // edges) and the middle (comets meeting) are BOTH zero-velocity turnarounds → a seamless loop, no jump.
+    val phase by tr.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(3800, easing = LinearEasing), RepeatMode.Restart),
+        label = "breath",
+    )
+    // A fast phase to flicker the flame brightness.
+    val flick by tr.animateFloat(
+        initialValue = 0f,
+        targetValue = (2.0 * Math.PI).toFloat(),
+        animationSpec = infiniteRepeatable(tween(430, easing = LinearEasing), RepeatMode.Restart),
+        label = "flicker",
+    )
+    // An independent looping driver for the ember fountain (staggered per spark → a continuous spray).
+    val ember by tr.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Restart),
+        label = "ember",
+    )
+    // A decaying "heat" field along the line: each comet deposits heat at its current position every frame,
+    // and every bin cools exponentially — so where a comet just ran, the line glows red and lingers ~1.3 s
+    // before fading back. Driven by real frame time in a LaunchedEffect that lives ONLY while composed
+    // (charging && screen-on), so it stops dead off-screen. 64 bins across the line width.
+    val heat = remember { FloatArray(64) }
+    LaunchedEffect(Unit) {
+        var last = 0L
+        while (true) {
+            withFrameNanos { now ->
+                val dt = if (last == 0L) 16f else ((now - last) / 1_000_000f).coerceIn(0f, 100f)
+                last = now
+                val decay = exp(-dt / 1300f)                   // ~1.3 s heat time-constant (the "lingering")
+                for (i in heat.indices) heat[i] *= decay
+                val ss = (0.5 - 0.5 * cos(phase * 2.0 * Math.PI)).toFloat()
+                depositHeat(heat, 0.5f * ss)                   // left comet head fraction
+                depositHeat(heat, 1f - 0.5f * ss)              // right comet head fraction
+            }
+        }
+    }
+    Canvas(modifier.clipToBounds()) {
+        val w = size.width
+        val h = size.height
+        if (w <= 0f || h <= 0f) return@Canvas
+        val lineHalf = (barThickness.toPx() / 2f).coerceAtMost(h / 2f)
+        val lineCy = lineHalf                                  // the bar hugs the top edge; embers fall below
+        val center = w / 2f
+        // s: 0 at the two ends → 1 at the centre → 0 again (seamless because cos gives zero velocity at both).
+        val s = (0.5 - 0.5 * cos(phase * 2.0 * Math.PI)).toFloat()
+        val tail = (w * 0.45f).coerceAtLeast(h * 2f)
+        val fallRange = (h - lineCy) * 0.96f                   // how far embers rain below the line
+        val flicker = (0.72 + 0.28 * (0.5 + 0.5 * sin(flick.toDouble())) *
+            (0.5 + 0.5 * sin(flick * 1.7 + 1.3))).toFloat()
+        drawIntoCanvas { canvas ->
+            val nc = canvas.nativeCanvas
+            // 0) lingering red heat-trail on the bar itself — drawn first so the comets/embers sit on top.
+            val binW = w / heat.size
+            val strip = lineHalf * 2f
+            val tint = android.graphics.Paint()
+            for (i in heat.indices) {
+                val hv = heat[i]
+                if (hv <= 0.02f) continue
+                tint.color = 0xFFE01A18.toInt()                // deep red; blends over the line's own colour
+                tint.alpha = (hv * 210f).toInt().coerceIn(0, 255)
+                nc.drawRect(i * binW, 0f, (i + 1) * binW + 1f, strip, tint)
+            }
+            // left comet: head glides 0 → centre; right comet: head glides w → centre (mirror).
+            drawDenchiComet(nc, s * center, 1f, tail, lineCy, lineHalf, fallRange, flicker, ember, 0.0)
+            drawDenchiComet(nc, w - s * center, -1f, tail, lineCy, lineHalf, fallRange, flicker, ember, 3.3)
+            // collision bloom where they meet in the middle (grows as s → 1) — deep-red/orange.
+            val meet = s * s
+            if (meet > 0.03f) {
+                val r = (h * 0.85f).coerceAtLeast(lineHalf * 4f)
+                val bloom = android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    shader = android.graphics.RadialGradient(
+                        center, lineCy, r,
+                        intArrayOf(0xFFFFA84E.toInt(), 0xCCE52424.toInt(), 0x00A00010),
+                        floatArrayOf(0f, 0.4f, 1f),
+                        android.graphics.Shader.TileMode.CLAMP,
+                    )
+                    alpha = (210 * meet * flicker).toInt().coerceIn(0, 255)
+                }
+                nc.drawCircle(center, lineCy, r, bloom)
+            }
+        }
+    }
+}
+
+/** Deposit heat (up to 1.0, brightest at [frac]) into a few bins of the line's heat field around the
+ *  fractional position [frac]∈[0,1]. Used by [ChargingFlame] to paint the comet's lingering trail. */
+private fun depositHeat(heat: FloatArray, frac: Float) {
+    val n = heat.size
+    val c = frac * (n - 1)
+    val radius = n * 0.035f + 1.2f
+    val lo = maxOf(0, (c - radius).toInt())
+    val hi = minOf(n - 1, (c + radius).toInt() + 1)
+    for (i in lo..hi) {
+        val v = (1f - abs(i - c) / radius).coerceIn(0f, 1f)
+        if (v > heat[i]) heat[i] = v
+    }
+}
+
+/**
+ * Draw ONE converging fire-comet of the charging effect: a soft-blurred capsule body along the top line
+ * (transparent tail → white-hot head), an incandescent head glow, and a fountain of red embers that spray
+ * up-and-out from the head and arc down under "gravity". All positions are derived from the animation
+ * phases (deterministic hashes for scatter) — no per-frame state. [dir] +1 = travelling right, -1 = left.
+ */
+private fun drawDenchiComet(
+    nc: android.graphics.Canvas,
+    headX: Float,
+    dir: Float,
+    tail: Float,
+    lineCy: Float,
+    lineHalf: Float,
+    fallRange: Float,
+    flicker: Float,
+    ember: Float,
+    seed: Double,
+) {
+    val tailX = headX - dir * tail
+    val lft = minOf(headX, tailX)
+    val rgt = maxOf(headX, tailX)
+    val bodyH = (lineHalf * 1.6f).coerceAtLeast(1.5f)
+    // 1) comet body — a deep, blood-red tail rising to a hot orange-red head (no white/amber), softly blurred.
+    val body = android.graphics.Paint().apply {
+        isAntiAlias = true
+        shader = android.graphics.LinearGradient(
+            tailX, 0f, headX, 0f,
+            intArrayOf(0x00A00010, 0x55C2181B.toInt(), 0xCCE02020.toInt(), 0xFFFF3A1A.toInt(), 0xFFFF7A3A.toInt()),
+            floatArrayOf(0f, 0.5f, 0.82f, 0.94f, 1f),
+            android.graphics.Shader.TileMode.CLAMP,
+        )
+        alpha = (255 * flicker).toInt().coerceIn(0, 255)
+        maskFilter = android.graphics.BlurMaskFilter(bodyH * 0.7f, android.graphics.BlurMaskFilter.Blur.NORMAL)
+    }
+    nc.drawRoundRect(lft, lineCy - bodyH, rgt, lineCy + bodyH, bodyH, bodyH, body)
+    // 2) head glow — hot orange-red core into deep red, fading to transparent dark red.
+    val glowR = bodyH * 3.2f
+    val glow = android.graphics.Paint().apply {
+        isAntiAlias = true
+        shader = android.graphics.RadialGradient(
+            headX, lineCy, glowR,
+            intArrayOf(0xFFFF8A40.toInt(), 0xE6E52020.toInt(), 0x00A00010),
+            floatArrayOf(0f, 0.4f, 1f),
+            android.graphics.Shader.TileMode.CLAMP,
+        )
+        alpha = (255 * flicker).toInt().coerceIn(0, 255)
+    }
+    nc.drawCircle(headX, lineCy, glowR, glow)
+    // 3) RED GLINTS at the tip — the "sparkle". Not a solid core (that read as a plain white dot): tiny
+    //    star-crosses (two crossing strokes) around the head that flash in and out on a fast cycle, in
+    //    bright red-orange. Twinkle comes from the rapid appear/disappear + the star shape, so it reads
+    //    as sparkling while staying firmly RED.
+    val glintPaint = android.graphics.Paint().apply {
+        isAntiAlias = true
+        strokeCap = android.graphics.Paint.Cap.ROUND
+        strokeWidth = (lineHalf * 0.7f).coerceAtLeast(1.2f)
+        style = android.graphics.Paint.Style.STROKE
+    }
+    val glints = 7
+    for (i in 0 until glints) {
+        // Each glint runs its own fast phase (~3 cycles per ember loop, offset per glint) and is only
+        // visible near the peak of its cycle → a scatter of brief red flashes around the tip.
+        val ph = ((ember * 3.0 + hashUnit(i * 7.31 + seed)) % 1.0).toFloat()
+        val vis = sin(ph * Math.PI).toFloat().let { it * it }             // 0→1→0, sharpened
+        if (vis < 0.3f) continue
+        val dx = (hashUnit(i * 17.77 + seed * 3.1) - 0.5f) * bodyH * 6f
+        val dy = (hashUnit(i * 29.53 + seed * 5.7) - 0.5f) * bodyH * 5f
+        val gx = headX + dx
+        val gy = (lineCy + dy).coerceAtLeast(0f)
+        val len = bodyH * (0.7f + hashUnit(i * 43.19 + seed) * 1.1f) * vis
+        // Bright red-orange, brighter at the flash peak — never white.
+        glintPaint.color = if (vis > 0.75f) 0xFFFF5A28.toInt() else 0xFFE01A18.toInt()
+        glintPaint.alpha = (255 * vis * flicker).toInt().coerceIn(0, 255)
+        nc.drawLine(gx - len, gy, gx + len, gy, glintPaint)               // ─ ray
+        nc.drawLine(gx, gy - len, gx, gy + len, glintPaint)               // │ ray → a + star
+    }
+    // 4) ember burst — 14 red sparks fired in ALL directions from the tip (bright red-orange at birth,
+    //    cooling to deep crimson), then pulled down by "gravity" so they arc and rain below the line.
+    val twoPi = 6.2831855f
+    val spark = android.graphics.Paint().apply { isAntiAlias = true }
+    val n = 14
+    for (i in 0 until n) {
+        val la = ((ember + i * 0.6180339887 + seed) % 1.0).toFloat()      // 0..1 life, golden-ratio staggered
+        val h1 = hashUnit(i * 12.9898 + seed * 78.233)                    // angle hash
+        val h2 = hashUnit(i * 39.425 + seed * 93.7)                       // reach hash
+        val ang = h1 * twoPi                                              // full circle → sparks all directions
+        val dist = fallRange * la * (0.45f + 0.55f * h2)
+        val sx = headX + cos(ang.toDouble()).toFloat() * dist * 0.75f + dir * fallRange * 0.12f * la
+        val sy = lineCy + sin(ang.toDouble()).toFloat() * dist * 0.6f + fallRange * 0.7f * la * la  // radial + gravity
+        val sr = (lineHalf * 1.5f * (1f - la)).coerceAtLeast(0.8f)
+        spark.color = emberColor(la)
+        spark.alpha = (255 * flicker * (1f - la) * (if (la < 0.1f) la / 0.1f else 1f)).toInt().coerceIn(0, 255)
+        nc.drawCircle(sx, sy, sr, spark)
+    }
+}
+
+/** Deterministic hash → [0,1) from a seed (classic fract(sin·k)); used to scatter sparks reproducibly. */
+private fun hashUnit(x: Double): Float {
+    val v = sin(x) * 43758.5453
+    return (v - kotlin.math.floor(v)).toFloat()
+}
+
+/** Ember colour ramp — RED throughout (no white; 白い熊: the white tip read as a plain dot): bright
+ *  red-orange at birth → red → deep crimson as it ages. Returns an opaque ARGB int (the caller overrides
+ *  the alpha to fade). */
+private fun emberColor(la: Float): Int {
+    val r: Int
+    val g: Int
+    val b: Int
+    if (la < 0.3f) {
+        val t = la / 0.3f
+        r = 255; g = (130 - 60 * t).toInt(); b = (60 - 40 * t).toInt()      // bright red-orange → red
+    } else {
+        val t = ((la - 0.3f) / 0.7f).coerceIn(0f, 1f)
+        r = (255 - 115 * t).toInt(); g = (70 - 55 * t).toInt(); b = (20 - 12 * t).toInt()  // red → deep crimson
+    }
+    return (0xFF shl 24) or (r shl 16) or (g shl 8) or b
 }
 
 /** Tracks the screen on/off state via the system broadcasts, so an overlay animation can pause itself

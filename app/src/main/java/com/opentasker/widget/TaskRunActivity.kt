@@ -105,6 +105,8 @@ class TaskRunActivity : Activity() {
         const val EXTRA_TASK_ID = "com.opentasker.widget.TASK_ID"
         const val EXTRA_TASK_NAME = "com.opentasker.widget.TASK_NAME"
         const val EXTRA_SOURCE = "com.opentasker.widget.SOURCE"
+        /** Informational: the app the task ultimately opens (see [TaskShortcutHelper.targetPackage]). */
+        const val EXTRA_TARGET_PACKAGE = "com.opentasker.widget.TARGET_PACKAGE"
         const val SOURCE_WIDGET = "Widget"
         const val SOURCE_SHORTCUT = "Shortcut"
         private const val TAG = "TaskRunActivity"

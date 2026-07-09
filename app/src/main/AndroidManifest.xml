@@ -290,6 +290,16 @@
             </intent-filter>
         </receiver>
 
+        <!-- External "which app does this task open?" bridge — lets a sister launcher point its
+             "app info"/"uninstall" entries for our run-task shortcuts at the task's target app. -->
+        <receiver
+            android:name="com.opentasker.widget.GetTaskTargetPackageReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="shiroikuma.jiyusagyoban.action.GET_TASK_TARGET_PACKAGE" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name="com.opentasker.core.actions.NotificationActionReceiver"
             android:exported="false">
