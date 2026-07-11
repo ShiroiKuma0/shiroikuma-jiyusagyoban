@@ -3,6 +3,87 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.75+181 — 2026-07-11
+
+The **music-reactive release**: the 音楽端灯 edge-light meteors now **dance to the actual music** —
+tempo-locked to a beat grid the engine derives live from the device's output mix — plus a
+narrow-screen (folded-cover) layout mode, a fix for the 物理鍵 grabber silently dead since the
+variable-demotion campaign, and a Visualizer feasibility diagnostic.
+
+### 音楽端灯 — 音楽反応: tempo-locked, audio-reactive meteors
+- New engine component **`MusicPulseSource`** (`core/media`): taps the device **output mix** via
+  `Visualizer` on audio session 0 with the **push capture listener** at the device max rate
+  (~20 Hz) and distills it into small live signals:
+  - **level** — smoothed loudness 0..1 (fast attack, slow release);
+  - **beat** — a decaying 0..1 impulse on bass onsets (low-FFT-bin flux over a ~2 s running
+    average, with a **180 ms refractory** so one drum hit is one onset);
+  - a **beat grid** — tempo + phase + confidence, from inter-onset-interval clustering **folded
+    into the 60–180 BPM band** (half/double-time hits agree), modal cluster ±8 %, gentle period
+    tracking, and **PLL-style anchor nudging** toward on-beat onsets; confidence fades out ~2 s
+    after onsets stop (quiet outros, pauses).
+- **Nothing is recorded** — the Visualizer yields transient 8-bit visualization snapshots only.
+- The bridge is injected into WEB scene elements as **`window.OngakuPulse`**
+  (`level()/beat()/bpm()/beatPhase()/tempoConf()`), polled from the page's rAF loop (R8 keep rule
+  for the `@JavascriptInterface` methods).
+- **Ref-counted lifecycle**: the Visualizer exists only while a reactive scene element is visible
+  AND the screen is on AND the knob is on — the scene's `musicPulse` config is live-%var-expanded
+  (`%Ongaku_Reactive`), so flipping the knob to `0` releases the capture completely.
+- The meteor canvas gained a reactive branch (scene bundle):
+  - with a confident tempo, the whole flow **pumps precisely ON each grid beat** —
+    `exp(-beatPhase × sharpness)`: sharp attack at the beat instant, decaying to the next
+    (metronomic, immune to missed/extra onsets); ribbons **flash** and head stars **swell** on
+    the same grid;
+  - the **baseline speed follows the music's dynamics, auto-gain normalised** against the track's
+    own rolling min/max (~8 s window) — mastering compression holds raw RMS nearly constant, which
+    froze speed in the first iteration; normalisation restores the full slow↔fast swing;
+  - low tempo confidence falls back to per-onset surges with a gentle drift; `Ongaku_Reactive=0`
+    reverts to the original random walk exactly.
+- **Five knobs, recipe-documented** in `音楽端灯の設定 [01]`: `%Ongaku_Reactive` (master),
+  `%Ongaku_Reactgain` (dynamics→speed sensitivity), `%Ongaku_Reactpulse` (beat flash),
+  `%Ongaku_Reactkick` (pump depth), `%Ongaku_Reactsharp` (pump shape: 2 = swell … 10 = jab). All
+  nine tuning labels (incl. `Speedmin/Speedmax/Twinkle/Headglow`) were rewritten as **cross-linked
+  recipes** — every label states its reactive-mode role and names partner knobs with concrete
+  setting ideas (EDM jab, ballad breathing, flash-only, no-stall floor …).
+
+### `music.viz.test` — Visualizer feasibility diagnostic
+- New Media action: taps `Visualizer(0)` for N seconds (play music!) and reports frames received,
+  live-frame share, peak RMS and peak bass energy, ending in a clear ✅/🔴 verdict — this decided
+  the reactive pipeline was buildable on the Mate XT before any of it was written.
+- Handles two verified EMUI quirks: a fresh `Visualizer(0)` can arrive **already enabled** (resize
+  then throws "wrong state 2" — disable → resize best-effort → re-enable), and **polled**
+  `getWaveForm()` is throttled to ~4 Hz (hence the push listener in the real pipeline).
+- Wired into the capability pre-flight (Microphone, blocking); manifest gains
+  `MODIFY_AUDIO_SETTINGS`; ships with a `視覚化試験` task in the 音楽端灯 project.
+
+### 物理鍵 — grabber dead since the variable demotion (fix)
+- The 2026-07-05 demotion campaign renamed the `%PKEY_*` super-globals to project-scoped
+  `%Pkey_*` and rewrote every task — but the engine's `ShizukuKeyEventListener` still read the
+  deleted ALL-CAPS names from the super-global bucket, so `enabled()` was permanently false and
+  the volume-key grabber (double-press → camera etc.) had been silently dead since that day.
+  It now resolves the MixedCase project-globals via `snapshotAll()` (the listener runs outside any
+  task, so it can't know the owning project's id), keeping the legacy ALL-CAPS names as fallback.
+- Same class of fix for the edge-bar long-swipe threshold: `SceneActivity` read the demoted
+  `%LONGSWIPE_DP` and silently fell back to the default — now `%Longswipe_Dp` first.
+- A full audit of all 40 demoted names found no other live code readers; stale prose mentions in
+  18 item notes were refreshed on-device via a minimal notes bundle.
+
+### Narrow screen — compact layout on the folded cover panel
+- Under **480 dp** window width (the folded Mate XT cover, ~336 dp; semi/unfolded stay regular),
+  the list layouts switch to a compact mode:
+  - the per-level **group indent shrinks 56 → 14 dp** (the old indent ate ~17 % of the panel);
+  - list side gutters 16 → 6 dp; task-card inner padding 16 → 10 dp;
+  - action rows **reflow: each argument on its own full-width line** — the key pill plus a value
+    that takes the whole rest of the row and **wraps to 2 lines** before ellipsising, so
+    `%Ongaku_*`-length names read in full instead of "Ong…".
+
+### Workspace content (bundles, not APK)
+- **Battery 割 display**: the short battery form (`%ST_BattShort` — the `batt-fold` widget and the
+  相撲字時計 overlays) now renders round tens as 九割/八割/…/一割 instead of 九〇/八〇 (non-round
+  values like 八五 and 100 = 全 unchanged; same character width, so no layout shifts).
+- The 18 pre-demotion variable names still mentioned in task/scene **notes** were freshened to the
+  current `%MixedCase` names (and the 画面操作 01 note's "super-global" claim corrected to
+  project-global).
+
 ## 0.2.75+175 — 2026-07-09
 
 The **living-overlay release**: a native **charging-fire animation** on the battery line, a rewritten
