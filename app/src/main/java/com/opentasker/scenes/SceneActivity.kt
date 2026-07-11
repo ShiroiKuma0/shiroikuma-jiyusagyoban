@@ -528,12 +528,14 @@ internal fun SceneElementView(
                 moveDebug != null
             val slopPx = with(LocalDensity.current) { 36.dp.toPx() }
             // Edge-bar long-swipe threshold (dp). Lives with the edge-bar project (画面操作), set in its 01 設定
-            // task as the super-global %LONGSWIPE_DP — same pattern as %PKEY_LONGMS for 物理鍵. A per-element
-            // `longSwipeDp` config still overrides it if present. Default 200dp (was a hardcoded 140 — a normal
-            // swipe now stays "short" → Home instead of crossing into a long swipe → Recents).
+            // task as %Longswipe_Dp (a 画面操作 project-global since the 2026-07-05 demotion; the old
+            // super-global %LONGSWIPE_DP is kept as a fallback) — same pattern as %Pkey_Longms for 物理鍵.
+            // A per-element `longSwipeDp` config still overrides it if present. Default 200dp (was a hardcoded
+            // 140 — a normal swipe now stays "short" → Home instead of crossing into a long swipe → Recents).
             val longSwipePx = with(LocalDensity.current) {
                 val cfgVal = v("longSwipeDp").trim().toIntOrNull()
-                val globalVal = expandAgainstGlobals("%LONGSWIPE_DP").trim().toIntOrNull()
+                val globalVal = expandAgainstGlobals("%Longswipe_Dp").trim().toIntOrNull()
+                    ?: expandAgainstGlobals("%LONGSWIPE_DP").trim().toIntOrNull()
                 (cfgVal ?: globalVal ?: 200).coerceIn(60, 400).dp.toPx()
             }
             // Pick the task for the swipe's dominant axis from a (up,down,left,right) set.
@@ -944,6 +946,17 @@ internal fun SceneElementView(
             // wakedance draw *while the screen is off/waking*, so they must NOT be paused (they omit the flag).
             val pauseWhenScreenOff = sceneBool(v("pauseWhenScreenOff"))
             val screenOn = rememberScreenOn()
+            // Audio-reactive opt-in (config `musicPulse`, %var-expanded live — the 音楽端灯 scene sets it
+            // to %Ongaku_Reactive): while true AND the screen is on, hold the shared output-mix Visualizer
+            // so the page's rAF loop can poll window.OngakuPulse.level()/beat(). Ref-counted release when
+            // the element hides, the screen goes dark, or the knob turns off — no capture runs otherwise.
+            val musicPulse = sceneBool(v("musicPulse"))
+            val appContext = LocalContext.current.applicationContext
+            DisposableEffect(musicPulse && screenOn) {
+                val hold = musicPulse && screenOn
+                if (hold) com.opentasker.core.media.MusicPulseSource.acquire(appContext)
+                onDispose { if (hold) com.opentasker.core.media.MusicPulseSource.release() }
+            }
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
@@ -952,6 +965,8 @@ internal fun SceneElementView(
                         isVerticalScrollBarEnabled = false
                         isHorizontalScrollBarEnabled = false
                         settings.javaScriptEnabled = true
+                        // Music-pulse bridge: read-only floats; harmless on non-reactive pages.
+                        addJavascriptInterface(com.opentasker.core.media.MusicPulseSource.Bridge, "OngakuPulse")
                     }
                 },
                 update = { wv ->

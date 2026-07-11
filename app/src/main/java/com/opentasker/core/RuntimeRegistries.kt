@@ -26,6 +26,7 @@ import com.opentasker.core.actions.LockDeviceAction
 import com.opentasker.core.actions.MakeLauncherTasksAction
 import com.opentasker.core.actions.LogAction
 import com.opentasker.core.actions.MobileDataAction
+import com.opentasker.core.actions.MusicVizTestAction
 import com.opentasker.core.actions.MuteAction
 import com.opentasker.core.actions.NextTrackAction
 import com.opentasker.core.actions.NotifyAction
@@ -188,6 +189,7 @@ private fun registerBuiltInActions() {
         MuteAction(),
         AudioRecordStartAction(),
         AudioRecordStopAction(),
+        MusicVizTestAction(),
         VibrateAction(),
         RebootAction(),
         PowerOffAction(),

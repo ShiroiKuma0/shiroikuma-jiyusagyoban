@@ -9,7 +9,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Start a voice recording (AAC/m4a). Args:
- *   - "dir": output directory (e.g. `%PKEY_DIR`); blank → app-external Recordings.
+ *   - "dir": output directory (e.g. `%Pkey_Dir`); blank → app-external Recordings.
  * No-op if a recording is already in progress. The file is finalized by [AudioRecordStopAction].
  */
 class AudioRecordStartAction : Action {

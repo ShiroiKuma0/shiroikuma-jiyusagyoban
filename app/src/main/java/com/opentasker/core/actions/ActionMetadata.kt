@@ -1514,7 +1514,7 @@ fun registerActionMetadata() {
             description = "Start a voice recording (AAC/m4a). No-op if already recording.",
             category = "Media",
             fields = listOf(
-                ActionField("dir", "Output directory", hint = "e.g. %PKEY_DIR or /sdcard/Recordings; blank = app folder"),
+                ActionField("dir", "Output directory", hint = "e.g. %Pkey_Dir or /sdcard/Recordings; blank = app folder"),
             )
         )
     )
@@ -1526,6 +1526,19 @@ fun registerActionMetadata() {
             description = "Stop the in-progress voice recording and save it (exposes %path).",
             category = "Media",
             fields = emptyList()
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "music.viz.test",
+            name = "Music Viz Test",
+            description = "Diagnostic: tap the output mix via Visualizer for a few seconds (play music!) and report whether live audio data arrives — decides if the audio-reactive 音楽端灯 is buildable",
+            category = "Media",
+            fields = listOf(
+                ActionField("seconds", "Sampling window (s)", FieldType.NUMBER, hint = "default 5, max 30"),
+                ActionField("var", "Report → variable", hint = "default: viz"),
+            )
         )
     )
 

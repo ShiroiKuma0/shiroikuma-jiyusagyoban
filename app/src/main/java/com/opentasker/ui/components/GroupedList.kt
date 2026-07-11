@@ -65,6 +65,14 @@ sealed interface GroupRow<out T> {
 /** Indent (dp) added per nesting level, so deeper groups/items step further right. */
 const val GROUP_INDENT_DP = 56
 
+/** Compact per-level indent for the narrow (folded-cover) panel, where 56dp would eat ~17% of the width. */
+const val GROUP_INDENT_NARROW_DP = 14
+
+/** The per-depth indent in effect: compact on a narrow screen so cards keep their width. */
+@Composable
+fun groupIndentDp(): Int =
+    if (com.opentasker.ui.theme.isNarrowScreen()) GROUP_INDENT_NARROW_DP else GROUP_INDENT_DP
+
 /** Sentinel "groupId" for the Ungrouped drop zone — means remove from group (real ids are >= 1). */
 const val UNGROUP_TARGET = 0L
 
@@ -245,7 +253,7 @@ fun <T> LazyListScope.groupedItems(
                     if (showTopIndicator) DropIndicator(row.depth)
                     Row(
                         modifier = Modifier
-                            .padding(start = (row.depth * GROUP_INDENT_DP).dp)
+                            .padding(start = (row.depth * groupIndentDp()).dp)
                             // Record untranslated window bounds (this sits BEFORE graphicsLayer, so the lifted
                             // row's drag offset doesn't corrupt the geometry used to pick the drop slot).
                             .onGloballyPositioned {
@@ -318,7 +326,7 @@ private fun DropIndicator(depth: Int) {
     Box(
         Modifier
             .fillMaxWidth()
-            .padding(start = (depth * GROUP_INDENT_DP).dp, top = 2.dp, bottom = 2.dp)
+            .padding(start = (depth * groupIndentDp()).dp, top = 2.dp, bottom = 2.dp)
             .height(3.dp)
             .clip(RoundedCornerShape(2.dp))
             .background(MaterialTheme.colorScheme.primary),
@@ -352,7 +360,7 @@ fun GroupHeaderRow(
     val themePrefs by ThemeStore.state.collectAsState()
     Row(
         modifier = modifier
-            .padding(start = (depth * GROUP_INDENT_DP).dp)
+            .padding(start = (depth * groupIndentDp()).dp)
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             // Normal header colour is user-settable (ARGB); selection/highlight keep the accent tints so

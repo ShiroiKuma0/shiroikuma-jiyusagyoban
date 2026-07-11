@@ -125,6 +125,7 @@ import com.opentasker.ui.components.rememberGroupMoveHost
 import com.opentasker.ui.components.selectableItem
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.ThemeStore
+import com.opentasker.ui.theme.isNarrowScreen
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -345,7 +346,12 @@ internal fun ProfilesScreen(
                 LazyColumn(
                     modifier = Modifier.fillMaxSize().weight(1f),
                     // Reserve clearance for the bottom-right "+" FAB so the last row is never hidden under it.
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 88.dp),
+                    // Narrow (folded cover): shrink the side gutters — width is precious there.
+                    contentPadding = PaddingValues(
+                        start = if (isNarrowScreen()) 6.dp else 16.dp,
+                        end = if (isNarrowScreen()) 6.dp else 16.dp,
+                        top = 4.dp, bottom = 88.dp,
+                    ),
                     verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
                 ) {
                     if (storageDecodeIssues.isNotEmpty()) {
@@ -862,7 +868,12 @@ internal fun TasksScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize().weight(1f),
                 // Reserve clearance for the bottom-right "+" FAB so the last row is never hidden under it.
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 88.dp),
+                // Narrow (folded cover): shrink the side gutters — width is precious there.
+                contentPadding = PaddingValues(
+                    start = if (isNarrowScreen()) 6.dp else 16.dp,
+                    end = if (isNarrowScreen()) 6.dp else 16.dp,
+                    top = 4.dp, bottom = 88.dp,
+                ),
                 verticalArrangement = Arrangement.spacedBy(themePrefs.taskCardGapDp.dp),
             ) {
                 if (storageDecodeIssues.isNotEmpty()) {
@@ -1024,7 +1035,13 @@ private fun TaskCard(
         ),
         shape = RoundedCornerShape(16.dp),
     ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = themePrefs.taskCardVPadDp.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+        Column(
+            Modifier.padding(
+                horizontal = if (isNarrowScreen()) 10.dp else 16.dp,   // narrow: keep the content wide
+                vertical = themePrefs.taskCardVPadDp.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth().selectableItem(
                     selectionActive = selectionActive,
@@ -1335,6 +1352,27 @@ private fun ActionRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2, overflow = TextOverflow.Ellipsis,
                     )
+                } else if (isNarrowScreen()) {
+                    // Narrow (folded cover) reflow: EACH arg gets its own full-width line — the (key)
+                    // pill + a value that takes the whole rest and wraps to 2 lines, instead of the
+                    // one-line row that crushed var names to "Ong…" (白い熊 2026-07-11).
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(themePrefs.actionRowPadDp.dp)) {
+                        action.args.entries.forEach { e ->
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ArgPill(
+                                    argKey = e.key, value = e.value, valueWeight = true,
+                                    maxValueLines = 2,
+                                    editing = editingKey == e.key,
+                                    selectionActive = selectionActive,
+                                    onStartEdit = { editingKey = e.key },
+                                    onSelectToggle = onTap,
+                                    onLongPress = onLongPress,
+                                    onCommit = { nv -> onSetArg(e.key, nv); editingKey = null },
+                                    onCancel = { editingKey = null },
+                                )
+                            }
+                        }
+                    }
                 } else {
                     // name + value (every arg) on ONE line: each (key) pill + its value. The last value
                     // takes the remaining width and ellipsises — tap it to edit / see the whole thing.
@@ -1397,6 +1435,7 @@ private fun RowScope.ArgPill(
     onLongPress: () -> Unit,
     onCommit: (String) -> Unit,
     onCancel: () -> Unit,
+    maxValueLines: Int = 1,   // narrow-screen rows pass 2 so long values wrap instead of ellipsising
 ) {
     val themePrefs by ThemeStore.state.collectAsState()
     val nameColor = Color(themePrefs.actionNameColor)   // the variable name (settable)
@@ -1455,7 +1494,7 @@ private fun RowScope.ArgPill(
             fontSize = dataSize,
             fontWeight = FontWeight.Bold,
             color = if (argKey == "name") nameColor else valueColor,
-            maxLines = 1,
+            maxLines = maxValueLines,
             overflow = TextOverflow.Ellipsis,
             // Last arg: fill whatever is left (and ellipsise there). Non-last (e.g. a var.set NAME): take
             // the NATURAL width so the name always shows completely — the hard 160dp cap truncated most

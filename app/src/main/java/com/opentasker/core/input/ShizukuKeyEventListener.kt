@@ -35,7 +35,9 @@ import java.util.concurrent.ConcurrentHashMap
  * `getevent -lq` and classify short/long ourselves. This detects but does NOT consume the keys — i.e. the
  * pre-grab behaviour, so we never end up worse than before. (`getevent` is a system binary; still no tmp.)
  *
- * Config (super-globals): `%PKEY_ON` ("1"/"true" enables; absent = off), `%PKEY_LONGMS` (threshold ms).
+ * Config (persisted globals, owned by the 物理鍵 project since the 2026-07-05 demotion): `%Pkey_On`
+ * ("1"/"true" enables; absent = off), `%Pkey_Longms` / `%Pkey_Doublems` (threshold ms). The legacy
+ * ALL-CAPS super-global names (`%PKEY_ON` …) are still honoured as a fallback.
  */
 class ShizukuKeyEventListener {
 
@@ -273,15 +275,21 @@ class ShizukuKeyEventListener {
 
     // ---- config ----
 
-    // Default OFF: the grabber only runs when %PKEY_ON is explicitly on (set by the 物理鍵 設定/起動 task),
+    // The listener runs outside any task, so it can't know the 物理鍵 project's id — resolve the
+    // MixedCase project-global by name across every bucket (snapshotAll), like widget rendering does.
+    // Falls back to the pre-demotion ALL-CAPS super-global so either naming keeps working.
+    private fun config(name: String, legacyName: String): String? =
+        PersistentGlobalScope.snapshotAll()[name] ?: PersistentGlobalScope.get(0L, legacyName)
+
+    // Default OFF: the grabber only runs when %Pkey_On is explicitly on (set by the 物理鍵 設定/起動 task),
     // so opening the app never starts grabbing on its own.
     private fun enabled(): Boolean {
-        val v = PersistentGlobalScope.get(0L, "PKEY_ON")?.trim()?.lowercase() ?: return false
+        val v = config("Pkey_On", "PKEY_ON")?.trim()?.lowercase() ?: return false
         return v == "1" || v == "true" || v == "on" || v == "yes"
     }
 
     private fun longPressMs(): Long =
-        PersistentGlobalScope.get(0L, "PKEY_LONGMS")?.trim()?.toLongOrNull()?.coerceIn(150L, 5000L)
+        config("Pkey_Longms", "PKEY_LONGMS")?.trim()?.toLongOrNull()?.coerceIn(150L, 5000L)
             ?: DEFAULT_LONG_MS
 
     // Double-tap window for double-enabled keys. Also the added latency a SINGLE short on those keys waits
@@ -290,7 +298,7 @@ class ShizukuKeyEventListener {
     // below ~120–150ms a deliberate double usually can't be tapped fast enough to register. Ceiling 10s is a
     // sanity bound only (large values just make a single press wait that long).
     private fun doublePressMs(): Long =
-        PersistentGlobalScope.get(0L, "PKEY_DOUBLEMS")?.trim()?.toLongOrNull()?.coerceIn(DOUBLE_MIN_MS, 10_000L)
+        config("Pkey_Doublems", "PKEY_DOUBLEMS")?.trim()?.toLongOrNull()?.coerceIn(DOUBLE_MIN_MS, 10_000L)
             ?: DEFAULT_DOUBLE_MS
 
     private class KeyState {

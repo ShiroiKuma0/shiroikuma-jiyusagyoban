@@ -105,6 +105,7 @@ object ActionCapabilityRegistry {
         "dialog.text" to dialogCapability(),
         "shell.run" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Shizuku installed, started, and access granted to this app.", CapabilityRequirement.Shizuku, blocking = true),
         "audio.record.start" to ActionCapability(CapabilityLevel.RequiresSetup, "Records the microphone — needs the Microphone (RECORD_AUDIO) permission.", CapabilityRequirement.Microphone, blocking = true),
+        "music.viz.test" to ActionCapability(CapabilityLevel.RequiresSetup, "Taps the audio output mix via Visualizer — needs the Microphone (RECORD_AUDIO) permission.", CapabilityRequirement.Microphone, blocking = true),
         "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported 白い熊 自由作業盤 action."),
     )
 

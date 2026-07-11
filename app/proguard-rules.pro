@@ -40,3 +40,10 @@
 -keepclassmembers class <1>$Companion {
     kotlinx.serialization.KSerializer serializer(...);
 }
+
+# Music-pulse JS bridge (window.OngakuPulse in WEB scene elements): the page calls these
+# reflectively, so R8 must keep the @JavascriptInterface methods and the object instance.
+-keepclassmembers class com.opentasker.core.media.MusicPulseSource$Bridge {
+    @android.webkit.JavascriptInterface <methods>;
+}
+-keep class com.opentasker.core.media.MusicPulseSource$Bridge { *; }
