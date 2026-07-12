@@ -49,4 +49,7 @@ enum class SceneElementType {
     // A horizontal fill bar: `value` (0..100, usually a %var) fills `fillColor` over `trackColor`;
     // when `charging` is truthy a highlight sweeps along the filled part. Used by the battery line.
     PROGRESS,
+    // Neon meteor ribbons orbiting the element's perimeter in a rounded-rect band — the native port
+    // of the 音楽端灯 WebView canvas (same Ongaku_* knobs via config, %var-live). See EdgeMeteors.kt.
+    METEOR,
 }

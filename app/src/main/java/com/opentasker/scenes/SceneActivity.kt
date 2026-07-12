@@ -918,6 +918,51 @@ internal fun SceneElementView(
             }
         }
 
+        SceneElementType.METEOR -> {
+            // Native meteor band (the 音楽端灯 heat fix, 2026-07-12): the WebView canvas version burned
+            // ~185% CPU in per-frame canvas-commit machinery; this draws the same dance on the window's
+            // own RenderThread (like the 電池線 ChargingFlame). Every config value is %var-live via v(),
+            // so the Ongaku_* knobs retune WITHOUT re-showing the scene. Screen-off drops the whole
+            // element out of composition — the frame loop stops dead, nothing computes in the dark.
+            val screenOn = rememberScreenOn()
+            val reactive = sceneBool(v("musicPulse"))
+            val appContext = LocalContext.current.applicationContext
+            DisposableEffect(reactive && screenOn) {
+                val hold = reactive && screenOn
+                if (hold) com.opentasker.core.media.MusicPulseSource.acquire(appContext)
+                onDispose { if (hold) com.opentasker.core.media.MusicPulseSource.release() }
+            }
+            val knobs = MeteorKnobs(
+                palette = meteorPalette(v("palette")),
+                padDp = meteorNum(v("padding"), 5f),
+                radiusDp = meteorNum(v("radius"), 32f),
+                cornerDp = meteorNum(v("cornerRadius"), meteorNum(v("radius"), 32f)),
+                periodS = meteorNum(v("period"), 5f).coerceAtLeast(0.2f),
+                glowDp = meteorNum(v("glow"), 12f),
+                glowLayers = meteorNum(v("glowLayers"), 2f).toInt().coerceIn(1, 4),
+                glowSpread = meteorNum(v("glowSpread"), 2f),
+                glowStrength = meteorNum(v("glowStrength"), 1f),
+                reverse = v("direction").contains("reverse"),
+                count = meteorNum(v("count"), 16f).toInt().coerceIn(1, 80),
+                spawnMs = meteorNum(v("spawnInterval"), 60f).coerceAtLeast(10f),
+                minLen = meteorNum(v("minLen"), 0.03f),
+                maxLen = meteorNum(v("maxLen"), 0.1f),
+                speedMin = meteorNum(v("speedMin"), 0f),
+                speedMax = meteorNum(v("speedMax"), 1.5f),
+                speedChangeS = meteorNum(v("speedChange"), 5f).coerceAtLeast(0.5f),
+                maxFps = meteorNum(v("maxFps"), 0f),
+                headGlow = meteorNum(v("headGlow"), 1.5f),
+                twinkle = meteorNum(v("twinkle"), 0.35f).coerceIn(0f, 1f),
+                hueDrift = meteorNum(v("hueDrift"), 12f),
+                reactive = reactive,
+                reactGain = meteorNum(v("reactGain"), 1f),
+                reactPulse = meteorNum(v("reactPulse"), 0.6f),
+                reactKick = meteorNum(v("reactKick"), 1f),
+                reactSharp = meteorNum(v("reactSharp"), 5f).coerceIn(0.5f, 12f),
+            )
+            if (screenOn) EdgeMeteors(Modifier.fillMaxSize(), knobs)
+        }
+
         SceneElementType.WEB -> {
             // A transparent, JS-enabled WebView showing raw HTML from config (e.g. the music
             // edge-light's canvas meteor animation). The page body is loaded RAW — not %var-expanded —
