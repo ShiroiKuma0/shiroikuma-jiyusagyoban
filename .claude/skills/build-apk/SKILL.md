@@ -1,6 +1,6 @@
 ---
 name: build-apk
-description: Build the signed release APK with the buildFork Gradle task, then deliver it automatically via the global /after-build skill (adb push if a phone is connected, else scp to skhw — no transfer prompt). Always build first without asking for permission to build. Use whenever 白い熊 asks to build the app, build the APK, make a release build, or build and send to the phone.
+description: Build the signed release APK with the buildFork Gradle task, then deliver it automatically — wireless adb connect, adb install -r, push to /sdcard/tmp (latest only), am start (fall back to /after-build's scp path if the phone is unreachable). Always build first without asking for permission to build. Use whenever 白い熊 asks to build the app, build the APK, make a release build, or build and send to the phone.
 ---
 
 # Build the release APK and optionally send to the phone
@@ -9,18 +9,17 @@ This is **shiroikuma-jiyusagyoban** — 白い熊's fork of [OpenTasker](https:/
 renamed to `shiroikuma.jiyusagyoban` ("白い熊 自由作業盤") so it installs side-by-side with upstream. Pure
 Kotlin/Compose, no native code, no Fossify Commons.
 
-> **ALWAYS build, then ALWAYS run /after-build — no asking, no exceptions (白い熊, 2026-07-05).**
+> **ALWAYS build, then ALWAYS deliver — no asking, no exceptions (白い熊, 2026-07-05).**
 > After ANY functional change you make (anything 白い熊 would want to test on the phone), build
-> **immediately** and deliver. Do **not** stop at a compile-check; do **not** say "compile-verified, say
-> build"; do **not** offer to build or wait for a "build" instruction. Build first (no permission needed),
-> then invoke the global **/after-build** skill (adb-push if a phone is connected, else scp to skhw) with
-> no transfer prompt. This is build-and-**DELIVER** only — it does **not** commit or push; a commit/push
-> still waits for 白い熊's explicit "Push". (Skip the build only for non-functional edits — docs, comments —
-> per the `no-pointless-rebuilds` rule.)
+> **immediately** and deliver via the **dev cycle** below. Do **not** stop at a compile-check; do **not**
+> say "compile-verified, say build"; do **not** offer to build or wait for a "build" instruction. This is
+> build-and-**DELIVER** only — it does **not** commit or push; a commit/push still waits for 白い熊's
+> explicit "Push". (Skip the build only for non-functional edits — docs, comments — per the
+> `no-pointless-rebuilds` rule.)
 
 > **Every `adb push` goes ONLY to `/sdcard/tmp/`.** This holds for the APK *and any other
-> file* (import bundles, configs, logs, screenshots) — never `/sdcard/Download/` or anywhere
-> else. Never `adb install` — 白い熊 installs manually.
+> file* (import bundles, configs, logs, screenshots) — never `/sdcard/Download/` or anywhere else.
+> **Install automatically** (`adb install -r`, 白い熊 2026-07-12); `adb uninstall` stays forbidden.
 
 ## Steps
 
@@ -42,12 +41,23 @@ Kotlin/Compose, no native code, no Fossify Commons.
    - If it fails with **`SDK location not found`**, create the gitignored `local.properties` at the repo
      root with `sdk.dir=/home/shiroikuma/android-sdk` (a background shell doesn't inherit `ANDROID_HOME`).
 
-3. **At the end of every successful build, ALWAYS deliver via the global /after-build skill** — no
-   exceptions, no asking. As soon as the build reports `BUILD SUCCESSFUL` and the APK is in `~/tmp/`,
-   invoke **/after-build**: it runs `/adb-check` UNSANDBOXED (a sandboxed check falsely reports no
-   device), then `/adb-push` to `/sdcard/tmp/` if a phone is connected, otherwise `/scp` to
-   `skhw:~/tmp/`, and announces the filename that landed. Never `adb install` — 白い熊 installs
-   manually from `/sdcard/tmp/`.
+3. **At the end of every successful build, ALWAYS run the dev cycle** (白い熊, 2026-07-12) — no
+   exceptions, no asking. Every adb call UNSANDBOXED (`dangerouslyDisableSandbox: true`).
+
+   ### dev-cycle
+   ```bash
+   adb devices                        # empty list? → wireless connect:
+   #   the phone's adbd already listens on TCP 5555; get the IP over ssh:
+   #   ssh skhw "ifconfig 2>/dev/null | grep -A1 wlan"   → adb connect <ip>:5555
+   adb install -r ~/tmp/shiroikuma-jiyusagyoban_<ver>_arm64-v8a.apk
+   adb push ~/tmp/shiroikuma-jiyusagyoban_<ver>_arm64-v8a.apk /sdcard/tmp/
+   # prune: delete every OLDER shiroikuma-jiyusagyoban_*.apk in /sdcard/tmp (keep only the new one)
+   adb shell am start -n shiroikuma.jiyusagyoban/com.opentasker.app.MainActivity
+   ```
+   Then announce the installed version. If the phone is unreachable even after the wireless-connect
+   attempt, fall back to the global **/after-build** (scp to `skhw:~/tmp/`) and say the install is
+   pending. Bundles for the cycle are imported headlessly via the broadcast bridge — commands in the
+   `workspace-mirror` skill.
 
 ## Notes / invariants
 

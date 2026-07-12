@@ -302,6 +302,15 @@
         </receiver>
 
         <receiver
+            android:name="com.opentasker.core.transfer.WorkspaceTransferReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="shiroikuma.jiyusagyoban.action.EXPORT_WORKSPACE" />
+                <action android:name="shiroikuma.jiyusagyoban.action.IMPORT_BUNDLE" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
             android:name="com.opentasker.core.actions.NotificationActionReceiver"
             android:exported="false">
             <intent-filter>

@@ -92,17 +92,29 @@ default **`standard`**.
   phone must carry a `yyyy-MM-dd_HH-mm-ss` stamp (our format — `date +%Y-%m-%d_%H-%M-%S`, to the
   SECOND) in its FILENAME, e.g. `volume-panel-reorder_2026-06-26_12-56-22.json`. Date-only (or a
   `b`/`(2)` suffix) is **not** enough — a same-day re-push must get a fresh stamp so it never collides
-  and 白い熊 always knows which is current. **Never delete/prune older copies from the phone** — 白い熊
-  keeps them; the unique timestamp is what avoids confusion, so leave every prior JSON in place (a
-  `ssh skhw 'rm …'` / `adb shell rm …` before a push counts as pruning — don't). Just state the exact
-  current filename in the handover. (See the `version-pushed-files` memory.)
+  and 白い熊 always knows which is current. **Keep only the LATEST copy in `/sdcard/tmp/`** (白い熊,
+  2026-07-12 — reverses the old never-prune rule): after a successful push/install/import, delete the
+  superseded APKs and imported JSONs from `/sdcard/tmp/` so only the current one remains. State the
+  exact current filename in the handover. (See the `version-pushed-files` memory.)
 - **Always ask 白い熊 to confirm a shipped bundle, then sync the mirror.** Whenever you hand over a JSON
   bundle, explicitly **request confirmation** that it imported / works. The moment 白い熊 OKs it, update
   the workspace mirror (`~/〇/[666] 私資料/[666][60792] …`) to match and **commit it** — see the
   `workspace-mirror` skill.
 - **Always run `adb` with `dangerouslyDisableSandbox: true`** (the sandbox blocks adb's server
   socket, so `adb devices` shows empty). Every `adb` invocation goes through the unsandboxed path.
-- **Never `adb install` / `adb uninstall`.** Push to `/sdcard/tmp/`; 白い熊 installs manually.
+- **Install builds automatically over wireless adb** (白い熊, 2026-07-12 — reverses the old
+  never-install rule): after every build, `adb install -r` the new APK, push a copy to `/sdcard/tmp/`
+  (pruning older ones), and `am start` the app. `adb uninstall` stays forbidden. Full cycle: the
+  `dev-cycle` section of the `build-apk` skill.
+- **Dev cycle (2026-07-12).** The app exposes a broadcast bridge (`WorkspaceTransferReceiver`) for
+  headless workspace transfer — `EXPORT_WORKSPACE` writes a full export to `/sdcard/tmp/`,
+  `IMPORT_BUNDLE` imports a JSON from there (see the `workspace-mirror` skill for the exact
+  commands). Before starting new task/profile/scene work: export all → explode into the mirror →
+  commit (baseline). During development: build → install → import bundles via the bridge → 白い熊
+  tests. On acceptance: export all → sync + commit the mirror → **move** (not copy) the final export
+  to `/sdcard/〇/[979] バックアップ/[979][60792] 白い熊 自由作業盤/` and the final APK to
+  `/sdcard/〇/[979] バックアップ/` → clean `/sdcard/tmp/` of the cycle's remaining intermediates
+  (after a completed cycle it holds none of our files).
 - **Never commit/push unprompted. On 白い熊's "Push", commit + push BOTH repos.** (1) the code repo —
   `custom` → `git push --force-with-lease origin custom`, `master` fast-forwards (this is the only one
   on github); (2) the workspace mirror at `~/〇/[666] 私資料/[666][60792] …` — a **local `git commit`

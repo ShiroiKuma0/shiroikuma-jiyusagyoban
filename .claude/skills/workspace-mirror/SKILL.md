@@ -20,13 +20,43 @@ repo's own `README.md`. In short:
 Filenames are only handles (`/`→`／`, empty→`_anon-<id>`); the authoritative name is the JSON `"name"`.
 Each per-item file is the bundle's object **verbatim**.
 
+## The broadcast bridge — headless export / import over adb (2026-07-12, +182)
+
+`WorkspaceTransferReceiver` (`core/transfer/`) lets adb drive export and import without the UI. Ordered
+broadcasts; `result=-1` (RESULT_OK) = success, `result=1` = failure with the message in `data=`. All adb
+calls UNSANDBOXED.
+
+```bash
+# EXPORT the whole workspace → /sdcard/tmp/白い熊 自由作業盤.<stamp>.json (path echoed in data=)
+adb shell "am broadcast -n shiroikuma.jiyusagyoban/com.opentasker.core.transfer.WorkspaceTransferReceiver \
+  -a shiroikuma.jiyusagyoban.action.EXPORT_WORKSPACE --ei shiroikuma.jiyusagyoban.extra.PROTOCOL 1"
+
+# IMPORT a bundle JSON (bare filename resolves against /sdcard/tmp; overwrite-in-place, merge projects)
+adb shell "am broadcast -n shiroikuma.jiyusagyoban/com.opentasker.core.transfer.WorkspaceTransferReceiver \
+  -a shiroikuma.jiyusagyoban.action.IMPORT_BUNDLE --ei shiroikuma.jiyusagyoban.extra.PROTOCOL 1 \
+  --es shiroikuma.jiyusagyoban.extra.PATH '<file>.json'"
+```
+
+So the standard dev cycle is fully hands-off:
+1. **Cycle start:** EXPORT_WORKSPACE → `adb pull` into `.scratch/` → explode + commit (baseline below).
+2. **During development:** push each bundle to `/sdcard/tmp/` (timestamped filename) → IMPORT_BUNDLE →
+   tell 白い熊 what to test. Imported intermediates may be deleted from `/sdcard/tmp/` afterwards —
+   only the latest matters (2026-07-12 rule).
+3. **On acceptance:** EXPORT_WORKSPACE → pull → explode + commit the mirror; then archive on-phone —
+   `adb shell mv` (MOVE, never cp — nothing stays behind in `/sdcard/tmp/`, 白い熊 2026-07-12) the
+   final export to `/sdcard/〇/[979] バックアップ/[979][60792] 白い熊 自由作業盤/` and the final APK to
+   `/sdcard/〇/[979] バックアップ/`; clean the cycle's remaining leftovers out of `/sdcard/tmp/`
+   (quote those paths — spaces + brackets). After a completed cycle `/sdcard/tmp/` holds NONE of our
+   files.
+
 ## When to use
 
-### 白い熊 hands over a fresh full export
-They do `Setup → Export`; the JSON lands in `~/tmp/白い熊 自由作業盤*.json`. Re-explode + commit:
+### Fresh full export (broadcast bridge, or 白い熊 hands one over)
+Get the export (EXPORT_WORKSPACE + `adb pull` as above, or 白い熊's manual `Setup → Export` into
+`~/tmp/`). Re-explode + commit:
 ```bash
 D="$HOME/〇/[666] 私資料/[666][60792] 白い熊 自由作業盤"
-python3 "$D/scripts/explode.py"                 # newest ~/tmp export (or pass an explicit path)
+python3 "$D/scripts/explode.py" <export.json>   # or no arg: newest ~/tmp export
 git -C "$D" add -A
 git -C "$D" -c user.name="白い熊" commit -m "Sync export <appVersion> (<YYYY-MM-DD>)"
 ```
