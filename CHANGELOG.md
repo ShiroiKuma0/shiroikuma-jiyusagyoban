@@ -3,6 +3,86 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.75+189 — 2026-07-12
+
+The **cool-running release**: the 音楽端灯 meteors move from a WebView canvas to a **native METEOR
+scene element** — same dance, roughly **a third of the CPU** during music playback (~195 % → ~60 %,
+measured) — plus a headless **adb workspace-transfer bridge** (broadcast-driven export/import) that
+powers a fully automated build-test cycle, physically **rounded screen corners** with their own knob,
+and a 電池線 fix that stops the charging flame at 100 % and turns the line blue.
+
+### 音楽端灯 — native METEOR element (the heat fix)
+- **Why:** the phone heated up badly while playing music. Systematic measurement (live `top`
+  sampling per variant, thread-level breakdown) traced the load to **WebView's per-frame canvas
+  machinery, not the meteor math**:
+  - the real meteor page cost **~185–195 % CPU** sustained (app process + WebView renderer);
+  - a bare full-screen canvas drawing ONE line at 60 fps already cost **~60 %**;
+  - four edge-strip canvases cost **more** (~110 %) — per-layer commit overhead, not pixels;
+  - an rAF loop with **no** canvas drawing cost ~0 % — the commit path itself was the furnace.
+- **New scene element `METEOR`** (`scenes/EdgeMeteors.kt` + a `SceneActivity` renderer branch):
+  a 1:1 native port of the meteor page — perimeter ribbons in a rounded-rect band, layered glow,
+  comet-taper core, white-hot head star, per-ribbon twinkle, hue drift, and the full **音楽反応 v3
+  tempo-locked** behaviour (beat-grid pump, auto-gain-normalised dynamics, onset fallback) — drawn
+  by the app's **own RenderThread** like the 電池線 charging fire, reading
+  **`MusicPulseSource.Bridge` natively** (no JS bridge, no WebView renderer process at all).
+- **Three rendering pathologies found and eliminated on the way** (each measured, each ~190 %+):
+  - `BlurMaskFilter` Gaussian glow — CPU-rasterized per blurred path on a hardware canvas (~225 %);
+  - wide anti-aliased **stroked paths** (even 3-point ones) — HWUI software-rasterizes every stroke
+    into a mask texture on its `hwuiTask` threads each frame;
+  - the band's **even-odd ring `clipPath`** — a full-window coverage mask rasterized every frame;
+    this was the invariant cost across ALL variants, the original WebView page included.
+- **Final architecture — GPU-native primitives only**: every ribbon is split at the screen corners
+  it crosses into 1–3 **axis-aligned capsules** (`drawRoundRect`); the glow is concentric widening
+  capsules with a Gaussian-ish alpha falloff; the core taper is a per-run axis-aligned
+  `LinearGradient`; the band's inner hole is punched by **one `PorterDuff.CLEAR` round-rect**
+  instead of a clip. Result: `hwuiTask` raster threads at **0.0 %**, RenderThread ~21 %,
+  **~60 % total at 60 fps / ~50 % at 45 fps** (vs ~195 %), dance visually intact.
+- **Physically rounded screen corners** (白い熊's design): four **opaque-black corner masks** drawn
+  over the band — ribbons run into the corner squarely underneath and emerge from behind the curve.
+  The mask path is static and HWUI-cached (rebuilt only on size/radius change), so it is free.
+  Its radius is an independent live knob **`%Ongaku_Corner`** (default 18; `0` = square corners,
+  `32` = the band's own rounding) in `音楽端灯の設定 [01]`.
+- **All knobs are now %var-live**: the METEOR config maps every `%Ongaku_*` variable through the
+  scene engine's live expansion, so palette, speeds, glow, fps, reactive tuning — everything —
+  applies **instantly without re-showing the scene** (the WebView read them once at page load).
+- **The FPS cap became a true linear heat dial**: a capped-out frame is skipped before the sim
+  step — no state write, no recompose, no draw, no commit — so `%Ongaku_Maxfps` now scales cost
+  almost proportionally. Default retuned **60 → 45** (visually smooth, measurably cooler);
+  the dead interim `Ongaku_Glowres` knob was removed from 設定.
+- Invisible ribbons (fade-in/fade-out ends of life) skip all drawing; `METEOR` is editable in the
+  scene editor (element-type list, defaults, size).
+- Screen-off gating as before: the element leaves composition when the display sleeps — the frame
+  loop stops dead, nothing computes in the dark.
+
+### Workspace-transfer bridge — headless export/import over adb
+- **New `WorkspaceTransferReceiver`** (`core/transfer/`), an exported ordered-broadcast bridge
+  gated by the shared protocol extra (same convention as the widget bridges):
+  - **`shiroikuma.jiyusagyoban.action.EXPORT_WORKSPACE`** — writes a full workspace export
+    (tasks, profiles, scenes, variables, templates, projects, groups, item metadata) as an
+    OpenTaskerBundle JSON to `/sdcard/tmp/白い熊 自由作業盤.<yyyy-MM-dd_HH-mm-ss>.json` (or an
+    explicit `extra.PATH`), answering with the written path and item counts;
+  - **`shiroikuma.jiyusagyoban.action.IMPORT_BUNDLE`** — imports the bundle JSON at `extra.PATH`
+    (a bare filename resolves against `/sdcard/tmp`) with the standard strategies (merge projects,
+    overwrite same-name items in place), answering with a human-readable import summary and any
+    validation warnings; failures return the error message in the broadcast result.
+- Powers the new **fully automated dev cycle**: baseline export → mirror sync → build →
+  `adb install -r` → push bundles → headless import → test → final export → archive — no manual
+  file picking anywhere.
+
+### 電池線 — stop the charging flame at 100 %, full-charge line goes blue (workspace-side)
+- `denchi.update` gained a gate: at **100 % battery `%Charging` is forced to `false`**, so the
+  charging fire stops while the plug stays in (it previously burned forever on a full battery,
+  since EXTRA_PLUGGED-based charging detection stays true).
+- **`%Denchi_Full`** (the 100 % line colour) changed green → **blue `#0000FF`**; label updated.
+- Both tasks re-shipped fully literate (labels on every action + task notes).
+
+### Packaging & docs
+- Dev-workflow overhaul recorded in `CLAUDE.md` and the repo skills (`build-apk`,
+  `workspace-mirror`): wireless adb (direct or via the `skhw` ssh tunnel), automatic
+  `adb install -r`, `/sdcard/tmp` keeps only the current APK, end-of-cycle archives the final
+  export and APK to the on-phone backup tree.
+- Version tail: builds `+182` – `+189`; `versionCode = 770189`.
+
 ## 0.2.75+181 — 2026-07-11
 
 The **music-reactive release**: the 音楽端灯 edge-light meteors now **dance to the actual music** —
