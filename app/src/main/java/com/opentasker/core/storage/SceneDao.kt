@@ -8,7 +8,6 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Update
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
@@ -21,15 +20,33 @@ data class SceneEntity(
     val heightDp: Int,
     val elementsJson: String,
 ) {
-    fun toDomain() = try {
-        Scene(id, name, widthDp, heightDp, Json.decodeFromString(elementsJson))
-    } catch (e: Exception) {
-        AppLogger.error("SceneDao", "Failed to deserialize scene $id: ${e.message}", e)
-        Scene(id, name, widthDp, heightDp, emptyList())
+    fun toDomain(): Scene {
+        val result = toDomainDecodeResult()
+        result.issue?.let { issue ->
+            AppLogger.error("SceneDao", "Failed to deserialize scene $id: ${issue.message}")
+        }
+        return result.value
+    }
+
+    fun toDomainDecodeResult(): StorageDecodeResult<Scene> {
+        val elements = runCatching { StorageJson.decodeFromString<List<SceneElement>>(elementsJson) }
+            .getOrElse { error ->
+                return StorageDecodeResult(
+                    value = Scene(id, name, widthDp, heightDp, emptyList()),
+                    issue = StorageDecodeIssue(
+                        recordType = StorageRecordType.SCENE,
+                        recordId = id,
+                        recordName = name,
+                        fieldName = "elementsJson",
+                        message = error.storageDecodeMessage(),
+                    ),
+                )
+            }
+        return StorageDecodeResult(value = Scene(id, name, widthDp, heightDp, elements))
     }
 }
 
-fun Scene.toEntity() = SceneEntity(id, name, widthDp, heightDp, Json.encodeToString(elements))
+fun Scene.toEntity() = SceneEntity(id, name, widthDp, heightDp, StorageJson.encodeToString(elements))
 
 @Dao
 interface SceneDao {

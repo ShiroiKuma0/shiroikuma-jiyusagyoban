@@ -5,6 +5,7 @@ import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.TaskEntity
 import com.opentasker.core.storage.toEntity
 
 data class TaskExecutionResult(
@@ -74,13 +75,23 @@ suspend fun logSkippedRun(
 
 /**
  * Resolves a sub-task by numeric id first, then by exact name (case-insensitive), for `task.run`.
+ * Corrupt tasks (whose stored payload fails to decode) resolve to `null` so `task.run` fails
+ * closed instead of silently running an empty action list.
  */
 fun dbSubTaskResolver(db: AppDatabase): SubTaskResolver = resolver@{ ref ->
+    fun TaskEntity.decodedOrNull(): Task? {
+        val result = toDomainDecodeResult()
+        if (result.issue != null) {
+            AppLogger.error(TAG, "Sub-task '$ref' (id=$id) is corrupt: ${result.issue.message}")
+            return null
+        }
+        return result.value
+    }
     val byId = ref.toLongOrNull()?.let { db.taskDao().getById(it) }
-    if (byId != null) return@resolver byId.toDomain()
+    if (byId != null) return@resolver byId.decodedOrNull()
     val exact = db.taskDao().getByName(ref)
-    if (exact != null) return@resolver exact.toDomain()
-    db.taskDao().getAll().firstOrNull { it.name.equals(ref, ignoreCase = true) }?.toDomain()
+    if (exact != null) return@resolver exact.decodedOrNull()
+    db.taskDao().getAll().firstOrNull { it.name.equals(ref, ignoreCase = true) }?.decodedOrNull()
 }
 
 suspend fun insertRunLog(db: AppDatabase, entry: RunLogEntry): Boolean =

@@ -212,14 +212,19 @@ class AutomationService : Service() {
 
     private suspend fun onProfileActivated(profile: com.opentasker.core.model.Profile) {
         if (profile.enterTaskId <= 0) return
-        
+
         val task = db.taskDao().getById(profile.enterTaskId)
         if (task == null) {
             AppLogger.warn(TAG, "Enter task ${profile.enterTaskId} not found for profile ${profile.name}")
             return
         }
-        val domain = task.toDomain()
-        dispatchTask(profile, domain)
+        val decoded = task.toDomainDecodeResult()
+        if (decoded.issue != null) {
+            AppLogger.error(TAG, "Enter task ${profile.enterTaskId} is corrupt for profile ${profile.name}: ${decoded.issue.message}")
+            logProfileSkippedRun(profile, decoded.value, "Enter task data is corrupt (${decoded.issue.fieldName}); recover it before it can run.")
+            return
+        }
+        dispatchTask(profile, decoded.value)
     }
 
     private suspend fun onProfileDeactivated(profile: com.opentasker.core.model.Profile) {
@@ -229,8 +234,13 @@ class AutomationService : Service() {
             AppLogger.warn(TAG, "Exit task ${profile.exitTaskId} not found for profile ${profile.name}")
             return
         }
-        val domain = task.toDomain()
-        dispatchTask(profile, domain)
+        val decoded = task.toDomainDecodeResult()
+        if (decoded.issue != null) {
+            AppLogger.error(TAG, "Exit task ${profile.exitTaskId} is corrupt for profile ${profile.name}: ${decoded.issue.message}")
+            logProfileSkippedRun(profile, decoded.value, "Exit task data is corrupt (${decoded.issue.fieldName}); recover it before it can run.")
+            return
+        }
+        dispatchTask(profile, decoded.value)
     }
 
     private fun dispatchTask(

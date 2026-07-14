@@ -36,5 +36,6 @@ interface EditHistoryDao {
         const val MAX_HISTORY_PER_ENTITY = 5
         const val TYPE_PROFILE = "profile"
         const val TYPE_TASK = "task"
+        const val TYPE_SCENE = "scene"
     }
 }

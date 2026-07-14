@@ -85,6 +85,16 @@ internal data class OpenTaskerBundleReviewState(
     val plan: BundleImportPlan,
 )
 
+/**
+ * Thrown when a normal editor save would overwrite a record whose stored payload currently fails
+ * to decode. Blocking the write keeps the corrupt bytes intact for recovery instead of clobbering
+ * them with an empty fallback (fail closed).
+ */
+internal class CorruptRecordOverwriteException(issue: StorageDecodeIssue) : IllegalStateException(
+    "Can't save ${issue.recordType.label.lowercase()} \"${issue.recordName}\": its stored " +
+        "${issue.fieldName} is corrupt. Recover it (undo or restore a backup) or delete it first.",
+)
+
 class ActiveAutomationViewModel(
     private val db: AppDatabase,
     private val appContext: Context,
@@ -112,19 +122,24 @@ class ActiveAutomationViewModel(
         .map { results -> results.map { it.value }.sortedBy { it.name.lowercase() }.toImmutableList() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
+    private val sceneDecodeResults = db.sceneDao()
+        .getAllAsFlow()
+        .map { entities -> entities.map { it.toDomainDecodeResult() } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     val storageDecodeIssues: StateFlow<ImmutableList<StorageDecodeIssue>> = combine(
         profileDecodeResults,
         taskDecodeResults,
-    ) { profileResults, taskResults ->
-        (profileResults.mapNotNull { it.issue } + taskResults.mapNotNull { it.issue })
+        sceneDecodeResults,
+    ) { profileResults, taskResults, sceneResults ->
+        (profileResults.mapNotNull { it.issue } + taskResults.mapNotNull { it.issue } + sceneResults.mapNotNull { it.issue })
             .sortedWith(compareBy<StorageDecodeIssue> { it.recordType.label }.thenBy { it.recordName.lowercase() })
             .toImmutableList()
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
-    val scenes: StateFlow<ImmutableList<Scene>> = db.sceneDao()
-        .getAllAsFlow()
-        .map { entities -> entities.map { it.toDomain() }.sortedBy { it.name.lowercase() }.toImmutableList() }
+    val scenes: StateFlow<ImmutableList<Scene>> = sceneDecodeResults
+        .map { results -> results.map { it.value }.sortedBy { it.name.lowercase() }.toImmutableList() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
     val runLogs: StateFlow<ImmutableList<RunLogEntry>> = db.runLogDao()
@@ -171,6 +186,9 @@ class ActiveAutomationViewModel(
     fun updateTask(task: Task, message: String = "Task updated") = launchWithMessage(message) {
         val previous = db.taskDao().getById(task.id)
         if (previous != null) {
+            previous.toDomainDecodeResult().issue?.let { issue ->
+                throw CorruptRecordOverwriteException(issue)
+            }
             db.editHistoryDao().insert(
                 EditHistoryEntity(
                     entityType = EditHistoryDao.TYPE_TASK,
@@ -210,6 +228,20 @@ class ActiveAutomationViewModel(
     }
 
     fun updateScene(scene: Scene, message: String = "Scene updated") = launchWithMessage(message) {
+        val previous = scene.id.takeIf { it > 0L }?.let { db.sceneDao().getById(it) }
+        if (previous != null) {
+            previous.toDomainDecodeResult().issue?.let { issue ->
+                throw CorruptRecordOverwriteException(issue)
+            }
+            db.editHistoryDao().insert(
+                EditHistoryEntity(
+                    entityType = EditHistoryDao.TYPE_SCENE,
+                    entityId = scene.id,
+                    previousJson = previous.elementsJson,
+                ),
+            )
+            db.editHistoryDao().pruneOld(EditHistoryDao.TYPE_SCENE, scene.id)
+        }
         db.sceneDao().update(scene.toEntity())
     }
 
@@ -235,6 +267,9 @@ class ActiveAutomationViewModel(
         launchWithMessage(message) {
             val previousEntity = profile.id.takeIf { it > 0L }
                 ?.let { db.profileDao().getById(it) }
+            previousEntity?.toDomainDecodeResult()?.issue?.let { issue ->
+                throw CorruptRecordOverwriteException(issue)
+            }
             val previous = previousEntity?.toDomain()
             if (previousEntity != null) {
                 db.editHistoryDao().insert(

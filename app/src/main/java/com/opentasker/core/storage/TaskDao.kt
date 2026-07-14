@@ -8,7 +8,6 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Update
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.CollisionMode
@@ -45,7 +44,7 @@ data class TaskEntity(
                 )
             }
 
-        val actions = runCatching { Json.decodeFromString<List<ActionSpec>>(actionsJson) }
+        val actions = runCatching { StorageJson.decodeFromString<List<ActionSpec>>(actionsJson) }
             .getOrElse { error ->
                 return StorageDecodeResult(
                     value = Task(id, name, priority, mode, emptyList()),
@@ -66,7 +65,7 @@ data class TaskEntity(
 }
 
 fun Task.toEntity() = TaskEntity(
-    id, name, priority, collisionMode.name, Json.encodeToString(actions)
+    id, name, priority, collisionMode.name, StorageJson.encodeToString(actions)
 )
 
 @Dao
