@@ -40,8 +40,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import com.opentasker.core.storage.ProfileEntity
 import java.util.ArrayDeque
 import java.util.Collections
 
@@ -96,6 +100,31 @@ class AutomationService : Service() {
         CameraMicContextEvents.start(this)
         profileCooldowns.putAll(cooldownStore.loadAll())
         scope.launch { pruneRunLogs(force = true) }
+        observeProfileRegistry()
+    }
+
+    /**
+     * Keeps the running engine in sync with the profiles table. Creating, editing, enabling,
+     * disabling, or deleting a profile changes the reconcile signature and triggers a matcher and
+     * plugin-subscription rebuild without a service restart. The initial snapshot is dropped because
+     * [onStartCommand] performs the first load, so the initial snapshot is dropped and only
+     * subsequent engine-relevant changes reconcile. Identical signatures are coalesced by
+     * [distinctUntilChanged], and [reloadProfiles] is idempotent, so rapid edits are safe.
+     *
+     * In-flight task runs are intentionally left running — reconciling re-subscribes matchers but
+     * does not cancel a task that is already executing.
+     */
+    private fun observeProfileRegistry() {
+        scope.launch {
+            db.profileDao().getAllAsFlow()
+                .map { profileRegistrySignature(it) }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect {
+                    AppLogger.info(TAG, "Profile registry changed; reconciling matchers")
+                    reloadProfiles()
+                }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -486,6 +515,28 @@ class AutomationService : Service() {
         private val RUN_LOG_PRUNE_INTERVAL_MS = TimeUnit.HOURS.toMillis(1)
     }
 }
+
+/**
+ * Reconcile signature for the running profile registry. Two profile-table snapshots produce the
+ * same signature when nothing the engine depends on has changed, so purely cosmetic edits (name,
+ * group) do not thrash matcher rebuilds while enable/disable, context, task-wiring, mode, and
+ * cooldown changes do. Disabled profiles are excluded because the engine only runs enabled ones.
+ */
+internal fun profileRegistrySignature(profiles: List<ProfileEntity>): List<String> =
+    profiles.asSequence()
+        .filter { it.enabled }
+        .sortedBy { it.id }
+        .map { p ->
+            listOf(
+                p.id,
+                p.enterTaskId,
+                p.exitTaskId,
+                p.cooldownSec,
+                p.automationMode,
+                p.contextsJson,
+            ).joinToString("|")
+        }
+        .toList()
 
 private data class CooldownReservation(
     val accepted: Boolean,
