@@ -42,6 +42,11 @@ import com.opentasker.core.actions.ScreenTimeoutAction
 import com.opentasker.core.actions.ScreenshotAction
 import com.opentasker.core.actions.SendSmsAction
 import com.opentasker.core.actions.SetVariableAction
+import com.opentasker.core.actions.TextMatchAction
+import com.opentasker.core.actions.TextReplaceAction
+import com.opentasker.core.actions.TextSplitAction
+import com.opentasker.core.actions.TextJoinAction
+import com.opentasker.core.actions.TextSubstringAction
 import com.opentasker.core.actions.StopSoundAction
 import com.opentasker.core.actions.TaskerUnsupportedAction
 import com.opentasker.core.actions.TermuxScriptAction
@@ -78,6 +83,11 @@ private fun registerBuiltInActions() {
         DateTimeFormatAction(),
         DateTimeParseAction(),
         DateTimeAddAction(),
+        TextMatchAction(),
+        TextReplaceAction(),
+        TextSplitAction(),
+        TextJoinAction(),
+        TextSubstringAction(),
         SayAction(),
         WaitAction(),
         LaunchIntentAction(),

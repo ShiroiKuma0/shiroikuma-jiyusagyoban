@@ -173,6 +173,79 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "text.match",
+            name = "Match Text (regex)",
+            description = "Find the first regex match; captures become the output array (%var(1)=group 1)",
+            category = "Variable",
+            fields = listOf(
+                ActionField("source", "Source text", required = true),
+                ActionField("pattern", "Regex pattern", required = true, hint = "linear-time RE2"),
+                ActionField("var", "Output variable", hint = "default: match (also sets array + %var_count)"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "text.replace",
+            name = "Replace Text (regex)",
+            description = "Replace every regex match; supports $1 group references",
+            category = "Variable",
+            fields = listOf(
+                ActionField("source", "Source text", required = true),
+                ActionField("pattern", "Regex pattern", required = true),
+                ActionField("replacement", "Replacement", hint = "may reference $1, $2, ..."),
+                ActionField("var", "Output variable", hint = "default: result"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "text.split",
+            name = "Split Text",
+            description = "Split into an array by a literal delimiter or a regex pattern",
+            category = "Variable",
+            fields = listOf(
+                ActionField("source", "Source text", required = true),
+                ActionField("delimiter", "Delimiter", hint = "literal separator (or use a regex pattern)"),
+                ActionField("pattern", "Regex pattern", hint = "regex separator (takes precedence)"),
+                ActionField("var", "Output variable", hint = "default: parts (array + %var_count)"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "text.join",
+            name = "Join Text",
+            description = "Join an array variable into a single string",
+            category = "Variable",
+            fields = listOf(
+                ActionField("array", "Array variable", required = true, hint = "name of an array (from split/read)"),
+                ActionField("delimiter", "Delimiter", hint = "default: ,"),
+                ActionField("var", "Output variable", hint = "default: joined"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "text.substring",
+            name = "Substring",
+            description = "Extract part of a string by character index (bounds are clamped)",
+            category = "Variable",
+            fields = listOf(
+                ActionField("source", "Source text", required = true),
+                ActionField("start", "Start index", required = true, hint = "0-based"),
+                ActionField("end", "End index", hint = "exclusive; omit for end of string"),
+                ActionField("var", "Output variable", hint = "default: substring"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "tts.speak",
             name = "Say (Text-to-Speech)",
             description = "Speak text aloud using the device speaker",
