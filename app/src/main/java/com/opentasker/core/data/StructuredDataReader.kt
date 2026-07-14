@@ -1,0 +1,178 @@
+package com.opentasker.core.data
+
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import javax.xml.parsers.DocumentBuilderFactory
+import org.w3c.dom.Element
+import org.xml.sax.InputSource
+
+/**
+ * Deterministic, on-device parser that turns a JSON / CSV / XML string into one or more variable
+ * values, without any network or cloud dependency. Used by the `data.read` action to make raw HTTP
+ * responses and file contents usable in automations.
+ *
+ * All inputs are bounded, and any parse failure or unresolved selector returns null so the action
+ * fails closed.
+ */
+object StructuredDataReader {
+    const val MAX_INPUT_CHARS = 1_000_000
+    const val MAX_RESULT_VALUES = 5_000
+
+    /** Result of a read: an ordered list of extracted string values (may be empty). */
+    data class ReadResult(val values: List<String>)
+
+    fun read(format: String, source: String, path: String): ReadResult? {
+        if (source.length > MAX_INPUT_CHARS) return null
+        val values = when (format.trim().lowercase()) {
+            "json" -> readJson(source, path)
+            "csv" -> readCsv(source, path)
+            "xml" -> readXml(source, path)
+            else -> null
+        } ?: return null
+        return ReadResult(values.take(MAX_RESULT_VALUES))
+    }
+
+    // ---- JSON ----
+
+    private val json = Json { ignoreUnknownKeys = true }
+
+    private fun readJson(source: String, path: String): List<String>? {
+        val root = runCatching { json.parseToJsonElement(source) }.getOrNull() ?: return null
+        val target = navigateJson(root, path) ?: return null
+        return when (target) {
+            is JsonArray -> target.map { it.asPlainString() }
+            else -> listOf(target.asPlainString())
+        }
+    }
+
+    private fun navigateJson(root: JsonElement, path: String): JsonElement? {
+        val selectors = parseSelectors(path) ?: return null
+        var current = root
+        for (selector in selectors) {
+            current = when (selector) {
+                is Selector.Property -> (current as? JsonObject)?.get(selector.name) ?: return null
+                is Selector.Index -> (current as? JsonArray)?.getOrNull(selector.index) ?: return null
+            }
+        }
+        return current
+    }
+
+    private fun JsonElement.asPlainString(): String = when (this) {
+        is JsonPrimitive -> content
+        else -> toString()
+    }
+
+    // ---- CSV ----
+    //
+    // path "" or "*"  -> every cell, row-major
+    // path "c"        -> column c across all rows
+    // path "r,c"      -> single cell at row r, column c
+    private fun readCsv(source: String, path: String): List<String>? {
+        val rows = source.split('\n')
+            .map { it.trimEnd('\r') }
+            .filter { it.isNotEmpty() }
+            .map { line -> line.split(',').map { it.trim() } }
+        if (rows.isEmpty()) return emptyList()
+
+        val trimmed = path.trim()
+        if (trimmed.isEmpty() || trimmed == "*") return rows.flatten()
+
+        val parts = trimmed.split(',').map { it.trim() }
+        return when (parts.size) {
+            1 -> {
+                val col = parts[0].toIntOrNull() ?: return null
+                if (col < 0) return null
+                rows.mapNotNull { it.getOrNull(col) }
+            }
+            2 -> {
+                val row = parts[0].toIntOrNull() ?: return null
+                val col = parts[1].toIntOrNull() ?: return null
+                val cell = rows.getOrNull(row)?.getOrNull(col) ?: return null
+                listOf(cell)
+            }
+            else -> null
+        }
+    }
+
+    // ---- XML ----
+    //
+    // path is a slash-separated element name path, e.g. "root/item/name". Returns the text content
+    // of every element matching the full path.
+    private fun readXml(source: String, path: String): List<String>? {
+        val names = path.trim().trim('/').split('/').map { it.trim() }.filter { it.isNotEmpty() }
+        if (names.isEmpty()) return null
+        val doc = runCatching {
+            val factory = DocumentBuilderFactory.newInstance().apply {
+                // Harden against XXE / entity-expansion in untrusted input.
+                setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+                isExpandEntityReferences = false
+                isNamespaceAware = false
+            }
+            factory.newDocumentBuilder().parse(InputSource(source.reader()))
+        }.getOrNull() ?: return null
+
+        val rootEl = doc.documentElement ?: return null
+        if (!rootEl.tagName.equals(names.first(), ignoreCase = false)) return emptyList()
+        var current = listOf(rootEl)
+        for (name in names.drop(1)) {
+            current = current.flatMap { el -> el.childElements().filter { it.tagName == name } }
+        }
+        return current.map { it.textContent.trim() }
+    }
+
+    private fun Element.childElements(): List<Element> {
+        val out = mutableListOf<Element>()
+        val children = childNodes
+        for (i in 0 until children.length) {
+            (children.item(i) as? Element)?.let { out.add(it) }
+        }
+        return out
+    }
+
+    // ---- selectors ----
+
+    private sealed interface Selector {
+        data class Property(val name: String) : Selector
+        data class Index(val index: Int) : Selector
+    }
+
+    /** Parses a JSON path like `items[0].name` (leading '.' optional) into selectors. */
+    private fun parseSelectors(path: String): List<Selector>? {
+        val trimmed = path.trim().removePrefix(".")
+        if (trimmed.isEmpty()) return emptyList()
+        val selectors = mutableListOf<Selector>()
+        var cursor = 0
+        // optional leading bare property
+        cursor = readProperty(trimmed, cursor, selectors) ?: return null
+        while (cursor < trimmed.length) {
+            when (trimmed[cursor]) {
+                '.' -> {
+                    cursor = readProperty(trimmed, cursor + 1, selectors) ?: return null
+                }
+                '[' -> {
+                    val close = trimmed.indexOf(']', cursor + 1)
+                    if (close == -1) return null
+                    val index = trimmed.substring(cursor + 1, close).trim().toIntOrNull() ?: return null
+                    if (index < 0) return null
+                    selectors += Selector.Index(index)
+                    cursor = close + 1
+                }
+                else -> return null
+            }
+        }
+        return selectors
+    }
+
+    private fun readProperty(path: String, start: Int, out: MutableList<Selector>): Int? {
+        var cursor = start
+        while (cursor < path.length && (path[cursor].isLetterOrDigit() || path[cursor] == '_' || path[cursor] == '-')) {
+            cursor++
+        }
+        if (cursor == start) return if (start == 0) start else null // allow leading '[' with no property
+        out += Selector.Property(path.substring(start, cursor))
+        return cursor
+    }
+}

@@ -4,6 +4,7 @@ import com.opentasker.core.actions.AirplaneModeAction
 import com.opentasker.core.actions.AppendFileAction
 import com.opentasker.core.actions.BluetoothToggleAction
 import com.opentasker.core.actions.BrightnessAction
+import com.opentasker.core.actions.DataReadAction
 import com.opentasker.core.actions.DoNotDisturbAction
 import com.opentasker.core.actions.DeleteFileAction
 import com.opentasker.core.actions.DownloadAction
@@ -70,6 +71,7 @@ private fun registerBuiltInActions() {
         NotifyCancelAction(),
         SetVariableAction(),
         PersistVariableAction(),
+        DataReadAction(),
         SayAction(),
         WaitAction(),
         LaunchIntentAction(),

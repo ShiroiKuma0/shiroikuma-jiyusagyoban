@@ -113,6 +113,21 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "data.read",
+            name = "Read Data",
+            description = "Parse JSON, CSV, or XML into variables — great for HTTP responses and files",
+            category = "Variable",
+            fields = listOf(
+                ActionField("source", "Source data", required = true, hint = "%response or file contents"),
+                ActionField("format", "Format", hint = "json (default), csv, or xml"),
+                ActionField("path", "Selector", hint = "JSON items[0].name · CSV column c or cell r,c · XML root/item/name"),
+                ActionField("var", "Output variable", hint = "default: data (also sets %var array + %var_count)"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "tts.speak",
             name = "Say (Text-to-Speech)",
             description = "Speak text aloud using the device speaker",
