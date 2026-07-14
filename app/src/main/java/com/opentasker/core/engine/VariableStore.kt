@@ -59,6 +59,17 @@ class VariableStore {
     }
 
     /**
+     * Seed the global scope with previously persisted values before a run starts. Only affects the
+     * global (uppercase) namespace; local task scopes are untouched.
+     */
+    fun seedGlobals(values: Map<String, String>) {
+        globals.putAll(values)
+    }
+
+    /** Snapshot of the current global scope, used to persist durable globals after a run. */
+    fun globalSnapshot(): Map<String, String> = globals.toMap()
+
+    /**
      * Store an array in the array storage.
      * Arrays can be accessed via %arrayName(#) for length, %arrayName(0) for index, etc.
      */

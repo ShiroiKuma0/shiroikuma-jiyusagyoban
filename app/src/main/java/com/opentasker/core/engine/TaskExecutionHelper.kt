@@ -6,6 +6,7 @@ import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.TaskEntity
+import com.opentasker.core.storage.VariableEntity
 import com.opentasker.core.storage.toEntity
 
 data class TaskExecutionResult(
@@ -23,10 +24,20 @@ suspend fun executeAndLogTask(
     logTag: String = TAG,
 ): TaskExecutionResult {
     val variables = VariableStore()
+    val persistedGlobals = runCatching {
+        db.variableDao().getAllGlobal().associate { it.name to it.value }
+    }.getOrElse { error ->
+        AppLogger.error(logTag, "Failed to hydrate global variables", error)
+        emptyMap()
+    }
+    variables.seedGlobals(persistedGlobals)
     initialVariables.forEach { (name, value) -> variables.set(name, value) }
+    // Baseline after seeding + event vars, so only globals actually changed during the run persist.
+    val baselineGlobals = variables.globalSnapshot()
     val ctx = ActionContext(appContext, variables) { msg -> AppLogger.info(logTag, msg) }
     val runner = TaskRunner(ctx, resolveTask = dbSubTaskResolver(db))
     val report = runner.run(task)
+    persistChangedGlobals(db, baselineGlobals, variables.globalSnapshot(), logTag)
     AppLogger.info(logTag, "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)")
     val classified = RunLogSource.classify(source)
     val logEntry = RunLogEntry(
@@ -45,6 +56,35 @@ suspend fun executeAndLogTask(
     )
     val inserted = insertRunLog(db, logEntry)
     return TaskExecutionResult(report, inserted)
+}
+
+/**
+ * Globals whose value changed during a run (added or modified), relative to the run's baseline.
+ * Deterministic and order-stable so parallel runs converge on a well-defined last-write-wins result
+ * once each commits. Pure for testability.
+ */
+fun changedGlobals(before: Map<String, String>, after: Map<String, String>): List<VariableEntity> =
+    after.asSequence()
+        .filter { (name, value) -> before[name] != value }
+        .sortedBy { it.key }
+        .map { (name, value) -> VariableEntity(name = name, value = value, isGlobal = true) }
+        .toList()
+
+/**
+ * Commits globals changed during the run to [com.opentasker.core.storage.VariableDao] before the
+ * task's success is reported, so `%UPPERCASE` globals and explicit `var.persist` values survive
+ * across separate runs and process restarts. Local (lowercase) variables never reach this path.
+ */
+private suspend fun persistChangedGlobals(
+    db: AppDatabase,
+    before: Map<String, String>,
+    after: Map<String, String>,
+    logTag: String,
+) {
+    for (entity in changedGlobals(before, after)) {
+        runCatching { db.variableDao().insert(entity) }
+            .onFailure { AppLogger.error(logTag, "Failed to persist global ${entity.name}", it) }
+    }
 }
 
 suspend fun logSkippedRun(
