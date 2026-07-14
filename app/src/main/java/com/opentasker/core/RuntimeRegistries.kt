@@ -5,6 +5,9 @@ import com.opentasker.core.actions.AppendFileAction
 import com.opentasker.core.actions.BluetoothToggleAction
 import com.opentasker.core.actions.BrightnessAction
 import com.opentasker.core.actions.DataReadAction
+import com.opentasker.core.actions.DateTimeAddAction
+import com.opentasker.core.actions.DateTimeFormatAction
+import com.opentasker.core.actions.DateTimeParseAction
 import com.opentasker.core.actions.DoNotDisturbAction
 import com.opentasker.core.actions.DeleteFileAction
 import com.opentasker.core.actions.DownloadAction
@@ -72,6 +75,9 @@ private fun registerBuiltInActions() {
         SetVariableAction(),
         PersistVariableAction(),
         DataReadAction(),
+        DateTimeFormatAction(),
+        DateTimeParseAction(),
+        DateTimeAddAction(),
         SayAction(),
         WaitAction(),
         LaunchIntentAction(),

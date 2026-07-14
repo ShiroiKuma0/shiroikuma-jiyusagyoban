@@ -128,6 +128,51 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "datetime.format",
+            name = "Format Date/Time",
+            description = "Format an epoch-millis time (or now) into a string",
+            category = "Variable",
+            fields = listOf(
+                ActionField("time", "Time", hint = "epoch millis or 'now' (default)"),
+                ActionField("format", "Pattern", hint = "default yyyy-MM-dd HH:mm:ss"),
+                ActionField("zone", "Time zone", hint = "e.g. UTC or America/New_York (optional)"),
+                ActionField("var", "Output variable", hint = "default: datetime"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "datetime.parse",
+            name = "Parse Date/Time",
+            description = "Parse a date-time string into epoch milliseconds",
+            category = "Variable",
+            fields = listOf(
+                ActionField("text", "Text", required = true, hint = "e.g. 2026-07-14 09:30"),
+                ActionField("format", "Pattern", required = true, hint = "e.g. yyyy-MM-dd HH:mm"),
+                ActionField("zone", "Time zone", hint = "optional"),
+                ActionField("var", "Output variable", hint = "default: datetime (epoch millis)"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "datetime.add",
+            name = "Add to Date/Time",
+            description = "Add or subtract a duration from an epoch-millis time",
+            category = "Variable",
+            fields = listOf(
+                ActionField("time", "Time", hint = "epoch millis or 'now' (default)"),
+                ActionField("amount", "Amount", required = true, hint = "integer, may be negative"),
+                ActionField("unit", "Unit", required = true, hint = "seconds/minutes/hours/days/weeks/months/years"),
+                ActionField("var", "Output variable", hint = "default: datetime (epoch millis)"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "tts.speak",
             name = "Say (Text-to-Speech)",
             description = "Speak text aloud using the device speaker",

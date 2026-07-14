@@ -15,7 +15,7 @@
 
 - **Profiles, contexts, tasks, actions** — a complete Room-backed automation pipeline with a Compose UI
 - **7 context families** — Application, Time, Day, Location, State, Event, and Plugin (Locale/Tasker condition)
-- **50 built-in actions** plus engine-handled flow control (`task.run`, `if`/`else`/`end if`, `for each`/`end for`, `stop`)
+- **53 built-in actions** plus engine-handled flow control (`task.run`, `if`/`else`/`end if`, `for each`/`end for`, `stop`)
 - **Template expressions** — bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math/date functions, traces, and strict regex policy
 - **Automation modes** — per-profile single, restart, queued, and parallel re-trigger behavior
 - **Profile groups** — organize profiles into named groups with filter chips
@@ -35,7 +35,7 @@
 - FOSS platform location/geofence — GPS/network fixes, balanced provider cadence, radius/accuracy/dwell evaluation, persisted dwell state, and API 36 background delivery evidence
 - Locale/Tasker condition plugins — polled as first-class context predicates with last-known-state caching
 
-### Actions (50 registered + 7 engine-handled)
+### Actions (53 registered + 7 engine-handled)
 
 | Category | Count | Examples |
 |----------|------:|---------|
@@ -46,7 +46,7 @@
 | Media | 6 | play, stop, pause, next, previous, mute |
 | System | 6 | vibrate, reboot, lock, screen off, wake, log |
 | Notification | 3 | notify/toast, cancel, TTS speak |
-| Variable | 2 | set variable, read data (JSON/CSV/XML → variables) |
+| Variable | 5 | set variable, read data (JSON/CSV/XML), format/parse/add date-time |
 | Flow | 1+7 | wait; engine: task.run, if/else/end if, for each/end for, stop |
 | Plugin | 2 | Locale setting dispatch, Locale condition query |
 | Script | 1 | gated Termux `RUN_COMMAND` dispatch |
