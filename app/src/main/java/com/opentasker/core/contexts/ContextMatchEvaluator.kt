@@ -1,5 +1,6 @@
 package com.opentasker.core.contexts
 
+import com.google.re2j.Pattern as Re2Pattern
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.location.FossGeofenceEvaluator
@@ -195,8 +196,10 @@ object ContextMatchEvaluator {
     private fun textMatches(value: String, filter: String, regex: Boolean): Boolean {
         if (!regex) return value.contains(filter, ignoreCase = true)
         if (filter.length > MAX_REGEX_PATTERN_CHARS || value.length > MAX_REGEX_INPUT_CHARS) return false
+        // Use linear-time RE2 (not the JDK backtracking engine) so a pathological user pattern such
+        // as (a+)+$ on an incoming notification/event cannot hang the matcher coroutine.
         return runCatching {
-            Regex(filter, RegexOption.IGNORE_CASE).containsMatchIn(value)
+            Re2Pattern.compile(filter, Re2Pattern.CASE_INSENSITIVE).matcher(value).find()
         }.getOrDefault(false)
     }
 

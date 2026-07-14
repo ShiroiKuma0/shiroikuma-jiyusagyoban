@@ -49,11 +49,12 @@ class StateContextSourceImpl : ContextSource {
                 when (intent.action) {
                     Intent.ACTION_BATTERY_CHANGED -> {
                         val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                        val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
                         val isCharging = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1).let {
                             it == BatteryManager.BATTERY_STATUS_CHARGING ||
                             it == BatteryManager.BATTERY_STATUS_FULL
                         }
-                        statePatch["battery_level"] = level.toString()
+                        batteryPercent(level, scale)?.let { statePatch["battery_level"] = it.toString() }
                         statePatch["charging"] = isCharging.toString()
                     }
                     Intent.ACTION_HEADSET_PLUG -> {
@@ -168,10 +169,11 @@ internal fun seedInitialState(app: Context): Map<String, String> {
     val batteryIntent = app.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
     if (batteryIntent != null) {
         val level = batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = batteryIntent.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
         val isCharging = batteryIntent.getIntExtra(BatteryManager.EXTRA_STATUS, -1).let {
             it == BatteryManager.BATTERY_STATUS_CHARGING || it == BatteryManager.BATTERY_STATUS_FULL
         }
-        if (level >= 0) seed["battery_level"] = level.toString()
+        batteryPercent(level, scale)?.let { seed["battery_level"] = it.toString() }
         seed["charging"] = isCharging.toString()
     }
 
@@ -253,6 +255,16 @@ private fun wifiMatches(
         "disconnected", "off", "false", "no" -> connected == false
         else -> actualSsid == expected
     }
+}
+
+/**
+ * Normalize a raw battery reading to a 0-100 percentage. `ACTION_BATTERY_CHANGED` reports
+ * `EXTRA_LEVEL` against `EXTRA_SCALE` (often 100, but some devices report 255), so a bare level is
+ * not a percentage. Returns null for an unknown level or a non-positive scale.
+ */
+internal fun batteryPercent(level: Int, scale: Int): Int? {
+    if (level < 0 || scale <= 0) return null
+    return (level * 100 / scale).coerceIn(0, 100)
 }
 
 private inline fun numericCompare(
