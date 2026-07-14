@@ -37,14 +37,44 @@ class VariableExpander {
 
     private fun expandInternal(expr: String, variableStore: VariableStore, arrayStore: ArrayStore): String {
         // Handle conditionals: (cond) ? true_val : false_val
-        val ternaryMatch = TERNARY_PATTERN.find(expr)
-        if (ternaryMatch != null) {
-            val (condition, trueVal, falseVal) = ternaryMatch.destructured
-            val result = evaluateConditionInternal(condition, variableStore, arrayStore)
-            return expandText(if (result) trueVal else falseVal, variableStore, arrayStore)
+        val ternary = parseTernary(expr)
+        if (ternary != null) {
+            val result = evaluateConditionInternal(ternary.condition, variableStore, arrayStore)
+            return expandText(if (result) ternary.trueValue else ternary.falseValue, variableStore, arrayStore)
         }
 
         return expandText(expr, variableStore, arrayStore)
+    }
+
+    private data class Ternary(val condition: String, val trueValue: String, val falseValue: String)
+
+    /**
+     * Parse a leading `(condition) ? trueValue : falseValue` expression. The condition is matched by
+     * balanced parentheses so operator expressions that contain parens (e.g. `(%A(+1) > 5)`) are
+     * handled, unlike the previous `[^)]+` regex which stopped at the first `)`.
+     */
+    private fun parseTernary(expr: String): Ternary? {
+        if (expr.isEmpty() || expr[0] != '(') return null
+        var depth = 0
+        var conditionEnd = -1
+        for (i in expr.indices) {
+            when (expr[i]) {
+                '(' -> depth++
+                ')' -> if (--depth == 0) { conditionEnd = i; break }
+            }
+        }
+        if (conditionEnd == -1) return null
+        var cursor = conditionEnd + 1
+        while (cursor < expr.length && expr[cursor].isWhitespace()) cursor++
+        if (cursor >= expr.length || expr[cursor] != '?') return null
+        val rest = expr.substring(cursor + 1)
+        val colon = rest.indexOf(':')
+        if (colon == -1) return null
+        return Ternary(
+            condition = expr.substring(1, conditionEnd),
+            trueValue = rest.substring(0, colon).trim(),
+            falseValue = rest.substring(colon + 1).trim(),
+        )
     }
 
     private fun expandText(expr: String, variableStore: VariableStore, arrayStore: ArrayStore): String {
@@ -385,7 +415,6 @@ class VariableExpander {
     }
 
     companion object {
-        private val TERNARY_PATTERN = Regex("""^\(([^)]+)\)\s*\?\s*([^:]+)\s*:\s*(.+)$""")
         private val COMPARISON_OPERATORS = listOf(
             ComparisonOperator.EQ,
             ComparisonOperator.NE,
@@ -412,18 +441,21 @@ class VariableExpander {
  * Arrays are accessed as %list(#) for count, %list(1) for index, %list() for join.
  */
 class ArrayStore {
-    private val arrays = java.util.concurrent.ConcurrentHashMap<String, List<String>>()
+    // Access-ordered LRU: the least-recently-used array is evicted at the cap, not an
+    // arbitrary entry. All access is synchronized on [lock] because the store is shared
+    // across concurrently running tasks.
+    private val lock = Any()
+    private val arrays = object : LinkedHashMap<String, List<String>>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<String>>): Boolean =
+            size > MAX_ARRAYS
+    }
 
     fun put(name: String, values: List<String>) {
-        if (arrays.size >= MAX_ARRAYS) {
-            val oldest = arrays.keys.firstOrNull() ?: return
-            arrays.remove(oldest)
-        }
-        arrays[name] = values
+        synchronized(lock) { arrays[name] = values }
     }
 
     fun clear() {
-        arrays.clear()
+        synchronized(lock) { arrays.clear() }
     }
 
     companion object {
@@ -431,21 +463,21 @@ class ArrayStore {
     }
 
     fun get(name: String, index: Int): String {
-        return arrays[name]?.getOrNull(index) ?: ""
+        return synchronized(lock) { arrays[name]?.getOrNull(index) } ?: ""
     }
 
     fun length(name: String): Int {
-        return arrays[name]?.size ?: 0
+        return synchronized(lock) { arrays[name]?.size } ?: 0
     }
 
     fun contains(name: String): Boolean {
-        return arrays.containsKey(name)
+        return synchronized(lock) { arrays.containsKey(name) }
     }
 
     fun join(name: String, delimiter: String): String {
-        return arrays[name]?.joinToString(delimiter) ?: ""
+        return synchronized(lock) { arrays[name]?.joinToString(delimiter) } ?: ""
     }
 
     fun snapshot(): Map<String, List<String>> =
-        HashMap(arrays).mapValues { (_, values) -> values.toList() }
+        synchronized(lock) { LinkedHashMap(arrays).mapValues { (_, values) -> values.toList() } }
 }

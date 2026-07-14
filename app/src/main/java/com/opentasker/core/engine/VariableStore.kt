@@ -154,6 +154,7 @@ class VariableStore {
      * Returns true if the write succeeded.
      */
     fun setArrayAtIndex(name: String, index: Int, value: String): Boolean {
+        if (index < 0 || index > MAX_ARRAY_INDEX) return false
         val items = arrayStore.snapshot()[name]?.toMutableList() ?: mutableListOf()
         while (items.size <= index) items.add("")
         items[index] = value
@@ -214,7 +215,7 @@ class VariableStore {
                     if (close == -1) return null
                     val body = fullPath.substring(cursor + 1, close).trim()
                     val index = body.toIntOrNull() ?: return null
-                    if (index < 0) return null
+                    if (index < 0 || index > MAX_ARRAY_INDEX) return null
                     selectors += PathSelector.Index(index)
                     cursor = close + 1
                 }
@@ -242,5 +243,12 @@ class VariableStore {
 
     companion object {
         private val jsonCodec = Json { ignoreUnknownKeys = true }
+
+        /**
+         * Upper bound for a nested/array write index. A `var.set` name such as `X[2000000000]`
+         * (reachable from an imported/shared profile) would otherwise grow a list ~2 billion
+         * entries, hanging the task thread and OOM-ing the process. Writes above this fail closed.
+         */
+        internal const val MAX_ARRAY_INDEX = 100_000
     }
 }
