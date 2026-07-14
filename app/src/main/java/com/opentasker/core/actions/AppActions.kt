@@ -134,12 +134,20 @@ class SendSmsAction : Action {
                 SmsManager.getDefault()
             } ?: return ActionResult.Failure("SMS service not available")
             smsManager.sendTextMessage(number, null, message, null, null)
-            ctx.logger("SMS sent to $number")
+            // Mask the recipient in the persisted run log — full numbers are PII and run-log
+            // redaction does not scrub phone numbers.
+            ctx.logger("SMS sent to ${maskPhoneNumber(number)}")
             ActionResult.Success
         } catch (ex: Exception) {
             ActionResult.Failure("SMS send failed: ${ex.message}", ex)
         }
     }
+}
+
+/** Masks all but the last 4 characters of a recipient number for logging (e.g. "***6789"). */
+internal fun maskPhoneNumber(number: String): String {
+    val tail = number.takeLast(4)
+    return if (number.length <= 4) "***" else "***$tail"
 }
 
 /**

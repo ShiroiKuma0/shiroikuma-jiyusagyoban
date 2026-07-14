@@ -34,7 +34,10 @@ class TermuxScriptAction : Action {
             return ActionResult.Failure("Script '$executable' is rate-limited. Wait before re-dispatching.")
         }
 
-        val arguments = args["arguments"]?.split(" ")?.toTypedArray() ?: emptyArray()
+        // Drop blank tokens so a present-but-empty (or double-spaced) "arguments" value doesn't
+        // dispatch a spurious empty argv entry to the script.
+        val arguments = args["arguments"]?.split(" ")?.filter { it.isNotBlank() }?.toTypedArray()
+            ?: emptyArray()
         val workingDirectory = args["workingDirectory"]?.trim()?.ifBlank { null }
         val capturePrefix = args["capturePrefix"]?.trim()?.ifBlank { null }
 

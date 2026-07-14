@@ -146,11 +146,15 @@ class ListFilesAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         val varName = args["var"] ?: args["variable"] ?: "result"
-        val pattern = args["pattern"].orEmpty()
+        val pattern = args["pattern"].orEmpty().trim()
         return try {
             val dir = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside OpenTasker files")
             if (!dir.isDirectory) return ActionResult.Failure("path is not a directory")
-            val matcher = fileNameMatcher(pattern)
+            val matcher = if (pattern.isEmpty()) {
+                null
+            } else {
+                fileNameMatcher(pattern) ?: return ActionResult.Failure("invalid file name pattern")
+            }
             val files = dir.listFiles()
                 ?.filter { file -> matcher?.matches(File(file.name).toPath()) ?: true }
                 ?.sortedWith(compareBy<File> { it.name.lowercase() }.thenBy { it.name })
@@ -165,16 +169,15 @@ class ListFilesAction : Action {
     }
 }
 
+/**
+ * Builds a file-name glob matcher, or returns null for an invalid pattern (too long, contains a
+ * path separator/null byte, or is not a valid glob) so the caller can surface a clean validation
+ * failure instead of leaking a raw Java exception string. Callers pass a non-blank, trimmed pattern.
+ */
 private fun fileNameMatcher(pattern: String): java.nio.file.PathMatcher? {
-    val trimmed = pattern.trim()
-    if (trimmed.isBlank()) return null
-    require(trimmed.length <= MAX_LIST_PATTERN_CHARS) {
-        "pattern exceeds $MAX_LIST_PATTERN_CHARS characters"
-    }
-    require(trimmed.none { it == '/' || it == '\\' || it == '\u0000' }) {
-        "pattern must match file names only"
-    }
-    return FileSystems.getDefault().getPathMatcher("glob:$trimmed")
+    if (pattern.isEmpty() || pattern.length > MAX_LIST_PATTERN_CHARS) return null
+    if (pattern.any { it == '/' || it == '\\' || it == '\u0000' }) return null
+    return runCatching { FileSystems.getDefault().getPathMatcher("glob:$pattern") }.getOrNull()
 }
 
 private fun safeUserFile(ctx: ActionContext, path: String, mustExist: Boolean = false): File? {

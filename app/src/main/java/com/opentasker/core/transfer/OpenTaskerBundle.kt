@@ -246,10 +246,10 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
                 val existing = db.variableDao().get(variable.name)
                 if (existing == null) {
                     db.variableDao().insert(variable.toEntity())
+                    insertedVariables++
                 } else {
                     db.variableDao().update(variable.toEntity())
                 }
-                insertedVariables++
             }
 
             bundle.profiles.sortedWith(compareBy<Profile> { it.name.lowercase() }.thenBy { it.id }).forEach { profile ->

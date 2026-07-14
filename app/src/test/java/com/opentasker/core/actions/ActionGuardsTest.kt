@@ -572,7 +572,7 @@ class ActionGuardsTest {
             )
 
             assertTrue("path-like pattern should fail", result is ActionResult.Failure)
-            assertTrue((result as ActionResult.Failure).message.contains("file names only"))
+            assertTrue((result as ActionResult.Failure).message.contains("pattern"))
         } finally {
             filesDir.deleteRecursively()
         }
