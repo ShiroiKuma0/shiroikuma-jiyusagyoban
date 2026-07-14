@@ -61,11 +61,18 @@ data class BundleImportReport(
 )
 
 object OpenTaskerBundleCodec {
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
     private val json = Json {
         prettyPrint = true
         encodeDefaults = true
         explicitNulls = false
         ignoreUnknownKeys = false
+        // Be forgiving of hand-edited/shared bundles on decode (export output is unaffected):
+        // allow // comments, trailing commas, and case-insensitive enum values. Unknown keys are
+        // still rejected so structurally wrong bundles fail.
+        allowComments = true
+        allowTrailingComma = true
+        decodeEnumsCaseInsensitive = true
     }
 
     fun build(

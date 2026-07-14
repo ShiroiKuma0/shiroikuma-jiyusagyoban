@@ -82,6 +82,17 @@ class AutomationTargetContractTest {
         assertTrue("pending result should always finish", source.contains("pending.finish()"))
     }
 
+    @Test
+    fun externalVariableExtrasAreCountBounded() {
+        val source = listOf(
+            File("src/main/java/com/opentasker/core/external/AutomationTargetReceiver.kt"),
+            File("app/src/main/java/com/opentasker/core/external/AutomationTargetReceiver.kt"),
+        ).first { it.exists() }.readText()
+
+        assertTrue("supplied variable count must be capped", source.contains("MAX_SUPPLIED_VARIABLES"))
+        assertTrue("the cap must actually bound extraction", source.contains("take(MAX_SUPPLIED_VARIABLES)"))
+    }
+
     private fun loadMainManifest() =
         DocumentBuilderFactory.newInstance()
             .newDocumentBuilder()

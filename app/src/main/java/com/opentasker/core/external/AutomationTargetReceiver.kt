@@ -158,13 +158,16 @@ class AutomationTargetReceiver : BroadcastReceiver() {
     private fun extractVariables(extras: Bundle?): Map<String, String> {
         if (extras == null) return emptyMap()
         return extras.keySet()
+            .asSequence()
             .filter { it.startsWith(AutomationTargetContract.VARIABLE_EXTRA_PREFIX) }
+            .sorted() // deterministic which variables survive the cap
             .mapNotNull { key ->
                 val name = key.removePrefix(AutomationTargetContract.VARIABLE_EXTRA_PREFIX)
                 if (!AutomationTargetContract.isValidVariableName(name)) return@mapNotNull null
                 val value = extras.getString(key) ?: return@mapNotNull null
                 name to value.take(MAX_VARIABLE_VALUE_CHARS)
             }
+            .take(MAX_SUPPLIED_VARIABLES)
             .toMap()
     }
 
@@ -179,6 +182,7 @@ class AutomationTargetReceiver : BroadcastReceiver() {
     companion object {
         private const val TAG = "AutomationTargetReceiver"
         private const val MAX_VARIABLE_VALUE_CHARS = 4_096
+        private const val MAX_SUPPLIED_VARIABLES = 64
     }
 }
 
