@@ -58,7 +58,10 @@ import java.util.Collections
  */
 class AutomationService : Service() {
     private val job = Job()
-    private val scope = CoroutineScope(Dispatchers.Main + job)
+    // Engine orchestration (context matching, dispatch) runs off the main thread. Room suspend DAOs
+    // dispatch to Room's own executor, and task execution hops to Dispatchers.IO inside
+    // executeAndLogTask, so no automation work blocks the UI thread.
+    private val scope = CoroutineScope(Dispatchers.Default + job)
     private val db by lazy { OpenTaskerApp_NoHilt.db }
     private val timeEventScheduler by lazy { TimeEventScheduler(this) }
     private val wifiNetworkMonitor by lazy { WiFiNetworkMonitor(this) }

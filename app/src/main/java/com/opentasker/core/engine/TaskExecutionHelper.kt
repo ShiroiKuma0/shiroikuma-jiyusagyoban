@@ -8,6 +8,8 @@ import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.TaskEntity
 import com.opentasker.core.storage.VariableEntity
 import com.opentasker.core.storage.toEntity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 data class TaskExecutionResult(
     val report: TaskRunReport,
@@ -22,7 +24,10 @@ suspend fun executeAndLogTask(
     metadata: List<String> = emptyList(),
     initialVariables: Map<String, String> = emptyMap(),
     logTag: String = TAG,
-): TaskExecutionResult {
+): TaskExecutionResult = withContext(Dispatchers.IO) {
+    // Run the whole task off the caller's thread. Manual runs (ViewModel), widget/shortcut, and
+    // notification-action paths call this from the main thread; without this hop, blocking actions
+    // (HTTP, file, ping) would throw NetworkOnMainThreadException and fail silently.
     val variables = VariableStore()
     val persistedGlobals = runCatching {
         db.variableDao().getAllGlobal().associate { it.name to it.value }
@@ -55,7 +60,7 @@ suspend fun executeAndLogTask(
         sourceLabel = classified.label,
     )
     val inserted = insertRunLog(db, logEntry)
-    return TaskExecutionResult(report, inserted)
+    TaskExecutionResult(report, inserted)
 }
 
 /**

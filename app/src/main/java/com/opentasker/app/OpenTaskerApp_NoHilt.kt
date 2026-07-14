@@ -1,6 +1,7 @@
 package com.opentasker.app
 
 import android.app.Application
+import android.os.StrictMode
 import androidx.room.Room
 import com.opentasker.core.registerCoreRuntime
 import com.opentasker.core.actions.registerActionMetadata
@@ -28,6 +29,7 @@ class OpenTaskerApp_NoHilt : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        installStrictModeInDebug()
         CrashLogHandler.install(this)
         registerActionMetadata()
         registerCoreRuntime()
@@ -53,5 +55,29 @@ class OpenTaskerApp_NoHilt : Application() {
         }
 
         RunLogPruneWorker.enqueue(this)
+    }
+
+    /**
+     * In debug builds, surface accidental main-thread disk/network I/O and leaked closeables or
+     * receivers/services to logcat (never crashes the app). Helps keep the automation engine's
+     * work off the UI thread as the codebase evolves.
+     */
+    private fun installStrictModeInDebug() {
+        if (!BuildConfig.DEBUG) return
+        StrictMode.setThreadPolicy(
+            StrictMode.ThreadPolicy.Builder()
+                .detectDiskReads()
+                .detectDiskWrites()
+                .detectNetwork()
+                .penaltyLog()
+                .build(),
+        )
+        StrictMode.setVmPolicy(
+            StrictMode.VmPolicy.Builder()
+                .detectLeakedClosableObjects()
+                .detectLeakedRegistrationObjects()
+                .penaltyLog()
+                .build(),
+        )
     }
 }
