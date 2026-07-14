@@ -240,7 +240,8 @@ class WakeOnLanAction : Action {
     }
 
     companion object {
-        private val MAC_PATTERN = Regex("^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$")
+        // Backreference \2 forces one consistent separator, so mixed forms like AA:BB-CC... are rejected.
+        private val MAC_PATTERN = Regex("^([0-9A-Fa-f]{2})([:-])([0-9A-Fa-f]{2}\\2){4}[0-9A-Fa-f]{2}$")
 
         internal fun parseMac(mac: String): ByteArray? {
             if (!MAC_PATTERN.matches(mac)) return null

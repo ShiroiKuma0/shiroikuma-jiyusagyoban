@@ -250,6 +250,14 @@ class ActionGuardsTest {
         assertTrue("short MAC should be rejected", WakeOnLanAction.parseMac("AA:BB") == null)
         assertTrue("non-hex should be rejected", WakeOnLanAction.parseMac("GG:HH:II:JJ:KK:LL") == null)
         assertTrue("empty should be rejected", WakeOnLanAction.parseMac("") == null)
+        assertTrue("mixed separators should be rejected", WakeOnLanAction.parseMac("AA:BB-CC:DD-EE:FF") == null)
+    }
+
+    @Test
+    fun wolAcceptsHyphenSeparatedMac() {
+        val mac = WakeOnLanAction.parseMac("AA-BB-CC-DD-EE-FF")
+        assertTrue("hyphen-separated MAC should parse", mac != null)
+        assertEquals(6, mac!!.size)
     }
 
     @Test
