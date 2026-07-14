@@ -327,7 +327,7 @@ private fun enforceHttpPolicy(url: URL, args: Map<String, String>): ActionResult
     }
     val addr = runCatching { InetAddress.getByName(url.host) }.getOrNull()
         ?: return ActionResult.Failure("cannot resolve host: ${url.host}")
-    if (!addr.isSiteLocalAddress && !addr.isLoopbackAddress && !addr.isLinkLocalAddress) {
+    if (!isPrivateOrLocalAddress(addr)) {
         return ActionResult.Failure(
             "HTTP is only allowed for private/LAN addresses (${url.host} resolved to a public address)"
         )
@@ -335,10 +335,25 @@ private fun enforceHttpPolicy(url: URL, args: Map<String, String>): ActionResult
     return null
 }
 
+/**
+ * True when [addr] is a loopback, link-local, IPv4 site-local (10/8, 172.16/12, 192.168/16), or
+ * IPv6 Unique Local (fc00::/7) address. `InetAddress.isSiteLocalAddress` does NOT cover IPv6 ULA,
+ * so it is detected explicitly; without this a `fd00::` LAN host would be treated as public.
+ */
+internal fun isPrivateOrLocalAddress(addr: InetAddress): Boolean {
+    if (addr.isLoopbackAddress || addr.isLinkLocalAddress || addr.isSiteLocalAddress) return true
+    if (addr is java.net.Inet6Address) {
+        val firstByte = addr.address.firstOrNull()?.toInt()?.and(0xff) ?: return false
+        // fc00::/7 -> high 7 bits equal 1111110, i.e. first byte is 0xfc or 0xfd.
+        if (firstByte and 0xfe == 0xfc) return true
+    }
+    return false
+}
+
 internal fun urlTargetsLocalNetwork(url: URL): Boolean {
     if (url.protocol != "http" && url.protocol != "https") return false
     val addr = runCatching { InetAddress.getByName(url.host) }.getOrNull() ?: return false
-    return addr.isSiteLocalAddress || addr.isLoopbackAddress || addr.isLinkLocalAddress
+    return isPrivateOrLocalAddress(addr)
 }
 
 internal fun checkLocalNetworkPermission(ctx: ActionContext): ActionResult? {

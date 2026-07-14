@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Cleartext HTTP is permitted at the platform level ONLY so that user-configured
+    private/LAN hosts (literal IPs such as 192.168.x.x, 10.x.x.x, fd00::/8) can be reached.
+    Android network-security-config <domain> entries are hostnames, not CIDR ranges, so
+    private IP ranges cannot be expressed here; the previous CIDR-as-domain entries silently
+    blocked every literal LAN IP.
+
+    The single enforcement point is NetworkActions.enforceHttpPolicy: HTTPS is the default,
+    cleartext requires an explicit per-action allow_http opt-in, and any host that does not
+    resolve to a loopback / link-local / site-local / IPv6-ULA address is rejected before a
+    connection is opened. Public cleartext therefore fails in code, before data is sent.
+-->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false" />
-    <domain-config cleartextTrafficPermitted="true">
-        <!-- LAN/private ranges: cleartext allowed only for local network hosts -->
-        <domain includeSubdomains="true">10.0.0.0</domain>
-        <domain includeSubdomains="true">172.16.0.0</domain>
-        <domain includeSubdomains="true">192.168.0.0</domain>
-        <domain includeSubdomains="true">localhost</domain>
-    </domain-config>
+    <base-config cleartextTrafficPermitted="true" />
 </network-security-config>
