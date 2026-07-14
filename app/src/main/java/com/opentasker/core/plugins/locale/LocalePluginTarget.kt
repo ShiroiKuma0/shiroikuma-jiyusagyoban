@@ -21,12 +21,14 @@ import com.opentasker.core.logging.AppLogger
 object LocalePluginTarget {
     const val BUNDLE_KEY_TASK_ID = "com.opentasker.locale.TASK_ID"
     const val BUNDLE_KEY_TASK_NAME = "com.opentasker.locale.TASK_NAME"
+    const val BUNDLE_KEY_GRANT = "com.opentasker.locale.GRANT"
     private const val TAG = "LocalePluginTarget"
 
-    fun buildResultBundle(taskId: Long, taskName: String): Bundle =
+    fun buildResultBundle(taskId: Long, taskName: String, grant: String): Bundle =
         Bundle().apply {
             putLong(BUNDLE_KEY_TASK_ID, taskId)
             putString(BUNDLE_KEY_TASK_NAME, taskName)
+            putString(BUNDLE_KEY_GRANT, grant)
         }
 
     fun buildBlurb(taskName: String): String =
@@ -40,6 +42,9 @@ object LocalePluginTarget {
 
     fun parseTaskName(bundle: Bundle?): String? =
         bundle?.getString(BUNDLE_KEY_TASK_NAME)?.ifBlank { null }
+
+    fun parseGrant(bundle: Bundle?): String? =
+        bundle?.getString(BUNDLE_KEY_GRANT)?.ifBlank { null }
 }
 
 class LocaleSettingFireReceiver : BroadcastReceiver() {
@@ -49,9 +54,18 @@ class LocaleSettingFireReceiver : BroadcastReceiver() {
         val bundle = intent.getBundleExtra(LocalePluginContract.EXTRA_BUNDLE)
         val taskId = LocalePluginTarget.parseTaskId(bundle)
         val taskName = LocalePluginTarget.parseTaskName(bundle) ?: "unknown"
+        val grant = LocalePluginTarget.parseGrant(bundle)
 
         if (taskId == null) {
             AppLogger.warn("LocaleSettingFireReceiver", "Missing or invalid task ID in Locale bundle")
+            return
+        }
+
+        if (!LocaleGrantStore(context).isValid(grant, taskId)) {
+            AppLogger.warn(
+                "LocaleSettingFireReceiver",
+                "Rejected Locale fire for taskId=$taskId: missing, forged, mutated, or revoked grant",
+            )
             return
         }
 

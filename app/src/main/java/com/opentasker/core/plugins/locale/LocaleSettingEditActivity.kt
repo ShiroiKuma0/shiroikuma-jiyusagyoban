@@ -37,6 +37,7 @@ class LocaleSettingEditActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val db = OpenTaskerApp_NoHilt.db
+        val grantStore = LocaleGrantStore(this)
         val tasksFlow = db.taskDao().getAllAsFlow().map { tasks ->
             tasks.map { TaskPickerItem(it.id, it.name) }
         }
@@ -53,7 +54,8 @@ class LocaleSettingEditActivity : ComponentActivity() {
                         tasks = tasks,
                         contentPadding = padding,
                         onSelect = { item ->
-                            val resultBundle = LocalePluginTarget.buildResultBundle(item.id, item.name)
+                            val grant = grantStore.issue(item.id)
+                            val resultBundle = LocalePluginTarget.buildResultBundle(item.id, item.name, grant)
                             val resultIntent = Intent().apply {
                                 putExtra(LocalePluginContract.EXTRA_BUNDLE, resultBundle)
                                 putExtra(

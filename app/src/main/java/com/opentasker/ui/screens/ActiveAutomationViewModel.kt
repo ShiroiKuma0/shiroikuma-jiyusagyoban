@@ -16,6 +16,7 @@ import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
+import com.opentasker.core.plugins.locale.LocaleGrantStore
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.EditHistoryDao
@@ -211,6 +212,7 @@ class ActiveAutomationViewModel(
                     return@launch
                 }
                 db.taskDao().delete(task.toEntity())
+                LocaleGrantStore(appContext).revokeAllForTask(task.id)
             }
                 .onSuccess { events.send("Task deleted") }
                 .onFailure { events.send("Error: ${it.message ?: "Task delete failed"}") }
