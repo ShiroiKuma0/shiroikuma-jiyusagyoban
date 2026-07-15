@@ -20,10 +20,13 @@ interface EditHistoryDao {
     @Insert
     suspend fun insert(entry: EditHistoryEntity): Long
 
-    @Query("SELECT * FROM edit_history WHERE entityType = :type AND entityId = :entityId ORDER BY timestamp DESC LIMIT 1")
+    @Query("SELECT * FROM edit_history WHERE entityType = :type AND entityId = :entityId ORDER BY timestamp DESC, id DESC LIMIT 1")
     suspend fun getLatest(type: String, entityId: Long): EditHistoryEntity?
 
-    @Query("DELETE FROM edit_history WHERE id NOT IN (SELECT id FROM edit_history WHERE entityType = :type AND entityId = :entityId ORDER BY timestamp DESC LIMIT :keep)")
+    @Query("SELECT * FROM edit_history WHERE entityType = :type AND entityId = :entityId ORDER BY timestamp DESC, id DESC")
+    suspend fun getForEntity(type: String, entityId: Long): List<EditHistoryEntity>
+
+    @Query("DELETE FROM edit_history WHERE entityType = :type AND entityId = :entityId AND id NOT IN (SELECT id FROM edit_history WHERE entityType = :type AND entityId = :entityId ORDER BY timestamp DESC, id DESC LIMIT :keep)")
     suspend fun pruneOld(type: String, entityId: Long, keep: Int = MAX_HISTORY_PER_ENTITY)
 
     @Query("DELETE FROM edit_history WHERE entityType = :type AND entityId = :entityId")

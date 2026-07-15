@@ -5,7 +5,9 @@ import android.os.Bundle
 import android.widget.Toast
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.engine.executeAndLogTask
+import com.opentasker.core.engine.logSkippedRun
 import com.opentasker.core.logging.AppLogger
+import com.opentasker.core.storage.recoveryMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,15 +33,24 @@ class TaskRunActivity : Activity() {
                 if (entity == null) {
                     "Task not found"
                 } else {
-                    val task = entity.toDomain()
-                    val result = executeAndLogTask(
-                        appContext = applicationContext,
-                        db = db,
-                        task = task,
-                        source = source,
-                    )
-                    val status = if (result.report.success) "succeeded" else "failed"
-                    "${task.name} $status (${result.report.durationMs}ms)"
+                    val decoded = entity.toDomainDecodeResult()
+                    val issue = decoded.issue
+                    if (issue != null) {
+                        val reason = issue.recoveryMessage()
+                        AppLogger.error(TAG, reason)
+                        logSkippedRun(db, decoded.value, source, reason)
+                        "${decoded.value.name} is corrupt; restore a database backup"
+                    } else {
+                        val task = decoded.value
+                        val result = executeAndLogTask(
+                            appContext = applicationContext,
+                            db = db,
+                            task = task,
+                            source = source,
+                        )
+                        val status = if (result.report.success) "succeeded" else "failed"
+                        "${task.name} $status (${result.report.durationMs}ms)"
+                    }
                 }
             } catch (e: Exception) {
                 AppLogger.error(TAG, "Task run failed", e)

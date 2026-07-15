@@ -4,6 +4,7 @@ import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.Task
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class TaskEntityTest {
@@ -20,13 +21,14 @@ class TaskEntityTest {
 
     @Test
     fun malformedActionsJsonReturnsFallbackWithDecodeIssue() {
-        val result = TaskEntity(
+        val entity = TaskEntity(
             id = 9,
             name = "Corrupted task",
             priority = 5,
             collisionMode = CollisionMode.WAIT.name,
             actionsJson = "{not-json",
-        ).toDomainDecodeResult()
+        )
+        val result = entity.toDomainDecodeResult()
 
         assertEquals(emptyList<com.opentasker.core.model.ActionSpec>(), result.value.actions)
         assertEquals(CollisionMode.WAIT, result.value.collisionMode)
@@ -36,5 +38,6 @@ class TaskEntityTest {
         assertEquals(StorageRecordType.TASK, issue.recordType)
         assertEquals(9L, issue.recordId)
         assertEquals("actionsJson", issue.fieldName)
+        assertThrows(CorruptStoredRecordException::class.java) { entity.toDomain() }
     }
 }

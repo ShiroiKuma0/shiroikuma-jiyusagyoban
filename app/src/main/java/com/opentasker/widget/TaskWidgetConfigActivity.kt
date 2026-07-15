@@ -44,6 +44,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.isSystemInDarkTheme
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.model.Task
+import com.opentasker.core.storage.StorageDecodeIssue
+import com.opentasker.ui.screens.StorageDecodeWarningCard
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemeMode
@@ -69,7 +71,13 @@ class TaskWidgetConfigActivity : ComponentActivity() {
         }
 
         val tasksFlow = OpenTaskerApp_NoHilt.db.taskDao().getAllAsFlow()
-            .map { entities -> entities.map { it.toDomain() } }
+            .map { entities ->
+                val results = entities.map { it.toDomainDecodeResult() }
+                WidgetTaskState(
+                    tasks = results.mapNotNull { result -> result.value.takeIf { result.issue == null } },
+                    storageDecodeIssues = results.mapNotNull { it.issue },
+                )
+            }
 
         setContent {
             val themeMode by ThemePreference.observe(this).collectAsState(initial = ThemeMode.System)
@@ -80,8 +88,12 @@ class TaskWidgetConfigActivity : ComponentActivity() {
                 ThemeMode.System -> isSystemInDarkTheme()
             }
             OpenTaskerTheme(darkTheme = darkTheme, highContrast = themeMode == ThemeMode.HighContrast) {
-                val tasks by tasksFlow.collectAsState(initial = emptyList())
-                ConfigScreen(tasks = tasks, onTaskSelected = ::onTaskPicked)
+                val taskState by tasksFlow.collectAsState(initial = WidgetTaskState())
+                ConfigScreen(
+                    tasks = taskState.tasks,
+                    storageDecodeIssues = taskState.storageDecodeIssues,
+                    onTaskSelected = ::onTaskPicked,
+                )
             }
         }
     }
@@ -106,7 +118,11 @@ class TaskWidgetConfigActivity : ComponentActivity() {
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun ConfigScreen(tasks: List<Task>, onTaskSelected: (Task) -> Unit) {
+private fun ConfigScreen(
+    tasks: List<Task>,
+    storageDecodeIssues: List<StorageDecodeIssue>,
+    onTaskSelected: (Task) -> Unit,
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -128,7 +144,7 @@ private fun ConfigScreen(tasks: List<Task>, onTaskSelected: (Task) -> Unit) {
             )
         },
     ) { padding ->
-        if (tasks.isEmpty()) {
+        if (tasks.isEmpty() && storageDecodeIssues.isEmpty()) {
             Surface(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 color = MaterialTheme.colorScheme.background,
@@ -174,6 +190,11 @@ private fun ConfigScreen(tasks: List<Task>, onTaskSelected: (Task) -> Unit) {
                 contentPadding = PaddingValues(DesignSystem.Screen.horizontalPadding),
                 verticalArrangement = Arrangement.spacedBy(DesignSystem.Screen.cardGap),
             ) {
+                if (storageDecodeIssues.isNotEmpty()) {
+                    item {
+                        StorageDecodeWarningCard(storageDecodeIssues)
+                    }
+                }
                 item {
                     WidgetConfigHeader(taskCount = tasks.size)
                 }
@@ -230,6 +251,11 @@ private fun ConfigScreen(tasks: List<Task>, onTaskSelected: (Task) -> Unit) {
         }
     }
 }
+
+private data class WidgetTaskState(
+    val tasks: List<Task> = emptyList(),
+    val storageDecodeIssues: List<StorageDecodeIssue> = emptyList(),
+)
 
 @Composable
 private fun WidgetConfigHeader(taskCount: Int) {

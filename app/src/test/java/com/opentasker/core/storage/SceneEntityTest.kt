@@ -6,6 +6,7 @@ import com.opentasker.core.model.SceneElementType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class SceneEntityTest {
@@ -36,13 +37,14 @@ class SceneEntityTest {
 
     @Test
     fun malformedElementsJsonReturnsFallbackWithDecodeIssue() {
-        val result = SceneEntity(
+        val entity = SceneEntity(
             id = 9,
             name = "Corrupted scene",
             widthDp = 200,
             heightDp = 120,
             elementsJson = "{not-json",
-        ).toDomainDecodeResult()
+        )
+        val result = entity.toDomainDecodeResult()
 
         assertEquals(emptyList<SceneElement>(), result.value.elements)
         val issue = result.issue
@@ -51,5 +53,6 @@ class SceneEntityTest {
         assertEquals(StorageRecordType.SCENE, issue.recordType)
         assertEquals(9L, issue.recordId)
         assertEquals("elementsJson", issue.fieldName)
+        assertThrows(CorruptStoredRecordException::class.java) { entity.toDomain() }
     }
 }

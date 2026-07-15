@@ -4,6 +4,7 @@ import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.Profile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class ProfileEntityTest {
@@ -37,7 +38,7 @@ class ProfileEntityTest {
 
     @Test
     fun malformedContextsJsonReturnsFallbackWithDecodeIssue() {
-        val result = ProfileEntity(
+        val entity = ProfileEntity(
             id = 5,
             name = "Corrupted profile",
             enabled = true,
@@ -45,7 +46,8 @@ class ProfileEntityTest {
             exitTaskId = null,
             cooldownSec = 0,
             contextsJson = "{not-json",
-        ).toDomainDecodeResult()
+        )
+        val result = entity.toDomainDecodeResult()
 
         assertEquals(emptyList<com.opentasker.core.model.ContextSpec>(), result.value.contexts)
         val issue = result.issue
@@ -54,5 +56,6 @@ class ProfileEntityTest {
         assertEquals(StorageRecordType.PROFILE, issue.recordType)
         assertEquals(5L, issue.recordId)
         assertEquals("contextsJson", issue.fieldName)
+        assertThrows(CorruptStoredRecordException::class.java) { entity.toDomain() }
     }
 }

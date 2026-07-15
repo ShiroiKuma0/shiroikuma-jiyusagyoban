@@ -8,7 +8,6 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Update
 import kotlinx.serialization.encodeToString
-import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
 
@@ -20,13 +19,7 @@ data class SceneEntity(
     val heightDp: Int,
     val elementsJson: String,
 ) {
-    fun toDomain(): Scene {
-        val result = toDomainDecodeResult()
-        result.issue?.let { issue ->
-            AppLogger.error("SceneDao", "Failed to deserialize scene $id: ${issue.message}")
-        }
-        return result.value
-    }
+    fun toDomain(): Scene = toDomainDecodeResult().requireDecoded()
 
     fun toDomainDecodeResult(): StorageDecodeResult<Scene> {
         val elements = runCatching { StorageJson.decodeFromString<List<SceneElement>>(elementsJson) }

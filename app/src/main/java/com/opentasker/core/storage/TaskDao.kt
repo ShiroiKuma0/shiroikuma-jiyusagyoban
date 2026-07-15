@@ -8,7 +8,6 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Update
 import kotlinx.serialization.encodeToString
-import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.Task
@@ -21,13 +20,7 @@ data class TaskEntity(
     val collisionMode: String,
     val actionsJson: String,
 ) {
-    fun toDomain(): Task {
-        val result = toDomainDecodeResult()
-        result.issue?.let { issue ->
-            AppLogger.error("TaskDao", "Failed to deserialize task $id: ${issue.message}")
-        }
-        return result.value
-    }
+    fun toDomain(): Task = toDomainDecodeResult().requireDecoded()
 
     fun toDomainDecodeResult(): StorageDecodeResult<Task> {
         val mode = runCatching { CollisionMode.valueOf(collisionMode) }

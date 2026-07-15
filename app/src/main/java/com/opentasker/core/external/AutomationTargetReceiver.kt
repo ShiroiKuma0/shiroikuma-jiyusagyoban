@@ -112,15 +112,15 @@ class AutomationTargetReceiver : BroadcastReceiver() {
 
     private suspend fun queryStatus(intent: Intent): TargetResponse {
         val db = OpenTaskerApp_NoHilt.db
-        val profiles = db.profileDao().getAll().map { it.toDomain() }
+        val profileEntities = db.profileDao().getAll()
         val tasks = db.taskDao().getAll()
-        val profile = resolveProfile(intent, profiles)
+        val profile = resolveProfileEntity(intent, profileEntities)?.toDomain()
         return TargetResponse(
             Activity.RESULT_OK,
             Bundle().apply {
                 putInt(AutomationTargetContract.EXTRA_TASK_COUNT, tasks.size)
-                putInt(AutomationTargetContract.EXTRA_PROFILE_COUNT, profiles.size)
-                putInt(AutomationTargetContract.EXTRA_ENABLED_PROFILE_COUNT, profiles.count { it.enabled })
+                putInt(AutomationTargetContract.EXTRA_PROFILE_COUNT, profileEntities.size)
+                putInt(AutomationTargetContract.EXTRA_ENABLED_PROFILE_COUNT, profileEntities.count { it.enabled })
                 putBoolean(AutomationTargetContract.EXTRA_PROFILE_FOUND, profile != null)
                 profile?.let {
                     putBoolean(AutomationTargetContract.EXTRA_PROFILE_ENABLED, it.enabled)
@@ -139,14 +139,17 @@ class AutomationTargetReceiver : BroadcastReceiver() {
                 ?.takeIf { it.isNotBlank() }
                 ?.let { name ->
                     OpenTaskerApp_NoHilt.db.taskDao().getAll()
-                        .map { it.toDomain() }
                         .firstOrNull { it.name.equals(name, ignoreCase = true) }
+                        ?.toDomain()
                 }
 
     private suspend fun resolveProfile(intent: Intent) =
-        resolveProfile(intent, OpenTaskerApp_NoHilt.db.profileDao().getAll().map { it.toDomain() })
+        resolveProfileEntity(intent, OpenTaskerApp_NoHilt.db.profileDao().getAll())?.toDomain()
 
-    private fun resolveProfile(intent: Intent, profiles: List<com.opentasker.core.model.Profile>) =
+    private fun resolveProfileEntity(
+        intent: Intent,
+        profiles: List<com.opentasker.core.storage.ProfileEntity>,
+    ) =
         intent.getLongExtra(AutomationTargetContract.EXTRA_PROFILE_ID, 0L)
             .takeIf { it > 0 }
             ?.let { id -> profiles.firstOrNull { it.id == id } }

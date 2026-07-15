@@ -341,7 +341,7 @@ private fun TaskLibrarySummaryCard(tasks: List<Task>, onCreateTask: () -> Unit) 
 }
 
 @Composable
-private fun StorageDecodeWarningCard(issues: List<StorageDecodeIssue>) {
+internal fun StorageDecodeWarningCard(issues: List<StorageDecodeIssue>) {
     val issueSummary = issues.take(3).joinToString(separator = "; ") { issue ->
         "${issue.recordType.label} \"${issue.recordName}\" #${issue.recordId}: ${issue.fieldName}"
     }

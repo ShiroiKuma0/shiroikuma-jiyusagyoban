@@ -188,15 +188,25 @@ class AutomationService : Service() {
         matchers.clear()
         oldJobs.forEach { it.cancel() }
 
-        val profiles = db.profileDao().getAllEnabled()
+        val profileEntities = db.profileDao().getAllEnabled()
+        val profiles = profileEntities.mapNotNull { entity ->
+            val decoded = entity.toDomainDecodeResult()
+            decoded.issue?.let { issue ->
+                AppLogger.error(
+                    TAG,
+                    "Profile ${entity.id} is corrupt and was not registered: ${issue.message}",
+                )
+                return@mapNotNull null
+            }
+            decoded.value
+        }
         val activeIds = profiles.map { it.id }.toSet()
         cooldownStore.pruneDeleted(activeIds)
         synchronized(queuedProfileTasks) {
             queuedProfileTasks.keys.removeAll { it !in activeIds }
         }
-        registerPluginSubscriptions(profiles.map { it.toDomain() })
-        for (profile in profiles) {
-            val domain = profile.toDomain()
+        registerPluginSubscriptions(profiles)
+        for (domain in profiles) {
             val matcher = ProfileMatcher(this, domain)
 
             val matcherJob = scope.launch {

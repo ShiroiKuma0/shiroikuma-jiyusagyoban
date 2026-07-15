@@ -13,16 +13,48 @@ import com.opentasker.core.model.SceneElementType
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.CorruptStoredRecordException
+import com.opentasker.core.storage.TaskEntity
 import com.opentasker.core.storage.toEntity
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class OpenTaskerBundleRepositoryInstrumentedTest {
+    @Test
+    fun exportRefusesCorruptStoredTaskWithoutChangingRawPayload() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        val rawPayload = "{not-json"
+
+        try {
+            val id = db.taskDao().insert(
+                TaskEntity(
+                    name = "Corrupt task",
+                    priority = 0,
+                    collisionMode = "ABORT_NEW",
+                    actionsJson = rawPayload,
+                ),
+            )
+
+            val failure = runCatching {
+                OpenTaskerBundleRepository(db).exportBundle(appVersion = "test")
+            }.exceptionOrNull()
+
+            assertTrue(failure is CorruptStoredRecordException)
+            assertEquals(rawPayload, db.taskDao().getById(id)?.actionsJson)
+        } finally {
+            db.close()
+        }
+    }
+
     @Test
     fun exportImportRoundTripRemapsIdsAndDisablesProfiles() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext

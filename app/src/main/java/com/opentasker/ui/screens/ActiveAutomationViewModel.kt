@@ -116,11 +116,19 @@ class ActiveAutomationViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val profiles: StateFlow<ImmutableList<Profile>> = profileDecodeResults
-        .map { results -> results.map { it.value }.sortedBy { it.name.lowercase() }.toImmutableList() }
+        .map { results ->
+            results.mapNotNull { result -> result.value.takeIf { result.issue == null } }
+                .sortedBy { it.name.lowercase() }
+                .toImmutableList()
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
     val tasks: StateFlow<ImmutableList<Task>> = taskDecodeResults
-        .map { results -> results.map { it.value }.sortedBy { it.name.lowercase() }.toImmutableList() }
+        .map { results ->
+            results.mapNotNull { result -> result.value.takeIf { result.issue == null } }
+                .sortedBy { it.name.lowercase() }
+                .toImmutableList()
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
     private val sceneDecodeResults = db.sceneDao()
@@ -140,7 +148,11 @@ class ActiveAutomationViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
     val scenes: StateFlow<ImmutableList<Scene>> = sceneDecodeResults
-        .map { results -> results.map { it.value }.sortedBy { it.name.lowercase() }.toImmutableList() }
+        .map { results ->
+            results.mapNotNull { result -> result.value.takeIf { result.issue == null } }
+                .sortedBy { it.name.lowercase() }
+                .toImmutableList()
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
     val runLogs: StateFlow<ImmutableList<RunLogEntry>> = db.runLogDao()

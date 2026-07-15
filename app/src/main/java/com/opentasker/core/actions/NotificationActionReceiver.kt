@@ -5,7 +5,9 @@ import android.content.Context
 import android.content.Intent
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.engine.executeAndLogTask
+import com.opentasker.core.engine.logSkippedRun
 import com.opentasker.core.logging.AppLogger
+import com.opentasker.core.storage.recoveryMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -27,7 +29,21 @@ class NotificationActionReceiver : BroadcastReceiver() {
                     AppLogger.warn(TAG, "Notification button '$buttonLabel' task '$taskName' not found")
                     return@launch
                 }
-                val task = entity.toDomain()
+                val decoded = entity.toDomainDecodeResult()
+                val issue = decoded.issue
+                if (issue != null) {
+                    val reason = issue.recoveryMessage()
+                    AppLogger.error(TAG, "Notification button '$buttonLabel' blocked: $reason")
+                    logSkippedRun(
+                        db = db,
+                        task = decoded.value,
+                        source = SOURCE,
+                        reason = reason,
+                        metadata = listOf("button=$buttonLabel"),
+                    )
+                    return@launch
+                }
+                val task = decoded.value
                 val result = executeAndLogTask(
                     appContext = context.applicationContext,
                     db = db,

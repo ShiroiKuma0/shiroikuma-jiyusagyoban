@@ -340,7 +340,7 @@
     <string name="workspace_recent_failure">Recent failure</string>
     <string name="workspace_review_run_log_details">Review the run log for details.</string>
     <string name="workspace_stored_data_review">Stored data needs review</string>
-    <string name="workspace_stored_data_review_body">OpenTasker loaded affected records with safe fallbacks. %1$s%2$s.</string>
+    <string name="workspace_stored_data_review_body">OpenTasker blocked affected records from execution and editing. %1$s%2$s. Restore a database backup before continuing; the raw stored data remains untouched.</string>
     <string name="workspace_runs_task">Runs: %1$s</string>
     <string name="workspace_missing_task">Missing task #%1$d</string>
     <string name="workspace_profile_cannot_match">Profile cannot match yet</string>
