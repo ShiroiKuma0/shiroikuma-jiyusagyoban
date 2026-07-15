@@ -19,6 +19,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
@@ -90,11 +91,15 @@ class SceneOverlayService : Service() {
 
     private fun showOverlay(scene: Scene) {
         val density = resources.displayMetrics.density
-        val widthPx = (scene.widthDp * density).toInt()
-        val heightPx = (scene.heightDp * density).toInt()
-
-        val headerHeightPx = (HEADER_HEIGHT_DP * density).toInt()
-        val closeButtonSizePx = (CLOSE_BUTTON_SIZE_DP * density).toInt()
+        val headerHeightPx = (HEADER_HEIGHT_DP * density).toInt().coerceAtLeast(1)
+        val closeButtonSizePx = (CLOSE_BUTTON_SIZE_DP * density).toInt().coerceAtLeast(1)
+        val displayMetrics = resources.displayMetrics
+        val layoutPlan = SceneOverlayLayoutPlanner.plan(
+            scene = scene,
+            density = density,
+            maxContentWidthPx = displayMetrics.widthPixels,
+            maxContentHeightPx = (displayMetrics.heightPixels - headerHeightPx).coerceAtLeast(1),
+        )
 
         // Root container: header + scene content
         val root = LinearLayout(this).apply {
@@ -126,26 +131,30 @@ class SceneOverlayService : Service() {
         root.addView(header)
 
         // Scene content area
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+        val content = FrameLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
+                layoutPlan.contentHeightPx,
             )
-            val padPx = (4 * density).toInt()
-            setPadding(padPx, padPx, padPx, padPx)
+            clipChildren = true
         }
 
-        for (element in scene.elements) {
-            val view = buildElementView(element)
-            content.addView(view)
+        for (layout in layoutPlan.elements) {
+            val view = buildElementView(layout.element, layout.widthPx, layout.heightPx)
+            content.addView(
+                view,
+                FrameLayout.LayoutParams(layout.widthPx, layout.heightPx).apply {
+                    leftMargin = layout.xPx
+                    topMargin = layout.yPx
+                },
+            )
         }
         root.addView(content)
 
         // WindowManager layout params
         val params = WindowManager.LayoutParams(
-            widthPx,
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            layoutPlan.contentWidthPx,
+            headerHeightPx + layoutPlan.contentHeightPx,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT,
@@ -162,7 +171,7 @@ class SceneOverlayService : Service() {
         overlayView = root
     }
 
-    private fun buildElementView(element: SceneElement): View {
+    private fun buildElementView(element: SceneElement, widthPx: Int, heightPx: Int): View {
         return when (element.type) {
             SceneElementType.BUTTON -> Button(this).apply {
                 text = element.config["label"] ?: "Button"
@@ -183,24 +192,71 @@ class SceneOverlayService : Service() {
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             }
 
-            SceneElementType.SLIDER -> SeekBar(this).apply {
-                val minVal = element.config["min"]?.toIntOrNull() ?: 0
-                val maxVal = element.config["max"]?.toIntOrNull() ?: 100
-                val progressVal = element.config["progress"]?.toIntOrNull() ?: minVal
-                min = minVal
-                max = maxVal
-                progress = progressVal.coerceIn(minVal, maxVal)
+            SceneElementType.SLIDER -> {
+                val config = SceneElementConfigResolver.slider(element)
+                val seekBar = SeekBar(this).apply {
+                    min = config.min
+                    max = config.max
+                    progress = config.value
+                }
+                if (config.label.isBlank()) {
+                    seekBar
+                } else {
+                    LinearLayout(this).apply {
+                        orientation = LinearLayout.VERTICAL
+                        addView(
+                            TextView(this@SceneOverlayService).apply {
+                                text = config.label
+                                setTextColor(Color.WHITE)
+                                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                            },
+                            LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT,
+                                LinearLayout.LayoutParams.WRAP_CONTENT,
+                            ),
+                        )
+                        addView(
+                            seekBar,
+                            LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT,
+                                0,
+                                1f,
+                            ),
+                        )
+                    }
+                }
             }
 
-            else -> TextView(this).apply {
-                text = "[${element.type.name}]"
-                setTextColor(Color.GRAY)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-                val padPx = (2 * resources.displayMetrics.density).toInt()
-                setPadding(padPx, padPx, padPx, padPx)
+            SceneElementType.IMAGE -> {
+                val bitmap = SceneImageLoader.load(
+                    context = this,
+                    source = element.config["source"].orEmpty(),
+                    targetWidthPx = widthPx,
+                    targetHeightPx = heightPx,
+                )
+                if (bitmap != null) {
+                    ImageView(this).apply {
+                        setImageBitmap(bitmap)
+                        scaleType = ImageView.ScaleType.CENTER_CROP
+                        contentDescription = element.config["contentDescription"]
+                    }
+                } else {
+                    unsupportedElementView(element)
+                }
             }
+
+            else -> unsupportedElementView(element)
         }
     }
+
+    private fun unsupportedElementView(element: SceneElement): TextView =
+        TextView(this).apply {
+            text = "[${element.type.name}]"
+            setTextColor(Color.GRAY)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            val padPx = (2 * resources.displayMetrics.density).toInt()
+            setPadding(padPx, padPx, padPx, padPx)
+        }
 
     private fun setupDrag(dragHandle: View, params: WindowManager.LayoutParams) {
         var initialX = 0

@@ -1,6 +1,9 @@
 package com.opentasker.ui.screens
 
+import android.content.Intent
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
@@ -81,6 +84,8 @@ import com.opentasker.core.scenes.AlignmentGuide
 import com.opentasker.core.scenes.GuideOrientation
 import com.opentasker.core.scenes.SceneAlignmentGuides
 import com.opentasker.core.scenes.SceneCanvasProjector
+import com.opentasker.core.scenes.SceneElementConfigResolver
+import com.opentasker.core.scenes.SceneImageLoader
 import com.opentasker.core.scenes.SceneOverlayService
 import com.opentasker.core.scenes.SceneElementDrafts
 import com.opentasker.core.scenes.SceneIssue
@@ -886,9 +891,11 @@ private fun SceneElementEditorDialog(
     onDismiss: () -> Unit,
     onSave: (SceneElement) -> Unit,
 ) {
+    val context = LocalContext.current
     val initial = remember(state) {
         state.element ?: SceneElementDrafts.defaultElement(state.scene, SceneElementType.BUTTON)
     }
+    val initialSlider = remember(initial) { SceneElementConfigResolver.slider(initial) }
     var type by rememberSaveable(state.scene.id, state.index) {
         mutableStateOf(initial.type.takeIf { it in SceneElementDrafts.editableTypes } ?: SceneElementType.BUTTON)
     }
@@ -899,9 +906,9 @@ private fun SceneElementEditorDialog(
     var label by rememberSaveable(state.scene.id, state.index) {
         mutableStateOf(initial.config["label"] ?: initial.config["text"] ?: "")
     }
-    var sliderMin by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.config["min"] ?: "0") }
-    var sliderMax by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.config["max"] ?: "100") }
-    var sliderValue by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.config["value"] ?: "50") }
+    var sliderMin by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initialSlider.min.toString()) }
+    var sliderMax by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initialSlider.max.toString()) }
+    var sliderValue by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initialSlider.value.toString()) }
     var imageSource by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.config["source"] ?: "") }
     var tapTaskId by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.tapTaskId) }
     var longPressTaskId by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.longPressTaskId) }
@@ -928,6 +935,17 @@ private fun SceneElementEditorDialog(
     val defaultButtonLabel = stringResource(R.string.scene_element_type_button)
     val defaultSliderLabel = stringResource(R.string.scene_element_type_slider)
     val defaultImageLabel = stringResource(R.string.scene_element_type_image)
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            }
+            imageSource = uri.toString().take(SceneImageLoader.MAX_SOURCE_CHARS)
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1005,13 +1023,23 @@ private fun SceneElementEditorDialog(
                         }
                     }
 
-                    SceneElementType.IMAGE -> OutlinedTextField(
-                        value = imageSource,
-                        onValueChange = { imageSource = it.take(160) },
-                        label = { Text(stringResource(R.string.label_image_label_or_uri)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    SceneElementType.IMAGE -> Column(
+                        verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+                    ) {
+                        OutlinedTextField(
+                            value = imageSource,
+                            onValueChange = { imageSource = it.take(SceneImageLoader.MAX_SOURCE_CHARS) },
+                            label = { Text(stringResource(R.string.label_image_label_or_uri)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedButton(
+                            onClick = { imagePicker.launch(arrayOf("image/*")) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(stringResource(R.string.action_choose_image))
+                        }
+                    }
 
                     else -> Unit
                 }
@@ -1274,11 +1302,9 @@ private fun sceneElementSummary(element: SceneElement): String? = when (element.
     SceneElementType.TEXT -> element.config["text"]?.takeIf { it.isNotBlank() }
     SceneElementType.BUTTON -> element.config["label"]?.takeIf { it.isNotBlank() }
     SceneElementType.SLIDER -> {
-        val label = element.config["label"].orEmpty().ifBlank { stringResource(R.string.scene_element_type_slider) }
-        val value = element.config["value"].orEmpty().ifBlank { "0" }
-        val min = element.config["min"].orEmpty().ifBlank { "0" }
-        val max = element.config["max"].orEmpty().ifBlank { "100" }
-        stringResource(R.string.scenes_slider_summary, label, value, min, max)
+        val slider = SceneElementConfigResolver.slider(element)
+        val label = slider.label.ifBlank { stringResource(R.string.scene_element_type_slider) }
+        stringResource(R.string.scenes_slider_summary, label, slider.value, slider.min, slider.max)
     }
     SceneElementType.IMAGE -> element.config["source"]?.takeIf { it.isNotBlank() }
     else -> null

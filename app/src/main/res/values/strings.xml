@@ -257,6 +257,7 @@
     <string name="action_import_tasker_xml">Import Tasker XML</string>
     <string name="action_create_task">Create Task</string>
     <string name="action_add_step">Add Step</string>
+    <string name="action_choose_image">Choose image</string>
 
     <string name="label_profiles">Profiles</string>
     <string name="label_contexts">Contexts</string>
