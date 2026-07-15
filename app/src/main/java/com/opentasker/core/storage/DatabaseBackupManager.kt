@@ -9,11 +9,17 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 /**
@@ -94,15 +100,22 @@ class DatabaseBackupManager(
         withContext(Dispatchers.IO) {
             runCatching {
                 val managedBackup = requireManagedBackupFile(backupFile)
+                val operationContext = currentCoroutineContext()
                 val output = context.contentResolver.openOutputStream(destination)
                     ?: throw IOException("Could not open export destination")
                 managedBackup.inputStream().use { input ->
                     output.use { stream ->
-                        BackupEncryption.encrypt(input, stream, passphrase)
+                        BackupEncryption.encrypt(
+                            input,
+                            stream,
+                            passphrase,
+                            cancellationCheck = { operationContext.ensureActive() },
+                        )
                     }
                 }
                 AppLogger.info(tag, "Encrypted backup exported to $destination")
             }.onFailure { error ->
+                if (error is CancellationException) throw error
                 AppLogger.error(tag, "Encrypted export failed: ${error.message}", error)
             }
         }
@@ -110,26 +123,36 @@ class DatabaseBackupManager(
     suspend fun stageEncryptedRestore(uri: Uri, passphrase: CharArray): Result<File> =
         withContext(Dispatchers.IO) {
             runCatching {
+                val operationContext = currentCoroutineContext()
+                val pending = pendingRestoreFile(context, databaseName)
+                val temp = File(backupDir, "${pending.name}.decrypt.tmp")
+                if (temp.exists() && !temp.delete()) {
+                    throw IOException("Could not clear interrupted encrypted-restore staging file")
+                }
                 val input = context.contentResolver.openInputStream(uri)
                     ?: throw IOException("Could not open encrypted backup file")
-                val temp = File(backupDir, "decrypt_staging.db")
                 try {
                     input.use { encrypted ->
                         FileOutputStream(temp).use { plainOut ->
-                            BackupEncryption.decrypt(encrypted, plainOut, passphrase)
+                            BackupEncryption.decrypt(
+                                encrypted,
+                                plainOut,
+                                passphrase,
+                                cancellationCheck = { operationContext.ensureActive() },
+                            )
+                            plainOut.fd.sync()
                         }
                     }
-                } catch (error: Exception) {
+                    validateDatabaseFile(temp)
+                    replaceFileAtomically(temp, pending, "pending encrypted restore")
+                } catch (error: Throwable) {
                     temp.delete()
                     throw error
                 }
-                validateDatabaseFile(temp)
-                val pending = pendingRestoreFile(context, databaseName)
-                temp.copyTo(pending, overwrite = true)
-                temp.delete()
                 AppLogger.warn(tag, "Encrypted restore staged; restart OpenTasker to apply it")
                 pending
             }.onFailure { error ->
+                if (error is CancellationException) throw error
                 AppLogger.error(tag, "Encrypted restore failed: ${error.message}", error)
             }
         }
@@ -209,19 +232,18 @@ class DatabaseBackupManager(
             input.use { source ->
                 FileOutputStream(temp).use { output ->
                     source.copyBoundedTo(output, MAX_BACKUP_IMPORT_BYTES)
+                    output.fd.sync()
                 }
             }
+            if (temp.length() == 0L) {
+                throw IOException("Backup file is empty")
+            }
+            validateDatabaseFile(temp)
+            replaceFileAtomically(temp, pending, "pending restore")
         } catch (error: Exception) {
             temp.delete()
             throw error
         }
-        if (temp.length() == 0L) {
-            temp.delete()
-            throw IOException("Backup file is empty")
-        }
-        validateDatabaseFile(temp)
-        temp.copyTo(pending, overwrite = true)
-        temp.delete()
         AppLogger.warn(tag, "Restore staged at ${pending.absolutePath}; restart OpenTasker to apply it")
         return pending
     }
@@ -251,6 +273,8 @@ class DatabaseBackupManager(
 
             val dbFile = context.getDatabasePath(databaseName)
             var rollback: File? = null
+            var replacementPublished = false
+            var temp: File? = null
             return try {
                 validateDatabaseFile(pending)
                 dbFile.parentFile?.mkdirs()
@@ -261,25 +285,38 @@ class DatabaseBackupManager(
                     null
                 }
 
-                val temp = File(requireNotNull(dbFile.parentFile), "$databaseName.restore.tmp")
-                pending.copyTo(temp, overwrite = true)
+                temp = File(requireNotNull(dbFile.parentFile), "$databaseName.restore.tmp")
+                if (temp.exists() && !temp.delete()) {
+                    throw IOException("Could not clear interrupted restore staging file")
+                }
+                pending.inputStream().use { source ->
+                    FileOutputStream(temp).use { output ->
+                        source.copyBoundedTo(output, MAX_BACKUP_IMPORT_BYTES)
+                        output.fd.sync()
+                    }
+                }
                 validateDatabaseFile(temp)
+
+                // The pending file is the durable restore journal. Keep it until the same-directory
+                // atomic replacement and stale-sidecar cleanup both finish, so a process death can
+                // safely retry the transaction on the next startup without a delete/rename gap.
+                replaceFileAtomically(temp, dbFile, "live database restore")
+                replacementPublished = true
                 deleteDatabaseSidecars(dbFile)
-                if (dbFile.exists() && !dbFile.delete()) {
-                    throw IOException("Could not replace existing database")
-                }
-                if (!temp.renameTo(dbFile)) {
-                    temp.copyTo(dbFile, overwrite = true)
-                    temp.delete()
-                }
-                deleteDatabaseSidecars(dbFile)
-                pending.delete()
+                if (!pending.delete()) throw IOException("Could not finalize the pending restore journal")
                 PendingRestoreApplyResult.Applied(dbFile, rollback)
             } catch (error: Exception) {
-                rollback?.takeIf { it.exists() }?.let { previous ->
+                temp?.delete()
+                rollback?.takeIf { replacementPublished && it.exists() }?.let { previous ->
                     runCatching {
-                        dbFile.parentFile?.mkdirs()
-                        previous.copyTo(dbFile, overwrite = true)
+                        val rollbackTemp = File(requireNotNull(dbFile.parentFile), "$databaseName.rollback.tmp")
+                        previous.inputStream().use { source ->
+                            FileOutputStream(rollbackTemp).use { output ->
+                                source.copyBoundedTo(output, MAX_BACKUP_IMPORT_BYTES)
+                                output.fd.sync()
+                            }
+                        }
+                        replaceFileAtomically(rollbackTemp, dbFile, "restore rollback")
                     }
                 }
                 val failed = File(backupDir(context), "${databaseName.removeSuffix(".db")}_restore_failed_${timestamp()}.db")
@@ -442,6 +479,23 @@ class DatabaseBackupManager(
                 if (sidecar.exists()) sidecar.delete()
             }
         }
+    }
+}
+
+/** Same-directory atomic publication or no publication; never delete the existing target first. */
+internal fun replaceFileAtomically(source: File, target: File, purpose: String) {
+    target.parentFile?.mkdirs()
+    try {
+        Files.move(
+            source.toPath(),
+            target.toPath(),
+            StandardCopyOption.ATOMIC_MOVE,
+            StandardCopyOption.REPLACE_EXISTING,
+        )
+    } catch (error: AtomicMoveNotSupportedException) {
+        throw IOException("Atomic $purpose is unavailable; the existing file was left unchanged", error)
+    } catch (error: IOException) {
+        throw IOException("Atomic $purpose failed; the existing file was left unchanged", error)
     }
 }
 

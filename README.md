@@ -94,7 +94,7 @@ Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON 
 - Play distribution profile with SMS/phone-state manifest policy gate
 - Local release verification scripts for F-Droid metadata, readiness, and APK payload comparison
 - Environment-driven release signing
-- SQLite database backup/restore with WAL-safe validation before local backups are published; secret rows stay ciphertext and the device-bound Keystore key is never copied, so a restore on another device requires secret re-entry
+- SQLite database backup/restore with WAL-safe validation and atomic staged restore; encrypted `.otbackup` v2 exports use bounded-memory, independently authenticated 64 KiB frames while legacy v1 files remain restorable. Secret rows stay ciphertext and the device-bound Keystore key is never copied, so a restore on another device requires secret re-entry
 - APK payload comparison harness for reproducibility checks
 
 ### Power-user backends

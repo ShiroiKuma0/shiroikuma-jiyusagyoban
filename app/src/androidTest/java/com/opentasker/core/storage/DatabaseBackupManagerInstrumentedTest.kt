@@ -1,6 +1,7 @@
 package com.opentasker.core.storage
 
 import android.database.sqlite.SQLiteDatabase
+import android.net.Uri
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -8,7 +9,9 @@ import com.opentasker.core.model.Profile
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Task
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -145,6 +148,45 @@ class DatabaseBackupManagerInstrumentedTest {
             assertTrue(failure?.message?.contains("schema version") == true)
         } finally {
             db.close()
+            cleanup(context)
+        }
+    }
+
+    @Test
+    fun corruptedEncryptedRestorePreservesExistingJournalAndCleansPlaintextStaging() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        cleanup(context)
+
+        val db = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DATABASE)
+            .allowMainThreadQueries()
+            .build()
+        val encrypted = context.cacheDir.resolve("opentasker-corrupt-restore.otbackup")
+        try {
+            val manager = DatabaseBackupManager(context, db, TEST_DATABASE)
+            db.profileDao().insert(Profile(name = "Keep pending", enterTaskId = 1).toEntity())
+            val backup = manager.backup().getOrThrow()
+            manager.restore(backup).getOrThrow()
+            val pending = DatabaseBackupManager.pendingRestoreFile(context, TEST_DATABASE)
+            val pendingBefore = pending.readBytes()
+
+            backup.inputStream().use { input ->
+                encrypted.outputStream().use { output ->
+                    BackupEncryption.encrypt(input, output, "correct".toCharArray())
+                }
+            }
+            val corrupted = encrypted.readBytes().also { bytes ->
+                bytes[bytes.lastIndex] = (bytes.last().toInt() xor 0x01).toByte()
+            }
+            encrypted.writeBytes(corrupted)
+
+            val failure = manager.stageEncryptedRestore(Uri.fromFile(encrypted), "correct".toCharArray()).exceptionOrNull()
+
+            assertTrue(failure is java.io.IOException)
+            assertArrayEquals(pendingBefore, pending.readBytes())
+            assertFalse(context.filesDir.resolve("backups/${pending.name}.decrypt.tmp").exists())
+        } finally {
+            db.close()
+            encrypted.delete()
             cleanup(context)
         }
     }
