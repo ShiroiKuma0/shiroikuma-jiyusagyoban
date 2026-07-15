@@ -31,11 +31,28 @@ import java.util.Locale
  *   against `/sdcard/tmp`) with the default strategies — merge projects, overwrite same-name
  *   items in place. The result data is a human-readable summary; warnings ride along in
  *   [EXTRA_WARNINGS].
+ * - [ACTION_DELETE_ITEMS]: delete named workspace items — a bundle import can only add/overwrite,
+ *   so headless cleanup (e.g. retiring a legacy feature's tasks/scenes/variables) needs this.
+ *   [EXTRA_PATH] names a JSON manifest:
+ *   `{"projectName": "...", "tasks": [...], "profiles": [...], "scenes": [...], "variables": [...]}`
+ *   Items are resolved by (project, name); a shown scene is hidden first; variables are removed from
+ *   BOTH the project bucket and the super bucket (pre-project-scoping residue); item notes are
+ *   cleaned up. Unknown names are reported as warnings, never failures.
  *
  * No permission (adb shell can't hold one): the broadcast must be explicit AND carry the shared
  * protocol extra, same gate as the other bridges. [Activity.RESULT_OK] = done;
  * [Activity.RESULT_FIRST_USER] = failed, message in [EXTRA_ERROR] / result data.
  */
+/** Manifest for [WorkspaceTransferReceiver.ACTION_DELETE_ITEMS] — names resolved within [projectName]. */
+@kotlinx.serialization.Serializable
+data class DeleteItemsManifest(
+    val projectName: String,
+    val tasks: List<String> = emptyList(),
+    val profiles: List<String> = emptyList(),
+    val scenes: List<String> = emptyList(),
+    val variables: List<String> = emptyList(),
+)
+
 class WorkspaceTransferReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -85,6 +102,20 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
                             })
                         }
                     }
+                    ACTION_DELETE_ITEMS -> {
+                        require(path.isNotEmpty()) { "missing $EXTRA_PATH" }
+                        val file = resolveInTmp(path)
+                        require(file.isFile) { "no such file: ${file.absolutePath}" }
+                        val manifest = json.decodeFromString<DeleteItemsManifest>(file.readText(Charsets.UTF_8))
+                        val result = deleteItems(manifest)
+                        pending.setResultCode(Activity.RESULT_OK)
+                        pending.setResultData(result.summary)
+                        if (result.warnings.isNotEmpty()) {
+                            pending.setResultExtras(Bundle().apply {
+                                putStringArray(EXTRA_WARNINGS, result.warnings.toTypedArray())
+                            })
+                        }
+                    }
                     else -> {
                         pending.setResultCode(Activity.RESULT_FIRST_USER)
                         pending.setResultData("unknown action: $action")
@@ -101,6 +132,53 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
         }
     }
 
+    private data class DeleteResult(val summary: String, val warnings: List<String>)
+
+    private suspend fun deleteItems(manifest: DeleteItemsManifest): DeleteResult {
+        val db = OpenTaskerApp_NoHilt.db
+        val warnings = mutableListOf<String>()
+        val project = db.projectDao().getAll().firstOrNull { it.name.equals(manifest.projectName, ignoreCase = true) }
+            ?: throw IllegalArgumentException("no such project: ${manifest.projectName}")
+        val pid = project.id
+        var tasks = 0; var profiles = 0; var scenes = 0; var variables = 0
+
+        // Profiles first, so nothing triggers a task while it's being removed; the engine reconciles
+        // from the Room flow automatically.
+        manifest.profiles.forEach { name ->
+            val entity = db.profileDao().getAll().firstOrNull { it.projectId == pid && it.name.equals(name, ignoreCase = true) }
+            if (entity == null) { warnings += "profile not found: $name"; return@forEach }
+            db.profileDao().delete(entity)
+            db.itemMetaDao().delete("profiles", entity.id.toString())
+            profiles++
+        }
+        manifest.scenes.forEach { name ->
+            val entity = db.sceneDao().getAll().firstOrNull { it.projectId == pid && it.name.equals(name, ignoreCase = true) }
+            if (entity == null) { warnings += "scene not found: $name"; return@forEach }
+            runCatching { com.opentasker.scenes.SceneOverlayManager.hide(entity.id) }
+            db.sceneDao().delete(entity)
+            db.itemMetaDao().delete("scenes", entity.id.toString())
+            scenes++
+        }
+        manifest.tasks.forEach { name ->
+            val entity = db.taskDao().getAll().firstOrNull { it.projectId == pid && it.name.equals(name, ignoreCase = true) }
+            if (entity == null) { warnings += "task not found: $name"; return@forEach }
+            db.taskDao().delete(entity)
+            db.itemMetaDao().delete("tasks", entity.id.toString())
+            tasks++
+        }
+        manifest.variables.forEach { name ->
+            // Project bucket + super bucket (a pre-project-scoping copy may linger in super).
+            var hit = false
+            if (db.variableDao().get(pid, name) != null) { db.variableDao().delete(pid, name); hit = true }
+            if (db.variableDao().get(0L, name) != null) { db.variableDao().delete(0L, name); hit = true }
+            if (hit) variables++ else warnings += "variable not found: $name"
+        }
+        return DeleteResult(
+            "deleted $tasks tasks, $profiles profiles, $scenes scenes, $variables variables from ${project.name}",
+            warnings,
+        )
+    }
+
     /** An absolute path is used as-is; a bare filename / relative path lands in `/sdcard/tmp`. */
     private fun resolveInTmp(path: String): File =
         if (path.startsWith("/")) File(path)
@@ -112,8 +190,10 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
     }
 
     companion object {
+        private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
         const val ACTION_EXPORT_WORKSPACE = "shiroikuma.jiyusagyoban.action.EXPORT_WORKSPACE"
         const val ACTION_IMPORT_BUNDLE = "shiroikuma.jiyusagyoban.action.IMPORT_BUNDLE"
+        const val ACTION_DELETE_ITEMS = "shiroikuma.jiyusagyoban.action.DELETE_ITEMS"
         const val EXTRA_PATH = "shiroikuma.jiyusagyoban.extra.PATH"
         const val EXTRA_ERROR = "shiroikuma.jiyusagyoban.extra.ERROR"
         const val EXTRA_WARNINGS = "shiroikuma.jiyusagyoban.extra.WARNINGS"
