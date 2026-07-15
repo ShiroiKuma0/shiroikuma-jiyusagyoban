@@ -66,6 +66,10 @@ internal data class MeteorKnobs(
 
 private const val REACT_TAU = 150f       // reactive speed easing (ms)
 private const val SPEED_TAU = 700f       // non-reactive speed easing (ms)
+// Reactive mode needs the Visualizer to actually hear the music. Android Auto (and A2DP-offload)
+// playback bypasses the output mix, so the capture runs but stays silent — after this much silence
+// the sim falls back to the non-reactive varying-speed animation instead of pinning at speedMin.
+private const val SILENT_FALLBACK_MS = 3_000L
 
 private class Ribbon {
     var pos = 0f; var len = 0f
@@ -199,7 +203,7 @@ private class MeteorSim {
         if (lastSpawnMs == 0.0) lastSpawnMs = nowMs
         if (speedNextMs == 0.0) speedNextMs = nowMs + k.speedChangeS * 1000.0
         pulse = 1f
-        if (k.reactive) {
+        if (k.reactive && MusicPulseSource.Bridge.silentMs() < SILENT_FALLBACK_MS) {
             // 音楽反応 v3 — tempo-locked: with a confident beat grid the speed pumps ON each grid
             // beat (sharp attack, exp decay through the beat); dynamics (auto-gain-normalised
             // loudness) set the baseline; low confidence falls back to onset surges.
@@ -227,6 +231,8 @@ private class MeteorSim {
             speedTarget = min(k.speedMax * 1.8f, tgt)
             speedMul += (speedTarget - speedMul) * (1f - exp(-dtMs / REACT_TAU))
         } else {
+            // Non-reactive — and the reactive fallback when the capture hears nothing (Android
+            // Auto): wander between speedMin and speedMax, retargeting every ~speedChangeS.
             if (nowMs > speedNextMs) {
                 speedTarget = k.speedMin + Random.nextFloat() * (k.speedMax - k.speedMin)
                 speedNextMs = nowMs + k.speedChangeS * 1000.0 * (0.5 + Random.nextFloat())
