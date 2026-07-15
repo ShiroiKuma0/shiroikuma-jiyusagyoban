@@ -14,7 +14,7 @@ Description: |-
   tasks, actions, guided templates, open JSON bundles, sharing manifests,
   Tasker migration review, FOSS geofence evaluation, runtime template
   argument and condition expansion, per-expression template diagnostics,
-  explicit regex template policy, optional Termux script readiness, and
+  explicit regex template policy, approved Termux script execution, and
   platform-aware setup checks.
 
 RepoType: git
