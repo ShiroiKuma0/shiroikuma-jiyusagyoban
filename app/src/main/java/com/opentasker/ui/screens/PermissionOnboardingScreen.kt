@@ -82,6 +82,7 @@ import com.opentasker.ui.theme.ThemePreference
 import kotlinx.coroutines.launch
 import com.opentasker.core.permissions.UsageAccess
 import com.opentasker.core.power.ShizukuPowerBackend
+import com.opentasker.core.power.ShizukuPowerState
 import com.opentasker.core.scheduling.ExactAlarmSupport
 import com.opentasker.core.scripting.TermuxScriptBackend
 
@@ -93,6 +94,7 @@ private data class PermissionSetupItem(
     val action: PermissionAction,
     val requiredFor: String,
     val optional: Boolean = false,
+    val allowActionWhenGranted: Boolean = false,
 )
 
 data class BackupSetupState(
@@ -104,6 +106,8 @@ data class BackupSetupState(
 private sealed interface PermissionAction {
     data class RuntimePermission(val permission: String) : PermissionAction
     data class SettingsIntent(val intent: Intent) : PermissionAction
+    data object ShizukuPermission : PermissionAction
+    data class ShizukuKillSwitch(val enabled: Boolean) : PermissionAction
     /** Try each OEM settings component in order, falling back to a web guide URL. */
     data class OemSettings(
         val targets: List<OemBatteryGuidance.SettingsTarget>,
@@ -237,6 +241,22 @@ fun PermissionOnboardingScreen(
                         }
                         is PermissionAction.SettingsIntent -> openSettingsIntent(context, action.intent, onMessage)
                         is PermissionAction.OemSettings -> openOemSettings(context, action, onMessage)
+                        PermissionAction.ShizukuPermission -> {
+                            val requested = ShizukuPowerBackend.requestPermission(SHIZUKU_PERMISSION_REQUEST_CODE)
+                            onMessage(
+                                if (requested) "Shizuku permission requested."
+                                else "Shizuku permission could not be requested; confirm the service is running.",
+                            )
+                            refreshTick++
+                        }
+                        is PermissionAction.ShizukuKillSwitch -> {
+                            ShizukuPowerBackend.setKillSwitchEnabled(context, action.enabled)
+                            onMessage(
+                                if (action.enabled) "Shizuku power mode disabled."
+                                else "Shizuku power mode enabled; elevated actions remain unsupported without a privileged transport.",
+                            )
+                            refreshTick++
+                        }
                     }
                 },
             )
@@ -526,7 +546,7 @@ private fun PermissionSetupCard(
                 Button(onClick = onRunAction, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                     Text(item.actionLabel)
                 }
-            } else if (item.action is PermissionAction.SettingsIntent && item.title == "App visibility") {
+            } else if (item.allowActionWhenGranted || (item.action is PermissionAction.SettingsIntent && item.title == "App visibility")) {
                 OutlinedButton(onClick = onRunAction, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                     Text(stringResource(R.string.setup_review_settings))
                 }
@@ -587,6 +607,28 @@ private fun buildPermissionItems(
     permissionHistory: RuntimePermissionRequestHistory,
 ): List<PermissionSetupItem> {
     val shizukuStatus = ShizukuPowerBackend.inspect(context)
+    val shizukuActionLabel = when (shizukuStatus.state) {
+        ShizukuPowerState.NotInstalled -> "Open setup guide"
+        ShizukuPowerState.ManagerInstalled -> "Open Shizuku settings"
+        ShizukuPowerState.PermissionNeeded -> "Request permission"
+        ShizukuPowerState.BackendUnavailable,
+        ShizukuPowerState.Ready,
+        -> "Disable power mode"
+        ShizukuPowerState.Disabled -> "Enable power mode"
+    }
+    val shizukuAction = when (shizukuStatus.state) {
+        ShizukuPowerState.NotInstalled -> PermissionAction.SettingsIntent(
+            Intent(Intent.ACTION_VIEW, Uri.parse(ShizukuPowerBackend.SETUP_URL)),
+        )
+        ShizukuPowerState.ManagerInstalled -> PermissionAction.SettingsIntent(
+            packageDetailsIntent(ShizukuPowerBackend.MANAGER_PACKAGE),
+        )
+        ShizukuPowerState.PermissionNeeded -> PermissionAction.ShizukuPermission
+        ShizukuPowerState.BackendUnavailable,
+        ShizukuPowerState.Ready,
+        -> PermissionAction.ShizukuKillSwitch(enabled = true)
+        ShizukuPowerState.Disabled -> PermissionAction.ShizukuKillSwitch(enabled = false)
+    }
     val termuxStatus = TermuxScriptBackend.inspect(context)
     val oem = OemBatteryGuidance.forDevice(Build.MANUFACTURER, Build.BRAND)
     return listOfNotNull(
@@ -733,18 +775,13 @@ private fun buildPermissionItems(
         ),
         PermissionSetupItem(
             title = "Shizuku power mode",
-            body = "${shizukuStatus.summary} Elevated actions remain blocked until the backend is implemented and explicitly enabled.",
-            granted = shizukuStatus.managerInstalled,
-            actionLabel = if (shizukuStatus.managerInstalled) "Open app settings" else "Open setup guide",
-            action = PermissionAction.SettingsIntent(
-                if (shizukuStatus.managerInstalled) {
-                    packageDetailsIntent(ShizukuPowerBackend.MANAGER_PACKAGE)
-                } else {
-                    Intent(Intent.ACTION_VIEW, Uri.parse(ShizukuPowerBackend.SETUP_URL))
-                },
-            ),
+            body = shizukuStatus.summary,
+            granted = shizukuStatus.isReady,
+            actionLabel = shizukuActionLabel,
+            action = shizukuAction,
             requiredFor = "Elevated actions",
             optional = true,
+            allowActionWhenGranted = true,
         ),
         PermissionSetupItem(
             title = "Termux script bridge",
@@ -790,6 +827,7 @@ private fun PermissionSetupItem.withRuntimePermissionRecovery(
 }
 
 private const val ANDROID_17_API = 37
+private const val SHIZUKU_PERMISSION_REQUEST_CODE = 4107
 
 private fun hasPermission(context: Context, permission: String): Boolean =
     ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED

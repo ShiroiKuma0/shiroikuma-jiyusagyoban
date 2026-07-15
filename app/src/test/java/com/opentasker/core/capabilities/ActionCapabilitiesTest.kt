@@ -1,6 +1,7 @@
 package com.opentasker.core.capabilities
 
 import com.opentasker.app.BuildConfig
+import com.opentasker.core.power.ShizukuPowerBackend
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -11,6 +12,16 @@ class ActionCapabilitiesTest {
     fun unsupportedActionsCannotBeAddedFromUi() {
         assertFalse(ActionCapabilityRegistry.get("reboot").canAdd)
         assertFalse(ActionCapabilityRegistry.get("wifi.toggle").canAdd)
+    }
+
+    @Test
+    fun elevatedActionsStayUnsupportedWithoutPrivilegedTransport() {
+        ShizukuPowerBackend.elevatedActionIds.forEach { actionId ->
+            val capability = ActionCapabilityRegistry.get(actionId)
+            assertEquals("$actionId must fail closed", CapabilityLevel.Unsupported, capability.level)
+            assertFalse(capability.canAdd)
+            assertTrue(capability.reason.contains("does not ship a privileged Shizuku user-service transport"))
+        }
     }
 
     @Test

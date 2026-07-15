@@ -13,6 +13,7 @@ import com.opentasker.core.storage.PendingRestoreApplyResult
 import com.opentasker.core.diagnostics.CrashLogHandler
 import com.opentasker.core.engine.RunLogPruneWorker
 import com.opentasker.core.platform.AppVisibilityTracker
+import com.opentasker.core.power.ShizukuPowerBackend
 
 // Application singleton keeps startup deterministic while Hilt is not active.
 class OpenTaskerApp_NoHilt : Application() {
@@ -33,6 +34,7 @@ class OpenTaskerApp_NoHilt : Application() {
         installStrictModeInDebug()
         CrashLogHandler.install(this)
         AppVisibilityTracker.register(this)
+        ShizukuPowerBackend.initialize(this)
         registerActionMetadata()
         registerCoreRuntime()
          

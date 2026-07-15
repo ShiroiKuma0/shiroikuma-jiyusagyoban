@@ -96,7 +96,7 @@ Privileged actions (airplane, mobile data, screenshot, reboot, screen off) are g
 
 ### Power-user backends
 
-- Shizuku manager/service/permission status, kill switch, and an allowlisted shell runner for elevated action candidates
+- Shizuku manager/service/permission status, a persisted default-on kill switch, and a fail-closed command allowlist; elevated actions remain unsupported until a privileged user-service transport ships
 - Termux/Termux:Tasker package checks plus gated `RUN_COMMAND` dispatch when permission and package prerequisites are satisfied
 
 ---

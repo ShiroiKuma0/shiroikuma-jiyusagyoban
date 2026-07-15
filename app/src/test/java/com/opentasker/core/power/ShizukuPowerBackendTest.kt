@@ -7,11 +7,14 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.After
 import org.junit.Test
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.io.path.readText
 
 class ShizukuPowerBackendTest {
     @After
     fun resetKillSwitch() {
-        ShizukuPowerBackend.killSwitchEnabled = false
+        ShizukuPowerBackend.killSwitchEnabled = true
     }
 
     @Test
@@ -55,7 +58,7 @@ class ShizukuPowerBackendTest {
         ShizukuPowerBackend.killSwitchEnabled = true
         val result = ShizukuShellRunner.execute("reboot")
         assertTrue(result is ShellResult.Failure)
-        assertTrue((result as ShellResult.Failure).reason.contains("kill-switch"))
+        assertTrue((result as ShellResult.Failure).reason.contains("kill switch"))
     }
 
     @Test
@@ -68,8 +71,84 @@ class ShizukuPowerBackendTest {
 
     @Test
     fun statusForDisabledShowsKillSwitchState() {
-        ShizukuPowerBackend.killSwitchEnabled = true
-        val status = ShizukuPowerBackend.statusFor(managerInstalled = true)
-        assertEquals(ShizukuPowerState.ManagerInstalled, status.state)
+        val status = ShizukuPowerBackend.statusFor(
+            managerInstalled = true,
+            killSwitchEnabled = true,
+        )
+        assertEquals(ShizukuPowerState.Disabled, status.state)
+    }
+
+    @Test
+    fun permissionAloneCannotReportReadyWithoutPrivilegedTransport() {
+        val unavailable = ShizukuPowerBackend.statusFor(
+            managerInstalled = true,
+            serviceRunning = true,
+            permissionGranted = true,
+            privilegedTransportAvailable = false,
+        )
+        val ready = ShizukuPowerBackend.statusFor(
+            managerInstalled = true,
+            serviceRunning = true,
+            permissionGranted = true,
+            privilegedTransportAvailable = true,
+        )
+
+        assertEquals(ShizukuPowerState.BackendUnavailable, unavailable.state)
+        assertFalse(unavailable.isReady)
+        assertEquals(ShizukuPowerState.Ready, ready.state)
+        assertTrue(ready.isReady)
+    }
+
+    @Test
+    fun runnerNeverFallsBackToOrdinaryAppProcess() {
+        ShizukuPowerBackend.killSwitchEnabled = false
+
+        val result = ShizukuShellRunner.execute("reboot")
+
+        assertTrue(result is ShellResult.Failure)
+        assertTrue((result as ShellResult.Failure).reason.contains("No privileged Shizuku user-service transport"))
+        assertFalse(ShizukuShellRunner.hasPrivilegedTransport())
+    }
+
+    @Test
+    fun productionRunnerContainsNoProcessBuilderExecution() {
+        val root = listOf(
+            Path.of("src/main/java"),
+            Path.of("app/src/main/java"),
+        ).first(Files::exists)
+        val source = root.resolve("com/opentasker/core/power/ShizukuShellRunner.kt").readText()
+
+        assertFalse(source.contains("ProcessBuilder("))
+    }
+
+    @Test
+    fun killSwitchDefaultsOnAndIsBackedByPreferences() {
+        val root = listOf(
+            Path.of("src/main/java"),
+            Path.of("app/src/main/java"),
+        ).first(Files::exists)
+        val source = root.resolve("com/opentasker/core/power/ShizukuPowerBackend.kt").readText()
+
+        assertTrue(source.contains("var killSwitchEnabled: Boolean = true"))
+        assertTrue(source.contains("KEY_KILL_SWITCH"))
+        assertTrue(source.contains("getSharedPreferences"))
+        assertTrue(source.contains("putBoolean(KEY_KILL_SWITCH, enabled)"))
+    }
+
+    @Test
+    fun setupAndCapabilitiesKeepUnavailableTransportFailClosed() {
+        val root = listOf(
+            Path.of("src/main/java"),
+            Path.of("app/src/main/java"),
+        ).first(Files::exists)
+        val setup = root.resolve("com/opentasker/ui/screens/PermissionOnboardingScreen.kt").readText()
+        val capabilities = root.resolve("com/opentasker/core/capabilities/ActionCapabilities.kt").readText()
+        val application = root.resolve("com/opentasker/app/OpenTaskerApp_NoHilt.kt").readText()
+
+        assertTrue(setup.contains("PermissionAction.ShizukuPermission"))
+        assertTrue(setup.contains("PermissionAction.ShizukuKillSwitch"))
+        assertTrue(setup.contains("ShizukuPowerState.BackendUnavailable"))
+        assertFalse(capabilities.contains("ShizukuPowerBackend.isReady()"))
+        assertTrue(application.contains("ShizukuPowerBackend.initialize(this)"))
     }
 }

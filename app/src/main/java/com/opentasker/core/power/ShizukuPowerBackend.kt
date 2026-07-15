@@ -4,12 +4,15 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import com.opentasker.core.logging.AppLogger
+import androidx.core.content.edit
 import rikka.shizuku.Shizuku
 
 object ShizukuPowerBackend {
     const val MANAGER_PACKAGE = "moe.shizuku.privileged.api"
     const val SETUP_URL = "https://shizuku.rikka.app/guide/setup/"
     private const val TAG = "ShizukuPowerBackend"
+    private const val PREFERENCES = "shizuku-power"
+    private const val KEY_KILL_SWITCH = "kill-switch-enabled"
 
     val elevatedActionIds: Set<String> = setOf(
         "airplane.toggle",
@@ -20,73 +23,71 @@ object ShizukuPowerBackend {
         "wake",
     )
 
-    private val ALLOWED_COMMANDS: Map<String, List<String>> = mapOf(
-        "airplane.toggle" to listOf("settings", "put", "global", "airplane_mode_on"),
-        "mobile.toggle" to listOf("svc", "data"),
-        "screenshot.take" to listOf("screencap"),
-        "reboot" to listOf("svc", "power", "reboot"),
-        "screen.off" to listOf("input", "keyevent", "KEYCODE_POWER"),
-        "wake" to listOf("input", "keyevent", "KEYCODE_WAKEUP"),
-    )
-
+    /** Defaults on so a process restart never enables privileged behavior before preferences load. */
     @Volatile
-    var killSwitchEnabled: Boolean = false
+    var killSwitchEnabled: Boolean = true
+        internal set
 
-    fun inspect(context: Context): ShizukuPowerStatus {
-        val installed = isPackageInstalled(context, MANAGER_PACKAGE)
-        if (!installed) {
-            return ShizukuPowerStatus(
-                state = ShizukuPowerState.NotInstalled,
-                summary = "Shizuku manager is not installed.",
-            )
-        }
-        if (killSwitchEnabled) {
-            return ShizukuPowerStatus(
-                state = ShizukuPowerState.Disabled,
-                summary = "Shizuku power mode is disabled by kill-switch.",
-            )
-        }
-        val alive = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
-        if (!alive) {
-            return ShizukuPowerStatus(
-                state = ShizukuPowerState.ManagerInstalled,
-                summary = "Shizuku manager is installed but the service is not running.",
-            )
-        }
-        val granted = runCatching {
-            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
-        }.getOrDefault(false)
-        return if (granted) {
-            ShizukuPowerStatus(
-                state = ShizukuPowerState.Ready,
-                summary = "Shizuku is active and permission is granted.",
-            )
-        } else {
-            ShizukuPowerStatus(
-                state = ShizukuPowerState.PermissionNeeded,
-                summary = "Shizuku is running but OpenTasker needs permission.",
-            )
-        }
+    fun initialize(context: Context) {
+        killSwitchEnabled = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .getBoolean(KEY_KILL_SWITCH, true)
     }
 
-    fun statusFor(managerInstalled: Boolean): ShizukuPowerStatus =
-        if (managerInstalled) {
-            ShizukuPowerStatus(
-                state = ShizukuPowerState.ManagerInstalled,
-                summary = "Shizuku manager is installed.",
-            )
-        } else {
-            ShizukuPowerStatus(
-                state = ShizukuPowerState.NotInstalled,
-                summary = "Shizuku manager is not installed.",
-            )
-        }
+    fun setKillSwitchEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .edit { putBoolean(KEY_KILL_SWITCH, enabled) }
+        killSwitchEnabled = enabled
+    }
+
+    fun inspect(context: Context): ShizukuPowerStatus = statusFor(
+        managerInstalled = isPackageInstalled(context, MANAGER_PACKAGE),
+        killSwitchEnabled = killSwitchEnabled,
+        serviceRunning = runCatching { Shizuku.pingBinder() }.getOrDefault(false),
+        permissionGranted = runCatching {
+            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        }.getOrDefault(false),
+        privilegedTransportAvailable = ShizukuShellRunner.hasPrivilegedTransport(),
+    )
+
+    internal fun statusFor(
+        managerInstalled: Boolean,
+        killSwitchEnabled: Boolean = false,
+        serviceRunning: Boolean = false,
+        permissionGranted: Boolean = false,
+        privilegedTransportAvailable: Boolean = false,
+    ): ShizukuPowerStatus = when {
+        !managerInstalled -> ShizukuPowerStatus(
+            state = ShizukuPowerState.NotInstalled,
+            summary = "Shizuku manager is not installed.",
+        )
+        killSwitchEnabled -> ShizukuPowerStatus(
+            state = ShizukuPowerState.Disabled,
+            summary = "Shizuku power mode is disabled by the persisted kill switch.",
+        )
+        !serviceRunning -> ShizukuPowerStatus(
+            state = ShizukuPowerState.ManagerInstalled,
+            summary = "Shizuku manager is installed but the service is not running.",
+        )
+        !permissionGranted -> ShizukuPowerStatus(
+            state = ShizukuPowerState.PermissionNeeded,
+            summary = "Shizuku is running but OpenTasker needs permission.",
+        )
+        !privilegedTransportAvailable -> ShizukuPowerStatus(
+            state = ShizukuPowerState.BackendUnavailable,
+            summary = "Shizuku permission is granted, but this build has no privileged user-service transport. " +
+                "Elevated actions remain unsupported.",
+        )
+        else -> ShizukuPowerStatus(
+            state = ShizukuPowerState.Ready,
+            summary = "Shizuku is active, permission is granted, and a privileged transport is available.",
+        )
+    }
 
     fun hintForAction(actionId: String): ShizukuActionHint? =
         if (actionId in elevatedActionIds) {
             ShizukuActionHint(
                 actionId = actionId,
-                message = "Requires Shizuku elevated mode. Enable in Setup if the Shizuku manager is running.",
+                message = "This build does not ship a privileged Shizuku user-service transport, so the action remains unsupported.",
             )
         } else {
             null
@@ -94,12 +95,14 @@ object ShizukuPowerBackend {
 
     fun isReady(): Boolean =
         !killSwitchEnabled &&
+            ShizukuShellRunner.hasPrivilegedTransport() &&
             runCatching { Shizuku.pingBinder() }.getOrDefault(false) &&
             runCatching { Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED }.getOrDefault(false)
 
-    fun requestPermission(requestCode: Int) {
-        Shizuku.requestPermission(requestCode)
-    }
+    fun requestPermission(requestCode: Int): Boolean =
+        runCatching { Shizuku.requestPermission(requestCode) }
+            .onFailure { AppLogger.error(TAG, "Failed to request Shizuku permission", it) }
+            .isSuccess
 
     private fun isPackageInstalled(context: Context, packageName: String): Boolean =
         runCatching {
@@ -127,6 +130,7 @@ enum class ShizukuPowerState {
     NotInstalled,
     ManagerInstalled,
     PermissionNeeded,
+    BackendUnavailable,
     Ready,
     Disabled,
 }

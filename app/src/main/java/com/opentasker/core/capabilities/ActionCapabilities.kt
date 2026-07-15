@@ -104,12 +104,8 @@ object ActionCapabilityRegistry {
         volumeCapabilityForSdk(android.os.Build.VERSION.SDK_INT, reason)
 
     private fun elevatedUnsupported(actionId: String, reason: String): ActionCapability =
-        if (ShizukuPowerBackend.isReady()) {
-            ActionCapability(CapabilityLevel.RequiresSetup, "$reason Shizuku elevated mode is active.")
-        } else {
-            ActionCapability(
-                CapabilityLevel.Unsupported,
-                "$reason ${ShizukuPowerBackend.hintForAction(actionId)?.message ?: "Optional elevated backend is not active."}",
-            )
-        }
+        ActionCapability(
+            CapabilityLevel.Unsupported,
+            "$reason ${ShizukuPowerBackend.hintForAction(actionId)?.message ?: "No privileged backend is available."}",
+        )
 }
