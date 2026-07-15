@@ -9,10 +9,11 @@ import java.nio.file.Path
 import kotlin.io.path.readText
 
 class AccessibilitySourceTest {
-    private val uiSourceRoot: Path = listOf(
-        Path.of("src/main/java/com/opentasker/ui"),
-        Path.of("app/src/main/java/com/opentasker/ui"),
+    private val mainSourceRoot: Path = listOf(
+        Path.of("src/main/java"),
+        Path.of("app/src/main/java"),
     ).first(Files::exists)
+    private val uiSourceRoot: Path = mainSourceRoot.resolve("com/opentasker/ui")
 
     @Test
     fun uiSourceDoesNotShipNullContentDescriptions() {
@@ -57,6 +58,51 @@ class AccessibilitySourceTest {
     }
 
     @Test
+    fun sceneOverlayKeepsTouchAndNonTouchMovementContracts() {
+        val source = mainSourceRoot.resolve("com/opentasker/core/scenes/SceneOverlayService.kt").readText()
+        val requiredMarkers = listOf(
+            "HEADER_HEIGHT_DP = 48",
+            "CLOSE_BUTTON_SIZE_DP = 48",
+            "scene_overlay_drag_handle_content_description",
+            "scene_overlay_close_content_description",
+            "scene_overlay_move_left_action",
+            "scene_overlay_move_up_action",
+            "scene_overlay_move_down_action",
+            "scene_overlay_move_right_action",
+            "ViewCompat.addAccessibilityAction",
+            "view.performClick()",
+        )
+        val missingMarkers = requiredMarkers.filterNot(source::contains)
+
+        assertTrue("Missing overlay accessibility contracts: $missingMarkers", missingMarkers.isEmpty())
+    }
+
+    @Test
+    fun automationRowsUseNamedControlsAndAuthoredSwitchState() {
+        val source = uiSourceRoot.resolve("screens/ActiveAutomationLists.kt").readText()
+        val requiredMarkers = listOf(
+            "R.string.a11y_profile_status",
+            "stateDescription = profileState",
+            "R.string.a11y_edit_profile",
+            "R.string.a11y_run_task",
+            "R.string.a11y_edit_action",
+            "R.string.a11y_delete_context",
+            "clearAndSetSemantics",
+        )
+        val missingMarkers = requiredMarkers.filterNot(source::contains)
+
+        assertTrue("Missing named automation control semantics: $missingMarkers", missingMarkers.isEmpty())
+        assertFalse(
+            "Nested automation controls must not use generic edit descriptions",
+            source.contains("contentDescription = stringResource(R.string.action_edit)"),
+        )
+        assertFalse(
+            "Profile switch must keep its authored accessible name and state",
+            source.contains("Switch(checked = profile.enabled, onCheckedChange = onToggle)"),
+        )
+    }
+
+    @Test
     fun criticalFlowsKeepAccessibilityContracts() {
         val requiredMarkersByFile = mapOf(
             "screens/PermissionOnboardingScreen.kt" to listOf(
@@ -97,6 +143,10 @@ class AccessibilitySourceTest {
                 "R.string.empty_run_log_search_title",
                 "R.string.run_log_share_diagnostic",
                 "contentDescription = when (outcome)",
+                "stateDescription = selectionDescription",
+                "R.string.a11y_expression_details",
+                "role = Role.Button",
+                "clearAndSetSemantics",
             ),
         )
 

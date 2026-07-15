@@ -43,6 +43,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -160,11 +165,17 @@ private fun RunLogRetentionCard(
             Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 RunLogRetentionOptions.all.forEach { option ->
                     val selected = option.policy == policy
+                    val selectionDescription = if (selected) {
+                        stringResource(R.string.a11y_selected)
+                    } else {
+                        stringResource(R.string.a11y_not_selected)
+                    }
                     OutlinedButton(
                         onClick = { onPolicyChange(option.policy) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .animateContentSize(),
+                            .animateContentSize()
+                            .semantics { stateDescription = selectionDescription },
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
                             containerColor = if (selected) {
@@ -197,7 +208,9 @@ private fun RunLogRetentionCard(
                                     Icon(
                                         Icons.Filled.CheckCircle,
                                         contentDescription = stringResource(R.string.label_selected),
-                                        modifier = Modifier.size(16.dp),
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .clearAndSetSemantics { },
                                     )
                                 } else {
                                     Spacer(Modifier.size(16.dp))
@@ -307,9 +320,14 @@ private fun RunLogFilterChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val selectionDescription = if (selected) {
+        stringResource(R.string.a11y_selected)
+    } else {
+        stringResource(R.string.a11y_not_selected)
+    }
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.semantics { stateDescription = selectionDescription },
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = if (selected) {
@@ -448,7 +466,9 @@ private fun RunLogCard(entry: RunLogEntry) {
                         RunLogOutcome.Skipped -> stringResource(R.string.status_skipped)
                     },
                     tint = accent,
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clearAndSetSemantics { },
                 )
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(entry.taskName, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -554,17 +574,34 @@ private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
             }
             if (trace.templateExpressions.isNotEmpty()) {
                 Spacer(Modifier.height(4.dp))
-                ExpressionDebugger(trace.templateExpressions)
+                ExpressionDebugger(
+                    expressions = trace.templateExpressions,
+                    traceLabel = trace.label,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun ExpressionDebugger(expressions: List<RunLogTemplateDiagnostic>) {
+private fun ExpressionDebugger(
+    expressions: List<RunLogTemplateDiagnostic>,
+    traceLabel: String,
+) {
     var expanded by remember { mutableStateOf(false) }
     val visibleExpressions = if (expanded) expressions else expressions.take(3)
     val hasWarnings = expressions.any { it.warning != null }
+    val stateLabel = if (expanded) {
+        stringResource(R.string.a11y_expanded)
+    } else {
+        stringResource(R.string.a11y_collapsed)
+    }
+    val actionLabel = if (expanded) {
+        stringResource(R.string.action_collapse)
+    } else {
+        stringResource(R.string.action_expand)
+    }
+    val debuggerDescription = stringResource(R.string.a11y_expression_details, traceLabel)
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -587,7 +624,14 @@ private fun ExpressionDebugger(expressions: List<RunLogTemplateDiagnostic>) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { expanded = !expanded },
+                    .semantics {
+                        contentDescription = debuggerDescription
+                        stateDescription = stateLabel
+                    }
+                    .clickable(
+                        role = Role.Button,
+                        onClickLabel = actionLabel,
+                    ) { expanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
@@ -597,7 +641,7 @@ private fun ExpressionDebugger(expressions: List<RunLogTemplateDiagnostic>) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    if (expanded) "collapse" else "expand",
+                    actionLabel,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                 )

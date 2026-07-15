@@ -16,6 +16,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
@@ -24,6 +25,8 @@ import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import com.opentasker.app.R
 import com.opentasker.core.external.AutomationTargetContract
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.Scene
@@ -110,6 +113,9 @@ class SceneOverlayService : Service() {
         // Header bar (draggable area + close button)
         val header = FrameLayout(this).apply {
             setBackgroundColor(HEADER_BACKGROUND)
+            contentDescription = getString(R.string.scene_overlay_drag_handle_content_description)
+            isFocusable = true
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 headerHeightPx,
@@ -122,6 +128,7 @@ class SceneOverlayService : Service() {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             setTypeface(null, Typeface.BOLD)
             gravity = Gravity.CENTER
+            contentDescription = getString(R.string.scene_overlay_close_content_description)
             layoutParams = FrameLayout.LayoutParams(closeButtonSizePx, closeButtonSizePx).apply {
                 gravity = Gravity.END or Gravity.CENTER_VERTICAL
             }
@@ -263,22 +270,60 @@ class SceneOverlayService : Service() {
         var initialY = 0
         var touchX = 0f
         var touchY = 0f
+        var moved = false
+        val touchSlop = ViewConfiguration.get(this).scaledTouchSlop
+        val accessibilityStepPx = (ACCESSIBILITY_MOVE_STEP_DP * resources.displayMetrics.density)
+            .toInt()
+            .coerceAtLeast(1)
 
-        dragHandle.setOnTouchListener { _, event ->
-            when (event.action) {
+        fun moveBy(deltaX: Int, deltaY: Int): Boolean {
+            params.x += deltaX
+            params.y += deltaY
+            overlayView?.let { windowManager.updateViewLayout(it, params) }
+            return true
+        }
+
+        ViewCompat.addAccessibilityAction(
+            dragHandle,
+            getString(R.string.scene_overlay_move_left_action),
+        ) { _, _ -> moveBy(-accessibilityStepPx, 0) }
+        ViewCompat.addAccessibilityAction(
+            dragHandle,
+            getString(R.string.scene_overlay_move_up_action),
+        ) { _, _ -> moveBy(0, -accessibilityStepPx) }
+        ViewCompat.addAccessibilityAction(
+            dragHandle,
+            getString(R.string.scene_overlay_move_down_action),
+        ) { _, _ -> moveBy(0, accessibilityStepPx) }
+        ViewCompat.addAccessibilityAction(
+            dragHandle,
+            getString(R.string.scene_overlay_move_right_action),
+        ) { _, _ -> moveBy(accessibilityStepPx, 0) }
+
+        dragHandle.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     initialX = params.x
                     initialY = params.y
                     touchX = event.rawX
                     touchY = event.rawY
+                    moved = false
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    params.x = initialX + (event.rawX - touchX).toInt()
-                    params.y = initialY + (event.rawY - touchY).toInt()
+                    val deltaX = event.rawX - touchX
+                    val deltaY = event.rawY - touchY
+                    moved = moved || kotlin.math.abs(deltaX) > touchSlop || kotlin.math.abs(deltaY) > touchSlop
+                    params.x = initialX + deltaX.toInt()
+                    params.y = initialY + deltaY.toInt()
                     overlayView?.let { windowManager.updateViewLayout(it, params) }
                     true
                 }
+                MotionEvent.ACTION_UP -> {
+                    if (!moved) view.performClick()
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> true
                 else -> false
             }
         }
@@ -331,8 +376,9 @@ class SceneOverlayService : Service() {
         const val CHANNEL_NAME = "Scene overlays"
         const val NOTIFICATION_ID = 1002
 
-        private const val HEADER_HEIGHT_DP = 28
-        private const val CLOSE_BUTTON_SIZE_DP = 28
+        private const val HEADER_HEIGHT_DP = 48
+        private const val CLOSE_BUTTON_SIZE_DP = 48
+        private const val ACCESSIBILITY_MOVE_STEP_DP = 24
         private const val CLOSE_LABEL = "✕"
         private const val OVERLAY_BACKGROUND = 0xE0_1E_1E_2E.toInt()  // Catppuccin Mocha base ~88% alpha
         private const val HEADER_BACKGROUND = 0xFF_31_32_44.toInt()   // Catppuccin Mocha surface0

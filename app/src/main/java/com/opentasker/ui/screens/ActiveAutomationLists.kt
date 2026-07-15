@@ -49,6 +49,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
@@ -393,6 +397,15 @@ private fun ProfileCard(
     onEditContext: (Int, ContextSpec) -> Unit,
     onDeleteContext: (Int) -> Unit,
 ) {
+    val profileState = if (profile.enabled) {
+        stringResource(R.string.label_enabled)
+    } else {
+        stringResource(R.string.label_paused)
+    }
+    val toggleDescription = stringResource(R.string.a11y_profile_status, profile.name)
+    val editDescription = stringResource(R.string.a11y_edit_profile, profile.name)
+    val addContextDescription = stringResource(R.string.a11y_add_context_to_profile, profile.name)
+    val deleteDescription = stringResource(R.string.a11y_delete_profile, profile.name)
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -412,7 +425,14 @@ private fun ProfileCard(
                     Text(profile.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(stringResource(R.string.workspace_runs_task, enterTaskName), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Switch(checked = profile.enabled, onCheckedChange = onToggle)
+                Switch(
+                    checked = profile.enabled,
+                    onCheckedChange = onToggle,
+                    modifier = Modifier.semantics {
+                        contentDescription = toggleDescription
+                        stateDescription = profileState
+                    },
+                )
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 item {
@@ -437,6 +457,7 @@ private fun ProfileCard(
             } else {
                 profile.contexts.forEachIndexed { index, context ->
                     ContextRow(
+                        index = index,
                         context = context,
                         onEdit = { onEditContext(index, context) },
                         onDelete = { onDeleteContext(index) },
@@ -444,20 +465,45 @@ private fun ProfileCard(
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit))
+                OutlinedButton(
+                    onClick = onEdit,
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics { contentDescription = editDescription },
+                ) {
+                    Icon(
+                        Icons.Filled.Edit,
+                        contentDescription = editDescription,
+                        modifier = Modifier.clearAndSetSemantics { },
+                    )
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.action_edit))
                 }
-                OutlinedButton(onClick = onAddContext, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.profile_add_context))
+                OutlinedButton(
+                    onClick = onAddContext,
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics { contentDescription = addContextDescription },
+                ) {
+                    Icon(
+                        Icons.Filled.Add,
+                        contentDescription = addContextDescription,
+                        modifier = Modifier.clearAndSetSemantics { },
+                    )
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.profile_add_context))
                 }
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.profile_delete))
+                TextButton(
+                    onClick = onDelete,
+                    modifier = Modifier.semantics { contentDescription = deleteDescription },
+                ) {
+                    Icon(
+                        Icons.Filled.Delete,
+                        contentDescription = deleteDescription,
+                        modifier = Modifier.clearAndSetSemantics { },
+                    )
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.profile_delete))
                 }
@@ -558,6 +604,11 @@ private fun TaskCard(
     onEditAction: (Int, ActionSpec) -> Unit,
     onDeleteAction: (Int) -> Unit,
 ) {
+    val editDescription = stringResource(R.string.a11y_edit_task, task.name)
+    val addActionDescription = stringResource(R.string.a11y_add_action_to_task, task.name)
+    val runDescription = stringResource(R.string.a11y_run_task, task.name)
+    val pinDescription = stringResource(R.string.a11y_pin_task, task.name)
+    val deleteDescription = stringResource(R.string.a11y_delete_task, task.name)
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -599,35 +650,74 @@ private fun TaskCard(
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit))
+                OutlinedButton(
+                    onClick = onEdit,
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics { contentDescription = editDescription },
+                ) {
+                    Icon(
+                        Icons.Filled.Edit,
+                        contentDescription = editDescription,
+                        modifier = Modifier.clearAndSetSemantics { },
+                    )
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.action_edit))
                 }
-                OutlinedButton(onClick = onAddAction, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.task_add_action))
+                OutlinedButton(
+                    onClick = onAddAction,
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics { contentDescription = addActionDescription },
+                ) {
+                    Icon(
+                        Icons.Filled.Add,
+                        contentDescription = addActionDescription,
+                        modifier = Modifier.clearAndSetSemantics { },
+                    )
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.task_add_action))
                 }
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 item {
-                    OutlinedButton(onClick = onRun) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.action_run))
+                    OutlinedButton(
+                        onClick = onRun,
+                        modifier = Modifier.semantics { contentDescription = runDescription },
+                    ) {
+                        Icon(
+                            Icons.Filled.PlayArrow,
+                            contentDescription = runDescription,
+                            modifier = Modifier.clearAndSetSemantics { },
+                        )
                         Spacer(Modifier.width(6.dp))
                         Text(stringResource(R.string.action_run))
                     }
                 }
                 item {
-                    OutlinedButton(onClick = onPin) {
-                        Icon(Icons.Filled.PushPin, contentDescription = stringResource(R.string.action_pin))
+                    OutlinedButton(
+                        onClick = onPin,
+                        modifier = Modifier.semantics { contentDescription = pinDescription },
+                    ) {
+                        Icon(
+                            Icons.Filled.PushPin,
+                            contentDescription = pinDescription,
+                            modifier = Modifier.clearAndSetSemantics { },
+                        )
                         Spacer(Modifier.width(6.dp))
                         Text(stringResource(R.string.action_pin))
                     }
                 }
                 item {
-                    TextButton(onClick = onDelete) {
-                        Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.task_delete))
+                    TextButton(
+                        onClick = onDelete,
+                        modifier = Modifier.semantics { contentDescription = deleteDescription },
+                    ) {
+                        Icon(
+                            Icons.Filled.Delete,
+                            contentDescription = deleteDescription,
+                            modifier = Modifier.clearAndSetSemantics { },
+                        )
                         Spacer(Modifier.width(6.dp))
                         Text(stringResource(R.string.task_delete))
                     }
@@ -646,6 +736,9 @@ private fun ActionRow(
 ) {
     val metadata = ActionMetadataRegistry.get(action.type)
     val capability = ActionCapabilityRegistry.get(action.type)
+    val actionLabel = action.label ?: metadata?.name ?: action.type
+    val editDescription = stringResource(R.string.a11y_edit_action, index + 1, actionLabel)
+    val deleteDescription = stringResource(R.string.a11y_delete_action, index + 1, actionLabel)
     Surface(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
         shape = RoundedCornerShape(DesignSystem.Radii.lg),
@@ -659,7 +752,7 @@ private fun ActionRow(
         ) {
             StatusPill("#${index + 1}", MaterialTheme.colorScheme.secondary)
             Column(Modifier.weight(1f)) {
-                Text(action.label ?: metadata?.name ?: action.type, style = MaterialTheme.typography.titleSmall)
+                Text(actionLabel, style = MaterialTheme.typography.titleSmall)
                 Text(
                     action.args.entries.joinToString { "${it.key}=${it.value}" }.ifBlank { metadata?.description ?: stringResource(R.string.workspace_no_arguments) },
                     style = MaterialTheme.typography.bodySmall,
@@ -675,11 +768,26 @@ private fun ActionRow(
                     )
                 }
             }
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit))
+            IconButton(
+                onClick = onEdit,
+                modifier = Modifier.semantics { contentDescription = editDescription },
+            ) {
+                Icon(
+                    Icons.Filled.Edit,
+                    contentDescription = editDescription,
+                    modifier = Modifier.clearAndSetSemantics { },
+                )
             }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete), tint = MaterialTheme.colorScheme.error)
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.semantics { contentDescription = deleteDescription },
+            ) {
+                Icon(
+                    Icons.Filled.Delete,
+                    contentDescription = deleteDescription,
+                    modifier = Modifier.clearAndSetSemantics { },
+                    tint = MaterialTheme.colorScheme.error,
+                )
             }
         }
     }
@@ -687,10 +795,14 @@ private fun ActionRow(
 
 @Composable
 private fun ContextRow(
+    index: Int,
     context: ContextSpec,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val contextTypeLabel = context.type.name.lowercase().replaceFirstChar { it.uppercase() }
+    val editDescription = stringResource(R.string.a11y_edit_context, index + 1, contextTypeLabel)
+    val deleteDescription = stringResource(R.string.a11y_delete_context, index + 1, contextTypeLabel)
     Surface(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
         shape = RoundedCornerShape(DesignSystem.Radii.lg),
@@ -703,7 +815,7 @@ private fun ContextRow(
             horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
         ) {
             Column(Modifier.weight(1f)) {
-                Text(context.type.name.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleSmall)
+                Text(contextTypeLabel, style = MaterialTheme.typography.titleSmall)
                 Text(
                     contextConfigSummary(context),
                     style = MaterialTheme.typography.bodySmall,
@@ -715,11 +827,26 @@ private fun ContextRow(
             if (context.invert) {
                 StatusPill(stringResource(R.string.label_inverted), MaterialTheme.colorScheme.secondary)
             }
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit))
+            IconButton(
+                onClick = onEdit,
+                modifier = Modifier.semantics { contentDescription = editDescription },
+            ) {
+                Icon(
+                    Icons.Filled.Edit,
+                    contentDescription = editDescription,
+                    modifier = Modifier.clearAndSetSemantics { },
+                )
             }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete), tint = MaterialTheme.colorScheme.error)
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.semantics { contentDescription = deleteDescription },
+            ) {
+                Icon(
+                    Icons.Filled.Delete,
+                    contentDescription = deleteDescription,
+                    modifier = Modifier.clearAndSetSemantics { },
+                    tint = MaterialTheme.colorScheme.error,
+                )
             }
         }
     }
