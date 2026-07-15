@@ -65,7 +65,6 @@ import com.opentasker.core.permissions.OemBatteryGuidance
 import com.opentasker.core.permissions.UsageAccess
 import com.opentasker.core.scheduling.ExactAlarmSupport
 import com.opentasker.core.storage.AppDatabase
-import com.opentasker.core.storage.StorageDecodeIssue
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -91,20 +90,9 @@ class ContextInspectorViewModel(
     private val refreshTick = MutableStateFlow(clock())
     private val locationDwellStateStore = LocationDwellStateStore(appContext, clock)
 
-    private val profileDecodeResults = db.profileDao()
+    private val profiles: StateFlow<List<Profile>> = db.profileDao()
         .getAllAsFlow()
-        .map { entities -> entities.map { it.toDomainDecodeResult() } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    private val profiles: StateFlow<List<Profile>> = profileDecodeResults
-        .map { results ->
-            results.mapNotNull { result -> result.value.takeIf { result.issue == null } }
-                .sortedBy { it.name.lowercase(Locale.US) }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    val storageDecodeIssues: StateFlow<List<StorageDecodeIssue>> = profileDecodeResults
-        .map { results -> results.mapNotNull { it.issue } }
+        .map { entities -> entities.map { it.toDomain() }.sortedBy { it.name.lowercase(Locale.US) } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val snapshot: StateFlow<ContextInspectionSnapshot> = combine(
@@ -146,6 +134,9 @@ class ContextInspectorViewModel(
 
     private fun startSourceCollectors() {
         requiredContextSourceKeys().forEach { key ->
+            // Never power on GPS just by opening the Inspector — location is only sampled when a profile
+            // actually needs it (白い熊). The location row shows last-known / setup state, not live updates.
+            if (key == "location") return@forEach
             val source = ContextSourceRegistry.get(key) ?: return@forEach
             viewModelScope.launch {
                 source.events(appContext)
@@ -189,14 +180,11 @@ fun ContextInspectorScreen(
     val factory = remember(db, context) { ContextInspectorViewModelFactory(db, context) }
     val viewModel: ContextInspectorViewModel = viewModel(factory = factory)
     val snapshot by viewModel.snapshot.collectAsState()
-    val storageDecodeIssues by viewModel.storageDecodeIssues.collectAsState()
 
-    if (snapshot.sources.isEmpty() && snapshot.profiles.isEmpty() && storageDecodeIssues.isEmpty()) {
+    if (snapshot.sources.isEmpty() && snapshot.profiles.isEmpty()) {
         InspectorEmptyState(contentPadding)
         return
     }
-
-    val oem = remember { OemBatteryGuidance.forDevice(Build.MANUFACTURER, Build.BRAND) }
 
     LazyColumn(
         modifier = modifier
@@ -207,16 +195,6 @@ fun ContextInspectorScreen(
     ) {
         item {
             ContextInspectorSummaryCard(snapshot = snapshot, onRefresh = viewModel::refresh)
-        }
-        if (storageDecodeIssues.isNotEmpty()) {
-            item {
-                StorageDecodeWarningCard(storageDecodeIssues)
-            }
-        }
-        if (oem.needsExtraSteps) {
-            item {
-                OemRiskNotice(oem)
-            }
         }
         item {
             Text(
@@ -269,8 +247,8 @@ private fun ContextInspectorSummaryCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
-        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(18.dp),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {

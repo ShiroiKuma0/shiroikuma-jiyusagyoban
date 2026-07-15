@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
@@ -44,7 +43,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -59,9 +57,7 @@ import com.opentasker.core.engine.ActionTraceStatus
 import com.opentasker.core.engine.RunLogActionDiagnostic
 import com.opentasker.core.engine.RunLogOutcome
 import com.opentasker.core.engine.RunLogSource
-import com.opentasker.core.engine.ActiveExecution
 import com.opentasker.core.engine.RunLogTemplateDiagnostic
-import com.opentasker.core.engine.RunLogVariableChange
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.selectedContainerColor
 import com.opentasker.core.engine.outcome
@@ -83,8 +79,6 @@ internal fun RunLogScreenContent(
     onRetentionPolicyChange: (RunLogRetentionPolicy) -> Unit,
     onShareDiagnostic: () -> Unit,
     contentPadding: PaddingValues,
-    activeExecutions: List<ActiveExecution> = emptyList(),
-    onCancelExecution: (Long) -> Unit = {},
 ) {
     var statusFilterOrdinal by rememberSaveable { mutableIntStateOf(0) }
     val statusFilter = RunLogStatusFilter.entries.getOrElse(statusFilterOrdinal) { RunLogStatusFilter.All }
@@ -94,6 +88,9 @@ internal fun RunLogScreenContent(
     val filteredLogs = remember(logs, statusFilter, taskIdFilter, query) {
         filterRunLogs(logs, RunLogFilterState(status = statusFilter, taskId = taskIdFilter, query = query))
     }
+    // The latest failure (logs are timestamp-DESC) gets a banner atop the Log tab — this is where
+    // run failures surface now that the Profiles workspace card is gone.
+    val latestFailure = logs.firstOrNull { !it.success }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -101,11 +98,12 @@ internal fun RunLogScreenContent(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
     ) {
-        if (activeExecutions.isNotEmpty()) {
+        if (latestFailure != null) {
             item {
-                ActiveExecutionsCard(
-                    executions = activeExecutions,
-                    onCancel = onCancelExecution,
+                InlineNotice(
+                    title = "Last failure: ${latestFailure.taskName}",
+                    body = latestFailure.message.ifBlank { "Tap the matching entry below for the full trace." },
+                    color = MaterialTheme.colorScheme.error,
                 )
             }
         }
@@ -438,7 +436,6 @@ private fun RunLogCard(entry: RunLogEntry) {
         RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.primary
         RunLogOutcome.Failed -> MaterialTheme.colorScheme.error
         RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondary
-        RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiary
     }
     val sourceText = entry.source?.let { key ->
         val name = RunLogSource.displayName(key)
@@ -451,7 +448,6 @@ private fun RunLogCard(entry: RunLogEntry) {
                 RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
                 RunLogOutcome.Failed -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.32f)
                 RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.36f)
-                RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.36f)
             }
         ),
         border = BorderStroke(
@@ -460,7 +456,6 @@ private fun RunLogCard(entry: RunLogEntry) {
                 RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)
                 RunLogOutcome.Failed -> MaterialTheme.colorScheme.error.copy(alpha = 0.30f)
                 RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.34f)
-                RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.34f)
             },
         ),
         shape = RoundedCornerShape(16.dp),
@@ -478,13 +473,11 @@ private fun RunLogCard(entry: RunLogEntry) {
                         RunLogOutcome.Succeeded -> Icons.Filled.CheckCircle
                         RunLogOutcome.Failed -> Icons.Filled.Error
                         RunLogOutcome.Skipped -> Icons.Filled.Info
-                        RunLogOutcome.Cancelled -> Icons.Filled.Cancel
                     },
                     contentDescription = when (outcome) {
                         RunLogOutcome.Succeeded -> stringResource(R.string.status_succeeded)
                         RunLogOutcome.Failed -> stringResource(R.string.status_failed)
                         RunLogOutcome.Skipped -> stringResource(R.string.status_skipped)
-                        RunLogOutcome.Cancelled -> stringResource(R.string.status_cancelled)
                     },
                     tint = accent,
                     modifier = Modifier
@@ -602,13 +595,6 @@ private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
                     traceLabel = trace.label,
                 )
             }
-            if (trace.variableChanges.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
-                VariableChangeInspector(
-                    changes = trace.variableChanges,
-                    traceLabel = trace.label,
-                )
-            }
         }
     }
 }
@@ -720,177 +706,6 @@ private fun ExpressionDebugger(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
-        }
-    }
-}
-
-/**
- * What this step actually wrote. Traces show the values that went *into* an action; without this,
- * a finished run never answers "what did the task set?".
- *
- * Values arrive already redacted from the engine when the variable is secret-derived, so nothing
- * here can reveal a secret it was not already allowed to show.
- */
-@Composable
-private fun VariableChangeInspector(
-    changes: List<RunLogVariableChange>,
-    traceLabel: String,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val visible = if (expanded) changes else changes.take(3)
-    val stateLabel = if (expanded) stringResource(R.string.a11y_expanded) else stringResource(R.string.a11y_collapsed)
-    val actionLabel = if (expanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand)
-    val inspectorDescription = stringResource(R.string.a11y_variable_changes, traceLabel)
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.10f),
-        shape = RoundedCornerShape(DesignSystem.Radii.md),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.16f)),
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = DesignSystem.ComponentSize.touchTargetMin)
-                    .semantics {
-                        contentDescription = inspectorDescription
-                        stateDescription = stateLabel
-                    }
-                    .clickable(role = Role.Button, onClickLabel = actionLabel) { expanded = !expanded },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    pluralStringResource(R.plurals.run_log_variable_changes, changes.size, changes.size),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    actionLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-            visible.forEach { change ->
-                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            change.name,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.tertiary,
-                            maxLines = 1,
-                        )
-                        Text(
-                            change.scope,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                        )
-                        Text(
-                            if (change.added) {
-                                stringResource(R.string.run_log_variable_added)
-                            } else {
-                                stringResource(R.string.run_log_variable_updated)
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                        )
-                    }
-                    Text(
-                        change.value,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = if (expanded) 4 else 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            if (!expanded && changes.size > 3) {
-                Text(
-                    stringResource(R.string.run_log_variable_more, changes.size - 3),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-/**
- * What the engine is running right now, and the only way to stop it. Completed runs were the only
- * thing the UI ever showed, so a runaway automation — a long wait, a hung request, an accidental
- * loop — was invisible and unstoppable short of force-stopping the app.
- */
-@Composable
-private fun ActiveExecutionsCard(
-    executions: List<ActiveExecution>,
-    onCancel: (Long) -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f),
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.30f)),
-        shape = RoundedCornerShape(16.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(
-                pluralStringResource(R.plurals.run_log_active_executions, executions.size, executions.size),
-                style = MaterialTheme.typography.titleSmall,
-            )
-            executions.forEach { execution ->
-                val elapsedSeconds = ((System.currentTimeMillis() - execution.startedAtMs) / 1000).coerceAtLeast(0)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            execution.taskName,
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            stringResource(
-                                R.string.run_log_active_execution_detail,
-                                execution.source,
-                                execution.stepIndex + 1,
-                                execution.stepLabel ?: stringResource(R.string.run_log_active_execution_starting),
-                                elapsedSeconds,
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    TextButton(
-                        onClick = { onCancel(execution.id) },
-                        enabled = !execution.cancelling,
-                        modifier = Modifier.heightIn(min = DesignSystem.ComponentSize.touchTargetMin),
-                    ) {
-                        Text(
-                            if (execution.cancelling) {
-                                stringResource(R.string.run_log_active_execution_cancelling)
-                            } else {
-                                stringResource(R.string.action_cancel)
-                            },
-                        )
-                    }
-                }
             }
         }
     }
