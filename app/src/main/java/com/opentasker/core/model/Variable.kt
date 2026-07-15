@@ -6,8 +6,8 @@ import kotlinx.serialization.Transient
 /**
  * Variables are %name slots, expanded at action runtime.
  *
- * Globals are uppercase (%MYVAR) and persist; locals are lowercase (%myvar) and live
- * only for the duration of a task invocation. This matches Tasker's convention.
+ * Globals contain at least one uppercase letter (%MyVar or %MYVAR) and persist; all-lowercase
+ * names (%myvar) are local to a task invocation. This matches Tasker's convention.
  */
 @Serializable
 data class Variable(

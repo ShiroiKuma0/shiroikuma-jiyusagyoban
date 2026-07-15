@@ -7,9 +7,9 @@ import org.junit.Test
 
 class VariableStoreTest {
     @Test
-    fun localScopeShadowsGlobalUntilPopped() {
+    fun localScopeShadowsRootLocalUntilPopped() {
         val store = VariableStore()
-        store.set("value", "global")
+        store.set("value", "root")
         store.pushScope()
         store.set("value", "local")
 
@@ -17,7 +17,27 @@ class VariableStoreTest {
 
         store.popScope()
 
-        assertEquals("global", store.expand("%value"))
+        assertEquals("root", store.expand("%value"))
+    }
+
+    @Test
+    fun allLowercaseRootValuesNeverLeakIntoGlobalSnapshot() {
+        val store = VariableStore()
+        store.set("event", "value")
+
+        assertEquals("value", store.get("event"))
+        assertFalse(store.globalSnapshot().containsKey("event"))
+    }
+
+    @Test
+    fun mixedCaseNameIsGlobalAndSurvivesLocalScope() {
+        val store = VariableStore()
+        store.pushScope()
+        store.set("myVar", "global")
+        store.popScope()
+
+        assertEquals("global", store.get("myVar"))
+        assertEquals("global", store.globalSnapshot()["myVar"])
     }
 
     @Test

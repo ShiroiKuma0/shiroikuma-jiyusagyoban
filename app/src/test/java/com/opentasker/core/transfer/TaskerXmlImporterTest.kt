@@ -9,6 +9,23 @@ import org.junit.Test
 
 class TaskerXmlImporterTest {
     @Test
+    fun mixedCaseTaskerVariableIsGlobalButAllLowercaseVariableIsLocal() {
+        val report = TaskerXmlImporter.parse(
+            rawXml = """
+                <TaskerData>
+                    <Variable><nme>%myValue</nme><val>global</val></Variable>
+                    <Variable><nme>%local</nme><val>local</val></Variable>
+                </TaskerData>
+            """.trimIndent(),
+            appVersion = "test",
+            importedAtEpochMs = 123L,
+        )
+
+        assertTrue(report.bundle.variables.single { it.name == "%myValue" }.isGlobal)
+        assertFalse(report.bundle.variables.single { it.name == "%local" }.isGlobal)
+    }
+
+    @Test
     fun parsesTasksProfilesVariablesAndMigrationReport() {
         val report = TaskerXmlImporter.parse(
             rawXml = """

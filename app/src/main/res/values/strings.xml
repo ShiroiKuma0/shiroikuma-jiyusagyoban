@@ -300,7 +300,7 @@
     <string name="variables_create">Create variable</string>
     <string name="variables_created">Variable created</string>
     <string name="variables_name_label">Global variable name</string>
-    <string name="variables_name_helper">Use 1–64 uppercase letters, numbers, or underscores; start with a letter.</string>
+    <string name="variables_name_helper">Use 1–64 letters, numbers, underscores, or hyphens; lowercase names are promoted to globals.</string>
     <string name="variables_name_duplicate">A variable with this name already exists.</string>
     <string name="variables_default_name">VARIABLE</string>
     <string name="variables_secret_label">Store as secret</string>

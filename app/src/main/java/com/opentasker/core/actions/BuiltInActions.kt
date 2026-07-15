@@ -17,6 +17,7 @@ import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.engine.isArgumentSensitive
+import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.platform.AndroidAudioHardening
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -208,7 +209,7 @@ class SetVariableAction : Action {
 /**
  * Persist a variable to global scope.
  *
- * Copies the current value of a variable into the global (uppercase) namespace
+ * Copies the current value of a variable into the global namespace
  * so it survives across task invocations within the same service lifetime.
  *
  * Args:
@@ -220,8 +221,12 @@ class PersistVariableAction : Action {
     override val category = ActionCategory.VARIABLE
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val name = args["name"] ?: return ActionResult.Failure("missing name")
-        val globalName = args["global_name"] ?: name.replaceFirstChar { it.uppercase() }
+        val rawName = args["name"] ?: return ActionResult.Failure("missing name")
+        val name = VariableNamePolicy.normalize(rawName)
+            ?: return ActionResult.Failure("invalid variable name '$rawName'")
+        val rawGlobalName = args["global_name"] ?: name
+        val globalName = VariableNamePolicy.promoteToGlobal(rawGlobalName)
+            ?: return ActionResult.Failure("invalid global variable name '$rawGlobalName'")
         val value = ctx.variables.get(name)
             ?: return ActionResult.Failure("variable '$name' is not set")
         val sensitive = ctx.variables.isSensitive(name)

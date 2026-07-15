@@ -6,6 +6,7 @@ import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
+import com.opentasker.core.model.VariableNamePolicy
 import org.w3c.dom.Document
 import org.w3c.dom.Element
 import org.w3c.dom.Node
@@ -153,7 +154,7 @@ object TaskerXmlImporter {
             Variable(
                 name = name,
                 value = element.childText("val", "value"),
-                isGlobal = name.dropWhile { it == '%' }.firstOrNull()?.isUpperCase() == true,
+                isGlobal = VariableNamePolicy.isGlobal(name),
             )
         }
 

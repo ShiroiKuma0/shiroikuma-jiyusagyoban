@@ -736,6 +736,38 @@ class ActionGuardsTest {
         assertEquals("hello", variables.get("GREETING"))
     }
 
+    @Test
+    fun persistVariablePromotesExplicitLowercaseTargetAndRoundTrips() = runBlocking {
+        val variables = VariableStore()
+        variables.pushScope()
+        variables.set("temp", "hello")
+
+        val result = PersistVariableAction().run(
+            ActionContext(ContextWrapper(null), variables),
+            mapOf("name" to "%temp", "global_name" to "%greeting"),
+        )
+        variables.popScope()
+
+        assertTrue("persist should succeed", result is ActionResult.Success)
+        assertEquals("hello", variables.globalSnapshot()["Greeting"])
+        assertEquals("hello", variables.get("%Greeting"))
+    }
+
+    @Test
+    fun persistVariableRejectsInvalidTargetInsteadOfSilentlyWritingLocal() = runBlocking {
+        val variables = VariableStore()
+        variables.pushScope()
+        variables.set("temp", "hello")
+
+        val result = PersistVariableAction().run(
+            ActionContext(ContextWrapper(null), variables),
+            mapOf("name" to "temp", "global_name" to "bad name"),
+        )
+
+        assertTrue(result is ActionResult.Failure)
+        assertTrue((result as ActionResult.Failure).message.contains("invalid global variable name"))
+    }
+
     // --- Notification channel resolution ---
 
     @Test

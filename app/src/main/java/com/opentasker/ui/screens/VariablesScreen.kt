@@ -49,10 +49,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.model.Variable
+import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.storage.AesGcmVariableSecretCodec
 import com.opentasker.ui.theme.DesignSystem
-
-private val VARIABLE_NAME_PATTERN = Regex("^[A-Z][A-Z0-9_]{0,63}$")
 
 @Composable
 fun VariablesScreen(
@@ -367,11 +366,11 @@ private fun VariableEditorDialog(
     var value by remember(stateKey) { mutableStateOf(variable?.value.orEmpty()) }
     var isSecret by rememberSaveable(stateKey) { mutableStateOf(variable?.isSecret == true) }
     var revealed by remember(stateKey) { mutableStateOf(false) }
-    val normalizedName = name.trim().uppercase()
-    val duplicateName = variable == null && normalizedName in existingNames
+    val normalizedName = VariableNamePolicy.promoteToGlobal(name)
+    val duplicateName = variable == null && normalizedName != null && normalizedName in existingNames
     val valueBytes = value.toByteArray(Charsets.UTF_8).size
     val needsReentry = variable?.isSecret == true && !variable.secretAvailable
-    val canSave = VARIABLE_NAME_PATTERN.matches(normalizedName) &&
+    val canSave = normalizedName != null &&
         !duplicateName &&
         valueBytes <= AesGcmVariableSecretCodec.MAX_SECRET_PLAINTEXT_BYTES &&
         (!needsReentry || value.isNotEmpty())
@@ -388,9 +387,13 @@ private fun VariableEditorDialog(
                 if (variable == null) {
                     OutlinedTextField(
                         value = name,
-                        onValueChange = { name = it.uppercase().filter { char -> char.isLetterOrDigit() || char == '_' }.take(64) },
+                        onValueChange = {
+                            name = it
+                                .filter { char -> char.isLetterOrDigit() || char == '_' || char == '-' }
+                                .take(VariableNamePolicy.MAX_LENGTH)
+                        },
                         label = { Text(stringResource(R.string.variables_name_label)) },
-                        isError = name.isNotEmpty() && (!VARIABLE_NAME_PATTERN.matches(normalizedName) || duplicateName),
+                        isError = name.isNotEmpty() && (normalizedName == null || duplicateName),
                         supportingText = if (duplicateName) {
                             { Text(stringResource(R.string.variables_name_duplicate)) }
                         } else {
@@ -414,7 +417,7 @@ private fun VariableEditorDialog(
                         Text(
                             stringResource(
                                 R.string.variables_value_label,
-                                variable?.name ?: normalizedName.ifBlank { stringResource(R.string.variables_default_name) },
+                                variable?.name ?: normalizedName.orEmpty().ifBlank { stringResource(R.string.variables_default_name) },
                             ),
                         )
                     },
@@ -462,7 +465,7 @@ private fun VariableEditorDialog(
         confirmButton = {
             TextButton(
                 enabled = canSave,
-                onClick = { onSave(normalizedName, value, isSecret) },
+                onClick = { onSave(requireNotNull(normalizedName), value, isSecret) },
             ) {
                 Text(stringResource(R.string.action_save))
             }

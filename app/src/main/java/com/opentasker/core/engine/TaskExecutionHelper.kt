@@ -119,8 +119,8 @@ fun changedGlobals(
 
 /**
  * Commits globals changed during the run to [com.opentasker.core.storage.VariableDao] before the
- * task's success is reported, so `%UPPERCASE` globals and explicit `var.persist` values survive
- * across separate runs and process restarts. Local (lowercase) variables never reach this path.
+ * task's success is reported, so names containing uppercase letters and explicit `var.persist`
+ * values survive across separate runs and process restarts. All-lowercase locals never reach this path.
  */
 private suspend fun persistChangedGlobals(
     variableRepository: VariableRepository,

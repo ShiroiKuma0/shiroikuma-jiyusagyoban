@@ -48,6 +48,21 @@ class VariableSecretStorageTest {
     }
 
     @Test
+    fun globalWritesUseCanonicalScopePolicy() = runBlocking {
+        val dao = FakeVariableDao()
+        val repository = VariableRepository(dao, codec(newKey()))
+
+        repository.upsert(Variable("%counter", "7", isGlobal = true))
+        repository.importVariable(Variable("myValue", "8", isGlobal = true))
+
+        assertEquals("7", dao.get("Counter")?.value)
+        assertEquals("8", dao.get("myValue")?.value)
+        assertTrue(runCatching {
+            repository.upsert(Variable("localName", "invalid", isGlobal = false))
+        }.isFailure)
+    }
+
+    @Test
     fun missingOrReplacedKeystoreKeyRequiresReentryWithoutReturningCiphertext() = runBlocking {
         val dao = FakeVariableDao()
         VariableRepository(dao, codec(newKey())).upsert(

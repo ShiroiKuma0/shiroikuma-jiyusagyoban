@@ -4,6 +4,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.Variable
+import com.opentasker.core.model.VariableNamePolicy
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
 import java.security.SecureRandom
@@ -176,7 +177,7 @@ class VariableRepository(
     }
 
     suspend fun upsert(variable: Variable) {
-        dao.insert(variable.toStoredEntity(secretCodec))
+        dao.insert(variable.normalizedForStorage().toStoredEntity(secretCodec))
     }
 
     suspend fun delete(name: String) {
@@ -184,8 +185,9 @@ class VariableRepository(
     }
 
     suspend fun importVariable(variable: Variable) {
-        val entity = variable.toStoredEntity(secretCodec)
-        if (dao.get(variable.name) == null) dao.insert(entity) else dao.update(entity)
+        val normalized = variable.normalizedForStorage()
+        val entity = normalized.toStoredEntity(secretCodec)
+        if (dao.get(normalized.name) == null) dao.insert(entity) else dao.update(entity)
     }
 
     suspend fun ordinaryExport(): OrdinaryVariableExport {
@@ -285,6 +287,18 @@ class VariableRepository(
 }
 
 internal fun VariableEntity.isEffectivelySecret(): Boolean = isSecret
+
+internal fun Variable.normalizedForStorage(): Variable {
+    val normalizedName = VariableNamePolicy.normalizeForScope(name, isGlobal)
+        ?: throw IllegalArgumentException(
+            if (isGlobal) {
+                "Invalid global variable name '$name'"
+            } else {
+                "Invalid local variable name '$name': local names must be all lowercase"
+            },
+        )
+    return if (normalizedName == name) this else copy(name = normalizedName)
+}
 
 internal fun Variable.toStoredEntity(codec: VariableSecretCodec): VariableEntity = VariableEntity(
     name = name,

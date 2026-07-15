@@ -3,6 +3,7 @@ package com.opentasker.core.engine
 import com.opentasker.core.engine.variables.ArrayStore
 import com.opentasker.core.engine.variables.VariableExpander
 import com.opentasker.core.expressions.TemplateScope
+import com.opentasker.core.model.VariableNamePolicy
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -23,8 +24,8 @@ data class TrackedExpansion(
  * Thread-safe for concurrent read/write access.
  *
  * Naming convention (matches Tasker):
- *   - %UPPERCASE   → global, persistent
- *   - %lowercase   → local to current task invocation
+ *   - a name containing any uppercase letter → global, persistent
+ *   - an all-lowercase name → local to the current task invocation
  *
  * Enhanced with operator support:
  *   - Math: %VAR(+5), %VAR(*2), %VAR(//), %VAR(/round)
@@ -35,9 +36,11 @@ data class TrackedExpansion(
  */
 class VariableStore {
     private val globals = ConcurrentHashMap<String, String>()
+    private val rootLocals = ConcurrentHashMap<String, String>()
     private val localStack = java.util.Collections.synchronizedList(mutableListOf<MutableMap<String, String>>())
     private val globalSensitiveNames = ConcurrentHashMap.newKeySet<String>()
     private val declaredSecretGlobals = ConcurrentHashMap.newKeySet<String>()
+    private val rootLocalSensitiveNames = ConcurrentHashMap.newKeySet<String>()
     private val localSensitiveStack = java.util.Collections.synchronizedList(mutableListOf<MutableSet<String>>())
     private val sensitiveArrayNames = ConcurrentHashMap.newKeySet<String>()
     private val sensitiveWriteDepth = AtomicInteger(0)
@@ -58,50 +61,60 @@ class VariableStore {
     }
 
     fun set(name: String, value: String, sensitive: Boolean = false) {
-        val shouldRemainSensitive = sensitive || sensitiveWriteDepth.get() > 0 || isSensitive(name)
-        if (isGlobalName(name)) {
-            globals[name] = value
-            updateSensitivity(globalSensitiveNames, name, shouldRemainSensitive || name in declaredSecretGlobals)
+        val normalizedName = VariableNamePolicy.normalize(name) ?: return
+        val shouldRemainSensitive = sensitive || sensitiveWriteDepth.get() > 0 || isSensitive(normalizedName)
+        if (VariableNamePolicy.isGlobal(normalizedName)) {
+            globals[normalizedName] = value
+            updateSensitivity(
+                globalSensitiveNames,
+                normalizedName,
+                shouldRemainSensitive || normalizedName in declaredSecretGlobals,
+            )
         } else {
             synchronized(localStack) {
                 val target = localStack.lastOrNull()
                 if (target == null) {
-                    globals[name] = value
-                    updateSensitivity(globalSensitiveNames, name, shouldRemainSensitive)
+                    rootLocals[normalizedName] = value
+                    updateSensitivity(rootLocalSensitiveNames, normalizedName, shouldRemainSensitive)
                 } else {
-                    target[name] = value
-                    updateSensitivity(localSensitiveStack.last(), name, shouldRemainSensitive)
+                    target[normalizedName] = value
+                    updateSensitivity(localSensitiveStack.last(), normalizedName, shouldRemainSensitive)
                 }
             }
         }
     }
 
     fun get(name: String): String? {
+        val normalizedName = VariableNamePolicy.normalize(name) ?: return null
         synchronized(localStack) {
             for (i in localStack.indices.reversed()) {
-                localStack[i][name]?.let { return it }
+                localStack[i][normalizedName]?.let { return it }
             }
         }
-        return globals[name]
+        return rootLocals[normalizedName] ?: globals[normalizedName]
     }
 
     fun isSensitive(name: String): Boolean {
+        val normalizedName = VariableNamePolicy.normalize(name) ?: return false
         synchronized(localStack) {
             for (index in localStack.indices.reversed()) {
-                if (name in localStack[index]) return name in localSensitiveStack[index]
+                if (normalizedName in localStack[index]) return normalizedName in localSensitiveStack[index]
             }
         }
-        return name in globalSensitiveNames
+        if (rootLocals.containsKey(normalizedName)) return normalizedName in rootLocalSensitiveNames
+        return normalizedName in globalSensitiveNames
     }
 
     /**
      * Seed the global scope with previously persisted values before a run starts. Only affects the
-     * global (uppercase) namespace; local task scopes are untouched.
+     * global namespace; local task scopes are untouched.
      */
     fun seedGlobals(values: Map<String, String>, secretNames: Set<String> = emptySet()) {
-        globals.putAll(values)
-        declaredSecretGlobals += secretNames
-        globalSensitiveNames += secretNames
+        values.forEach { (rawName, value) ->
+            VariableNamePolicy.promoteToGlobal(rawName)?.let { name -> globals[name] = value }
+        }
+        secretNames.mapNotNullTo(declaredSecretGlobals, VariableNamePolicy::promoteToGlobal)
+        globalSensitiveNames += declaredSecretGlobals
     }
 
     /** Snapshot of the current global scope, used to persist durable globals after a run. */
@@ -162,7 +175,7 @@ class VariableStore {
     }
 
     fun toTemplateScope(event: Map<String, String> = emptyMap()): TemplateScope {
-        val taskValues = mutableMapOf<String, String>()
+        val taskValues = rootLocals.toMutableMap()
         synchronized(localStack) {
             localStack.forEach { scope -> taskValues += scope }
         }
@@ -173,7 +186,7 @@ class VariableStore {
             arrays = arrayStore.snapshot(),
             sensitiveGlobal = globalSensitiveNames.toSet(),
             sensitiveTask = synchronized(localStack) {
-                localSensitiveStack.flatMapTo(linkedSetOf()) { it }
+                localSensitiveStack.flatMapTo(rootLocalSensitiveNames.toMutableSet()) { it }
             },
             sensitiveArrays = sensitiveArrayNames.toSet(),
         )
@@ -300,9 +313,6 @@ class VariableStore {
 
     private fun isPathBaseChar(char: Char): Boolean =
         char.isLetterOrDigit() || char == '_' || char == '-'
-
-    private fun isGlobalName(name: String): Boolean =
-        name.isNotEmpty() && name[0].isUpperCase()
 
     private fun updateSensitivity(target: MutableSet<String>, name: String, sensitive: Boolean) {
         if (sensitive) target += name else target -= name

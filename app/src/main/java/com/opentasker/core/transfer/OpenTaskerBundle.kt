@@ -10,6 +10,7 @@ import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
+import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.VariableRepository
 import com.opentasker.core.storage.toEntity
@@ -374,7 +375,9 @@ class OpenTaskerBundleRepository(
             }
 
             bundle.variables.sortedWith(compareBy<Variable> { it.name.lowercase() }.thenBy { it.name }).forEach { variable ->
-                val existing = db.variableDao().get(variable.name)
+                val storageName = VariableNamePolicy.normalizeForScope(variable.name, variable.isGlobal)
+                    ?: throw IllegalArgumentException("Invalid variable name '${variable.name}'")
+                val existing = db.variableDao().get(storageName)
                 variableRepository.importVariable(variable)
                 if (existing == null) insertedVariables++
             }

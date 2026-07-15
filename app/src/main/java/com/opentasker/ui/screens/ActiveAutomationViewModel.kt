@@ -17,6 +17,7 @@ import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
+import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.plugins.locale.LocaleGrantStore
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseBackupManager
@@ -610,7 +611,10 @@ class ActiveAutomationViewModel(
     fun updateVariable(name: String, value: String, isSecret: Boolean, successMessage: String) {
         viewModelScope.launch {
             runCatching {
-                variableRepository.upsert(Variable(name, value, isGlobal = true, isSecret = isSecret))
+                val globalName = requireNotNull(VariableNamePolicy.promoteToGlobal(name)) {
+                    "Invalid variable name"
+                }
+                variableRepository.upsert(Variable(globalName, value, isGlobal = true, isSecret = isSecret))
                 events.send(successMessage)
             }.onFailure { error ->
                 events.send("Error: ${error.message ?: "Variable could not be saved"}")
