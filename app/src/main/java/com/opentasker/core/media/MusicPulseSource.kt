@@ -36,6 +36,10 @@ object MusicPulseSource {
     @Volatile private var levelV = 0f
     @Volatile private var beatAt = 0L        // elapsedRealtime of the last bass onset
     @Volatile private var beatPeak = 0f      // strength of that onset, 0..1
+    // elapsedRealtime of the last capture frame with REAL signal (raw RMS above the noise floor).
+    // Android Auto / A2DP-offload playback bypasses the output mix, so the Visualizer runs but
+    // captures pure silence — this lets consumers detect that and fall back (Bridge.silentMs()).
+    @Volatile private var signalAt = 0L
 
     // Bass running average for onset detection (listener thread only).
     private var bassAvg = 0.0
@@ -115,6 +119,7 @@ object MusicPulseSource {
                             sum += (c * c).toDouble()
                         }
                         val raw = (sqrt(sum / wave.size) / 64.0).coerceIn(0.0, 1.0).toFloat()
+                        if (raw > 0.015f) signalAt = SystemClock.elapsedRealtime()
                         val cur = levelV
                         // Fast attack so hits register, slow release so the level breathes down.
                         levelV = if (raw > cur) cur + (raw - cur) * 0.5f else cur + (raw - cur) * 0.12f
@@ -146,6 +151,9 @@ object MusicPulseSource {
             )
             v.enabled = true
             viz = v
+            // Grace period: count "silent since" from the start, so silentMs() ramps from 0 and the
+            // fallback only engages if real signal genuinely never arrives.
+            signalAt = SystemClock.elapsedRealtime()
             Log.i(TAG, "music pulse: visualizer started (rate=${Visualizer.getMaxCaptureRate()} mHz)")
         }.onFailure { Log.w(TAG, "music pulse: start failed: ${it.message}") }
     }
@@ -161,6 +169,7 @@ object MusicPulseSource {
             viz = null
             levelV = 0f
             beatPeak = 0f
+            signalAt = 0L
             bassInit = false
             bassAvg = 0.0
             onsets.clear()
@@ -192,6 +201,18 @@ object MusicPulseSource {
             var ph = ((SystemClock.elapsedRealtime() - anchorMs).toDouble() % p) / p
             if (ph < 0) ph += 1.0
             return ph.toFloat()
+        }
+
+        /**
+         * ms since the capture last carried real signal (Long.MAX_VALUE if never / not running).
+         * Stays huge during Android Auto / A2DP-offload playback, where the output mix is silent
+         * even though music plays — consumers use this to switch to a non-reactive fallback.
+         */
+        @JavascriptInterface
+        fun silentMs(): Long {
+            val at = signalAt
+            if (at == 0L) return Long.MAX_VALUE
+            return SystemClock.elapsedRealtime() - at
         }
 
         /** Tempo confidence 0..1, fading out when onsets stop coming (track pause/quiet outro). */
