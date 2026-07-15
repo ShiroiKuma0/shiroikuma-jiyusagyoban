@@ -14,7 +14,7 @@
         android:layout_height="30dp"
         android:src="@android:drawable/ic_media_play"
         android:tint="@color/widget_primary"
-        android:contentDescription="Run selected task"
+        android:contentDescription="@string/widget_run_selected_task"
         android:layout_marginEnd="12dp" />
 
     <LinearLayout
@@ -27,7 +27,7 @@
             android:id="@+id/widget_task_name"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="OpenTasker"
+            android:text="@string/app_name"
             android:textColor="@color/widget_text_primary"
             android:textSize="15sp"
             android:textStyle="bold"
@@ -37,7 +37,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Tap to run"
+            android:text="@string/widget_tap_to_run"
             android:textColor="@color/widget_text_secondary"
             android:textSize="12sp"
             android:maxLines="1"

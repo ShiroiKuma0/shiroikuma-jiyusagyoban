@@ -1,5 +1,7 @@
 package com.opentasker.ui
 
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
@@ -8,26 +10,23 @@ import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.io.path.readText
 
 class LocalizationSourceTest {
-    private val uiSourceRoot: Path = listOf(
-        Path.of("src/main/java/com/opentasker/ui"),
-        Path.of("app/src/main/java/com/opentasker/ui"),
-    ).first(Files::exists)
-
-    private val resRoot: Path = listOf(
-        Path.of("src/main/res"),
-        Path.of("app/src/main/res"),
-    ).first(Files::exists)
+    private val moduleRoot: Path = listOf(Path.of("."), Path.of("app"))
+        .first { Files.isDirectory(it.resolve("src/main")) }
+    private val sourceRoot: Path = moduleRoot.resolve("src/main/java")
+    private val resRoot: Path = moduleRoot.resolve("src/main/res")
 
     @Test
-    fun coreUiScreensUseStringResourcesForVisibleCopy() {
+    fun presentationSurfacesUseStringResourcesForVisibleCopy() {
         val localizedFiles = listOf(
-            "components/PremiumComponents.kt",
-            "screens/ActiveAutomationLists.kt",
-            "screens/ActionEditorDialogs.kt",
-            "screens/AutomationFlowScreen.kt",
-            "screens/ContextEditorDialogs.kt",
-            "screens/EditorDialogs.kt",
-            "screens/SceneLibraryScreen.kt",
+            "com/opentasker/ui/components/PremiumComponents.kt",
+            "com/opentasker/ui/screens/ActiveAutomationLists.kt",
+            "com/opentasker/ui/screens/ActionEditorDialogs.kt",
+            "com/opentasker/ui/screens/AutomationFlowScreen.kt",
+            "com/opentasker/ui/screens/ContextEditorDialogs.kt",
+            "com/opentasker/ui/screens/EditorDialogs.kt",
+            "com/opentasker/ui/screens/PermissionOnboardingScreen.kt",
+            "com/opentasker/ui/screens/SceneLibraryScreen.kt",
+            "com/opentasker/widget/TaskWidgetConfigActivity.kt",
         )
         val forbiddenPatterns = mapOf(
             "Text literal" to Regex("""\bText\s*\(\s*""" + "\""),
@@ -38,7 +37,7 @@ class LocalizationSourceTest {
         )
 
         val offenders = localizedFiles.flatMap { relativePath ->
-            val source = uiSourceRoot.resolve(relativePath).readText()
+            val source = sourceRoot.resolve(relativePath).readText()
             forbiddenPatterns.mapNotNull { (name, pattern) ->
                 if (pattern.containsMatchIn(source)) "$relativePath: $name" else null
             }
@@ -51,9 +50,82 @@ class LocalizationSourceTest {
     }
 
     @Test
+    fun dynamicActionAndContextCatalogsUseCompleteResourceIds() {
+        val metadata = sourceRoot.resolve("com/opentasker/core/actions/ActionMetadata.kt").readText()
+        val contextEditor = sourceRoot.resolve("com/opentasker/ui/screens/ContextEditorDialogs.kt").readText()
+        val catalogReferences = Regex("""R\.string\.(catalog_[a-z0-9_]+)""")
+            .findAll(metadata)
+            .map { it.groupValues[1] }
+            .toSet()
+        val resourceNames = defaultStringResourceNames()
+        val catalogResources = resourceNames.filter { it.startsWith("catalog_") }.toSet()
+
+        assertTrue("Action catalog should expose resource-backed action names", "nameRes = R.string.catalog_" in metadata)
+        assertTrue("Action catalog should expose resource-backed descriptions", "descriptionRes = R.string.catalog_" in metadata)
+        assertTrue("Action catalog should expose resource-backed categories", "categoryRes = R.string.catalog_" in metadata)
+        assertFalse("Action metadata must not retain presentation string keys", Regex("""(?:nameRes|descriptionRes|categoryRes|hintRes)\s*=\s*\"""").containsMatchIn(metadata))
+        assertEquals("Catalog resources and compile-time references must stay in lockstep", catalogResources, catalogReferences)
+        assertEquals("Expected every built-in action name to be resource backed", 66, Regex("""nameRes = R\.string\.catalog_action_""").findAll(metadata).count())
+        assertEquals("Expected every action field to be resource backed", 124, Regex("""ActionField\(\s*\"""").findAll(metadata).count())
+        assertFalse("Context field labels must use resource IDs", Regex("""ActionField\(\s*\"[^\"]+\"\s*,\s*\"""").containsMatchIn(contextEditor))
+        assertTrue("Context type names must be resource backed", "contextTitleRes" in contextEditor)
+        assertTrue("Context descriptions must be resource backed", "contextDescriptionRes" in contextEditor)
+    }
+
+    @Test
+    fun widgetsOverlaysAndCapabilityDiagnosticsAreResourceBacked() {
+        val widget = sourceRoot.resolve("com/opentasker/widget/TaskWidgetConfigActivity.kt").readText()
+        val provider = sourceRoot.resolve("com/opentasker/widget/TaskWidgetProvider.kt").readText()
+        val overlay = sourceRoot.resolve("com/opentasker/core/scenes/SceneOverlayService.kt").readText()
+        val actionEditor = sourceRoot.resolve("com/opentasker/ui/screens/ActionEditorDialogs.kt").readText()
+        val widgetLayout = resRoot.resolve("layout/widget_task.xml").readText()
+
+        assertTrue("Widget quantities must use Android plurals", "pluralStringResource(R.plurals.widget_action_count" in widget)
+        assertTrue("Widget summary quantities must use Android plurals", "pluralStringResource(R.plurals.widget_saved_task_count" in widget)
+        assertTrue("Widget provider fallback must use the app-name resource", "context.getString(R.string.app_name)" in provider)
+        assertFalse("Widget layout contains hardcoded visible copy", Regex("""android:(?:text|contentDescription)=\"(?!@)[^\"]+\"""").containsMatchIn(widgetLayout))
+        assertTrue("Overlay button fallback must be localized", "getString(R.string.scene_overlay_default_button)" in overlay)
+        assertTrue("Overlay notification title must be localized", "getString(R.string.scene_overlay_notification_title)" in overlay)
+        assertTrue("Overlay notification channel must be localized", "getString(R.string.scene_overlay_channel_name)" in overlay)
+        assertFalse("Overlay service contains hardcoded view or notification copy", Regex("""(?:text\s*=|setContentTitle\()\s*\"[A-Za-z\[]""").containsMatchIn(overlay))
+        assertTrue("Action capability diagnostics must resolve through resources", "stringResource(capability.reasonRes)" in actionEditor)
+    }
+
+    @Test
+    fun setupPermissionAndBackupCopyUsesResources() {
+        val setup = sourceRoot.resolve("com/opentasker/ui/screens/PermissionOnboardingScreen.kt").readText()
+        val forbiddenPatterns = mapOf(
+            "permission title" to Regex("""title\s*=\s*\""""),
+            "permission body" to Regex("""body\s*=\s*\""""),
+            "permission action" to Regex("""actionLabel\s*=\s*\""""),
+            "permission requirement" to Regex("""requiredFor\s*=\s*\""""),
+            "message" to Regex("""onMessage\(\s*\""""),
+            "dynamic paragraph" to Regex("""append\(\s*\"[A-Za-z]"""),
+        )
+        val offenders = forbiddenPatterns.filterValues { it.containsMatchIn(setup) }.keys
+
+        assertTrue("Setup contains hardcoded permission/backup presentation copy: $offenders", offenders.isEmpty())
+        assertTrue("Setup must resolve non-Compose permission cards through resources", "context.getString(R.string.setup_notifications_card_title)" in setup)
+        assertTrue("Setup must localize dynamic Shizuku status", "setup_shizuku_status_transport_unavailable" in setup)
+        assertTrue("Setup must localize dynamic Termux status", "setup_termux_status_plugin_missing" in setup)
+    }
+
+    @Test
+    fun debugBuildGeneratesAndroidPseudoLocales() {
+        val buildFile = moduleRoot.resolve("build.gradle.kts").readText()
+        assertTrue(
+            "Debug builds must enable Android en-XA/ar-XB pseudo locales",
+            Regex("""getByName\(\"debug\"\)\s*\{[^}]*isPseudoLocalesEnabled\s*=\s*true""", RegexOption.DOT_MATCHES_ALL)
+                .containsMatchIn(buildFile),
+        )
+    }
+
+    @Test
     fun localeDirectoriesRemainValidWeblateResourceTargets() {
-        val sourceStrings = resRoot.resolve("values/strings.xml")
-        assertTrue("Default string resource file is missing", Files.isRegularFile(sourceStrings))
+        val defaultValueFiles = Files.list(resRoot.resolve("values")).use { paths ->
+            paths.filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".xml") }.toList()
+        }
+        assertTrue("Default value resources are missing", defaultValueFiles.isNotEmpty())
 
         val localeFiles = Files.list(resRoot).use { paths ->
             paths
@@ -63,14 +135,51 @@ class LocalizationSourceTest {
         }
         assertTrue("Expected locale resource directories for Weblate targets", localeFiles.isNotEmpty())
 
-        val parserFactory = DocumentBuilderFactory.newInstance()
-        val invalidFiles = (localeFiles + listOf(sourceStrings)).mapNotNull { file ->
+        val invalidFiles = (localeFiles + defaultValueFiles).mapNotNull { file ->
             runCatching {
-                val root = parserFactory.newDocumentBuilder().parse(file.toFile()).documentElement.nodeName
+                val root = newDocumentBuilderFactory().newDocumentBuilder().parse(file.toFile()).documentElement.nodeName
                 if (root == "resources") null else "${resRoot.relativize(file)} root=$root"
             }.getOrElse { error -> "${resRoot.relativize(file)} ${error.message}" }
         }
 
-        assertTrue("Invalid Android string resource XML: $invalidFiles", invalidFiles.isEmpty())
+        assertTrue("Invalid Android value resource XML: $invalidFiles", invalidFiles.isEmpty())
+        val defaultStrings = defaultValueFiles.flatMap { stringResourceValues(it).entries }.associate { it.toPair() }
+        val translatedLocales = localeFiles.filter { file ->
+            stringResourceValues(file).any { (name, value) -> defaultStrings[name]?.let { it != value } == true }
+        }
+        assertTrue("At least one real locale must contain translated, non-placeholder strings", translatedLocales.isNotEmpty())
+    }
+
+    private fun defaultStringResourceNames(): Set<String> =
+        Files.list(resRoot.resolve("values")).use { paths ->
+            paths
+                .filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".xml") }
+                .flatMap { file ->
+                    val document = newDocumentBuilderFactory().newDocumentBuilder().parse(file.toFile())
+                    val strings = document.getElementsByTagName("string")
+                    (0 until strings.length).map { index ->
+                        strings.item(index).attributes.getNamedItem("name").nodeValue
+                    }.stream()
+                }
+                .toList()
+                .toSet()
+        }
+
+    private fun newDocumentBuilderFactory(): DocumentBuilderFactory =
+        DocumentBuilderFactory.newInstance().apply {
+            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            setFeature("http://xml.org/sax/features/external-general-entities", false)
+            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            isXIncludeAware = false
+            isExpandEntityReferences = false
+        }
+
+    private fun stringResourceValues(file: Path): Map<String, String> {
+        val document = newDocumentBuilderFactory().newDocumentBuilder().parse(file.toFile())
+        val strings = document.getElementsByTagName("string")
+        return (0 until strings.length).associate { index ->
+            val item = strings.item(index)
+            item.attributes.getNamedItem("name").nodeValue to item.textContent.trim()
+        }
     }
 }

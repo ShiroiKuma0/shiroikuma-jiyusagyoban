@@ -59,17 +59,31 @@ import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
 import com.opentasker.ui.theme.DesignSystem
 
+private data class LocalizedActionMetadata(
+    val metadata: ActionMetadata,
+    val name: String,
+    val description: String,
+    val category: String,
+)
+
 @Composable
 internal fun ActionPickerDialog(
     onDismiss: () -> Unit,
     onSelect: (ActionMetadata) -> Unit,
 ) {
-    val actionGroups = remember {
-        ActionMetadataRegistry.all()
-            .groupBy { it.category }
-            .toSortedMap()
-            .map { (category, actions) -> category to actions.sortedBy { it.name } }
+    val localizedActions = mutableListOf<LocalizedActionMetadata>()
+    for (metadata in ActionMetadataRegistry.all()) {
+        localizedActions += LocalizedActionMetadata(
+            metadata = metadata,
+            name = stringResource(metadata.nameRes),
+            description = stringResource(metadata.descriptionRes),
+            category = stringResource(metadata.categoryRes),
+        )
     }
+    val actionGroups = localizedActions
+        .groupBy { it.category }
+        .toSortedMap()
+        .map { (category, actions) -> category to actions.sortedBy { it.name } }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.dialog_add_action)) },
@@ -87,7 +101,8 @@ internal fun ActionPickerDialog(
                             modifier = Modifier.padding(top = 4.dp),
                         )
                     }
-                    items(actions, key = { it.id }) { metadata ->
+                    items(actions, key = { it.metadata.id }) { localized ->
+                        val metadata = localized.metadata
                         val capability = ActionCapabilityRegistry.get(metadata.id)
                         Card(
                             onClick = { onSelect(metadata) },
@@ -109,7 +124,7 @@ internal fun ActionPickerDialog(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
                                 ) {
-                                    Text(metadata.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                                    Text(localized.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                                     if (capability.level != CapabilityLevel.Supported) {
                                         StatusPill(
                                             if (capability.level == CapabilityLevel.Unsupported) stringResource(R.string.label_unsupported) else stringResource(R.string.label_setup),
@@ -117,9 +132,9 @@ internal fun ActionPickerDialog(
                                         )
                                     }
                                 }
-                                Text(metadata.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(localized.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 if (capability.level != CapabilityLevel.Supported) {
-                                    Text(capability.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                                    Text(stringResource(capability.reasonRes), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                                 }
                             }
                         }
@@ -195,8 +210,10 @@ internal fun ActionConfigDialog(
     onDismiss: () -> Unit,
     onSave: (ActionSpec) -> Unit,
 ) {
-    var label by rememberSaveable(state.existing?.id, state.metadata.id) {
-        mutableStateOf(state.existing?.label ?: state.metadata.name)
+    val metadataName = stringResource(state.metadata.nameRes)
+    val metadataDescription = stringResource(state.metadata.descriptionRes)
+    var label by rememberSaveable(state.existing?.id, state.metadata.id, metadataName) {
+        mutableStateOf(state.existing?.label ?: metadataName)
     }
     var values by rememberSaveable(state.existing?.id, state.metadata.id) {
         mutableStateOf(
@@ -226,14 +243,14 @@ internal fun ActionConfigDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(state.metadata.name) },
+        title = { Text(metadataName) },
         text = {
             LazyColumn(
                 modifier = Modifier.heightIn(max = 420.dp),
                 verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
             ) {
                 item {
-                    Text(state.metadata.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(metadataDescription, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (capability.level != CapabilityLevel.Supported) {
                         Spacer(Modifier.height(8.dp))
                         Surface(
@@ -245,7 +262,7 @@ internal fun ActionConfigDialog(
                             shape = RoundedCornerShape(DesignSystem.Radii.lg),
                         ) {
                             Text(
-                                capability.reason,
+                                stringResource(capability.reasonRes),
                                 modifier = Modifier.padding(12.dp),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -292,7 +309,7 @@ internal fun ActionConfigDialog(
                         ActionSpec(
                             id = state.existing?.id ?: 0,
                             type = state.metadata.id,
-                            label = label.trim().ifBlank { state.metadata.name },
+                            label = label.trim().takeUnless { it.isBlank() || it == metadataName },
                             args = values.filterValues { it.isNotBlank() },
                             continueOnError = state.existing?.continueOnError ?: false,
                             condition = state.existing?.condition,
@@ -314,7 +331,8 @@ internal fun ActionFieldInput(
     onChange: (String) -> Unit,
     tasks: List<Task> = emptyList(),
 ) {
-    val label = field.label + if (field.required) " *" else ""
+    val label = stringResource(field.labelRes) + if (field.required) " *" else ""
+    val hint = field.hintRes?.let { stringResource(it) }
     when (field.fieldType) {
         FieldType.CHECKBOX -> {
             val checked = value.toBoolean()
@@ -340,7 +358,7 @@ internal fun ActionFieldInput(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(label, style = MaterialTheme.typography.labelLarge)
-                    field.hint?.let {
+                    hint?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -353,7 +371,7 @@ internal fun ActionFieldInput(
             value = value,
             onValueChange = onChange,
             label = { Text(label) },
-            placeholder = field.hint?.let { { Text(it) } },
+            placeholder = hint?.let { { Text(it) } },
             supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
             minLines = 3,
             modifier = Modifier.fillMaxWidth(),
@@ -363,7 +381,7 @@ internal fun ActionFieldInput(
             value = value,
             onValueChange = { onChange(it.filter { ch -> ch.isDigit() || ch == '-' || ch == '.' }) },
             label = { Text(label) },
-            placeholder = field.hint?.let { { Text(it) } },
+            placeholder = hint?.let { { Text(it) } },
             supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             singleLine = true,
@@ -372,7 +390,7 @@ internal fun ActionFieldInput(
 
         FieldType.TASK -> TaskActionFieldInput(
             label = label,
-            hint = field.hint,
+            hint = hint,
             value = value,
             tasks = tasks,
             onChange = onChange,
@@ -383,7 +401,7 @@ internal fun ActionFieldInput(
             value = value,
             onValueChange = onChange,
             label = { Text(label) },
-            placeholder = field.hint?.let { { Text(it) } },
+            placeholder = hint?.let { { Text(it) } },
             supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
             singleLine = field.fieldType != FieldType.MULTILINE,
             modifier = Modifier.fillMaxWidth(),

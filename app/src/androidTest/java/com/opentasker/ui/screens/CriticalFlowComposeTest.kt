@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.dp
+import com.opentasker.app.R
 import com.opentasker.core.actions.ActionField
 import com.opentasker.core.actions.ActionMetadata
 import com.opentasker.core.model.ContextType
@@ -105,10 +106,10 @@ class CriticalFlowComposeTest {
         var actionSaved = false
         val metadata = ActionMetadata(
             id = "test.required",
-            name = "Required action",
-            description = "Requires one field.",
-            category = "Test",
-            fields = listOf(ActionField("message", "Message", required = true)),
+            nameRes = R.string.catalog_action_notify_show_name,
+            descriptionRes = R.string.catalog_action_notify_show_description,
+            categoryRes = R.string.catalog_category_notification,
+            fields = listOf(ActionField("message", R.string.catalog_action_notify_show_field_text_label, required = true)),
         )
         composeTestRule.setContent {
             TestTheme {
@@ -123,7 +124,7 @@ class CriticalFlowComposeTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Required action").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Show Notification").assertIsDisplayed()
         composeTestRule.onNodeWithText("Required").assertIsDisplayed()
         composeTestRule.onNodeWithText("Save").assertIsNotEnabled()
         assertTrue(!actionSaved)

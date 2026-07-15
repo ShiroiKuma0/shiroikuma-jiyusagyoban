@@ -21,10 +21,10 @@ class TaskWidgetConfigPolishSourceTest {
     fun widgetTaskPickerUsesPremiumCardsAndGuidedEmptyState() {
         val source = sourceRoot.resolve("com/opentasker/widget/TaskWidgetConfigActivity.kt").readText()
 
-        assertTrue("Widget picker should explain the assignment flow", source.contains("Choose widget task"))
+        assertTrue("Widget picker should explain the assignment flow", source.contains("R.string.widget_choose_task_title"))
         assertTrue("Widget picker should keep a summary/header card", source.contains("WidgetConfigHeader"))
-        assertTrue("Empty state should explain how to unlock widget assignment", source.contains("Create a task first"))
-        assertTrue("Task rows should expose an explicit assign affordance", source.contains("\"Assign\""))
+        assertTrue("Empty state should explain how to unlock widget assignment", source.contains("R.string.widget_empty_title"))
+        assertTrue("Task rows should expose an explicit assign affordance", source.contains("R.string.widget_assign"))
         assertFalse("Widget picker should not regress to plain divider list rows", source.contains("HorizontalDivider"))
     }
 
@@ -35,7 +35,7 @@ class TaskWidgetConfigPolishSourceTest {
         val colors = resRoot.resolve("values/colors.xml").readText()
 
         assertTrue("Widget should use the branded rounded background drawable", layout.contains("@drawable/widget_task_background"))
-        assertTrue("Widget should include a visible secondary action cue", layout.contains("Tap to run"))
+        assertTrue("Widget should include a visible secondary action cue", layout.contains("@string/widget_tap_to_run"))
         assertTrue("Widget background should have rounded corners", background.contains("android:radius=\"16dp\""))
         assertTrue("Widget colors should be centralized in resources", colors.contains("widget_primary"))
     }

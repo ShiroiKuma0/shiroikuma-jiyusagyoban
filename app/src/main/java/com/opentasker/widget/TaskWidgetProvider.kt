@@ -39,7 +39,8 @@ class TaskWidgetProvider : AppWidgetProvider() {
         fun updateWidget(context: Context, manager: AppWidgetManager, widgetId: Int) {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val taskId = prefs.getLong(keyTaskId(widgetId), -1L)
-            val taskName = prefs.getString(keyTaskName(widgetId), "OpenTasker") ?: "OpenTasker"
+            val defaultTaskName = context.getString(R.string.app_name)
+            val taskName = prefs.getString(keyTaskName(widgetId), defaultTaskName) ?: defaultTaskName
 
             val views = RemoteViews(context.packageName, R.layout.widget_task)
             views.setTextViewText(R.id.widget_task_name, taskName)

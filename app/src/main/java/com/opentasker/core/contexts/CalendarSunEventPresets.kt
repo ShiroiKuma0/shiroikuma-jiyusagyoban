@@ -1,8 +1,11 @@
 package com.opentasker.core.contexts
 
+import androidx.annotation.StringRes
+import com.opentasker.app.R
+
 data class EventContextPreset(
     val id: String,
-    val label: String,
+    @get:StringRes val labelRes: Int,
     val config: Map<String, String>,
 )
 
@@ -10,22 +13,22 @@ object CalendarSunEventPresets {
     private val calendarPresets = listOf(
         EventContextPreset(
             id = "calendar-during",
-            label = "During meeting",
+            labelRes = R.string.context_preset_during_meeting,
             config = mapOf("event" to "calendar", "state" to "during"),
         ),
         EventContextPreset(
             id = "calendar-15-before",
-            label = "15 min before",
+            labelRes = R.string.context_preset_15_before,
             config = mapOf("event" to "calendar", "state" to "upcoming", "beforeMinutes" to "15"),
         ),
         EventContextPreset(
             id = "calendar-30-before",
-            label = "30 min before",
+            labelRes = R.string.context_preset_30_before,
             config = mapOf("event" to "calendar", "state" to "upcoming", "beforeMinutes" to "30"),
         ),
         EventContextPreset(
             id = "calendar-all-day",
-            label = "All-day busy",
+            labelRes = R.string.context_preset_all_day_busy,
             config = mapOf("event" to "calendar", "state" to "during", "allDay" to "true"),
         ),
     )
@@ -46,17 +49,17 @@ object CalendarSunEventPresets {
     private fun sunPresets(event: String): List<EventContextPreset> = listOf(
         EventContextPreset(
             id = "$event-at",
-            label = "At $event",
+            labelRes = if (event == "sunrise") R.string.context_preset_at_sunrise else R.string.context_preset_at_sunset,
             config = mapOf("event" to event, "offsetMinutes" to "0", "windowMinutes" to "5"),
         ),
         EventContextPreset(
             id = "$event-before",
-            label = "30 min before",
+            labelRes = R.string.context_preset_30_before,
             config = mapOf("event" to event, "offsetMinutes" to "-30", "windowMinutes" to "10"),
         ),
         EventContextPreset(
             id = "$event-after",
-            label = "30 min after",
+            labelRes = R.string.context_preset_30_after,
             config = mapOf("event" to event, "offsetMinutes" to "30", "windowMinutes" to "10"),
         ),
     )

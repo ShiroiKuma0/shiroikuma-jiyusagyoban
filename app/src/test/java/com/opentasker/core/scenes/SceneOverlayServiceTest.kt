@@ -14,8 +14,9 @@ class SceneOverlayServiceTest {
     }
 
     @Test
-    fun channelNameIsHumanReadable() {
-        assertEquals("Scene overlays", SceneOverlayService.CHANNEL_NAME)
+    fun channelNameIsResourceBacked() {
+        val source = loadMainSource("com/opentasker/core/scenes/SceneOverlayService.kt")
+        assertTrue(source.contains("getString(R.string.scene_overlay_channel_name)"))
     }
 
     @Test
@@ -67,4 +68,10 @@ class SceneOverlayServiceTest {
                 ).first { it.exists() }
             )
             .documentElement
+
+    private fun loadMainSource(relativePath: String): String =
+        listOf(
+            File("src/main/java/$relativePath"),
+            File("app/src/main/java/$relativePath"),
+        ).first { it.exists() }.readText()
 }

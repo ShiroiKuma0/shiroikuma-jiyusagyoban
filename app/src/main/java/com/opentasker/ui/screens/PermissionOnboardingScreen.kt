@@ -73,7 +73,6 @@ import com.opentasker.app.BuildConfig
 import com.opentasker.app.R
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
-import com.opentasker.core.location.LocationPolicyDisclosures
 import com.opentasker.core.permissions.OemBatteryGuidance
 import com.opentasker.core.permissions.RuntimePermissionOutcome
 import com.opentasker.core.permissions.RuntimePermissionRequestHistory
@@ -85,6 +84,7 @@ import com.opentasker.core.power.ShizukuPowerBackend
 import com.opentasker.core.power.ShizukuPowerState
 import com.opentasker.core.scheduling.ExactAlarmSupport
 import com.opentasker.core.scripting.TermuxScriptBackend
+import com.opentasker.core.scripting.TermuxScriptState
 
 private data class PermissionSetupItem(
     val title: String,
@@ -131,6 +131,10 @@ fun PermissionOnboardingScreen(
     val permissionGrantedMessage = stringResource(R.string.permission_granted)
     val permissionDeniedRetryMessage = stringResource(R.string.permission_denied_retry)
     val permissionDeniedSettingsMessage = stringResource(R.string.permission_denied_settings)
+    val shizukuPermissionRequestedMessage = stringResource(R.string.setup_shizuku_permission_requested)
+    val shizukuPermissionFailedMessage = stringResource(R.string.setup_shizuku_permission_failed)
+    val shizukuModeDisabledMessage = stringResource(R.string.setup_shizuku_mode_disabled)
+    val shizukuModeEnabledMessage = stringResource(R.string.setup_shizuku_mode_enabled)
     var refreshTick by remember { mutableIntStateOf(0) }
     var pendingPermission by rememberSaveable { mutableStateOf<String?>(null) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -184,15 +188,15 @@ fun PermissionOnboardingScreen(
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Column(Modifier.weight(1f)) {
-                            Text("Setup checklist", style = MaterialTheme.typography.headlineSmall)
+                            Text(stringResource(R.string.title_setup_checklist), style = MaterialTheme.typography.headlineSmall)
                             Text(
-                                "OpenTasker can run with missing access, but affected automations stay gated until setup is complete.",
+                                stringResource(R.string.setup_checklist_body),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                         PermissionStatusPill(
-                            if (pendingCount == 0) "Ready" else "$pendingCount pending",
+                            if (pendingCount == 0) stringResource(R.string.status_ready) else stringResource(R.string.status_pending, pendingCount),
                             if (pendingCount == 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
                         )
                     }
@@ -229,11 +233,12 @@ fun PermissionOnboardingScreen(
         }
 
         items(orderedItems, key = { it.title }) { item ->
+            val alreadyReadyMessage = stringResource(R.string.setup_item_already_ready, item.title)
             PermissionSetupCard(
                 item = item,
                 onRunAction = {
                     when (val action = item.action) {
-                        PermissionAction.None -> onMessage("${item.title} is already ready.")
+                        PermissionAction.None -> onMessage(alreadyReadyMessage)
                         is PermissionAction.RuntimePermission -> {
                             pendingPermission = action.permission
                             permissionHistory.recordRequest(action.permission)
@@ -244,16 +249,16 @@ fun PermissionOnboardingScreen(
                         PermissionAction.ShizukuPermission -> {
                             val requested = ShizukuPowerBackend.requestPermission(SHIZUKU_PERMISSION_REQUEST_CODE)
                             onMessage(
-                                if (requested) "Shizuku permission requested."
-                                else "Shizuku permission could not be requested; confirm the service is running.",
+                                if (requested) shizukuPermissionRequestedMessage
+                                else shizukuPermissionFailedMessage,
                             )
                             refreshTick++
                         }
                         is PermissionAction.ShizukuKillSwitch -> {
                             ShizukuPowerBackend.setKillSwitchEnabled(context, action.enabled)
                             onMessage(
-                                if (action.enabled) "Shizuku power mode disabled."
-                                else "Shizuku power mode enabled; elevated actions remain unsupported without a privileged transport.",
+                                if (action.enabled) shizukuModeDisabledMessage
+                                else shizukuModeEnabledMessage,
                             )
                             refreshTick++
                         }
@@ -281,9 +286,9 @@ private fun ThemeSetupCard() {
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("Theme", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.setup_theme_label), style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Choose the display mode used across navigation, setup, and runtime review surfaces.",
+                    stringResource(R.string.setup_theme_helper_full),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -384,9 +389,9 @@ private fun BackupSetupCard(
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Backup and restore", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.setup_backup_label), style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Create a local database snapshot, export a copy, or stage an import for the next restart.",
+                    stringResource(R.string.setup_backup_helper_full),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -399,7 +404,7 @@ private fun BackupSetupCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                 ) {
-                    Text(if (state.busy) "Working..." else "Create Local Backup")
+                    Text(if (state.busy) stringResource(R.string.setup_backup_working) else stringResource(R.string.setup_backup_create))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     OutlinedButton(
@@ -409,7 +414,7 @@ private fun BackupSetupCard(
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
                     ) {
-                        Text("Export", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(stringResource(R.string.action_export), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     OutlinedButton(
                         onClick = onImportBackup,
@@ -418,7 +423,7 @@ private fun BackupSetupCard(
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
                     ) {
-                        Text("Import", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(stringResource(R.string.action_import), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -434,14 +439,14 @@ private fun BackupStateBanner(state: BackupSetupState) {
         else -> MaterialTheme.colorScheme.secondary
     }
     val title = when {
-        state.pendingRestore -> "Restore staged"
-        state.latestBackupName != null -> "Backup available"
-        else -> "No backup yet"
+        state.pendingRestore -> stringResource(R.string.setup_backup_restore_staged)
+        state.latestBackupName != null -> stringResource(R.string.setup_backup_available)
+        else -> stringResource(R.string.setup_backup_none)
     }
     val body = when {
-        state.pendingRestore -> "Restart OpenTasker to apply the staged restore before the database opens."
-        state.latestBackupName != null -> "Latest backup: ${state.latestBackupName}"
-        else -> "Create a local backup before testing imports or risky automation changes."
+        state.pendingRestore -> stringResource(R.string.setup_backup_restore_body)
+        state.latestBackupName != null -> stringResource(R.string.setup_backup_latest, state.latestBackupName)
+        else -> stringResource(R.string.setup_backup_none_body)
     }
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -546,7 +551,7 @@ private fun PermissionSetupCard(
                 Button(onClick = onRunAction, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                     Text(item.actionLabel)
                 }
-            } else if (item.allowActionWhenGranted || (item.action is PermissionAction.SettingsIntent && item.title == "App visibility")) {
+            } else if (item.allowActionWhenGranted) {
                 OutlinedButton(onClick = onRunAction, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                     Text(stringResource(R.string.setup_review_settings))
                 }
@@ -607,15 +612,23 @@ private fun buildPermissionItems(
     permissionHistory: RuntimePermissionRequestHistory,
 ): List<PermissionSetupItem> {
     val shizukuStatus = ShizukuPowerBackend.inspect(context)
-    val shizukuActionLabel = when (shizukuStatus.state) {
-        ShizukuPowerState.NotInstalled -> "Open setup guide"
-        ShizukuPowerState.ManagerInstalled -> "Open Shizuku settings"
-        ShizukuPowerState.PermissionNeeded -> "Request permission"
+    val shizukuActionLabel = context.getString(when (shizukuStatus.state) {
+        ShizukuPowerState.NotInstalled -> R.string.setup_action_open_setup_guide
+        ShizukuPowerState.ManagerInstalled -> R.string.setup_action_open_shizuku_settings
+        ShizukuPowerState.PermissionNeeded -> R.string.setup_action_request_permission
         ShizukuPowerState.BackendUnavailable,
         ShizukuPowerState.Ready,
-        -> "Disable power mode"
-        ShizukuPowerState.Disabled -> "Enable power mode"
-    }
+        -> R.string.setup_action_disable_power_mode
+        ShizukuPowerState.Disabled -> R.string.setup_action_enable_power_mode
+    })
+    val shizukuSummary = context.getString(when (shizukuStatus.state) {
+        ShizukuPowerState.NotInstalled -> R.string.setup_shizuku_status_not_installed
+        ShizukuPowerState.ManagerInstalled -> R.string.setup_shizuku_status_manager_stopped
+        ShizukuPowerState.PermissionNeeded -> R.string.setup_shizuku_status_permission_needed
+        ShizukuPowerState.BackendUnavailable -> R.string.setup_shizuku_status_transport_unavailable
+        ShizukuPowerState.Ready -> R.string.setup_shizuku_status_ready
+        ShizukuPowerState.Disabled -> R.string.setup_shizuku_status_disabled
+    })
     val shizukuAction = when (shizukuStatus.state) {
         ShizukuPowerState.NotInstalled -> PermissionAction.SettingsIntent(
             Intent(Intent.ACTION_VIEW, Uri.parse(ShizukuPowerBackend.SETUP_URL)),
@@ -630,164 +643,175 @@ private fun buildPermissionItems(
         ShizukuPowerState.Disabled -> PermissionAction.ShizukuKillSwitch(enabled = false)
     }
     val termuxStatus = TermuxScriptBackend.inspect(context)
+    val termuxSummary = context.getString(when (termuxStatus.state) {
+        TermuxScriptState.TermuxMissing -> R.string.setup_termux_status_missing
+        TermuxScriptState.TaskerPluginMissing -> R.string.setup_termux_status_plugin_missing
+        TermuxScriptState.PluginInstalled -> R.string.setup_termux_status_ready
+    })
     val oem = OemBatteryGuidance.forDevice(Build.MANUFACTURER, Build.BRAND)
+    val request = context.getString(R.string.setup_action_request)
+    val openSettings = context.getString(R.string.setup_action_open_settings)
     return listOfNotNull(
         PermissionSetupItem(
-            title = "Notifications",
-            body = "Required for foreground-service visibility and user-facing notification actions on Android 13 and newer.",
+            title = context.getString(R.string.setup_notifications_card_title),
+            body = context.getString(R.string.setup_notifications_card_body),
             granted = Build.VERSION.SDK_INT < 33 || hasPermission(context, Manifest.permission.POST_NOTIFICATIONS),
-            actionLabel = "Request",
+            actionLabel = request,
             action = if (Build.VERSION.SDK_INT >= 33) {
                 PermissionAction.RuntimePermission(Manifest.permission.POST_NOTIFICATIONS)
             } else {
                 PermissionAction.None
             },
-            requiredFor = "Foreground service, notification actions",
+            requiredFor = context.getString(R.string.setup_notifications_required_for),
         ),
         PermissionSetupItem(
-            title = "Exact alarms",
-            body = "Allows precise scheduled automations. If denied, OpenTasker falls back to inexact delivery windows.",
+            title = context.getString(R.string.setup_exact_alarm_card_title),
+            body = context.getString(R.string.setup_exact_alarm_card_body),
             granted = ExactAlarmSupport.canScheduleExactAlarms(context),
-            actionLabel = "Open settings",
+            actionLabel = openSettings,
             action = PermissionAction.SettingsIntent(ExactAlarmSupport.settingsIntent(context)),
-            requiredFor = "Time triggers, schedules",
+            requiredFor = context.getString(R.string.setup_exact_alarm_required_for),
         ),
         PermissionSetupItem(
-            title = "Battery optimization",
-            body = "OEM and Android battery managers can stop background automation. Exempting OpenTasker improves reliability. " +
-                oem.summary,
+            title = context.getString(R.string.setup_battery_title),
+            body = context.getString(R.string.setup_battery_card_body, oem.summary),
             granted = ignoresBatteryOptimizations(context),
-            actionLabel = "Open settings",
+            actionLabel = openSettings,
             action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)),
-            requiredFor = "Long-running automation service",
+            requiredFor = context.getString(R.string.setup_battery_required_for),
         ),
         if (oem.needsExtraSteps) PermissionSetupItem(
-            title = "${oem.oemName} background guidance",
-            body = buildString {
-                append("Detected ${oem.oemName} (reliability risk: ${oem.riskLevel.label()}). ")
-                append("Battery-optimization exemption alone is often not enough on this OEM.\n\n")
-                oem.steps.forEachIndexed { index, step -> append("${index + 1}. $step\n") }
-                append("\nIf the button cannot open the right screen, see ${oem.dontKillMyAppUrl}")
-            }.trim(),
+            title = context.getString(R.string.setup_oem_guidance_title, oem.oemName),
+            body = context.getString(
+                R.string.setup_oem_guidance_body,
+                oem.oemName,
+                context.getString(oem.riskLevel.labelRes()),
+                oem.steps.mapIndexed { index, step -> "${index + 1}. $step" }.joinToString("\n"),
+                oem.dontKillMyAppUrl,
+            ),
             granted = false,
-            actionLabel = if (oem.settingsTargets.isNotEmpty()) "Open ${oem.oemName} settings" else "Open dontkillmyapp.com",
+            actionLabel = if (oem.settingsTargets.isNotEmpty()) {
+                context.getString(R.string.setup_action_open_oem_settings, oem.oemName)
+            } else {
+                context.getString(R.string.setup_action_open_dontkillmyapp)
+            },
             action = PermissionAction.OemSettings(oem.settingsTargets, oem.dontKillMyAppUrl),
-            requiredFor = "Reliable background automation on ${oem.oemName}",
+            requiredFor = context.getString(R.string.setup_oem_required_for, oem.oemName),
             optional = true,
         ) else null,
         PermissionSetupItem(
-            title = "Usage access",
-            body = "Needed to detect foreground apps without an accessibility service.",
+            title = context.getString(R.string.setup_usage_card_title),
+            body = context.getString(R.string.setup_usage_card_body),
             granted = UsageAccess.hasUsageStatsAccess(context),
-            actionLabel = "Open settings",
+            actionLabel = openSettings,
             action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)),
-            requiredFor = "Application contexts",
+            requiredFor = context.getString(R.string.setup_usage_required_for),
         ),
         PermissionSetupItem(
-            title = "Notification access",
-            body = "Needed for notification-text triggers and rich notification matching.",
+            title = context.getString(R.string.setup_notification_access_title),
+            body = context.getString(R.string.setup_notification_access_body),
             granted = hasNotificationListenerAccess(context),
-            actionLabel = "Open settings",
+            actionLabel = openSettings,
             action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)),
-            requiredFor = "Notification triggers",
+            requiredFor = context.getString(R.string.setup_notification_access_required_for),
         ),
         PermissionSetupItem(
-            title = "Calendar access",
-            body = "Needed for local calendar-window triggers. OpenTasker only emits redacted calendar metadata to matching.",
+            title = context.getString(R.string.setup_calendar_access_title),
+            body = context.getString(R.string.setup_calendar_access_body),
             granted = hasPermission(context, Manifest.permission.READ_CALENDAR),
-            actionLabel = "Request",
+            actionLabel = request,
             action = PermissionAction.RuntimePermission(Manifest.permission.READ_CALENDAR),
-            requiredFor = "Calendar triggers",
+            requiredFor = context.getString(R.string.setup_calendar_access_required_for),
         ),
         PermissionSetupItem(
-            title = "Overlay access",
-            body = "Needed for scene overlays and controls displayed over other apps.",
+            title = context.getString(R.string.setup_overlay_access_title),
+            body = context.getString(R.string.setup_overlay_access_body),
             granted = Settings.canDrawOverlays(context),
-            actionLabel = "Open settings",
+            actionLabel = openSettings,
             action = PermissionAction.SettingsIntent(
                 Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}")),
             ),
-            requiredFor = "Scenes, overlay UI",
+            requiredFor = context.getString(R.string.setup_overlay_access_required_for),
         ),
         PermissionSetupItem(
-            title = "Foreground location",
-            body = LocationPolicyDisclosures.foregroundSetupBody,
+            title = context.getString(R.string.setup_foreground_location_title),
+            body = context.getString(R.string.setup_foreground_location_body),
             granted = hasAnyLocationPermission(context),
-            actionLabel = "Request",
+            actionLabel = request,
             action = PermissionAction.RuntimePermission(Manifest.permission.ACCESS_FINE_LOCATION),
-            requiredFor = "Location and WiFi contexts",
+            requiredFor = context.getString(R.string.setup_foreground_location_required_for),
         ),
         PermissionSetupItem(
-            title = "Nearby WiFi devices",
-            body = "Needed on Android 13 and newer for WiFi-aware automations. SSID visibility can still require location access.",
+            title = context.getString(R.string.setup_nearby_wifi_title),
+            body = context.getString(R.string.setup_nearby_wifi_body),
             granted = Build.VERSION.SDK_INT < 33 || hasPermission(context, Manifest.permission.NEARBY_WIFI_DEVICES),
-            actionLabel = "Request",
+            actionLabel = request,
             action = if (Build.VERSION.SDK_INT >= 33) {
                 PermissionAction.RuntimePermission(Manifest.permission.NEARBY_WIFI_DEVICES)
             } else {
                 PermissionAction.None
             },
-            requiredFor = "WiFi contexts",
+            requiredFor = context.getString(R.string.setup_nearby_wifi_required_for),
         ),
         PermissionSetupItem(
-            title = "Background location",
-            body = LocationPolicyDisclosures.backgroundSetupBody(Build.VERSION.SDK_INT),
+            title = context.getString(R.string.setup_background_location_title),
+            body = context.getString(if (Build.VERSION.SDK_INT >= 30) R.string.setup_background_location_body_modern else R.string.setup_background_location_body_legacy),
             granted = Build.VERSION.SDK_INT < 29 || hasPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION),
-            actionLabel = "Open app settings",
+            actionLabel = context.getString(R.string.action_open_app_settings),
             action = PermissionAction.SettingsIntent(appDetailsIntent(context)),
-            requiredFor = "Background location radius evaluation",
+            requiredFor = context.getString(R.string.setup_background_location_required_for),
         ),
         PermissionSetupItem(
-            title = "Bluetooth connect",
-            body = "Needed on Android 12 and newer for Bluetooth device actions and context checks.",
+            title = context.getString(R.string.setup_bluetooth_title),
+            body = context.getString(R.string.setup_bluetooth_body),
             granted = Build.VERSION.SDK_INT < 31 || hasPermission(context, Manifest.permission.BLUETOOTH_CONNECT),
-            actionLabel = "Request",
+            actionLabel = request,
             action = if (Build.VERSION.SDK_INT >= 31) {
                 PermissionAction.RuntimePermission(Manifest.permission.BLUETOOTH_CONNECT)
             } else {
                 PermissionAction.None
             },
-            requiredFor = "Bluetooth actions",
+            requiredFor = context.getString(R.string.setup_bluetooth_required_for),
         ),
         if (Build.VERSION.SDK_INT >= ANDROID_17_API) PermissionSetupItem(
-            title = "Local network access",
-            body = "Android 17+ requires this permission for any LAN device communication (HTTP, Ping, Wake-on-LAN, MQTT, mDNS). Without it, network actions targeting local addresses will fail.",
+            title = context.getString(R.string.setup_local_network_title),
+            body = context.getString(R.string.setup_local_network_body),
             granted = hasPermission(context, "android.permission.ACCESS_LOCAL_NETWORK"),
-            actionLabel = "Request",
+            actionLabel = request,
             action = PermissionAction.RuntimePermission("android.permission.ACCESS_LOCAL_NETWORK"),
-            requiredFor = "LAN network actions",
+            requiredFor = context.getString(R.string.setup_local_network_required_for),
         ) else null,
         if (BuildConfig.SMS_ACTION_AVAILABLE) PermissionSetupItem(
-            title = "SMS send",
-            body = "Needed before SMS actions can send messages. Keep SMS automations explicit and user-authored.",
+            title = context.getString(R.string.setup_sms_title),
+            body = context.getString(R.string.setup_sms_body),
             granted = hasPermission(context, Manifest.permission.SEND_SMS),
-            actionLabel = "Request",
+            actionLabel = request,
             action = PermissionAction.RuntimePermission(Manifest.permission.SEND_SMS),
-            requiredFor = "SMS actions",
+            requiredFor = context.getString(R.string.setup_sms_required_for),
         ) else null,
         PermissionSetupItem(
-            title = "Do Not Disturb access",
-            body = "Needed before OpenTasker can change interruption filters or DND-related settings.",
+            title = context.getString(R.string.setup_dnd_title),
+            body = context.getString(R.string.setup_dnd_body),
             granted = hasNotificationPolicyAccess(context),
-            actionLabel = "Open settings",
+            actionLabel = openSettings,
             action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)),
-            requiredFor = "DND actions",
+            requiredFor = context.getString(R.string.setup_dnd_required_for),
         ),
         PermissionSetupItem(
-            title = "Shizuku power mode",
-            body = shizukuStatus.summary,
+            title = context.getString(R.string.setup_shizuku_title),
+            body = shizukuSummary,
             granted = shizukuStatus.isReady,
             actionLabel = shizukuActionLabel,
             action = shizukuAction,
-            requiredFor = "Elevated actions",
+            requiredFor = context.getString(R.string.setup_shizuku_required_for),
             optional = true,
             allowActionWhenGranted = true,
         ),
         PermissionSetupItem(
-            title = "Termux script bridge",
-            body = "${termuxStatus.summary} Script actions remain blocked until permission handling, execution isolation, output capture, and audit logging are implemented.",
+            title = context.getString(R.string.setup_termux_title),
+            body = context.getString(R.string.setup_termux_body, termuxSummary),
             granted = termuxStatus.bridgeInstalled,
-            actionLabel = if (termuxStatus.bridgeInstalled) "Open app settings" else "Open setup guide",
+            actionLabel = if (termuxStatus.bridgeInstalled) context.getString(R.string.action_open_app_settings) else context.getString(R.string.setup_action_open_setup_guide),
             action = PermissionAction.SettingsIntent(
                 if (termuxStatus.bridgeInstalled) {
                     packageDetailsIntent(TermuxScriptBackend.TERMUX_TASKER_PACKAGE)
@@ -795,16 +819,17 @@ private fun buildPermissionItems(
                     Intent(Intent.ACTION_VIEW, Uri.parse(TermuxScriptBackend.SETUP_URL))
                 },
             ),
-            requiredFor = "Script actions",
+            requiredFor = context.getString(R.string.setup_termux_required_for),
             optional = true,
         ),
         PermissionSetupItem(
-            title = "App visibility",
-            body = "Android package visibility limits app lookup. If app selection fails, review app-info permissions and future query filters.",
+            title = context.getString(R.string.setup_app_visibility_title),
+            body = context.getString(R.string.setup_app_visibility_body),
             granted = true,
-            actionLabel = "Ready",
+            actionLabel = context.getString(R.string.status_ready),
             action = PermissionAction.SettingsIntent(appDetailsIntent(context)),
-            requiredFor = "App launch and app context selection",
+            requiredFor = context.getString(R.string.setup_app_visibility_required_for),
+            allowActionWhenGranted = true,
         ),
     ).map { item -> item.withRuntimePermissionRecovery(context, permissionHistory) }
 }
@@ -820,7 +845,7 @@ private fun PermissionSetupItem.withRuntimePermissionRecovery(
     }
     if (!history.requiresSettings(runtimePermission.permission)) return this
     return copy(
-        body = "$body ${context.getString(R.string.permission_denied_settings_body)}",
+        body = context.getString(R.string.setup_body_with_recovery, body, context.getString(R.string.permission_denied_settings_body)),
         actionLabel = context.getString(R.string.action_open_app_settings),
         action = PermissionAction.SettingsIntent(appDetailsIntent(context)),
     )
@@ -867,17 +892,17 @@ private fun openSettingsIntent(context: Context, intent: Intent, onMessage: (Str
     try {
         context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     } catch (ex: ActivityNotFoundException) {
-        onMessage("Settings screen is unavailable on this device: ${ex.message ?: "no handler"}")
+        onMessage(context.getString(R.string.setup_settings_unavailable, ex.message ?: context.getString(R.string.setup_error_no_handler)))
     } catch (ex: SecurityException) {
-        onMessage("Settings screen could not be opened: ${ex.message ?: "permission denied"}")
+        onMessage(context.getString(R.string.setup_settings_open_failed, ex.message ?: context.getString(R.string.setup_error_permission_denied)))
     }
 }
 
-private fun OemBatteryGuidance.RiskLevel.label(): String = when (this) {
-    OemBatteryGuidance.RiskLevel.LOW -> "low"
-    OemBatteryGuidance.RiskLevel.MEDIUM -> "medium"
-    OemBatteryGuidance.RiskLevel.HIGH -> "high"
-    OemBatteryGuidance.RiskLevel.SEVERE -> "severe"
+private fun OemBatteryGuidance.RiskLevel.labelRes(): Int = when (this) {
+    OemBatteryGuidance.RiskLevel.LOW -> R.string.setup_risk_low
+    OemBatteryGuidance.RiskLevel.MEDIUM -> R.string.setup_risk_medium
+    OemBatteryGuidance.RiskLevel.HIGH -> R.string.setup_risk_high
+    OemBatteryGuidance.RiskLevel.SEVERE -> R.string.setup_risk_severe
 }
 
 /**
@@ -904,9 +929,9 @@ private fun openOemSettings(context: Context, action: PermissionAction.OemSettin
     try {
         context.startActivity(fallback)
         if (action.targets.isNotEmpty()) {
-            onMessage("Could not open the OEM settings screen directly; opened the online guide instead.")
+            onMessage(context.getString(R.string.setup_oem_fallback_opened))
         }
     } catch (ex: ActivityNotFoundException) {
-        onMessage("No app can open the guidance page: ${ex.message ?: "no handler"}")
+        onMessage(context.getString(R.string.setup_oem_guide_unavailable, ex.message ?: context.getString(R.string.setup_error_no_handler)))
     }
 }

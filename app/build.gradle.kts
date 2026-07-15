@@ -66,6 +66,9 @@ android {
     }
 
     buildTypes {
+        getByName("debug") {
+            isPseudoLocalesEnabled = true
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

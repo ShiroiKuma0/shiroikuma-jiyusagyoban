@@ -571,7 +571,7 @@ internal fun DeleteConfirmationDialog(
         is DeleteTarget.TaskTarget -> stringResource(R.string.delete_task_body, target.task.name, target.task.actions.size)
         is DeleteTarget.SceneTarget -> stringResource(R.string.delete_scene_body, target.scene.name, target.scene.elements.size)
         is DeleteTarget.ActionTarget -> stringResource(R.string.delete_action_body, target.index + 1, target.task.name)
-        is DeleteTarget.ContextTarget -> stringResource(R.string.delete_context_body, target.context.type.name.lowercase(), target.profile.name)
+        is DeleteTarget.ContextTarget -> stringResource(R.string.delete_context_body, stringResource(contextTitleRes(target.context.type)), target.profile.name)
     }
     val confirmLabel = when (target) {
         is DeleteTarget.ProfileTarget -> stringResource(R.string.profile_delete)

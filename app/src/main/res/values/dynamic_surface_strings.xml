@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <!-- Dynamic context catalog. Stable context/config keys remain in Kotlin; presentation lives here. -->
+    <string name="context_type_application_title" formatted="false">Application</string>
+    <string name="context_type_application_description" formatted="false">Matches when an app is detected in the foreground.</string>
+    <string name="context_type_time_title" formatted="false">Time</string>
+    <string name="context_type_time_description" formatted="false">Matches during a clock time window.</string>
+    <string name="context_type_day_title" formatted="false">Day</string>
+    <string name="context_type_day_description" formatted="false">Matches on selected days, presets, or weekday/weekend ranges.</string>
+    <string name="context_type_location_title" formatted="false">Location</string>
+    <string name="context_type_location_description" formatted="false">Matches near a latitude/longitude radius with optional accuracy and dwell checks.</string>
+    <string name="context_type_state_title" formatted="false">State</string>
+    <string name="context_type_state_description" formatted="false">Matches a device state such as battery level, charging, headphones, or screen.</string>
+    <string name="context_type_event_title" formatted="false">Event</string>
+    <string name="context_type_event_description" formatted="false">Matches a one-shot event such as boot, notification, NFC, Bluetooth connect/disconnect, calendar, sun, shake, or Locale plugin queries.</string>
+    <string name="context_type_plugin_title" formatted="false">Plugin</string>
+    <string name="context_type_plugin_description" formatted="false">Matches when a Locale/Tasker condition plugin reports satisfied. The plugin is polled periodically and its last known state is cached.</string>
+
+    <string name="context_field_application_package_label" formatted="false">Package name</string>
+    <string name="context_field_application_package_hint" formatted="false">com.example.app (personal profile only)</string>
+    <string name="context_field_time_start_label" formatted="false">Start HH:mm</string>
+    <string name="context_field_time_start_hint" formatted="false">09:00</string>
+    <string name="context_field_time_end_label" formatted="false">End HH:mm</string>
+    <string name="context_field_time_end_hint" formatted="false">17:00</string>
+    <string name="context_field_day_days_label" formatted="false">Days</string>
+    <string name="context_field_day_days_hint" formatted="false">weekdays, weekends, MON-FRI</string>
+    <string name="context_field_location_latitude_label" formatted="false">Latitude</string>
+    <string name="context_field_location_longitude_label" formatted="false">Longitude</string>
+    <string name="context_field_location_radius_label" formatted="false">Radius meters</string>
+    <string name="context_field_location_radius_hint" formatted="false">100</string>
+    <string name="context_field_location_accuracy_label" formatted="false">Max accuracy meters</string>
+    <string name="context_field_location_accuracy_hint" formatted="false">50</string>
+    <string name="context_field_location_dwell_label" formatted="false">Dwell seconds</string>
+    <string name="context_field_location_dwell_hint" formatted="false">300</string>
+    <string name="context_field_state_key_label" formatted="false">State key</string>
+    <string name="context_field_state_key_hint" formatted="false">battery_level, charging, headphones, screen</string>
+    <string name="context_field_state_operator_label" formatted="false">Operator</string>
+    <string name="context_field_state_operator_hint" formatted="false">=, &gt;=, &lt;=, &gt;, &lt;</string>
+    <string name="context_field_state_value_label" formatted="false">Expected value</string>
+    <string name="context_field_state_value_hint" formatted="false">true/false, connected/disconnected, on/off, 80</string>
+    <string name="context_field_event_type_label" formatted="false">Event type</string>
+    <string name="context_field_event_type_hint" formatted="false">boot_completed, notification, nfc, bluetooth, calendar, sunrise, sunset, shake, package_added, package_removed, package_replaced</string>
+    <string name="context_field_event_state_label" formatted="false">Event state</string>
+    <string name="context_field_event_state_hint" formatted="false">during, upcoming, connected, disconnected</string>
+    <string name="context_field_event_calendar_label" formatted="false">Calendar name</string>
+    <string name="context_field_event_calendar_hint" formatted="false">Work</string>
+    <string name="context_field_event_before_label" formatted="false">Before minutes</string>
+    <string name="context_field_event_before_hint" formatted="false">15</string>
+    <string name="context_field_event_package_label" formatted="false">Package allowlist</string>
+    <string name="context_field_event_package_hint" formatted="false">com.example.app, com.chat.app</string>
+    <string name="context_field_event_tag_label" formatted="false">NFC tag ID</string>
+    <string name="context_field_event_tag_hint" formatted="false">04AABBCC</string>
+    <string name="context_field_event_latitude_label" formatted="false">Latitude</string>
+    <string name="context_field_event_latitude_hint" formatted="false">40.7128</string>
+    <string name="context_field_event_longitude_label" formatted="false">Longitude</string>
+    <string name="context_field_event_longitude_hint" formatted="false">-74.0060</string>
+    <string name="context_field_event_offset_label" formatted="false">Sun offset minutes</string>
+    <string name="context_field_event_offset_hint" formatted="false">-30</string>
+    <string name="context_field_event_window_label" formatted="false">Sun window minutes</string>
+    <string name="context_field_event_window_hint" formatted="false">5</string>
+    <string name="context_field_event_title_label" formatted="false">Title contains</string>
+    <string name="context_field_event_title_hint" formatted="false">Optional notification title text</string>
+    <string name="context_field_event_body_label" formatted="false">Body contains</string>
+    <string name="context_field_event_body_hint" formatted="false">Optional notification body text</string>
+    <string name="context_field_event_filter_label" formatted="false">Any metadata filter</string>
+    <string name="context_field_event_filter_hint" formatted="false">Optional text/package/action filter</string>
+    <string name="context_field_event_regex_label" formatted="false">Use regex matching</string>
+    <string name="context_field_plugin_package_label" formatted="false">Plugin package</string>
+    <string name="context_field_plugin_package_hint" formatted="false">com.example.plugin</string>
+    <string name="context_field_plugin_bundle_label" formatted="false">Plugin config JSON</string>
+    <string name="context_field_plugin_bundle_hint" formatted="false">{&quot;key&quot;:&quot;value&quot;}</string>
+    <string name="context_field_plugin_blurb_label" formatted="false">Description</string>
+    <string name="context_field_plugin_blurb_hint" formatted="false">Optional label from plugin config</string>
+    <string name="context_field_plugin_timeout_label" formatted="false">Query timeout ms</string>
+    <string name="context_field_plugin_timeout_hint" formatted="false">5000</string>
+
+    <string name="context_day_mon" formatted="false">MON</string>
+    <string name="context_day_tue" formatted="false">TUE</string>
+    <string name="context_day_wed" formatted="false">WED</string>
+    <string name="context_day_thu" formatted="false">THU</string>
+    <string name="context_day_fri" formatted="false">FRI</string>
+    <string name="context_day_sat" formatted="false">SAT</string>
+    <string name="context_day_sun" formatted="false">SUN</string>
+
+    <string name="context_preset_during_meeting" formatted="false">During meeting</string>
+    <string name="context_preset_15_before" formatted="false">15 min before</string>
+    <string name="context_preset_30_before" formatted="false">30 min before</string>
+    <string name="context_preset_all_day_busy" formatted="false">All-day busy</string>
+    <string name="context_preset_at_sunrise" formatted="false">At sunrise</string>
+    <string name="context_preset_at_sunset" formatted="false">At sunset</string>
+    <string name="context_preset_30_after" formatted="false">30 min after</string>
+
+    <!-- Home-screen widget and configuration activity. -->
+    <string name="widget_choose_task_title" formatted="false">Choose widget task</string>
+    <string name="widget_choose_task_subtitle" formatted="false">Tap a task to assign it to this home-screen widget</string>
+    <string name="widget_setup_required" formatted="false">Setup required</string>
+    <string name="widget_empty_title" formatted="false">Create a task first</string>
+    <string name="widget_empty_body" formatted="false">Widgets run saved OpenTasker tasks from your home screen. Build a task in the app, then return here to assign it.</string>
+    <string name="widget_selectable_task" formatted="false">Selectable task</string>
+    <string name="widget_assign" formatted="false">Assign</string>
+    <string name="widget_action_title" formatted="false">Widget action</string>
+    <string name="widget_run_selected_task" formatted="false">Run selected task</string>
+    <string name="widget_tap_to_run" formatted="false">Tap to run</string>
+    <plurals name="widget_action_count">
+        <item quantity="one">%1$d action</item>
+        <item quantity="other">%1$d actions</item>
+    </plurals>
+    <plurals name="widget_saved_task_count">
+        <item quantity="one">%1$d saved task available. Choose the task this widget should run when tapped.</item>
+        <item quantity="other">%1$d saved tasks available. Choose the task this widget should run when tapped.</item>
+    </plurals>
+
+    <!-- Scene overlay service and fallback views. -->
+    <string name="scene_overlay_default_button" formatted="false">Button</string>
+    <string name="scene_overlay_unsupported_element">[%1$s]</string>
+    <string name="scene_overlay_notification_title" formatted="false">Scene overlay active</string>
+    <string name="scene_overlay_channel_name" formatted="false">Scene overlays</string>
+
+    <!-- Action eligibility and setup diagnostics displayed by the dynamic catalog. -->
+    <string name="capability_ready" formatted="false">Ready</string>
+    <string name="capability_notification_permission" formatted="false">Requires notification permission on Android 13+.</string>
+    <string name="capability_notification_cancel_permission" formatted="false">Cancels a posted notification by tag and/or ID. Requires notification permission on Android 13+.</string>
+    <string name="capability_locale_fire_setup" formatted="false">Requires an installed Locale-compatible plugin; requests are dispatched only to an explicit package.</string>
+    <string name="capability_locale_query_setup" formatted="false">Requires an installed Locale-compatible condition plugin; queries are explicit ordered broadcasts with timeout handling.</string>
+    <string name="capability_wifi_unsupported" formatted="false">Android 10+ blocks direct Wi-Fi toggles for normal apps.</string>
+    <string name="capability_bluetooth_unsupported" formatted="false">Android 13+ blocks direct Bluetooth enable/disable for normal apps.</string>
+    <string name="capability_bluetooth_permission" formatted="false">Requires Bluetooth permission.</string>
+    <string name="capability_write_settings" formatted="false">Requires Write Settings special access.</string>
+    <string name="capability_dnd_access" formatted="false">Requires Do Not Disturb access.</string>
+    <string name="capability_torch_ready" formatted="false">Uses the camera flashlight.</string>
+    <string name="capability_airplane_unsupported" formatted="false">Airplane mode changes require system or device-owner privileges. No privileged transport is available in this build.</string>
+    <string name="capability_mobile_data_unsupported" formatted="false">Mobile data changes require carrier, system, or device-owner privileges. No privileged transport is available in this build.</string>
+    <string name="capability_screenshot_unsupported" formatted="false">Screenshots require MediaProjection consent or privileged shell access. No privileged transport is available in this build.</string>
+    <string name="capability_reboot_unsupported" formatted="false">Reboot requires privileged device-owner or system-app access. No privileged transport is available in this build.</string>
+    <string name="capability_lock_unsupported" formatted="false">Device lock requires configured device-admin support.</string>
+    <string name="capability_screen_off_unsupported" formatted="false">Screen-off requires privileged power-management access. No privileged transport is available in this build.</string>
+    <string name="capability_wake_unsupported" formatted="false">Wake requires a foreground activity or privileged wake flow. No privileged transport is available in this build.</string>
+    <string name="capability_termux_setup" formatted="false">Requires Termux and Termux:Tasker with external app access enabled.</string>
+    <string name="capability_tasker_import_unsupported" formatted="false">The imported Tasker action could not be mapped to a supported OpenTasker action.</string>
+    <string name="capability_sms_permission" formatted="false">Requires SMS permission; Play builds omit SMS actions for policy compliance.</string>
+    <string name="capability_sms_distribution_unsupported" formatted="false">SMS is unavailable in this distribution because SMS and phone-state permissions are omitted for Play policy compliance.</string>
+    <string name="capability_audio_output_restricted" formatted="false">Android 17 restricts audio output unless OpenTasker has a while-in-use eligible foreground-service path.</string>
+    <string name="capability_audio_output_ready" formatted="false">Audio output is available.</string>
+    <string name="capability_media_key_restricted" formatted="false">Android 17 restricts media-key dispatch unless OpenTasker has a while-in-use eligible foreground-service path.</string>
+    <string name="capability_media_key_ready" formatted="false">Media-key dispatch is available.</string>
+    <string name="capability_volume_restricted" formatted="false">Android 17 restricts volume changes unless OpenTasker has a while-in-use eligible foreground-service path.</string>
+    <string name="capability_volume_policy" formatted="false">May require Do Not Disturb policy access.</string>
+</resources>

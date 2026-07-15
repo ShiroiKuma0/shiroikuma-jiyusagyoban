@@ -736,7 +736,9 @@ private fun ActionRow(
 ) {
     val metadata = ActionMetadataRegistry.get(action.type)
     val capability = ActionCapabilityRegistry.get(action.type)
-    val actionLabel = action.label ?: metadata?.name ?: action.type
+    val metadataName = metadata?.let { stringResource(it.nameRes) }
+    val metadataDescription = metadata?.let { stringResource(it.descriptionRes) }
+    val actionLabel = action.label ?: metadataName ?: action.type
     val editDescription = stringResource(R.string.a11y_edit_action, index + 1, actionLabel)
     val deleteDescription = stringResource(R.string.a11y_delete_action, index + 1, actionLabel)
     Surface(
@@ -754,7 +756,7 @@ private fun ActionRow(
             Column(Modifier.weight(1f)) {
                 Text(actionLabel, style = MaterialTheme.typography.titleSmall)
                 Text(
-                    action.args.entries.joinToString { "${it.key}=${it.value}" }.ifBlank { metadata?.description ?: stringResource(R.string.workspace_no_arguments) },
+                    action.args.entries.joinToString { "${it.key}=${it.value}" }.ifBlank { metadataDescription ?: stringResource(R.string.workspace_no_arguments) },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
@@ -800,7 +802,7 @@ private fun ContextRow(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val contextTypeLabel = context.type.name.lowercase().replaceFirstChar { it.uppercase() }
+    val contextTypeLabel = stringResource(contextTitleRes(context.type))
     val editDescription = stringResource(R.string.a11y_edit_context, index + 1, contextTypeLabel)
     val deleteDescription = stringResource(R.string.a11y_delete_context, index + 1, contextTypeLabel)
     Surface(

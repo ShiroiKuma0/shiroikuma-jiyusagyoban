@@ -181,7 +181,7 @@ class SceneOverlayService : Service() {
     private fun buildElementView(element: SceneElement, widthPx: Int, heightPx: Int): View {
         return when (element.type) {
             SceneElementType.BUTTON -> Button(this).apply {
-                text = element.config["label"] ?: "Button"
+                text = element.config["label"] ?: getString(R.string.scene_overlay_default_button)
                 setOnClickListener {
                     element.tapTaskId?.let { taskId -> fireRunTask(taskId) }
                 }
@@ -258,7 +258,7 @@ class SceneOverlayService : Service() {
 
     private fun unsupportedElementView(element: SceneElement): TextView =
         TextView(this).apply {
-            text = "[${element.type.name}]"
+            text = getString(R.string.scene_overlay_unsupported_element, element.type.name)
             setTextColor(Color.GRAY)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             val padPx = (2 * resources.displayMetrics.density).toInt()
@@ -349,10 +349,10 @@ class SceneOverlayService : Service() {
     private fun startForegroundWithNotification() {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_MIN),
+            NotificationChannel(CHANNEL_ID, getString(R.string.scene_overlay_channel_name), NotificationManager.IMPORTANCE_MIN),
         )
         val notification = Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("Scene overlay active")
+            .setContentTitle(getString(R.string.scene_overlay_notification_title))
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setOngoing(true)
             .build()
@@ -373,7 +373,6 @@ class SceneOverlayService : Service() {
         const val EXTRA_SCENE_ID = "com.opentasker.extra.SCENE_ID"
         const val EXTRA_SCENE_JSON = "com.opentasker.extra.SCENE_JSON"
         const val CHANNEL_ID = "opentasker.scenes"
-        const val CHANNEL_NAME = "Scene overlays"
         const val NOTIFICATION_ID = 1002
 
         private const val HEADER_HEIGHT_DP = 48

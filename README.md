@@ -198,9 +198,9 @@ Issues and pull requests welcome. See [ROADMAP.md](ROADMAP.md) for planned featu
 
 ### Translations
 
-OpenTasker supports localization. String resources live in `app/src/main/res/values/strings.xml` (English default), with `app/src/main/res/values-*/strings.xml` locale targets ready for Weblate-style translation workflows. To contribute a translation:
+OpenTasker supports localization. English source copy lives in `app/src/main/res/values/strings.xml`, `action_catalog_strings.xml`, and `dynamic_surface_strings.xml`; locale targets under `app/src/main/res/values-*` are ready for Weblate-style translation workflows. Debug builds enable Android's `en-XA` and `ar-XB` pseudolocales for expansion and right-to-left checks. To contribute a translation:
 
-1. Copy `app/src/main/res/values/strings.xml` to `app/src/main/res/values-<locale>/strings.xml`
+1. Copy the three translatable XML files from `app/src/main/res/values/` to `app/src/main/res/values-<locale>/`
 2. Translate only the string values (not the `name` attributes)
 3. Omit strings that are identical to English — Android falls back automatically
 4. Submit a PR with your locale directory

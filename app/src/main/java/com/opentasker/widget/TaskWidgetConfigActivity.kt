@@ -38,10 +38,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.isSystemInDarkTheme
+import com.opentasker.app.R
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.StorageDecodeIssue
@@ -128,9 +131,9 @@ private fun ConfigScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Choose widget task", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(stringResource(R.string.widget_choose_task_title), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
-                            "Tap a task to assign it to this home-screen widget",
+                            stringResource(R.string.widget_choose_task_subtitle),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -164,7 +167,7 @@ private fun ConfigScreen(
                         Box(Modifier.padding(14.dp), contentAlignment = Alignment.Center) {
                             Icon(
                                 Icons.Filled.Info,
-                                contentDescription = "Setup required",
+                                contentDescription = stringResource(R.string.widget_setup_required),
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(30.dp),
                             )
@@ -172,12 +175,12 @@ private fun ConfigScreen(
                     }
                     Spacer(Modifier.size(20.dp))
                     Text(
-                        "Create a task first",
+                        stringResource(R.string.widget_empty_title),
                         style = MaterialTheme.typography.headlineSmall,
                         textAlign = TextAlign.Center,
                     )
                     Text(
-                        "Widgets run saved OpenTasker tasks from your home screen. Build a task in the app, then return here to assign it.",
+                        stringResource(R.string.widget_empty_body),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -218,7 +221,7 @@ private fun ConfigScreen(
                         ) {
                             Icon(
                                 Icons.Filled.CheckCircle,
-                                contentDescription = "Selectable task",
+                                contentDescription = stringResource(R.string.widget_selectable_task),
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(24.dp),
                             )
@@ -231,7 +234,7 @@ private fun ConfigScreen(
                                     overflow = TextOverflow.Ellipsis,
                                 )
                                 Text(
-                                    "${task.actions.size} action${if (task.actions.size != 1) "s" else ""}",
+                                    pluralStringResource(R.plurals.widget_action_count, task.actions.size, task.actions.size),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
@@ -240,7 +243,7 @@ private fun ConfigScreen(
                             }
                             Spacer(Modifier.width(12.dp))
                             Text(
-                                "Assign",
+                                stringResource(R.string.widget_assign),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
                             )
@@ -268,9 +271,9 @@ private fun WidgetConfigHeader(taskCount: Int) {
         shape = RoundedCornerShape(DesignSystem.Radii.xxl),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Widget action", style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.widget_action_title), style = MaterialTheme.typography.headlineSmall)
             Text(
-                "$taskCount saved task${if (taskCount != 1) "s" else ""} available. Choose the task this widget should run when tapped.",
+                pluralStringResource(R.plurals.widget_saved_task_count, taskCount, taskCount),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

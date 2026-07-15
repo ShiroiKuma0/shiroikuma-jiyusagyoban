@@ -630,11 +630,12 @@ private fun nodeColor(kind: AutomationFlowNodeKind, muted: Boolean): Color {
     }
 }
 
+@Composable
 private fun displayTitle(node: AutomationFlowNode): String {
     if (node.kind != AutomationFlowNodeKind.ACTION) return node.title
     val actionType = node.detail?.substringBefore(" - ") ?: return node.title
-    val metadataName = ActionMetadataRegistry.get(actionType)?.name ?: return node.title
-    return if (node.title.startsWith("Step ")) node.title.replace(actionType, metadataName) else node.title
+    val metadata = ActionMetadataRegistry.get(actionType) ?: return node.title
+    return node.title.replace(actionType, stringResource(metadata.nameRes))
 }
 
 private fun plural(count: Int): String = if (count == 1) "" else "s"
