@@ -79,6 +79,23 @@ class TaskerXmlExportTest {
     }
 
     @Test
+    fun omitsSecretVariables() {
+        val report = TaskerXmlExporter.export(
+            emptyList(),
+            emptyList(),
+            listOf(
+                Variable("MODE", "silent", isGlobal = true),
+                Variable("API_TOKEN", "must-not-export", isGlobal = true, isSecret = true),
+            ),
+        )
+
+        assertEquals(1, report.exportedVariableCount)
+        assertTrue(report.xml.contains("silent"))
+        assertTrue(!report.xml.contains("must-not-export"))
+        assertTrue(report.warnings.any { it.contains("1 secret variable") })
+    }
+
+    @Test
     fun escapesXmlSpecialCharacters() {
         val task = Task(
             id = 1,

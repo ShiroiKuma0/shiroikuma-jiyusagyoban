@@ -29,6 +29,7 @@ class TaskRunner(
         val foreachIndex: Int,
         val items: List<String>,
         val itemVar: String,
+        val sensitive: Boolean,
         var index: Int,
     )
 
@@ -148,8 +149,9 @@ class TaskRunner(
                 if (items.isEmpty()) {
                     outcome("foreach $listName -> 0 items", endfor + 1)
                 } else {
-                    loopStack.addLast(LoopFrame(pc, items, itemVar, 0))
-                    ctx.variables.set(itemVar, items[0])
+                    val sensitive = listName?.let(ctx.variables::isArraySensitive) == true
+                    loopStack.addLast(LoopFrame(pc, items, itemVar, sensitive, 0))
+                    ctx.variables.set(itemVar, items[0], sensitive = sensitive)
                     outcome("foreach $listName -> ${items.size} items (1/${items.size})", pc + 1)
                 }
             }
@@ -165,7 +167,7 @@ class TaskRunner(
                 } else {
                     frame.index++
                     if (frame.index < frame.items.size) {
-                        ctx.variables.set(frame.itemVar, frame.items[frame.index])
+                        ctx.variables.set(frame.itemVar, frame.items[frame.index], sensitive = frame.sensitive)
                         outcome("loop ${frame.index + 1}/${frame.items.size}", frame.foreachIndex + 1)
                     } else {
                         loopStack.removeLast()
@@ -210,9 +212,11 @@ class TaskRunner(
             }
         val expansionReport = expandArgs(spec.args)
         val timeoutMs = actionTimeoutMs(spec.type)
-        val result = try {
+        val rawResult = try {
             withTimeout(timeoutMs) {
-                action.run(ctx, expansionReport.args)
+                ctx.variables.withSensitiveWrites(expansionReport.hasSecretDerivedValues()) {
+                    action.run(ctx.forAction(expansionReport.sensitiveArgumentNames()), expansionReport.args)
+                }
             }
         } catch (e: TimeoutCancellationException) {
             ActionResult.Failure("timed out after ${timeoutMs / 1000}s")
@@ -220,6 +224,11 @@ class TaskRunner(
             throw e
         } catch (e: Exception) {
             ActionResult.Failure("threw: ${e.message}", e)
+        }
+        val result = if (rawResult is ActionResult.Failure && expansionReport.hasSecretDerivedValues()) {
+            ActionResult.Failure(SECRET_DERIVED_FAILURE)
+        } else {
+            rawResult
         }
         return result to traceFor(index, spec, started, result, expansionReport)
     }
@@ -248,7 +257,9 @@ class TaskRunner(
 
         // Pass any extra args as input variables; the shared store lets global outputs flow back.
         args.forEach { (key, value) ->
-            if (key !in SUB_TASK_REF_KEYS) ctx.variables.set(key, value)
+            if (key !in SUB_TASK_REF_KEYS) {
+                ctx.variables.set(key, value, sensitive = expansionReport.isArgumentSensitive(key))
+            }
         }
 
         val child = TaskRunner(ctx, templateExpressionEngine, resolveTask, depth + 1)
@@ -308,17 +319,33 @@ class TaskRunner(
         val templateScope = ctx.variables.toTemplateScope(ctx.eventVariables)
         val expansions = mutableListOf<ActionArgumentExpansionTrace>()
         val expandedArgs = args.mapValues { (name, rawValue) ->
-            val legacyExpanded = ctx.variables.expand(rawValue)
-            if (!legacyExpanded.contains("{{")) return@mapValues legacyExpanded
+            val legacy = ctx.variables.expandTracked(rawValue)
+            if (!legacy.value.contains("{{")) {
+                if (legacy.isSecretDerived) {
+                    expansions += ActionArgumentExpansionTrace(
+                        argName = name,
+                        rawValue = rawValue,
+                        expandedValue = REDACTED_VALUE,
+                        expressions = emptyList(),
+                        warnings = emptyList(),
+                        isSecretDerived = true,
+                    )
+                }
+                return@mapValues legacy.value
+            }
 
-            val result = templateExpressionEngine.expand(legacyExpanded, templateScope)
-            if (result.traces.isNotEmpty() || result.warnings.isNotEmpty()) {
+            val result = templateExpressionEngine.expand(legacy.value, templateScope)
+            val isSecretDerived = legacy.isSecretDerived || result.traces.any { it.isSecretDerived }
+            if (result.traces.isNotEmpty() || result.warnings.isNotEmpty() || isSecretDerived) {
                 expansions += ActionArgumentExpansionTrace(
                     argName = name,
                     rawValue = rawValue,
-                    expandedValue = result.value,
-                    expressions = result.traces,
+                    expandedValue = if (isSecretDerived) REDACTED_VALUE else result.value,
+                    expressions = result.traces.map { trace ->
+                        if (trace.isSecretDerived) trace.copy(value = REDACTED_VALUE) else trace
+                    },
                     warnings = result.warnings,
+                    isSecretDerived = isSecretDerived,
                 )
             }
             result.value
@@ -379,6 +406,7 @@ data class ActionArgumentExpansionTrace(
     val expandedValue: String,
     val expressions: List<TemplateExpansionTrace>,
     val warnings: List<String>,
+    val isSecretDerived: Boolean = false,
 )
 
 fun ActionExecutionTrace.toSummaryLine(): String =
@@ -403,12 +431,22 @@ private data class ActionArgumentExpansionReport(
         return expansions
             .take(MAX_SUMMARY_ARGS)
             .joinToString(", ") { expansion ->
-                "${expansion.argName}=${summarizeArgValue(expansion.argName, expansion.expandedValue)}"
+                "${expansion.argName}=${summarizeArgValue(expansion.argName, expansion.expandedValue, expansion.isSecretDerived)}"
             }
             .let { summary ->
                 val remaining = expansions.size - MAX_SUMMARY_ARGS
                 if (remaining > 0) "$summary, +$remaining more" else summary
             }
+    }
+
+    fun hasSecretDerivedValues(): Boolean = expansions.any { it.isSecretDerived }
+
+    fun sensitiveArgumentNames(): Set<String> = expansions
+        .filter { it.isSecretDerived }
+        .mapTo(linkedSetOf()) { it.argName }
+
+    fun isArgumentSensitive(name: String): Boolean = expansions.any {
+        it.argName == name && it.isSecretDerived
     }
 
     companion object {
@@ -434,7 +472,7 @@ private fun ActionExecutionTrace.toRunLogLines(): List<String> = buildList {
 
 private fun ActionArgumentExpansionTrace.toTemplateDiagnosticLines(): List<String> =
     expressions.map { expressionTrace ->
-        val sensitive = isSensitiveArgName(argName)
+        val sensitive = isSecretDerived || isSensitiveArgName(argName) || expressionTrace.isSecretDerived
         listOf(
             TEMPLATE_TRACE_PREFIX,
             argName.toLogField(),
@@ -445,8 +483,8 @@ private fun ActionArgumentExpansionTrace.toTemplateDiagnosticLines(): List<Strin
         ).joinToString("\t")
     }
 
-private fun summarizeArgValue(argName: String, value: String): String {
-    if (isSensitiveArgName(argName)) {
+private fun summarizeArgValue(argName: String, value: String, forceRedact: Boolean = false): String {
+    if (forceRedact || isSensitiveArgName(argName)) {
         return REDACTED_VALUE
     }
     val singleLine = value.replace(Regex("""\s+"""), " ").trim()
@@ -480,6 +518,7 @@ private val SENSITIVE_ARG_TOKENS = listOf(
 )
 private const val TEMPLATE_TRACE_PREFIX = "Template:"
 private const val REDACTED_VALUE = "<redacted>"
+private const val SECRET_DERIVED_FAILURE = "Action failed; details redacted because an input depends on a secret"
 private const val MAX_SUMMARY_ARGS = 4
 private const val MAX_SUMMARY_VALUE_LENGTH = 80
 private const val MAX_TEMPLATE_TRACE_LINES_PER_ACTION = 8

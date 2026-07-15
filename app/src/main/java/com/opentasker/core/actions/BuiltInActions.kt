@@ -16,6 +16,7 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.engine.isArgumentSensitive
 import com.opentasker.core.platform.AndroidAudioHardening
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -184,10 +185,21 @@ class SetVariableAction : Action {
             if (!ctx.variables.setAtPath(name, value)) {
                 return ActionResult.Failure("invalid path: $name")
             }
-            ctx.logger("Set path \$$name = $value")
+            val baseName = name.takeWhile { it != '.' && it != '[' }
+            val loggedValue = if (ctx.isArgumentSensitive("value") || ctx.variables.isSensitive(baseName)) {
+                REDACTED_VARIABLE_VALUE
+            } else {
+                value
+            }
+            ctx.logger("Set path \$$name = $loggedValue")
         } else {
             ctx.variables.set(name, value)
-            ctx.logger("Set \$$name = $value")
+            val loggedValue = if (ctx.isArgumentSensitive("value") || ctx.variables.isSensitive(name)) {
+                REDACTED_VARIABLE_VALUE
+            } else {
+                value
+            }
+            ctx.logger("Set \$$name = $loggedValue")
         }
         return ActionResult.Success
     }
@@ -212,11 +224,14 @@ class PersistVariableAction : Action {
         val globalName = args["global_name"] ?: name.replaceFirstChar { it.uppercase() }
         val value = ctx.variables.get(name)
             ?: return ActionResult.Failure("variable '$name' is not set")
-        ctx.variables.set(globalName, value)
-        ctx.logger("Persist \$$name → \$$globalName = $value")
+        val sensitive = ctx.variables.isSensitive(name)
+        ctx.variables.set(globalName, value, sensitive = sensitive)
+        ctx.logger("Persist \$$name → \$$globalName = ${if (sensitive) REDACTED_VARIABLE_VALUE else value}")
         return ActionResult.Success
     }
 }
+
+private const val REDACTED_VARIABLE_VALUE = "<redacted>"
 
 /**
  * Say (text-to-speech) action.

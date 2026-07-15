@@ -1,0 +1,156 @@
+package com.opentasker.core.storage
+
+import com.opentasker.core.model.Variable
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class VariableSecretStorageTest {
+    @Test
+    fun aesGcmEnvelopeAuthenticatesValueAndVariableName() {
+        val codec = codec(newKey())
+        val envelope = codec.encrypt("API_TOKEN", "super-secret-value")
+
+        assertTrue(envelope.startsWith("otsec:v1:"))
+        assertFalse(envelope.contains("super-secret-value"))
+        assertEquals("super-secret-value", codec.decrypt("API_TOKEN", envelope).getOrThrow())
+        assertTrue(codec.decrypt("OTHER_TOKEN", envelope).isFailure)
+
+        val tamperIndex = envelope.lastIndex - 2
+        val tampered = envelope.replaceRange(
+            tamperIndex,
+            tamperIndex + 1,
+            if (envelope[tamperIndex] == 'A') "B" else "A",
+        )
+        assertTrue(codec.decrypt("API_TOKEN", tampered).isFailure)
+    }
+
+    @Test
+    fun secretRowsStoreOnlyCiphertextAndDecodeForUi() = runBlocking {
+        val dao = FakeVariableDao()
+        val repository = VariableRepository(dao, codec(newKey()))
+
+        repository.upsert(Variable("API_TOKEN", "token-123", isGlobal = true, isSecret = true))
+
+        val stored = dao.get("API_TOKEN")!!
+        assertTrue(stored.isSecret)
+        assertNotEquals("token-123", stored.value)
+        assertFalse(stored.value.contains("token-123"))
+        assertEquals("token-123", repository.observeGlobals().first().single().value)
+    }
+
+    @Test
+    fun missingOrReplacedKeystoreKeyRequiresReentryWithoutReturningCiphertext() = runBlocking {
+        val dao = FakeVariableDao()
+        VariableRepository(dao, codec(newKey())).upsert(
+            Variable("API_TOKEN", "token-123", isGlobal = true, isSecret = true),
+        )
+
+        val restoredOnDifferentDevice = VariableRepository(dao, codec(newKey()))
+        val variable = restoredOnDifferentDevice.observeGlobals().first().single()
+        val runtime = restoredOnDifferentDevice.runtimeGlobals()
+
+        assertTrue(variable.isSecret)
+        assertFalse(variable.secretAvailable)
+        assertEquals("", variable.value)
+        assertFalse("Unavailable secrets must not be expanded", runtime.values.containsKey("API_TOKEN"))
+        assertEquals(setOf("API_TOKEN"), runtime.unavailableSecretNames)
+
+        restoredOnDifferentDevice.upsert(variable.copy(value = "replacement", secretAvailable = true))
+        assertEquals("replacement", restoredOnDifferentDevice.runtimeGlobals().values["API_TOKEN"])
+    }
+
+    @Test
+    fun legacyNameMaskedVariablesAreEncryptedBeforeReadOrExport() = runBlocking {
+        val dao = FakeVariableDao(
+            VariableEntity("PASSWORD", "legacy-plaintext", isGlobal = true, isSecret = true),
+            VariableEntity("COUNT", "7", isGlobal = true),
+        )
+        val repository = VariableRepository(dao, codec(newKey()))
+
+        val observed = repository.observeGlobals().first()
+        val storedSecret = dao.get("PASSWORD")!!
+        val exported = repository.ordinaryExport()
+
+        assertTrue(storedSecret.isSecret)
+        assertFalse(storedSecret.value.contains("legacy-plaintext"))
+        assertTrue(observed.single { it.name == "PASSWORD" }.isSecret)
+        assertEquals(listOf("COUNT"), exported.variables.map { it.name })
+        assertEquals(1, exported.omittedSecretCount)
+    }
+
+    @Test
+    fun legacyValueThatOnlyLooksLikeAnEnvelopeIsStillEncrypted() = runBlocking {
+        val legacyValue = "otsec:v1:not-a-valid-envelope"
+        val dao = FakeVariableDao(
+            VariableEntity("API_TOKEN", legacyValue, isGlobal = true, isSecret = true),
+        )
+        val repository = VariableRepository(dao, codec(newKey()))
+
+        repository.requireEncryptedSecretRows()
+
+        assertNotEquals(legacyValue, dao.get("API_TOKEN")!!.value)
+        assertEquals(legacyValue, repository.runtimeGlobals().values["API_TOKEN"])
+    }
+
+    @Test
+    fun backupGuardFailsClosedWhenLegacyPlaintextCannotBeEncrypted() = runBlocking {
+        val dao = FakeVariableDao(
+            VariableEntity("API_TOKEN", "legacy-plaintext", isGlobal = true, isSecret = true),
+        )
+        val repository = VariableRepository(
+            dao,
+            object : VariableSecretCodec {
+                override fun encrypt(variableName: String, plaintext: String): String = error("Keystore unavailable")
+                override fun decrypt(variableName: String, envelope: String): Result<String> = Result.failure(
+                    IllegalStateException("Keystore unavailable"),
+                )
+            },
+        )
+
+        val failure = runCatching { repository.requireEncryptedSecretRows() }.exceptionOrNull()
+
+        assertTrue(failure is IllegalStateException)
+        assertEquals("legacy-plaintext", dao.get("API_TOKEN")!!.value)
+    }
+
+    private fun codec(key: SecretKey): VariableSecretCodec = AesGcmVariableSecretCodec(keyProvider = { key })
+
+    private fun newKey(): SecretKey = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+
+    private class FakeVariableDao(vararg initial: VariableEntity) : VariableDao {
+        private val state = MutableStateFlow(initial.toList())
+
+        override suspend fun insert(v: VariableEntity) {
+            state.value = state.value.filterNot { it.name == v.name } + v
+        }
+
+        override suspend fun update(v: VariableEntity) {
+            insert(v)
+        }
+
+        override suspend fun delete(v: VariableEntity) {
+            deleteByName(v.name)
+        }
+
+        override suspend fun deleteByName(name: String) {
+            state.value = state.value.filterNot { it.name == name }
+        }
+
+        override suspend fun get(name: String): VariableEntity? = state.value.firstOrNull { it.name == name }
+
+        override suspend fun getAll(): List<VariableEntity> = state.value
+
+        override suspend fun getAllGlobal(): List<VariableEntity> = state.value.filter { it.isGlobal }
+
+        override fun getAllGlobalAsFlow(): Flow<List<VariableEntity>> = state
+    }
+}

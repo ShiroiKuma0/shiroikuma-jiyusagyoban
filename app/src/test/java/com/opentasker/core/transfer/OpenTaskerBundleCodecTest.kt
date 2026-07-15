@@ -114,4 +114,36 @@ class OpenTaskerBundleCodecTest {
 
         assertEquals(bundle, decoded)
     }
+
+    @Test
+    fun ordinaryBundleBuildOmitsSecretValuesAndRecordsReentryWarning() {
+        val bundle = OpenTaskerBundleCodec.build(
+            appVersion = "0.2.75",
+            exportedAtEpochMs = 123L,
+            profiles = emptyList(),
+            tasks = emptyList(),
+            variables = listOf(
+                Variable("COUNT", "7", isGlobal = true),
+                Variable("API_TOKEN", "must-not-export", isGlobal = true, isSecret = true),
+            ),
+        )
+
+        val encoded = OpenTaskerBundleCodec.encode(bundle)
+        assertEquals(listOf("COUNT"), bundle.variables.map { it.name })
+        assertFalse(encoded.contains("must-not-export"))
+        assertTrue(bundle.metadata.warnings.any { it.contains("must be re-entered") })
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun codecRejectsDirectSecretSerialization() {
+        OpenTaskerBundleCodec.encode(
+            OpenTaskerBundle(
+                appVersion = "0.2.75",
+                exportedAtEpochMs = 123L,
+                variables = listOf(
+                    Variable("API_TOKEN", "must-not-export", isGlobal = true, isSecret = true),
+                ),
+            ),
+        )
+    }
 }

@@ -8,13 +8,13 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * Add new migrations here as the schema evolves.
  */
 object DatabaseMigrations {
-    
+
     val MIGRATION_1_2 = object : Migration(1, 2) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE profiles ADD COLUMN automationMode TEXT NOT NULL DEFAULT 'SINGLE'")
         }
     }
-    
+
     /**
      * Get all configured migrations in order.
      */
@@ -46,26 +46,47 @@ object DatabaseMigrations {
         }
     }
 
+    val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE variables ADD COLUMN isSecret INTEGER NOT NULL DEFAULT 0")
+            // Preserve the previous name-based masking policy exactly, but mark only rows that
+            // existed during this schema migration. VariableRepository encrypts these flagged
+            // plaintext values immediately after Room opens; new v6 rows use explicit UI state.
+            db.execSQL(
+                """
+                UPDATE variables SET isSecret = 1
+                WHERE lower(name) LIKE '%password%'
+                   OR lower(name) LIKE '%token%'
+                   OR lower(name) LIKE '%secret%'
+                   OR lower(name) LIKE '%key%'
+                   OR lower(name) LIKE '%credential%'
+                   OR lower(name) LIKE '%auth%'
+                """.trimIndent(),
+            )
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
             MIGRATION_3_4,
             MIGRATION_4_5,
+            MIGRATION_5_6,
         )
     }
 }
 
 /**
  * Documentation for future schema changes:
- * 
+ *
  * Version 1:
  *   - profiles: id, name, enabled, enterTaskId, exitTaskId, cooldownSec, contextsJson
  *   - tasks: id, name, priority, collisionMode, actionsJson
  *   - scenes: id, name, widthDp, heightDp, elementsJson
  *   - variables: name (pk), value, isGlobal
  *   - run_logs: id, taskId, taskName, timestamp, durationMs, success, message
- * 
+ *
  * Version 2:
  *   - profiles: adds automationMode (SINGLE, RESTART, QUEUED, PARALLEL)
  *
@@ -75,8 +96,11 @@ object DatabaseMigrations {
  * Version 4:
  *   - run_logs: adds nullable source (typed trigger key) and sourceLabel (human label)
  *
- * Version 5 (current):
+ * Version 5:
  *   - profiles: adds nullable profileGroup for folder/tag organization
+ *
+ * Version 6 (current):
+ *   - variables: adds isSecret; secret rows store authenticated Keystore ciphertext in value
  *
  * To add a migration:
  * 1. Increment database version in @Database annotation

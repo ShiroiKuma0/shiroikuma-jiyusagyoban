@@ -24,7 +24,7 @@ import com.opentasker.core.storage.EditHistoryEntity
 import com.opentasker.core.storage.RunLogRetentionPolicy
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.StorageDecodeIssue
-import com.opentasker.core.storage.VariableEntity
+import com.opentasker.core.storage.VariableRepository
 import com.opentasker.core.storage.minimumTimestamp
 import com.opentasker.core.storage.normalized
 import com.opentasker.core.storage.toEntity
@@ -101,7 +101,8 @@ class ActiveAutomationViewModel(
     private val appContext: Context,
 ) : ViewModel() {
     private val locationDwellStateStore = LocationDwellStateStore(appContext)
-    private val bundleRepository = OpenTaskerBundleRepository(db)
+    private val variableRepository = VariableRepository(db.variableDao())
+    private val bundleRepository = OpenTaskerBundleRepository(db, variableRepository)
     private val runLogRetentionSettings = RunLogRetentionSettings(appContext)
     private val databaseBackupManager = DatabaseBackupManager(appContext, db)
 
@@ -160,9 +161,9 @@ class ActiveAutomationViewModel(
         .map { entities -> entities.map { it.toDomain() }.toImmutableList() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
-    val globalVariables: StateFlow<ImmutableList<Variable>> = db.variableDao()
-        .getAllGlobalAsFlow()
-        .map { entities -> entities.map { it.toDomain() }.toImmutableList() }
+    val globalVariables: StateFlow<ImmutableList<Variable>> = variableRepository
+        .observeGlobals()
+        .map { variables -> variables.toImmutableList() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
     private val events = Channel<String>(Channel.BUFFERED)
@@ -581,15 +582,20 @@ class ActiveAutomationViewModel(
         db.editHistoryDao().deleteFor(EditHistoryDao.TYPE_PROFILE, profileId)
     }
 
-    fun updateVariable(name: String, value: String) {
+    fun updateVariable(name: String, value: String, isSecret: Boolean, successMessage: String) {
         viewModelScope.launch {
-            db.variableDao().insert(VariableEntity(name, value, isGlobal = true))
+            runCatching {
+                variableRepository.upsert(Variable(name, value, isGlobal = true, isSecret = isSecret))
+                events.send(successMessage)
+            }.onFailure { error ->
+                events.send("Error: ${error.message ?: "Variable could not be saved"}")
+            }
         }
     }
 
     fun deleteVariable(name: String) {
         viewModelScope.launch {
-            db.variableDao().delete(VariableEntity(name, "", isGlobal = true))
+            variableRepository.delete(name)
         }
     }
 

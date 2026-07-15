@@ -13,8 +13,25 @@ class ActionContext(
     val variables: VariableStore,
     val eventVariables: Map<String, String> = emptyMap(),
     val audioEligibility: AudioRuntimeEligibility = AudioRuntimeEligibility(),
+    val sensitiveArgumentNames: Set<String> = emptySet(),
     val logger: (String) -> Unit = {},
 )
+
+fun ActionContext.forAction(sensitiveArgumentNames: Set<String>): ActionContext {
+    if (sensitiveArgumentNames.isEmpty()) return this
+    return ActionContext(
+        app = app,
+        variables = variables,
+        eventVariables = eventVariables,
+        audioEligibility = audioEligibility,
+        logger = { logger(SECRET_DERIVED_ACTION_LOG) },
+        sensitiveArgumentNames = sensitiveArgumentNames,
+    )
+}
+
+fun ActionContext.isArgumentSensitive(name: String): Boolean = name in sensitiveArgumentNames
+
+internal const val SECRET_DERIVED_ACTION_LOG = "<redacted: action output depends on a secret>"
 
 /** Result of executing a single Action. */
 sealed class ActionResult {

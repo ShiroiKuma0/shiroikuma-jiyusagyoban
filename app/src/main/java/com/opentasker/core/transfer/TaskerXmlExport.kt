@@ -52,7 +52,11 @@ object TaskerXmlExporter {
             appendProfile(sb, profile, taskMap, warnings)
         }
 
-        variables.forEach { variable ->
+        val omittedSecretCount = variables.count { it.isSecret }
+        if (omittedSecretCount > 0) {
+            warnings += "$omittedSecretCount secret variable(s) were omitted and must be re-entered after import."
+        }
+        variables.filterNot { it.isSecret }.forEach { variable ->
             appendVariable(sb, variable)
         }
 
@@ -62,7 +66,7 @@ object TaskerXmlExporter {
             xml = sb.toString(),
             exportedTaskCount = tasks.size,
             exportedProfileCount = profiles.size,
-            exportedVariableCount = variables.size,
+            exportedVariableCount = variables.count { !it.isSecret },
             skippedActions = skipped,
             warnings = warnings,
         )

@@ -30,6 +30,7 @@ class LocalizationSourceTest {
             "com/opentasker/ui/screens/SceneLibraryScreen.kt",
             "com/opentasker/ui/screens/SceneLibraryCards.kt",
             "com/opentasker/ui/screens/SceneOverlayControls.kt",
+            "com/opentasker/ui/screens/VariablesScreen.kt",
             "com/opentasker/widget/TaskWidgetConfigActivity.kt",
         )
         val forbiddenPatterns = mapOf(

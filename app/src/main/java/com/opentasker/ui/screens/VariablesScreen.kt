@@ -14,10 +14,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -25,6 +29,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -37,35 +42,36 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.model.Variable
+import com.opentasker.core.storage.AesGcmVariableSecretCodec
 import com.opentasker.ui.theme.DesignSystem
 
-private val SENSITIVE_NAMES = setOf("password", "token", "secret", "key", "credential", "auth")
-
-private fun isSensitive(name: String): Boolean =
-    SENSITIVE_NAMES.any { name.lowercase().contains(it) }
+private val VARIABLE_NAME_PATTERN = Regex("^[A-Z][A-Z0-9_]{0,63}$")
 
 @Composable
 fun VariablesScreen(
     variables: List<Variable>,
     contentPadding: PaddingValues,
-    onUpdate: (name: String, value: String) -> Unit,
+    onUpdate: (name: String, value: String, isSecret: Boolean, successMessage: String) -> Unit,
     onDelete: (name: String) -> Unit,
     onMessage: (String) -> Unit,
 ) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var editTargetName by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingDeleteName by rememberSaveable { mutableStateOf<String?>(null) }
+    var showCreateDialog by rememberSaveable { mutableStateOf(false) }
 
     val filtered = remember(variables, searchQuery) {
         if (searchQuery.isBlank()) variables
         else variables.filter {
             it.name.contains(searchQuery, ignoreCase = true) ||
-                it.value.contains(searchQuery, ignoreCase = true)
+                (!it.isSecret && it.value.contains(searchQuery, ignoreCase = true))
         }
     }
 
@@ -80,7 +86,8 @@ fun VariablesScreen(
             VariableSummaryCard(
                 totalCount = variables.size,
                 visibleCount = filtered.size,
-                sensitiveCount = variables.count { isSensitive(it.name) },
+                sensitiveCount = variables.count { it.isSecret },
+                onCreate = { showCreateDialog = true },
             )
         }
         item {
@@ -129,6 +136,19 @@ fun VariablesScreen(
         editTargetName?.let { targetName -> variables.firstOrNull { it.name == targetName } }
     }
 
+    if (showCreateDialog) {
+        val createdMsg = stringResource(R.string.variables_created)
+        VariableEditorDialog(
+            variable = null,
+            existingNames = variables.mapTo(hashSetOf()) { it.name },
+            onDismiss = { showCreateDialog = false },
+            onSave = { name, value, isSecret ->
+                onUpdate(name, value, isSecret, createdMsg)
+                showCreateDialog = false
+            },
+        )
+    }
+
     pendingDeleteName?.let { name ->
         val deletedMsg = stringResource(R.string.variables_deleted, name)
         AlertDialog(
@@ -167,13 +187,13 @@ fun VariablesScreen(
 
     editTarget?.let { target ->
         val updatedMsg = stringResource(R.string.variables_updated, target.name)
-        EditVariableDialog(
+        VariableEditorDialog(
             variable = target,
+            existingNames = variables.mapTo(hashSetOf()) { it.name },
             onDismiss = { editTargetName = null },
-            onSave = { newValue ->
-                onUpdate(target.name, newValue)
+            onSave = { name, newValue, isSecret ->
+                onUpdate(name, newValue, isSecret, updatedMsg)
                 editTargetName = null
-                onMessage(updatedMsg)
             },
         )
     }
@@ -184,6 +204,7 @@ private fun VariableSummaryCard(
     totalCount: Int,
     visibleCount: Int,
     sensitiveCount: Int,
+    onCreate: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -202,13 +223,17 @@ private fun VariableSummaryCard(
                     )
                 }
                 VariablePill(
-                    label = "$visibleCount shown",
+                    label = stringResource(R.string.variables_shown_count, visibleCount),
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                VariableMetric("$totalCount", "Saved", Modifier.weight(1f))
+                VariableMetric("$totalCount", stringResource(R.string.variables_saved_count_label), Modifier.weight(1f))
                 VariableMetric("$sensitiveCount", stringResource(R.string.label_masked), Modifier.weight(1f))
+            }
+            Button(onClick = onCreate, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.variables_create))
+                Text(stringResource(R.string.variables_create), modifier = Modifier.padding(start = 6.dp))
             }
         }
     }
@@ -244,7 +269,7 @@ private fun VariableEmptyState(title: String, body: String) {
         ) {
             Icon(
                 Icons.Filled.Info,
-                contentDescription = "Info",
+                contentDescription = stringResource(R.string.content_description_info),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(22.dp),
             )
@@ -262,7 +287,7 @@ private fun VariableRow(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val sensitive = isSensitive(variable.name)
+    val sensitive = variable.isSecret
     Card(
         onClick = onEdit,
         modifier = Modifier.fillMaxWidth(),
@@ -286,7 +311,11 @@ private fun VariableRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = if (sensitive) stringResource(R.string.variables_masked_value) else variable.value,
+                    text = when {
+                        !sensitive -> variable.value
+                        !variable.secretAvailable -> stringResource(R.string.variables_secret_unavailable)
+                        else -> stringResource(R.string.variables_masked_value)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
@@ -326,26 +355,117 @@ private fun VariablePill(label: String, color: Color) {
 }
 
 @Composable
-private fun EditVariableDialog(
-    variable: Variable,
+private fun VariableEditorDialog(
+    variable: Variable?,
+    existingNames: Set<String>,
     onDismiss: () -> Unit,
-    onSave: (String) -> Unit,
+    onSave: (String, String, Boolean) -> Unit,
 ) {
-    var value by rememberSaveable(variable.name) { mutableStateOf(variable.value) }
+    val stateKey = variable?.name ?: "new-variable"
+    var name by rememberSaveable(stateKey) { mutableStateOf(variable?.name.orEmpty()) }
+    // Never place plaintext secrets in Android saved-instance state.
+    var value by remember(stateKey) { mutableStateOf(variable?.value.orEmpty()) }
+    var isSecret by rememberSaveable(stateKey) { mutableStateOf(variable?.isSecret == true) }
+    var revealed by remember(stateKey) { mutableStateOf(false) }
+    val normalizedName = name.trim().uppercase()
+    val duplicateName = variable == null && normalizedName in existingNames
+    val valueBytes = value.toByteArray(Charsets.UTF_8).size
+    val needsReentry = variable?.isSecret == true && !variable.secretAvailable
+    val canSave = VARIABLE_NAME_PATTERN.matches(normalizedName) &&
+        !duplicateName &&
+        valueBytes <= AesGcmVariableSecretCodec.MAX_SECRET_PLAINTEXT_BYTES &&
+        (!needsReentry || value.isNotEmpty())
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("%${variable.name}") },
-        text = {
-            OutlinedTextField(
-                value = value,
-                onValueChange = { value = it },
-                label = { Text(stringResource(R.string.variables_value_label, variable.name)) },
-                modifier = Modifier.fillMaxWidth(),
+        title = {
+            Text(
+                if (variable == null) stringResource(R.string.variables_create) else "%${variable.name}",
             )
         },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+                if (variable == null) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it.uppercase().filter { char -> char.isLetterOrDigit() || char == '_' }.take(64) },
+                        label = { Text(stringResource(R.string.variables_name_label)) },
+                        isError = name.isNotEmpty() && (!VARIABLE_NAME_PATTERN.matches(normalizedName) || duplicateName),
+                        supportingText = if (duplicateName) {
+                            { Text(stringResource(R.string.variables_name_duplicate)) }
+                        } else {
+                            { Text(stringResource(R.string.variables_name_helper)) }
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                if (needsReentry) {
+                    Text(
+                        stringResource(R.string.variables_secret_reentry_helper),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it.take(AesGcmVariableSecretCodec.MAX_SECRET_PLAINTEXT_BYTES) },
+                    label = {
+                        Text(
+                            stringResource(
+                                R.string.variables_value_label,
+                                variable?.name ?: normalizedName.ifBlank { stringResource(R.string.variables_default_name) },
+                            ),
+                        )
+                    },
+                    visualTransformation = if (isSecret && !revealed) PasswordVisualTransformation() else VisualTransformation.None,
+                    trailingIcon = if (isSecret) {
+                        {
+                            IconButton(onClick = { revealed = !revealed }) {
+                                Icon(
+                                    if (revealed) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                    contentDescription = stringResource(
+                                        if (revealed) R.string.variables_hide_secret else R.string.variables_reveal_secret,
+                                    ),
+                                )
+                            }
+                        }
+                    } else {
+                        null
+                    },
+                    isError = valueBytes > AesGcmVariableSecretCodec.MAX_SECRET_PLAINTEXT_BYTES,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.variables_secret_label), style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            stringResource(R.string.variables_secret_helper),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = isSecret,
+                        onCheckedChange = {
+                            isSecret = it
+                            revealed = false
+                        },
+                    )
+                }
+            }
+        },
         confirmButton = {
-            TextButton(onClick = { onSave(value) }) { Text(stringResource(R.string.action_save)) }
+            TextButton(
+                enabled = canSave,
+                onClick = { onSave(normalizedName, value, isSecret) },
+            ) {
+                Text(stringResource(R.string.action_save))
+            }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }

@@ -9,6 +9,7 @@ import com.opentasker.core.model.SceneElement
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.VariableRepository
 import com.opentasker.core.storage.toEntity
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -82,17 +83,29 @@ object OpenTaskerBundleCodec {
         tasks: List<Task>,
         variables: List<Variable> = emptyList(),
         scenes: List<Scene> = emptyList(),
+        omittedSecretVariableCount: Int = 0,
         name: String = "OpenTasker Export",
         description: String = "",
     ): OpenTaskerBundle {
         val sortedTasks = tasks.sortedWith(compareBy<Task> { it.name.lowercase() }.thenBy { it.id })
         val sortedProfiles = profiles.sortedWith(compareBy<Profile> { it.name.lowercase() }.thenBy { it.id })
-        val sortedVariables = variables.sortedWith(compareBy<Variable> { it.name.lowercase() }.thenBy { it.name })
+        val omittedSecretCount = omittedSecretVariableCount + variables.count { it.isSecret }
+        val sortedVariables = variables
+            .filterNot { it.isSecret }
+            .sortedWith(compareBy<Variable> { it.name.lowercase() }.thenBy { it.name })
         val sortedScenes = scenes.sortedWith(compareBy<Scene> { it.name.lowercase() }.thenBy { it.id })
         val base = OpenTaskerBundle(
             appVersion = appVersion,
             exportedAtEpochMs = exportedAtEpochMs,
-            metadata = BundleMetadata(name = name, description = description),
+            metadata = BundleMetadata(
+                name = name,
+                description = description,
+                warnings = if (omittedSecretCount > 0) {
+                    listOf("$omittedSecretCount secret variable(s) were omitted and must be re-entered after import.")
+                } else {
+                    emptyList()
+                },
+            ),
             tasks = sortedTasks,
             profiles = sortedProfiles,
             variables = sortedVariables,
@@ -102,12 +115,17 @@ object OpenTaskerBundleCodec {
         return base.copy(
             metadata = base.metadata.copy(
                 capabilityRequirements = capabilityRequirements(sortedTasks),
-                warnings = plan.warnings + plan.lossyWarnings,
+                warnings = base.metadata.warnings + plan.warnings + plan.lossyWarnings,
             )
         )
     }
 
-    fun encode(bundle: OpenTaskerBundle): String = json.encodeToString(bundle)
+    fun encode(bundle: OpenTaskerBundle): String {
+        require(bundle.variables.none { it.isSecret }) {
+            "Secret variable values cannot be written to an ordinary OpenTasker bundle."
+        }
+        return json.encodeToString(bundle)
+    }
 
     @Throws(SerializationException::class, IllegalArgumentException::class)
     fun decode(rawJson: String): OpenTaskerBundle = decode(rawJson, ImportResourceBudget.Default)
@@ -216,7 +234,10 @@ object OpenTaskerBundleCodec {
             }
 }
 
-class OpenTaskerBundleRepository(private val db: AppDatabase) {
+class OpenTaskerBundleRepository(
+    private val db: AppDatabase,
+    private val variableRepository: VariableRepository = VariableRepository(db.variableDao()),
+) {
     suspend fun exportBundle(
         appVersion: String,
         exportedAtEpochMs: Long = System.currentTimeMillis(),
@@ -225,7 +246,7 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
     ): OpenTaskerBundle {
         val tasks = db.taskDao().getAll().map { it.toDomain() }
         val profiles = db.profileDao().getAll().map { it.toDomain() }
-        val variables = db.variableDao().getAll().map { it.toDomain() }
+        val variableExport = variableRepository.ordinaryExport()
         val scenes = db.sceneDao().getAll().map { it.toDomain() }
 
         return OpenTaskerBundleCodec.build(
@@ -233,8 +254,9 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             exportedAtEpochMs = exportedAtEpochMs,
             profiles = profiles,
             tasks = tasks,
-            variables = variables,
+            variables = variableExport.variables,
             scenes = scenes,
+            omittedSecretVariableCount = variableExport.omittedSecretCount,
             name = name,
             description = description,
         )
@@ -261,12 +283,8 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
 
             bundle.variables.sortedWith(compareBy<Variable> { it.name.lowercase() }.thenBy { it.name }).forEach { variable ->
                 val existing = db.variableDao().get(variable.name)
-                if (existing == null) {
-                    db.variableDao().insert(variable.toEntity())
-                    insertedVariables++
-                } else {
-                    db.variableDao().update(variable.toEntity())
-                }
+                variableRepository.importVariable(variable)
+                if (existing == null) insertedVariables++
             }
 
             bundle.profiles.sortedWith(compareBy<Profile> { it.name.lowercase() }.thenBy { it.id }).forEach { profile ->

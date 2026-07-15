@@ -85,7 +85,11 @@ class TextJoinAction : Action {
         val delimiter = args["delimiter"] ?: ","
         val varName = outputVar(args, "joined")
         val items = ctx.variables.getArrayItems(arrayName) ?: emptyList()
-        ctx.variables.set(varName, TextOps.join(items, delimiter))
+        ctx.variables.set(
+            varName,
+            TextOps.join(items, delimiter),
+            sensitive = ctx.variables.isArraySensitive(arrayName),
+        )
         ctx.logger("text.join -> \$$varName (${items.size} item(s))")
         return ActionResult.Success
     }

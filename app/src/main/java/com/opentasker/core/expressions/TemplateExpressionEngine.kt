@@ -18,6 +18,9 @@ data class TemplateScope(
     val task: Map<String, String> = emptyMap(),
     val event: Map<String, String> = emptyMap(),
     val arrays: Map<String, List<String>> = emptyMap(),
+    val sensitiveGlobal: Set<String> = emptySet(),
+    val sensitiveTask: Set<String> = emptySet(),
+    val sensitiveArrays: Set<String> = emptySet(),
 )
 
 data class TemplateExpressionLimits(
@@ -44,6 +47,7 @@ data class TemplateExpansionTrace(
     val path: String,
     val functions: List<String> = emptyList(),
     val warning: String? = null,
+    val isSecretDerived: Boolean = false,
 )
 
 enum class TemplateValueSource {
@@ -189,6 +193,7 @@ class TemplateExpressionEngine(
                 path = current.path,
                 functions = functionNames,
                 warning = warnings.firstOrNull(),
+                isSecretDerived = current.isSecretDerived,
             ),
             warnings = warnings,
         )
@@ -207,26 +212,30 @@ class TemplateExpressionEngine(
                 normalized.removePrefix("task."),
                 scope.task,
                 TemplateValueSource.TASK,
+                scope.sensitiveTask,
             )
             normalized.startsWith("event.") -> resolveInMap(
                 normalized.removePrefix("event."),
                 scope.event,
                 TemplateValueSource.EVENT,
+                emptySet(),
             )
             normalized.startsWith("global.") -> resolveInMap(
                 normalized.removePrefix("global."),
                 scope.global,
                 TemplateValueSource.GLOBAL,
+                scope.sensitiveGlobal,
             )
             normalized.startsWith("array.") -> resolveArray(
                 normalized.removePrefix("array."),
                 scope.arrays,
+                scope.sensitiveArrays,
             )
-            else -> resolveInMap(normalized, scope.task, TemplateValueSource.TASK)
+            else -> resolveInMap(normalized, scope.task, TemplateValueSource.TASK, scope.sensitiveTask)
                 .takeIfResolved()
-                ?: resolveInMap(normalized, scope.event, TemplateValueSource.EVENT).takeIfResolved()
-                ?: resolveInMap(normalized, scope.global, TemplateValueSource.GLOBAL).takeIfResolved()
-                ?: resolveArray(normalized, scope.arrays).takeIfResolved()
+                ?: resolveInMap(normalized, scope.event, TemplateValueSource.EVENT, emptySet()).takeIfResolved()
+                ?: resolveInMap(normalized, scope.global, TemplateValueSource.GLOBAL, scope.sensitiveGlobal).takeIfResolved()
+                ?: resolveArray(normalized, scope.arrays, scope.sensitiveArrays).takeIfResolved()
                 ?: ResolvedValue("", TemplateValueSource.MISSING, normalized, missing = true)
         }
     }
@@ -246,9 +255,15 @@ class TemplateExpressionEngine(
         referenceText: String,
         values: Map<String, String>,
         source: TemplateValueSource,
+        sensitiveNames: Set<String>,
     ): ResolvedValue {
         val exact = values[referenceText]
-        if (exact != null) return ResolvedValue(exact, source, referenceText)
+        if (exact != null) return ResolvedValue(
+            exact,
+            source,
+            referenceText,
+            isSecretDerived = referenceText in sensitiveNames,
+        )
 
         val reference = parseReference(referenceText) ?: return ResolvedValue(
             value = "",
@@ -263,14 +278,26 @@ class TemplateExpressionEngine(
             missing = true,
         )
         if (reference.selectors.isEmpty()) {
-            return ResolvedValue(base, source, reference.base)
+            return ResolvedValue(
+                base,
+                source,
+                reference.base,
+                isSecretDerived = reference.base in sensitiveNames,
+            )
         }
-        return resolveJsonSelectors(base, reference.selectors, source, referenceText)
+        return resolveJsonSelectors(
+            base,
+            reference.selectors,
+            source,
+            referenceText,
+            isSecretDerived = reference.base in sensitiveNames,
+        )
     }
 
     private fun resolveArray(
         referenceText: String,
         arrays: Map<String, List<String>>,
+        sensitiveNames: Set<String>,
     ): ResolvedValue {
         val reference = parseReference(referenceText) ?: return ResolvedValue(
             value = "",
@@ -290,6 +317,7 @@ class TemplateExpressionEngine(
                 source = TemplateValueSource.ARRAY,
                 path = reference.base,
                 array = values,
+                isSecretDerived = reference.base in sensitiveNames,
             )
         }
 
@@ -305,13 +333,20 @@ class TemplateExpressionEngine(
             )
         }
         if (first is Selector.Count || reference.selectors.size == 1) {
-            return ResolvedValue(item, TemplateValueSource.ARRAY, referenceText, array = values)
+            return ResolvedValue(
+                item,
+                TemplateValueSource.ARRAY,
+                referenceText,
+                array = values,
+                isSecretDerived = reference.base in sensitiveNames,
+            )
         }
         return resolveJsonSelectors(
             jsonText = item,
             selectors = reference.selectors.drop(1),
             source = TemplateValueSource.ARRAY,
             path = referenceText,
+            isSecretDerived = reference.base in sensitiveNames,
         )
     }
 
@@ -320,6 +355,7 @@ class TemplateExpressionEngine(
         selectors: List<Selector>,
         source: TemplateValueSource,
         path: String,
+        isSecretDerived: Boolean,
     ): ResolvedValue {
         if (selectors.size > limits.maxJsonDepth) {
             return ResolvedValue("", TemplateValueSource.MISSING, path, missing = true)
@@ -370,7 +406,12 @@ class TemplateExpressionEngine(
             }
         }
 
-        return ResolvedValue(jsonElementToString(current), source, path)
+        return ResolvedValue(
+            jsonElementToString(current),
+            source,
+            path,
+            isSecretDerived = isSecretDerived,
+        )
     }
 
     private fun applyFunction(current: ResolvedValue, function: TemplateFunction): FunctionApplication {
@@ -658,6 +699,7 @@ class TemplateExpressionEngine(
         val path: String,
         val missing: Boolean = false,
         val array: List<String>? = null,
+        val isSecretDerived: Boolean = false,
     )
 
     private data class FunctionApplication(

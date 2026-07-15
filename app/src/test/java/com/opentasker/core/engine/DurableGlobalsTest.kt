@@ -26,6 +26,21 @@ class DurableGlobalsTest {
     }
 
     @Test
+    fun changedGlobalsPersistsSensitivityOnlyChanges() {
+        val same = mapOf("TOKEN" to "value")
+
+        val changed = changedGlobals(
+            before = same,
+            after = same,
+            beforeSensitive = emptySet(),
+            afterSensitive = setOf("TOKEN"),
+        )
+
+        assertEquals(listOf("TOKEN"), changed.map { it.name })
+        assertTrue(changed.single().isSecret)
+    }
+
+    @Test
     fun seededGlobalsAreReadableAndSnapshotted() {
         val store = VariableStore()
         store.seedGlobals(mapOf("TOKEN" to "abc"))

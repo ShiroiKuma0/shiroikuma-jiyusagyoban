@@ -175,6 +175,37 @@ class DatabaseMigrationInstrumentedTest {
     }
 
     @Test
+    fun appDatabaseMigratesFrom5To6AndFlagsOnlyLegacyMaskedVariables() {
+        appDatabaseHelper.createDatabase(APP_DATABASE_NAME, 5).apply {
+            execSQL(
+                "INSERT INTO variables (name, value, isGlobal) VALUES ('COUNT', '7', 1)",
+            )
+            execSQL(
+                "INSERT INTO variables (name, value, isGlobal) VALUES ('API_TOKEN', 'legacy', 1)",
+            )
+            close()
+        }
+
+        val migrated = appDatabaseHelper.runMigrationsAndValidate(
+            APP_DATABASE_NAME,
+            6,
+            true,
+            DatabaseMigrations.MIGRATION_5_6,
+        )
+
+        migrated.query("SELECT name, value, isSecret FROM variables WHERE name = 'COUNT'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("COUNT", cursor.getString(0))
+            assertEquals("7", cursor.getString(1))
+            assertEquals(0, cursor.getInt(2))
+        }
+        migrated.query("SELECT isSecret FROM variables WHERE name = 'API_TOKEN'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(1, cursor.getInt(0))
+        }
+    }
+
+    @Test
     fun appDatabaseMigratesFullPathFrom1ToCurrent() {
         appDatabaseHelper.createDatabase(APP_DATABASE_NAME, 1).apply {
             execSQL(
@@ -191,7 +222,7 @@ class DatabaseMigrationInstrumentedTest {
 
         val migrated = appDatabaseHelper.runMigrationsAndValidate(
             APP_DATABASE_NAME,
-            5,
+            6,
             true,
             *DatabaseMigrations.getAllMigrations(),
         )

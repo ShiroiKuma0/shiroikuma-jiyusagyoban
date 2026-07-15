@@ -17,6 +17,7 @@
 - **7 context families** — Application, Time, Day, Location, State, Event, and Plugin (Locale/Tasker condition)
 - **58 built-in actions** plus engine-handled flow control (`task.run`, `if`/`else`/`end if`, `for each`/`end for`, `stop`)
 - **Template expressions** — bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math/date functions, traces, and strict regex policy
+- **First-class secret variables** — AES-256-GCM Android Keystore storage, deliberate reveal/re-entry UX, and provenance-based redaction for derived action arguments, logs, traces, and failures
 - **Automation modes** — per-profile single, restart, queued, and parallel re-trigger behavior
 - **Profile groups** — organize profiles into named groups with filter chips
 
@@ -68,7 +69,7 @@ Privileged actions (airplane, mobile data, screenshot, reboot, screen off) are g
 - **Locale/Tasker plugin host** — setting dispatch, condition queries, configuration parsing, request-query events, bundle validation, and last-known-state fallback
 - **Locale/Tasker condition context** — condition plugins as first-class profile predicates polled every 30 seconds
 - **External automation target** — signature-scoped intents to run tasks, toggle profiles, query status, and pass variables
-- **OpenTasker JSON bundles** — schema-versioned export/import with warnings, capability review, and disabled-by-default installation
+- **OpenTasker JSON bundles** — schema-versioned export/import with warnings, capability review, disabled-by-default installation, and secret values omitted by design
 - **Tasker XML import** — preview with migration/capability warnings, mapped and unsupported action reporting
 - **Profile sharing** — offline share manifests with safety findings and GitHub Discussions submission text
 
@@ -93,7 +94,7 @@ Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON 
 - Play distribution profile with SMS/phone-state manifest policy gate
 - Local release verification scripts for F-Droid metadata, readiness, and APK payload comparison
 - Environment-driven release signing
-- SQLite database backup/restore with WAL-safe validation before local backups are published
+- SQLite database backup/restore with WAL-safe validation before local backups are published; secret rows stay ciphertext and the device-bound Keystore key is never copied, so a restore on another device requires secret re-entry
 - APK payload comparison harness for reproducibility checks
 
 ### Power-user backends

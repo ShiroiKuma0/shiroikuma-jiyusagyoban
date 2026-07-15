@@ -297,6 +297,21 @@
     <string name="variables_updated">Updated %1$s</string>
     <string name="variables_masked_value">Masked sensitive value</string>
     <string name="variables_value_label">Value for %%%1$s</string>
+    <string name="variables_create">Create variable</string>
+    <string name="variables_created">Variable created</string>
+    <string name="variables_name_label">Global variable name</string>
+    <string name="variables_name_helper">Use 1–64 uppercase letters, numbers, or underscores; start with a letter.</string>
+    <string name="variables_name_duplicate">A variable with this name already exists.</string>
+    <string name="variables_default_name">VARIABLE</string>
+    <string name="variables_secret_label">Store as secret</string>
+    <string name="variables_secret_helper">Encrypt with Android Keystore and redact values derived from it.</string>
+    <string name="variables_secret_unavailable">Secret unavailable — re-entry required</string>
+    <string name="variables_secret_reentry_helper">This secret cannot be decrypted, usually after restoring on another device or losing the Keystore key. Enter a replacement value to recover it.</string>
+    <string name="variables_reveal_secret">Reveal secret value</string>
+    <string name="variables_hide_secret">Hide secret value</string>
+    <string name="variables_shown_count">%1$d shown</string>
+    <string name="variables_saved_count_label">Saved</string>
+    <string name="content_description_info">Information</string>
 
     <!-- Scenes screen -->
     <string name="scenes_create">Create Scene</string>

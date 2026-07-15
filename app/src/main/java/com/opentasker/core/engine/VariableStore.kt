@@ -11,6 +11,12 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
+
+data class TrackedExpansion(
+    val value: String,
+    val isSecretDerived: Boolean,
+)
 
 /**
  * In-memory variable store with a global scope and stack of local scopes.
@@ -30,21 +36,42 @@ import java.util.concurrent.ConcurrentHashMap
 class VariableStore {
     private val globals = ConcurrentHashMap<String, String>()
     private val localStack = java.util.Collections.synchronizedList(mutableListOf<MutableMap<String, String>>())
+    private val globalSensitiveNames = ConcurrentHashMap.newKeySet<String>()
+    private val declaredSecretGlobals = ConcurrentHashMap.newKeySet<String>()
+    private val localSensitiveStack = java.util.Collections.synchronizedList(mutableListOf<MutableSet<String>>())
+    private val sensitiveArrayNames = ConcurrentHashMap.newKeySet<String>()
+    private val sensitiveWriteDepth = AtomicInteger(0)
     private val expander = VariableExpander()
     private val arrayStore = ArrayStore()
 
-    fun pushScope() { localStack.add(java.util.concurrent.ConcurrentHashMap()) }
-    fun popScope() { 
+    fun pushScope() {
+        localStack.add(java.util.concurrent.ConcurrentHashMap())
+        localSensitiveStack.add(ConcurrentHashMap.newKeySet())
+    }
+    fun popScope() {
         synchronized(localStack) {
-            if (localStack.isNotEmpty()) localStack.removeAt(localStack.size - 1)
+            if (localStack.isNotEmpty()) {
+                localStack.removeAt(localStack.size - 1)
+                localSensitiveStack.removeAt(localSensitiveStack.size - 1)
+            }
         }
     }
 
-    fun set(name: String, value: String) {
-        if (isGlobalName(name)) globals[name] = value
-        else {
+    fun set(name: String, value: String, sensitive: Boolean = false) {
+        val shouldRemainSensitive = sensitive || sensitiveWriteDepth.get() > 0 || isSensitive(name)
+        if (isGlobalName(name)) {
+            globals[name] = value
+            updateSensitivity(globalSensitiveNames, name, shouldRemainSensitive || name in declaredSecretGlobals)
+        } else {
             synchronized(localStack) {
-                (localStack.lastOrNull() ?: globals)[name] = value
+                val target = localStack.lastOrNull()
+                if (target == null) {
+                    globals[name] = value
+                    updateSensitivity(globalSensitiveNames, name, shouldRemainSensitive)
+                } else {
+                    target[name] = value
+                    updateSensitivity(localSensitiveStack.last(), name, shouldRemainSensitive)
+                }
             }
         }
     }
@@ -58,23 +85,42 @@ class VariableStore {
         return globals[name]
     }
 
+    fun isSensitive(name: String): Boolean {
+        synchronized(localStack) {
+            for (index in localStack.indices.reversed()) {
+                if (name in localStack[index]) return name in localSensitiveStack[index]
+            }
+        }
+        return name in globalSensitiveNames
+    }
+
     /**
      * Seed the global scope with previously persisted values before a run starts. Only affects the
      * global (uppercase) namespace; local task scopes are untouched.
      */
-    fun seedGlobals(values: Map<String, String>) {
+    fun seedGlobals(values: Map<String, String>, secretNames: Set<String> = emptySet()) {
         globals.putAll(values)
+        declaredSecretGlobals += secretNames
+        globalSensitiveNames += secretNames
     }
 
     /** Snapshot of the current global scope, used to persist durable globals after a run. */
     fun globalSnapshot(): Map<String, String> = globals.toMap()
 
+    /** Secret/taint metadata paired with [globalSnapshot] for encrypted durable persistence. */
+    fun globalSensitiveSnapshot(): Set<String> = globalSensitiveNames.toSet()
+
     /**
      * Store an array in the array storage.
      * Arrays can be accessed via %arrayName(#) for length, %arrayName(0) for index, etc.
      */
-    fun setArray(name: String, values: List<String>) {
+    fun setArray(name: String, values: List<String>, sensitive: Boolean = false) {
         arrayStore.put(name, values)
+        updateSensitivity(
+            sensitiveArrayNames,
+            name,
+            sensitive || sensitiveWriteDepth.get() > 0 || name in sensitiveArrayNames,
+        )
     }
 
     /**
@@ -84,10 +130,21 @@ class VariableStore {
     fun getArrayItems(name: String): List<String>? =
         arrayStore.snapshot()[name]
 
+    fun isArraySensitive(name: String): Boolean = name in sensitiveArrayNames
+
     /** Expand all variable references in [s] using the current scope chain. */
     fun expand(s: String): String {
         return expander.expand(s, this, arrayStore)
     }
+
+    /** Expands a legacy expression while retaining whether any referenced input was secret. */
+    fun expandTracked(s: String): TrackedExpansion = TrackedExpansion(
+        value = expand(s),
+        isSecretDerived = variableReference.findAll(s).any { match ->
+            val name = match.groupValues[1]
+            isSensitive(name) || name in sensitiveArrayNames
+        },
+    )
 
     /**
      * Expand with operator support. Examples:
@@ -114,7 +171,22 @@ class VariableStore {
             task = taskValues.toMap(),
             event = event.toMap(),
             arrays = arrayStore.snapshot(),
+            sensitiveGlobal = globalSensitiveNames.toSet(),
+            sensitiveTask = synchronized(localStack) {
+                localSensitiveStack.flatMapTo(linkedSetOf()) { it }
+            },
+            sensitiveArrays = sensitiveArrayNames.toSet(),
         )
+    }
+
+    suspend fun <T> withSensitiveWrites(sensitive: Boolean, block: suspend () -> T): T {
+        if (!sensitive) return block()
+        sensitiveWriteDepth.incrementAndGet()
+        return try {
+            block()
+        } finally {
+            sensitiveWriteDepth.decrementAndGet()
+        }
     }
 
     /**
@@ -159,6 +231,7 @@ class VariableStore {
         while (items.size <= index) items.add("")
         items[index] = value
         arrayStore.put(name, items)
+        if (sensitiveWriteDepth.get() > 0) sensitiveArrayNames += name
         return true
     }
 
@@ -231,6 +304,10 @@ class VariableStore {
     private fun isGlobalName(name: String): Boolean =
         name.isNotEmpty() && name[0].isUpperCase()
 
+    private fun updateSensitivity(target: MutableSet<String>, name: String, sensitive: Boolean) {
+        if (sensitive) target += name else target -= name
+    }
+
     private sealed interface PathSelector {
         data class Property(val name: String) : PathSelector
         data class Index(val index: Int) : PathSelector
@@ -243,6 +320,7 @@ class VariableStore {
 
     companion object {
         private val jsonCodec = Json { ignoreUnknownKeys = true }
+        private val variableReference = Regex("%([A-Za-z][A-Za-z0-9_-]*)")
 
         /**
          * Upper bound for a nested/array write index. A `var.set` name such as `X[2000000000]`

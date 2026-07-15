@@ -3,7 +3,7 @@ package com.opentasker.core.storage
 import androidx.room.Database
 import androidx.room.RoomDatabase
 
-const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 5
+const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 6
 
 @Database(
     entities = [ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class, EditHistoryEntity::class],

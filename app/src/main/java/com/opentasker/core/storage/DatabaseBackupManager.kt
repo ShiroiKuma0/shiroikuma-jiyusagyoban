@@ -29,6 +29,9 @@ class DatabaseBackupManager(
 
     suspend fun backup(): Result<File> = withContext(Dispatchers.IO) {
         runCatching {
+            // A database opened from v5 can briefly contain rows flagged by the Room migration but
+            // not yet rewritten by the asynchronous startup migration. Never copy that plaintext.
+            VariableRepository(db.variableDao()).requireEncryptedSecretRows()
             val sourceFile = context.getDatabasePath(databaseName)
             if (!sourceFile.exists()) {
                 throw IOException(
@@ -327,7 +330,14 @@ class DatabaseBackupManager(
                         throw IOException("Backup failed SQLite integrity check")
                     }
                 }
-                val requiredSchema = requiredSchemaColumns()
+                val schemaVersion = readLong(sqlite, "PRAGMA user_version").toInt()
+                if (schemaVersion !in 1..OPEN_TASKER_DATABASE_SCHEMA_VERSION) {
+                    throw IOException(
+                        "Backup schema version $schemaVersion is outside the supported range " +
+                            "1..$OPEN_TASKER_DATABASE_SCHEMA_VERSION",
+                    )
+                }
+                val requiredSchema = requiredSchemaColumns(schemaVersion)
                 val requiredTables = requiredSchema.keys
                 sqlite.rawQuery(
                     "SELECT name FROM sqlite_master WHERE type='table'",
@@ -350,7 +360,7 @@ class DatabaseBackupManager(
                     val missingColumns = requiredColumns - foundColumns
                     if (missingColumns.isNotEmpty()) {
                         throw IOException(
-                            "Backup schema version ${OPEN_TASKER_DATABASE_SCHEMA_VERSION} is missing " +
+                            "Backup schema version $schemaVersion is missing " +
                                 "${table}.${missingColumns.joinToString()}",
                         )
                     }
@@ -362,8 +372,8 @@ class DatabaseBackupManager(
             }
         }
 
-        private fun requiredSchemaColumns(): Map<String, Set<String>> = mapOf(
-            "profiles" to setOf(
+        private fun requiredSchemaColumns(schemaVersion: Int): Map<String, Set<String>> {
+            val profiles = mutableSetOf(
                 "id",
                 "name",
                 "enabled",
@@ -371,13 +381,14 @@ class DatabaseBackupManager(
                 "exitTaskId",
                 "cooldownSec",
                 "contextsJson",
-                "automationMode",
-                "profileGroup",
-            ),
-            "tasks" to setOf("id", "name", "priority", "collisionMode", "actionsJson"),
-            "scenes" to setOf("id", "name", "widthDp", "heightDp", "elementsJson"),
-            "variables" to setOf("name", "value", "isGlobal"),
-            "run_logs" to setOf(
+            )
+            if (schemaVersion >= 2) profiles += "automationMode"
+            if (schemaVersion >= 5) profiles += "profileGroup"
+
+            val variables = mutableSetOf("name", "value", "isGlobal")
+            if (schemaVersion >= 6) variables += "isSecret"
+
+            val runLogs = mutableSetOf(
                 "id",
                 "taskId",
                 "taskName",
@@ -385,11 +396,20 @@ class DatabaseBackupManager(
                 "durationMs",
                 "success",
                 "message",
-                "source",
-                "sourceLabel",
-            ),
-            "edit_history" to setOf("id", "entityType", "entityId", "previousJson", "timestamp"),
-        )
+            )
+            if (schemaVersion >= 4) runLogs += setOf("source", "sourceLabel")
+
+            return buildMap {
+                put("profiles", profiles)
+                put("tasks", setOf("id", "name", "priority", "collisionMode", "actionsJson"))
+                put("scenes", setOf("id", "name", "widthDp", "heightDp", "elementsJson"))
+                put("variables", variables)
+                put("run_logs", runLogs)
+                if (schemaVersion >= 3) {
+                    put("edit_history", setOf("id", "entityType", "entityId", "previousJson", "timestamp"))
+                }
+            }
+        }
 
         private fun tableColumns(sqlite: SQLiteDatabase, table: String): Set<String> =
             sqlite.rawQuery("PRAGMA table_info($table)", null).use { cursor ->

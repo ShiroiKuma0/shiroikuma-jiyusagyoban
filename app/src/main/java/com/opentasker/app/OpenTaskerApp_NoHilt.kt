@@ -10,13 +10,20 @@ import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.DatabaseMigrations
 import com.opentasker.core.storage.PendingRestoreApplyResult
+import com.opentasker.core.storage.VariableRepository
 import com.opentasker.core.diagnostics.CrashLogHandler
 import com.opentasker.core.engine.RunLogPruneWorker
 import com.opentasker.core.platform.AppVisibilityTracker
 import com.opentasker.core.power.ShizukuPowerBackend
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 // Application singleton keeps startup deterministic while Hilt is not active.
 class OpenTaskerApp_NoHilt : Application() {
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     companion object {
         private var _db: AppDatabase? = null
         
@@ -56,6 +63,14 @@ class OpenTaskerApp_NoHilt : Application() {
             )
                 .addMigrations(*DatabaseMigrations.getAllMigrations())
                 .build()
+        }
+
+        applicationScope.launch {
+            runCatching {
+                VariableRepository(db.variableDao()).migrateLegacySensitiveVariables()
+            }.onFailure { error ->
+                AppLogger.error("OpenTasker", "Legacy secret migration failed", error)
+            }
         }
 
         RunLogPruneWorker.enqueue(this)

@@ -8,7 +8,9 @@ import com.opentasker.core.platform.AudioForegroundServiceEligibility
 import com.opentasker.core.platform.AudioRuntimeEligibility
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.TaskEntity
-import com.opentasker.core.storage.VariableEntity
+import com.opentasker.core.storage.RuntimeVariableSeed
+import com.opentasker.core.storage.RuntimeVariableValue
+import com.opentasker.core.storage.VariableRepository
 import com.opentasker.core.storage.toEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -33,16 +35,24 @@ suspend fun executeAndLogTask(
     // notification-action paths call this from the main thread; without this hop, blocking actions
     // (HTTP, file, ping) would throw NetworkOnMainThreadException and fail silently.
     val variables = VariableStore()
+    val variableRepository = VariableRepository(db.variableDao())
     val persistedGlobals = runCatching {
-        db.variableDao().getAllGlobal().associate { it.name to it.value }
+        variableRepository.runtimeGlobals()
     }.getOrElse { error ->
         AppLogger.error(logTag, "Failed to hydrate global variables", error)
-        emptyMap()
+        RuntimeVariableSeed(emptyMap(), emptySet(), emptySet())
     }
-    variables.seedGlobals(persistedGlobals)
+    variables.seedGlobals(persistedGlobals.values, persistedGlobals.secretNames)
+    if (persistedGlobals.unavailableSecretNames.isNotEmpty()) {
+        AppLogger.warn(
+            logTag,
+            "Secret variables require re-entry: ${persistedGlobals.unavailableSecretNames.sorted().joinToString()}",
+        )
+    }
     initialVariables.forEach { (name, value) -> variables.set(name, value) }
     // Baseline after seeding + event vars, so only globals actually changed during the run persist.
     val baselineGlobals = variables.globalSnapshot()
+    val baselineSensitiveGlobals = variables.globalSensitiveSnapshot()
     val audioEligibility = AudioRuntimeEligibility(
         appVisible = visibleActivity,
         foregroundService = audioForegroundService,
@@ -54,7 +64,14 @@ suspend fun executeAndLogTask(
     ) { msg -> AppLogger.info(logTag, msg) }
     val runner = TaskRunner(ctx, resolveTask = dbSubTaskResolver(db))
     val report = runner.run(task)
-    persistChangedGlobals(db, baselineGlobals, variables.globalSnapshot(), logTag)
+    persistChangedGlobals(
+        variableRepository,
+        baselineGlobals,
+        variables.globalSnapshot(),
+        baselineSensitiveGlobals,
+        variables.globalSensitiveSnapshot(),
+        logTag,
+    )
     AppLogger.info(logTag, "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)")
     val classified = RunLogSource.classify(source)
     val logEntry = RunLogEntry(
@@ -80,11 +97,16 @@ suspend fun executeAndLogTask(
  * Deterministic and order-stable so parallel runs converge on a well-defined last-write-wins result
  * once each commits. Pure for testability.
  */
-fun changedGlobals(before: Map<String, String>, after: Map<String, String>): List<VariableEntity> =
+fun changedGlobals(
+    before: Map<String, String>,
+    after: Map<String, String>,
+    beforeSensitive: Set<String> = emptySet(),
+    afterSensitive: Set<String> = emptySet(),
+): List<RuntimeVariableValue> =
     after.asSequence()
-        .filter { (name, value) -> before[name] != value }
+        .filter { (name, value) -> before[name] != value || (name in beforeSensitive) != (name in afterSensitive) }
         .sortedBy { it.key }
-        .map { (name, value) -> VariableEntity(name = name, value = value, isGlobal = true) }
+        .map { (name, value) -> RuntimeVariableValue(name, value, isSecret = name in afterSensitive) }
         .toList()
 
 /**
@@ -93,14 +115,16 @@ fun changedGlobals(before: Map<String, String>, after: Map<String, String>): Lis
  * across separate runs and process restarts. Local (lowercase) variables never reach this path.
  */
 private suspend fun persistChangedGlobals(
-    db: AppDatabase,
+    variableRepository: VariableRepository,
     before: Map<String, String>,
     after: Map<String, String>,
+    beforeSensitive: Set<String>,
+    afterSensitive: Set<String>,
     logTag: String,
 ) {
-    for (entity in changedGlobals(before, after)) {
-        runCatching { db.variableDao().insert(entity) }
-            .onFailure { AppLogger.error(logTag, "Failed to persist global ${entity.name}", it) }
+    for (value in changedGlobals(before, after, beforeSensitive, afterSensitive)) {
+        runCatching { variableRepository.persistRuntime(listOf(value)) }
+            .onFailure { AppLogger.error(logTag, "Failed to persist global ${value.name}", it) }
     }
 }
 
