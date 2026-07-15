@@ -36,6 +36,7 @@
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
 
     <uses-feature
         android:name="android.hardware.telephony"
@@ -52,7 +53,6 @@
 
     <queries>
         <package android:name="com.termux" />
-        <package android:name="com.termux.tasker" />
         <package android:name="moe.shizuku.privileged.api" />
         <intent>
             <action android:name="com.twofortyfouram.locale.intent.action.EDIT_SETTING" />
@@ -190,6 +190,10 @@
                 <action android:name="com.opentasker.action.NOTIFICATION_BUTTON" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name="com.opentasker.core.scripting.TermuxResultReceiver"
+            android:exported="false" />
 
         <receiver
             android:name="com.opentasker.core.external.AutomationTargetReceiver"

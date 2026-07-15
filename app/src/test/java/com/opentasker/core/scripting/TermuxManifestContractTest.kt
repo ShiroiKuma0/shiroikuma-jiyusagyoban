@@ -7,7 +7,7 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 class TermuxManifestContractTest {
     @Test
-    fun manifestQueriesTermuxPackages() {
+    fun manifestQueriesTermuxAndDeclaresRunCommandPermission() {
         val manifest = loadMainManifest()
         val queries = manifest.getElementsByTagName("queries")
         assertTrue("manifest must declare package visibility queries", queries.length > 0)
@@ -22,9 +22,14 @@ class TermuxManifestContractTest {
             "manifest must query Termux package",
             TermuxScriptBackend.TERMUX_PACKAGE in queriedPackages,
         )
+        val permissions = manifest.getElementsByTagName("uses-permission")
+        val declaredPermissions = (0 until permissions.length)
+            .asSequence()
+            .mapNotNull { permissions.item(it).attributes.getNamedItem("android:name")?.nodeValue }
+            .toSet()
         assertTrue(
-            "manifest must query Termux:Tasker package",
-            TermuxScriptBackend.TERMUX_TASKER_PACKAGE in queriedPackages,
+            "manifest must request the Termux RUN_COMMAND permission",
+            TermuxScriptBackend.RUN_COMMAND_PERMISSION in declaredPermissions,
         )
     }
 

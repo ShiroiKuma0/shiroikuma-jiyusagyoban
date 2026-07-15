@@ -135,7 +135,7 @@
     <string name="capability_lock_unsupported" formatted="false">Device lock requires configured device-admin support.</string>
     <string name="capability_screen_off_unsupported" formatted="false">Screen-off requires privileged power-management access. No privileged transport is available in this build.</string>
     <string name="capability_wake_unsupported" formatted="false">Wake requires a foreground activity or privileged wake flow. No privileged transport is available in this build.</string>
-    <string name="capability_termux_setup" formatted="false">Requires Termux and Termux:Tasker with external app access enabled.</string>
+    <string name="capability_termux_setup" formatted="false">Requires Termux 0.109 or newer, RUN_COMMAND permission, and an approved script hash.</string>
     <string name="capability_tasker_import_unsupported" formatted="false">The imported Tasker action could not be mapped to a supported OpenTasker action.</string>
     <string name="capability_sms_permission" formatted="false">Requires SMS permission; Play builds omit SMS actions for policy compliance.</string>
     <string name="capability_sms_distribution_unsupported" formatted="false">SMS is unavailable in this distribution because SMS and phone-state permissions are omitted for Play policy compliance.</string>

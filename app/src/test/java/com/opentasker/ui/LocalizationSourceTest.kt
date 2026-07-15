@@ -66,7 +66,7 @@ class LocalizationSourceTest {
         assertFalse("Action metadata must not retain presentation string keys", Regex("""(?:nameRes|descriptionRes|categoryRes|hintRes)\s*=\s*\"""").containsMatchIn(metadata))
         assertEquals("Catalog resources and compile-time references must stay in lockstep", catalogResources, catalogReferences)
         assertEquals("Expected every built-in action name to be resource backed", 66, Regex("""nameRes = R\.string\.catalog_action_""").findAll(metadata).count())
-        assertEquals("Expected every action field to be resource backed", 124, Regex("""ActionField\(\s*\"""").findAll(metadata).count())
+        assertEquals("Expected every action field to be resource backed", 125, Regex("""ActionField\(\s*\"""").findAll(metadata).count())
         assertFalse("Context field labels must use resource IDs", Regex("""ActionField\(\s*\"[^\"]+\"\s*,\s*\"""").containsMatchIn(contextEditor))
         assertTrue("Context type names must be resource backed", "contextTitleRes" in contextEditor)
         assertTrue("Context descriptions must be resource backed", "contextDescriptionRes" in contextEditor)
@@ -107,7 +107,7 @@ class LocalizationSourceTest {
         assertTrue("Setup contains hardcoded permission/backup presentation copy: $offenders", offenders.isEmpty())
         assertTrue("Setup must resolve non-Compose permission cards through resources", "context.getString(R.string.setup_notifications_card_title)" in setup)
         assertTrue("Setup must localize dynamic Shizuku status", "setup_shizuku_status_transport_unavailable" in setup)
-        assertTrue("Setup must localize dynamic Termux status", "setup_termux_status_plugin_missing" in setup)
+        assertTrue("Setup must localize dynamic Termux status", "setup_termux_status_permission_needed" in setup)
     }
 
     @Test

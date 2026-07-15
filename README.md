@@ -49,7 +49,7 @@
 | Variable | 10 | set variable, read data (JSON/CSV/XML), date-time (format/parse/add), text (match/replace/split/join/substring) |
 | Flow | 1+7 | wait; engine: task.run, if/else/end if, for each/end for, stop |
 | Plugin | 2 | Locale setting dispatch, Locale condition query |
-| Script | 1 | gated Termux `RUN_COMMAND` dispatch |
+| Script | 1 | SHA-256-pinned Termux `RUN_COMMAND` with bounded result capture |
 | Import | 1 | unsupported Tasker action placeholder |
 
 Privileged actions (airplane, mobile data, screenshot, reboot, screen off) are gated to fail honestly. SMS is available in standard/F-Droid builds; Play builds omit SMS/phone-state permissions.
@@ -99,7 +99,9 @@ Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON 
 ### Power-user backends
 
 - Shizuku manager/service/permission status, a persisted default-on kill switch, and a fail-closed command allowlist; elevated actions remain unsupported until a privileged user-service transport ships
-- Termux/Termux:Tasker package checks plus gated `RUN_COMMAND` dispatch when permission and package prerequisites are satisfied
+- Termux 0.109+ `RUN_COMMAND` integration with a user-managed SHA-256 allowlist, pre-run hash verification, timeouts, and bounded output variables
+
+To run a Termux script, place it below `~/.termux/tasker/`, enable Termux's external-app access, and grant OpenTasker `RUN_COMMAND` permission from Setup. Add the script path and the expected 64-character SHA-256 under **Approved Termux scripts**; OpenTasker performs a hash preflight and rechecks inside the fixed execution wrapper before the script can run. A capture prefix such as `%script` writes bounded `%script_stdout`, `%script_stderr`, `%script_exit_code`, and original-length variables; captured content is never written to the run log.
 
 ---
 

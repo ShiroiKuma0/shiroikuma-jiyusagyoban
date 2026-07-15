@@ -55,7 +55,7 @@ object ActionCapabilityRegistry {
         TermuxScriptBackend.ACTION_ID to ActionCapability(
             CapabilityLevel.RequiresSetup,
             TermuxScriptBackend.hintForAction(TermuxScriptBackend.ACTION_ID)?.message
-                ?: "Termux script dispatch ready when Termux and Termux:Tasker are installed.",
+                ?: "Termux 0.109+, RUN_COMMAND permission, and an approved script hash are required.",
             R.string.capability_termux_setup,
         ),
         "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported OpenTasker action.", R.string.capability_tasker_import_unsupported),

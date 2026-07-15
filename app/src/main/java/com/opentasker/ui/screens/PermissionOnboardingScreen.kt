@@ -232,6 +232,8 @@ fun PermissionOnboardingScreen(
             )
         }
 
+        item { TermuxScriptAllowlistCard(onMessage) }
+
         items(orderedItems, key = { it.title }) { item ->
             val alreadyReadyMessage = stringResource(R.string.setup_item_already_ready, item.title)
             PermissionSetupCard(
@@ -645,8 +647,9 @@ private fun buildPermissionItems(
     val termuxStatus = TermuxScriptBackend.inspect(context)
     val termuxSummary = context.getString(when (termuxStatus.state) {
         TermuxScriptState.TermuxMissing -> R.string.setup_termux_status_missing
-        TermuxScriptState.TaskerPluginMissing -> R.string.setup_termux_status_plugin_missing
-        TermuxScriptState.PluginInstalled -> R.string.setup_termux_status_ready
+        TermuxScriptState.VersionUnsupported -> R.string.setup_termux_status_version_unsupported
+        TermuxScriptState.PermissionRequired -> R.string.setup_termux_status_permission_needed
+        TermuxScriptState.Ready -> R.string.setup_termux_status_ready
     })
     val oem = OemBatteryGuidance.forDevice(Build.MANUFACTURER, Build.BRAND)
     val request = context.getString(R.string.setup_action_request)
@@ -810,15 +813,21 @@ private fun buildPermissionItems(
         PermissionSetupItem(
             title = context.getString(R.string.setup_termux_title),
             body = context.getString(R.string.setup_termux_body, termuxSummary),
-            granted = termuxStatus.bridgeInstalled,
-            actionLabel = if (termuxStatus.bridgeInstalled) context.getString(R.string.action_open_app_settings) else context.getString(R.string.setup_action_open_setup_guide),
-            action = PermissionAction.SettingsIntent(
-                if (termuxStatus.bridgeInstalled) {
-                    packageDetailsIntent(TermuxScriptBackend.TERMUX_TASKER_PACKAGE)
-                } else {
-                    Intent(Intent.ACTION_VIEW, Uri.parse(TermuxScriptBackend.SETUP_URL))
-                },
-            ),
+            granted = termuxStatus.isReady,
+            actionLabel = when (termuxStatus.state) {
+                TermuxScriptState.PermissionRequired -> request
+                TermuxScriptState.Ready -> context.getString(R.string.action_open_app_settings)
+                TermuxScriptState.TermuxMissing,
+                TermuxScriptState.VersionUnsupported,
+                -> context.getString(R.string.setup_action_open_setup_guide)
+            },
+            action = when (termuxStatus.state) {
+                TermuxScriptState.PermissionRequired -> PermissionAction.RuntimePermission(TermuxScriptBackend.RUN_COMMAND_PERMISSION)
+                TermuxScriptState.Ready -> PermissionAction.SettingsIntent(packageDetailsIntent(TermuxScriptBackend.TERMUX_PACKAGE))
+                TermuxScriptState.TermuxMissing,
+                TermuxScriptState.VersionUnsupported,
+                -> PermissionAction.SettingsIntent(Intent(Intent.ACTION_VIEW, Uri.parse(TermuxScriptBackend.SETUP_URL)))
+            },
             requiredFor = context.getString(R.string.setup_termux_required_for),
             optional = true,
         ),

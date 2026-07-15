@@ -4,6 +4,8 @@ import android.content.ContextWrapper
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.engine.VariableStore
+import com.opentasker.core.scripting.TermuxCommandResult
+import com.opentasker.core.scripting.TermuxScriptExecutionResult
 import com.sun.net.httpserver.HttpServer
 import java.io.File
 import java.net.InetSocketAddress
@@ -434,6 +436,36 @@ class ActionGuardsTest {
         val result = action.run(ctx(), mapOf("executable" to "/bin/sh"))
         assertTrue("Termux script should fail closed without Termux installed", result is ActionResult.Failure)
         assertTrue((result as ActionResult.Failure).message.contains("not ready"))
+    }
+
+    @Test
+    fun termuxScriptMapsBoundedResultsWithoutLoggingTheirContents() {
+        val variables = VariableStore()
+        val logs = mutableListOf<String>()
+        val context = ActionContext(ContextWrapper(null), variables, logger = logs::add)
+        val result = TermuxScriptAction().completeExecution(
+            context,
+            "%script",
+            TermuxScriptExecutionResult.Completed(
+                command = TermuxCommandResult(
+                    stdout = "private stdout",
+                    stderr = "private stderr",
+                    exitCode = 0,
+                    stdoutOriginalLength = 14,
+                    stderrOriginalLength = 14,
+                    errorCode = 0,
+                ),
+                approvedHash = "a".repeat(64),
+            ),
+        )
+
+        assertEquals(ActionResult.Success, result)
+        assertEquals("private stdout", variables.get("%script_stdout"))
+        assertEquals("private stderr", variables.get("%script_stderr"))
+        assertEquals("0", variables.get("%script_exit_code"))
+        assertTrue(logs.single().contains("stdout=<redacted:14B>"))
+        assertTrue("stdout content leaked into logs", logs.none { "private stdout" in it })
+        assertTrue("stderr content leaked into logs", logs.none { "private stderr" in it })
     }
 
     // --- VolumeAction guards ---

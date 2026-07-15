@@ -192,7 +192,7 @@
     <string name="catalog_action_plugin_locale_query_field_resultvariable_hint" formatted="false">%plugin_state</string>
     <string name="catalog_action_plugin_locale_query_field_requiresatisfied_label" formatted="false">Fail unless satisfied</string>
     <string name="catalog_action_script_termux_run_name" formatted="false">Run Termux Script</string>
-    <string name="catalog_action_script_termux_run_description" formatted="false">Plan a Termux:Tasker script run; blocked until the script backend is implemented</string>
+    <string name="catalog_action_script_termux_run_description" formatted="false">Run an approved Termux script and optionally capture bounded output</string>
     <string name="catalog_category_script" formatted="false">Script</string>
     <string name="catalog_action_script_termux_run_field_executable_label" formatted="false">Executable</string>
     <string name="catalog_action_script_termux_run_field_executable_hint" formatted="false">~/.termux/tasker/my_script</string>
@@ -204,6 +204,8 @@
     <string name="catalog_action_script_termux_run_field_stdin_hint" formatted="false">Optional stdin payload</string>
     <string name="catalog_action_script_termux_run_field_captureprefix_label" formatted="false">Output variable prefix</string>
     <string name="catalog_action_script_termux_run_field_captureprefix_hint" formatted="false">%script</string>
+    <string name="catalog_action_script_termux_run_field_timeoutms_label" formatted="false">Timeout ms</string>
+    <string name="catalog_action_script_termux_run_field_timeoutms_hint" formatted="false">30000 (1000–120000)</string>
     <string name="catalog_action_tasker_unsupported_name" formatted="false">Unsupported Tasker Action</string>
     <string name="catalog_action_tasker_unsupported_description" formatted="false">Placeholder for a Tasker action that could not be safely mapped during import</string>
     <string name="catalog_category_import" formatted="false">Import</string>

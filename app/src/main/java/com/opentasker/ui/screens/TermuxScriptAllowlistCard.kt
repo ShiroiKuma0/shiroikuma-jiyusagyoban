@@ -1,0 +1,161 @@
+package com.opentasker.ui.screens
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.opentasker.app.R
+import com.opentasker.core.scripting.TermuxAllowlistSaveResult
+import com.opentasker.core.scripting.TermuxScriptAllowlistStore
+import com.opentasker.core.scripting.TermuxScriptPolicy
+
+@Composable
+internal fun TermuxScriptAllowlistCard(onMessage: (String) -> Unit) {
+    val context = LocalContext.current
+    val store = remember(context) { TermuxScriptAllowlistStore(context) }
+    var executable by rememberSaveable { mutableStateOf("") }
+    var sha256 by rememberSaveable { mutableStateOf("") }
+    var revision by remember { mutableIntStateOf(0) }
+    val entries = remember(store, revision) { store.entries() }
+    val pathValid = TermuxScriptPolicy.normalizeExecutable(executable) != null
+    val hashValid = TermuxScriptPolicy.normalizeHash(sha256) != null
+    val savedMessage = stringResource(R.string.setup_termux_script_saved)
+    val invalidPathMessage = stringResource(R.string.setup_termux_script_path_error)
+    val invalidHashMessage = stringResource(R.string.setup_termux_script_hash_error)
+    val allowlistFullMessage = stringResource(R.string.setup_termux_allowlist_full)
+    val revokedMessage = stringResource(R.string.setup_termux_script_revoked)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(R.string.setup_termux_allowlist_title), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.setup_termux_allowlist_body),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            OutlinedTextField(
+                value = executable,
+                onValueChange = { executable = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.setup_termux_script_path_label)) },
+                placeholder = { Text(stringResource(R.string.setup_termux_script_path_hint)) },
+                singleLine = true,
+                isError = executable.isNotBlank() && !pathValid,
+                supportingText = if (executable.isNotBlank() && !pathValid) {
+                    { Text(stringResource(R.string.setup_termux_script_path_error)) }
+                } else {
+                    null
+                },
+            )
+            OutlinedTextField(
+                value = sha256,
+                onValueChange = { sha256 = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.setup_termux_script_hash_label)) },
+                placeholder = { Text(stringResource(R.string.setup_termux_script_hash_hint)) },
+                singleLine = true,
+                isError = sha256.isNotBlank() && !hashValid,
+                supportingText = if (sha256.isNotBlank() && !hashValid) {
+                    { Text(stringResource(R.string.setup_termux_script_hash_error)) }
+                } else {
+                    null
+                },
+            )
+            Button(
+                onClick = {
+                    val result = store.approve(executable, sha256)
+                    val message = when (result) {
+                        TermuxAllowlistSaveResult.SAVED -> {
+                            executable = ""
+                            sha256 = ""
+                            revision++
+                            savedMessage
+                        }
+                        TermuxAllowlistSaveResult.INVALID_PATH -> invalidPathMessage
+                        TermuxAllowlistSaveResult.INVALID_HASH -> invalidHashMessage
+                        TermuxAllowlistSaveResult.FULL -> allowlistFullMessage
+                    }
+                    onMessage(message)
+                },
+                enabled = pathValid && hashValid,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+            ) {
+                Text(stringResource(R.string.setup_termux_script_approve))
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+            if (entries.isEmpty()) {
+                Text(
+                    stringResource(R.string.setup_termux_allowlist_empty),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                entries.forEach { entry ->
+                    val deleteDescription = stringResource(R.string.setup_termux_script_delete_a11y, entry.executable)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                entry.executable,
+                                style = MaterialTheme.typography.labelLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                stringResource(R.string.setup_termux_script_hash_value, entry.sha256),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        TextButton(
+                            onClick = {
+                                store.revoke(entry.executable)
+                                revision++
+                                onMessage(revokedMessage)
+                            },
+                            modifier = Modifier.semantics { contentDescription = deleteDescription },
+                        ) {
+                            Text(stringResource(R.string.action_delete))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

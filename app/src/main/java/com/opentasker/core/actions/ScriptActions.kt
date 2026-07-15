@@ -1,16 +1,19 @@
 package com.opentasker.core.actions
 
-import android.content.ComponentName
-import android.content.Intent
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.logging.AppLogger
+import com.opentasker.core.scripting.TermuxCommandBroker
+import com.opentasker.core.scripting.TermuxScriptAllowlistStore
 import com.opentasker.core.scripting.TermuxScriptBackend
-import java.io.File
-import java.security.MessageDigest
-import java.util.concurrent.ConcurrentHashMap
+import com.opentasker.core.scripting.TermuxScriptCoordinator
+import com.opentasker.core.scripting.TermuxScriptExecutionResult
+import com.opentasker.core.scripting.TermuxScriptInvocation
+import com.opentasker.core.scripting.TermuxScriptPolicy
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 
 class TermuxScriptAction : Action {
     override val id = TermuxScriptBackend.ACTION_ID
@@ -19,84 +22,73 @@ class TermuxScriptAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val executable = args["executable"]?.trim()
             ?: return ActionResult.Failure("Missing 'executable' argument")
+        if (executable.isBlank()) return ActionResult.Failure("Executable path is blank")
 
-        if (executable.isBlank()) {
-            return ActionResult.Failure("Executable path is blank")
-        }
-
-        if (!TermuxScriptBackend.isDispatchReady(ctx.app)) {
-            return ActionResult.Failure(
-                "Termux dispatch is not ready: ${TermuxScriptBackend.inspect(ctx.app).summary}",
-            )
-        }
-
-        if (!TermuxScriptDispatch.checkFrequencyCap(executable)) {
-            return ActionResult.Failure("Script '$executable' is rate-limited. Wait before re-dispatching.")
-        }
-
-        // Drop blank tokens so a present-but-empty (or double-spaced) "arguments" value doesn't
-        // dispatch a spurious empty argv entry to the script.
-        val arguments = args["arguments"]?.split(" ")?.filter { it.isNotBlank() }?.toTypedArray()
-            ?: emptyArray()
-        val workingDirectory = args["workingDirectory"]?.trim()?.ifBlank { null }
+        val timeoutMs = TermuxScriptPolicy.parseTimeout(args["timeoutMs"])
+            ?: return ActionResult.Failure("Timeout must be a whole number of milliseconds")
         val capturePrefix = args["capturePrefix"]?.trim()?.ifBlank { null }
-
-        val intent = Intent().apply {
-            component = ComponentName(
-                TermuxScriptBackend.TERMUX_PACKAGE,
-                "com.termux.app.RunCommandService",
-            )
-            action = "com.termux.RUN_COMMAND"
-            putExtra("com.termux.RUN_COMMAND_PATH", executable)
-            putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arguments)
-            putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
-            workingDirectory?.let {
-                putExtra("com.termux.RUN_COMMAND_WORKDIR", it)
-            }
+        if (capturePrefix != null && !TermuxScriptPolicy.isValidCapturePrefix(capturePrefix)) {
+            return ActionResult.Failure("Output variable prefix is invalid")
         }
+
+        val invocation = TermuxScriptInvocation(
+            executable = executable,
+            argumentText = args["arguments"],
+            workingDirectory = args["workingDirectory"],
+            stdin = args["stdin"],
+            timeoutMs = timeoutMs,
+        )
+        val readiness = TermuxScriptBackend.isDispatchReady(ctx.app)
+        val coordinator = TermuxScriptCoordinator()
 
         return try {
-            ctx.app.startForegroundService(intent)
-            TermuxScriptDispatch.recordDispatch(executable)
-            ctx.logger("Dispatched Termux script: $executable")
-
-            if (capturePrefix != null) {
-                ctx.variables.set("${capturePrefix}_dispatched", "true")
-                ctx.variables.set("${capturePrefix}_executable", executable)
+            val execution = coordinator.execute(
+                ready = readiness,
+                invocation = invocation,
+                approvedHashFor = { normalizedExecutable ->
+                    TermuxScriptAllowlistStore(ctx.app).expectedHash(normalizedExecutable)
+                },
+                commandRunner = { request -> TermuxCommandBroker.execute(ctx.app, request) },
+            )
+            when (execution) {
+                is TermuxScriptExecutionResult.Rejected -> ActionResult.Failure(execution.message)
+                is TermuxScriptExecutionResult.Completed -> completeExecution(ctx, capturePrefix, execution)
             }
-
-            ActionResult.Success
-        } catch (e: SecurityException) {
-            ActionResult.Failure("Permission denied: ${e.message}")
-        } catch (e: Exception) {
-            AppLogger.error("TermuxScriptAction", "Dispatch failed: ${e.message}", e)
-            ActionResult.Failure("Dispatch failed: ${e.message}")
+        } catch (_: TimeoutCancellationException) {
+            ctx.logger("Termux script timed out; stdout=<redacted> stderr=<redacted>")
+            ActionResult.Failure("Termux command timed out")
+        } catch (_: SecurityException) {
+            ActionResult.Failure("Termux RUN_COMMAND permission was denied")
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            AppLogger.error("TermuxScriptAction", "Dispatch failed (${error.javaClass.simpleName}); output redacted")
+            ActionResult.Failure("Termux dispatch failed (${error.javaClass.simpleName})")
         }
     }
-}
 
-object TermuxScriptDispatch {
-    private const val MIN_DISPATCH_INTERVAL_MS = 1000L
-    private val lastDispatchTimes = ConcurrentHashMap<String, Long>()
-
-    fun checkFrequencyCap(executable: String): Boolean {
-        val now = System.currentTimeMillis()
-        val lastTime = lastDispatchTimes[executable] ?: return true
-        return (now - lastTime) >= MIN_DISPATCH_INTERVAL_MS
-    }
-
-    fun recordDispatch(executable: String) {
-        lastDispatchTimes[executable] = System.currentTimeMillis()
-    }
-
-    fun hashScript(content: ByteArray): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        return digest.digest(content).joinToString("") { "%02x".format(it) }
-    }
-
-    fun verifyScriptHash(scriptFile: File, expectedHash: String): Boolean {
-        if (!scriptFile.exists()) return false
-        val actualHash = hashScript(scriptFile.readBytes())
-        return actualHash.equals(expectedHash, ignoreCase = true)
+    internal fun completeExecution(
+        ctx: ActionContext,
+        capturePrefix: String?,
+        execution: TermuxScriptExecutionResult.Completed,
+    ): ActionResult {
+        val result = execution.command
+        if (capturePrefix != null) {
+            ctx.variables.set("${capturePrefix}_stdout", result.stdout)
+            ctx.variables.set("${capturePrefix}_stderr", result.stderr)
+            ctx.variables.set("${capturePrefix}_exit_code", result.exitCode.toString())
+            ctx.variables.set("${capturePrefix}_stdout_length", result.stdoutOriginalLength.toString())
+            ctx.variables.set("${capturePrefix}_stderr_length", result.stderrOriginalLength.toString())
+        }
+        ctx.logger(
+            "Termux script completed: hash=${execution.approvedHash}; exit=${result.exitCode}; " +
+                "stdout=<redacted:${TermuxScriptPolicy.utf8Size(result.stdout)}B>; " +
+                "stderr=<redacted:${TermuxScriptPolicy.utf8Size(result.stderr)}B>",
+        )
+        return when {
+            result.errorCode != 0 -> ActionResult.Failure("Termux could not execute the approved script")
+            result.exitCode != 0 -> ActionResult.Failure("Termux script exited with code ${result.exitCode}")
+            else -> ActionResult.Success
+        }
     }
 }
