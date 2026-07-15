@@ -250,14 +250,15 @@ fun ActiveAutomationUi(
     var profileDialogId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var showCreateProfileDialog by rememberSaveable { mutableStateOf(false) }
     var showTemplateDialog by rememberSaveable { mutableStateOf(false) }
+    var onboardingTemplateFlow by rememberSaveable { mutableStateOf(false) }
+    var selectedTemplateId by rememberSaveable { mutableStateOf<String?>(null) }
     val onboardingCompleted by OnboardingPreference.hasCompleted(context).collectAsState(initial = true)
     LaunchedEffect(onboardingCompleted) {
-        if (!onboardingCompleted) {
+        if (shouldLaunchOnboarding(onboardingCompleted, selectedTemplateId)) {
             showTemplateDialog = true
-            OnboardingPreference.markCompleted(context)
+            onboardingTemplateFlow = true
         }
     }
-    var selectedTemplateId by rememberSaveable { mutableStateOf<String?>(null) }
     var actionPickerTaskId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var actionEditTaskId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var actionEditActionId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -593,7 +594,10 @@ fun ActiveAutomationUi(
                     showCreateTaskDialog = true
                 },
                 onCreateProfile = { showCreateProfileDialog = true },
-                onBrowseTemplates = { showTemplateDialog = true },
+                onBrowseTemplates = {
+                    showTemplateDialog = true
+                    if (!onboardingCompleted) onboardingTemplateFlow = true
+                },
                 onExportOpenTaskerBundle = { openTaskerBundleExportLauncher.launch(openTaskerBundleExportName()) },
                 onImportOpenTaskerBundle = { openTaskerBundleImportLauncher.launch(OPEN_TASKER_BUNDLE_MIME_TYPES) },
                 openTaskerBundleBusy = openTaskerBundleBusy,
@@ -775,10 +779,24 @@ fun ActiveAutomationUi(
 
     if (showTemplateDialog) {
         TemplatePickerDialog(
-            onDismiss = { showTemplateDialog = false },
+            onDismiss = {
+                showTemplateDialog = false
+                onboardingTemplateFlow = false
+            },
             onSelect = { template ->
                 showTemplateDialog = false
                 selectedTemplateId = template.id
+            },
+            onSkip = if (onboardingTemplateFlow) {
+                {
+                    showTemplateDialog = false
+                    onboardingTemplateFlow = false
+                    if (shouldCompleteOnboarding(OnboardingExit.Skipped)) {
+                        scope.launch { OnboardingPreference.markCompleted(context) }
+                    }
+                }
+            } else {
+                null
             },
         )
     }
@@ -786,11 +804,18 @@ fun ActiveAutomationUi(
     selectedTemplate?.let { template ->
         TemplateSlotDialog(
             template = template,
-            onDismiss = { selectedTemplateId = null },
+            onDismiss = {
+                selectedTemplateId = null
+                onboardingTemplateFlow = false
+            },
             onInstall = { values ->
                 viewModel.installProfileTemplate(template, values)
                 selectedTemplateId = null
                 screenOrdinal = OpenTaskerScreen.Profiles.ordinal
+                if (onboardingTemplateFlow && shouldCompleteOnboarding(OnboardingExit.InstalledTemplate)) {
+                    onboardingTemplateFlow = false
+                    scope.launch { OnboardingPreference.markCompleted(context) }
+                }
             },
         )
     }

@@ -23,3 +23,15 @@ object OnboardingPreference {
         }
     }
 }
+
+internal enum class OnboardingExit {
+    Dismissed,
+    Skipped,
+    InstalledTemplate,
+}
+
+internal fun shouldCompleteOnboarding(exit: OnboardingExit): Boolean =
+    exit == OnboardingExit.Skipped || exit == OnboardingExit.InstalledTemplate
+
+internal fun shouldLaunchOnboarding(completed: Boolean, selectedTemplateId: String?): Boolean =
+    !completed && selectedTemplateId == null

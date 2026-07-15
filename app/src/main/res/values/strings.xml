@@ -263,6 +263,12 @@
     <string name="action_task_binding_ambiguous_name">Legacy task “%1$s” is ambiguous — choose the intended task by ID</string>
     <string name="action_task_binding_invalid_value">Invalid task binding “%1$s” — choose another task or None</string>
     <string name="action_task_picker_option">%1$s (%2$d)</string>
+    <string name="action_skip_for_now">Continue without a template</string>
+    <string name="action_open_app_settings">Open app settings</string>
+    <string name="permission_granted">Permission granted.</string>
+    <string name="permission_denied_retry">Permission denied. You can retry when this feature is needed.</string>
+    <string name="permission_denied_settings">Permission denied repeatedly. Use app settings to grant it.</string>
+    <string name="permission_denied_settings_body">Android will no longer show the request dialog; use app settings to recover access.</string>
 
     <string name="label_profiles">Profiles</string>
     <string name="label_contexts">Contexts</string>

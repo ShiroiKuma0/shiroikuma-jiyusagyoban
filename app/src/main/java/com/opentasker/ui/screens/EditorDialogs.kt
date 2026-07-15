@@ -72,6 +72,7 @@ import com.opentasker.ui.theme.DesignSystem
 internal fun TemplatePickerDialog(
     onDismiss: () -> Unit,
     onSelect: (ProfileTemplate) -> Unit,
+    onSkip: (() -> Unit)? = null,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -126,7 +127,11 @@ internal fun TemplatePickerDialog(
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
+        dismissButton = {
+            TextButton(onClick = onSkip ?: onDismiss) {
+                Text(stringResource(if (onSkip == null) R.string.action_close else R.string.action_skip_for_now))
+            }
+        },
     )
 }
 

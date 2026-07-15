@@ -1,9 +1,11 @@
 package com.opentasker.ui.screens
 
 import android.Manifest
+import android.app.Activity
 import android.app.NotificationManager
 import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -48,7 +50,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +75,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import com.opentasker.core.location.LocationPolicyDisclosures
 import com.opentasker.core.permissions.OemBatteryGuidance
+import com.opentasker.core.permissions.RuntimePermissionOutcome
+import com.opentasker.core.permissions.RuntimePermissionRequestHistory
 import com.opentasker.ui.theme.ThemeMode
 import com.opentasker.ui.theme.ThemePreference
 import kotlinx.coroutines.launch
@@ -117,8 +123,24 @@ fun PermissionOnboardingScreen(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val permissionHistory = remember(context) { RuntimePermissionRequestHistory(context) }
+    val permissionGrantedMessage = stringResource(R.string.permission_granted)
+    val permissionDeniedRetryMessage = stringResource(R.string.permission_denied_retry)
+    val permissionDeniedSettingsMessage = stringResource(R.string.permission_denied_settings)
     var refreshTick by remember { mutableIntStateOf(0) }
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+    var pendingPermission by rememberSaveable { mutableStateOf<String?>(null) }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        pendingPermission?.let { permission ->
+            val shouldShowRationale = context.findActivity()
+                ?.shouldShowRequestPermissionRationale(permission)
+                ?: false
+            when (permissionHistory.recordResult(permission, granted, shouldShowRationale).outcome) {
+                RuntimePermissionOutcome.Granted -> onMessage(permissionGrantedMessage)
+                RuntimePermissionOutcome.DeniedCanRetry -> onMessage(permissionDeniedRetryMessage)
+                RuntimePermissionOutcome.SettingsRequired -> onMessage(permissionDeniedSettingsMessage)
+            }
+        }
+        pendingPermission = null
         refreshTick++
     }
 
@@ -132,7 +154,7 @@ fun PermissionOnboardingScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val items = remember(context, refreshTick) { buildPermissionItems(context) }
+    val items = remember(context, refreshTick) { buildPermissionItems(context, permissionHistory) }
     val orderedItems = remember(items) {
         items.sortedWith(compareBy<PermissionSetupItem> { it.optional }.thenBy { it.granted }.thenBy { it.title })
     }
@@ -208,7 +230,11 @@ fun PermissionOnboardingScreen(
                 onRunAction = {
                     when (val action = item.action) {
                         PermissionAction.None -> onMessage("${item.title} is already ready.")
-                        is PermissionAction.RuntimePermission -> permissionLauncher.launch(action.permission)
+                        is PermissionAction.RuntimePermission -> {
+                            pendingPermission = action.permission
+                            permissionHistory.recordRequest(action.permission)
+                            permissionLauncher.launch(action.permission)
+                        }
                         is PermissionAction.SettingsIntent -> openSettingsIntent(context, action.intent, onMessage)
                         is PermissionAction.OemSettings -> openOemSettings(context, action, onMessage)
                     }
@@ -556,7 +582,10 @@ private fun PermissionRequirement(label: String) {
     }
 }
 
-private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
+private fun buildPermissionItems(
+    context: Context,
+    permissionHistory: RuntimePermissionRequestHistory,
+): List<PermissionSetupItem> {
     val shizukuStatus = ShizukuPowerBackend.inspect(context)
     val termuxStatus = TermuxScriptBackend.inspect(context)
     val oem = OemBatteryGuidance.forDevice(Build.MANUFACTURER, Build.BRAND)
@@ -740,6 +769,23 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
             action = PermissionAction.SettingsIntent(appDetailsIntent(context)),
             requiredFor = "App launch and app context selection",
         ),
+    ).map { item -> item.withRuntimePermissionRecovery(context, permissionHistory) }
+}
+
+private fun PermissionSetupItem.withRuntimePermissionRecovery(
+    context: Context,
+    history: RuntimePermissionRequestHistory,
+): PermissionSetupItem {
+    val runtimePermission = action as? PermissionAction.RuntimePermission ?: return this
+    if (granted) {
+        history.clear(runtimePermission.permission)
+        return this
+    }
+    if (!history.requiresSettings(runtimePermission.permission)) return this
+    return copy(
+        body = "$body ${context.getString(R.string.permission_denied_settings_body)}",
+        actionLabel = context.getString(R.string.action_open_app_settings),
+        action = PermissionAction.SettingsIntent(appDetailsIntent(context)),
     )
 }
 
@@ -772,6 +818,12 @@ private fun appDetailsIntent(context: Context): Intent =
 
 private fun packageDetailsIntent(packageName: String): Intent =
     Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
 
 private fun openSettingsIntent(context: Context, intent: Intent, onMessage: (String) -> Unit) {
     try {
