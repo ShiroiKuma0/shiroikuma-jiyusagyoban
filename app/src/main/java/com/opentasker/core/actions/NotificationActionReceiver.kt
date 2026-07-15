@@ -17,18 +17,36 @@ class NotificationActionReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION_NOTIFICATION_BUTTON) return
-        val taskName = intent.getStringExtra(EXTRA_TASK_NAME) ?: return
-        val buttonLabel = intent.getStringExtra(EXTRA_BUTTON_LABEL) ?: taskName
+        val taskId = intent.getLongExtra(EXTRA_TASK_ID, -1L).takeIf { it > 0 }
+        val legacyTaskName = intent.getStringExtra(EXTRA_TASK_NAME)
+        val reference = taskId?.let { NotificationTaskReference.Id(it) }
+            ?: legacyTaskName?.let { NotificationTaskReference.LegacyName(it) }
+            ?: return
+        val buttonLabel = intent.getStringExtra(EXTRA_BUTTON_LABEL)
+            ?: legacyTaskName
+            ?: "Task ${taskId ?: "unknown"}"
 
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
                 val db = OpenTaskerApp_NoHilt.db
-                val entity = db.taskDao().getByName(taskName)
-                if (entity == null) {
-                    AppLogger.warn(TAG, "Notification button '$buttonLabel' task '$taskName' not found")
+                val entities = if (taskId != null) {
+                    listOfNotNull(db.taskDao().getById(taskId))
+                } else {
+                    db.taskDao().getAll()
+                }
+                val resolution = NotificationTaskBindings.resolve(
+                    reference = reference,
+                    candidates = entities.map { NotificationTaskCandidate(it.id, it.name) },
+                )
+                if (resolution !is NotificationTaskResolution.Bound) {
+                    AppLogger.warn(
+                        TAG,
+                        "Notification button '$buttonLabel' did not run: ${NotificationTaskBindings.failureMessage(resolution)}",
+                    )
                     return@launch
                 }
+                val entity = entities.single { it.id == resolution.task.id }
                 val decoded = entity.toDomainDecodeResult()
                 val issue = decoded.issue
                 if (issue != null) {
@@ -63,6 +81,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
 
     companion object {
         const val ACTION_NOTIFICATION_BUTTON = "com.opentasker.action.NOTIFICATION_BUTTON"
+        const val EXTRA_TASK_ID = "com.opentasker.extra.TASK_ID"
+        /** Compatibility only for PendingIntents created before immutable ID bindings shipped. */
         const val EXTRA_TASK_NAME = "com.opentasker.extra.TASK_NAME"
         const val EXTRA_BUTTON_LABEL = "com.opentasker.extra.BUTTON_LABEL"
         const val SOURCE = "Notification action"

@@ -77,7 +77,7 @@ class AccessibilitySourceTest {
             "screens/ActionEditorDialogs.kt" to listOf(
                 "role = Role.Switch",
                 "stateDescription = stateDescriptionLabel",
-                "enabled = !missingRequired && capability.canAdd",
+                "enabled = !missingRequired && taskBindingIssues.isEmpty() && capability.canAdd",
                 "R.string.label_required",
             ),
             "screens/ContextEditorDialogs.kt" to listOf(

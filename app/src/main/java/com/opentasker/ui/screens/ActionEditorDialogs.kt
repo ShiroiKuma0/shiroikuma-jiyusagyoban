@@ -2,6 +2,7 @@ package com.opentasker.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,7 +19,10 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -38,15 +42,21 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.actions.ActionField
 import com.opentasker.core.actions.ActionMetadata
 import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.actions.FieldType
+import com.opentasker.core.actions.NotificationTaskBindings
+import com.opentasker.core.actions.NotificationTaskCandidate
+import com.opentasker.core.actions.NotificationTaskReference
+import com.opentasker.core.actions.NotificationTaskResolution
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.model.ActionSpec
+import com.opentasker.core.model.Task
 import com.opentasker.ui.theme.DesignSystem
 
 @Composable
@@ -126,7 +136,8 @@ internal fun existingActionArgValue(
     actionId: String,
     key: String,
     args: Map<String, String>,
-): String = args[key] ?: when (actionId to key) {
+    tasks: List<Task> = emptyList(),
+): String = args[key] ?: notificationTaskEditorValue(actionId, key, args, tasks) ?: when (actionId to key) {
     "brightness.set" to "brightness" -> args["level"]
     "screenshot.take" to "path" -> args["filename"]
     "file.read" to "var" -> args["variable"]
@@ -139,9 +150,48 @@ internal fun existingActionArgValue(
     else -> null
 }.orEmpty()
 
+private fun notificationTaskEditorValue(
+    actionId: String,
+    key: String,
+    args: Map<String, String>,
+    tasks: List<Task>,
+): String? {
+    if (actionId != "notify.show") return null
+    val buttonIndex = (1..NotificationTaskBindings.BUTTON_COUNT)
+        .firstOrNull { NotificationTaskBindings.taskIdKey(it) == key }
+        ?: return null
+    val reference = NotificationTaskBindings.parse(args, buttonIndex) ?: return ""
+    return when (val resolution = NotificationTaskBindings.resolve(reference, tasks.toNotificationCandidates())) {
+        is NotificationTaskResolution.Bound -> resolution.task.id.toString()
+        else -> ""
+    }
+}
+
+internal fun unresolvedNotificationTaskBindings(
+    actionId: String,
+    args: Map<String, String>,
+    tasks: List<Task>,
+): Map<String, NotificationTaskResolution> {
+    if (actionId != "notify.show") return emptyMap()
+    val candidates = tasks.toNotificationCandidates()
+    return (1..NotificationTaskBindings.BUTTON_COUNT).mapNotNull { buttonIndex ->
+        val reference = NotificationTaskBindings.parse(args, buttonIndex) ?: return@mapNotNull null
+        val resolution = NotificationTaskBindings.resolve(reference, candidates)
+        if (resolution is NotificationTaskResolution.Bound) {
+            null
+        } else {
+            NotificationTaskBindings.taskIdKey(buttonIndex) to resolution
+        }
+    }.toMap()
+}
+
+private fun List<Task>.toNotificationCandidates(): List<NotificationTaskCandidate> =
+    map { NotificationTaskCandidate(it.id, it.name) }
+
 @Composable
 internal fun ActionConfigDialog(
     state: ActionEditState,
+    tasks: List<Task> = emptyList(),
     onDismiss: () -> Unit,
     onSave: (ActionSpec) -> Unit,
 ) {
@@ -155,10 +205,22 @@ internal fun ActionConfigDialog(
                     actionId = state.metadata.id,
                     key = field.key,
                     args = state.existing?.args.orEmpty(),
+                    tasks = tasks,
                 )
             }
         )
     }
+    val initialTaskBindingIssues = remember(state.existing?.args, state.metadata.id, tasks) {
+        unresolvedNotificationTaskBindings(
+            actionId = state.metadata.id,
+            args = state.existing?.args.orEmpty(),
+            tasks = tasks,
+        )
+    }
+    var addressedTaskBindingKeys by rememberSaveable(state.existing?.id, state.metadata.id) {
+        mutableStateOf(emptyList<String>())
+    }
+    val taskBindingIssues = initialTaskBindingIssues.filterKeys { it !in addressedTaskBindingKeys }
     val capability = remember(state.metadata.id) { ActionCapabilityRegistry.get(state.metadata.id) }
     val missingRequired = state.metadata.fields.any { it.required && values[it.key].isNullOrBlank() }
 
@@ -204,14 +266,27 @@ internal fun ActionConfigDialog(
                     ActionFieldInput(
                         field = field,
                         value = values[field.key].orEmpty(),
-                        onChange = { newValue -> values = values + (field.key to newValue) },
+                        onChange = { newValue ->
+                            values = values + (field.key to newValue)
+                            if (field.fieldType == FieldType.TASK && field.key !in addressedTaskBindingKeys) {
+                                addressedTaskBindingKeys = addressedTaskBindingKeys + field.key
+                            }
+                        },
+                        tasks = tasks,
                     )
+                    taskBindingIssues[field.key]?.let { issue ->
+                        Text(
+                            notificationTaskBindingIssueText(issue),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
             }
         },
         confirmButton = {
             Button(
-                enabled = !missingRequired && capability.canAdd,
+                enabled = !missingRequired && taskBindingIssues.isEmpty() && capability.canAdd,
                 onClick = {
                     onSave(
                         ActionSpec(
@@ -233,7 +308,12 @@ internal fun ActionConfigDialog(
 }
 
 @Composable
-internal fun ActionFieldInput(field: ActionField, value: String, onChange: (String) -> Unit) {
+internal fun ActionFieldInput(
+    field: ActionField,
+    value: String,
+    onChange: (String) -> Unit,
+    tasks: List<Task> = emptyList(),
+) {
     val label = field.label + if (field.required) " *" else ""
     when (field.fieldType) {
         FieldType.CHECKBOX -> {
@@ -290,6 +370,14 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
             modifier = Modifier.fillMaxWidth(),
         )
 
+        FieldType.TASK -> TaskActionFieldInput(
+            label = label,
+            hint = field.hint,
+            value = value,
+            tasks = tasks,
+            onChange = onChange,
+        )
+
         FieldType.DROPDOWN,
         FieldType.TEXT -> OutlinedTextField(
             value = value,
@@ -301,4 +389,69 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
             modifier = Modifier.fillMaxWidth(),
         )
     }
+}
+
+@Composable
+private fun TaskActionFieldInput(
+    label: String,
+    hint: String?,
+    value: String,
+    tasks: List<Task>,
+    onChange: (String) -> Unit,
+) {
+    var expanded by rememberSaveable(label) { mutableStateOf(false) }
+    val selectedId = value.toLongOrNull()
+    val selectedLabel = when {
+        value.isBlank() -> stringResource(R.string.label_none)
+        selectedId == null -> stringResource(R.string.action_task_binding_invalid_value, value)
+        else -> tasks.firstOrNull { it.id == selectedId }?.name
+            ?: stringResource(R.string.action_task_binding_missing_id, selectedId)
+    }
+    Box(Modifier.fillMaxWidth()) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(label, style = MaterialTheme.typography.labelLarge)
+                Text(selectedLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                hint?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.label_none)) },
+                onClick = {
+                    onChange("")
+                    expanded = false
+                },
+            )
+            tasks.sortedBy { it.name.lowercase() }.forEach { task ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.action_task_picker_option, task.name, task.id)) },
+                    onClick = {
+                        onChange(task.id.toString())
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun notificationTaskBindingIssueText(issue: NotificationTaskResolution): String = when (issue) {
+    is NotificationTaskResolution.Bound -> ""
+    is NotificationTaskResolution.Missing -> when (val reference = issue.reference) {
+        is NotificationTaskReference.Id -> stringResource(R.string.action_task_binding_missing_id, reference.taskId)
+        is NotificationTaskReference.LegacyName -> stringResource(R.string.action_task_binding_missing_name, reference.taskName)
+        is NotificationTaskReference.Invalid -> stringResource(R.string.action_task_binding_invalid_value, reference.rawValue)
+    }
+    is NotificationTaskResolution.Ambiguous -> stringResource(
+        R.string.action_task_binding_ambiguous_name,
+        issue.taskName,
+    )
+    is NotificationTaskResolution.Invalid -> stringResource(R.string.action_task_binding_invalid_value, issue.rawValue)
 }

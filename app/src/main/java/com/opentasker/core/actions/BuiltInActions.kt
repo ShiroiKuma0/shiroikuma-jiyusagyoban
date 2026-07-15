@@ -10,6 +10,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import com.opentasker.app.OpenTaskerApp_NoHilt
 import kotlinx.coroutines.suspendCancellableCoroutine
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
@@ -64,12 +65,26 @@ class NotifyAction : Action {
             .setAutoCancel(!persistent)
             .setOngoing(persistent)
 
-        for (i in 1..3) {
-            val taskName = args["button${i}_task"] ?: continue
-            val label = args["button${i}_label"] ?: taskName
+        val taskReferences = (1..NotificationTaskBindings.BUTTON_COUNT).mapNotNull { buttonIndex ->
+            NotificationTaskBindings.parse(args, buttonIndex)?.let { buttonIndex to it }
+        }
+        val taskCandidates = if (taskReferences.isEmpty()) {
+            emptyList()
+        } else {
+            OpenTaskerApp_NoHilt.db.taskDao().getAll().map { NotificationTaskCandidate(it.id, it.name) }
+        }
+
+        for ((i, reference) in taskReferences) {
+            val resolution = NotificationTaskBindings.resolve(reference, taskCandidates)
+            if (resolution !is NotificationTaskResolution.Bound) {
+                return ActionResult.Failure(
+                    "Notification button $i is not runnable: ${NotificationTaskBindings.failureMessage(resolution)}",
+                )
+            }
+            val label = args["button${i}_label"] ?: resolution.task.name
             val buttonIntent = Intent(ctx.app, NotificationActionReceiver::class.java).apply {
                 action = NotificationActionReceiver.ACTION_NOTIFICATION_BUTTON
-                putExtra(NotificationActionReceiver.EXTRA_TASK_NAME, taskName)
+                putExtra(NotificationActionReceiver.EXTRA_TASK_ID, resolution.task.id)
                 putExtra(NotificationActionReceiver.EXTRA_BUTTON_LABEL, label)
                 putExtra("_req", (notifId.hashCode() * 31 + i) and 0x7FFFFFFF)
             }
