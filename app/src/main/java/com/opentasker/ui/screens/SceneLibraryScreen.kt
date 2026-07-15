@@ -85,6 +85,7 @@ import com.opentasker.core.scenes.GuideOrientation
 import com.opentasker.core.scenes.SceneAlignmentGuides
 import com.opentasker.core.scenes.SceneCanvasProjector
 import com.opentasker.core.scenes.SceneElementConfigResolver
+import com.opentasker.core.scenes.SceneEditorMutations
 import com.opentasker.core.scenes.SceneImageLoader
 import com.opentasker.core.scenes.SceneOverlayService
 import com.opentasker.core.scenes.SceneElementDrafts
@@ -222,16 +223,7 @@ fun SceneLibraryScreen(
                     pendingElementDeleteSceneId = scene.id
                     pendingElementDeleteIndex = index
                 },
-                onMoveElement = { index, element ->
-                    onUpdateScene(
-                        scene.copy(
-                            elements = scene.elements.mapIndexed { i, existing ->
-                                if (i == index) element else existing
-                            },
-                        ),
-                        "Element moved",
-                    )
-                },
+                onUpdateScene = onUpdateScene,
                 onDelete = { onDeleteScene(scene) },
                 onShowOverlay = { SceneOverlayService.show(sceneContext, scene) },
             )
@@ -377,7 +369,7 @@ private fun SceneCard(
     onAddElement: () -> Unit,
     onEditElement: (Int, SceneElement) -> Unit,
     onDeleteElement: (Int, SceneElement) -> Unit,
-    onMoveElement: (Int, SceneElement) -> Unit,
+    onUpdateScene: (Scene, String) -> Unit,
     onDelete: () -> Unit,
     onShowOverlay: () -> Unit = {},
 ) {
@@ -417,12 +409,22 @@ private fun SceneCard(
                 scene = scene,
                 onMoveElement = { index, xDp, yDp ->
                     scene.elements.getOrNull(index)?.let { element ->
-                        onMoveElement(index, element.copy(xDp = xDp, yDp = yDp))
+                        onUpdateScene(
+                            SceneEditorMutations.replaceElement(scene, index, element.copy(xDp = xDp, yDp = yDp)),
+                            "Element moved",
+                        )
                     }
                 },
                 onResizeElement = { index, widthDp, heightDp ->
                     scene.elements.getOrNull(index)?.let { element ->
-                        onMoveElement(index, element.copy(widthDp = widthDp, heightDp = heightDp))
+                        onUpdateScene(
+                            SceneEditorMutations.replaceElement(
+                                scene,
+                                index,
+                                element.copy(widthDp = widthDp, heightDp = heightDp),
+                            ),
+                            "Element resized",
+                        )
                     }
                 },
                 selectedIndices = selectedIndices,
@@ -430,14 +432,9 @@ private fun SceneCard(
                     selectedIndices = if (index in selectedIndices) selectedIndices - index else selectedIndices + index
                 },
                 onMoveSelected = { dx, dy ->
-                    val updated = scene.elements.mapIndexed { i, el ->
-                        if (i in selectedIndices) el.nudgedWithin(scene, dx, dy) else el
-                    }
-                    val updatedScene = scene.copy(elements = updated)
-                    updated.forEachIndexed { i, el ->
-                        if (i in selectedIndices && el != scene.elements[i]) {
-                            onMoveElement(i, el)
-                        }
+                    val updatedScene = SceneEditorMutations.moveSelected(scene, selectedIndices, dx, dy)
+                    if (updatedScene != scene) {
+                        onUpdateScene(updatedScene, "Elements moved")
                     }
                 },
             )
@@ -456,7 +453,14 @@ private fun SceneCard(
                             element = element,
                             taskNames = taskNames,
                             onNudge = { deltaX, deltaY ->
-                                onMoveElement(index, element.nudgedWithin(scene, deltaX, deltaY))
+                                onUpdateScene(
+                                    SceneEditorMutations.replaceElement(
+                                        scene,
+                                        index,
+                                        element.nudgedWithin(scene, deltaX, deltaY),
+                                    ),
+                                    "Element moved",
+                                )
                             },
                             onEdit = { onEditElement(index, element) },
                             onDelete = { onDeleteElement(index, element) },
@@ -707,12 +711,18 @@ private fun SceneCanvasElement(
                             resizeDy += dragAmount.y / density.density
                         },
                         onDragEnd = {
-                            val scale = scene.widthDp / canvasWidth
-                            val newW = ((element.widthDp + (resizeDx * scale).toInt()).coerceIn(MIN_ELEMENT_SIZE, scene.widthDp))
-                            val newH = ((element.heightDp + (resizeDy * scale).toInt()).coerceIn(MIN_ELEMENT_SIZE, scene.heightDp))
+                            val resized = SceneEditorMutations.resizeElementFromCanvasDelta(
+                                scene = scene,
+                                element = element,
+                                deltaCanvasX = resizeDx,
+                                deltaCanvasY = resizeDy,
+                                canvasWidth = canvasWidth,
+                                canvasHeight = canvasHeight,
+                                minimumSizeDp = MIN_ELEMENT_SIZE,
+                            )
                             resizeDx = 0f
                             resizeDy = 0f
-                            onResizeElement(index, newW, newH)
+                            onResizeElement(index, resized.widthDp, resized.heightDp)
                         },
                         onDragCancel = {
                             resizeDx = 0f

@@ -242,21 +242,23 @@ class ActiveAutomationViewModel(
     }
 
     fun updateScene(scene: Scene, message: String = "Scene updated") = launchWithMessage(message) {
-        val previous = scene.id.takeIf { it > 0L }?.let { db.sceneDao().getById(it) }
-        if (previous != null) {
-            previous.toDomainDecodeResult().issue?.let { issue ->
-                throw CorruptRecordOverwriteException(issue)
+        db.withTransaction {
+            val previous = scene.id.takeIf { it > 0L }?.let { db.sceneDao().getById(it) }
+            if (previous != null) {
+                previous.toDomainDecodeResult().issue?.let { issue ->
+                    throw CorruptRecordOverwriteException(issue)
+                }
+                db.editHistoryDao().insert(
+                    EditHistoryEntity(
+                        entityType = EditHistoryDao.TYPE_SCENE,
+                        entityId = scene.id,
+                        previousJson = previous.elementsJson,
+                    ),
+                )
+                db.editHistoryDao().pruneOld(EditHistoryDao.TYPE_SCENE, scene.id)
             }
-            db.editHistoryDao().insert(
-                EditHistoryEntity(
-                    entityType = EditHistoryDao.TYPE_SCENE,
-                    entityId = scene.id,
-                    previousJson = previous.elementsJson,
-                ),
-            )
-            db.editHistoryDao().pruneOld(EditHistoryDao.TYPE_SCENE, scene.id)
+            db.sceneDao().update(scene.toEntity())
         }
-        db.sceneDao().update(scene.toEntity())
     }
 
     fun deleteScene(scene: Scene) = launchWithMessage("Scene deleted") {
