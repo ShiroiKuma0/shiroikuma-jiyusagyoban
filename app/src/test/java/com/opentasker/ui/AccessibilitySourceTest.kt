@@ -45,7 +45,7 @@ class AccessibilitySourceTest {
         assertTrue(flowSource.contains("graph.accessibilitySummary()"))
         assertTrue(flowSource.contains("node.accessibilityLabel()"))
 
-        val sceneSource = uiSourceRoot.resolve("screens/SceneLibraryScreen.kt").readText()
+        val sceneSource = uiSourceRoot.resolve("screens/SceneLibraryCards.kt").readText()
         val requiredNudgeLabels = listOf(
             "R.string.scenes_move_left_content_description",
             "R.string.scenes_move_up_content_description",
@@ -132,10 +132,12 @@ class AccessibilitySourceTest {
                 "enabled = !missingRequired",
                 "R.string.context_invert_helper",
             ),
-            "screens/SceneLibraryScreen.kt" to listOf(
+            "screens/SceneLibraryCards.kt" to listOf(
                 "R.string.scenes_empty_content_description",
-                "R.string.scenes_remove_element_content_description",
                 "R.string.scenes_move_left_content_description",
+            ),
+            "screens/SceneEditorDialogs.kt" to listOf(
+                "R.string.scenes_remove_element_content_description",
                 "enabled = canSave",
             ),
             "screens/RunLogScreenContent.kt" to listOf(

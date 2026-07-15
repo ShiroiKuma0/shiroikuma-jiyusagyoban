@@ -25,7 +25,11 @@ class LocalizationSourceTest {
             "com/opentasker/ui/screens/ContextEditorDialogs.kt",
             "com/opentasker/ui/screens/EditorDialogs.kt",
             "com/opentasker/ui/screens/PermissionOnboardingScreen.kt",
+            "com/opentasker/ui/screens/SceneEditorCanvas.kt",
+            "com/opentasker/ui/screens/SceneEditorDialogs.kt",
             "com/opentasker/ui/screens/SceneLibraryScreen.kt",
+            "com/opentasker/ui/screens/SceneLibraryCards.kt",
+            "com/opentasker/ui/screens/SceneOverlayControls.kt",
             "com/opentasker/widget/TaskWidgetConfigActivity.kt",
         )
         val forbiddenPatterns = mapOf(
