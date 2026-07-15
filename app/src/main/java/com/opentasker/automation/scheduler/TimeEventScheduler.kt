@@ -14,25 +14,36 @@ class TimeEventScheduler(context: Context) {
     private val alarmManager = appContext.getSystemService(AlarmManager::class.java)
 
     fun scheduleNextMinute(nowMillis: Long = System.currentTimeMillis()) {
-        val triggerAtMillis = nextMinuteBoundaryMillis(nowMillis)
+        scheduleAt(nextMinuteBoundaryMillis(nowMillis))
+    }
+
+    fun scheduleRecovery(nowMillis: Long = System.currentTimeMillis()) {
+        scheduleAt(recoveryTriggerAtMillis(nowMillis))
+    }
+
+    private fun scheduleAt(triggerAtMillis: Long) {
         val pendingIntent = tickPendingIntent()
 
         alarmManager.cancel(pendingIntent)
         when (ExactAlarmSupport.schedulePrecision(appContext)) {
             AlarmSchedulePrecision.Exact -> {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
-                AppLogger.debug(TAG, "Scheduled exact time tick for $triggerAtMillis")
+                try {
+                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+                    AppLogger.debug(TAG, "Scheduled exact time tick for $triggerAtMillis")
+                } catch (error: SecurityException) {
+                    scheduleInexactWhileIdle(triggerAtMillis, pendingIntent)
+                    AppLogger.warn(TAG, "Exact-alarm access changed while scheduling; used Doze-capable fallback")
+                }
             }
             AlarmSchedulePrecision.InexactFallback -> {
-                alarmManager.setWindow(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerAtMillis,
-                    INEXACT_WINDOW_MS,
-                    pendingIntent,
-                )
-                AppLogger.warn(TAG, "Exact alarms unavailable; scheduled inexact time tick for $triggerAtMillis")
+                scheduleInexactWhileIdle(triggerAtMillis, pendingIntent)
+                AppLogger.warn(TAG, "Exact alarms unavailable; scheduled Doze-capable inexact time tick for $triggerAtMillis")
             }
         }
+    }
+
+    private fun scheduleInexactWhileIdle(triggerAtMillis: Long, pendingIntent: PendingIntent) {
+        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
     }
 
     fun cancel() {
@@ -51,10 +62,12 @@ class TimeEventScheduler(context: Context) {
         const val ACTION_TIME_TICK = "com.opentasker.automation.TIME_TICK"
         private const val REQUEST_CODE_TIME_TICK = 13001
         private const val MINUTE_MS = 60_000L
-        private const val INEXACT_WINDOW_MS = 10 * MINUTE_MS
+        internal const val RECOVERY_DELAY_MS = 5_000L
         private const val TAG = "TimeEventScheduler"
 
         internal fun nextMinuteBoundaryMillis(nowMillis: Long): Long =
             ((nowMillis / MINUTE_MS) + 1L) * MINUTE_MS
+
+        internal fun recoveryTriggerAtMillis(nowMillis: Long): Long = nowMillis + RECOVERY_DELAY_MS
     }
 }

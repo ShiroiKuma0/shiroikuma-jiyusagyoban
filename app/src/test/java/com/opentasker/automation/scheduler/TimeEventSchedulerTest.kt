@@ -13,4 +13,9 @@ class TimeEventSchedulerTest {
     fun nextMinuteBoundaryAdvancesWhenAlreadyOnBoundary() {
         assertEquals(180_000L, TimeEventScheduler.nextMinuteBoundaryMillis(120_000L))
     }
+
+    @Test
+    fun recoveryAlarmIsScheduledPromptlyAfterTimeout() {
+        assertEquals(15_000L, TimeEventScheduler.recoveryTriggerAtMillis(10_000L))
+    }
 }

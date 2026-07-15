@@ -62,6 +62,7 @@ Variable names follow Tasker's scope rule: an all-lowercase name is local to the
 ### Reliability and observability
 
 - OEM battery-killer detection with per-vendor remediation (Samsung, Xiaomi, OnePlus, Oppo, Realme, Vivo, Huawei, etc.)
+- Alarm-backed time/day reevaluation through Doze, with a persisted engine heartbeat and periodic WorkManager watchdog that re-arms dropped ticks and foreground-service timeout recovery
 - Setup checklist covering notifications, exact alarms, battery optimization, usage access, overlays, location, Bluetooth, SMS, DND, Shizuku, and Termux
 - Context inspector with live source health, latest values, and per-profile match explanations
 - Step-level run logs with action traces, template diagnostics, warning counts, and configurable retention

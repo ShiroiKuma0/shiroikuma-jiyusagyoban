@@ -3,7 +3,9 @@ package com.opentasker.automation.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import androidx.core.content.ContextCompat
 import com.opentasker.automation.scheduler.TimeEventScheduler
+import com.opentasker.core.engine.AutomationService
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.scheduling.ExactAlarmSupport
 
@@ -17,12 +19,21 @@ class TimeEventReceiver : BroadcastReceiver() {
         when (intent.action) {
             TimeEventScheduler.ACTION_TIME_TICK,
             Intent.ACTION_TIME_TICK -> {
-                try {
-                    AppLogger.debug(TAG, "Time tick event")
-                } catch (e: Exception) {
-                    AppLogger.error(TAG, "Error processing time event", e)
-                } finally {
-                    TimeEventScheduler(context).scheduleNextMinute()
+                val scheduler = TimeEventScheduler(context)
+                runCatching { scheduler.scheduleNextMinute() }
+                    .onFailure { AppLogger.error(TAG, "Could not re-arm the next time tick", it) }
+                runCatching {
+                    ContextCompat.startForegroundService(
+                        context,
+                        Intent(context, AutomationService::class.java)
+                            .setAction(AutomationService.ACTION_TIME_TICK_TRIGGER),
+                    )
+                }.onSuccess {
+                    AppLogger.debug(TAG, "Delivered alarm-backed time tick to the engine")
+                }.onFailure { error ->
+                    AppLogger.error(TAG, "Could not deliver alarm-backed time tick", error)
+                    runCatching { scheduler.scheduleRecovery() }
+                        .onFailure { AppLogger.error(TAG, "Could not schedule time-tick recovery", it) }
                 }
             }
             ExactAlarmSupport.PERMISSION_STATE_CHANGED_ACTION -> {

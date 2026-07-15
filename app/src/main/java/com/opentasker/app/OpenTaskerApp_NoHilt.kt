@@ -13,6 +13,7 @@ import com.opentasker.core.storage.PendingRestoreApplyResult
 import com.opentasker.core.storage.VariableRepository
 import com.opentasker.core.diagnostics.CrashLogHandler
 import com.opentasker.core.engine.RunLogPruneWorker
+import com.opentasker.core.engine.EngineWatchdogWorker
 import com.opentasker.core.platform.AppVisibilityTracker
 import com.opentasker.core.power.ShizukuPowerBackend
 import kotlinx.coroutines.CoroutineScope
@@ -74,6 +75,7 @@ class OpenTaskerApp_NoHilt : Application() {
         }
 
         RunLogPruneWorker.enqueue(this)
+        EngineWatchdogWorker.enqueue(this)
     }
 
     /**

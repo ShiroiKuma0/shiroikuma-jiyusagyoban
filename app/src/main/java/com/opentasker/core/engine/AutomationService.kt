@@ -28,6 +28,7 @@ import com.opentasker.core.contexts.CameraMicContextEvents
 import com.opentasker.core.contexts.PackageContextEvents
 import com.opentasker.core.contexts.PluginConditionSubscription
 import com.opentasker.core.contexts.PluginConditionSubscriptions
+import com.opentasker.core.contexts.TimeContextEvents
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
@@ -45,6 +46,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -74,6 +76,7 @@ class AutomationService : Service() {
     private val appUsageMonitor by lazy { AppUsageMonitor(this) }
     private val shakeDetector by lazy { ShakeDetector(this) }
     private val runLogRetentionSettings by lazy { RunLogRetentionSettings(this) }
+    private val engineHeartbeatStore by lazy { EngineHeartbeatStore(this) }
     private val contextMonitorLifecycle by lazy {
         ContextMonitorLifecycle(
             mapOf(
@@ -134,6 +137,7 @@ class AutomationService : Service() {
     private val profileReloadMutex = Mutex()
     private var lastRunLogPruneAt = 0L
     private var audioForegroundServiceEligibility = AudioForegroundServiceEligibility.BACKGROUND_STARTED
+    @Volatile private var engineLoaded = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -141,6 +145,13 @@ class AutomationService : Service() {
         super.onCreate()
         startForegroundCompat()
         timeEventScheduler.scheduleNextMinute()
+        engineHeartbeatStore.recordAlive()
+        scope.launch {
+            while (isActive) {
+                engineHeartbeatStore.recordAlive()
+                delay(ENGINE_HEARTBEAT_INTERVAL_MS)
+            }
+        }
         profileCooldowns.putAll(cooldownStore.loadAll())
         scope.launch { pruneRunLogs(force = true) }
         observeProfileRegistry()
@@ -175,10 +186,16 @@ class AutomationService : Service() {
             audioForegroundServiceEligibility = AudioForegroundServiceEligibility.WHILE_IN_USE
         }
         val bootCompletedTrigger = intent?.action == ACTION_BOOT_COMPLETED_TRIGGER
+        val timeTickTrigger = intent?.action == ACTION_TIME_TICK_TRIGGER
+        timeEventScheduler.scheduleNextMinute()
+        engineHeartbeatStore.recordAlive()
         scope.launch {
-            reloadProfiles()
+            if (!timeTickTrigger || !engineLoaded) reloadProfiles()
             if (bootCompletedTrigger) {
                 BootContextEvents.publishBootCompleted()
+            }
+            if (timeTickTrigger) {
+                TimeContextEvents.publish()
             }
         }
         return START_STICKY
@@ -186,6 +203,8 @@ class AutomationService : Service() {
 
     override fun onTimeout(startId: Int, fgsType: Int) {
         AppLogger.warn(TAG, "Foreground service timeout (startId=$startId, fgsType=$fgsType); stopping cleanly")
+        engineHeartbeatStore.recordStopped()
+        timeEventScheduler.scheduleRecovery()
         scope.launch {
             val entry = com.opentasker.core.storage.RunLogEntity(
                 taskId = 0,
@@ -212,7 +231,7 @@ class AutomationService : Service() {
         profileCooldowns.clear()
         profileTaskJobs.clear()
         queuedProfileTasks.clear()
-        timeEventScheduler.cancel()
+        engineHeartbeatStore.recordStopped()
         PluginConditionSubscriptions.clear()
         job.cancel()
         logContextMonitorTransition(contextMonitorLifecycle.stopAll())
@@ -279,6 +298,7 @@ class AutomationService : Service() {
             AppLogger.warn(TAG, "Context monitor subscription barrier timed out; starting required sources in degraded mode")
         }
         logContextMonitorTransition(contextMonitorLifecycle.reconcile(profiles))
+        engineLoaded = true
     }
 
     private fun logContextMonitorTransition(transition: ContextMonitorTransition) {
@@ -585,11 +605,13 @@ class AutomationService : Service() {
     companion object {
         private const val TAG = "AutomationService"
         const val ACTION_BOOT_COMPLETED_TRIGGER = "com.opentasker.action.BOOT_COMPLETED_TRIGGER"
+        const val ACTION_TIME_TICK_TRIGGER = "com.opentasker.action.TIME_TICK_TRIGGER"
         const val EXTRA_STARTED_FROM_VISIBLE_UI = "com.opentasker.extra.STARTED_FROM_VISIBLE_UI"
         private const val CHANNEL = "opentasker.engine"
         private const val NOTIF_ID = 1001
         private const val MAX_QUEUED_TASKS = 50
         private const val MONITOR_SUBSCRIPTION_TIMEOUT_MS = 2_000L
+        private const val ENGINE_HEARTBEAT_INTERVAL_MS = 60_000L
         private val RUN_LOG_PRUNE_INTERVAL_MS = TimeUnit.HOURS.toMillis(1)
     }
 }
