@@ -147,6 +147,14 @@ Play manifest policy check:
 ./gradlew -PopenTaskerDistribution=play :app:verifyPlayManifestPolicy
 ```
 
+Full local release gate (blocking lint, JVM tests, Room schemas, Android-test compilation, resolved dependency/SBOM and OSV policy, configuration-cache reuse, plus Play and F-Droid release builds):
+
+```powershell
+.\tools\verify-local-release.ps1
+```
+
+The gate writes machine-readable reports under `build/reports/opentasker/`. To prove failure propagation without running the full build, run `.\tools\verify-local-release.ps1 -SeedFailure`; success is a nonzero exit with `Seeded local quality-gate failure`.
+
 ---
 
 ## Development

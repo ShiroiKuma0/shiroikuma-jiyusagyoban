@@ -1,3 +1,5 @@
+import java.net.URLEncoder
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -73,9 +75,7 @@ android {
     }
 
     lint {
-        baseline = file("lint-baseline.xml")
-        disable += listOf("MissingPermission", "CoarseFineLocation")
-        abortOnError = false
+        abortOnError = true
     }
 
     compileOptions {
@@ -149,12 +149,240 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
+abstract class VerifyResolvedDependencyPolicyTask : org.gradle.api.DefaultTask() {
+    @get:org.gradle.api.tasks.Input
+    abstract val components: org.gradle.api.provider.ListProperty<String>
+
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    abstract val versionCatalog: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    abstract val moduleBuildFile: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    abstract val settingsFile: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    abstract val verificationMetadata: org.gradle.api.file.RegularFileProperty
+
+    @org.gradle.api.tasks.TaskAction
+    fun verify() {
+        val resolved = components.get().distinct().sorted()
+        check(resolved.isNotEmpty()) { "Release runtime dependency graph is empty." }
+
+        val invalidResolved = resolved.filter { coordinate ->
+            val version = coordinate.split(':', limit = 3).getOrNull(2).orEmpty()
+            version.isBlank() || version.isDynamicVersion()
+        }
+        check(invalidResolved.isEmpty()) {
+            "Resolved dependency graph contains missing or dynamic versions: ${invalidResolved.joinToString()}"
+        }
+
+        val catalogVersions = Regex("""(?m)^\s*[A-Za-z0-9_.-]+\s*=\s*"([^"]+)"\s*$""")
+            .findAll(versionCatalog.get().asFile.readText())
+            .map { match -> match.groupValues[1] }
+        val buildVersions = Regex("""["'](?:[A-Za-z0-9_.-]+):(?:[A-Za-z0-9_.-]+):([^"']+)["']""")
+            .findAll(moduleBuildFile.get().asFile.readText())
+            .map { match -> match.groupValues[1] }
+        val invalidDeclared = (catalogVersions + buildVersions)
+            .filter { version -> version.isDynamicVersion() }
+            .distinct()
+            .sorted()
+            .toList()
+        check(invalidDeclared.isEmpty()) {
+            "Dynamic or snapshot dependency declarations are forbidden: ${invalidDeclared.joinToString()}"
+        }
+
+        val settings = settingsFile.get().asFile.readText()
+        check("RepositoriesMode.FAIL_ON_PROJECT_REPOS" in settings) {
+            "Dependency repositories must remain centralized with FAIL_ON_PROJECT_REPOS."
+        }
+        val repositoryBlocks = Regex(
+            """repositories\s*\{([^{}]*)}""",
+            setOf(RegexOption.DOT_MATCHES_ALL),
+        ).findAll(settings).map { match -> match.groupValues[1] }.toList()
+        check(repositoryBlocks.size == 2) {
+            "Expected exactly the centralized plugin and dependency repository blocks."
+        }
+        val allowedRepositoryCalls = setOf("google()", "mavenCentral()", "gradlePluginPortal()")
+        val repositoryCalls = repositoryBlocks.flatMap { block ->
+            block.lineSequence()
+                .map { line -> line.substringBefore("//").trim() }
+                .filter(String::isNotEmpty)
+                .toList()
+        }
+        val forbiddenRepositoryCalls = repositoryCalls.filterNot { call -> call in allowedRepositoryCalls }
+        check(forbiddenRepositoryCalls.isEmpty()) {
+            "Only google(), mavenCentral(), and gradlePluginPortal() repositories are allowed; found ${forbiddenRepositoryCalls.joinToString()}."
+        }
+
+        val verification = verificationMetadata.get().asFile.readText()
+        check("<verify-metadata>true</verify-metadata>" in verification && "<sha256 value=" in verification) {
+            "Gradle dependency verification metadata must enforce SHA-256 checksums."
+        }
+        println("Resolved dependency policy passed for ${resolved.size} release runtime components.")
+    }
+
+    private fun String.isDynamicVersion(): Boolean {
+        val normalized = lowercase()
+        return '+' in this || normalized.startsWith("latest.") || normalized.endsWith("-snapshot") ||
+            startsWith('[') || startsWith('(')
+    }
+}
+
+abstract class GenerateCycloneDxSbomTask : org.gradle.api.DefaultTask() {
+    @get:org.gradle.api.tasks.Input
+    abstract val components: org.gradle.api.provider.ListProperty<String>
+
+    @get:org.gradle.api.tasks.Input
+    abstract val applicationVersion: org.gradle.api.provider.Property<String>
+
+    @get:org.gradle.api.tasks.OutputFile
+    abstract val outputFile: org.gradle.api.file.RegularFileProperty
+
+    @org.gradle.api.tasks.TaskAction
+    fun generate() {
+        val entries = components.get()
+            .distinct()
+            .sorted()
+            .map { coordinate ->
+                val (group, name, version) = coordinate.split(':', limit = 3)
+                val purl = "pkg:maven/$group/$name@${URLEncoder.encode(version, Charsets.UTF_8.name()).replace("+", "%20")}"
+                """    {"type":"library","bom-ref":${purl.json()},"group":${group.json()},"name":${name.json()},"version":${version.json()},"purl":${purl.json()}}"""
+            }
+        val version = applicationVersion.get()
+        val appPurl = "pkg:generic/OpenTasker@$version"
+        val output = outputFile.get().asFile
+        output.parentFile.mkdirs()
+        output.writeText(
+            buildString {
+                appendLine("{")
+                appendLine("  \"\$schema\": \"https://cyclonedx.org/schema/bom-1.6.schema.json\",")
+                appendLine("  \"bomFormat\": \"CycloneDX\",")
+                appendLine("  \"specVersion\": \"1.6\",")
+                appendLine("  \"version\": 1,")
+                appendLine("  \"metadata\": {\"component\": {\"type\":\"application\",\"bom-ref\":${appPurl.json()},\"group\":\"com.opentasker\",\"name\":\"OpenTasker\",\"version\":${version.json()},\"purl\":${appPurl.json()}}},")
+                appendLine("  \"components\": [")
+                appendLine(entries.joinToString(",\n"))
+                appendLine("  ]")
+                appendLine("}")
+            }
+        )
+        println("CycloneDX SBOM wrote ${entries.size} components to ${output.absolutePath}")
+    }
+
+    private fun String.json(): String = buildString {
+        append('"')
+        this@json.forEach { char ->
+            when (char) {
+                '\\' -> append("\\\\")
+                '"' -> append("\\\"")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                else -> if (char.code < 0x20) append("\\u%04x".format(char.code)) else append(char)
+            }
+        }
+        append('"')
+    }
+}
+
+abstract class VerifyJvmTestCountTask : org.gradle.api.DefaultTask() {
+    @get:org.gradle.api.tasks.InputDirectory
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    abstract val resultsDirectory: org.gradle.api.file.DirectoryProperty
+
+    @get:org.gradle.api.tasks.Input
+    abstract val minimumTests: org.gradle.api.provider.Property<Int>
+
+    @org.gradle.api.tasks.TaskAction
+    fun verify() {
+        val reports = resultsDirectory.get().asFile.listFiles { file ->
+            file.isFile && file.name.startsWith("TEST-") && file.extension == "xml"
+        }.orEmpty()
+        check(reports.isNotEmpty()) { "No JVM test XML reports were produced." }
+        fun count(attribute: String): Int = reports.sumOf { report ->
+            Regex("""\b$attribute="(\d+)"""").find(report.readText())?.groupValues?.get(1)?.toInt() ?: 0
+        }
+        val tests = count("tests")
+        val failures = count("failures")
+        val errors = count("errors")
+        check(failures == 0 && errors == 0) { "JVM tests reported $failures failure(s) and $errors error(s)." }
+        check(tests >= minimumTests.get()) {
+            "JVM test floor regressed: found $tests, expected at least ${minimumTests.get()}."
+        }
+        println("JVM test floor passed: $tests tests, 0 failures, 0 errors.")
+    }
+}
+
+abstract class VerifyQualityGateSeedTask : org.gradle.api.DefaultTask() {
+    @get:org.gradle.api.tasks.Input
+    abstract val seedFailure: org.gradle.api.provider.Property<Boolean>
+
+    @org.gradle.api.tasks.TaskAction
+    fun verify() {
+        check(!seedFailure.get()) { "Seeded local quality-gate failure." }
+    }
+}
+
+val releaseRuntimeCoordinates = providers.provider {
+    val configuration = configurations.single { candidate ->
+        candidate.isCanBeResolved && candidate.name.equals("releaseRuntimeClasspath", ignoreCase = true)
+    }
+    configuration.incoming.resolutionResult.allComponents.mapNotNull { component ->
+        val id = component.id as? org.gradle.api.artifacts.component.ModuleComponentIdentifier
+        id?.let { "${it.group}:${it.module}:${it.version}" }
+    }
+}
+
+val verifyResolvedDependencyPolicy = tasks.register<VerifyResolvedDependencyPolicyTask>("verifyResolvedDependencyPolicy") {
+    group = "verification"
+    description = "Checks the resolved release graph, fixed versions, repositories, and checksum policy."
+    components.set(releaseRuntimeCoordinates)
+    versionCatalog.set(rootProject.layout.projectDirectory.file("gradle/libs.versions.toml"))
+    moduleBuildFile.set(layout.projectDirectory.file("build.gradle.kts"))
+    settingsFile.set(rootProject.layout.projectDirectory.file("settings.gradle.kts"))
+    verificationMetadata.set(rootProject.layout.projectDirectory.file("gradle/verification-metadata.xml"))
+}
+
+val generateCycloneDxSbom = tasks.register<GenerateCycloneDxSbomTask>("generateCycloneDxSbom") {
+    group = "reporting"
+    description = "Writes a deterministic CycloneDX SBOM from the resolved release runtime graph."
+    components.set(releaseRuntimeCoordinates)
+    applicationVersion.set(appVersionName)
+    outputFile.set(rootProject.layout.buildDirectory.file("reports/opentasker/sbom.cdx.json"))
+}
+
+val verifyJvmTestCount = tasks.register<VerifyJvmTestCountTask>("verifyJvmTestCount") {
+    group = "verification"
+    description = "Fails if the passing JVM test count drops below the release floor."
+    dependsOn("testDebugUnitTest")
+    resultsDirectory.set(layout.buildDirectory.dir("test-results/testDebugUnitTest"))
+    minimumTests.set(522)
+}
+
+val qualityGateSeedFailure = providers.gradleProperty("openTaskerQualityGateSeedFailure")
+    .map(String::toBoolean)
+    .orElse(false)
+val verifyQualityGateSeed = tasks.register<VerifyQualityGateSeedTask>("verifyQualityGateSeed") {
+    group = "verification"
+    description = "Provides an explicit seeded failure used to prove the local gate exits nonzero."
+    seedFailure.set(qualityGateSeedFailure)
+}
+
 tasks.register("verifyRoomSchema") {
     group = "verification"
     description = "Checks that all Room schema versions up to the current are exported and tracked."
 
+    dependsOn("kspDebugKotlin")
+    val schemaDir = file("$projectDir/schemas/com.opentasker.core.storage.AppDatabase")
+    inputs.dir(schemaDir)
+
     doLast {
-        val schemaDir = file("$projectDir/schemas/com.opentasker.core.storage.AppDatabase")
         check(schemaDir.isDirectory) { "Room schema directory missing: $schemaDir" }
         val currentVersion = 5
         val missing = (1..currentVersion).filter { !File(schemaDir, "$it.json").isFile }
@@ -184,14 +412,14 @@ tasks.register("verifyFdroidReadiness") {
             "crashlytics",
             "appsflyer",
         )
-        val forbidden = configurations
-            .flatMap { configuration ->
-                configuration.dependencies.mapNotNull { dependency ->
-                    val group = dependency.group.orEmpty()
-                    val name = dependency.name.lowercase()
-                    val blocked = group in forbiddenGroups || forbiddenNames.any { token -> token in name }
-                    if (blocked) "${configuration.name}:$group:${dependency.name}" else null
+        val forbidden = releaseRuntimeCoordinates.get()
+            .mapNotNull { coordinate ->
+                val (group, name) = coordinate.split(':', limit = 3)
+                val blockedGroup = forbiddenGroups.any { forbiddenGroup ->
+                    group == forbiddenGroup || group.startsWith("$forbiddenGroup.")
                 }
+                val blocked = blockedGroup || forbiddenNames.any { token -> token in name.lowercase() }
+                coordinate.takeIf { blocked }
             }
             .distinct()
             .sorted()
@@ -295,4 +523,18 @@ tasks.register("verifyPlayManifestPolicy") {
         }
         println("Play manifest policy check passed: SMS/phone-state permissions are absent.")
     }
+}
+
+tasks.register("localQualityGate") {
+    group = "verification"
+    description = "Runs the deterministic local debug-quality and dependency-report gate."
+    dependsOn(
+        "lintDebug",
+        "compileDebugAndroidTestKotlin",
+        "verifyRoomSchema",
+        verifyResolvedDependencyPolicy,
+        generateCycloneDxSbom,
+        verifyJvmTestCount,
+        verifyQualityGateSeed,
+    )
 }
