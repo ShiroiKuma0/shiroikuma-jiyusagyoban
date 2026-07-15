@@ -24,8 +24,8 @@ class AppUsageMonitor(
     private var lastForegroundPackage: String? = null
     private var warnedMissingAccess = false
 
-    fun start(scope: CoroutineScope) {
-        if (monitorJob?.isActive == true) return
+    fun start(scope: CoroutineScope): Boolean {
+        if (monitorJob?.isActive == true) return true
         monitorJob = scope.launch(Dispatchers.Default) {
             while (isActive) {
                 if (!UsageAccess.hasUsageStatsAccess(appContext)) {
@@ -42,6 +42,7 @@ class AppUsageMonitor(
                 delay(POLL_INTERVAL_MS)
             }
         }
+        return true
     }
 
     fun stop() {

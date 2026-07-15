@@ -34,14 +34,14 @@ class WiFiNetworkMonitor(
         }
     }
 
-    fun start() {
-        if (!started.compareAndSet(false, true)) return
+    fun start(): Boolean {
+        if (!started.compareAndSet(false, true)) return true
         val cm = connectivityManager
         if (cm == null) {
             started.set(false)
             AppLogger.warn(TAG, "ConnectivityManager unavailable; WiFi monitoring disabled")
             emitState(WiFiState(connected = false, ssid = UNKNOWN_SSID))
-            return
+            return false
         }
 
         val request = NetworkRequest.Builder()
@@ -52,10 +52,12 @@ class WiFiNetworkMonitor(
             cm.registerNetworkCallback(request, callback)
             emitCurrentState()
             AppLogger.debug(TAG, "WiFi NetworkCallback registered")
+            return true
         } catch (ex: RuntimeException) {
             started.set(false)
             AppLogger.error(TAG, "Failed to register WiFi NetworkCallback", ex)
             emitState(WiFiState(connected = false, ssid = UNKNOWN_SSID))
+            return false
         }
     }
 

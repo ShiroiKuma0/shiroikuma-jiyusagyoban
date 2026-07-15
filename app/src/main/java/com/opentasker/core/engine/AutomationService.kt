@@ -45,7 +45,11 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import com.opentasker.core.storage.ProfileEntity
 import java.util.ArrayDeque
 import java.util.Collections
@@ -70,6 +74,56 @@ class AutomationService : Service() {
     private val appUsageMonitor by lazy { AppUsageMonitor(this) }
     private val shakeDetector by lazy { ShakeDetector(this) }
     private val runLogRetentionSettings by lazy { RunLogRetentionSettings(this) }
+    private val contextMonitorLifecycle by lazy {
+        ContextMonitorLifecycle(
+            mapOf(
+                ContextMonitor.WIFI to ContextMonitorHandle(
+                    start = { wifiNetworkMonitor.start() },
+                    stop = { wifiNetworkMonitor.stop() },
+                ),
+                ContextMonitor.CONNECTIVITY to ContextMonitorHandle(
+                    start = { connectivityMonitor.start() },
+                    stop = { connectivityMonitor.stop() },
+                ),
+                ContextMonitor.APP_USAGE to ContextMonitorHandle(
+                    start = { appUsageMonitor.start(scope) },
+                    stop = { appUsageMonitor.stop() },
+                ),
+                ContextMonitor.SHAKE to ContextMonitorHandle(
+                    start = { shakeDetector.start() },
+                    stop = { shakeDetector.stop() },
+                ),
+                ContextMonitor.CAMERA_MIC to ContextMonitorHandle(
+                    start = { CameraMicContextEvents.start(this) },
+                    stop = { CameraMicContextEvents.stop(this) },
+                ),
+                ContextMonitor.PACKAGE_EVENTS to ContextMonitorHandle(
+                    start = {
+                        ContextCompat.registerReceiver(
+                            this,
+                            PackageContextEvents.receiver,
+                            PackageContextEvents.intentFilter(),
+                            ContextCompat.RECEIVER_NOT_EXPORTED,
+                        )
+                        true
+                    },
+                    stop = { unregisterReceiver(PackageContextEvents.receiver) },
+                ),
+                ContextMonitor.BLUETOOTH_EVENTS to ContextMonitorHandle(
+                    start = {
+                        ContextCompat.registerReceiver(
+                            this,
+                            BluetoothContextEvents.receiver,
+                            BluetoothContextEvents.intentFilter(),
+                            ContextCompat.RECEIVER_NOT_EXPORTED,
+                        )
+                        true
+                    },
+                    stop = { unregisterReceiver(BluetoothContextEvents.receiver) },
+                ),
+            ),
+        )
+    }
     
     private val cooldownStore by lazy { CooldownStore(this) }
     private val matchers = Collections.synchronizedMap(mutableMapOf<Long, ProfileMatcher>())
@@ -77,6 +131,7 @@ class AutomationService : Service() {
     private val matcherJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>()) // Track jobs for cleanup
     private val profileTaskJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>())
     private val queuedProfileTasks = Collections.synchronizedMap(mutableMapOf<Long, ArrayDeque<Task>>())
+    private val profileReloadMutex = Mutex()
     private var lastRunLogPruneAt = 0L
     private var audioForegroundServiceEligibility = AudioForegroundServiceEligibility.BACKGROUND_STARTED
 
@@ -86,23 +141,6 @@ class AutomationService : Service() {
         super.onCreate()
         startForegroundCompat()
         timeEventScheduler.scheduleNextMinute()
-        wifiNetworkMonitor.start()
-        connectivityMonitor.start()
-        appUsageMonitor.start(scope)
-        shakeDetector.start()
-        ContextCompat.registerReceiver(
-            this,
-            PackageContextEvents.receiver,
-            PackageContextEvents.intentFilter(),
-            ContextCompat.RECEIVER_NOT_EXPORTED,
-        )
-        ContextCompat.registerReceiver(
-            this,
-            BluetoothContextEvents.receiver,
-            BluetoothContextEvents.intentFilter(),
-            ContextCompat.RECEIVER_NOT_EXPORTED,
-        )
-        CameraMicContextEvents.start(this)
         profileCooldowns.putAll(cooldownStore.loadAll())
         scope.launch { pruneRunLogs(force = true) }
         observeProfileRegistry()
@@ -175,23 +213,18 @@ class AutomationService : Service() {
         profileTaskJobs.clear()
         queuedProfileTasks.clear()
         timeEventScheduler.cancel()
-        wifiNetworkMonitor.stop()
-        connectivityMonitor.stop()
-        appUsageMonitor.stop()
-        shakeDetector.stop()
-        runCatching { unregisterReceiver(PackageContextEvents.receiver) }
-        runCatching { unregisterReceiver(BluetoothContextEvents.receiver) }
-        CameraMicContextEvents.stop(this)
         PluginConditionSubscriptions.clear()
         job.cancel()
+        logContextMonitorTransition(contextMonitorLifecycle.stopAll())
         super.onDestroy()
     }
 
-    private suspend fun reloadProfiles() {
+    private suspend fun reloadProfiles() = profileReloadMutex.withLock {
         val oldJobs = matcherJobs.values.toList()
         matcherJobs.clear()
         matchers.clear()
         oldJobs.forEach { it.cancel() }
+        oldJobs.joinAll()
 
         val profileEntities = db.profileDao().getAllEnabled()
         val profiles = profileEntities.mapNotNull { entity ->
@@ -214,7 +247,7 @@ class AutomationService : Service() {
         for (domain in profiles) {
             val matcher = ProfileMatcher(this, domain)
 
-            val matcherJob = scope.launch {
+            val matcherJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 try {
                     matcher.stateChanges().collect { change ->
                         try {
@@ -237,6 +270,30 @@ class AutomationService : Service() {
             
             matcherJobs[domain.id] = matcherJob
             matchers[domain.id] = matcher
+        }
+        val subscriptionsReady = withTimeoutOrNull(MONITOR_SUBSCRIPTION_TIMEOUT_MS) {
+            matchers.values.toList().forEach { it.awaitMonitorSubscriptions() }
+            true
+        } == true
+        if (!subscriptionsReady) {
+            AppLogger.warn(TAG, "Context monitor subscription barrier timed out; starting required sources in degraded mode")
+        }
+        logContextMonitorTransition(contextMonitorLifecycle.reconcile(profiles))
+    }
+
+    private fun logContextMonitorTransition(transition: ContextMonitorTransition) {
+        val counts = contextMonitorLifecycle.currentReferenceCounts()
+        transition.started.forEach { monitor ->
+            AppLogger.info(TAG, "Context monitor $monitor started for ${counts.getOrDefault(monitor, 0)} enabled profile(s)")
+        }
+        transition.stopped.forEach { monitor ->
+            AppLogger.info(TAG, "Context monitor $monitor stopped after its final enabled profile was removed")
+        }
+        transition.failedToStart.forEach { monitor ->
+            AppLogger.warn(TAG, "Context monitor $monitor could not start; it will retry on the next profile reconcile")
+        }
+        transition.failedToStop.forEach { monitor ->
+            AppLogger.warn(TAG, "Context monitor $monitor could not stop cleanly")
         }
     }
 
@@ -532,6 +589,7 @@ class AutomationService : Service() {
         private const val CHANNEL = "opentasker.engine"
         private const val NOTIF_ID = 1001
         private const val MAX_QUEUED_TASKS = 50
+        private const val MONITOR_SUBSCRIPTION_TIMEOUT_MS = 2_000L
         private val RUN_LOG_PRUNE_INTERVAL_MS = TimeUnit.HOURS.toMillis(1)
     }
 }

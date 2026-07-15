@@ -30,14 +30,14 @@ class ConnectivityMonitor(context: Context) {
         }
     }
 
-    fun start() {
-        if (!started.compareAndSet(false, true)) return
+    fun start(): Boolean {
+        if (!started.compareAndSet(false, true)) return true
         val manager = cm
         if (manager == null) {
             started.set(false)
             AppLogger.warn(TAG, "ConnectivityManager unavailable; connectivity monitoring disabled")
             emitState(ConnState(internet = false, networkType = "none", vpn = false))
-            return
+            return false
         }
         val request = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
@@ -46,10 +46,12 @@ class ConnectivityMonitor(context: Context) {
             manager.registerNetworkCallback(request, callback)
             emitCurrentState()
             AppLogger.debug(TAG, "Connectivity callback registered")
+            return true
         } catch (ex: RuntimeException) {
             started.set(false)
             AppLogger.error(TAG, "Failed to register connectivity callback", ex)
             emitState(ConnState(internet = false, networkType = "none", vpn = false))
+            return false
         }
     }
 

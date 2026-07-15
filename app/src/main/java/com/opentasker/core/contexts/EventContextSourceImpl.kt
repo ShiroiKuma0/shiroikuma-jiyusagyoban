@@ -2,8 +2,11 @@ package com.opentasker.core.contexts
 
 import android.content.Context
 import com.opentasker.core.plugins.locale.LocalePluginRequestQueryEvents
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.launch
 
 /**
  * Real EventContextSource backed by explicit app-owned event bridges.
@@ -14,22 +17,40 @@ import kotlinx.coroutines.flow.merge
  *   - "sun_tick": local minute tick used by sunrise/sunset event filters
  *   - "nfc": NFC tag scan
  *   - "bluetooth": Bluetooth device connected/disconnected
+ *   - "shake": accelerometer shake pulse
+ *   - "camera" / "mic": active AppOps watcher pulse
+ *   - "package_added" / "package_removed" / "package_replaced": package changes
  *   - "locale_request_query": Locale condition plugin requested a host query
  *   - "boot_completed": manifest boot receiver restarted the engine
  *   - "tile_clicked": Quick Settings tile toggled
  */
-class EventContextSourceImpl : ContextSource {
+class EventContextSourceImpl : SubscriptionReadyContextSource {
     override val type = "event"
 
-    override fun events(app: Context): Flow<ContextEvent> = merge(
+    override fun events(app: Context, onSubscribed: () -> Unit): Flow<ContextEvent> = channelFlow {
+        val collectors = eventFlows(app).map { upstream ->
+            launch(start = CoroutineStart.UNDISPATCHED) {
+                upstream.collect { event -> send(event) }
+            }
+        }
+
+        // Managed pulse flows are subscribed by undispatched collectors before this callback. The
+        // service waits for it before starting a newly required sensor, receiver, or AppOps watcher.
+        onSubscribed()
+        awaitClose { collectors.forEach { it.cancel() } }
+    }
+
+    private fun eventFlows(app: Context): List<Flow<ContextEvent>> = listOf(
+        // Keep service-owned pulse bridges first so onSubscribed is a strict producer barrier.
+        ShakeContextEvents.events,
+        CameraMicContextEvents.flow,
+        PackageContextEvents.events,
+        BluetoothContextEvents.events,
         NotificationContextEvents.events,
         NfcContextEvents.events,
         BootContextEvents.events,
         CalendarSunContextEvents.events(app),
         LocalePluginRequestQueryEvents.events(app),
         QuickSettingsTileContextEvents.events,
-        ShakeContextEvents.events,
-        PackageContextEvents.events,
-        BluetoothContextEvents.events,
     )
 }

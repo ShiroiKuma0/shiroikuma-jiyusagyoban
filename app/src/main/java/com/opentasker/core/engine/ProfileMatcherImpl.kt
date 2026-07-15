@@ -3,11 +3,13 @@ package com.opentasker.core.engine
 import android.content.Context
 import com.opentasker.core.contexts.ContextMatchEvaluator
 import com.opentasker.core.contexts.ContextSourceRegistry
+import com.opentasker.core.contexts.SubscriptionReadyContextSource
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -31,19 +33,34 @@ class ProfileMatcher(
     private val tag = "ProfileMatcher[${profile.name}]"
     private val performanceThresholdMs = 1000L // Warn if evaluation takes > 1 second
     private val locationDwellStateStore = LocationDwellStateStore(app)
+    private val monitorSubscriptionsReady = CompletableDeferred<Unit>()
+    private val readyPulseContextIndexes = mutableSetOf<Int>()
+
+    suspend fun awaitMonitorSubscriptions() {
+        monitorSubscriptionsReady.await()
+    }
     
     fun stateChanges(): Flow<ProfileStateChange> {
         if (profile.contexts.isEmpty()) {
+            monitorSubscriptionsReady.complete(Unit)
             return emptyFlow()
         }
 
-        val hasPulseContexts = profile.contexts.any { it.type == ContextType.EVENT }
+        val pulseContextCount = profile.contexts.count { it.type == ContextType.EVENT }
+        val hasPulseContexts = pulseContextCount > 0
+        if (!hasPulseContexts) monitorSubscriptionsReady.complete(Unit)
         val flows = profile.contexts.mapIndexed { index, spec ->
             val sourceType = ContextMatchEvaluator.sourceKey(spec.type)
             val source = sourceType?.let(ContextSourceRegistry::get)
             if (source != null) {
                 val isPulseContext = spec.type == ContextType.EVENT
-                source.events(app).scan(ContextMatchUpdate.initial(isPulseContext)) { previous, event ->
+                val sourceEvents = if (isPulseContext && source is SubscriptionReadyContextSource) {
+                    source.events(app) { markPulseContextSubscribed(index, pulseContextCount) }
+                } else {
+                    if (isPulseContext) markPulseContextSubscribed(index, pulseContextCount)
+                    source.events(app)
+                }
+                sourceEvents.scan(ContextMatchUpdate.initial(isPulseContext)) { previous, event ->
                     val preparedEvent = if (spec.type == ContextType.LOCATION) {
                         locationDwellStateStore.enrich(profile.id, index, spec, event)
                     } else {
@@ -59,6 +76,7 @@ class ProfileMatcher(
                 }
             } else {
                 AppLogger.warn(tag, "No context source registered for ${spec.type}; treating as non-matching")
+                if (spec.type == ContextType.EVENT) markPulseContextSubscribed(index, pulseContextCount)
                 flowOf(ContextMatchUpdate.initial(spec.type == ContextType.EVENT))
             }
         }
@@ -103,6 +121,14 @@ class ProfileMatcher(
             allMatched = allMatched,
             pulseSequence = pulseSequence,
         )
+    }
+
+    private fun markPulseContextSubscribed(index: Int, expectedCount: Int) {
+        synchronized(readyPulseContextIndexes) {
+            if (readyPulseContextIndexes.add(index) && readyPulseContextIndexes.size >= expectedCount) {
+                monitorSubscriptionsReady.complete(Unit)
+            }
+        }
     }
 
 }

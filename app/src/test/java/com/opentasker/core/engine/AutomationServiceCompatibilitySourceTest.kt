@@ -44,4 +44,15 @@ class AutomationServiceCompatibilitySourceTest {
             source.contains("@RequiresApi(Build.VERSION_CODES.R)"),
         )
     }
+
+    @Test
+    fun cameraMicEventsReachMatchersThroughTheSubscriptionReadyEventSource() {
+        val source = sourceRoot.resolve("com/opentasker/core/contexts/EventContextSourceImpl.kt").readText()
+
+        assertTrue("Camera/mic AppOps events must reach event-context matchers", source.contains("CameraMicContextEvents.flow"))
+        assertTrue(
+            "Event monitor startup must wait until the event source is subscribed",
+            source.contains("SubscriptionReadyContextSource") && source.contains("onSubscribed()"),
+        )
+    }
 }

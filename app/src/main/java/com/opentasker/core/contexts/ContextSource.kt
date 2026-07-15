@@ -15,6 +15,17 @@ interface ContextSource {
     fun events(app: Context): Flow<ContextEvent>
 }
 
+/**
+ * A source that can prove its upstream callbacks are subscribed before an external producer starts.
+ * The production event source uses this handshake for non-replayed pulse events; diagnostic
+ * collectors use [events] and never acquire or retain producer ownership.
+ */
+interface SubscriptionReadyContextSource : ContextSource {
+    fun events(app: Context, onSubscribed: () -> Unit): Flow<ContextEvent>
+
+    override fun events(app: Context): Flow<ContextEvent> = events(app) {}
+}
+
 object ContextSourceRegistry {
     private val byType = Collections.synchronizedMap(mutableMapOf<String, ContextSource>())
 

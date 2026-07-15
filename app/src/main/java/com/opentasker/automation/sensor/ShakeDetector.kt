@@ -7,12 +7,14 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import com.opentasker.core.contexts.ShakeContextEvents
 import com.opentasker.core.logging.AppLogger
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.sqrt
 
 class ShakeDetector(context: Context) {
 
     private val sensorManager = context.applicationContext.getSystemService(SensorManager::class.java)
     private val accelerometer = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+    private val started = AtomicBoolean(false)
 
     private var lastShakeTime = 0L
 
@@ -39,20 +41,29 @@ class ShakeDetector(context: Context) {
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
     }
 
-    fun start() {
+    fun start(): Boolean {
+        if (!started.compareAndSet(false, true)) return true
         if (accelerometer == null) {
+            started.set(false)
             AppLogger.warn(TAG, "No accelerometer sensor available")
-            return
+            return false
         }
-        sensorManager?.registerListener(
+        val registered = sensorManager?.registerListener(
             listener,
             accelerometer,
             SensorManager.SENSOR_DELAY_UI,
-        )
-        AppLogger.info(TAG, "Shake detector started")
+        ) == true
+        if (registered) {
+            AppLogger.info(TAG, "Shake detector started")
+        } else {
+            started.set(false)
+            AppLogger.warn(TAG, "Accelerometer listener could not be registered")
+        }
+        return registered
     }
 
     fun stop() {
+        if (!started.compareAndSet(true, false)) return
         sensorManager?.unregisterListener(listener)
         AppLogger.info(TAG, "Shake detector stopped")
     }

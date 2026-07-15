@@ -39,7 +39,7 @@
     <string name="context_field_state_value_label" formatted="false">Expected value</string>
     <string name="context_field_state_value_hint" formatted="false">true/false, connected/disconnected, on/off, 80</string>
     <string name="context_field_event_type_label" formatted="false">Event type</string>
-    <string name="context_field_event_type_hint" formatted="false">boot_completed, notification, nfc, bluetooth, calendar, sunrise, sunset, shake, package_added, package_removed, package_replaced</string>
+    <string name="context_field_event_type_hint" formatted="false">boot_completed, notification, nfc, bluetooth, calendar, sunrise, sunset, shake, camera, mic, package_added, package_removed, package_replaced</string>
     <string name="context_field_event_state_label" formatted="false">Event state</string>
     <string name="context_field_event_state_hint" formatted="false">during, upcoming, connected, disconnected</string>
     <string name="context_field_event_calendar_label" formatted="false">Calendar name</string>
