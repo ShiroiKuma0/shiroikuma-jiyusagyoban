@@ -278,12 +278,14 @@ class AutomationService : Service() {
                             throw e
                         } catch (e: Exception) {
                             AppLogger.error(TAG, "Failed handling state change for ${domain.name}", e)
+                            recordMatcherError("Failed handling state change for ${domain.name}", e)
                         }
                     }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     AppLogger.error(TAG, "Profile matcher stopped for ${domain.name}", e)
+                    recordMatcherError("Profile matcher stopped for ${domain.name}", e)
                 }
             }
             
@@ -568,11 +570,13 @@ class AutomationService : Service() {
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .build()
+        val activeTypes = foregroundServiceTypes()
         if (Build.VERSION.SDK_INT >= 34) {
-            startForeground(NOTIF_ID, n, foregroundServiceTypes())
+            startForeground(NOTIF_ID, n, activeTypes)
         } else {
             startForeground(NOTIF_ID, n)
         }
+        engineHeartbeatStore.recordAlive(foregroundServiceTypes = activeTypes)
     }
 
     private fun foregroundServiceTypes(): Int {
@@ -601,6 +605,11 @@ class AutomationService : Service() {
 
     private fun hasPermission(permission: String): Boolean =
         ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+
+    private fun recordMatcherError(message: String, error: Throwable) {
+        val detail = error.message?.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty()
+        engineHeartbeatStore.recordMatcherError(message + detail)
+    }
 
     companion object {
         private const val TAG = "AutomationService"

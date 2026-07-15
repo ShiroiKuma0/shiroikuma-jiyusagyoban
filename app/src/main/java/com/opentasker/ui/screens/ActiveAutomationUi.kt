@@ -152,6 +152,7 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -187,6 +188,7 @@ private enum class OpenTaskerScreen(val label: String) {
     Inspector("Inspector"),
     Setup("Setup"),
     RunLog("Run Log"),
+    Diagnostics("Diagnostics"),
 }
 
 private val primaryNavigationScreens = listOf(
@@ -207,6 +209,7 @@ private fun OpenTaskerScreen.icon(): ImageVector = when (this) {
     OpenTaskerScreen.Inspector -> Icons.Filled.Info
     OpenTaskerScreen.Setup -> Icons.Filled.Settings
     OpenTaskerScreen.RunLog -> Icons.Filled.Info
+    OpenTaskerScreen.Diagnostics -> Icons.Filled.Error
 }
 
 internal data class ActionEditState(
@@ -240,6 +243,7 @@ fun ActiveAutomationUi(
     val globalVariables by viewModel.globalVariables.collectAsState()
     val runLogRetentionPolicy by viewModel.runLogRetentionPolicy.collectAsState()
     val backupSetupState by viewModel.backupSetupState.collectAsState()
+    val diagnosticsState by viewModel.diagnosticsState.collectAsState()
     val storageDecodeIssues by viewModel.storageDecodeIssues.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -466,6 +470,14 @@ fun ActiveAutomationUi(
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
+    LaunchedEffect(screen) {
+        if (screen == OpenTaskerScreen.Diagnostics) {
+            while (true) {
+                viewModel.refreshDiagnostics()
+                delay(DIAGNOSTICS_REFRESH_INTERVAL_MS)
+            }
+        }
+    }
 
     var showMoreDestinations by rememberSaveable { mutableStateOf(false) }
     val headerDetail = when (screen) {
@@ -477,6 +489,7 @@ fun ActiveAutomationUi(
         OpenTaskerScreen.Inspector -> "Live context health"
         OpenTaskerScreen.Setup -> "Permission and reliability checks"
         OpenTaskerScreen.RunLog -> "${runLogs.size} recent entries"
+        OpenTaskerScreen.Diagnostics -> "Engine, crashes, and app logs"
     }
 
     Scaffold(
@@ -539,6 +552,7 @@ fun ActiveAutomationUi(
                 OpenTaskerScreen.Inspector,
                 OpenTaskerScreen.Setup,
                 OpenTaskerScreen.RunLog -> Unit
+                OpenTaskerScreen.Diagnostics -> Unit
             }
         },
         bottomBar = {
@@ -708,6 +722,13 @@ fun ActiveAutomationUi(
                 onRetentionPolicyChange = viewModel::updateRunLogRetention,
                 onShareDiagnostic = viewModel::shareDiagnosticReport,
                 contentPadding = innerPadding,
+            )
+
+            OpenTaskerScreen.Diagnostics -> DiagnosticsScreen(
+                state = diagnosticsState,
+                contentPadding = innerPadding,
+                onRefresh = viewModel::refreshDiagnostics,
+                onShare = viewModel::shareDiagnosticReport,
             )
         }
     }
@@ -915,6 +936,8 @@ fun ActiveAutomationUi(
         )
     }
 }
+
+private const val DIAGNOSTICS_REFRESH_INTERVAL_MS = 5_000L
 
 @Composable
 private fun OpenTaskerNavigationItem(

@@ -617,4 +617,30 @@
     <string name="scene_element_type_text">Text</string>
     <string name="scene_element_type_slider">Slider</string>
     <string name="scene_element_type_image">Image</string>
+
+    <string name="diagnostics_title">Diagnostics and engine health</string>
+    <string name="diagnostics_summary_body">Inspect background delivery, captured crashes, and the bounded in-app log without connecting to a server.</string>
+    <string name="diagnostics_status_healthy">Engine healthy</string>
+    <string name="diagnostics_status_attention">Needs attention</string>
+    <string name="diagnostics_refresh">Refresh diagnostics</string>
+    <string name="diagnostics_share">Share redacted report</string>
+    <string name="diagnostics_engine_health">Engine health</string>
+    <string name="diagnostics_service">Automation service</string>
+    <string name="diagnostics_service_running">Running</string>
+    <string name="diagnostics_service_stopped">Stopped or heartbeat stale</string>
+    <string name="diagnostics_last_heartbeat">Last heartbeat</string>
+    <string name="diagnostics_fgs_types">Foreground service types</string>
+    <string name="diagnostics_standby_bucket">App standby bucket</string>
+    <string name="diagnostics_exact_alarm">Time alarm delivery</string>
+    <string name="diagnostics_matcher_error">Last matcher error</string>
+    <string name="diagnostics_worker_stop">Watchdog stop reason</string>
+    <string name="diagnostics_never">Never</string>
+    <string name="diagnostics_none">None recorded</string>
+    <string name="diagnostics_loading">Loading…</string>
+    <string name="diagnostics_crash_logs">Crash logs (%1$d)</string>
+    <string name="diagnostics_no_crashes">No captured crashes.</string>
+    <string name="diagnostics_app_log">In-app log (%1$d recent)</string>
+    <string name="diagnostics_no_app_logs">No in-app log entries in this process yet.</string>
+    <string name="diagnostics_crash_record">%1$s - %2$s</string>
+    <string name="diagnostics_log_record">%1$s  %2$s/%3$s</string>
 </resources>

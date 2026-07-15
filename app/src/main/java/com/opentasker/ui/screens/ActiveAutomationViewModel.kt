@@ -9,6 +9,10 @@ import androidx.lifecycle.viewModelScope
 import com.opentasker.core.capabilities.ImportedProfileEnablePolicy
 import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.diagnostics.DiagnosticExport
+import com.opentasker.core.diagnostics.CrashLogHandler
+import com.opentasker.core.diagnostics.CrashLogRecord
+import com.opentasker.core.diagnostics.EngineHealthReader
+import com.opentasker.core.diagnostics.EngineHealthStatus
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.model.AutomationMode
@@ -18,6 +22,8 @@ import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import com.opentasker.core.model.VariableNamePolicy
+import com.opentasker.core.logging.AppLogEntry
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.plugins.locale.LocaleGrantStore
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseBackupManager
@@ -45,6 +51,7 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -86,6 +93,13 @@ internal data class TaskerImportReviewState(
 internal data class OpenTaskerBundleReviewState(
     val bundle: OpenTaskerBundle,
     val plan: BundleImportPlan,
+)
+
+data class DiagnosticsUiState(
+    val health: EngineHealthStatus? = null,
+    val crashLogs: List<CrashLogRecord> = emptyList(),
+    val appLogs: List<AppLogEntry> = emptyList(),
+    val loadedAtMillis: Long = 0L,
 )
 
 /**
@@ -177,6 +191,10 @@ class ActiveAutomationViewModel(
     private val _backupSetupState = MutableStateFlow(loadBackupSetupState(busy = false))
     val backupSetupState: StateFlow<BackupSetupState> = _backupSetupState.asStateFlow()
 
+    private val _diagnosticsState = MutableStateFlow(DiagnosticsUiState())
+    val diagnosticsState: StateFlow<DiagnosticsUiState> = _diagnosticsState.asStateFlow()
+    private var diagnosticsRefreshJob: Job? = null
+
     private val _taskerImportReview = MutableStateFlow<TaskerImportReviewState?>(null)
     internal val taskerImportReview: StateFlow<TaskerImportReviewState?> = _taskerImportReview.asStateFlow()
 
@@ -192,6 +210,29 @@ class ActiveAutomationViewModel(
     init {
         viewModelScope.launch {
             runCatching { pruneRunLogs(_runLogRetentionPolicy.value) }
+        }
+        refreshDiagnostics()
+    }
+
+    fun refreshDiagnostics() {
+        if (diagnosticsRefreshJob?.isActive == true) return
+        diagnosticsRefreshJob = viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    DiagnosticsUiState(
+                        health = EngineHealthReader.read(appContext),
+                        crashLogs = CrashLogHandler.listCrashLogs(appContext),
+                        appLogs = AppLogger.snapshot().takeLast(100).map { entry ->
+                            entry.copy(message = DiagnosticExport.redactSensitive(entry.message))
+                        },
+                        loadedAtMillis = System.currentTimeMillis(),
+                    )
+                }
+            }.onSuccess { state ->
+                _diagnosticsState.value = state
+            }.onFailure { error ->
+                events.send("Error: ${error.message ?: "Diagnostics could not be refreshed"}")
+            }
         }
     }
 

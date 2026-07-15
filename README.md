@@ -66,7 +66,7 @@ Variable names follow Tasker's scope rule: an all-lowercase name is local to the
 - Setup checklist covering notifications, exact alarms, battery optimization, usage access, overlays, location, Bluetooth, SMS, DND, Shizuku, and Termux
 - Context inspector with live source health, latest values, and per-profile match explanations
 - Step-level run logs with action traces, template diagnostics, warning counts, and configurable retention
-- Diagnostic report sharing with automatic sensitive-data redaction
+- In-app diagnostics for service/foreground-type/standby/exact-alarm/matcher/watchdog health, a bounded process log, and captured crash previews; shared reports include the same evidence with credential redaction
 - Crash log capture and local diagnostic export
 
 ### Interoperability

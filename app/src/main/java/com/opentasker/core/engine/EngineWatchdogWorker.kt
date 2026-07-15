@@ -36,7 +36,7 @@ class EngineWatchdogWorker(
 
     companion object {
         private const val TAG = "EngineWatchdogWorker"
-        private const val WORK_NAME = "engine_watchdog"
+        internal const val WORK_NAME = "engine_watchdog"
 
         fun enqueue(context: Context) {
             val request = PeriodicWorkRequestBuilder<EngineWatchdogWorker>(

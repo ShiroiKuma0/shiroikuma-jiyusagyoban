@@ -3,6 +3,7 @@ package com.opentasker.core.diagnostics
 import android.content.Context
 import android.os.Build
 import com.opentasker.app.BuildConfig
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.storage.AppDatabase
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -29,6 +30,41 @@ object DiagnosticExport {
         sb.appendLine("Model: ${Build.MANUFACTURER} ${Build.MODEL}")
         sb.appendLine("Android: ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
         sb.appendLine("ABI: ${Build.SUPPORTED_ABIS.joinToString()}")
+        sb.appendLine()
+
+        sb.appendLine("--- Engine Health ---")
+        try {
+            val health = EngineHealthReader.read(context, now)
+            sb.appendLine("Service running: ${health.serviceRunning}")
+            sb.appendLine("Last heartbeat: ${formatTimestamp(health.lastHeartbeatAtMillis, dateFormat)}")
+            sb.appendLine("Foreground service types: ${health.activeForegroundServiceTypes}")
+            sb.appendLine("Standby bucket: ${health.standbyBucket}")
+            sb.appendLine("Exact alarm: ${health.exactAlarmStatus}")
+            sb.appendLine("Last matcher error: ${health.lastMatcherError ?: "none"}")
+            sb.appendLine("Last worker stop reason: ${health.lastWorkerStopReason ?: "none"}")
+        } catch (e: Exception) {
+            sb.appendLine("  (failed to read engine health: ${redactSensitive(e.message.orEmpty())})")
+        }
+        sb.appendLine()
+
+        sb.appendLine("--- In-App Log (recent 100) ---")
+        AppLogger.snapshot().takeLast(100).forEach { entry ->
+            val time = dateFormat.format(Date(entry.timestampMillis))
+            sb.appendLine("  [$time] ${entry.level} ${entry.tag}: ${redactSensitive(entry.message)}")
+        }
+        sb.appendLine()
+
+        sb.appendLine("--- Crash Logs ---")
+        val crashes = CrashLogHandler.listCrashLogs(context)
+        if (crashes.isEmpty()) {
+            sb.appendLine("  none")
+        } else {
+            crashes.forEach { crash ->
+                sb.appendLine("  === ${crash.fileName} (${dateFormat.format(Date(crash.modifiedAtMillis))}) ===")
+                sb.appendLine(crash.redactedContent.take(MAX_EXPORTED_CRASH_CHARS))
+                if (crash.redactedContent.length > MAX_EXPORTED_CRASH_CHARS) sb.appendLine("[export excerpt truncated]")
+            }
+        }
         sb.appendLine()
 
         sb.appendLine("--- Run Log (recent 50) ---")
@@ -73,7 +109,14 @@ object DiagnosticExport {
 
     internal fun redactSensitive(text: String): String {
         return text
+            .replace(Regex("""(?i)\bauthorization\s*:\s*[^\r\n]+"""), "Authorization: [REDACTED]")
+            .replace(Regex("""(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+"""), "Bearer [REDACTED]")
             .replace(Regex("""(?i)(password|secret|token|key|auth)\s*[:=]\s*\S+"""), "$1=[REDACTED]")
             .replace(Regex("""\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b"""), "[REDACTED-CARD]")
     }
+
+    private fun formatTimestamp(timestampMillis: Long, dateFormat: SimpleDateFormat): String =
+        if (timestampMillis <= 0L) "never" else dateFormat.format(Date(timestampMillis))
+
+    private const val MAX_EXPORTED_CRASH_CHARS = 32 * 1024
 }

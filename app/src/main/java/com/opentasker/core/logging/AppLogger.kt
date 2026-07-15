@@ -1,71 +1,88 @@
 package com.opentasker.core.logging
 
 import android.util.Log
+import java.util.ArrayDeque
 
-/**
- * Structured logging framework with levels: DEBUG, INFO, WARN, ERROR.
- * Uses android.util.Log under the hood with consistent tag-based filtering.
- */
+data class AppLogEntry(
+    val timestampMillis: Long,
+    val level: AppLogger.Level,
+    val tag: String,
+    val message: String,
+)
+
+/** Android logging plus a bounded process-local ring for in-app diagnostics. */
 object AppLogger {
     private const val DEFAULT_TAG = "OpenTasker"
-    
+    internal const val MAX_BUFFERED_ENTRIES = 300
+
     enum class Level {
         DEBUG, INFO, WARN, ERROR
     }
-    
-    // Can be configured to filter logs
-    private var minimumLevel = Level.DEBUG
-    
+
+    @Volatile private var minimumLevel = Level.DEBUG
+    private val ring = ArrayDeque<AppLogEntry>(MAX_BUFFERED_ENTRIES)
+
     fun setMinimumLevel(level: Level) {
         minimumLevel = level
     }
-    
-    fun debug(tag: String = DEFAULT_TAG, message: String, throwable: Throwable? = null) {
-        if (minimumLevel <= Level.DEBUG) {
-            if (throwable != null) Log.d(tag, message, throwable) else Log.d(tag, message)
+
+    fun debug(tag: String = DEFAULT_TAG, message: String, throwable: Throwable? = null) =
+        emit(Level.DEBUG, tag, message, throwable)
+
+    fun info(tag: String = DEFAULT_TAG, message: String, throwable: Throwable? = null) =
+        emit(Level.INFO, tag, message, throwable)
+
+    fun warn(tag: String = DEFAULT_TAG, message: String, throwable: Throwable? = null) =
+        emit(Level.WARN, tag, message, throwable)
+
+    fun error(tag: String = DEFAULT_TAG, message: String, throwable: Throwable? = null) =
+        emit(Level.ERROR, tag, message, throwable)
+
+    fun snapshot(): List<AppLogEntry> = synchronized(ring) { ring.toList() }
+
+    private fun emit(level: Level, tag: String, message: String, throwable: Throwable?) {
+        if (level < minimumLevel) return
+        val bufferedMessage = buildString {
+            append(message)
+            throwable?.let { error ->
+                append(" (")
+                append(error::class.java.simpleName)
+                error.message?.takeIf(String::isNotBlank)?.let { append(": ").append(it) }
+                append(')')
+            }
+        }.take(MAX_BUFFERED_MESSAGE_CHARS)
+        synchronized(ring) {
+            while (ring.size >= MAX_BUFFERED_ENTRIES) ring.removeFirst()
+            ring.addLast(AppLogEntry(System.currentTimeMillis(), level, tag.take(MAX_TAG_CHARS), bufferedMessage))
+        }
+        // android.util.Log is unavailable in host JVM tests; the diagnostic ring remains testable.
+        runCatching {
+            when (level) {
+                Level.DEBUG -> if (throwable != null) Log.d(tag, message, throwable) else Log.d(tag, message)
+                Level.INFO -> if (throwable != null) Log.i(tag, message, throwable) else Log.i(tag, message)
+                Level.WARN -> if (throwable != null) Log.w(tag, message, throwable) else Log.w(tag, message)
+                Level.ERROR -> if (throwable != null) Log.e(tag, message, throwable) else Log.e(tag, message)
+            }
         }
     }
-    
-    fun info(tag: String = DEFAULT_TAG, message: String, throwable: Throwable? = null) {
-        if (minimumLevel <= Level.INFO) {
-            if (throwable != null) Log.i(tag, message, throwable) else Log.i(tag, message)
-        }
-    }
-    
-    fun warn(tag: String = DEFAULT_TAG, message: String, throwable: Throwable? = null) {
-        if (minimumLevel <= Level.WARN) {
-            if (throwable != null) Log.w(tag, message, throwable) else Log.w(tag, message)
-        }
-    }
-    
-    fun error(tag: String = DEFAULT_TAG, message: String, throwable: Throwable? = null) {
-        if (minimumLevel <= Level.ERROR) {
-            if (throwable != null) Log.e(tag, message, throwable) else Log.e(tag, message)
-        }
-    }
-    
-    /**
-     * Log execution timing for performance monitoring.
-     */
+
     fun logExecution(tag: String, operation: String, durationMs: Long, success: Boolean = true) {
         val status = if (success) "OK" else "FAILED"
         info(tag, "$operation completed in ${durationMs}ms [$status]")
     }
-    
-    /**
-     * Log with structured data for easier analysis.
-     */
+
     fun logStructured(tag: String, level: Level, message: String, data: Map<String, Any> = emptyMap()) {
-        val dataStr = if (data.isNotEmpty()) {
+        val dataText = if (data.isEmpty()) "" else {
             " | " + data.entries.joinToString(", ") { "${it.key}=${it.value}" }
-        } else ""
-        
-        val fullMessage = message + dataStr
-        when (level) {
-            Level.DEBUG -> debug(tag, fullMessage)
-            Level.INFO -> info(tag, fullMessage)
-            Level.WARN -> warn(tag, fullMessage)
-            Level.ERROR -> error(tag, fullMessage)
         }
+        emit(level, tag, message + dataText, null)
     }
+
+    internal fun clearForTest() {
+        synchronized(ring) { ring.clear() }
+        minimumLevel = Level.DEBUG
+    }
+
+    private const val MAX_BUFFERED_MESSAGE_CHARS = 2_000
+    private const val MAX_TAG_CHARS = 64
 }

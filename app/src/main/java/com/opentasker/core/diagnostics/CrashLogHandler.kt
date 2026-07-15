@@ -11,6 +11,12 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+data class CrashLogRecord(
+    val fileName: String,
+    val modifiedAtMillis: Long,
+    val redactedContent: String,
+)
+
 object CrashLogHandler {
     private const val TAG = "CrashLogHandler"
     private const val MAX_CRASH_FILES = 5
@@ -43,7 +49,9 @@ object CrashLogHandler {
                 writer.appendLine()
                 val sw = StringWriter()
                 throwable.printStackTrace(PrintWriter(sw))
-                writer.append(sw.toString())
+                val stackTrace = sw.toString()
+                writer.append(stackTrace.take(MAX_CRASH_LOG_CHARS))
+                if (stackTrace.length > MAX_CRASH_LOG_CHARS) writer.appendLine("\n[stack trace truncated]")
             }
 
             AppLogger.error(TAG, "Crash log written to ${file.absolutePath}")
@@ -62,9 +70,40 @@ object CrashLogHandler {
     }
 
     fun getLatestCrashLog(context: Context): String? {
-        val dir = File(context.filesDir, CRASH_DIR)
-        return dir.listFiles { f -> f.name.startsWith("crash-") && f.name.endsWith(".txt") }
-            ?.maxByOrNull { it.lastModified() }
-            ?.readText()
+        return listCrashLogs(context).firstOrNull()?.redactedContent
     }
+
+    fun listCrashLogs(context: Context): List<CrashLogRecord> =
+        listCrashLogFiles(File(context.filesDir, CRASH_DIR))
+
+    internal fun listCrashLogFiles(directory: File): List<CrashLogRecord> =
+        directory.listFiles { file ->
+            file.isFile && file.name.startsWith("crash-") && file.name.endsWith(".txt")
+        }
+            .orEmpty()
+            .sortedByDescending(File::lastModified)
+            .take(MAX_CRASH_FILES)
+            .mapNotNull { file ->
+                runCatching {
+                    CrashLogRecord(
+                        fileName = file.name,
+                        modifiedAtMillis = file.lastModified(),
+                        redactedContent = DiagnosticExport.redactSensitive(readBounded(file)),
+                    )
+                }.getOrNull()
+            }
+
+    private fun readBounded(file: File): String = file.reader().use { reader ->
+        val result = StringBuilder()
+        val buffer = CharArray(8_192)
+        while (result.length < MAX_CRASH_LOG_CHARS) {
+            val count = reader.read(buffer, 0, minOf(buffer.size, MAX_CRASH_LOG_CHARS - result.length))
+            if (count <= 0) break
+            result.append(buffer, 0, count)
+        }
+        if (reader.read() != -1) result.append("\n[crash log truncated]")
+        result.toString()
+    }
+
+    private const val MAX_CRASH_LOG_CHARS = 256 * 1024
 }
