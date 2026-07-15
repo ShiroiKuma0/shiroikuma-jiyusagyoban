@@ -12,6 +12,10 @@ class ActionContext(
     val app: Context,
     val variables: VariableStore,
     val eventVariables: Map<String, String> = emptyMap(),
+    /** Read-only named parameters passed into a called task; referenced as `{{ param.name }}`. */
+    val parameters: Map<String, String> = emptyMap(),
+    /** Named return values this task exposes to a caller; populated by the Return Values action. */
+    val returns: MutableMap<String, String> = mutableMapOf(),
     val audioEligibility: AudioRuntimeEligibility = AudioRuntimeEligibility(),
     val sensitiveArgumentNames: Set<String> = emptySet(),
     val logger: (String) -> Unit = {},
@@ -23,6 +27,8 @@ fun ActionContext.forAction(sensitiveArgumentNames: Set<String>): ActionContext 
         app = app,
         variables = variables,
         eventVariables = eventVariables,
+        parameters = parameters,
+        returns = returns,
         audioEligibility = audioEligibility,
         logger = { logger(SECRET_DERIVED_ACTION_LOG) },
         sensitiveArgumentNames = sensitiveArgumentNames,

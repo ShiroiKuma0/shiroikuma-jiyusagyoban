@@ -83,7 +83,7 @@ class DownloadAction : Action {
                 ?: return ActionResult.Failure("max_bytes must be a positive integer")
             val effectiveLimit = maxDownload.coerceAtMost(MAX_DOWNLOAD_BYTES)
             val destination = safeDownloadFile(ctx, path)
-                ?: return ActionResult.Failure("path is outside OpenTasker downloads")
+                ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 downloads")
             destination.parentFile?.mkdirs()
 
             val client = DOWNLOAD_CLIENT.newBuilder()

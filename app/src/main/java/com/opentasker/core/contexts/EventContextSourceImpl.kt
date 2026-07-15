@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
  *   - "locale_request_query": Locale condition plugin requested a host query
  *   - "boot_completed": manifest boot receiver restarted the engine
  *   - "tile_clicked": Quick Settings tile toggled
+ *   - "fold": foldable posture changed (folded / semi / unfolded), also exposed as %FOLD
  */
 class EventContextSourceImpl : SubscriptionReadyContextSource {
     override val type = "event"
@@ -52,5 +53,10 @@ class EventContextSourceImpl : SubscriptionReadyContextSource {
         CalendarSunContextEvents.events(app),
         LocalePluginRequestQueryEvents.events(app),
         QuickSettingsTileContextEvents.events,
+        BroadcastContextEvents.events,
+        OrientationContextEvents.events,
+        FoldContextEvents.events,
+        AppForegroundChangedContextEvents.events,
+        HardwareKeyContextEvents.events,
     )
 }

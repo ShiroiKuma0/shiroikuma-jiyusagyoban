@@ -5,31 +5,39 @@ import androidx.room.Delete
 import androidx.room.Entity
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
-import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Update
 import com.opentasker.core.model.Variable
 import kotlinx.coroutines.flow.Flow
 
-@Entity("variables")
+/**
+ * A persisted variable. [projectId] selects the scope:
+ *   - `0`  → **super-global** (`%ALLCAPS`), app-wide.
+ *   - `>0` → **project-global** (`%MixedCase`), owned by that project.
+ * Task-local (`%lowercase`) variables are never persisted, so they don't appear here.
+ * The primary key is the (projectId, name) pair, so the same name can exist in different scopes.
+ */
+@Entity("variables", primaryKeys = ["projectId", "name"])
 data class VariableEntity(
-    @PrimaryKey val name: String,
+    val projectId: Long,
+    val name: String,
     val value: String,
-    val isGlobal: Boolean,
     val isSecret: Boolean = false,
 ) {
     /** Plain-value mapping retained for non-secret fixtures; ciphertext never reaches the domain. */
     fun toDomain(): Variable {
         require(!isEffectivelySecret()) { "Secret variables must be decoded through VariableRepository." }
-        return Variable(name, value, isGlobal)
+        return Variable(name, value, projectId)
     }
 }
 
 /** Plain-value mapping retained for non-secret import fixtures; secret rows must use VariableRepository. */
 fun Variable.toEntity(): VariableEntity {
     require(!isSecret) { "Secret variables must be encoded through VariableRepository." }
-    return VariableEntity(name, value, isGlobal, isSecret = false)
+    return VariableEntity(projectId, name, value, isSecret = false)
 }
+
+const val SUPER_GLOBAL_PROJECT_ID = 0L
 
 @Dao
 interface VariableDao {
@@ -37,9 +45,19 @@ interface VariableDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertAll(values: List<VariableEntity>)
     @Update suspend fun update(v: VariableEntity)
     @Delete suspend fun delete(v: VariableEntity)
-    @Query("DELETE FROM variables WHERE name = :name") suspend fun deleteByName(name: String)
-    @Query("SELECT * FROM variables WHERE name = :name") suspend fun get(name: String): VariableEntity?
+    @Query("DELETE FROM variables WHERE projectId = :projectId AND name = :name")
+    suspend fun delete(projectId: Long, name: String)
+    /** Drop project-globals whose projectId matches NO current project (dangling after a project was
+     *  deleted/re-created) — they're dead, frozen-stale, and unreachable. Swept at startup. */
+    @Query("DELETE FROM variables WHERE projectId != 0 AND projectId NOT IN (SELECT id FROM projects)")
+    suspend fun deleteDangling(): Int
+    /** Drop stale super-global copies of engine event vars (`INTENT_*` / `NOTIF_*`). These are now threaded
+     *  per-invocation (event-local) to the triggered task, so any persisted copy is dead residue that only
+     *  clutters the global namespace. Swept at startup. */
+    @Query("DELETE FROM variables WHERE projectId = 0 AND (name GLOB 'INTENT_*' OR name GLOB 'NOTIF_*')")
+    suspend fun deleteStaleEventVars(): Int
+    @Query("SELECT * FROM variables WHERE projectId = :projectId AND name = :name")
+    suspend fun get(projectId: Long, name: String): VariableEntity?
     @Query("SELECT * FROM variables") suspend fun getAll(): List<VariableEntity>
-    @Query("SELECT * FROM variables WHERE isGlobal = 1") suspend fun getAllGlobal(): List<VariableEntity>
-    @Query("SELECT * FROM variables WHERE isGlobal = 1 ORDER BY name") fun getAllGlobalAsFlow(): Flow<List<VariableEntity>>
+    @Query("SELECT * FROM variables ORDER BY projectId, name") fun getAllAsFlow(): Flow<List<VariableEntity>>
 }

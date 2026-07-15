@@ -16,6 +16,16 @@
 -keep class moe.shizuku.** { *; }
 -keep interface rikka.shizuku.** { *; }
 
+# Native key grabber (Shizuku UserService). The JNI symbols are derived from the class + method names,
+# and the service is instantiated by name inside the privileged process — so it must NOT be renamed or
+# stripped. onNativeKey is called from JNI by name.
+-keep class com.opentasker.core.input.KeyGrabberService {
+    <init>(...);
+    native <methods>;
+    void onNativeKey(int, int);
+}
+-keep class com.opentasker.core.input.IKeyGrabber* { *; }
+
 # RE2J internals (uses sun.misc.Unsafe fallback)
 -dontwarn com.google.re2j.**
 -keep class com.google.re2j.** { *; }
@@ -30,3 +40,10 @@
 -keepclassmembers class <1>$Companion {
     kotlinx.serialization.KSerializer serializer(...);
 }
+
+# Music-pulse JS bridge (window.OngakuPulse in WEB scene elements): the page calls these
+# reflectively, so R8 must keep the @JavascriptInterface methods and the object instance.
+-keepclassmembers class com.opentasker.core.media.MusicPulseSource$Bridge {
+    @android.webkit.JavascriptInterface <methods>;
+}
+-keep class com.opentasker.core.media.MusicPulseSource$Bridge { *; }
