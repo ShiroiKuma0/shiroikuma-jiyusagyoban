@@ -151,6 +151,11 @@ data class RuntimeVariableValue(
     val isGlobal: Boolean = true,
 )
 
+data class RuntimeVariableCommitResult(
+    val appliedNames: List<String>,
+    val conflictedNames: List<String>,
+)
+
 data class OrdinaryVariableExport(
     val variables: List<Variable>,
     val omittedSecretCount: Int,
@@ -177,17 +182,21 @@ class VariableRepository(
     }
 
     suspend fun upsert(variable: Variable) {
-        dao.insert(variable.normalizedForStorage().toStoredEntity(secretCodec))
+        storageMutationMutex.withLock {
+            dao.insert(variable.normalizedForStorage().toStoredEntity(secretCodec))
+        }
     }
 
     suspend fun delete(name: String) {
-        dao.deleteByName(name)
+        storageMutationMutex.withLock { dao.deleteByName(name) }
     }
 
     suspend fun importVariable(variable: Variable) {
         val normalized = variable.normalizedForStorage()
         val entity = normalized.toStoredEntity(secretCodec)
-        if (dao.get(normalized.name) == null) dao.insert(entity) else dao.update(entity)
+        storageMutationMutex.withLock {
+            if (dao.get(normalized.name) == null) dao.insert(entity) else dao.update(entity)
+        }
     }
 
     suspend fun ordinaryExport(): OrdinaryVariableExport {
@@ -203,6 +212,10 @@ class VariableRepository(
 
     suspend fun runtimeGlobals(): RuntimeVariableSeed {
         migrateLegacySensitiveVariables()
+        return readRuntimeGlobals()
+    }
+
+    private suspend fun readRuntimeGlobals(): RuntimeVariableSeed {
         val values = linkedMapOf<String, String>()
         val secretNames = linkedSetOf<String>()
         val unavailable = linkedSetOf<String>()
@@ -221,15 +234,42 @@ class VariableRepository(
     }
 
     suspend fun persistRuntime(values: List<RuntimeVariableValue>) {
-        values.forEach { value ->
-            upsert(
-                Variable(
-                    name = value.name,
-                    value = value.value,
-                    isGlobal = true,
-                    isSecret = value.isSecret,
-                ),
-            )
+        val entities = values.map(::runtimeValueToEntity)
+        storageMutationMutex.withLock {
+            dao.insertAll(entities)
+        }
+    }
+
+    /**
+     * Applies a run's changed globals as one Room insert batch only when each row still matches the
+     * snapshot that run hydrated. The first commit wins a same-name race; disjoint names merge.
+     */
+    suspend fun persistRuntimeAtomically(
+        expected: RuntimeVariableSeed,
+        values: List<RuntimeVariableValue>,
+    ): RuntimeVariableCommitResult {
+        if (values.isEmpty()) return RuntimeVariableCommitResult(emptyList(), emptyList())
+        migrateLegacySensitiveVariables()
+        return storageMutationMutex.withLock {
+            val current = readRuntimeGlobals()
+            val accepted = mutableListOf<RuntimeVariableValue>()
+            val appliedNames = mutableListOf<String>()
+            val conflictedNames = mutableListOf<String>()
+            values.sortedBy(RuntimeVariableValue::name).forEach { value ->
+                val currentState = current.stateOf(value.name)
+                val expectedState = expected.stateOf(value.name)
+                val desiredState = RuntimeVariableState(value.value, value.isSecret, unavailable = false)
+                when {
+                    currentState == desiredState -> appliedNames += value.name
+                    currentState == expectedState -> {
+                        accepted += value
+                        appliedNames += value.name
+                    }
+                    else -> conflictedNames += value.name
+                }
+            }
+            if (accepted.isNotEmpty()) dao.insertAll(accepted.map(::runtimeValueToEntity))
+            RuntimeVariableCommitResult(appliedNames, conflictedNames)
         }
     }
 
@@ -237,24 +277,26 @@ class VariableRepository(
         if (legacyMigrationAttempted) return
         migrationMutex.withLock {
             if (legacyMigrationAttempted) return
-            dao.getAll()
-                .filter { it.isSecret && !AesGcmVariableSecretCodec.isEnvelope(it.value) }
-                .forEach { entity ->
-                    runCatching {
-                        dao.update(
-                            entity.copy(
-                                value = secretCodec.encrypt(entity.name, entity.value),
-                                isSecret = true,
-                            ),
-                        )
-                    }.onFailure { error ->
-                        // Logging must never replace the encryption failure (notably in host-side
-                        // migration tests where android.util.Log is unavailable).
+            storageMutationMutex.withLock {
+                dao.getAll()
+                    .filter { it.isSecret && !AesGcmVariableSecretCodec.isEnvelope(it.value) }
+                    .forEach { entity ->
                         runCatching {
-                            AppLogger.error(TAG, "Failed to encrypt legacy masked variable ${entity.name}", error)
+                            dao.update(
+                                entity.copy(
+                                    value = secretCodec.encrypt(entity.name, entity.value),
+                                    isSecret = true,
+                                ),
+                            )
+                        }.onFailure { error ->
+                            // Logging must never replace the encryption failure (notably in host-side
+                            // migration tests where android.util.Log is unavailable).
+                            runCatching {
+                                AppLogger.error(TAG, "Failed to encrypt legacy masked variable ${entity.name}", error)
+                            }
                         }
                     }
-                }
+            }
             legacyMigrationAttempted = true
         }
     }
@@ -281,10 +323,31 @@ class VariableRepository(
         )
     }
 
+    private fun runtimeValueToEntity(value: RuntimeVariableValue): VariableEntity =
+        Variable(
+            name = value.name,
+            value = value.value,
+            isGlobal = true,
+            isSecret = value.isSecret,
+        ).normalizedForStorage().toStoredEntity(secretCodec)
+
     companion object {
         private const val TAG = "VariableRepository"
+        private val storageMutationMutex = Mutex()
     }
 }
+
+private data class RuntimeVariableState(
+    val value: String?,
+    val isSecret: Boolean,
+    val unavailable: Boolean,
+)
+
+private fun RuntimeVariableSeed.stateOf(name: String): RuntimeVariableState = RuntimeVariableState(
+    value = values[name],
+    isSecret = name in secretNames,
+    unavailable = name in unavailableSecretNames,
+)
 
 internal fun VariableEntity.isEffectivelySecret(): Boolean = isSecret
 

@@ -57,7 +57,7 @@ Privileged actions (airplane, mobile data, screenshot, reboot, screen off) are g
 
 New automations use **HTTP Request** for GET, HEAD, POST, PUT, PATCH, DELETE, and OPTIONS. It accepts structured query/header lines, inline or OpenTasker-file request bodies, per-stage timeouts, status/header/body variables, and atomic file output. Redirects default off and can be enabled only for the same origin; TLS verification cannot be disabled, cleartext remains private-LAN-only, and response/request sizes are bounded. Stored `http.get` and `http.post` actions continue to execute through compatibility aliases. Put credentials in Keystore-backed secret variables and reference them from Authorization or header fields so traces remain redacted.
 
-Variable names follow Tasker's scope rule: an all-lowercase name is local to the current task, while any name containing an uppercase letter is global and durable. `var.persist` promotes an all-lowercase target to a global name, and the Variable vault applies the same normalization.
+Variable names follow Tasker's scope rule: an all-lowercase name is local to the current task, while any name containing an uppercase letter is global and durable. `var.persist` promotes an all-lowercase target to a global name, and the Variable vault applies the same normalization. Concurrent runs merge changes to different globals; if two stale snapshots change the same global, the first committed value is kept and the later conflict is recorded in the run log.
 
 ### Reliability and observability
 

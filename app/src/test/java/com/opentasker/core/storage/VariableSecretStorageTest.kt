@@ -3,6 +3,8 @@ package com.opentasker.core.storage
 import com.opentasker.core.model.Variable
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -60,6 +62,64 @@ class VariableSecretStorageTest {
         assertTrue(runCatching {
             repository.upsert(Variable("localName", "invalid", isGlobal = false))
         }.isFailure)
+    }
+
+    @Test
+    fun concurrentDisjointGlobalCommitsMergeWithoutLoss() = runBlocking {
+        val dao = FakeVariableDao(
+            VariableEntity("ALPHA", "0", isGlobal = true),
+            VariableEntity("BETA", "0", isGlobal = true),
+        )
+        val key = newKey()
+        val first = VariableRepository(dao, codec(key))
+        val second = VariableRepository(dao, codec(key))
+        val baseline = first.runtimeGlobals()
+
+        val results = listOf(
+            async {
+                first.persistRuntimeAtomically(
+                    baseline,
+                    listOf(RuntimeVariableValue("ALPHA", "1", isSecret = false)),
+                )
+            },
+            async {
+                second.persistRuntimeAtomically(
+                    baseline,
+                    listOf(RuntimeVariableValue("BETA", "2", isSecret = false)),
+                )
+            },
+        ).awaitAll()
+
+        assertTrue(results.all { it.conflictedNames.isEmpty() })
+        assertEquals(mapOf("ALPHA" to "1", "BETA" to "2"), first.runtimeGlobals().values)
+    }
+
+    @Test
+    fun concurrentSameGlobalCommitKeepsFirstCommittedValue() = runBlocking {
+        val dao = FakeVariableDao(VariableEntity("COUNT", "0", isGlobal = true))
+        val key = newKey()
+        val first = VariableRepository(dao, codec(key))
+        val second = VariableRepository(dao, codec(key))
+        val baseline = first.runtimeGlobals()
+
+        val results = listOf(
+            async {
+                first.persistRuntimeAtomically(
+                    baseline,
+                    listOf(RuntimeVariableValue("COUNT", "1", isSecret = false)),
+                )
+            },
+            async {
+                second.persistRuntimeAtomically(
+                    baseline,
+                    listOf(RuntimeVariableValue("COUNT", "2", isSecret = false)),
+                )
+            },
+        ).awaitAll()
+
+        assertEquals(1, results.count { "COUNT" in it.appliedNames })
+        assertEquals(1, results.count { "COUNT" in it.conflictedNames })
+        assertTrue(first.runtimeGlobals().values["COUNT"] in setOf("1", "2"))
     }
 
     @Test
@@ -146,6 +206,10 @@ class VariableSecretStorageTest {
 
         override suspend fun insert(v: VariableEntity) {
             state.value = state.value.filterNot { it.name == v.name } + v
+        }
+
+        override suspend fun insertAll(values: List<VariableEntity>) {
+            values.forEach { insert(it) }
         }
 
         override suspend fun update(v: VariableEntity) {

@@ -34,6 +34,7 @@ fun Variable.toEntity(): VariableEntity {
 @Dao
 interface VariableDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insert(v: VariableEntity)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertAll(values: List<VariableEntity>)
     @Update suspend fun update(v: VariableEntity)
     @Delete suspend fun delete(v: VariableEntity)
     @Query("DELETE FROM variables WHERE name = :name") suspend fun deleteByName(name: String)

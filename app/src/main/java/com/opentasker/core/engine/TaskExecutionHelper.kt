@@ -44,6 +44,13 @@ suspend fun executeAndLogTask(
         RuntimeVariableSeed(emptyMap(), emptySet(), emptySet())
     }
     variables.seedGlobals(persistedGlobals.values, persistedGlobals.secretNames)
+    val persistedBaselineValues = variables.globalSnapshot()
+    val persistedBaselineSecretNames = variables.globalSensitiveSnapshot()
+    val persistedBaseline = RuntimeVariableSeed(
+        values = persistedBaselineValues,
+        secretNames = persistedBaselineSecretNames,
+        unavailableSecretNames = persistedBaselineSecretNames - persistedBaselineValues.keys,
+    )
     if (persistedGlobals.unavailableSecretNames.isNotEmpty()) {
         AppLogger.warn(
             logTag,
@@ -65,8 +72,9 @@ suspend fun executeAndLogTask(
     ) { msg -> AppLogger.info(logTag, msg) }
     val runner = TaskRunner(ctx, resolveTask = dbSubTaskResolver(db))
     val report = runner.run(task)
-    persistChangedGlobals(
+    val globalCommitMetadata = persistChangedGlobals(
         variableRepository,
+        persistedBaseline,
         baselineGlobals,
         variables.globalSnapshot(),
         baselineSensitiveGlobals,
@@ -84,7 +92,7 @@ suspend fun executeAndLogTask(
         success = report.success,
         message = runLogMessage(
             source = source,
-            metadata = riskMetadata + metadata,
+            metadata = riskMetadata + metadata + globalCommitMetadata,
             traces = report.traces,
         ),
         source = classified.key,
@@ -124,16 +132,29 @@ fun changedGlobals(
  */
 private suspend fun persistChangedGlobals(
     variableRepository: VariableRepository,
+    persistedBaseline: RuntimeVariableSeed,
     before: Map<String, String>,
     after: Map<String, String>,
     beforeSensitive: Set<String>,
     afterSensitive: Set<String>,
     logTag: String,
-) {
-    for (value in changedGlobals(before, after, beforeSensitive, afterSensitive)) {
-        runCatching { variableRepository.persistRuntime(listOf(value)) }
-            .onFailure { AppLogger.error(logTag, "Failed to persist global ${value.name}", it) }
+): List<String> {
+    val changed = changedGlobals(before, after, beforeSensitive, afterSensitive)
+    if (changed.isEmpty()) return emptyList()
+    val commit = runCatching {
+        variableRepository.persistRuntimeAtomically(persistedBaseline, changed)
+    }.getOrElse { error ->
+        AppLogger.error(
+            logTag,
+            "Failed to persist ${changed.size} global variable change(s) atomically",
+            error,
+        )
+        return listOf("Global commit failed: ${changed.map(RuntimeVariableValue::name).joinToString()}")
     }
+    if (commit.conflictedNames.isEmpty()) return emptyList()
+    val names = commit.conflictedNames.joinToString()
+    AppLogger.warn(logTag, "Global commit preserved newer concurrent value(s): $names")
+    return listOf("Global write conflict (newer value kept): $names")
 }
 
 suspend fun logSkippedRun(
