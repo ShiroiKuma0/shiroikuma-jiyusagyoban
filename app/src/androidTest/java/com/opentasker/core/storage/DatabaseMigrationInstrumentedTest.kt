@@ -206,6 +206,33 @@ class DatabaseMigrationInstrumentedTest {
     }
 
     @Test
+    fun appDatabaseMigratesFrom6To7WithExistingProfilesTrusted() {
+        appDatabaseHelper.createDatabase(APP_DATABASE_NAME, 6).apply {
+            execSQL(
+                """
+                INSERT INTO profiles (
+                    id, name, enabled, enterTaskId, exitTaskId, cooldownSec, contextsJson,
+                    automationMode, profileGroup
+                ) VALUES (1, 'Existing profile', 1, 1, NULL, 0, '[]', 'SINGLE', NULL)
+                """.trimIndent(),
+            )
+            close()
+        }
+
+        val migrated = appDatabaseHelper.runMigrationsAndValidate(
+            APP_DATABASE_NAME,
+            7,
+            true,
+            DatabaseMigrations.MIGRATION_6_7,
+        )
+
+        migrated.query("SELECT requiresRiskAcknowledgement FROM profiles WHERE id = 1").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0))
+        }
+    }
+
+    @Test
     fun appDatabaseMigratesFullPathFrom1ToCurrent() {
         appDatabaseHelper.createDatabase(APP_DATABASE_NAME, 1).apply {
             execSQL(
@@ -222,17 +249,20 @@ class DatabaseMigrationInstrumentedTest {
 
         val migrated = appDatabaseHelper.runMigrationsAndValidate(
             APP_DATABASE_NAME,
-            6,
+            7,
             true,
             *DatabaseMigrations.getAllMigrations(),
         )
 
-        migrated.query("SELECT name, automationMode, profileGroup FROM profiles WHERE id = 1")
+        migrated.query(
+            "SELECT name, automationMode, profileGroup, requiresRiskAcknowledgement FROM profiles WHERE id = 1",
+        )
             .use { cursor ->
                 assertTrue(cursor.moveToFirst())
                 assertEquals("Full path test", cursor.getString(0))
                 assertEquals("SINGLE", cursor.getString(1))
                 assertTrue("profileGroup should be NULL after full migration", cursor.isNull(2))
+                assertEquals(0, cursor.getInt(3))
             }
     }
 

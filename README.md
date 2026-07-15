@@ -69,7 +69,7 @@ Privileged actions (airplane, mobile data, screenshot, reboot, screen off) are g
 - **Locale/Tasker plugin host** — setting dispatch, condition queries, configuration parsing, request-query events, bundle validation, and last-known-state fallback
 - **Locale/Tasker condition context** — condition plugins as first-class profile predicates polled every 30 seconds
 - **External automation target** — signature-scoped intents to run tasks, toggle profiles, query status, and pass variables
-- **OpenTasker JSON bundles** — schema-versioned export/import with warnings, capability review, disabled-by-default installation, and secret values omitted by design
+- **OpenTasker JSON bundles** — schema-versioned export/import with computed action-power manifests, data-to-external-chain warnings, disabled-by-default installation, explicit first-enable acknowledgement, and secret values omitted by design
 - **Tasker XML import** — preview with migration/capability warnings, mapped and unsupported action reporting
 - **Profile sharing** — offline share manifests with safety findings and GitHub Discussions submission text
 

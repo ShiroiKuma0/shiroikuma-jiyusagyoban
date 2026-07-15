@@ -100,6 +100,9 @@ class AutomationTargetReceiver : BroadcastReceiver() {
         val profile = resolveProfile(intent)
             ?: return failure("Profile not found. Provide ${AutomationTargetContract.EXTRA_PROFILE_ID} or ${AutomationTargetContract.EXTRA_PROFILE_NAME}.")
         val enabled = intent.getBooleanExtra(AutomationTargetContract.EXTRA_ENABLED, profile.enabled)
+        if (enabled && profile.requiresRiskAcknowledgement) {
+            return failure("Imported profile requires in-app power review before its first enable.")
+        }
         db.profileDao().update(profile.copy(enabled = enabled).toEntity())
         return TargetResponse(
             Activity.RESULT_OK,
@@ -120,7 +123,10 @@ class AutomationTargetReceiver : BroadcastReceiver() {
             Bundle().apply {
                 putInt(AutomationTargetContract.EXTRA_TASK_COUNT, tasks.size)
                 putInt(AutomationTargetContract.EXTRA_PROFILE_COUNT, profileEntities.size)
-                putInt(AutomationTargetContract.EXTRA_ENABLED_PROFILE_COUNT, profileEntities.count { it.enabled })
+                putInt(
+                    AutomationTargetContract.EXTRA_ENABLED_PROFILE_COUNT,
+                    profileEntities.count { it.enabled && !it.requiresRiskAcknowledgement },
+                )
                 putBoolean(AutomationTargetContract.EXTRA_PROFILE_FOUND, profile != null)
                 profile?.let {
                     putBoolean(AutomationTargetContract.EXTRA_PROFILE_ENABLED, it.enabled)

@@ -260,6 +260,7 @@ internal fun ProfileEditorDialog(
     var group by rememberSaveable(profile?.id) { mutableStateOf(profile?.group.orEmpty()) }
     val parsedCooldown = cooldown.toIntOrNull()
     val canSave = name.isNotBlank() && enterTaskId > 0 && (cooldown.isBlank() || parsedCooldown != null)
+    val importedReviewRequired = profile?.requiresRiskAcknowledgement == true
     val onLabel = stringResource(R.string.label_on)
     val offLabel = stringResource(R.string.label_off)
 
@@ -294,6 +295,7 @@ internal fun ProfileEditorDialog(
                         .fillMaxWidth()
                         .toggleable(
                             value = enabled,
+                            enabled = !importedReviewRequired,
                             role = Role.Switch,
                             onValueChange = { enabled = it },
                         )
@@ -308,12 +310,18 @@ internal fun ProfileEditorDialog(
                         Column(Modifier.weight(1f)) {
                             Text(stringResource(R.string.profile_enable_after_save), style = MaterialTheme.typography.labelLarge)
                             Text(
-                                stringResource(R.string.profile_enable_after_save_helper),
+                                stringResource(
+                                    if (importedReviewRequired) {
+                                        R.string.imported_profile_editor_helper
+                                    } else {
+                                        R.string.profile_enable_after_save_helper
+                                    },
+                                ),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        Switch(checked = enabled, onCheckedChange = null)
+                        Switch(checked = enabled, onCheckedChange = null, enabled = !importedReviewRequired)
                     }
                 }
                 Text(stringResource(R.string.profile_enter_task), style = MaterialTheme.typography.labelLarge)

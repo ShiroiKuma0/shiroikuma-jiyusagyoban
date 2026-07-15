@@ -1,6 +1,7 @@
 package com.opentasker.core.engine
 
 import android.content.Context
+import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Task
@@ -74,6 +75,7 @@ suspend fun executeAndLogTask(
     )
     AppLogger.info(logTag, "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)")
     val classified = RunLogSource.classify(source)
+    val riskMetadata = taskPowerRunLogMetadata(task)
     val logEntry = RunLogEntry(
         taskId = task.id,
         taskName = task.name,
@@ -82,7 +84,7 @@ suspend fun executeAndLogTask(
         success = report.success,
         message = runLogMessage(
             source = source,
-            metadata = metadata,
+            metadata = riskMetadata + metadata,
             traces = report.traces,
         ),
         source = classified.key,
@@ -90,6 +92,12 @@ suspend fun executeAndLogTask(
     )
     val inserted = insertRunLog(db, logEntry)
     TaskExecutionResult(report, inserted)
+}
+
+internal fun taskPowerRunLogMetadata(task: Task): List<String> {
+    val riskPowers = AutomationSensitivityRegistry.summarize(task).powers
+        .map { it.name.lowercase().replace('_', ' ') }
+    return if (riskPowers.isEmpty()) emptyList() else listOf("Powers: ${riskPowers.joinToString()}")
 }
 
 /**

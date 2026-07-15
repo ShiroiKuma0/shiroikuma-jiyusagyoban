@@ -36,6 +36,13 @@ class ProfileRegistrySignatureTest {
     }
 
     @Test
+    fun importedProfilesAwaitingReviewAreExcludedEvenIfEnabledBitIsSet() {
+        val awaitingReview = profile(1, enabled = true).copy(requiresRiskAcknowledgement = true)
+
+        assertEquals(emptyList<String>(), profileRegistrySignature(listOf(awaitingReview)))
+    }
+
+    @Test
     fun cosmeticEditsDoNotChangeSignature() {
         val before = profileRegistrySignature(listOf(profile(1, name = "Home", group = "A")))
         val after = profileRegistrySignature(listOf(profile(1, name = "Renamed", group = "B")))

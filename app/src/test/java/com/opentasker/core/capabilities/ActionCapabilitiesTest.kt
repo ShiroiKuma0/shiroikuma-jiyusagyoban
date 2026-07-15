@@ -76,7 +76,8 @@ class ActionCapabilitiesTest {
     }
 
     @Test
-    fun unknownActionsDefaultToSupportedForPluginCompatibility() {
-        assertTrue(ActionCapabilityRegistry.get("plugin.example").canAdd)
+    fun unknownActionsFailClosedUntilClassified() {
+        assertFalse(ActionCapabilityRegistry.get("plugin.example").canAdd)
+        assertEquals(CapabilityLevel.Unsupported, ActionCapabilityRegistry.get("plugin.example").level)
     }
 }

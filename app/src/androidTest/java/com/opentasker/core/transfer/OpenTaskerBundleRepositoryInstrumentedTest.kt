@@ -75,7 +75,7 @@ class OpenTaskerBundleRepositoryInstrumentedTest {
             val exitTaskId = source.taskDao().insert(
                 Task(
                     name = "Exit task",
-                    actions = listOf(ActionSpec(type = "notify.toast", args = mapOf("message" to "bye"))),
+                    actions = listOf(ActionSpec(type = "notify.show", args = mapOf("text" to "bye"))),
                 ).toEntity()
             )
             source.profileDao().insert(
@@ -127,6 +127,7 @@ class OpenTaskerBundleRepositoryInstrumentedTest {
             val importedTaskIds = importedTasks.associate { it.name to it.id }
             val importedProfile = target.profileDao().getAll().single().toDomain()
             assertFalse(importedProfile.enabled)
+            assertTrue(importedProfile.requiresRiskAcknowledgement)
             assertEquals(importedTaskIds.getValue("Log task"), importedProfile.enterTaskId)
             assertEquals(importedTaskIds.getValue("Exit task"), importedProfile.exitTaskId)
             assertNotEquals(enterTaskId, importedProfile.enterTaskId)

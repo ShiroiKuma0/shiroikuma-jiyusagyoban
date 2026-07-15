@@ -544,7 +544,7 @@ class AutomationService : Service() {
  */
 internal fun profileRegistrySignature(profiles: List<ProfileEntity>): List<String> =
     profiles.asSequence()
-        .filter { it.enabled }
+        .filter { it.enabled && !it.requiresRiskAcknowledgement }
         .sortedBy { it.id }
         .map { p ->
             listOf(

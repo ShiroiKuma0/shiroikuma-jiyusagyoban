@@ -1,5 +1,7 @@
 package com.opentasker.core.engine
 
+import com.opentasker.core.capabilities.AutomationSensitivityRegistry
+import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.expressions.TemplateExpansionTrace
 import com.opentasker.core.expressions.TemplateExpressionEngine
 import com.opentasker.core.model.ActionSpec
@@ -38,6 +40,71 @@ class TaskRunner(
         val started = System.currentTimeMillis()
         val results = mutableListOf<ActionResult>()
         val traces = mutableListOf<ActionExecutionTrace>()
+
+        val unknownActionIds = task.actions
+            .map(ActionSpec::type)
+            .filter { actionId ->
+                !AutomationSensitivityRegistry.isKnown(actionId) && ActionRegistry.get(actionId) == null
+            }
+            .distinct()
+            .sorted()
+        if (unknownActionIds.isNotEmpty()) {
+            ctx.variables.popScope()
+            val failure = ActionResult.Failure(
+                "task contains unknown unclassified actions: ${unknownActionIds.joinToString()}",
+            )
+            return TaskRunReport(
+                taskId = task.id,
+                taskName = task.name,
+                startedAt = started,
+                durationMs = System.currentTimeMillis() - started,
+                results = listOf(failure),
+                traces = listOf(
+                    ActionExecutionTrace(
+                        index = 0,
+                        actionType = "preflight",
+                        label = "action classification",
+                        durationMs = 0,
+                        status = ActionTraceStatus.FAILURE,
+                        message = failure.message,
+                    ),
+                ),
+                success = false,
+            )
+        }
+
+        val unsupportedActionIds = task.actions
+            .map(ActionSpec::type)
+            .filter { actionId ->
+                AutomationSensitivityRegistry.isKnown(actionId) &&
+                    !ActionCapabilityRegistry.get(actionId).canAdd
+            }
+            .distinct()
+            .sorted()
+        if (unsupportedActionIds.isNotEmpty()) {
+            ctx.variables.popScope()
+            val failure = ActionResult.Failure(
+                "task contains unsupported actions: ${unsupportedActionIds.joinToString()}",
+            )
+            return TaskRunReport(
+                taskId = task.id,
+                taskName = task.name,
+                startedAt = started,
+                durationMs = System.currentTimeMillis() - started,
+                results = listOf(failure),
+                traces = listOf(
+                    ActionExecutionTrace(
+                        index = 0,
+                        actionType = "preflight",
+                        label = "action capability",
+                        durationMs = 0,
+                        status = ActionTraceStatus.FAILURE,
+                        message = failure.message,
+                    ),
+                ),
+                success = false,
+            )
+        }
 
         val structure = FlowStructure.analyze(task.actions)
         if (structure.error != null) {

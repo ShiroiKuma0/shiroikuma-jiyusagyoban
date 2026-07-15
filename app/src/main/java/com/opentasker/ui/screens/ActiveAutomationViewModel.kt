@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.opentasker.core.capabilities.ImportedProfileEnablePolicy
 import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.diagnostics.DiagnosticExport
 import com.opentasker.core.engine.executeAndLogTask
@@ -288,6 +289,12 @@ class ActiveAutomationViewModel(
                 throw CorruptRecordOverwriteException(issue)
             }
             val previous = previousEntity?.toDomain()
+            if (
+                previous?.requiresRiskAcknowledgement == true &&
+                (profile.enabled || !profile.requiresRiskAcknowledgement)
+            ) {
+                throw IllegalStateException("Review imported automation powers before enabling this profile.")
+            }
             if (previousEntity != null) {
                 db.editHistoryDao().insert(
                     EditHistoryEntity(
@@ -302,6 +309,24 @@ class ActiveAutomationViewModel(
                 locationDwellStateStore.clearProfile(profile.id)
             }
             db.profileDao().update(profile.toEntity())
+        }
+
+    fun acknowledgeAndEnableImportedProfile(profileId: Long) =
+        launchWithMessage("Imported profile reviewed and enabled") {
+            val current = db.profileDao().getById(profileId)?.toDomain()
+                ?: throw IllegalStateException("Profile no longer exists.")
+            check(current.requiresRiskAcknowledgement) { "Profile review is no longer required." }
+            val tasks = db.taskDao().getAll().map { it.toDomain() }
+            val review = ImportedProfileEnablePolicy.review(current, tasks)
+            check(review.canAcknowledge) {
+                "Remove unsupported or unknown actions before enabling this imported profile."
+            }
+            db.profileDao().update(
+                current.copy(
+                    enabled = true,
+                    requiresRiskAcknowledgement = false,
+                ).toEntity(),
+            )
         }
 
     fun deleteProfile(profile: Profile) = launchWithMessage("Profile deleted") {

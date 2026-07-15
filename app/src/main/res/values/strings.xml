@@ -312,6 +312,28 @@
     <string name="variables_shown_count">%1$d shown</string>
     <string name="variables_saved_count_label">Saved</string>
     <string name="content_description_info">Information</string>
+    <string name="import_power_review">Requested automation powers</string>
+    <string name="import_power_task">Task %1$s: %2$s</string>
+    <string name="import_power_profiles">Profiles: %1$s</string>
+    <string name="import_power_no_profile">not directly linked</string>
+    <string name="import_power_chain">Potential data transfer: %1$s → %2$s</string>
+    <string name="automation_power_data_access">data access</string>
+    <string name="automation_power_external_transmission">external transmission</string>
+    <string name="automation_power_device_control">device control</string>
+    <string name="automation_power_destructive">destructive changes</string>
+    <string name="imported_profile_review_title">Review imported automation</string>
+    <string name="imported_profile_review_body">%1$s was imported and cannot run until you review its current tasks and powers.</string>
+    <string name="imported_profile_tasks_title">Tasks that can run</string>
+    <string name="imported_profile_no_sensitive_powers">No sensitive powers are currently classified for these tasks.</string>
+    <string name="imported_profile_data_chain_title">Potential data transfer</string>
+    <string name="imported_profile_blocked_title">Cannot enable this profile</string>
+    <string name="imported_profile_blocked_body">Resolve missing task references and remove unsupported or unknown actions first: %1$s</string>
+    <string name="imported_profile_acknowledgement">I reviewed these tasks and understand the requested powers.</string>
+    <string name="imported_profile_acknowledge_enable">Acknowledge and enable</string>
+    <string name="imported_profile_editor_helper">Imported profiles must be reviewed from the profile list before their first enable.</string>
+    <string name="imported_profile_review_required">Review required</string>
+    <string name="imported_profile_missing_task_reference">missing task #%1$d</string>
+    <string name="imported_profile_no_tasks">No resolvable tasks.</string>
 
     <!-- Scenes screen -->
     <string name="scenes_create">Create Scene</string>

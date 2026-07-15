@@ -198,6 +198,7 @@ class TaskerXmlImporterTest {
         val confirmedBundle = TaskerImportPlanner.confirmedBundle(report)
 
         assertFalse(confirmedBundle.profiles.single().enabled)
+        assertTrue(confirmedBundle.profiles.single().requiresRiskAcknowledgement)
         assertTrue(confirmedBundle.metadata.warnings.any { it.contains("disabled by default") })
     }
 }

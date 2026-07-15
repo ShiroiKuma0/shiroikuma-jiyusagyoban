@@ -24,6 +24,11 @@ data class ActionCapability(
 
 object ActionCapabilityRegistry {
     private val supported = ActionCapability(CapabilityLevel.Supported, "Ready", R.string.capability_ready)
+    private val unknown = ActionCapability(
+        CapabilityLevel.Unsupported,
+        "Unknown actions are not classified and cannot be added, imported, or enabled.",
+        R.string.capability_unknown_action,
+    )
 
     private val capabilities = mapOf(
         "notify.show" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires notification permission on Android 13+.", R.string.capability_notification_permission),
@@ -61,7 +66,8 @@ object ActionCapabilityRegistry {
         "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported OpenTasker action.", R.string.capability_tasker_import_unsupported),
     )
 
-    fun get(actionId: String): ActionCapability = capabilities[actionId] ?: supported
+    fun get(actionId: String): ActionCapability = capabilities[actionId]
+        ?: if (AutomationSensitivityRegistry.isKnown(actionId)) supported else unknown
 
     private fun bluetoothCapability(): ActionCapability =
         if (android.os.Build.VERSION.SDK_INT >= 33) {

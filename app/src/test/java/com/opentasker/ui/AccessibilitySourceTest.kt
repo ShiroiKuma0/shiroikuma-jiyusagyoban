@@ -120,6 +120,12 @@ class AccessibilitySourceTest {
                 "R.string.ui_info_content_description",
                 "R.string.delete_cannot_undo",
             ),
+            "screens/ImportedProfileRiskDialog.kt" to listOf(
+                "Checkbox(checked = acknowledged",
+                "enabled = review.canAcknowledge && acknowledged",
+                "R.string.imported_profile_acknowledgement",
+                "R.string.imported_profile_acknowledge_enable",
+            ),
             "screens/ActionEditorDialogs.kt" to listOf(
                 "role = Role.Switch",
                 "stateDescription = stateDescriptionLabel",

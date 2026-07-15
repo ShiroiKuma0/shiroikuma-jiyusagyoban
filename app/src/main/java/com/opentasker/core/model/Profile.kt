@@ -18,6 +18,7 @@ data class Profile(
     val cooldownSec: Int = 0,
     val automationMode: AutomationMode = AutomationMode.SINGLE,
     val group: String? = null,
+    val requiresRiskAcknowledgement: Boolean = false,
 )
 
 @Serializable

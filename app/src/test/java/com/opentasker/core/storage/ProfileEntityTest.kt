@@ -21,6 +21,19 @@ class ProfileEntityTest {
     }
 
     @Test
+    fun profileEntityRoundTripPreservesImportedReviewRequirement() {
+        val profile = Profile(
+            id = 8,
+            name = "Imported",
+            enabled = false,
+            enterTaskId = 42,
+            requiresRiskAcknowledgement = true,
+        )
+
+        assertEquals(true, profile.toEntity().toDomain().requiresRiskAcknowledgement)
+    }
+
+    @Test
     fun unknownAutomationModeFallsBackToSingle() {
         val entity = ProfileEntity(
             id = 1,

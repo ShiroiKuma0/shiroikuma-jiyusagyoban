@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
+import com.opentasker.core.capabilities.AutomationPower
+import com.opentasker.core.transfer.RecipePowerRequest
 import com.opentasker.ui.theme.DesignSystem
 
 @Composable
@@ -29,7 +31,8 @@ internal fun OpenTaskerBundleReviewDialog(
     val bundle = state.bundle
     val plan = state.plan
     val reviewWarnings = (bundle.metadata.warnings + plan.warnings + plan.lossyWarnings).distinct()
-    val capabilityRequirements = bundle.metadata.capabilityRequirements
+    val capabilityRequirements = plan.capabilityRequirements
+    val powerRequests = plan.powerRequests
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
         title = { Text(stringResource(R.string.dialog_review_bundle)) },
@@ -85,6 +88,15 @@ internal fun OpenTaskerBundleReviewDialog(
                                 "${it.actionId}: ${it.level.name.lowercase().replace('_', ' ')} - ${it.reason}"
                             },
                             color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+                if (powerRequests.isNotEmpty()) {
+                    item {
+                        TaskerImportListSection(
+                            title = stringResource(R.string.import_power_review),
+                            values = powerRequests.map { request -> powerRequestSummary(request) },
+                            color = MaterialTheme.colorScheme.error,
                         )
                     }
                 }
@@ -170,6 +182,15 @@ internal fun TaskerImportReviewDialog(
                         )
                     }
                 }
+                if (preview.powerRequests.isNotEmpty()) {
+                    item {
+                        TaskerImportListSection(
+                            title = stringResource(R.string.import_power_review),
+                            values = preview.powerRequests.map { request -> powerRequestSummary(request) },
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
                 if (migrationWarnings.isNotEmpty()) {
                     item {
                         TaskerImportListSection(
@@ -218,6 +239,36 @@ internal fun TaskerImportReviewDialog(
         },
     )
 }
+
+@Composable
+private fun powerRequestSummary(request: RecipePowerRequest): String {
+    val powers = request.powers.map { power -> automationPowerLabel(power) }.joinToString()
+    val profiles = request.profileNames.takeIf { it.isNotEmpty() }
+        ?.joinToString()
+        ?: stringResource(R.string.import_power_no_profile)
+    val chain = request.dataToExternalChains.firstOrNull()?.let { value ->
+        stringResource(R.string.import_power_chain, value.sourceActionId, value.sinkActionId)
+    }
+    return buildString {
+        append(stringResource(R.string.import_power_task, request.taskName, powers))
+        append('\n')
+        append(stringResource(R.string.import_power_profiles, profiles))
+        if (chain != null) {
+            append('\n')
+            append(chain)
+        }
+    }
+}
+
+@Composable
+internal fun automationPowerLabel(power: AutomationPower): String = stringResource(
+    when (power) {
+        AutomationPower.DATA_ACCESS -> R.string.automation_power_data_access
+        AutomationPower.EXTERNAL_TRANSMISSION -> R.string.automation_power_external_transmission
+        AutomationPower.DEVICE_CONTROL -> R.string.automation_power_device_control
+        AutomationPower.DESTRUCTIVE -> R.string.automation_power_destructive
+    },
+)
 
 @Composable
 private fun TaskerImportListSection(

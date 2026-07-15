@@ -107,6 +107,16 @@ internal object ImportResourceGuard {
             bytes += requirement.actionId.utf8ByteLength()
             bytes += requirement.reason.utf8ByteLength()
         }
+        metadata.powerRequests.forEach { request ->
+            bytes += request.taskName.utf8ByteLength()
+            request.profileNames.forEach { bytes += it.utf8ByteLength() }
+            request.actionIds.forEach { bytes += it.utf8ByteLength() }
+            request.unknownActionIds.forEach { bytes += it.utf8ByteLength() }
+            request.dataToExternalChains.forEach { chain ->
+                bytes += chain.sourceActionId.utf8ByteLength()
+                bytes += chain.sinkActionId.utf8ByteLength()
+            }
+        }
         tasks.forEach { task ->
             bytes += task.name.utf8ByteLength()
             task.actions.forEach { action -> bytes += action.aggregateStringBytes() }

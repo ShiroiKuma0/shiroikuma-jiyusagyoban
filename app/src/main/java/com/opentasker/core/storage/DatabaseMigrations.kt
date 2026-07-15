@@ -66,6 +66,14 @@ object DatabaseMigrations {
         }
     }
 
+    val MIGRATION_6_7 = object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE profiles ADD COLUMN requiresRiskAcknowledgement INTEGER NOT NULL DEFAULT 0",
+            )
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -73,6 +81,7 @@ object DatabaseMigrations {
             MIGRATION_3_4,
             MIGRATION_4_5,
             MIGRATION_5_6,
+            MIGRATION_6_7,
         )
     }
 }
@@ -99,8 +108,11 @@ object DatabaseMigrations {
  * Version 5:
  *   - profiles: adds nullable profileGroup for folder/tag organization
  *
- * Version 6 (current):
+ * Version 6:
  *   - variables: adds isSecret; secret rows store authenticated Keystore ciphertext in value
+ *
+ * Version 7 (current):
+ *   - profiles: adds requiresRiskAcknowledgement for imported-profile first-enable gating
  *
  * To add a migration:
  * 1. Increment database version in @Database annotation

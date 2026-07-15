@@ -7,6 +7,24 @@ import org.junit.Test
 
 class RunLogDiagnosticsTest {
     @Test
+    fun taskPowerMetadataLabelsSensitiveExecution() {
+        val metadata = taskPowerRunLogMetadata(
+            com.opentasker.core.model.Task(
+                name = "Upload",
+                actions = listOf(
+                    com.opentasker.core.model.ActionSpec(type = "file.read"),
+                    com.opentasker.core.model.ActionSpec(type = "http.post"),
+                ),
+            ),
+        )
+
+        assertEquals(
+            listOf("Powers: data access, external transmission"),
+            metadata,
+        )
+    }
+
+    @Test
     fun runLogMessageIncludesSourceMetadataAndTraceDetails() {
         val message = runLogMessage(
             source = "Profile: Morning",

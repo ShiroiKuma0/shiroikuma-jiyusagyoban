@@ -2,6 +2,8 @@ package com.opentasker.core.transfer
 
 import androidx.room.withTransaction
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
+import com.opentasker.core.capabilities.AutomationPower
+import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Scene
@@ -17,7 +19,8 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-const val OPEN_TASKER_BUNDLE_SCHEMA_VERSION = 1
+const val OPEN_TASKER_BUNDLE_SCHEMA_VERSION = 2
+private val SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMAS = 1..OPEN_TASKER_BUNDLE_SCHEMA_VERSION
 
 @Serializable
 data class OpenTaskerBundle(
@@ -36,6 +39,7 @@ data class BundleMetadata(
     val name: String = "OpenTasker Export",
     val description: String = "",
     val capabilityRequirements: List<CapabilityRequirement> = emptyList(),
+    val powerRequests: List<RecipePowerRequest> = emptyList(),
     val warnings: List<String> = emptyList(),
 )
 
@@ -46,10 +50,29 @@ data class CapabilityRequirement(
     val reason: String,
 )
 
+@Serializable
+data class RecipePowerRequest(
+    val taskId: Long,
+    val taskName: String,
+    val profileNames: List<String> = emptyList(),
+    val powers: List<AutomationPower> = emptyList(),
+    val actionIds: List<String> = emptyList(),
+    val dataToExternalChains: List<DataToExternalChainRequest> = emptyList(),
+    val unknownActionIds: List<String> = emptyList(),
+)
+
+@Serializable
+data class DataToExternalChainRequest(
+    val sourceActionId: String,
+    val sinkActionId: String,
+)
+
 data class BundleImportPlan(
     val canImport: Boolean,
     val warnings: List<String> = emptyList(),
     val lossyWarnings: List<String> = emptyList(),
+    val capabilityRequirements: List<CapabilityRequirement> = emptyList(),
+    val powerRequests: List<RecipePowerRequest> = emptyList(),
 )
 
 data class BundleImportReport(
@@ -94,6 +117,8 @@ object OpenTaskerBundleCodec {
             .filterNot { it.isSecret }
             .sortedWith(compareBy<Variable> { it.name.lowercase() }.thenBy { it.name })
         val sortedScenes = scenes.sortedWith(compareBy<Scene> { it.name.lowercase() }.thenBy { it.id })
+        val capabilityRequirements = capabilityRequirements(sortedTasks)
+        val powerRequests = powerRequests(sortedTasks, sortedProfiles)
         val base = OpenTaskerBundle(
             appVersion = appVersion,
             exportedAtEpochMs = exportedAtEpochMs,
@@ -105,6 +130,8 @@ object OpenTaskerBundleCodec {
                 } else {
                     emptyList()
                 },
+                capabilityRequirements = capabilityRequirements,
+                powerRequests = powerRequests,
             ),
             tasks = sortedTasks,
             profiles = sortedProfiles,
@@ -114,7 +141,8 @@ object OpenTaskerBundleCodec {
         val plan = validate(base)
         return base.copy(
             metadata = base.metadata.copy(
-                capabilityRequirements = capabilityRequirements(sortedTasks),
+                capabilityRequirements = plan.capabilityRequirements,
+                powerRequests = plan.powerRequests,
                 warnings = base.metadata.warnings + plan.warnings + plan.lossyWarnings,
             )
         )
@@ -150,8 +178,9 @@ object OpenTaskerBundleCodec {
             )
         }
 
-        if (bundle.schemaVersion != OPEN_TASKER_BUNDLE_SCHEMA_VERSION) {
-            warnings += "Unsupported schema version ${bundle.schemaVersion}; expected $OPEN_TASKER_BUNDLE_SCHEMA_VERSION."
+        if (bundle.schemaVersion !in SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMAS) {
+            warnings += "Unsupported schema version ${bundle.schemaVersion}; supported versions are " +
+                "${SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMAS.first}..${SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMAS.last}."
         }
 
         duplicateLongs(bundle.tasks.map { it.id }).takeIf { it.isNotEmpty() }?.let { duplicates ->
@@ -183,9 +212,45 @@ object OpenTaskerBundleCodec {
             }
         }
 
+        val taskPowerRequests = powerRequests(bundle.tasks, bundle.profiles)
+        val computedCapabilityRequirements = capabilityRequirements(bundle.tasks)
+        val unknownActions = taskPowerRequests.flatMap { it.unknownActionIds }.distinct().sorted()
+        if (unknownActions.isNotEmpty()) {
+            warnings += "Bundle contains unknown unclassified actions: ${unknownActions.joinToString()}."
+        }
+        taskPowerRequests
+            .filter { it.dataToExternalChains.isNotEmpty() }
+            .forEach { request ->
+                val profiles = request.profileNames.takeIf(List<String>::isNotEmpty)
+                    ?.joinToString(prefix = " (profiles: ", postfix = ")")
+                    .orEmpty()
+                warnings += "Potential data-to-external chain in task '${request.taskName}'$profiles: " +
+                    request.dataToExternalChains.joinToString { "${it.sourceActionId} -> ${it.sinkActionId}" }
+            }
+        bundle.profiles.forEach { profile ->
+            val profileRisk = AutomationSensitivityRegistry.summarize(profile, bundle.tasks)
+            profileRisk.dataToExternalChains.forEach { chain ->
+                warnings += "Potential data-to-external chain in profile '${profile.name}': " +
+                    "${chain.sourceActionId} -> ${chain.sinkActionId}."
+            }
+        }
+
+        if (bundle.schemaVersion >= 2 && bundle.metadata.powerRequests != taskPowerRequests) {
+            warnings += "Bundle power manifest did not match its actions; review uses the computed powers."
+        }
+        if (
+            bundle.schemaVersion >= 2 &&
+            bundle.metadata.capabilityRequirements != computedCapabilityRequirements
+        ) {
+            warnings += "Bundle capability manifest did not match its actions; review uses the computed requirements."
+        }
+
         val unsupportedActions = bundle.tasks
             .flatMap { task -> task.actions.map { task.name to it.type } }
-            .filter { (_, actionId) -> ActionCapabilityRegistry.get(actionId).level == CapabilityLevel.Unsupported }
+            .filter { (_, actionId) ->
+                AutomationSensitivityRegistry.isKnown(actionId) &&
+                    ActionCapabilityRegistry.get(actionId).level == CapabilityLevel.Unsupported
+            }
         if (unsupportedActions.isNotEmpty()) {
             warnings += "Bundle contains unsupported actions: ${unsupportedActions.joinToString { "${it.first}:${it.second}" }}."
         }
@@ -194,6 +259,8 @@ object OpenTaskerBundleCodec {
             canImport = warnings.none { warning -> warning.isBlockingImportWarning() },
             warnings = warnings,
             lossyWarnings = lossyWarnings,
+            capabilityRequirements = computedCapabilityRequirements,
+            powerRequests = taskPowerRequests,
         )
     }
 
@@ -201,6 +268,7 @@ object OpenTaskerBundleCodec {
         startsWith("Unsupported schema version") ||
             startsWith("Bundle has duplicate task ids") ||
             startsWith("Bundle has duplicate variable names") ||
+            startsWith("Bundle contains unknown unclassified actions") ||
             startsWith("Import budget exceeded")
 
     private fun duplicateLongs(values: List<Long>): List<Long> =
@@ -232,6 +300,30 @@ object OpenTaskerBundleCodec {
                     reason = capability.reason,
                 )
             }
+
+    private fun powerRequests(tasks: List<Task>, profiles: List<Profile>): List<RecipePowerRequest> {
+        val profileNamesByTaskId = mutableMapOf<Long, MutableSet<String>>()
+        profiles.forEach { profile ->
+            AutomationSensitivityRegistry.reachableTasks(profile, tasks).forEach { task ->
+                profileNamesByTaskId.getOrPut(task.id, ::linkedSetOf).add(profile.name)
+            }
+        }
+        return tasks.mapNotNull { task ->
+            val summary = AutomationSensitivityRegistry.summarize(task)
+            if (summary.powers.isEmpty() && summary.unknownActionIds.isEmpty()) return@mapNotNull null
+            RecipePowerRequest(
+                taskId = task.id,
+                taskName = task.name,
+                profileNames = profileNamesByTaskId[task.id].orEmpty().sorted(),
+                powers = summary.powers.sortedBy(AutomationPower::ordinal),
+                actionIds = summary.sensitiveActionIds.sorted(),
+                dataToExternalChains = summary.dataToExternalChains.map { chain ->
+                    DataToExternalChainRequest(chain.sourceActionId, chain.sinkActionId)
+                },
+                unknownActionIds = summary.unknownActionIds.sorted(),
+            )
+        }.sortedWith(compareBy<RecipePowerRequest> { it.taskName.lowercase() }.thenBy { it.taskId })
+    }
 }
 
 class OpenTaskerBundleRepository(
@@ -296,6 +388,7 @@ class OpenTaskerBundleRepository(
                 val remappedProfile = profile.copy(
                     id = 0,
                     enabled = false,
+                    requiresRiskAcknowledgement = true,
                     enterTaskId = enterTaskId,
                     exitTaskId = profile.exitTaskId?.let { taskIdMap[it] },
                 )

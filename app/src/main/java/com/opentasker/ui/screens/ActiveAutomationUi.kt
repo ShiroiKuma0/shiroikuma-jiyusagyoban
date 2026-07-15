@@ -270,6 +270,7 @@ fun ActiveAutomationUi(
     var pendingDeleteKind by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingDeleteOwnerId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var pendingDeleteIndex by rememberSaveable { mutableIntStateOf(NO_DIALOG_INDEX) }
+    var importedProfileReviewId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     val taskerImportReview by viewModel.taskerImportReview.collectAsState()
     val taskerImportBusy by viewModel.taskerImportBusy.collectAsState()
     val openTaskerBundleReview by viewModel.openTaskerBundleReview.collectAsState()
@@ -341,6 +342,8 @@ fun ActiveAutomationUi(
             ?.let { profile -> profile.contexts.getOrNull(pendingDeleteIndex)?.let { DeleteTarget.ContextTarget(profile, pendingDeleteIndex, it) } }
         else -> null
     }
+    val importedProfileReview = importedProfileReviewId.takeIf { it != NO_DIALOG_ENTITY_ID }
+        ?.let { profileId -> profiles.firstOrNull { it.id == profileId } }
     fun clearPendingDelete() {
         pendingDeleteKind = null
         pendingDeleteOwnerId = NO_DIALOG_ENTITY_ID
@@ -606,7 +609,14 @@ fun ActiveAutomationUi(
                 onEditProfile = { openProfileDialog(it) },
                 onDeleteProfile = { openDeleteProfile(it) },
                 onToggleProfile = { profile, enabled ->
-                    viewModel.updateProfile(profile.copy(enabled = enabled), "Profile ${if (enabled) "enabled" else "disabled"}")
+                    if (enabled && profile.requiresRiskAcknowledgement) {
+                        importedProfileReviewId = profile.id
+                    } else {
+                        viewModel.updateProfile(
+                            profile.copy(enabled = enabled),
+                            "Profile ${if (enabled) "enabled" else "disabled"}",
+                        )
+                    }
                 },
                 onAddContext = { openContextPicker(it) },
                 onEditContext = { profile, index, context ->
@@ -721,6 +731,18 @@ fun ActiveAutomationUi(
                     )
                 }
                 clearPendingDelete()
+            },
+        )
+    }
+
+    importedProfileReview?.let { profile ->
+        ImportedProfileRiskDialog(
+            profile = profile,
+            tasks = tasks,
+            onDismiss = { importedProfileReviewId = NO_DIALOG_ENTITY_ID },
+            onAcknowledgeAndEnable = {
+                viewModel.acknowledgeAndEnableImportedProfile(profile.id)
+                importedProfileReviewId = NO_DIALOG_ENTITY_ID
             },
         )
     }

@@ -397,10 +397,10 @@ private fun ProfileCard(
     onEditContext: (Int, ContextSpec) -> Unit,
     onDeleteContext: (Int) -> Unit,
 ) {
-    val profileState = if (profile.enabled) {
-        stringResource(R.string.label_enabled)
-    } else {
-        stringResource(R.string.label_paused)
+    val profileState = when {
+        profile.requiresRiskAcknowledgement -> stringResource(R.string.imported_profile_review_required)
+        profile.enabled -> stringResource(R.string.label_enabled)
+        else -> stringResource(R.string.label_paused)
     }
     val toggleDescription = stringResource(R.string.a11y_profile_status, profile.name)
     val editDescription = stringResource(R.string.a11y_edit_profile, profile.name)
@@ -437,8 +437,12 @@ private fun ProfileCard(
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 item {
                     StatusPill(
-                        label = if (profile.enabled) stringResource(R.string.label_enabled) else stringResource(R.string.label_paused),
-                        color = if (profile.enabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        label = profileState,
+                        color = when {
+                            profile.requiresRiskAcknowledgement -> MaterialTheme.colorScheme.error
+                            profile.enabled -> MaterialTheme.colorScheme.tertiary
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                     )
                 }
                 item { StatusPill(stringResource(R.string.label_context_count, profile.contexts.size), MaterialTheme.colorScheme.primary) }

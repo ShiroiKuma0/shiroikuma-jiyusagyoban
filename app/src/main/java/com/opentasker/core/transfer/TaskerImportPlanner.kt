@@ -17,6 +17,7 @@ data class TaskerImportPreview(
     val mappedActionCount: Int,
     val unsupportedActionCount: Int,
     val capabilityWarnings: List<String>,
+    val powerRequests: List<RecipePowerRequest>,
     val warnings: List<String>,
     val lossyWarnings: List<String>,
     val canImport: Boolean,
@@ -46,9 +47,10 @@ object TaskerImportPlanner {
             importSceneCount = report.bundle.scenes.size,
             mappedActionCount = report.mappedActions.size,
             unsupportedActionCount = report.unsupportedActions.size,
-            capabilityWarnings = report.bundle.metadata.capabilityRequirements
+            capabilityWarnings = plan.capabilityRequirements
                 .filter { it.level != CapabilityLevel.Supported }
                 .map { "${it.actionId}: ${it.level.name.lowercase()} - ${it.reason}" },
+            powerRequests = plan.powerRequests,
             warnings = (report.warnings + plan.warnings + emptyWarning).distinct(),
             lossyWarnings = (report.lossyWarnings + plan.lossyWarnings).distinct(),
             canImport = plan.canImport && hasImportableContent,
@@ -64,7 +66,9 @@ object TaskerImportPlanner {
         }
 
         return report.bundle.copy(
-            profiles = report.bundle.profiles.map { it.copy(enabled = false) },
+            profiles = report.bundle.profiles.map {
+                it.copy(enabled = false, requiresRiskAcknowledgement = true)
+            },
             metadata = report.bundle.metadata.copy(warnings = warnings.distinct()),
         )
     }

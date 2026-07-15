@@ -24,6 +24,8 @@ class LocalizationSourceTest {
             "com/opentasker/ui/screens/AutomationFlowScreen.kt",
             "com/opentasker/ui/screens/ContextEditorDialogs.kt",
             "com/opentasker/ui/screens/EditorDialogs.kt",
+            "com/opentasker/ui/screens/ImportedProfileRiskDialog.kt",
+            "com/opentasker/ui/screens/ImportReviewDialogs.kt",
             "com/opentasker/ui/screens/PermissionOnboardingScreen.kt",
             "com/opentasker/ui/screens/SceneEditorCanvas.kt",
             "com/opentasker/ui/screens/SceneEditorDialogs.kt",

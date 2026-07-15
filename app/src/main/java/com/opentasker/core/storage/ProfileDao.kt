@@ -23,6 +23,7 @@ data class ProfileEntity(
     val contextsJson: String,
     val automationMode: String = AutomationMode.SINGLE.name,
     val profileGroup: String? = null,
+    val requiresRiskAcknowledgement: Boolean = false,
 ) {
     fun toDomain(): Profile = toDomainDecodeResult().requireDecoded()
 
@@ -31,7 +32,18 @@ data class ProfileEntity(
         val contexts = runCatching { StorageJson.decodeFromString<List<ContextSpec>>(contextsJson) }
             .getOrElse { error ->
                 return StorageDecodeResult(
-                    value = Profile(id, name, enabled, emptyList(), enterTaskId, exitTaskId, cooldownSec, mode, profileGroup),
+                    value = Profile(
+                        id,
+                        name,
+                        enabled,
+                        emptyList(),
+                        enterTaskId,
+                        exitTaskId,
+                        cooldownSec,
+                        mode,
+                        profileGroup,
+                        requiresRiskAcknowledgement,
+                    ),
                     issue = StorageDecodeIssue(
                         recordType = StorageRecordType.PROFILE,
                         recordId = id,
@@ -53,13 +65,23 @@ data class ProfileEntity(
                 cooldownSec,
                 mode,
                 profileGroup,
+                requiresRiskAcknowledgement,
             ),
         )
     }
 }
 
 fun Profile.toEntity() = ProfileEntity(
-    id, name, enabled, enterTaskId, exitTaskId, cooldownSec, StorageJson.encodeToString(contexts), automationMode.name, group
+    id,
+    name,
+    enabled,
+    enterTaskId,
+    exitTaskId,
+    cooldownSec,
+    StorageJson.encodeToString(contexts),
+    automationMode.name,
+    group,
+    requiresRiskAcknowledgement,
 )
 
 @Dao
@@ -69,6 +91,7 @@ interface ProfileDao {
     @Delete suspend fun delete(p: ProfileEntity)
     @Query("SELECT * FROM profiles WHERE id = :id") suspend fun getById(id: Long): ProfileEntity?
     @Query("SELECT * FROM profiles") suspend fun getAll(): List<ProfileEntity>
-    @Query("SELECT * FROM profiles WHERE enabled = 1") suspend fun getAllEnabled(): List<ProfileEntity>
+    @Query("SELECT * FROM profiles WHERE enabled = 1 AND requiresRiskAcknowledgement = 0")
+    suspend fun getAllEnabled(): List<ProfileEntity>
     @Query("SELECT * FROM profiles") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<ProfileEntity>>
 }
