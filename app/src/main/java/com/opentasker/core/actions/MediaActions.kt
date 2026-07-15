@@ -11,6 +11,7 @@ import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.platform.AndroidAudioHardening
+import com.opentasker.core.platform.AudioUsageEligibility
 
 /**
  * Play a sound or music file.
@@ -24,10 +25,8 @@ class PlaySoundAction : Action {
     override val category = ActionCategory.MEDIA
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        if (AndroidAudioHardening.isRestricted()) {
-            return AndroidAudioHardening.soundPlaybackFailure()
-        }
         val path = args["path"] ?: return ActionResult.Failure("missing path")
+        AndroidAudioHardening.failureIfIneligible(ctx, "sound playback")?.let { return it }
         val volume = args["volume"]?.toFloatOrNull()?.let { (it / 100f).coerceIn(0f, 1f) }
 
         val player = try {
@@ -122,13 +121,15 @@ class MuteAction : Action {
     override val category = ActionCategory.MEDIA
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        if (AndroidAudioHardening.isRestricted()) {
-            return AndroidAudioHardening.volumeFailure("mute")
-        }
         val stream = args["stream"] ?: "music"
+        val streamType = streamType(stream) ?: return ActionResult.Failure("invalid stream: $stream")
+        AndroidAudioHardening.failureIfIneligible(
+            ctx = ctx,
+            operation = "mute",
+            usage = audioUsageForStreamType(streamType),
+        )?.let { return it }
         val am = ctx.app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
             ?: return ActionResult.Failure("audio service not available")
-        val streamType = streamType(stream) ?: return ActionResult.Failure("invalid stream: $stream")
         return try {
             am.adjustStreamVolume(streamType, AudioManager.ADJUST_MUTE, 0)
             ctx.logger("Mute $stream")
@@ -140,9 +141,7 @@ class MuteAction : Action {
 }
 
 private fun dispatchMediaKey(ctx: ActionContext, keyCode: Int): ActionResult {
-    if (AndroidAudioHardening.isRestricted()) {
-        return AndroidAudioHardening.mediaKeyFailure()
-    }
+    AndroidAudioHardening.failureIfIneligible(ctx, "media-key dispatch")?.let { return it }
     val audioManager = ctx.app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         ?: return ActionResult.Failure("audio service not available")
 
@@ -164,3 +163,10 @@ private fun streamType(name: String): Int? = when (name.lowercase()) {
     "voice", "call" -> AudioManager.STREAM_VOICE_CALL
     else -> null
 }
+
+private fun audioUsageForStreamType(streamType: Int): AudioUsageEligibility =
+    if (streamType == AudioManager.STREAM_ALARM) {
+        AudioUsageEligibility.ALARM
+    } else {
+        AudioUsageEligibility.GENERAL
+    }

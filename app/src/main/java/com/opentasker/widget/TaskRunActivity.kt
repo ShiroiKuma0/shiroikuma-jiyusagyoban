@@ -47,6 +47,7 @@ class TaskRunActivity : Activity() {
                             db = db,
                             task = task,
                             source = source,
+                            visibleActivity = true,
                         )
                         val status = if (result.report.success) "succeeded" else "failed"
                         "${task.name} $status (${result.report.durationMs}ms)"

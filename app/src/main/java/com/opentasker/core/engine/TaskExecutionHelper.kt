@@ -4,6 +4,8 @@ import android.content.Context
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Task
+import com.opentasker.core.platform.AudioForegroundServiceEligibility
+import com.opentasker.core.platform.AudioRuntimeEligibility
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.TaskEntity
 import com.opentasker.core.storage.VariableEntity
@@ -23,6 +25,8 @@ suspend fun executeAndLogTask(
     source: String,
     metadata: List<String> = emptyList(),
     initialVariables: Map<String, String> = emptyMap(),
+    visibleActivity: Boolean = false,
+    audioForegroundService: AudioForegroundServiceEligibility = AudioForegroundServiceEligibility.NONE,
     logTag: String = TAG,
 ): TaskExecutionResult = withContext(Dispatchers.IO) {
     // Run the whole task off the caller's thread. Manual runs (ViewModel), widget/shortcut, and
@@ -39,7 +43,15 @@ suspend fun executeAndLogTask(
     initialVariables.forEach { (name, value) -> variables.set(name, value) }
     // Baseline after seeding + event vars, so only globals actually changed during the run persist.
     val baselineGlobals = variables.globalSnapshot()
-    val ctx = ActionContext(appContext, variables) { msg -> AppLogger.info(logTag, msg) }
+    val audioEligibility = AudioRuntimeEligibility(
+        appVisible = visibleActivity,
+        foregroundService = audioForegroundService,
+    )
+    val ctx = ActionContext(
+        app = appContext,
+        variables = variables,
+        audioEligibility = audioEligibility,
+    ) { msg -> AppLogger.info(logTag, msg) }
     val runner = TaskRunner(ctx, resolveTask = dbSubTaskResolver(db))
     val report = runner.run(task)
     persistChangedGlobals(db, baselineGlobals, variables.globalSnapshot(), logTag)

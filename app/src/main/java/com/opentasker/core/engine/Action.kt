@@ -1,6 +1,7 @@
 package com.opentasker.core.engine
 
 import android.content.Context
+import com.opentasker.core.platform.AudioRuntimeEligibility
 import java.util.Collections
 
 /**
@@ -11,6 +12,7 @@ class ActionContext(
     val app: Context,
     val variables: VariableStore,
     val eventVariables: Map<String, String> = emptyMap(),
+    val audioEligibility: AudioRuntimeEligibility = AudioRuntimeEligibility(),
     val logger: (String) -> Unit = {},
 )
 

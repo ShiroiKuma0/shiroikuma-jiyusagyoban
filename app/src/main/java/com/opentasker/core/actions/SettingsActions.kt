@@ -20,6 +20,7 @@ import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.platform.AndroidAudioHardening
+import com.opentasker.core.platform.AudioUsageEligibility
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
@@ -42,7 +43,7 @@ class WiFiToggleAction : Action {
         }
         val wm = ctx.app.getSystemService(Context.WIFI_SERVICE) as? WifiManager
             ?: return ActionResult.Failure("WiFi not available")
-        
+
         when (state.lowercase()) {
             "toggle" -> wm.isWifiEnabled = !wm.isWifiEnabled
             "on" -> wm.isWifiEnabled = true
@@ -135,13 +136,16 @@ class VolumeAction : Action {
     override val category = ActionCategory.SETTINGS
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        if (AndroidAudioHardening.isRestricted()) {
-            return AndroidAudioHardening.volumeFailure("volume control")
-        }
         val levelArg = args["level"] ?: return ActionResult.Failure("missing level")
+        val streamType = streamType(args["stream"] ?: "music") ?: return ActionResult.Failure("invalid stream")
+        val usage = if (streamType == AudioManager.STREAM_ALARM) {
+            AudioUsageEligibility.ALARM
+        } else {
+            AudioUsageEligibility.GENERAL
+        }
+        AndroidAudioHardening.failureIfIneligible(ctx, "volume control", usage)?.let { return it }
         val audioManager = ctx.app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
             ?: return ActionResult.Failure("audio service not available")
-        val streamType = streamType(args["stream"] ?: "music") ?: return ActionResult.Failure("invalid stream")
 
         return try {
             when (levelArg.lowercase()) {
@@ -229,8 +233,6 @@ class RingerModeAction : Action {
     override val category = ActionCategory.SETTINGS
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val am = ctx.app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-            ?: return ActionResult.Failure("audio service not available")
         val mode = args["mode"] ?: return ActionResult.Failure("missing mode argument")
         val ringerMode = when (mode.lowercase()) {
             "normal", "ring" -> AudioManager.RINGER_MODE_NORMAL
@@ -238,6 +240,9 @@ class RingerModeAction : Action {
             "silent" -> AudioManager.RINGER_MODE_SILENT
             else -> return ActionResult.Failure("invalid ringer mode: $mode (use normal/vibrate/silent)")
         }
+        AndroidAudioHardening.failureIfIneligible(ctx, "ringer-mode change")?.let { return it }
+        val am = ctx.app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            ?: return ActionResult.Failure("audio service not available")
         return try {
             am.ringerMode = ringerMode
             ctx.logger("Ringer: $mode")

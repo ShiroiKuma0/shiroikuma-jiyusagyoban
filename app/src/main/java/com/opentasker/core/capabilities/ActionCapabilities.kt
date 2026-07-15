@@ -32,7 +32,7 @@ object ActionCapabilityRegistry {
         "brightness.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access."),
         "volume.set" to volumeCapability("May be blocked by Do Not Disturb policy access."),
         "dnd.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Do Not Disturb access."),
-        "ringer.set" to ActionCapability(CapabilityLevel.RequiresSetup, "May require Do Not Disturb access on some devices when switching to silent mode."),
+        "ringer.set" to volumeCapability("May require Do Not Disturb access on some devices when switching to silent mode."),
         "torch.set" to ActionCapability(CapabilityLevel.Supported, "Uses camera flashlight."),
         "airplane.toggle" to elevatedUnsupported("airplane.toggle", "Airplane mode changes require system or device-owner privileges."),
         "mobile.toggle" to elevatedUnsupported("mobile.toggle", "Mobile data changes require carrier, system, or device-owner privileges."),
@@ -75,21 +75,21 @@ object ActionCapabilityRegistry {
 
     internal fun audioOutputCapabilityForSdk(sdkInt: Int, reason: String): ActionCapability =
         if (AndroidAudioHardening.isRestricted(sdkInt)) {
-            ActionCapability(CapabilityLevel.Unsupported, AndroidAudioHardening.outputCapabilityReason(reason))
+            ActionCapability(CapabilityLevel.RequiresSetup, AndroidAudioHardening.outputCapabilityReason(reason))
         } else {
             ActionCapability(CapabilityLevel.Supported, reason)
         }
 
     internal fun mediaKeyCapabilityForSdk(sdkInt: Int, reason: String): ActionCapability =
         if (AndroidAudioHardening.isRestricted(sdkInt)) {
-            ActionCapability(CapabilityLevel.Unsupported, AndroidAudioHardening.mediaKeyCapabilityReason(reason))
+            ActionCapability(CapabilityLevel.RequiresSetup, AndroidAudioHardening.mediaKeyCapabilityReason(reason))
         } else {
             ActionCapability(CapabilityLevel.Supported, reason)
         }
 
     internal fun volumeCapabilityForSdk(sdkInt: Int, reason: String): ActionCapability =
         if (AndroidAudioHardening.isRestricted(sdkInt)) {
-            ActionCapability(CapabilityLevel.Unsupported, AndroidAudioHardening.volumeCapabilityReason(reason))
+            ActionCapability(CapabilityLevel.RequiresSetup, AndroidAudioHardening.volumeCapabilityReason(reason))
         } else {
             ActionCapability(CapabilityLevel.RequiresSetup, reason)
         }

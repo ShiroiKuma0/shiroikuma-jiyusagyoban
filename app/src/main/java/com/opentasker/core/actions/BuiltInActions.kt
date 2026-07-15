@@ -229,14 +229,12 @@ class SayAction : Action {
     override val category = ActionCategory.NOTIFICATION
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        if (AndroidAudioHardening.isRestricted()) {
-            return AndroidAudioHardening.ttsFailure()
-        }
         val text = args["text"]?.takeIf { it.isNotBlank() }
             ?: return ActionResult.Failure("missing text argument")
         if (text.length > MAX_TTS_CHARS) {
             return ActionResult.Failure("text exceeds $MAX_TTS_CHARS character limit (${text.length})")
         }
+        AndroidAudioHardening.failureIfIneligible(ctx, "text-to-speech output")?.let { return it }
         return suspendCancellableCoroutine { cont ->
             var tts: android.speech.tts.TextToSpeech? = null
             val resumed = java.util.concurrent.atomic.AtomicBoolean(false)

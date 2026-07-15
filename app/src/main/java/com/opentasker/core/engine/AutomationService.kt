@@ -31,6 +31,7 @@ import com.opentasker.core.contexts.PluginConditionSubscriptions
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
+import com.opentasker.core.platform.AudioForegroundServiceEligibility
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.minimumTimestamp
 import java.util.concurrent.TimeUnit
@@ -77,6 +78,7 @@ class AutomationService : Service() {
     private val profileTaskJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>())
     private val queuedProfileTasks = Collections.synchronizedMap(mutableMapOf<Long, ArrayDeque<Task>>())
     private var lastRunLogPruneAt = 0L
+    private var audioForegroundServiceEligibility = AudioForegroundServiceEligibility.BACKGROUND_STARTED
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -131,6 +133,9 @@ class AutomationService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.getBooleanExtra(EXTRA_STARTED_FROM_VISIBLE_UI, false) == true) {
+            audioForegroundServiceEligibility = AudioForegroundServiceEligibility.WHILE_IN_USE
+        }
         val bootCompletedTrigger = intent?.action == ACTION_BOOT_COMPLETED_TRIGGER
         scope.launch {
             reloadProfiles()
@@ -395,6 +400,7 @@ class AutomationService : Service() {
             task = task,
             source = "Profile: ${profile.name}",
             metadata = profileRunMetadata(profile),
+            audioForegroundService = audioForegroundServiceEligibility,
         )
         if (result.logInserted) {
             pruneRunLogs(force = false)
@@ -522,6 +528,7 @@ class AutomationService : Service() {
     companion object {
         private const val TAG = "AutomationService"
         const val ACTION_BOOT_COMPLETED_TRIGGER = "com.opentasker.action.BOOT_COMPLETED_TRIGGER"
+        const val EXTRA_STARTED_FROM_VISIBLE_UI = "com.opentasker.extra.STARTED_FROM_VISIBLE_UI"
         private const val CHANNEL = "opentasker.engine"
         private const val NOTIF_ID = 1001
         private const val MAX_QUEUED_TASKS = 50

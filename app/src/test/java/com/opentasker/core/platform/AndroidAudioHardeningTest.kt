@@ -13,13 +13,96 @@ class AndroidAudioHardeningTest {
     }
 
     @Test
-    fun soundAndTtsFailuresAreHonest() {
-        val sound = AndroidAudioHardening.soundPlaybackFailure()
-        val tts = AndroidAudioHardening.ttsFailure()
+    fun lowerApisRetainExistingBehavior() {
+        val decision = AndroidAudioHardening.evaluate(
+            eligibility = AudioRuntimeEligibility(),
+            sdkInt = 36,
+            targetSdkInt = 36,
+        )
 
-        assertTrue(sound.message.contains("Android 17+"))
-        assertTrue(sound.message.contains("without a media foreground-service type"))
-        assertTrue(tts.message.contains("TTS"))
-        assertTrue(tts.message.contains("without a media foreground-service type"))
+        assertTrue(decision.allowed)
+    }
+
+    @Test
+    fun visibleActivityIsEligibleOnAndroid17() {
+        val decision = AndroidAudioHardening.evaluate(
+            eligibility = AudioRuntimeEligibility(appVisible = true),
+            sdkInt = 37,
+        )
+
+        assertTrue(decision.allowed)
+        assertTrue(decision.reason.contains("visible activity"))
+    }
+
+    @Test
+    fun whileInUseForegroundServiceIsEligibleOnAndroid17() {
+        val decision = AndroidAudioHardening.evaluate(
+            eligibility = AudioRuntimeEligibility(
+                foregroundService = AudioForegroundServiceEligibility.WHILE_IN_USE,
+            ),
+            sdkInt = 37,
+        )
+
+        assertTrue(decision.allowed)
+        assertTrue(decision.reason.contains("while-in-use"))
+    }
+
+    @Test
+    fun backgroundStartedForegroundServiceFailsClosedForTarget37() {
+        val decision = AndroidAudioHardening.evaluate(
+            eligibility = AudioRuntimeEligibility(
+                foregroundService = AudioForegroundServiceEligibility.BACKGROUND_STARTED,
+            ),
+            sdkInt = 37,
+            targetSdkInt = 37,
+        )
+
+        assertFalse(decision.allowed)
+        assertTrue(decision.reason.contains("started in the background"))
+        assertTrue(decision.reason.contains("Open OpenTasker"))
+    }
+
+    @Test
+    fun ordinaryForegroundServiceRemainsEligibleForPreTarget37Apps() {
+        val decision = AndroidAudioHardening.evaluate(
+            eligibility = AudioRuntimeEligibility(
+                foregroundService = AudioForegroundServiceEligibility.BACKGROUND_STARTED,
+            ),
+            sdkInt = 37,
+            targetSdkInt = 36,
+        )
+
+        assertTrue(decision.allowed)
+    }
+
+    @Test
+    fun exactAlarmPermissionOnlyExemptsAlarmUsage() {
+        val eligibility = AudioRuntimeEligibility(exactAlarmPermission = true)
+
+        val alarm = AndroidAudioHardening.evaluate(
+            eligibility = eligibility,
+            usage = AudioUsageEligibility.ALARM,
+            sdkInt = 37,
+        )
+        val general = AndroidAudioHardening.evaluate(
+            eligibility = eligibility,
+            usage = AudioUsageEligibility.GENERAL,
+            sdkInt = 37,
+        )
+
+        assertTrue(alarm.allowed)
+        assertFalse(general.allowed)
+    }
+
+    @Test
+    fun missingExactAlarmAccessProvidesSpecificRecovery() {
+        val decision = AndroidAudioHardening.evaluate(
+            eligibility = AudioRuntimeEligibility(),
+            usage = AudioUsageEligibility.ALARM,
+            sdkInt = 37,
+        )
+
+        assertFalse(decision.allowed)
+        assertTrue(decision.reason.contains("Grant exact-alarm access in Setup"))
     }
 }

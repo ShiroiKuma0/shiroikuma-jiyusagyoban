@@ -68,7 +68,11 @@ class MainActivity : ComponentActivity() {
 
     private fun startAutomationService() {
         runCatching {
-            ContextCompat.startForegroundService(this, Intent(this, AutomationService::class.java))
+            ContextCompat.startForegroundService(
+                this,
+                Intent(this, AutomationService::class.java)
+                    .putExtra(AutomationService.EXTRA_STARTED_FROM_VISIBLE_UI, true),
+            )
         }.onFailure { error ->
             AppLogger.error("MainActivity", "Failed to start OpenTasker automation service", error)
         }

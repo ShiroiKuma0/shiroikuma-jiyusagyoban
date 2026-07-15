@@ -36,18 +36,18 @@ class ActionCapabilitiesTest {
     }
 
     @Test
-    fun android17AudioCapabilitiesFailClosed() {
+    fun android17AudioCapabilitiesRemainAddableWithRuntimeEligibilityWarning() {
         val output = ActionCapabilityRegistry.audioOutputCapabilityForSdk(37, "Uses Android TTS.")
         val mediaKey = ActionCapabilityRegistry.mediaKeyCapabilityForSdk(37, "Dispatches a media key.")
         val volume = ActionCapabilityRegistry.volumeCapabilityForSdk(37, "Changes a media stream.")
 
-        assertEquals(CapabilityLevel.Unsupported, output.level)
-        assertEquals(CapabilityLevel.Unsupported, mediaKey.level)
-        assertEquals(CapabilityLevel.Unsupported, volume.level)
-        assertFalse(output.canAdd)
-        assertTrue(output.reason.contains("media foreground-service type"))
-        assertTrue(mediaKey.reason.contains("media key dispatch"))
-        assertTrue(volume.reason.contains("background volume changes"))
+        assertEquals(CapabilityLevel.RequiresSetup, output.level)
+        assertEquals(CapabilityLevel.RequiresSetup, mediaKey.level)
+        assertEquals(CapabilityLevel.RequiresSetup, volume.level)
+        assertTrue(output.canAdd)
+        assertTrue(output.reason.contains("while-in-use eligible foreground service"))
+        assertTrue(mediaKey.reason.contains("media-key dispatch"))
+        assertTrue(volume.reason.contains("volume changes"))
     }
 
     @Test
