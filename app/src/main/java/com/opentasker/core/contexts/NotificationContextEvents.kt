@@ -16,12 +16,22 @@ object NotificationContextEvents {
         packageName: String,
         title: CharSequence?,
         body: CharSequence?,
-    ): Boolean = notifications.tryEmit(buildEvent(packageName, title, body))
+        ongoing: Boolean = false,
+        isProtected: Boolean = false,
+    ): Boolean {
+        // The notification's fields are threaded PER-INVOCATION to the enter task via ContextEvent.vars
+        // (see buildEvent) — NOT persisted as super-globals. The only reader is the notification enter task
+        // (通知明滅点灯), which receives these locals; persisting them just cluttered the global namespace.
+        val pkg = packageName.trim()
+        return notifications.tryEmit(buildEvent(pkg, title, body, ongoing, isProtected))
+    }
 
     fun buildEvent(
         packageName: String,
         title: CharSequence?,
         body: CharSequence?,
+        ongoing: Boolean = false,
+        isProtected: Boolean = false,
     ): ContextEvent = ContextEvent(
         type = "event",
         matched = true,
@@ -30,6 +40,17 @@ object NotificationContextEvents {
             "package" to packageName.trim(),
             "title" to sanitizeText(title),
             "body" to sanitizeText(body),
+            "ongoing" to ongoing.toString(),
+            "protected" to isProtected.toString(),
+        ),
+        // Per-invocation snapshot under the SAME names as the published super-globals, so a queued
+        // task (e.g. 通知明滅 in QUEUED mode) reads THIS notification's values, not a later one's.
+        vars = mapOf(
+            "NOTIF_PACKAGE" to packageName.trim(),
+            "NOTIF_TITLE" to sanitizeText(title),
+            "NOTIF_BODY" to sanitizeText(body),
+            "NOTIF_ONGOING" to ongoing.toString(),
+            "NOTIF_PROTECTED" to isProtected.toString(),
         ),
     )
 

@@ -174,7 +174,7 @@ object ProfileTemplateCatalog {
                 TemplateContext(ContextType.STATE, mapOf("key" to "wifi", "value" to "{ssid}")),
             ),
             actions = listOf(
-                TemplateAction("notify.show", "Show arrival notification", mapOf("title" to "OpenTasker", "text" to "{message}")),
+                TemplateAction("notify.show", "Show arrival notification", mapOf("title" to "白い熊 自由作業盤", "text" to "{message}")),
                 TemplateAction("log", "Log WiFi arrival", mapOf("message" to "{message}")),
             ),
         ),
@@ -229,7 +229,7 @@ object ProfileTemplateCatalog {
             ),
             actions = listOf(
                 TemplateAction("flow.wait", "Wait before reminder", mapOf("millis" to "{delayMillis}")),
-                TemplateAction("notify.show", "Show app reminder", mapOf("title" to "OpenTasker reminder", "text" to "{message}")),
+                TemplateAction("notify.show", "Show app reminder", mapOf("title" to "白い熊 自由作業盤 reminder", "text" to "{message}")),
             ),
         ),
         ProfileTemplate(

@@ -6,7 +6,6 @@ import androidx.activity.ComponentActivity
 import com.opentasker.core.logging.AppLogger
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
@@ -19,8 +18,7 @@ import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.engine.AutomationService
 import com.opentasker.ui.screens.ActiveAutomationUi
 import com.opentasker.ui.theme.OpenTaskerTheme
-import com.opentasker.ui.theme.ThemeMode
-import com.opentasker.ui.theme.ThemePreference
+import com.opentasker.ui.theme.ThemeStore
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,14 +26,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         
         setContent {
-            val themeMode by ThemePreference.observe(this).collectAsState(initial = ThemeMode.System)
-            val darkTheme = when (themeMode) {
-                ThemeMode.Dark -> true
-                ThemeMode.Light -> false
-                ThemeMode.HighContrast -> true
-                ThemeMode.System -> isSystemInDarkTheme()
-            }
-            OpenTaskerTheme(darkTheme = darkTheme, highContrast = themeMode == ThemeMode.HighContrast) {
+            val themePrefs by ThemeStore.state.collectAsState()
+            OpenTaskerTheme(prefs = themePrefs) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

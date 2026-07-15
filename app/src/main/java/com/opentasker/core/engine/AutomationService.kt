@@ -1,11 +1,13 @@
 package com.opentasker.core.engine
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
@@ -16,43 +18,41 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.opentasker.app.MainActivity
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.core.bubbles.FreezeBubbleOverlayManager
 import com.opentasker.automation.app.AppUsageMonitor
 import com.opentasker.automation.network.ConnectivityMonitor
 import com.opentasker.automation.network.WiFiNetworkMonitor
+import com.opentasker.automation.sensor.FoldDetector
+import com.opentasker.automation.sensor.OrientationDetector
 import com.opentasker.automation.sensor.ShakeDetector
 import com.opentasker.automation.scheduler.TimeEventScheduler
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.contexts.BluetoothContextEvents
 import com.opentasker.core.contexts.BootContextEvents
+import com.opentasker.core.contexts.BroadcastContextEvents
 import com.opentasker.core.contexts.CameraMicContextEvents
 import com.opentasker.core.contexts.PackageContextEvents
 import com.opentasker.core.contexts.PluginConditionSubscription
 import com.opentasker.core.contexts.PluginConditionSubscriptions
-import com.opentasker.core.contexts.TimeContextEvents
 import com.opentasker.core.model.AutomationMode
+import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
-import com.opentasker.core.platform.AudioForegroundServiceEligibility
+import com.opentasker.core.storage.AutoStartSettings
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.minimumTimestamp
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withTimeoutOrNull
-import com.opentasker.core.storage.ProfileEntity
 import java.util.ArrayDeque
 import java.util.Collections
 
@@ -64,138 +64,100 @@ import java.util.Collections
  * automation engine to evaluate triggers reliably.
  */
 class AutomationService : Service() {
-    private val job = Job()
-    // Engine orchestration (context matching, dispatch) runs off the main thread. Room suspend DAOs
-    // dispatch to Room's own executor, and task execution hops to Dispatchers.IO inside
-    // executeAndLogTask, so no automation work blocks the UI thread.
-    private val scope = CoroutineScope(Dispatchers.Default + job)
+    // SupervisorJob: a failing child coroutine (a matcher, the reload collector, a prune) must NOT cancel
+    // the parent and take down every engine coroutine with it — that froze the clock while the process
+    // stayed alive. Children now fail in isolation; the heartbeat re-arms anything that does die.
+    private val job = SupervisorJob()
+    private val scope = CoroutineScope(Dispatchers.Main + job)
     private val db by lazy { OpenTaskerApp_NoHilt.db }
     private val timeEventScheduler by lazy { TimeEventScheduler(this) }
     private val wifiNetworkMonitor by lazy { WiFiNetworkMonitor(this) }
     private val connectivityMonitor by lazy { ConnectivityMonitor(this) }
     private val appUsageMonitor by lazy { AppUsageMonitor(this) }
     private val shakeDetector by lazy { ShakeDetector(this) }
+    private val orientationDetector by lazy { OrientationDetector(this) }
+    private val foldDetector by lazy { FoldDetector(this) }
+    private val hardwareKeyListener by lazy { com.opentasker.core.input.ShizukuKeyEventListener() }
     private val runLogRetentionSettings by lazy { RunLogRetentionSettings(this) }
-    private val engineHeartbeatStore by lazy { EngineHeartbeatStore(this) }
-    private val contextMonitorLifecycle by lazy {
-        ContextMonitorLifecycle(
-            mapOf(
-                ContextMonitor.WIFI to ContextMonitorHandle(
-                    start = { wifiNetworkMonitor.start() },
-                    stop = { wifiNetworkMonitor.stop() },
-                ),
-                ContextMonitor.CONNECTIVITY to ContextMonitorHandle(
-                    start = { connectivityMonitor.start() },
-                    stop = { connectivityMonitor.stop() },
-                ),
-                ContextMonitor.APP_USAGE to ContextMonitorHandle(
-                    start = { appUsageMonitor.start(scope) },
-                    stop = { appUsageMonitor.stop() },
-                ),
-                ContextMonitor.SHAKE to ContextMonitorHandle(
-                    start = { shakeDetector.start() },
-                    stop = { shakeDetector.stop() },
-                ),
-                ContextMonitor.CAMERA_MIC to ContextMonitorHandle(
-                    start = { CameraMicContextEvents.start(this) },
-                    stop = { CameraMicContextEvents.stop(this) },
-                ),
-                ContextMonitor.PACKAGE_EVENTS to ContextMonitorHandle(
-                    start = {
-                        ContextCompat.registerReceiver(
-                            this,
-                            PackageContextEvents.receiver,
-                            PackageContextEvents.intentFilter(),
-                            ContextCompat.RECEIVER_NOT_EXPORTED,
-                        )
-                        true
-                    },
-                    stop = { unregisterReceiver(PackageContextEvents.receiver) },
-                ),
-                ContextMonitor.BLUETOOTH_EVENTS to ContextMonitorHandle(
-                    start = {
-                        ContextCompat.registerReceiver(
-                            this,
-                            BluetoothContextEvents.receiver,
-                            BluetoothContextEvents.intentFilter(),
-                            ContextCompat.RECEIVER_NOT_EXPORTED,
-                        )
-                        true
-                    },
-                    stop = { unregisterReceiver(BluetoothContextEvents.receiver) },
-                ),
-            ),
-        )
-    }
     
     private val cooldownStore by lazy { CooldownStore(this) }
     private val matchers = Collections.synchronizedMap(mutableMapOf<Long, ProfileMatcher>())
     private val profileCooldowns = Collections.synchronizedMap(mutableMapOf<Long, Long>()) // profileId -> cooldownUntilMs
     private val matcherJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>()) // Track jobs for cleanup
     private val profileTaskJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>())
-    private val queuedProfileTasks = Collections.synchronizedMap(mutableMapOf<Long, ArrayDeque<Task>>())
-    private val profileReloadMutex = Mutex()
+    // Each queued run carries its own event snapshot, so a burst of different-source events (e.g.
+    // notifications from different apps) each runs with ITS values, not the latest one's.
+    private data class QueuedRun(val task: Task, val eventVars: Map<String, String>)
+    private val queuedProfileTasks = Collections.synchronizedMap(mutableMapOf<Long, ArrayDeque<QueuedRun>>())
     private var lastRunLogPruneAt = 0L
-    private var audioForegroundServiceEligibility = AudioForegroundServiceEligibility.BACKGROUND_STARTED
-    @Volatile private var engineLoaded = false
+    // Each sensor/usage monitor runs only while an enabled profile needs it — tracked so we start/stop
+    // on transitions (白い熊: no idle CPU drain, no wakelock, phone can deep-sleep).
+    private var shakeOn = false
+    private var orientationOn = false
+    private var foldOn = false
+    private var appUsageOn = false
+    private var autoStartDone = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         startForegroundCompat()
+        // No engine wakelock: the per-minute clock rides a Doze-exempt exact alarm and triggers ride
+        // their own event sources, so the CPU is free to deep-sleep when idle (白い熊 freezes Powergenie).
         timeEventScheduler.scheduleNextMinute()
-        engineHeartbeatStore.recordAlive()
-        scope.launch {
-            while (isActive) {
-                engineHeartbeatStore.recordAlive()
-                delay(ENGINE_HEARTBEAT_INTERVAL_MS)
-            }
-        }
+        wifiNetworkMonitor.start()
+        connectivityMonitor.start()
+        // Shake / orientation / app-foreground monitors are NOT started here — reloadProfiles() gates
+        // them on whether an enabled profile actually uses them (applyContextSourceGating).
+        hardwareKeyListener.start(this, scope)
+        ContextCompat.registerReceiver(
+            this,
+            PackageContextEvents.receiver,
+            PackageContextEvents.intentFilter(),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        ContextCompat.registerReceiver(
+            this,
+            BluetoothContextEvents.receiver,
+            BluetoothContextEvents.intentFilter(),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        CameraMicContextEvents.start(this)
+        // Freeze bubbles: render pending re-freeze bubbles, gated to the Desktop launcher being foreground.
+        FreezeBubbleOverlayManager.start(this, scope)
         profileCooldowns.putAll(cooldownStore.loadAll())
         scope.launch { pruneRunLogs(force = true) }
-        observeProfileRegistry()
-    }
-
-    /**
-     * Keeps the running engine in sync with the profiles table. Creating, editing, enabling,
-     * disabling, or deleting a profile changes the reconcile signature and triggers a matcher and
-     * plugin-subscription rebuild without a service restart. The initial snapshot is dropped because
-     * [onStartCommand] performs the first load, so the initial snapshot is dropped and only
-     * subsequent engine-relevant changes reconcile. Identical signatures are coalesced by
-     * [distinctUntilChanged], and [reloadProfiles] is idempotent, so rapid edits are safe.
-     *
-     * In-flight task runs are intentionally left running — reconciling re-subscribes matchers but
-     * does not cancel a task that is already executing.
-     */
-    private fun observeProfileRegistry() {
+        // Re-arm matchers (and dynamic receivers like the broadcast trigger) whenever profiles change,
+        // so enabling/importing a profile takes effect without relaunching the app. drop(1) skips the
+        // initial emission — onStartCommand does the first load.
         scope.launch {
-            db.profileDao().getAllAsFlow()
-                .map { profileRegistrySignature(it) }
-                .distinctUntilChanged()
-                .drop(1)
-                .collect {
-                    AppLogger.info(TAG, "Profile registry changed; reconciling matchers")
-                    reloadProfiles()
-                }
+            db.profileDao().getAllAsFlow().drop(1).collect { reloadProfiles() }
         }
+        isRunning = true
+        EngineHeartbeat.markEngineStart()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.getBooleanExtra(EXTRA_STARTED_FROM_VISIBLE_UI, false) == true) {
-            audioForegroundServiceEligibility = AudioForegroundServiceEligibility.WHILE_IN_USE
-        }
         val bootCompletedTrigger = intent?.action == ACTION_BOOT_COMPLETED_TRIGGER
-        val timeTickTrigger = intent?.action == ACTION_TIME_TICK_TRIGGER
-        timeEventScheduler.scheduleNextMinute()
-        engineHeartbeatStore.recordAlive()
+        val rearm = intent?.action == ACTION_REARM
         scope.launch {
-            if (!timeTickTrigger || !engineLoaded) reloadProfiles()
-            if (bootCompletedTrigger) {
-                BootContextEvents.publishBootCompleted()
-            }
-            if (timeTickTrigger) {
-                TimeContextEvents.publish()
+            if (rearm) {
+                // The per-minute alarm found the tick stale (engine coroutines died while the process
+                // lived). Re-arm the matchers, which relaunches the tick loop.
+                if (EngineHeartbeat.isStale()) {
+                    EngineHeartbeat.markRearm()
+                    reloadProfiles()
+                }
+            } else {
+                reloadProfiles()
+                if (!autoStartDone) {
+                    autoStartDone = true
+                    runAutoStartTasks()
+                }
+                if (bootCompletedTrigger) {
+                    BootContextEvents.publishBootCompleted()
+                }
             }
         }
         return START_STICKY
@@ -203,8 +165,6 @@ class AutomationService : Service() {
 
     override fun onTimeout(startId: Int, fgsType: Int) {
         AppLogger.warn(TAG, "Foreground service timeout (startId=$startId, fgsType=$fgsType); stopping cleanly")
-        engineHeartbeatStore.recordStopped()
-        timeEventScheduler.scheduleRecovery()
         scope.launch {
             val entry = com.opentasker.core.storage.RunLogEntity(
                 taskId = 0,
@@ -231,91 +191,89 @@ class AutomationService : Service() {
         profileCooldowns.clear()
         profileTaskJobs.clear()
         queuedProfileTasks.clear()
-        engineHeartbeatStore.recordStopped()
+        timeEventScheduler.cancel()
+        wifiNetworkMonitor.stop()
+        connectivityMonitor.stop()
+        appUsageMonitor.stop()
+        shakeDetector.stop()
+        orientationDetector.stop()
+        foldDetector.stop()
+        hardwareKeyListener.stop()
+        runCatching { unregisterReceiver(PackageContextEvents.receiver) }
+        runCatching { unregisterReceiver(BluetoothContextEvents.receiver) }
+        CameraMicContextEvents.stop(this)
         PluginConditionSubscriptions.clear()
+        BroadcastContextEvents.stop(this)
+        shakeOn = false
+        orientationOn = false
+        foldOn = false
+        appUsageOn = false
+        isRunning = false
         job.cancel()
-        logContextMonitorTransition(contextMonitorLifecycle.stopAll())
         super.onDestroy()
     }
 
-    private suspend fun reloadProfiles() = profileReloadMutex.withLock {
+    private suspend fun reloadProfiles() {
         val oldJobs = matcherJobs.values.toList()
         matcherJobs.clear()
         matchers.clear()
         oldJobs.forEach { it.cancel() }
-        oldJobs.joinAll()
 
-        val profileEntities = db.profileDao().getAllEnabled()
-        val profiles = profileEntities.mapNotNull { entity ->
-            val decoded = entity.toDomainDecodeResult()
-            decoded.issue?.let { issue ->
-                AppLogger.error(
-                    TAG,
-                    "Profile ${entity.id} is corrupt and was not registered: ${issue.message}",
-                )
-                return@mapNotNull null
-            }
-            decoded.value
-        }
+        val profiles = db.profileDao().getAllEnabled()
         val activeIds = profiles.map { it.id }.toSet()
         cooldownStore.pruneDeleted(activeIds)
         synchronized(queuedProfileTasks) {
             queuedProfileTasks.keys.removeAll { it !in activeIds }
         }
-        registerPluginSubscriptions(profiles)
-        for (domain in profiles) {
+        val domains = profiles.map { it.toDomain() }
+        registerPluginSubscriptions(domains)
+        // Keep the broadcast (Intent Received) receiver listening for exactly the actions in use.
+        val broadcastActions = domains
+            .flatMap { it.contexts }
+            .filter { it.type == ContextType.EVENT && it.config["event"]?.trim().equals("broadcast", ignoreCase = true) }
+            .flatMap { (it.config["action"] ?: it.config["actions"] ?: "").split(",") }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toSet()
+        BroadcastContextEvents.setActions(this, broadcastActions)
+        applyContextSourceGating(domains)
+        for (domain in domains) {
             val matcher = ProfileMatcher(this, domain)
 
-            val matcherJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                try {
-                    matcher.stateChanges().collect { change ->
-                        try {
-                            when (change) {
-                                is ProfileStateChange.Activated -> onProfileActivated(domain)
-                                is ProfileStateChange.Deactivated -> onProfileDeactivated(domain)
+            val matcherJob = scope.launch {
+                // Self-healing: if a matcher's flow ever errors, re-collect after a short backoff
+                // instead of dying permanently. A dead matcher used to freeze the clock/battery tick and
+                // the 電池線 charging state for hours; now it recovers within seconds, independent of the
+                // alarm re-arm. (A clean completion — e.g. a profile with no contexts — just stops.)
+                while (isActive) {
+                    val errored = try {
+                        matcher.stateChanges().collect { change ->
+                            try {
+                                when (change) {
+                                    is ProfileStateChange.Activated -> onProfileActivated(domain, change.vars)
+                                    is ProfileStateChange.Deactivated -> onProfileDeactivated(domain)
+                                }
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                android.util.Log.e("OpenTasker", "Failed handling state change for ${domain.name}", e)
                             }
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            AppLogger.error(TAG, "Failed handling state change for ${domain.name}", e)
-                            recordMatcherError("Failed handling state change for ${domain.name}", e)
                         }
+                        false
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        android.util.Log.e("OpenTasker", "Profile matcher errored for ${domain.name}; restarting", e)
+                        EngineHeartbeat.markMatcherRestart(domain.name)
+                        true
                     }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    AppLogger.error(TAG, "Profile matcher stopped for ${domain.name}", e)
-                    recordMatcherError("Profile matcher stopped for ${domain.name}", e)
+                    if (!errored) break
+                    if (isActive) delay(3_000)
                 }
             }
             
             matcherJobs[domain.id] = matcherJob
             matchers[domain.id] = matcher
-        }
-        val subscriptionsReady = withTimeoutOrNull(MONITOR_SUBSCRIPTION_TIMEOUT_MS) {
-            matchers.values.toList().forEach { it.awaitMonitorSubscriptions() }
-            true
-        } == true
-        if (!subscriptionsReady) {
-            AppLogger.warn(TAG, "Context monitor subscription barrier timed out; starting required sources in degraded mode")
-        }
-        logContextMonitorTransition(contextMonitorLifecycle.reconcile(profiles))
-        engineLoaded = true
-    }
-
-    private fun logContextMonitorTransition(transition: ContextMonitorTransition) {
-        val counts = contextMonitorLifecycle.currentReferenceCounts()
-        transition.started.forEach { monitor ->
-            AppLogger.info(TAG, "Context monitor $monitor started for ${counts.getOrDefault(monitor, 0)} enabled profile(s)")
-        }
-        transition.stopped.forEach { monitor ->
-            AppLogger.info(TAG, "Context monitor $monitor stopped after its final enabled profile was removed")
-        }
-        transition.failedToStart.forEach { monitor ->
-            AppLogger.warn(TAG, "Context monitor $monitor could not start; it will retry on the next profile reconcile")
-        }
-        transition.failedToStop.forEach { monitor ->
-            AppLogger.warn(TAG, "Context monitor $monitor could not stop cleanly")
         }
     }
 
@@ -336,42 +294,41 @@ class AutomationService : Service() {
         PluginConditionSubscriptions.replaceAll(subs)
     }
 
-    private suspend fun onProfileActivated(profile: com.opentasker.core.model.Profile) {
-        if (profile.enterTaskId <= 0) return
+    /**
+     * Resolve a profile's task by NAME first (survives bundle re-imports that re-id tasks), with the id
+     * as the fallback. A rename leaves the stored name stale → the name misses → the id fallback still
+     * works; a re-import re-ids the task → the id is stale → the name still resolves it.
+     */
+    private suspend fun resolveTask(name: String, fallbackId: Long): com.opentasker.core.model.Task? {
+        val entity = (if (name.isNotBlank()) db.taskDao().getByName(name) else null)
+            ?: (if (fallbackId > 0) db.taskDao().getById(fallbackId) else null)
+        return entity?.toDomain()
+    }
 
-        val task = db.taskDao().getById(profile.enterTaskId)
-        if (task == null) {
-            AppLogger.warn(TAG, "Enter task ${profile.enterTaskId} not found for profile ${profile.name}")
+    private suspend fun onProfileActivated(profile: com.opentasker.core.model.Profile, eventVars: Map<String, String>) {
+        if (profile.enterTaskName.isBlank() && profile.enterTaskId <= 0) return
+        val domain = resolveTask(profile.enterTaskName, profile.enterTaskId)
+        if (domain == null) {
+            android.util.Log.w("OpenTasker", "Enter task not found for profile ${profile.name} (name='${profile.enterTaskName}', id=${profile.enterTaskId})")
             return
         }
-        val decoded = task.toDomainDecodeResult()
-        if (decoded.issue != null) {
-            AppLogger.error(TAG, "Enter task ${profile.enterTaskId} is corrupt for profile ${profile.name}: ${decoded.issue.message}")
-            logProfileSkippedRun(profile, decoded.value, "Enter task data is corrupt (${decoded.issue.fieldName}); recover it before it can run.")
-            return
-        }
-        dispatchTask(profile, decoded.value)
+        dispatchTask(profile, domain, eventVars)
     }
 
     private suspend fun onProfileDeactivated(profile: com.opentasker.core.model.Profile) {
-        if (profile.exitTaskId == null || profile.exitTaskId <= 0) return
-        val task = db.taskDao().getById(profile.exitTaskId)
-        if (task == null) {
-            AppLogger.warn(TAG, "Exit task ${profile.exitTaskId} not found for profile ${profile.name}")
+        if (profile.exitTaskName.isBlank() && (profile.exitTaskId == null || profile.exitTaskId <= 0)) return
+        val domain = resolveTask(profile.exitTaskName, profile.exitTaskId ?: 0L)
+        if (domain == null) {
+            android.util.Log.w("OpenTasker", "Exit task not found for profile ${profile.name} (name='${profile.exitTaskName}', id=${profile.exitTaskId})")
             return
         }
-        val decoded = task.toDomainDecodeResult()
-        if (decoded.issue != null) {
-            AppLogger.error(TAG, "Exit task ${profile.exitTaskId} is corrupt for profile ${profile.name}: ${decoded.issue.message}")
-            logProfileSkippedRun(profile, decoded.value, "Exit task data is corrupt (${decoded.issue.fieldName}); recover it before it can run.")
-            return
-        }
-        dispatchTask(profile, decoded.value)
+        dispatchTask(profile, domain, emptyMap())
     }
 
     private fun dispatchTask(
         profile: Profile,
         task: Task,
+        eventVars: Map<String, String>,
     ) {
         when (profile.automationMode) {
             AutomationMode.SINGLE -> {
@@ -385,7 +342,7 @@ class AutomationService : Service() {
                     logCooldownSkip(profile, task, reservation.remainingMs)
                     return
                 }
-                profileTaskJobs[profile.id] = launchTrackedTask(profile, task)
+                profileTaskJobs[profile.id] = launchTrackedTask(profile, task, eventVars)
             }
 
             AutomationMode.RESTART -> {
@@ -395,7 +352,7 @@ class AutomationService : Service() {
                     return
                 }
                 profileTaskJobs[profile.id]?.cancel()
-                profileTaskJobs[profile.id] = launchTrackedTask(profile, task)
+                profileTaskJobs[profile.id] = launchTrackedTask(profile, task, eventVars)
             }
 
             AutomationMode.QUEUED -> {
@@ -412,12 +369,12 @@ class AutomationService : Service() {
                             logProfileSkippedRun(profile, task, "Task queue is full ($MAX_QUEUED_TASKS pending).")
                             return
                         }
-                        queue.add(task)
+                        queue.add(QueuedRun(task, eventVars))
                     }
                     AppLogger.info(TAG, "Profile ${profile.id} queued retrigger")
                     return
                 }
-                profileTaskJobs[profile.id] = launchQueuedTasks(profile, task)
+                profileTaskJobs[profile.id] = launchQueuedTasks(profile, task, eventVars)
             }
 
             AutomationMode.PARALLEL -> {
@@ -426,16 +383,16 @@ class AutomationService : Service() {
                     logCooldownSkip(profile, task, reservation.remainingMs)
                     return
                 }
-                scope.launch { runTask(task, profile) }
+                scope.launch { runTask(task, profile, eventVars) }
             }
         }
     }
 
-    private fun launchTrackedTask(profile: Profile, task: Task): Job =
+    private fun launchTrackedTask(profile: Profile, task: Task, eventVars: Map<String, String>): Job =
         scope.launch(start = CoroutineStart.DEFAULT) {
             val thisJob = currentCoroutineContext()[Job]
             try {
-                runTask(task, profile)
+                runTask(task, profile, eventVars)
             } finally {
                 synchronized(profileTaskJobs) {
                     if (profileTaskJobs[profile.id] == thisJob) {
@@ -445,14 +402,15 @@ class AutomationService : Service() {
             }
         }
 
-    private fun launchQueuedTasks(profile: Profile, firstTask: Task): Job =
+    private fun launchQueuedTasks(profile: Profile, firstTask: Task, firstEventVars: Map<String, String>): Job =
         scope.launch(start = CoroutineStart.DEFAULT) {
             val thisJob = currentCoroutineContext()[Job]
-            var nextTask: Task? = firstTask
+            var nextRun: QueuedRun? = QueuedRun(firstTask, firstEventVars)
             try {
-                while (isActive && nextTask != null) {
-                    runTask(requireNotNull(nextTask), profile)
-                    nextTask = synchronized(queuedProfileTasks) {
+                while (isActive && nextRun != null) {
+                    val run = requireNotNull(nextRun)
+                    runTask(run.task, profile, run.eventVars)
+                    nextRun = synchronized(queuedProfileTasks) {
                         queuedProfileTasks[profile.id]?.poll()?.also {
                             if (queuedProfileTasks[profile.id]?.isEmpty() == true) {
                                 queuedProfileTasks.remove(profile.id)
@@ -472,6 +430,7 @@ class AutomationService : Service() {
     private suspend fun runTask(
         task: Task,
         profile: Profile,
+        eventVars: Map<String, String> = emptyMap(),
     ) {
         val result = executeAndLogTask(
             appContext = this,
@@ -479,7 +438,7 @@ class AutomationService : Service() {
             task = task,
             source = "Profile: ${profile.name}",
             metadata = profileRunMetadata(profile),
-            audioForegroundService = audioForegroundServiceEligibility,
+            eventLocals = eventVars,
         )
         if (result.logInserted) {
             pruneRunLogs(force = false)
@@ -553,9 +512,42 @@ class AutomationService : Service() {
         return if (seconds == 1L) "1 second" else "$seconds seconds"
     }
 
+    /** Run the user's configured auto-start tasks once per process (after a fresh start / resurrect),
+     *  so overlays and state come back without manually running the master "起動" task. */
+    private fun runAutoStartTasks() {
+        scope.launch {
+            delay(2_000) // let the engine + context sources settle before re-establishing state
+            for (id in AutoStartSettings.taskIds(this@AutomationService)) {
+                val task = db.taskDao().getById(id)?.toDomain() ?: continue
+                runCatching { executeAndLogTask(this@AutomationService, db, task, source = "Auto-start") }
+            }
+        }
+    }
+
+    /** Start each sensor/usage monitor ONLY while an enabled profile actually uses it. Shake &
+     *  orientation are accelerometer listeners; app-foreground is a 2-second usage poll — running them
+     *  for the whole service life kept the CPU busy and blocked deep sleep even when nothing used them.
+     *  Transition-guarded (the flags) so we never double-register a sensor listener. */
+    private fun applyContextSourceGating(domains: List<Profile>) {
+        val contexts = domains.flatMap { it.contexts }
+        fun usesEvent(key: String) = contexts.any {
+            it.type == ContextType.EVENT && it.config["event"]?.trim().equals(key, ignoreCase = true)
+        }
+        val needShake = usesEvent("shake")
+        val needOrientation = usesEvent("orientation")
+        val needFold = usesEvent("fold")
+        // AppUsageMonitor drives BOTH the APPLICATION context type (音楽端灯・前面) AND the "app_foreground"
+        // EVENT (通知明滅・前面) — gate on either, or the foreground-clear profile silently stops.
+        val needApp = contexts.any { it.type == ContextType.APPLICATION } || usesEvent("app_foreground")
+        if (needShake != shakeOn) { if (needShake) shakeDetector.start() else shakeDetector.stop(); shakeOn = needShake }
+        if (needOrientation != orientationOn) { if (needOrientation) orientationDetector.start() else orientationDetector.stop(); orientationOn = needOrientation }
+        if (needFold != foldOn) { if (needFold) foldDetector.start() else foldDetector.stop(); foldOn = needFold }
+        if (needApp != appUsageOn) { if (needApp) appUsageMonitor.start(scope) else appUsageMonitor.stop(); appUsageOn = needApp }
+    }
+
     private fun startForegroundCompat() {
         val nm = getSystemService(NotificationManager::class.java)
-        val channel = NotificationChannel(CHANNEL, "OpenTasker engine", NotificationManager.IMPORTANCE_MIN)
+        val channel = NotificationChannel(CHANNEL, "白い熊 自由作業盤 engine", NotificationManager.IMPORTANCE_MIN)
         nm.createNotificationChannel(channel)
         val pendingIntent = PendingIntent.getActivity(
             this,
@@ -564,19 +556,17 @@ class AutomationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val n: Notification = NotificationCompat.Builder(this, CHANNEL)
-            .setContentTitle("OpenTasker is running")
+            .setContentTitle("白い熊 自由作業盤 is running")
             .setContentText("Tap to open automation status")
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .build()
-        val activeTypes = foregroundServiceTypes()
         if (Build.VERSION.SDK_INT >= 34) {
-            startForeground(NOTIF_ID, n, activeTypes)
+            startForeground(NOTIF_ID, n, foregroundServiceTypes())
         } else {
             startForeground(NOTIF_ID, n)
         }
-        engineHeartbeatStore.recordAlive(foregroundServiceTypes = activeTypes)
     }
 
     private fun foregroundServiceTypes(): Int {
@@ -606,46 +596,37 @@ class AutomationService : Service() {
     private fun hasPermission(permission: String): Boolean =
         ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
-    private fun recordMatcherError(message: String, error: Throwable) {
-        val detail = error.message?.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty()
-        engineHeartbeatStore.recordMatcherError(message + detail)
-    }
-
     companion object {
         private const val TAG = "AutomationService"
         const val ACTION_BOOT_COMPLETED_TRIGGER = "com.opentasker.action.BOOT_COMPLETED_TRIGGER"
-        const val ACTION_TIME_TICK_TRIGGER = "com.opentasker.action.TIME_TICK_TRIGGER"
+        const val ACTION_REARM = "com.opentasker.action.ENGINE_REARM"
+        /** Set by MainActivity when it (re)starts the engine from a visible UI — upstream uses this to
+         *  promote audio-action eligibility (Android 17 hardening); accepted here for compatibility. */
         const val EXTRA_STARTED_FROM_VISIBLE_UI = "com.opentasker.extra.STARTED_FROM_VISIBLE_UI"
         private const val CHANNEL = "opentasker.engine"
         private const val NOTIF_ID = 1001
         private const val MAX_QUEUED_TASKS = 50
-        private const val MONITOR_SUBSCRIPTION_TIMEOUT_MS = 2_000L
-        private const val ENGINE_HEARTBEAT_INTERVAL_MS = 60_000L
+
+        /** True while the engine service is alive in this process — lets the per-minute tick resurrect it if EMUI reaped it. */
+        @Volatile
+        var isRunning = false
+            private set
+
+        /** (Re)start the foreground engine service. Safe to call when it is already running. */
+        fun start(context: Context) {
+            ContextCompat.startForegroundService(context, Intent(context, AutomationService::class.java))
+        }
+
+        /** Ask a running engine to re-arm its matchers — used by the heartbeat when the tick went stale. */
+        fun rearm(context: Context) {
+            ContextCompat.startForegroundService(
+                context,
+                Intent(context, AutomationService::class.java).setAction(ACTION_REARM),
+            )
+        }
         private val RUN_LOG_PRUNE_INTERVAL_MS = TimeUnit.HOURS.toMillis(1)
     }
 }
-
-/**
- * Reconcile signature for the running profile registry. Two profile-table snapshots produce the
- * same signature when nothing the engine depends on has changed, so purely cosmetic edits (name,
- * group) do not thrash matcher rebuilds while enable/disable, context, task-wiring, mode, and
- * cooldown changes do. Disabled profiles are excluded because the engine only runs enabled ones.
- */
-internal fun profileRegistrySignature(profiles: List<ProfileEntity>): List<String> =
-    profiles.asSequence()
-        .filter { it.enabled && !it.requiresRiskAcknowledgement }
-        .sortedBy { it.id }
-        .map { p ->
-            listOf(
-                p.id,
-                p.enterTaskId,
-                p.exitTaskId,
-                p.cooldownSec,
-                p.automationMode,
-                p.contextsJson,
-            ).joinToString("|")
-        }
-        .toList()
 
 private data class CooldownReservation(
     val accepted: Boolean,

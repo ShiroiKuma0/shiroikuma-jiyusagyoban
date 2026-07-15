@@ -23,7 +23,7 @@ class ProfileMatcherTest {
         ).toList()
 
         assertEquals(
-            listOf(ProfileStateChange.Activated, ProfileStateChange.Activated),
+            listOf(ProfileStateChange.Activated(), ProfileStateChange.Activated()),
             changes,
         )
     }
@@ -40,7 +40,7 @@ class ProfileMatcherTest {
             hasPulseContexts = true,
         ).toList()
 
-        assertEquals(listOf(ProfileStateChange.Activated), changes)
+        assertEquals(listOf(ProfileStateChange.Activated()), changes)
     }
 
     @Test
@@ -56,7 +56,7 @@ class ProfileMatcherTest {
         ).toList()
 
         assertEquals(
-            listOf(ProfileStateChange.Activated, ProfileStateChange.Deactivated),
+            listOf(ProfileStateChange.Activated(), ProfileStateChange.Deactivated),
             changes,
         )
     }
