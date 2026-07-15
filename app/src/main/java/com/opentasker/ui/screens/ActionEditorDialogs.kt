@@ -73,6 +73,7 @@ internal fun ActionPickerDialog(
 ) {
     val localizedActions = mutableListOf<LocalizedActionMetadata>()
     for (metadata in ActionMetadataRegistry.all()) {
+        if (!metadata.pickerVisible) continue
         localizedActions += LocalizedActionMetadata(
             metadata = metadata,
             name = stringResource(metadata.nameRes),

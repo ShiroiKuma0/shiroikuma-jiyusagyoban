@@ -14,6 +14,7 @@ import com.opentasker.core.actions.DownloadAction
 import com.opentasker.core.actions.GoHomeAction
 import com.opentasker.core.actions.HttpGetAction
 import com.opentasker.core.actions.HttpPostAction
+import com.opentasker.core.actions.HttpRequestAction
 import com.opentasker.core.actions.KillAppAction
 import com.opentasker.core.actions.LaunchAppAction
 import com.opentasker.core.actions.LaunchIntentAction
@@ -115,6 +116,7 @@ private fun registerBuiltInActions() {
         AppendFileAction(),
         DeleteFileAction(),
         ListFilesAction(),
+        HttpRequestAction(),
         HttpGetAction(),
         HttpPostAction(),
         PingAction(),

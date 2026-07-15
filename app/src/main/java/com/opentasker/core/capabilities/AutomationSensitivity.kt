@@ -77,6 +77,7 @@ object AutomationSensitivityRegistry {
         "app.launch",
         "url.open",
         "sms.send",
+        "http.request",
         "http.get",
         "http.post",
         "ping",

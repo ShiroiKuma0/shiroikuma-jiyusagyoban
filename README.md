@@ -36,14 +36,14 @@
 - FOSS platform location/geofence — GPS/network fixes, balanced provider cadence, radius/accuracy/dwell evaluation, persisted dwell state, and API 36 background delivery evidence
 - Locale/Tasker condition plugins — polled as first-class context predicates with last-known-state caching
 
-### Actions (58 registered + 7 engine-handled)
+### Actions (59 registered + 7 engine-handled)
 
 | Category | Count | Examples |
 |----------|------:|---------|
 | Settings | 11 | Wi-Fi, Bluetooth, brightness, volume, airplane, mobile data, screen timeout, DND, ringer mode, torch, tile state |
 | App | 7 | launch intent, launch app, kill, go home, open URL, SMS, screenshot |
 | File | 5 | read, write, append, delete, list |
-| Network | 5 | HTTP GET/POST, ping, download, Wake-on-LAN |
+| Network | 6 | HTTP Request, legacy GET/POST aliases, ping, download, Wake-on-LAN |
 | Media | 6 | play, stop, pause, next, previous, mute |
 | System | 6 | vibrate, reboot, lock, screen off, wake, log |
 | Notification | 3 | notify/toast, cancel, TTS speak |
@@ -54,6 +54,8 @@
 | Import | 1 | unsupported Tasker action placeholder |
 
 Privileged actions (airplane, mobile data, screenshot, reboot, screen off) are gated to fail honestly. SMS is available in standard/F-Droid builds; Play builds omit SMS/phone-state permissions.
+
+New automations use **HTTP Request** for GET, HEAD, POST, PUT, PATCH, DELETE, and OPTIONS. It accepts structured query/header lines, inline or OpenTasker-file request bodies, per-stage timeouts, status/header/body variables, and atomic file output. Redirects default off and can be enabled only for the same origin; TLS verification cannot be disabled, cleartext remains private-LAN-only, and response/request sizes are bounded. Stored `http.get` and `http.post` actions continue to execute through compatibility aliases. Put credentials in Keystore-backed secret variables and reference them from Authorization or header fields so traces remain redacted.
 
 ### Reliability and observability
 

@@ -578,8 +578,11 @@ private fun isSensitiveArgName(argName: String): Boolean =
 private val SENSITIVE_ARG_TOKENS = listOf(
     "authorization",
     "cookie",
+    "body",
+    "headers",
     "key",
     "password",
+    "query",
     "secret",
     "token",
 )

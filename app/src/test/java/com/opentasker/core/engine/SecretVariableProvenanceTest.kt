@@ -14,6 +14,34 @@ import org.junit.Test
 
 class SecretVariableProvenanceTest {
     @Test
+    fun structuredHttpHeadersAreAlwaysRedactedFromTraceSummaries() = runBlocking {
+        val actionId = "test.http.headers"
+        ActionRegistry.register(
+            object : Action {
+                override val id = actionId
+                override val category = ActionCategory.NET
+                override suspend fun run(ctx: ActionContext, args: Map<String, String>) = ActionResult.Success
+            },
+        )
+        val variables = VariableStore().apply { seedGlobals(mapOf("TOKEN" to "literal-secret")) }
+        val report = TaskRunner(ActionContext(ContextWrapper(null), variables)).run(
+            Task(
+                name = "Header redaction",
+                actions = listOf(
+                    ActionSpec(
+                        type = actionId,
+                        args = mapOf("headers" to "Authorization: Bearer {{ global.TOKEN }}"),
+                    ),
+                ),
+            ),
+        )
+
+        val runLog = report.traces.toRunLogMessage()
+        assertTrue(runLog.contains("headers=<redacted>"))
+        assertFalse(runLog.contains("literal-secret"))
+    }
+
+    @Test
     fun legacyExpansionRedactsNonsensitiveArgumentAndTaintsDerivedOutput() = runBlocking {
         val actionId = "test.secret.legacy"
         ActionRegistry.register(capturingAction(actionId))

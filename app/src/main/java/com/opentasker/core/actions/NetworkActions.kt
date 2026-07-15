@@ -20,100 +20,6 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
 /**
- * HTTP GET request.
- *
- * Args:
- *   - "url": request URL
- *   - "var": variable to store response
- *   - "timeout_sec": optional request timeout
- */
-class HttpGetAction : Action {
-    override val id = "http.get"
-    override val category = ActionCategory.NET
-
-    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val url = args["url"] ?: return ActionResult.Failure("missing url")
-        val varName = args["var"] ?: args["variable"] ?: "result"
-        val timeout = (args["timeout_sec"]?.toIntOrNull() ?: 10).coerceIn(1, 60) * 1000
-        return try {
-            val parsedUrl = URL(url)
-            enforceHttpPolicy(parsedUrl, args)?.let { return it }
-            if (urlTargetsLocalNetwork(parsedUrl)) checkLocalNetworkPermission(ctx)?.let { return it }
-            val connection = parsedUrl.openConnection() as HttpURLConnection
-            try {
-                val response = connection.apply {
-                    connectTimeout = timeout
-                    readTimeout = timeout
-                    requestMethod = "GET"
-                    instanceFollowRedirects = false
-                }.getInputStream().readBounded(MAX_RESPONSE_BYTES)
-                ctx.variables.set(varName, response)
-                ctx.logger("HTTP GET ${parsedUrl.host} to \$$varName")
-                ActionResult.Success
-            } finally {
-                connection.disconnect()
-            }
-        } catch (e: Exception) {
-            ActionResult.Failure("request failed: ${e.message}")
-        }
-    }
-}
-
-/**
- * HTTP POST request.
- *
- * Args:
- *   - "url": request URL
- *   - "data": POST body
- *   - "var": variable to store response
- */
-class HttpPostAction : Action {
-    override val id = "http.post"
-    override val category = ActionCategory.NET
-
-    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val url = args["url"] ?: return ActionResult.Failure("missing url")
-        val data = args["data"] ?: args["body"] ?: ""
-        val varName = args["var"] ?: args["variable"] ?: "result"
-        val timeout = (args["timeout_sec"]?.toIntOrNull() ?: 10).coerceIn(1, 60) * 1000
-        return try {
-            val parsedUrl = URL(url)
-            enforceHttpPolicy(parsedUrl, args)?.let { return it }
-            if (urlTargetsLocalNetwork(parsedUrl)) checkLocalNetworkPermission(ctx)?.let { return it }
-            val payload = data.toByteArray(Charsets.UTF_8)
-            if (payload.size > MAX_REQUEST_BODY_BYTES) {
-                return ActionResult.Failure(
-                    "POST body exceeds ${MAX_REQUEST_BODY_BYTES / 1024} KB limit"
-                )
-            }
-            val connection = parsedUrl.openConnection() as HttpURLConnection
-            try {
-                val response = connection.apply {
-                    connectTimeout = timeout
-                    readTimeout = timeout
-                    requestMethod = "POST"
-                    instanceFollowRedirects = false
-                    doOutput = true
-                    setFixedLengthStreamingMode(payload.size.toLong())
-                    setRequestProperty("Content-Type", args["content_type"] ?: "text/plain; charset=utf-8")
-                }.run {
-                    outputStream.use { it.write(payload) }
-                    val stream = if (responseCode in 200..299) inputStream else errorStream
-                    stream?.readBounded(MAX_RESPONSE_BYTES).orEmpty()
-                }
-                ctx.variables.set(varName, response)
-                ctx.logger("HTTP POST ${parsedUrl.host} to \$$varName")
-                ActionResult.Success
-            } finally {
-                connection.disconnect()
-            }
-        } catch (e: Exception) {
-            ActionResult.Failure("request failed: ${e.message}")
-        }
-    }
-}
-
-/**
  * Ping a host (check connectivity).
  *
  * Args:
@@ -259,7 +165,6 @@ class WakeOnLanAction : Action {
     }
 }
 
-private const val MAX_REQUEST_BODY_BYTES = 1_048_576L // 1 MB for POST request bodies
 private const val MAX_RESPONSE_BYTES = 1_048_576L // 1 MB for in-memory response variables
 private const val MAX_DOWNLOAD_BYTES = 52_428_800L // 50 MB for file downloads
 
@@ -317,7 +222,7 @@ private fun replaceFile(source: File, destination: File) {
     }
 }
 
-private fun enforceHttpPolicy(url: URL, args: Map<String, String>): ActionResult? {
+internal fun enforceHttpPolicy(url: URL, args: Map<String, String>): ActionResult? {
     if (url.protocol == "https") return null
     if (url.protocol != "http") return ActionResult.Failure("unsupported protocol: ${url.protocol}")
     val allowHttp = args["allow_http"]?.lowercase() == "true"
@@ -326,11 +231,11 @@ private fun enforceHttpPolicy(url: URL, args: Map<String, String>): ActionResult
             "only https URLs are allowed; set allow_http=true for LAN/private-network hosts"
         )
     }
-    val addr = runCatching { InetAddress.getByName(url.host) }.getOrNull()
+    val addresses = runCatching { InetAddress.getAllByName(url.host).toList() }.getOrNull()
         ?: return ActionResult.Failure("cannot resolve host: ${url.host}")
-    if (!isPrivateOrLocalAddress(addr)) {
+    if (addresses.isEmpty() || addresses.any { !isPrivateOrLocalAddress(it) }) {
         return ActionResult.Failure(
-            "HTTP is only allowed for private/LAN addresses (${url.host} resolved to a public address)"
+            "HTTP is only allowed when every resolved address for ${url.host} is private/LAN"
         )
     }
     return null
@@ -353,8 +258,8 @@ internal fun isPrivateOrLocalAddress(addr: InetAddress): Boolean {
 
 internal fun urlTargetsLocalNetwork(url: URL): Boolean {
     if (url.protocol != "http" && url.protocol != "https") return false
-    val addr = runCatching { InetAddress.getByName(url.host) }.getOrNull() ?: return false
-    return isPrivateOrLocalAddress(addr)
+    val addresses = runCatching { InetAddress.getAllByName(url.host).toList() }.getOrNull() ?: return false
+    return addresses.any(::isPrivateOrLocalAddress)
 }
 
 internal fun checkLocalNetworkPermission(ctx: ActionContext): ActionResult? {

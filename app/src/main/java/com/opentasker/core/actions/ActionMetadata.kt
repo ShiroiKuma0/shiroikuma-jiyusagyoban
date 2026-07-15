@@ -30,6 +30,7 @@ data class ActionMetadata(
     @get:StringRes val descriptionRes: Int,
     @get:StringRes val categoryRes: Int,
     val fields: List<ActionField> = emptyList(),
+    val pickerVisible: Boolean = true,
 )
 
 /**
@@ -697,6 +698,37 @@ fun registerActionMetadata() {
     // Network actions
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "http.request",
+            nameRes = R.string.catalog_action_http_request_name,
+            descriptionRes = R.string.catalog_action_http_request_description,
+            categoryRes = R.string.catalog_category_network,
+            fields = listOf(
+                ActionField("method", R.string.catalog_action_http_request_field_method_label, hintRes = R.string.catalog_action_http_request_field_method_hint),
+                ActionField("url", R.string.catalog_action_http_request_field_url_label, required = true),
+                ActionField("query", R.string.catalog_action_http_request_field_query_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_http_request_field_query_hint),
+                ActionField("headers", R.string.catalog_action_http_request_field_headers_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_http_request_field_headers_hint),
+                ActionField("authorization", R.string.catalog_action_http_request_field_authorization_label, hintRes = R.string.catalog_action_http_request_field_authorization_hint),
+                ActionField("body", R.string.catalog_action_http_request_field_body_label, FieldType.MULTILINE),
+                ActionField("body_file", R.string.catalog_action_http_request_field_body_file_label, hintRes = R.string.catalog_action_http_request_field_body_file_hint),
+                ActionField("content_type", R.string.catalog_action_http_request_field_content_type_label, hintRes = R.string.catalog_action_http_request_field_content_type_hint),
+                ActionField("response_var", R.string.catalog_action_http_request_field_response_var_label, hintRes = R.string.catalog_action_http_request_field_response_var_hint),
+                ActionField("status_var", R.string.catalog_action_http_request_field_status_var_label, hintRes = R.string.catalog_action_http_request_field_status_var_hint),
+                ActionField("headers_var", R.string.catalog_action_http_request_field_headers_var_label, hintRes = R.string.catalog_action_http_request_field_headers_var_hint),
+                ActionField("output_file", R.string.catalog_action_http_request_field_output_file_label, hintRes = R.string.catalog_action_http_request_field_output_file_hint),
+                ActionField("max_response_bytes", R.string.catalog_action_http_request_field_max_response_bytes_label, FieldType.NUMBER, hintRes = R.string.catalog_action_http_request_field_max_response_bytes_hint),
+                ActionField("redirects", R.string.catalog_action_http_request_field_redirects_label, hintRes = R.string.catalog_action_http_request_field_redirects_hint),
+                ActionField("allow_http", R.string.catalog_action_http_request_field_allow_http_label, FieldType.CHECKBOX, hintRes = R.string.catalog_action_http_request_field_allow_http_hint),
+                ActionField("timeout_sec", R.string.catalog_action_http_request_field_timeout_label, FieldType.NUMBER, hintRes = R.string.catalog_action_http_request_field_timeout_hint),
+                ActionField("connect_timeout_sec", R.string.catalog_action_http_request_field_connect_timeout_label, FieldType.NUMBER),
+                ActionField("read_timeout_sec", R.string.catalog_action_http_request_field_read_timeout_label, FieldType.NUMBER),
+                ActionField("write_timeout_sec", R.string.catalog_action_http_request_field_write_timeout_label, FieldType.NUMBER),
+                ActionField("call_timeout_sec", R.string.catalog_action_http_request_field_call_timeout_label, FieldType.NUMBER),
+            ),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "http.get",
             nameRes = R.string.catalog_action_http_get_name,
             descriptionRes = R.string.catalog_action_http_get_description,
@@ -705,7 +737,8 @@ fun registerActionMetadata() {
                 ActionField("url", R.string.catalog_action_http_get_field_url_label, required = true),
                 ActionField("var", R.string.catalog_action_http_get_field_var_label, hintRes = R.string.catalog_action_http_get_field_var_hint),
                 ActionField("allow_http", R.string.catalog_action_http_get_field_allow_http_label, FieldType.CHECKBOX, hintRes = R.string.catalog_action_http_get_field_allow_http_hint),
-            )
+            ),
+            pickerVisible = false,
         )
     )
 
@@ -720,7 +753,8 @@ fun registerActionMetadata() {
                 ActionField("data", R.string.catalog_action_http_post_field_data_label, FieldType.MULTILINE),
                 ActionField("var", R.string.catalog_action_http_post_field_var_label, hintRes = R.string.catalog_action_http_post_field_var_hint),
                 ActionField("allow_http", R.string.catalog_action_http_post_field_allow_http_label, FieldType.CHECKBOX, hintRes = R.string.catalog_action_http_post_field_allow_http_hint),
-            )
+            ),
+            pickerVisible = false,
         )
     )
 

@@ -48,6 +48,13 @@ class RuntimeRegistriesTest {
         assertFieldKeys("file.write", "path", "text")
         assertFieldKeys("file.append", "path", "text")
         assertFieldKeys("file.list", "path", "var", "pattern")
+        assertFieldKeys(
+            "http.request",
+            "method", "url", "query", "headers", "authorization", "body", "body_file", "content_type",
+            "response_var", "status_var", "headers_var", "output_file", "max_response_bytes", "redirects",
+            "allow_http", "timeout_sec", "connect_timeout_sec", "read_timeout_sec", "write_timeout_sec",
+            "call_timeout_sec",
+        )
         assertFieldKeys("http.get", "url", "var", "allow_http")
         assertFieldKeys("http.post", "url", "data", "var", "allow_http")
     }

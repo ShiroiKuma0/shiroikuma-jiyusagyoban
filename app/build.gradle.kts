@@ -139,11 +139,13 @@ dependencies {
     implementation(libs.kotlinx.collections.immutable)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.okhttp)
     implementation(libs.re2j)
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
 
     testImplementation(libs.junit)
+    testImplementation(libs.okhttp.mockwebserver)
     testImplementation("androidx.work:work-testing:2.11.2")
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)

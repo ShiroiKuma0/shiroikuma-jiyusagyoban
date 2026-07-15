@@ -54,6 +54,7 @@ class ReleaseTruthContractTest {
             assertDocTableValue(dependencyDoc, "Compose BOM", catalogVersion(versions, "composeBom"))
             assertDocTableValue(dependencyDoc, "Room", catalogVersion(versions, "room"))
             assertDocTableValue(dependencyDoc, "WorkManager", catalogVersion(versions, "work"))
+            assertDocTableValue(dependencyDoc, "OkHttp / MockWebServer", catalogVersion(versions, "okhttp"))
             assertDocTableValue(dependencyDoc, "Shizuku API / Provider", catalogVersion(versions, "shizuku"))
         }
 
