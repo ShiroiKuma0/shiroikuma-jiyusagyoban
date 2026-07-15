@@ -157,7 +157,7 @@ class TaskerXmlImporterTest {
         }.exceptionOrNull()
 
         assertTrue(error is IllegalArgumentException)
-        assertTrue(error!!.message.orEmpty().contains("size limit"))
+        assertTrue(error!!.message.orEmpty().contains("XML characters"))
     }
 
     @Test

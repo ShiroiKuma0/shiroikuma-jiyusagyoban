@@ -42,13 +42,15 @@ object TaskerXmlImporter {
         rawXml: String,
         appVersion: String,
         importedAtEpochMs: Long = System.currentTimeMillis(),
+    ): TaskerXmlImportReport = parse(rawXml, appVersion, importedAtEpochMs, ImportResourceBudget.Default)
+
+    internal fun parse(
+        rawXml: String,
+        appVersion: String,
+        importedAtEpochMs: Long,
+        budget: ImportResourceBudget,
     ): TaskerXmlImportReport {
-        require(rawXml.length <= MAX_TASKER_XML_CHARS) {
-            "Tasker XML exceeds ${MAX_TASKER_XML_CHARS / 1024 / 1024} MB size limit"
-        }
-        require(!DOCTYPE_PATTERN.containsMatchIn(rawXml)) {
-            "Tasker XML with DOCTYPE declarations is not supported"
-        }
+        ImportResourceGuard.requireXmlPreflight(rawXml, budget)
         val doc = parseDocument(rawXml)
         val warnings = mutableListOf<String>()
         val lossyWarnings = mutableListOf<String>()
@@ -72,6 +74,7 @@ object TaskerXmlImporter {
             name = "Tasker XML Import",
             description = "Converted from a Tasker XML export. Review warnings before enabling imported profiles.",
         )
+        ImportResourceGuard.requireBundle(bundle, budget)
         val mergedWarnings = (bundle.metadata.warnings + warnings + lossyWarnings).distinct()
         val reportBundle = bundle.copy(
             metadata = bundle.metadata.copy(warnings = mergedWarnings),
@@ -377,6 +380,4 @@ object TaskerXmlImporter {
     )
 
     const val TASKER_UNSUPPORTED_ACTION_ID = "tasker.unsupported"
-    private const val MAX_TASKER_XML_CHARS = 4 * 1024 * 1024
-    private val DOCTYPE_PATTERN = Regex("""<!\s*DOCTYPE\b""", RegexOption.IGNORE_CASE)
 }

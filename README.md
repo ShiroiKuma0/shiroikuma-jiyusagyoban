@@ -72,6 +72,8 @@ Privileged actions (airplane, mobile data, screenshot, reboot, screen off) are g
 - **Tasker XML import** — preview with migration/capability warnings, mapped and unsupported action reporting
 - **Profile sharing** — offline share manifests with safety findings and GitHub Discussions submission text
 
+Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON is capped at 16 Mi characters, 250,000 lexical tokens, and depth 64; Tasker XML is capped at 4 Mi characters, 100,000 nodes, and depth 64. Both formats share decoded limits of 5,000 top-level entities, 20,000 actions, 10,000 contexts, 10,000 scene elements, and 8 MiB of aggregate UTF-8 string data. A named budget violation aborts before the Room transaction.
+
 ### UI and theming
 
 - AMOLED-first Catppuccin Mocha (dark) and Latte (light) palettes, high contrast mode

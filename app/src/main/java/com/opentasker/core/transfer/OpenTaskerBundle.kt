@@ -110,18 +110,27 @@ object OpenTaskerBundleCodec {
     fun encode(bundle: OpenTaskerBundle): String = json.encodeToString(bundle)
 
     @Throws(SerializationException::class, IllegalArgumentException::class)
-    fun decode(rawJson: String): OpenTaskerBundle {
-        require(rawJson.length <= MAX_BUNDLE_JSON_CHARS) {
-            "Bundle JSON exceeds ${MAX_BUNDLE_JSON_CHARS / 1024 / 1024} MB size limit"
+    fun decode(rawJson: String): OpenTaskerBundle = decode(rawJson, ImportResourceBudget.Default)
+
+    internal fun decode(rawJson: String, budget: ImportResourceBudget): OpenTaskerBundle {
+        ImportResourceGuard.requireJsonPreflight(rawJson, budget)
+        return json.decodeFromString<OpenTaskerBundle>(rawJson).also { bundle ->
+            ImportResourceGuard.requireBundle(bundle, budget)
         }
-        return json.decodeFromString(rawJson)
     }
 
-    private const val MAX_BUNDLE_JSON_CHARS = 16 * 1024 * 1024
+    fun validate(bundle: OpenTaskerBundle): BundleImportPlan = validate(bundle, ImportResourceBudget.Default)
 
-    fun validate(bundle: OpenTaskerBundle): BundleImportPlan {
+    internal fun validate(bundle: OpenTaskerBundle, budget: ImportResourceBudget): BundleImportPlan {
         val warnings = mutableListOf<String>()
         val lossyWarnings = mutableListOf<String>()
+
+        ImportResourceGuard.bundleViolation(bundle, budget)?.let { violation ->
+            return BundleImportPlan(
+                canImport = false,
+                warnings = listOf(violation.message.orEmpty()),
+            )
+        }
 
         if (bundle.schemaVersion != OPEN_TASKER_BUNDLE_SCHEMA_VERSION) {
             warnings += "Unsupported schema version ${bundle.schemaVersion}; expected $OPEN_TASKER_BUNDLE_SCHEMA_VERSION."
@@ -173,7 +182,8 @@ object OpenTaskerBundleCodec {
     private fun String.isBlockingImportWarning(): Boolean =
         startsWith("Unsupported schema version") ||
             startsWith("Bundle has duplicate task ids") ||
-            startsWith("Bundle has duplicate variable names")
+            startsWith("Bundle has duplicate variable names") ||
+            startsWith("Import budget exceeded")
 
     private fun duplicateLongs(values: List<Long>): List<Long> =
         values.groupingBy { it }

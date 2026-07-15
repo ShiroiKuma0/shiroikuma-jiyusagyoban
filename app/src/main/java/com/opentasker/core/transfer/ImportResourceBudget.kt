@@ -1,0 +1,420 @@
+package com.opentasker.core.transfer
+
+import com.opentasker.core.model.ActionSpec
+import com.opentasker.core.model.ContextSpec
+import com.opentasker.core.model.SceneElement
+import org.xml.sax.Attributes
+import org.xml.sax.InputSource
+import org.xml.sax.SAXException
+import org.xml.sax.helpers.DefaultHandler
+import java.io.StringReader
+import javax.xml.parsers.SAXParserFactory
+
+/**
+ * One resource contract for every untrusted automation import.
+ *
+ * Raw input limits bound the source retained by the UI. Streaming preflights reject excessive
+ * token/node counts and nesting before kotlinx.serialization or DOM allocation. The decoded-model
+ * checks are deliberately repeated so callers that construct a bundle without the codecs cannot
+ * bypass the Room write boundary.
+ */
+internal data class ImportResourceBudget(
+    val maxJsonChars: Int = 16 * 1024 * 1024,
+    val maxXmlChars: Int = 4 * 1024 * 1024,
+    val maxEntities: Long = 5_000,
+    val maxActions: Long = 20_000,
+    val maxContexts: Long = 10_000,
+    val maxSceneElements: Long = 10_000,
+    val maxJsonTokens: Long = 250_000,
+    val maxXmlNodes: Long = 100_000,
+    val maxNestingDepth: Int = 64,
+    val maxAggregateStringBytes: Long = 8L * 1024 * 1024,
+) {
+    companion object {
+        val Default = ImportResourceBudget()
+    }
+}
+
+internal class ImportBudgetExceededException(
+    val budgetName: String,
+    val observed: Long,
+    val limit: Long,
+) : IllegalArgumentException("Import budget exceeded: $budgetName is $observed; limit is $limit.")
+
+internal object ImportResourceGuard {
+    fun requireJsonPreflight(rawJson: String, budget: ImportResourceBudget = ImportResourceBudget.Default) {
+        requireWithin("JSON characters", rawJson.length.toLong(), budget.maxJsonChars.toLong())
+        JsonBudgetScanner(rawJson, budget).scan()
+    }
+
+    fun requireXmlPreflight(rawXml: String, budget: ImportResourceBudget = ImportResourceBudget.Default) {
+        requireWithin("XML characters", rawXml.length.toLong(), budget.maxXmlChars.toLong())
+        require(!DOCTYPE_PATTERN.containsMatchIn(rawXml)) {
+            "Tasker XML with DOCTYPE declarations is not supported"
+        }
+
+        val factory = SAXParserFactory.newInstance().apply {
+            isNamespaceAware = false
+            setRequiredFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            setFeatureSafely("http://xml.org/sax/features/external-general-entities", false)
+            setFeatureSafely("http://xml.org/sax/features/external-parameter-entities", false)
+            setFeatureSafely("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+        }
+        val handler = XmlBudgetHandler(budget)
+        try {
+            factory.newSAXParser().parse(InputSource(StringReader(rawXml)), handler)
+        } catch (error: BudgetSaxException) {
+            throw error.violation
+        }
+    }
+
+    fun bundleViolation(
+        bundle: OpenTaskerBundle,
+        budget: ImportResourceBudget = ImportResourceBudget.Default,
+    ): ImportBudgetExceededException? {
+        val entityCount = bundle.tasks.size.toLong() +
+            bundle.profiles.size +
+            bundle.variables.size +
+            bundle.scenes.size
+        violation("entities", entityCount, budget.maxEntities)?.let { return it }
+
+        val actionCount = bundle.tasks.sumOf { task -> task.actions.size.toLong() }
+        violation("actions", actionCount, budget.maxActions)?.let { return it }
+
+        val contextCount = bundle.profiles.sumOf { profile -> profile.contexts.size.toLong() }
+        violation("contexts", contextCount, budget.maxContexts)?.let { return it }
+
+        val sceneElementCount = bundle.scenes.sumOf { scene -> scene.elements.size.toLong() }
+        violation("scene elements", sceneElementCount, budget.maxSceneElements)?.let { return it }
+
+        val stringBytes = bundle.aggregateStringBytes()
+        return violation("aggregate string bytes", stringBytes, budget.maxAggregateStringBytes)
+    }
+
+    fun requireBundle(
+        bundle: OpenTaskerBundle,
+        budget: ImportResourceBudget = ImportResourceBudget.Default,
+    ) {
+        bundleViolation(bundle, budget)?.let { throw it }
+    }
+
+    private fun OpenTaskerBundle.aggregateStringBytes(): Long {
+        var bytes = appVersion.utf8ByteLength()
+        bytes += metadata.name.utf8ByteLength()
+        bytes += metadata.description.utf8ByteLength()
+        metadata.warnings.forEach { bytes += it.utf8ByteLength() }
+        metadata.capabilityRequirements.forEach { requirement ->
+            bytes += requirement.actionId.utf8ByteLength()
+            bytes += requirement.reason.utf8ByteLength()
+        }
+        tasks.forEach { task ->
+            bytes += task.name.utf8ByteLength()
+            task.actions.forEach { action -> bytes += action.aggregateStringBytes() }
+        }
+        profiles.forEach { profile ->
+            bytes += profile.name.utf8ByteLength()
+            bytes += profile.group?.utf8ByteLength() ?: 0L
+            profile.contexts.forEach { context -> bytes += context.aggregateStringBytes() }
+        }
+        variables.forEach { variable ->
+            bytes += variable.name.utf8ByteLength()
+            bytes += variable.value.utf8ByteLength()
+        }
+        scenes.forEach { scene ->
+            bytes += scene.name.utf8ByteLength()
+            scene.elements.forEach { element -> bytes += element.aggregateStringBytes() }
+        }
+        return bytes
+    }
+
+    private fun ActionSpec.aggregateStringBytes(): Long {
+        var bytes = type.utf8ByteLength()
+        bytes += label?.utf8ByteLength() ?: 0L
+        bytes += condition?.utf8ByteLength() ?: 0L
+        args.forEach { (key, value) ->
+            bytes += key.utf8ByteLength()
+            bytes += value.utf8ByteLength()
+        }
+        return bytes
+    }
+
+    private fun ContextSpec.aggregateStringBytes(): Long {
+        var bytes = orGroup?.utf8ByteLength() ?: 0L
+        config.forEach { (key, value) ->
+            bytes += key.utf8ByteLength()
+            bytes += value.utf8ByteLength()
+        }
+        return bytes
+    }
+
+    private fun SceneElement.aggregateStringBytes(): Long {
+        var bytes = 0L
+        config.forEach { (key, value) ->
+            bytes += key.utf8ByteLength()
+            bytes += value.utf8ByteLength()
+        }
+        return bytes
+    }
+}
+
+private class JsonBudgetScanner(
+    private val source: String,
+    private val budget: ImportResourceBudget,
+) {
+    private var index = 0
+    private var depth = 0
+    private var tokenCount = 0L
+    private var stringBytes = 0L
+
+    fun scan() {
+        while (index < source.length) {
+            when (val char = source[index]) {
+                ' ', '\t', '\r', '\n' -> index++
+                '"' -> {
+                    countToken()
+                    scanString()
+                }
+                '{', '[' -> {
+                    countToken()
+                    depth++
+                    requireWithin("nesting depth", depth.toLong(), budget.maxNestingDepth.toLong())
+                    index++
+                }
+                '}', ']' -> {
+                    countToken()
+                    depth--
+                    index++
+                }
+                ':', ',' -> {
+                    countToken()
+                    index++
+                }
+                '/' -> if (!scanComment()) scanBareToken()
+                else -> if (char.isWhitespace()) index++ else scanBareToken()
+            }
+        }
+    }
+
+    private fun scanString() {
+        index++
+        var pendingHighSurrogate: Int? = null
+        while (index < source.length) {
+            val char = source[index++]
+            if (char == '"') break
+            val codeUnit = if (char == '\\' && index < source.length) {
+                when (val escaped = source[index++]) {
+                    '"', '\\', '/' -> escaped.code
+                    'b' -> '\b'.code
+                    'f' -> 12
+                    'n' -> '\n'.code
+                    'r' -> '\r'.code
+                    't' -> '\t'.code
+                    'u' -> readUnicodeEscape()
+                    else -> escaped.code
+                }
+            } else {
+                char.code
+            }
+
+            if (pendingHighSurrogate != null) {
+                if (codeUnit in LOW_SURROGATE_RANGE) {
+                    stringBytes += 4
+                    pendingHighSurrogate = null
+                    requireStringBytes()
+                    continue
+                }
+                stringBytes += 3
+                pendingHighSurrogate = null
+            }
+            when {
+                codeUnit in HIGH_SURROGATE_RANGE -> pendingHighSurrogate = codeUnit
+                codeUnit <= 0x7f -> stringBytes++
+                codeUnit <= 0x7ff -> stringBytes += 2
+                else -> stringBytes += 3
+            }
+            requireStringBytes()
+        }
+        if (pendingHighSurrogate != null) {
+            stringBytes += 3
+            requireStringBytes()
+        }
+    }
+
+    private fun readUnicodeEscape(): Int {
+        if (index + 4 > source.length) return 0xfffd
+        var value = 0
+        repeat(4) { offset ->
+            val digit = source[index + offset].digitToIntOrNull(16) ?: return 0xfffd
+            value = value * 16 + digit
+        }
+        index += 4
+        return value
+    }
+
+    private fun scanComment(): Boolean {
+        if (index + 1 >= source.length) return false
+        return when (source[index + 1]) {
+            '/' -> {
+                index += 2
+                while (index < source.length && source[index] != '\n') index++
+                true
+            }
+            '*' -> {
+                index += 2
+                while (index + 1 < source.length && !(source[index] == '*' && source[index + 1] == '/')) index++
+                index = (index + 2).coerceAtMost(source.length)
+                true
+            }
+            else -> false
+        }
+    }
+
+    private fun scanBareToken() {
+        countToken()
+        do {
+            index++
+        } while (index < source.length && !source[index].isJsonTokenBoundary())
+    }
+
+    private fun countToken() {
+        tokenCount++
+        requireWithin("JSON tokens", tokenCount, budget.maxJsonTokens)
+    }
+
+    private fun requireStringBytes() {
+        requireWithin("aggregate string bytes", stringBytes, budget.maxAggregateStringBytes)
+    }
+}
+
+private class XmlBudgetHandler(private val budget: ImportResourceBudget) : DefaultHandler() {
+    private var depth = 0
+    private var nodeCount = 0L
+    private var entityCount = 0L
+    private var actionCount = 0L
+    private var contextCount = 0L
+    private var sceneElementCount = 0L
+    private var stringBytes = 0L
+    private var profileDepth = 0
+
+    override fun startElement(uri: String?, localName: String?, qName: String, attributes: Attributes) {
+        depth++
+        nodeCount++
+        check("nesting depth", depth.toLong(), budget.maxNestingDepth.toLong())
+        check("XML nodes", nodeCount, budget.maxXmlNodes)
+
+        addString(qName)
+        repeat(attributes.length) { index ->
+            addString(attributes.getQName(index))
+            addString(attributes.getValue(index))
+        }
+
+        val tag = qName.lowercase()
+        when (tag) {
+            "task", "profile", "variable", "scene" -> {
+                entityCount++
+                check("entities", entityCount, budget.maxEntities)
+            }
+            "action" -> {
+                actionCount++
+                check("actions", actionCount, budget.maxActions)
+            }
+            "element" -> {
+                sceneElementCount++
+                check("scene elements", sceneElementCount, budget.maxSceneElements)
+            }
+        }
+        if (profileDepth > 0 && tag in TASKER_CONTEXT_TAGS) {
+            contextCount++
+            check("contexts", contextCount, budget.maxContexts)
+        }
+        if (tag == "profile") profileDepth++
+    }
+
+    override fun endElement(uri: String?, localName: String?, qName: String) {
+        if (qName.equals("profile", ignoreCase = true)) profileDepth--
+        depth--
+    }
+
+    override fun characters(ch: CharArray, start: Int, length: Int) {
+        stringBytes += ch.utf8ByteLength(start, length)
+        check("aggregate string bytes", stringBytes, budget.maxAggregateStringBytes)
+    }
+
+    private fun addString(value: String?) {
+        stringBytes += value.orEmpty().utf8ByteLength()
+        check("aggregate string bytes", stringBytes, budget.maxAggregateStringBytes)
+    }
+
+    private fun check(name: String, observed: Long, limit: Long) {
+        violation(name, observed, limit)?.let { throw BudgetSaxException(it) }
+    }
+}
+
+private class BudgetSaxException(val violation: ImportBudgetExceededException) : SAXException(violation.message)
+
+private fun SAXParserFactory.setFeatureSafely(name: String, value: Boolean) {
+    runCatching { setFeature(name, value) }
+}
+
+private fun SAXParserFactory.setRequiredFeature(name: String, value: Boolean) {
+    try {
+        setFeature(name, value)
+    } catch (error: Exception) {
+        throw IllegalStateException("XML parser does not support required secure feature: $name", error)
+    }
+}
+
+private fun Char.isJsonTokenBoundary(): Boolean =
+    isWhitespace() || this == '"' || this == '{' || this == '}' || this == '[' || this == ']' ||
+        this == ':' || this == ',' || this == '/'
+
+private fun String.utf8ByteLength(): Long {
+    var bytes = 0L
+    var index = 0
+    while (index < length) {
+        val char = this[index]
+        when {
+            char.code <= 0x7f -> bytes++
+            char.code <= 0x7ff -> bytes += 2
+            char.isHighSurrogate() && index + 1 < length && this[index + 1].isLowSurrogate() -> {
+                bytes += 4
+                index++
+            }
+            else -> bytes += 3
+        }
+        index++
+    }
+    return bytes
+}
+
+private fun CharArray.utf8ByteLength(start: Int, length: Int): Long {
+    var bytes = 0L
+    var index = start
+    val end = start + length
+    while (index < end) {
+        val char = this[index]
+        when {
+            char.code <= 0x7f -> bytes++
+            char.code <= 0x7ff -> bytes += 2
+            char.isHighSurrogate() && index + 1 < end && this[index + 1].isLowSurrogate() -> {
+                bytes += 4
+                index++
+            }
+            else -> bytes += 3
+        }
+        index++
+    }
+    return bytes
+}
+
+private fun violation(name: String, observed: Long, limit: Long): ImportBudgetExceededException? =
+    if (observed > limit) ImportBudgetExceededException(name, observed, limit) else null
+
+private fun requireWithin(name: String, observed: Long, limit: Long) {
+    violation(name, observed, limit)?.let { throw it }
+}
+
+private val HIGH_SURROGATE_RANGE = 0xd800..0xdbff
+private val LOW_SURROGATE_RANGE = 0xdc00..0xdfff
+private val TASKER_CONTEXT_TAGS = setOf("time", "day", "application", "app", "state", "event", "location")
+private val DOCTYPE_PATTERN = Regex("""<!\s*DOCTYPE\b""", RegexOption.IGNORE_CASE)
