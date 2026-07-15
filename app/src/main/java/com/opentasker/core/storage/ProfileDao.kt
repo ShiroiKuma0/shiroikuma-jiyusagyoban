@@ -3,6 +3,7 @@ package com.opentasker.core.storage
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
@@ -12,7 +13,7 @@ import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ContextSpec
 
-@Entity("profiles")
+@Entity("profiles", indices = [Index(value = ["projectId", "name"], unique = true)])
 data class ProfileEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
@@ -22,7 +23,10 @@ data class ProfileEntity(
     val cooldownSec: Int,
     val contextsJson: String,
     val automationMode: String = AutomationMode.SINGLE.name,
-    val profileGroup: String? = null,
+    val projectId: Long? = null,
+    val position: Int = 0,
+    val enterTaskName: String = "",
+    val exitTaskName: String = "",
     val requiresRiskAcknowledgement: Boolean = false,
 ) {
     fun toDomain(): Profile = toDomainDecodeResult().requireDecoded()
@@ -32,18 +36,7 @@ data class ProfileEntity(
         val contexts = runCatching { StorageJson.decodeFromString<List<ContextSpec>>(contextsJson) }
             .getOrElse { error ->
                 return StorageDecodeResult(
-                    value = Profile(
-                        id,
-                        name,
-                        enabled,
-                        emptyList(),
-                        enterTaskId,
-                        exitTaskId,
-                        cooldownSec,
-                        mode,
-                        profileGroup,
-                        requiresRiskAcknowledgement,
-                    ),
+                    value = Profile(id, name, enabled, emptyList(), enterTaskId, exitTaskId, cooldownSec, mode, projectId, position, enterTaskName, exitTaskName, requiresRiskAcknowledgement = requiresRiskAcknowledgement),
                     issue = StorageDecodeIssue(
                         recordType = StorageRecordType.PROFILE,
                         recordId = id,
@@ -64,24 +57,18 @@ data class ProfileEntity(
                 exitTaskId,
                 cooldownSec,
                 mode,
-                profileGroup,
-                requiresRiskAcknowledgement,
+                projectId,
+                position,
+                enterTaskName,
+                exitTaskName,
+                requiresRiskAcknowledgement = requiresRiskAcknowledgement,
             ),
         )
     }
 }
 
 fun Profile.toEntity() = ProfileEntity(
-    id,
-    name,
-    enabled,
-    enterTaskId,
-    exitTaskId,
-    cooldownSec,
-    StorageJson.encodeToString(contexts),
-    automationMode.name,
-    group,
-    requiresRiskAcknowledgement,
+    id, name, enabled, enterTaskId, exitTaskId, cooldownSec, StorageJson.encodeToString(contexts), automationMode.name, projectId, position, enterTaskName, exitTaskName, requiresRiskAcknowledgement
 )
 
 @Dao
@@ -90,8 +77,10 @@ interface ProfileDao {
     @Update suspend fun update(p: ProfileEntity)
     @Delete suspend fun delete(p: ProfileEntity)
     @Query("SELECT * FROM profiles WHERE id = :id") suspend fun getById(id: Long): ProfileEntity?
-    @Query("SELECT * FROM profiles") suspend fun getAll(): List<ProfileEntity>
+    @Query("SELECT * FROM profiles ORDER BY position, id") suspend fun getAll(): List<ProfileEntity>
     @Query("SELECT * FROM profiles WHERE enabled = 1 AND requiresRiskAcknowledgement = 0")
     suspend fun getAllEnabled(): List<ProfileEntity>
-    @Query("SELECT * FROM profiles") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<ProfileEntity>>
+    @Query("SELECT * FROM profiles ORDER BY position, id") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<ProfileEntity>>
+    @Query("UPDATE profiles SET position = :position WHERE id = :id") suspend fun setPosition(id: Long, position: Int)
+    @Query("SELECT COALESCE(MAX(position), -1) + 1 FROM profiles") suspend fun nextPosition(): Int
 }

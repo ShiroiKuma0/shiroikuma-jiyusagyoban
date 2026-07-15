@@ -44,13 +44,13 @@ class TaskRunnerSubTaskTest {
     }
 
     @Test
-    fun passesInputVariablesAndReceivesGlobalOutput() = runBlocking {
-        // Sub-task echoes an input variable into a global output variable.
+    fun passesInputParameterAndReceivesGlobalOutput() = runBlocking {
+        // Sub-task echoes a named parameter (param:input) into a global output variable.
         ActionRegistry.register(object : Action {
             override val id = "test.sub.echo"
             override val category = ActionCategory.FLOW
             override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-                ctx.variables.set("RESULT", ctx.variables.get("input").orEmpty())
+                ctx.variables.set("RESULT", ctx.parameters["input"].orEmpty())
                 return ActionResult.Success
             }
         })
@@ -60,7 +60,7 @@ class TaskRunnerSubTaskTest {
             Task(
                 name = "Parent",
                 actions = listOf(
-                    ActionSpec(type = "task.run", args = mapOf("task" to "Echo", "input" to "hello")),
+                    ActionSpec(type = "task.run", args = mapOf("task" to "Echo", "param:input" to "hello")),
                 ),
             ),
         )

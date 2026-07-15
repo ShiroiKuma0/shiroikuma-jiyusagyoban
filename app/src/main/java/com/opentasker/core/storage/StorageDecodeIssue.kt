@@ -1,14 +1,10 @@
 package com.opentasker.core.storage
 
-import kotlinx.serialization.json.Json
 
-/**
- * Shared JSON codec for stored automation payloads (task actions, profile contexts, scene
- * elements). `ignoreUnknownKeys` keeps valid older/newer payloads that carry additive fields
- * decodable instead of being misclassified as corrupt, while structurally invalid JSON still
- * fails closed with a [StorageDecodeIssue].
- */
-val StorageJson: Json = Json { ignoreUnknownKeys = true }
+
+// The shared JSON codec for stored automation payloads lives in StorageJson.kt (the fork's
+// tolerant variant — ignoreUnknownKeys + isLenient + coerceInputValues); structurally invalid
+// JSON still fails closed with a [StorageDecodeIssue].
 
 enum class StorageRecordType(val label: String) {
     PROFILE("Profile"),

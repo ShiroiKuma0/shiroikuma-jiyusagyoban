@@ -30,10 +30,8 @@ keystore.properties
 # Kotlin
 .kotlin/
 
-# Local agent working notes (never commit)
-CLAUDE.md
+# Local agent working notes
 CODEX_CHANGELOG.md
-.claude/
 *.bak
 AUDIT_COMPLETE.md
 PHASE_5_CHECKPOINT.md
@@ -43,13 +41,10 @@ build_output.txt
 build_*.bat
 build.sh
 
-# Markdown files local-only (except README)
-*.md
-!README.md
+# shiroikuma fork: CLAUDE.md, .claude/skills, .md docs and hand-off.md ARE committed;
+# only host-specific local Claude settings stay out.
+.claude/settings.local.json
 
-# AI config
-AGENTS.md
-.codex/
-.ai/
-PROJECT_CONTEXT.md
-CONTINUATION_PROMPT.md
+# Claude's scratch space: generator/demo/sim scripts and their JSON output live here
+# (never in ~/tmp — that's 白い熊's). Pushed to the device's /sdcard/tmp/ from here.
+.scratch/

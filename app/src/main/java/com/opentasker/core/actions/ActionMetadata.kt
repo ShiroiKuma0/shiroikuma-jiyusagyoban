@@ -1,18 +1,18 @@
 package com.opentasker.core.actions
 
-import androidx.annotation.StringRes
-import com.opentasker.app.R
-
 /**
  * Metadata describing the arguments required/optional for an Action.
  * Used to build dynamic forms in the UI.
  */
 data class ActionField(
     val key: String,                    // argument key in ActionSpec.args
-    @get:StringRes val labelRes: Int,   // localized UI label
+    val label: String,                  // UI label
     val fieldType: FieldType = FieldType.TEXT,
     val required: Boolean = false,
-    @get:StringRes val hintRes: Int? = null,
+    val hint: String? = null,
+    // For DROPDOWN: the selectable values. The field stays free-text (so it can be a %variable); these
+    // just populate the picker. Empty = a plain text field with no picker.
+    val options: List<String> = emptyList(),
 )
 
 enum class FieldType {
@@ -21,16 +21,17 @@ enum class FieldType {
     DROPDOWN,       // select from predefined values
     CHECKBOX,       // boolean toggle
     MULTILINE,      // multi-line text area
-    TASK,           // stable task-ID picker
+    COLOR,          // #AARRGGBB via a 4-slider RGBA picker (blank = use default)
+    WIDGET_LAYOUT,  // widget layout JSON, edited with the full visual editor (+ Tasker import)
+    APP_PACKAGE,    // editable text (a package name or %var) plus an installed-apps picker button
 }
 
 data class ActionMetadata(
     val id: String,                     // e.g. "notify.show"
-    @get:StringRes val nameRes: Int,
-    @get:StringRes val descriptionRes: Int,
-    @get:StringRes val categoryRes: Int,
+    val name: String,                   // e.g. "Show Notification"
+    val description: String,            // Human-readable description
+    val category: String,               // e.g. "Notification", "Settings"
     val fields: List<ActionField> = emptyList(),
-    val pickerVisible: Boolean = true,
 )
 
 /**
@@ -47,8 +48,8 @@ object ActionMetadataRegistry {
 
     fun all(): Collection<ActionMetadata> = byId.values
 
-    fun byCategory(@StringRes categoryRes: Int): List<ActionMetadata> =
-        byId.values.filter { it.categoryRes == categoryRes }
+    fun byCategory(category: String): List<ActionMetadata> =
+        byId.values.filter { it.category == category }
 }
 
 // ============ Built-in Action Metadata ============
@@ -58,34 +59,47 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "notify.show",
-            nameRes = R.string.catalog_action_notify_show_name,
-            descriptionRes = R.string.catalog_action_notify_show_description,
-            categoryRes = R.string.catalog_category_notification,
+            name = "Show Notification",
+            description = "Post a notification with channel, persistence, and replacement controls",
+            category = "Notification",
             fields = listOf(
-                ActionField("title", R.string.catalog_action_notify_show_field_title_label, required = true, hintRes = R.string.catalog_action_notify_show_field_title_hint),
-                ActionField("text", R.string.catalog_action_notify_show_field_text_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_notify_show_field_text_hint),
-                ActionField("channel", R.string.catalog_action_notify_show_field_channel_label, FieldType.DROPDOWN, hintRes = R.string.catalog_action_notify_show_field_channel_hint),
-                ActionField("persistent", R.string.catalog_action_notify_show_field_persistent_label, FieldType.CHECKBOX, hintRes = R.string.catalog_action_notify_show_field_persistent_hint),
-                ActionField("tag", R.string.catalog_action_notify_show_field_tag_label, hintRes = R.string.catalog_action_notify_show_field_tag_hint),
-                ActionField("id", R.string.catalog_action_notify_show_field_id_label, FieldType.NUMBER, hintRes = R.string.catalog_action_notify_show_field_id_hint),
-                ActionField("button1_label", R.string.catalog_action_notify_show_field_button1_label_label, hintRes = R.string.catalog_action_notify_show_field_button1_label_hint),
-                ActionField("button1_task_id", R.string.catalog_action_notify_show_field_button1_task_id_label, FieldType.TASK, hintRes = R.string.catalog_action_notify_show_field_button1_task_id_hint),
-                ActionField("button2_label", R.string.catalog_action_notify_show_field_button2_label_label, hintRes = R.string.catalog_action_notify_show_field_button2_label_hint),
-                ActionField("button2_task_id", R.string.catalog_action_notify_show_field_button2_task_id_label, FieldType.TASK, hintRes = R.string.catalog_action_notify_show_field_button2_task_id_hint),
-                ActionField("button3_label", R.string.catalog_action_notify_show_field_button3_label_label, hintRes = R.string.catalog_action_notify_show_field_button3_label_hint),
-                ActionField("button3_task_id", R.string.catalog_action_notify_show_field_button3_task_id_label, FieldType.TASK, hintRes = R.string.catalog_action_notify_show_field_button3_task_id_hint),
+                ActionField("title", "Title", required = true, hint = "Notification title"),
+                ActionField("text", "Message", FieldType.MULTILINE, hint = "Notification body"),
+                ActionField("channel", "Channel", FieldType.DROPDOWN, hint = "quiet / default / urgent"),
+                ActionField("persistent", "Persistent", FieldType.CHECKBOX, hint = "Keep until cancelled"),
+                ActionField("tag", "Tag", hint = "Replacement tag (same tag replaces)"),
+                ActionField("id", "ID", FieldType.NUMBER, hint = "Notification ID (same ID replaces)"),
+                ActionField("tap_task", "Tap task", hint = "Task to run when the notification body is tapped (works collapsed)"),
+                ActionField("button1_label", "Button 1 label", hint = "Action button label"),
+                ActionField("button1_task", "Button 1 task", hint = "Task name to run on tap"),
+                ActionField("button2_label", "Button 2 label", hint = "Second button label"),
+                ActionField("button2_task", "Button 2 task", hint = "Task name to run on tap"),
+                ActionField("button3_label", "Button 3 label", hint = "Third button label"),
+                ActionField("button3_task", "Button 3 task", hint = "Task name to run on tap"),
             )
         )
     )
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "notify.cancel",
-            nameRes = R.string.catalog_action_notify_cancel_name,
-            descriptionRes = R.string.catalog_action_notify_cancel_description,
-            categoryRes = R.string.catalog_category_notification,
+            name = "Cancel Notification",
+            description = "Cancel a notification by tag and/or ID",
+            category = "Notification",
             fields = listOf(
-                ActionField("tag", R.string.catalog_action_notify_cancel_field_tag_label, hintRes = R.string.catalog_action_notify_cancel_field_tag_hint),
-                ActionField("id", R.string.catalog_action_notify_cancel_field_id_label, FieldType.NUMBER, hintRes = R.string.catalog_action_notify_cancel_field_id_hint),
+                ActionField("tag", "Tag", hint = "Notification tag to cancel"),
+                ActionField("id", "ID", FieldType.NUMBER, hint = "Notification ID to cancel"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "notify.dismiss",
+            name = "Dismiss App Notifications",
+            description = "Cancel another app's notifications by package (needs notification access)",
+            category = "Notification",
+            fields = listOf(
+                ActionField("package", "App", FieldType.APP_PACKAGE, required = true, hint = "pick an app whose notifications to dismiss, or type a package / %var"),
             )
         )
     )
@@ -93,40 +107,29 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "var.set",
-            nameRes = R.string.catalog_action_var_set_name,
-            descriptionRes = R.string.catalog_action_var_set_description,
-            categoryRes = R.string.catalog_category_variable,
+            name = "Set Variable",
+            description = "Set a variable to a new value",
+            category = "Variable",
             fields = listOf(
-                ActionField("name", R.string.catalog_action_var_set_field_name_label, required = true, hintRes = R.string.catalog_action_var_set_field_name_hint),
-                ActionField("value", R.string.catalog_action_var_set_field_value_label, required = true, hintRes = R.string.catalog_action_var_set_field_value_hint),
+                ActionField("name", "Variable name", required = true, hint = "%var name"),
+                ActionField("value", "Value", required = true, hint = "Supports %expansion"),
             )
         )
     )
 
-    ActionMetadataRegistry.register(
-        ActionMetadata(
-            id = "var.persist",
-            nameRes = R.string.catalog_action_var_persist_name,
-            descriptionRes = R.string.catalog_action_var_persist_description,
-            categoryRes = R.string.catalog_category_variable,
-            fields = listOf(
-                ActionField("name", R.string.catalog_action_var_persist_field_name_label, required = true, hintRes = R.string.catalog_action_var_persist_field_name_hint),
-                ActionField("global_name", R.string.catalog_action_var_persist_field_global_name_label, hintRes = R.string.catalog_action_var_persist_field_global_name_hint),
-            )
-        )
-    )
+    // ---- Upstream 0.2.75/77 additions: structured data, date-time, and text/regex packs ----
 
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "data.read",
-            nameRes = R.string.catalog_action_data_read_name,
-            descriptionRes = R.string.catalog_action_data_read_description,
-            categoryRes = R.string.catalog_category_variable,
+            name = "Read Data",
+            description = "Parse JSON, CSV or XML text into variables (with an optional path selector)",
+            category = "Variable",
             fields = listOf(
-                ActionField("source", R.string.catalog_action_data_read_field_source_label, required = true, hintRes = R.string.catalog_action_data_read_field_source_hint),
-                ActionField("format", R.string.catalog_action_data_read_field_format_label, hintRes = R.string.catalog_action_data_read_field_format_hint),
-                ActionField("path", R.string.catalog_action_data_read_field_path_label, hintRes = R.string.catalog_action_data_read_field_path_hint),
-                ActionField("var", R.string.catalog_action_data_read_field_var_label, hintRes = R.string.catalog_action_data_read_field_var_hint),
+                ActionField("source", "Source text", required = true, hint = "The JSON/CSV/XML text (usually a %var)"),
+                ActionField("format", "Format", FieldType.DROPDOWN, hint = "auto (default), json, csv or xml", options = listOf("auto", "json", "csv", "xml")),
+                ActionField("path", "Path selector", hint = "e.g. items[0].name, a CSV column, or root/item/name"),
+                ActionField("var", "Result variable", hint = "Also sets %var_count for arrays"),
             )
         )
     )
@@ -134,14 +137,14 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "datetime.format",
-            nameRes = R.string.catalog_action_datetime_format_name,
-            descriptionRes = R.string.catalog_action_datetime_format_description,
-            categoryRes = R.string.catalog_category_variable,
+            name = "Format Date/Time",
+            description = "Format epoch milliseconds as text",
+            category = "Variable",
             fields = listOf(
-                ActionField("time", R.string.catalog_action_datetime_format_field_time_label, hintRes = R.string.catalog_action_datetime_format_field_time_hint),
-                ActionField("format", R.string.catalog_action_datetime_format_field_format_label, hintRes = R.string.catalog_action_datetime_format_field_format_hint),
-                ActionField("zone", R.string.catalog_action_datetime_format_field_zone_label, hintRes = R.string.catalog_action_datetime_format_field_zone_hint),
-                ActionField("var", R.string.catalog_action_datetime_format_field_var_label, hintRes = R.string.catalog_action_datetime_format_field_var_hint),
+                ActionField("time", "Time (epoch ms)", hint = "Blank = now"),
+                ActionField("format", "Pattern", hint = "e.g. yyyy-MM-dd HH:mm (blank = ISO-8601)"),
+                ActionField("zone", "Time zone", hint = "e.g. Asia/Tokyo (blank = device zone)"),
+                ActionField("var", "Result variable", hint = "Default: %datetime_text"),
             )
         )
     )
@@ -149,14 +152,14 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "datetime.parse",
-            nameRes = R.string.catalog_action_datetime_parse_name,
-            descriptionRes = R.string.catalog_action_datetime_parse_description,
-            categoryRes = R.string.catalog_category_variable,
+            name = "Parse Date/Time",
+            description = "Parse formatted text into epoch milliseconds",
+            category = "Variable",
             fields = listOf(
-                ActionField("text", R.string.catalog_action_datetime_parse_field_text_label, required = true, hintRes = R.string.catalog_action_datetime_parse_field_text_hint),
-                ActionField("format", R.string.catalog_action_datetime_parse_field_format_label, required = true, hintRes = R.string.catalog_action_datetime_parse_field_format_hint),
-                ActionField("zone", R.string.catalog_action_datetime_parse_field_zone_label, hintRes = R.string.catalog_action_datetime_parse_field_zone_hint),
-                ActionField("var", R.string.catalog_action_datetime_parse_field_var_label, hintRes = R.string.catalog_action_datetime_parse_field_var_hint),
+                ActionField("text", "Text", required = true, hint = "The date/time string to parse"),
+                ActionField("format", "Pattern", required = true, hint = "e.g. yyyy-MM-dd HH:mm"),
+                ActionField("zone", "Time zone", hint = "e.g. Asia/Tokyo (blank = device zone)"),
+                ActionField("var", "Result variable", hint = "Default: %datetime_ms"),
             )
         )
     )
@@ -164,14 +167,14 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "datetime.add",
-            nameRes = R.string.catalog_action_datetime_add_name,
-            descriptionRes = R.string.catalog_action_datetime_add_description,
-            categoryRes = R.string.catalog_category_variable,
+            name = "Add to Date/Time",
+            description = "Calendar-aware date arithmetic on epoch milliseconds",
+            category = "Variable",
             fields = listOf(
-                ActionField("time", R.string.catalog_action_datetime_add_field_time_label, hintRes = R.string.catalog_action_datetime_add_field_time_hint),
-                ActionField("amount", R.string.catalog_action_datetime_add_field_amount_label, required = true, hintRes = R.string.catalog_action_datetime_add_field_amount_hint),
-                ActionField("unit", R.string.catalog_action_datetime_add_field_unit_label, required = true, hintRes = R.string.catalog_action_datetime_add_field_unit_hint),
-                ActionField("var", R.string.catalog_action_datetime_add_field_var_label, hintRes = R.string.catalog_action_datetime_add_field_var_hint),
+                ActionField("time", "Time (epoch ms)", hint = "Blank = now"),
+                ActionField("amount", "Amount", FieldType.NUMBER, required = true, hint = "May be negative"),
+                ActionField("unit", "Unit", FieldType.DROPDOWN, required = true, hint = "seconds … years", options = listOf("seconds", "minutes", "hours", "days", "weeks", "months", "years")),
+                ActionField("var", "Result variable", hint = "Default: %datetime_ms"),
             )
         )
     )
@@ -179,13 +182,13 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "text.match",
-            nameRes = R.string.catalog_action_text_match_name,
-            descriptionRes = R.string.catalog_action_text_match_description,
-            categoryRes = R.string.catalog_category_variable,
+            name = "Match Text",
+            description = "Match a regex against text; capture groups become an array",
+            category = "Variable",
             fields = listOf(
-                ActionField("source", R.string.catalog_action_text_match_field_source_label, required = true),
-                ActionField("pattern", R.string.catalog_action_text_match_field_pattern_label, required = true, hintRes = R.string.catalog_action_text_match_field_pattern_hint),
-                ActionField("var", R.string.catalog_action_text_match_field_var_label, hintRes = R.string.catalog_action_text_match_field_var_hint),
+                ActionField("source", "Source text", required = true),
+                ActionField("pattern", "Regex pattern", required = true, hint = "Linear-time RE2 syntax"),
+                ActionField("var", "Result variable", hint = "Matches land in %var / %var(#)"),
             )
         )
     )
@@ -193,14 +196,14 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "text.replace",
-            nameRes = R.string.catalog_action_text_replace_name,
-            descriptionRes = R.string.catalog_action_text_replace_description,
-            categoryRes = R.string.catalog_category_variable,
+            name = "Replace Text",
+            description = "Replace regex matches in text ($1 group references supported)",
+            category = "Variable",
             fields = listOf(
-                ActionField("source", R.string.catalog_action_text_replace_field_source_label, required = true),
-                ActionField("pattern", R.string.catalog_action_text_replace_field_pattern_label, required = true),
-                ActionField("replacement", R.string.catalog_action_text_replace_field_replacement_label, hintRes = R.string.catalog_action_text_replace_field_replacement_hint),
-                ActionField("var", R.string.catalog_action_text_replace_field_var_label, hintRes = R.string.catalog_action_text_replace_field_var_hint),
+                ActionField("source", "Source text", required = true),
+                ActionField("pattern", "Regex pattern", required = true),
+                ActionField("replacement", "Replacement", hint = "$1, $2 … reference capture groups"),
+                ActionField("var", "Result variable"),
             )
         )
     )
@@ -208,14 +211,14 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "text.split",
-            nameRes = R.string.catalog_action_text_split_name,
-            descriptionRes = R.string.catalog_action_text_split_description,
-            categoryRes = R.string.catalog_category_variable,
+            name = "Split Text",
+            description = "Split text into an array by a literal delimiter or a regex",
+            category = "Variable",
             fields = listOf(
-                ActionField("source", R.string.catalog_action_text_split_field_source_label, required = true),
-                ActionField("delimiter", R.string.catalog_action_text_split_field_delimiter_label, hintRes = R.string.catalog_action_text_split_field_delimiter_hint),
-                ActionField("pattern", R.string.catalog_action_text_split_field_pattern_label, hintRes = R.string.catalog_action_text_split_field_pattern_hint),
-                ActionField("var", R.string.catalog_action_text_split_field_var_label, hintRes = R.string.catalog_action_text_split_field_var_hint),
+                ActionField("source", "Source text", required = true),
+                ActionField("delimiter", "Delimiter (literal)", hint = "Used when no regex pattern is given"),
+                ActionField("pattern", "Regex pattern", hint = "Overrides the literal delimiter"),
+                ActionField("var", "Result array variable"),
             )
         )
     )
@@ -223,13 +226,13 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "text.join",
-            nameRes = R.string.catalog_action_text_join_name,
-            descriptionRes = R.string.catalog_action_text_join_description,
-            categoryRes = R.string.catalog_category_variable,
+            name = "Join Text",
+            description = "Join an array's elements into one string",
+            category = "Variable",
             fields = listOf(
-                ActionField("array", R.string.catalog_action_text_join_field_array_label, required = true, hintRes = R.string.catalog_action_text_join_field_array_hint),
-                ActionField("delimiter", R.string.catalog_action_text_join_field_delimiter_label, hintRes = R.string.catalog_action_text_join_field_delimiter_hint),
-                ActionField("var", R.string.catalog_action_text_join_field_var_label, hintRes = R.string.catalog_action_text_join_field_var_hint),
+                ActionField("array", "Array variable", required = true, hint = "Name of the array to join"),
+                ActionField("delimiter", "Delimiter", hint = "Placed between elements (default: comma)"),
+                ActionField("var", "Result variable"),
             )
         )
     )
@@ -237,26 +240,702 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "text.substring",
-            nameRes = R.string.catalog_action_text_substring_name,
-            descriptionRes = R.string.catalog_action_text_substring_description,
-            categoryRes = R.string.catalog_category_variable,
+            name = "Substring",
+            description = "Extract part of a text by start/end index",
+            category = "Variable",
             fields = listOf(
-                ActionField("source", R.string.catalog_action_text_substring_field_source_label, required = true),
-                ActionField("start", R.string.catalog_action_text_substring_field_start_label, required = true, hintRes = R.string.catalog_action_text_substring_field_start_hint),
-                ActionField("end", R.string.catalog_action_text_substring_field_end_label, hintRes = R.string.catalog_action_text_substring_field_end_hint),
-                ActionField("var", R.string.catalog_action_text_substring_field_var_label, hintRes = R.string.catalog_action_text_substring_field_var_hint),
+                ActionField("source", "Source text", required = true),
+                ActionField("start", "Start index", FieldType.NUMBER, required = true, hint = "0-based; negative counts from the end"),
+                ActionField("end", "End index", FieldType.NUMBER, hint = "Blank = to the end"),
+                ActionField("var", "Result variable"),
             )
         )
     )
 
     ActionMetadataRegistry.register(
         ActionMetadata(
-            id = "tts.speak",
-            nameRes = R.string.catalog_action_tts_speak_name,
-            descriptionRes = R.string.catalog_action_tts_speak_description,
-            categoryRes = R.string.catalog_category_notification,
+            id = "http.request",
+            name = "HTTP Request",
+            description = "Full HTTP request (any method) with headers, body, timeouts and response capture",
+            category = "Network",
             fields = listOf(
-                ActionField("text", R.string.catalog_action_tts_speak_field_text_label, FieldType.MULTILINE, required = true),
+                ActionField("method", "Method", FieldType.DROPDOWN, hint = "Default GET", options = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD")),
+                ActionField("url", "URL", required = true),
+                ActionField("query", "Query parameters", FieldType.MULTILINE, hint = "name=value, one per line"),
+                ActionField("headers", "Headers", FieldType.MULTILINE, hint = "Name: value, one per line"),
+                ActionField("authorization", "Authorization", hint = "Value for the Authorization header"),
+                ActionField("body", "Body", FieldType.MULTILINE),
+                ActionField("body_file", "Body from file", hint = "Path to a file to send as the body"),
+                ActionField("content_type", "Content type", hint = "e.g. application/json"),
+                ActionField("response_var", "Response variable", hint = "Stores the response body"),
+                ActionField("status_var", "Status variable", hint = "Stores the HTTP status code"),
+                ActionField("headers_var", "Headers variable", hint = "Stores the response headers"),
+                ActionField("output_file", "Response to file", hint = "Write the response body to this path"),
+                ActionField("max_response_bytes", "Max response bytes", FieldType.NUMBER),
+                ActionField("redirects", "Follow redirects", hint = "true/false"),
+                ActionField("allow_http", "Allow cleartext HTTP (LAN)", FieldType.CHECKBOX, hint = "Only loopback/private hosts are ever allowed"),
+                ActionField("timeout_sec", "Timeout (s)", FieldType.NUMBER),
+                ActionField("connect_timeout_sec", "Connect timeout (s)", FieldType.NUMBER),
+                ActionField("read_timeout_sec", "Read timeout (s)", FieldType.NUMBER),
+                ActionField("write_timeout_sec", "Write timeout (s)", FieldType.NUMBER),
+                ActionField("call_timeout_sec", "Call timeout (s)", FieldType.NUMBER),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "task.editaction",
+            name = "Set Action Field",
+            description = "Write a value into another task's action argument (e.g. bake a picker's result into a config task's var.set value so it survives startup)",
+            category = "Tasks",
+            fields = listOf(
+                ActionField("task", "Target task name", required = true, hint = "the task to edit"),
+                ActionField("matchType", "Match action type", hint = "e.g. var.set (first match wins)"),
+                ActionField("matchName", "Match name arg", hint = "the variable a var.set writes, e.g. SC_Blacklist"),
+                ActionField("index", "Or action index", hint = "0-based; used instead of the matchers"),
+                ActionField("key", "Field to set", hint = "arg key; default 'value'"),
+                ActionField("value", "New value", required = true, hint = "%-expanded before writing"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "var.persist",
+            name = "Persist Variable",
+            description = "Copy a variable's current value into the global scope so it survives across task runs",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Source variable", required = true, hint = "local variable name"),
+                ActionField("global_name", "Global name", hint = "Auto-uppercased from source if omitted"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "var.clear",
+            name = "Variable Clear",
+            description = "Unset a variable (and any array of the same name)",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Variable name", required = true, hint = "bare name, no %"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "var.split",
+            name = "Variable Split",
+            description = "Split a variable's value into an array of the same name",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Variable name", required = true, hint = "bare name, no %"),
+                ActionField("splitter", "Splitter", hint = "delimiter; \\n \\t allowed; empty = per character"),
+                ActionField("delete_base", "Delete base", FieldType.CHECKBOX, hint = "Unset the scalar after splitting"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "var.join",
+            name = "Variable Join",
+            description = "Join the array of this name back into a single value",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Array name", required = true, hint = "bare name, no %"),
+                ActionField("joiner", "Joiner", hint = "delimiter; \\n \\t allowed"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "var.replace",
+            name = "Variable Search Replace",
+            description = "Regex search/replace within a variable; optionally store matches",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Variable name", required = true, hint = "bare name, no %"),
+                ActionField("search", "Search", required = true, hint = "regular expression"),
+                ActionField("replace", "Replace with", hint = "replacement (empty = remove matches)"),
+                ActionField("ignore_case", "Ignore case", FieldType.CHECKBOX),
+                ActionField("multiline", "Multi-line", FieldType.CHECKBOX, hint = "^ and $ match per line"),
+                ActionField("store_matches", "Store matches in", hint = "array variable for matches (optional)"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "var.convert",
+            name = "Variable Convert",
+            description = "Transform a variable's value (case, encoding, hash, …)",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Variable name", required = true, hint = "bare name, no %"),
+                ActionField("function", "Function", FieldType.DROPDOWN, required = true,
+                    hint = "upper / lower / trim / length / reverse / capitalize / urlencode / urldecode / base64encode / base64decode / md5 / sha1 / sha256"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "var.add",
+            name = "Variable Add",
+            description = "Add a number to a numeric variable, with optional wrap and round",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Variable name", required = true, hint = "bare name, no %"),
+                ActionField("value", "Amount", FieldType.NUMBER, required = true, hint = "number to add (may be negative)"),
+                ActionField("wrap", "Wrap around", FieldType.NUMBER, hint = "wrap result modulo this value (optional)"),
+                ActionField("round", "Round", FieldType.CHECKBOX, hint = "round result to a whole number"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "datetime",
+            name = "Parse/Format DateTime",
+            description = "Produce a formatted date/time string into a variable",
+            category = "Variable",
+            fields = listOf(
+                ActionField("store", "Store result in", required = true, hint = "bare variable name"),
+                ActionField("source", "Source", FieldType.DROPDOWN, hint = "now / seconds / millis / formatted"),
+                ActionField("input", "Input", hint = "epoch value, or a date string when source = formatted"),
+                ActionField("inputformat", "Input format", hint = "pattern when source = formatted (e.g. yyyy-MM-dd)"),
+                ActionField("format", "Output format", hint = "default yyyy-MM-dd HH:mm:ss"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "array.set",
+            name = "Array Set",
+            description = "Populate an array from a delimited string",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Array name", required = true, hint = "bare name, no %"),
+                ActionField("values", "Values", FieldType.MULTILINE, hint = "delimited string"),
+                ActionField("splitter", "Splitter", hint = "delimiter; default , ; \\n \\t allowed"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "array.push",
+            name = "Array Push",
+            description = "Insert a value into an array",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Array name", required = true, hint = "bare name, no %"),
+                ActionField("value", "Value", hint = "value to insert"),
+                ActionField("position", "Position", FieldType.NUMBER, hint = "1-based; empty = end"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "array.pop",
+            name = "Array Pop",
+            description = "Remove an element from an array into a variable",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Array name", required = true, hint = "bare name, no %"),
+                ActionField("position", "Position", FieldType.NUMBER, hint = "1-based; empty = last"),
+                ActionField("store", "Store removed in", hint = "variable for the popped value (optional)"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "array.clear",
+            name = "Array Clear",
+            description = "Empty an array",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Array name", required = true, hint = "bare name, no %"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "array.process",
+            name = "Array Process",
+            description = "Sort, reverse, shuffle, dedupe or squash an array",
+            category = "Variable",
+            fields = listOf(
+                ActionField("name", "Array name", required = true, hint = "bare name, no %"),
+                ActionField("type", "Type", FieldType.DROPDOWN, required = true,
+                    hint = "sort / sort-desc / numeric / reverse / shuffle / unique / squash"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "array.merge",
+            name = "Arrays Merge",
+            description = "Concatenate several arrays into one",
+            category = "Variable",
+            fields = listOf(
+                ActionField("arrays", "Source arrays", required = true, hint = "comma-separated array names"),
+                ActionField("into", "Result array", required = true, hint = "bare name for the merged array"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "file.move",
+            name = "Move File",
+            description = "Move or rename a file within the app's files",
+            category = "File",
+            fields = listOf(
+                ActionField("from", "From", required = true, hint = "source path"),
+                ActionField("to", "To", required = true, hint = "destination path"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "file.mkdir",
+            name = "Create Directory",
+            description = "Create a directory (and parents) within the app's files",
+            category = "File",
+            fields = listOf(
+                ActionField("path", "Path", required = true, hint = "directory path"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "flash",
+            name = "Flash",
+            description = "Show a styled overlay message. Colours/size default to the UI Flash settings.",
+            category = "System",
+            fields = listOf(
+                ActionField("text", "Text", FieldType.MULTILINE, required = true, hint = "message; supports %expansion"),
+                ActionField("html", "Use HTML", FieldType.CHECKBOX, hint = "interpret HTML tags (<b>, <h1>, <font color>, …)"),
+                ActionField("text_color", "Text color", FieldType.COLOR, hint = "blank uses the UI default"),
+                ActionField("background_color", "Background color", FieldType.COLOR, hint = "blank uses the UI default"),
+                ActionField("border_color", "Border color", FieldType.COLOR, hint = "blank uses the UI default"),
+                ActionField("position", "Position", FieldType.DROPDOWN,
+                    hint = "top-left / top / top-right / left / center / right / bottom-left / bottom / bottom-right"),
+                ActionField("x", "X offset (dp)", FieldType.NUMBER, hint = "horizontal offset from the anchor"),
+                ActionField("y", "Y offset (dp)", FieldType.NUMBER, hint = "vertical offset from the anchor"),
+                ActionField("long", "Long", FieldType.CHECKBOX, hint = "longer display time"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "flow.comment",
+            name = "Comment",
+            description = "A no-op note for documenting a task",
+            category = "Flow",
+            fields = listOf(
+                ActionField("text", "Comment", FieldType.MULTILINE, hint = "note text"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "clipboard.set",
+            name = "Set Clipboard",
+            description = "Put text on the system clipboard",
+            category = "System",
+            fields = listOf(
+                ActionField("text", "Text", FieldType.MULTILINE, hint = "text to copy"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "clipboard.get",
+            name = "Get Clipboard",
+            description = "Read clipboard text into a variable",
+            category = "System",
+            fields = listOf(
+                ActionField("store", "Store in", required = true, hint = "variable name"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "email.compose",
+            name = "Compose Email",
+            description = "Open the email composer prefilled",
+            category = "App",
+            fields = listOf(
+                ActionField("to", "To", hint = "comma-separated addresses"),
+                ActionField("cc", "Cc", hint = "comma-separated addresses"),
+                ActionField("subject", "Subject"),
+                ActionField("body", "Body", FieldType.MULTILINE),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "wallpaper.set",
+            name = "Set Wallpaper",
+            description = "Set the wallpaper from an image in the app's files",
+            category = "System",
+            fields = listOf(
+                ActionField("path", "Image path", required = true, hint = "path to a .png/.jpg in app files"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "wifi.settings",
+            name = "WiFi Settings",
+            description = "Open the system Wi-Fi settings screen",
+            category = "Settings",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "apps.list",
+            name = "List Apps",
+            description = "List installed apps into array variable(s)",
+            category = "App",
+            fields = listOf(
+                ActionField("packages", "Packages array", required = true, hint = "array name for package names"),
+                ActionField("labels", "Labels array", hint = "array name for app labels (optional)"),
+                ActionField("include_system", "Include system apps", FieldType.CHECKBOX),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "ime.pick",
+            name = "Keyboard Picker",
+            description = "Show the input-method (keyboard) picker",
+            category = "System",
+        )
+    )
+
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "nav.back",
+            name = "Back",
+            description = "Press Back (needs the accessibility service enabled)",
+            category = "Interface",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "nav.recents",
+            name = "Recents",
+            description = "Open the recent-apps overview (needs the accessibility service)",
+            category = "Interface",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "nav.screenshot",
+            name = "Take Screenshot",
+            description = "Take a system screenshot (saved to the gallery; needs the accessibility service, API 30+)",
+            category = "Interface",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "panel.notifications",
+            name = "Notifications Panel",
+            description = "Open the notification shade (needs the accessibility service)",
+            category = "Interface",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "panel.quicksettings",
+            name = "Quick Settings",
+            description = "Open the quick-settings panel (needs the accessibility service)",
+            category = "Interface",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "nav.power",
+            name = "Power Dialog",
+            description = "Show the power / long-press menu (needs the accessibility service)",
+            category = "Interface",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "screen.lock",
+            name = "Lock Screen",
+            description = "Lock the screen — Android 9+ (needs the accessibility service)",
+            category = "Interface",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "screen.lockdown",
+            name = "Lockdown",
+            description = "Lock and require PIN/password (biometrics disabled) — Android 9+ (needs the accessibility service)",
+            category = "Interface",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "call.place",
+            name = "Call",
+            description = "Place a phone call (or open the dialer without CALL_PHONE)",
+            category = "App",
+            fields = listOf(
+                ActionField("number", "Number", required = true, hint = "phone number"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "brightness.auto",
+            name = "Auto Brightness",
+            description = "Turn automatic screen brightness on/off (Write Settings access)",
+            category = "Settings",
+            fields = listOf(
+                ActionField("state", "State", FieldType.DROPDOWN, hint = "on / off / toggle (or a %variable)", options = listOf("on", "off", "toggle")),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "file.open",
+            name = "Open File",
+            description = "Open a file in the app's files with another app",
+            category = "File",
+            fields = listOf(
+                ActionField("path", "Path", required = true, hint = "file path"),
+                ActionField("mime", "MIME type", hint = "optional; guessed from extension if blank"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "profile.toggle",
+            name = "Profile Status",
+            description = "Enable, disable, or toggle a profile by name",
+            category = "System",
+            fields = listOf(
+                ActionField("profile", "Profile name", required = true, hint = "exact profile name"),
+                ActionField("state", "State", FieldType.DROPDOWN, hint = "on / off / toggle (or a %variable)", options = listOf("on", "off", "toggle")),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "setting.get",
+            name = "Get Setting",
+            description = "Read a System/Secure/Global setting into a variable",
+            category = "Settings",
+            fields = listOf(
+                ActionField("namespace", "Namespace", FieldType.DROPDOWN, hint = "system / secure / global"),
+                ActionField("name", "Setting name", required = true, hint = "e.g. screen_off_timeout"),
+                ActionField("store", "Store in", required = true, hint = "variable name"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "setting.put",
+            name = "Set Setting",
+            description = "Write a System setting (Write Settings access; System namespace only)",
+            category = "Settings",
+            fields = listOf(
+                ActionField("namespace", "Namespace", FieldType.DROPDOWN, hint = "system (secure/global need Shizuku)"),
+                ActionField("name", "Setting name", required = true, hint = "e.g. screen_off_timeout"),
+                ActionField("value", "Value", hint = "value to write"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "dialog.input",
+            name = "Input Dialog",
+            description = "Prompt for text and store the result in a variable",
+            category = "Alert",
+            fields = listOf(
+                ActionField("title", "Title"),
+                ActionField("text", "Prompt", FieldType.MULTILINE),
+                ActionField("default", "Default value"),
+                ActionField("input_type", "Input type", FieldType.DROPDOWN, hint = "text / number / password / email"),
+                ActionField("store", "Store in", hint = "variable name (default: input)"),
+                ActionField("timeout", "Close after (s)", FieldType.NUMBER, hint = "0 = wait indefinitely"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "dialog.list",
+            name = "List Dialog",
+            description = "Show a list to pick from; store the chosen item and index",
+            category = "Alert",
+            fields = listOf(
+                ActionField("title", "Title"),
+                ActionField("items", "Items", FieldType.MULTILINE, required = true, hint = "separated list (default separator: ,)"),
+                ActionField("separator", "Separator", hint = "default ,"),
+                ActionField("store", "Store selection in", hint = "variable name (default: selected)"),
+                ActionField("store_index", "Store index in", hint = "variable for the picked index (optional)"),
+                ActionField("timeout", "Close after (s)", FieldType.NUMBER, hint = "0 = wait indefinitely"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "dialog.text",
+            name = "Text Dialog",
+            description = "Show text with OK/Cancel; store which button was pressed",
+            category = "Alert",
+            fields = listOf(
+                ActionField("title", "Title"),
+                ActionField("text", "Text", FieldType.MULTILINE),
+                ActionField("ok", "OK label", hint = "default: OK"),
+                ActionField("cancel", "Cancel label", hint = "default: Cancel"),
+                ActionField("store", "Store OK in", hint = "variable set to true/false (optional)"),
+                ActionField("timeout", "Close after (s)", FieldType.NUMBER, hint = "0 = wait indefinitely"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "shell.run",
+            name = "Run Shell",
+            description = "Run a shell command with Shizuku (ADB/root) privileges",
+            category = "System",
+            fields = listOf(
+                ActionField("command", "Command", FieldType.MULTILINE, required = true, hint = "runs via sh -c"),
+                ActionField("store_stdout", "Store stdout in", hint = "variable (default: stdout)"),
+                ActionField("store_stderr", "Store stderr in", hint = "variable (default: stderr)"),
+                ActionField("store_exit", "Store exit code in", hint = "variable (default: exit)"),
+                ActionField("ignore_exit", "Ignore exit code", FieldType.CHECKBOX, hint = "succeed even if exit code is non-zero"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "location.mode",
+            name = "Location Mode",
+            description = "Turn location services on/off (via Shizuku)",
+            category = "Settings",
+            fields = listOf(
+                ActionField("state", "State", FieldType.DROPDOWN, hint = "on / off / toggle (or a %variable)", options = listOf("on", "off", "toggle")),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "ime.set",
+            name = "Set Keyboard",
+            description = "Switch the active input method / keyboard (via Shizuku)",
+            category = "System",
+            fields = listOf(
+                ActionField("ime", "IME id", required = true, hint = "e.g. com.pkg/.InputMethodService"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "widget.set",
+            name = "Set Widget",
+            description = "Replace a styled home-screen widget's layout and re-render it",
+            category = "System",
+            fields = listOf(
+                ActionField("widget", "Widget name", required = true, hint = "the name set when the widget was placed"),
+                ActionField("template", "Template (optional)", hint = "a saved Widget Templates name; overrides the layout below"),
+                ActionField("layout", "Layout", FieldType.WIDGET_LAYOUT, hint = "inline layout (used when no template is set); %vars are expanded"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "widget.refresh",
+            name = "Refresh Widgets",
+            description = "Re-render every placed styled widget. Template-bound widgets pull their template and re-expand %vars (the pull model) — run this once per minute instead of a Set Widget per location.",
+            category = "System",
+            fields = emptyList(),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "scene.show",
+            name = "Show Scene",
+            description = "Display a scene (from the Scenes tab). With the Display-over-other-apps permission it shows over other apps; its elements run tasks on tap and %vars in text are expanded.",
+            category = "System",
+            fields = listOf(
+                ActionField("scene", "Scene name", required = true, hint = "the scene's name — resolves within this task's project first, so a name reused in another project still finds the right one (a numeric id also works)"),
+                ActionField("position", "Position", FieldType.DROPDOWN, hint = "top / center / bottom (default center)"),
+                ActionField("modal", "Modal", FieldType.CHECKBOX, hint = "block the app underneath (on) vs tap-through HUD (off)"),
+                ActionField("dismissOnOutside", "Tap outside closes", FieldType.CHECKBOX, hint = "default on; off = close only via Back, a button, or timeout"),
+                ActionField("timeout", "Auto-dismiss (s)", FieldType.NUMBER, hint = "seconds before it closes itself; blank = stay"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "scene.hide",
+            name = "Hide Scene",
+            description = "Dismiss any scene currently shown.",
+            category = "System",
+            fields = emptyList(),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "tts.speak",
+            name = "Say (Text-to-Speech)",
+            description = "Speak text aloud using the device speaker",
+            category = "Notification",
+            fields = listOf(
+                ActionField("text", "Text to speak", FieldType.MULTILINE, required = true),
             )
         )
     )
@@ -264,11 +943,11 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "flow.wait",
-            nameRes = R.string.catalog_action_flow_wait_name,
-            descriptionRes = R.string.catalog_action_flow_wait_description,
-            categoryRes = R.string.catalog_category_flow,
+            name = "Wait",
+            description = "Pause task execution for a specified duration",
+            category = "Flow",
             fields = listOf(
-                ActionField("millis", R.string.catalog_action_flow_wait_field_millis_label, FieldType.NUMBER, required = true, hintRes = R.string.catalog_action_flow_wait_field_millis_hint),
+                ActionField("millis", "Milliseconds", FieldType.NUMBER, required = true, hint = "Duration in ms"),
             )
         )
     )
@@ -276,11 +955,33 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "task.run",
-            nameRes = R.string.catalog_action_task_run_name,
-            descriptionRes = R.string.catalog_action_task_run_description,
-            categoryRes = R.string.catalog_category_flow,
+            name = "Run Task",
+            description = "Run another task as a sub-task with named parameters (it reads them as {{ param.name }}). Capture its named results and ok/error status into variables under a prefix. Globals are shared; locals are isolated; max 8 levels deep.",
+            category = "Flow",
             fields = listOf(
-                ActionField("task", R.string.catalog_action_task_run_field_task_label, required = true, hintRes = R.string.catalog_action_task_run_field_task_hint),
+                ActionField("task", "Task id or name", required = true, hint = "Toggle WiFi"),
+                ActionField("results_prefix", "Store results into (prefix)", hint = "e.g. r_  →  %r_<name>, %r_ok, %r_error"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "task.return",
+            name = "Return Values",
+            description = "Return named values to the task that called this one (via its Run Task results prefix). Values may reference this task's variables and {{ param.* }}.",
+            category = "Flow",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "flow.fail",
+            name = "Fail",
+            description = "Stop the task with an error message. Surfaced to a caller's Run Task as %<prefix>error / %<prefix>ok=false.",
+            category = "Flow",
+            fields = listOf(
+                ActionField("message", "Error message", FieldType.MULTILINE, hint = "Why the task failed"),
             )
         )
     )
@@ -288,11 +989,11 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "flow.if",
-            nameRes = R.string.catalog_action_flow_if_name,
-            descriptionRes = R.string.catalog_action_flow_if_description,
-            categoryRes = R.string.catalog_category_flow,
+            name = "If",
+            description = "Run the following actions only when the condition is true (close with End If)",
+            category = "Flow",
             fields = listOf(
-                ActionField("condition", R.string.catalog_action_flow_if_field_condition_label, required = true, hintRes = R.string.catalog_action_flow_if_field_condition_hint),
+                ActionField("condition", "Condition", required = true, hint = "%battery < 20"),
             )
         )
     )
@@ -300,30 +1001,30 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "flow.else",
-            nameRes = R.string.catalog_action_flow_else_name,
-            descriptionRes = R.string.catalog_action_flow_else_description,
-            categoryRes = R.string.catalog_category_flow,
+            name = "Else",
+            description = "Alternate branch executed when the matching If was false",
+            category = "Flow",
         )
     )
 
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "flow.endif",
-            nameRes = R.string.catalog_action_flow_endif_name,
-            descriptionRes = R.string.catalog_action_flow_endif_description,
-            categoryRes = R.string.catalog_category_flow,
+            name = "End If",
+            description = "Closes the matching If/Else block",
+            category = "Flow",
         )
     )
 
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "flow.foreach",
-            nameRes = R.string.catalog_action_flow_foreach_name,
-            descriptionRes = R.string.catalog_action_flow_foreach_description,
-            categoryRes = R.string.catalog_category_flow,
+            name = "For Each",
+            description = "Iterate the following actions over an array variable (close with End For)",
+            category = "Flow",
             fields = listOf(
-                ActionField("list", R.string.catalog_action_flow_foreach_field_list_label, required = true, hintRes = R.string.catalog_action_flow_foreach_field_list_hint),
-                ActionField("var", R.string.catalog_action_flow_foreach_field_var_label, hintRes = R.string.catalog_action_flow_foreach_field_var_hint),
+                ActionField("list", "Array variable name", required = true, hint = "myList"),
+                ActionField("var", "Item variable name", hint = "item"),
             )
         )
     )
@@ -331,31 +1032,63 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "flow.endfor",
-            nameRes = R.string.catalog_action_flow_endfor_name,
-            descriptionRes = R.string.catalog_action_flow_endfor_description,
-            categoryRes = R.string.catalog_category_flow,
+            name = "End For",
+            description = "Closes the matching For Each loop",
+            category = "Flow",
         )
     )
 
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "flow.stop",
-            nameRes = R.string.catalog_action_flow_stop_name,
-            descriptionRes = R.string.catalog_action_flow_stop_description,
-            categoryRes = R.string.catalog_category_flow,
+            name = "Stop",
+            description = "Halt the rest of the task immediately",
+            category = "Flow",
         )
     )
 
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "intent.launch",
-            nameRes = R.string.catalog_action_intent_launch_name,
-            descriptionRes = R.string.catalog_action_intent_launch_description,
-            categoryRes = R.string.catalog_category_app,
+            name = "Launch Intent",
+            description = "Launch an activity or service via intent",
+            category = "App",
             fields = listOf(
-                ActionField("package", R.string.catalog_action_intent_launch_field_package_label, required = true, hintRes = R.string.catalog_action_intent_launch_field_package_hint),
-                ActionField("action", R.string.catalog_action_intent_launch_field_action_label, hintRes = R.string.catalog_action_intent_launch_field_action_hint),
-                ActionField("category", R.string.catalog_action_intent_launch_field_category_label, hintRes = R.string.catalog_action_intent_launch_field_category_hint),
+                ActionField("package", "App", FieldType.APP_PACKAGE, required = true, hint = "pick an app, or type a package / %var"),
+                ActionField("action", "Intent action", hint = "MAIN, VIEW, etc."),
+                ActionField("category", "Intent category", hint = "Optional"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "intent.send",
+            name = "Send Intent",
+            description = "Fire an arbitrary Android intent (action, component, data URI, MIME, string extras) as an activity, service, or broadcast — e.g. the 白い熊 GNU Jami automation intents",
+            category = "App",
+            fields = listOf(
+                ActionField("action", "Intent action", hint = "shiroikuma.jami.action.SEND_MESSAGE or android.intent.action.VIEW"),
+                ActionField("package", "Target app", FieldType.APP_PACKAGE, hint = "pick an app, or type a package / %var (e.g. shiroikuma.jami)"),
+                ActionField("class", "Component class (fully-qualified)", hint = "cx.ring.automation.AutomationActivity"),
+                ActionField("data", "Data URI", hint = "jami-cmd://send/default/<hex>?text=hi&token=…"),
+                ActionField("mime", "MIME type", hint = "text/plain (optional)"),
+                ActionField("target", "Dispatch target", FieldType.DROPDOWN, hint = "activity / foreground-service / service / broadcast"),
+                ActionField("extra1_key", "Extra 1 key", hint = "account"),
+                ActionField("extra1_value", "Extra 1 value", hint = "default"),
+                ActionField("extra2_key", "Extra 2 key", hint = "peer"),
+                ActionField("extra2_value", "Extra 2 value", hint = "jami:<40-hex>"),
+                ActionField("extra3_key", "Extra 3 key", hint = "text"),
+                ActionField("extra3_value", "Extra 3 value", hint = "Hello from a task"),
+                ActionField("extra4_key", "Extra 4 key", hint = "token"),
+                ActionField("extra4_value", "Extra 4 value", hint = "automation token"),
+                ActionField("extra5_key", "Extra 5 key"),
+                ActionField("extra5_value", "Extra 5 value"),
+                ActionField("extra6_key", "Extra 6 key"),
+                ActionField("extra6_value", "Extra 6 value"),
+                ActionField("flags", "Intent flags", hint = "optional; decimal or 0x-hex, OR'd in"),
+                ActionField("result_var", "Result variable (broadcast)", hint = "ordered broadcast; stores the receiver's result data"),
+                ActionField("result_timeout", "Result timeout (s)", FieldType.NUMBER, hint = "default 5"),
             )
         )
     )
@@ -363,14 +1096,14 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "plugin.locale.fire",
-            nameRes = R.string.catalog_action_plugin_locale_fire_name,
-            descriptionRes = R.string.catalog_action_plugin_locale_fire_description,
-            categoryRes = R.string.catalog_category_plugin,
+            name = "Locale Plugin Setting",
+            description = "Dispatch an explicit Locale/Tasker-compatible setting plugin request",
+            category = "Plugin",
             fields = listOf(
-                ActionField("package", R.string.catalog_action_plugin_locale_fire_field_package_label, required = true, hintRes = R.string.catalog_action_plugin_locale_fire_field_package_hint),
-                ActionField("bundleJson", R.string.catalog_action_plugin_locale_fire_field_bundlejson_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_plugin_locale_fire_field_bundlejson_hint),
-                ActionField("blurb", R.string.catalog_action_plugin_locale_fire_field_blurb_label, hintRes = R.string.catalog_action_plugin_locale_fire_field_blurb_hint),
-                ActionField("timeoutMs", R.string.catalog_action_plugin_locale_fire_field_timeoutms_label, FieldType.NUMBER, hintRes = R.string.catalog_action_plugin_locale_fire_field_timeoutms_hint),
+                ActionField("package", "Plugin package", required = true, hint = "com.example.plugin"),
+                ActionField("bundleJson", "Bundle JSON", FieldType.MULTILINE, hint = "{\"key\":\"value\"}"),
+                ActionField("blurb", "Blurb", hint = "Short user-visible summary"),
+                ActionField("timeoutMs", "Timeout ms", FieldType.NUMBER, hint = "5000"),
             )
         )
     )
@@ -378,16 +1111,16 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "plugin.locale.query",
-            nameRes = R.string.catalog_action_plugin_locale_query_name,
-            descriptionRes = R.string.catalog_action_plugin_locale_query_description,
-            categoryRes = R.string.catalog_category_plugin,
+            name = "Locale Plugin Condition",
+            description = "Query an explicit Locale/Tasker-compatible condition plugin and store its state",
+            category = "Plugin",
             fields = listOf(
-                ActionField("package", R.string.catalog_action_plugin_locale_query_field_package_label, required = true, hintRes = R.string.catalog_action_plugin_locale_query_field_package_hint),
-                ActionField("bundleJson", R.string.catalog_action_plugin_locale_query_field_bundlejson_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_plugin_locale_query_field_bundlejson_hint),
-                ActionField("blurb", R.string.catalog_action_plugin_locale_query_field_blurb_label, hintRes = R.string.catalog_action_plugin_locale_query_field_blurb_hint),
-                ActionField("timeoutMs", R.string.catalog_action_plugin_locale_query_field_timeoutms_label, FieldType.NUMBER, hintRes = R.string.catalog_action_plugin_locale_query_field_timeoutms_hint),
-                ActionField("resultVariable", R.string.catalog_action_plugin_locale_query_field_resultvariable_label, hintRes = R.string.catalog_action_plugin_locale_query_field_resultvariable_hint),
-                ActionField("requireSatisfied", R.string.catalog_action_plugin_locale_query_field_requiresatisfied_label, FieldType.CHECKBOX),
+                ActionField("package", "Plugin package", required = true, hint = "com.example.plugin"),
+                ActionField("bundleJson", "Bundle JSON", FieldType.MULTILINE, hint = "{\"key\":\"value\"}"),
+                ActionField("blurb", "Blurb", hint = "Short user-visible summary"),
+                ActionField("timeoutMs", "Timeout ms", FieldType.NUMBER, hint = "5000"),
+                ActionField("resultVariable", "Result variable", hint = "%plugin_state"),
+                ActionField("requireSatisfied", "Fail unless satisfied", FieldType.CHECKBOX),
             )
         )
     )
@@ -395,16 +1128,15 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "script.termux.run",
-            nameRes = R.string.catalog_action_script_termux_run_name,
-            descriptionRes = R.string.catalog_action_script_termux_run_description,
-            categoryRes = R.string.catalog_category_script,
+            name = "Run Termux Script",
+            description = "Plan a Termux:Tasker script run; blocked until the script backend is implemented",
+            category = "Script",
             fields = listOf(
-                ActionField("executable", R.string.catalog_action_script_termux_run_field_executable_label, required = true, hintRes = R.string.catalog_action_script_termux_run_field_executable_hint),
-                ActionField("arguments", R.string.catalog_action_script_termux_run_field_arguments_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_script_termux_run_field_arguments_hint),
-                ActionField("workingDirectory", R.string.catalog_action_script_termux_run_field_workingdirectory_label, hintRes = R.string.catalog_action_script_termux_run_field_workingdirectory_hint),
-                ActionField("stdin", R.string.catalog_action_script_termux_run_field_stdin_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_script_termux_run_field_stdin_hint),
-                ActionField("capturePrefix", R.string.catalog_action_script_termux_run_field_captureprefix_label, hintRes = R.string.catalog_action_script_termux_run_field_captureprefix_hint),
-                ActionField("timeoutMs", R.string.catalog_action_script_termux_run_field_timeoutms_label, FieldType.NUMBER, hintRes = R.string.catalog_action_script_termux_run_field_timeoutms_hint),
+                ActionField("executable", "Executable", required = true, hint = "~/.termux/tasker/my_script"),
+                ActionField("arguments", "Arguments", FieldType.MULTILINE, hint = "Optional shell-style arguments"),
+                ActionField("workingDirectory", "Working directory", hint = "Optional Termux working directory"),
+                ActionField("stdin", "Standard input", FieldType.MULTILINE, hint = "Optional stdin payload"),
+                ActionField("capturePrefix", "Output variable prefix", hint = "%script"),
             )
         )
     )
@@ -412,12 +1144,12 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "tasker.unsupported",
-            nameRes = R.string.catalog_action_tasker_unsupported_name,
-            descriptionRes = R.string.catalog_action_tasker_unsupported_description,
-            categoryRes = R.string.catalog_category_import,
+            name = "Unsupported Tasker Action",
+            description = "Placeholder for a Tasker action that could not be safely mapped during import",
+            category = "Import",
             fields = listOf(
-                ActionField("taskerCode", R.string.catalog_action_tasker_unsupported_field_taskercode_label, required = true),
-                ActionField("summary", R.string.catalog_action_tasker_unsupported_field_summary_label, FieldType.MULTILINE),
+                ActionField("taskerCode", "Tasker action code", required = true),
+                ActionField("summary", "Import note", FieldType.MULTILINE),
             )
         )
     )
@@ -426,11 +1158,11 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "wifi.toggle",
-            nameRes = R.string.catalog_action_wifi_toggle_name,
-            descriptionRes = R.string.catalog_action_wifi_toggle_description,
-            categoryRes = R.string.catalog_category_settings,
+            name = "Toggle WiFi",
+            description = "Turn WiFi on or off",
+            category = "Settings",
             fields = listOf(
-                ActionField("state", R.string.catalog_action_wifi_toggle_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_wifi_toggle_field_state_hint),
+                ActionField("state", "State", FieldType.DROPDOWN, required = true, hint = "on/off/toggle"),
             )
         )
     )
@@ -438,11 +1170,11 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "bluetooth.toggle",
-            nameRes = R.string.catalog_action_bluetooth_toggle_name,
-            descriptionRes = R.string.catalog_action_bluetooth_toggle_description,
-            categoryRes = R.string.catalog_category_settings,
+            name = "Toggle Bluetooth",
+            description = "Turn Bluetooth on or off",
+            category = "Settings",
             fields = listOf(
-                ActionField("state", R.string.catalog_action_bluetooth_toggle_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_bluetooth_toggle_field_state_hint),
+                ActionField("state", "State", FieldType.DROPDOWN, required = true, hint = "on/off/toggle"),
             )
         )
     )
@@ -450,11 +1182,11 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "brightness.set",
-            nameRes = R.string.catalog_action_brightness_set_name,
-            descriptionRes = R.string.catalog_action_brightness_set_description,
-            categoryRes = R.string.catalog_category_settings,
+            name = "Set Brightness",
+            description = "Set screen brightness level",
+            category = "Settings",
             fields = listOf(
-                ActionField("brightness", R.string.catalog_action_brightness_set_field_brightness_label, FieldType.NUMBER, required = true),
+                ActionField("brightness", "Brightness (0-255)", FieldType.NUMBER, required = true),
             )
         )
     )
@@ -462,12 +1194,42 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "volume.set",
-            nameRes = R.string.catalog_action_volume_set_name,
-            descriptionRes = R.string.catalog_action_volume_set_description,
-            categoryRes = R.string.catalog_category_settings,
+            name = "Set Volume",
+            description = "Adjust volume for a stream",
+            category = "Settings",
             fields = listOf(
-                ActionField("stream", R.string.catalog_action_volume_set_field_stream_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_volume_set_field_stream_hint),
-                ActionField("level", R.string.catalog_action_volume_set_field_level_label, FieldType.NUMBER, required = true),
+                ActionField("stream", "Stream", FieldType.DROPDOWN, required = true, hint = "music / ring / alarm / notification / call / system"),
+                ActionField("level", "Level", FieldType.NUMBER, required = true, hint = "0..max for the stream, or mute / unmute"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "volume.get",
+            name = "Get Volume",
+            description = "Read the current volume of a stream into a variable",
+            category = "Settings",
+            fields = listOf(
+                ActionField("stream", "Stream", FieldType.DROPDOWN, required = true, hint = "music / ring / alarm / notification / call / system"),
+                ActionField("var", "Store in variable", required = true, hint = "Variable name (e.g. VOL) to receive 0..max"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "state.get",
+            name = "Get Device State",
+            description = "Read battery %, charging, WiFi and airplane state into variables (no permissions needed)",
+            category = "Settings",
+            fields = listOf(
+                ActionField("battery", "Battery % → variable", hint = "var for 00..99 or 100 (e.g. BATT)"),
+                ActionField("charging", "Charging → variable", hint = "var for true/false (e.g. CHG)"),
+                ActionField("wifi", "WiFi on → variable", hint = "var for true/false (e.g. WIFI)"),
+                ActionField("airplane", "Airplane on → variable", hint = "var for true/false (e.g. AIR)"),
+                ActionField("screen", "Screen on → variable", hint = "var for on/off (e.g. SCR)"),
+                ActionField("app", "Foreground app → variable", hint = "var for the package name (e.g. APP)"),
             )
         )
     )
@@ -475,11 +1237,11 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "airplane.toggle",
-            nameRes = R.string.catalog_action_airplane_toggle_name,
-            descriptionRes = R.string.catalog_action_airplane_toggle_description,
-            categoryRes = R.string.catalog_category_settings,
+            name = "Toggle Airplane Mode",
+            description = "Turn Airplane mode on or off",
+            category = "Settings",
             fields = listOf(
-                ActionField("state", R.string.catalog_action_airplane_toggle_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_airplane_toggle_field_state_hint),
+                ActionField("state", "State", FieldType.DROPDOWN, required = true, hint = "on/off/toggle"),
             )
         )
     )
@@ -487,11 +1249,11 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "mobile.toggle",
-            nameRes = R.string.catalog_action_mobile_toggle_name,
-            descriptionRes = R.string.catalog_action_mobile_toggle_description,
-            categoryRes = R.string.catalog_category_settings,
+            name = "Toggle Mobile Data",
+            description = "Turn mobile data on or off",
+            category = "Settings",
             fields = listOf(
-                ActionField("state", R.string.catalog_action_mobile_toggle_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_mobile_toggle_field_state_hint),
+                ActionField("state", "State", FieldType.DROPDOWN, required = true, hint = "on/off/toggle"),
             )
         )
     )
@@ -499,11 +1261,11 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "screen.timeout",
-            nameRes = R.string.catalog_action_screen_timeout_name,
-            descriptionRes = R.string.catalog_action_screen_timeout_description,
-            categoryRes = R.string.catalog_category_settings,
+            name = "Set Screen Timeout",
+            description = "Set screen sleep timeout duration",
+            category = "Settings",
             fields = listOf(
-                ActionField("millis", R.string.catalog_action_screen_timeout_field_millis_label, FieldType.NUMBER, required = true, hintRes = R.string.catalog_action_screen_timeout_field_millis_hint),
+                ActionField("millis", "Timeout (ms)", FieldType.NUMBER, required = true, hint = "1000, 30000, etc."),
             )
         )
     )
@@ -511,11 +1273,11 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "dnd.set",
-            nameRes = R.string.catalog_action_dnd_set_name,
-            descriptionRes = R.string.catalog_action_dnd_set_description,
-            categoryRes = R.string.catalog_category_settings,
+            name = "Set Do Not Disturb",
+            description = "Set DND interruption filter mode",
+            category = "Settings",
             fields = listOf(
-                ActionField("mode", R.string.catalog_action_dnd_set_field_mode_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_dnd_set_field_mode_hint),
+                ActionField("mode", "Mode", FieldType.DROPDOWN, required = true, hint = "off/priority/alarms/total_silence"),
             )
         )
     )
@@ -523,11 +1285,11 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "ringer.set",
-            nameRes = R.string.catalog_action_ringer_set_name,
-            descriptionRes = R.string.catalog_action_ringer_set_description,
-            categoryRes = R.string.catalog_category_settings,
+            name = "Set Ringer Mode",
+            description = "Set device ringer mode",
+            category = "Settings",
             fields = listOf(
-                ActionField("mode", R.string.catalog_action_ringer_set_field_mode_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_ringer_set_field_mode_hint),
+                ActionField("mode", "Mode", FieldType.DROPDOWN, required = true, hint = "normal/vibrate/silent"),
             )
         )
     )
@@ -535,11 +1297,11 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "torch.set",
-            nameRes = R.string.catalog_action_torch_set_name,
-            descriptionRes = R.string.catalog_action_torch_set_description,
-            categoryRes = R.string.catalog_category_settings,
+            name = "Toggle Torch",
+            description = "Turn camera flashlight on or off",
+            category = "Settings",
             fields = listOf(
-                ActionField("state", R.string.catalog_action_torch_set_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_torch_set_field_state_hint),
+                ActionField("state", "State", FieldType.DROPDOWN, required = true, hint = "on/off/toggle"),
             )
         )
     )
@@ -547,12 +1309,12 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "tile.set",
-            nameRes = R.string.catalog_action_tile_set_name,
-            descriptionRes = R.string.catalog_action_tile_set_description,
-            categoryRes = R.string.catalog_category_settings,
+            name = "Set Tile State",
+            description = "Update Quick Settings tile state",
+            category = "Settings",
             fields = listOf(
-                ActionField("state", R.string.catalog_action_tile_set_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_tile_set_field_state_hint),
-                ActionField("label", R.string.catalog_action_tile_set_field_label_label, required = false, hintRes = R.string.catalog_action_tile_set_field_label_hint),
+                ActionField("state", "State", FieldType.DROPDOWN, required = true, hint = "active/inactive"),
+                ActionField("label", "Label", required = false, hint = "Tile label text"),
             )
         )
     )
@@ -561,11 +1323,11 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "app.launch",
-            nameRes = R.string.catalog_action_app_launch_name,
-            descriptionRes = R.string.catalog_action_app_launch_description,
-            categoryRes = R.string.catalog_category_app,
+            name = "Launch App",
+            description = "Launch an installed application",
+            category = "App",
             fields = listOf(
-                ActionField("package", R.string.catalog_action_app_launch_field_package_label, required = true, hintRes = R.string.catalog_action_app_launch_field_package_hint),
+                ActionField("package", "App", FieldType.APP_PACKAGE, required = true, hint = "pick an app, or type a package / %var"),
             )
         )
     )
@@ -573,11 +1335,63 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "app.kill",
-            nameRes = R.string.catalog_action_app_kill_name,
-            descriptionRes = R.string.catalog_action_app_kill_description,
-            categoryRes = R.string.catalog_category_app,
+            name = "Kill App",
+            description = "Force close an app",
+            category = "App",
             fields = listOf(
-                ActionField("package", R.string.catalog_action_app_kill_field_package_label, required = true),
+                ActionField("package", "App", FieldType.APP_PACKAGE, required = true, hint = "pick an app, or type a package / %var"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "app.freeze",
+            name = "Freeze App",
+            description = "Disable an app so it can't run (Shizuku) — it disappears until unfrozen",
+            category = "App",
+            fields = listOf(
+                ActionField("package", "App", FieldType.APP_PACKAGE, required = true, hint = "pick an app, or type a package / %var"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "app.unfreeze",
+            name = "Unfreeze App",
+            description = "Re-enable a frozen app (Shizuku)",
+            category = "App",
+            fields = listOf(
+                ActionField("package", "App", FieldType.APP_PACKAGE, required = true, hint = "pick an app, or type a package / %var"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "tasks.launchers",
+            name = "Make Launcher Tasks",
+            description = "Pick apps; create an unfreeze-then-launch task for each in a project group.",
+            category = "App",
+            fields = listOf(
+                ActionField("project", "Project", required = true),
+                ActionField("group", "Group", required = true),
+                ActionField("suffix", "Task name suffix"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "app.pickmulti",
+            name = "Pick Apps → Variable",
+            description = "Multi-select apps (the variable's current packages pre-ticked and shown first); write the chosen packages back to the variable.",
+            category = "App",
+            fields = listOf(
+                ActionField("variable", "Variable", required = true, hint = "read pre-selection from + write back, e.g. SC_Blacklist"),
+                ActionField("title", "Title", hint = "dialog title"),
+                ActionField("separator", "Separator", hint = "joins the packages (default: space)"),
             )
         )
     )
@@ -585,9 +1399,29 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "home.go",
-            nameRes = R.string.catalog_action_home_go_name,
-            descriptionRes = R.string.catalog_action_home_go_description,
-            categoryRes = R.string.catalog_category_app,
+            name = "Go Home",
+            description = "Return to launcher home screen",
+            category = "App",
+            fields = emptyList()
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "app.previous",
+            name = "Previous App",
+            description = "Switch to the most recent app before this one (alt-tab). Needs Usage access.",
+            category = "App",
+            fields = emptyList()
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "app.next",
+            name = "Next App",
+            description = "Step forward through the recent-apps cycle. Needs Usage access.",
+            category = "App",
             fields = emptyList()
         )
     )
@@ -595,11 +1429,11 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "url.open",
-            nameRes = R.string.catalog_action_url_open_name,
-            descriptionRes = R.string.catalog_action_url_open_description,
-            categoryRes = R.string.catalog_category_app,
+            name = "Open URL",
+            description = "Open a URL in the browser",
+            category = "App",
             fields = listOf(
-                ActionField("url", R.string.catalog_action_url_open_field_url_label, required = true, hintRes = R.string.catalog_action_url_open_field_url_hint),
+                ActionField("url", "URL", required = true, hint = "https://example.com"),
             )
         )
     )
@@ -607,12 +1441,12 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "sms.send",
-            nameRes = R.string.catalog_action_sms_send_name,
-            descriptionRes = R.string.catalog_action_sms_send_description,
-            categoryRes = R.string.catalog_category_app,
+            name = "Send SMS",
+            description = "Send a text message",
+            category = "App",
             fields = listOf(
-                ActionField("number", R.string.catalog_action_sms_send_field_number_label, required = true),
-                ActionField("message", R.string.catalog_action_sms_send_field_message_label, FieldType.MULTILINE, required = true),
+                ActionField("number", "Phone number", required = true),
+                ActionField("message", "Message", FieldType.MULTILINE, required = true),
             )
         )
     )
@@ -620,11 +1454,12 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "screenshot.take",
-            nameRes = R.string.catalog_action_screenshot_take_name,
-            descriptionRes = R.string.catalog_action_screenshot_take_description,
-            categoryRes = R.string.catalog_category_app,
+            name = "Take Screenshot",
+            description = "Capture the screen to a file via Shizuku",
+            category = "App",
             fields = listOf(
-                ActionField("path", R.string.catalog_action_screenshot_take_field_path_label, hintRes = R.string.catalog_action_screenshot_take_field_path_hint),
+                ActionField("path", "Path", hint = "optional output path (default: app external files)"),
+                ActionField("store", "Store path in", hint = "variable for the saved path (default: screenshot_path)"),
             )
         )
     )
@@ -633,12 +1468,12 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "file.read",
-            nameRes = R.string.catalog_action_file_read_name,
-            descriptionRes = R.string.catalog_action_file_read_description,
-            categoryRes = R.string.catalog_category_file,
+            name = "Read File",
+            description = "Read file contents into a variable",
+            category = "File",
             fields = listOf(
-                ActionField("path", R.string.catalog_action_file_read_field_path_label, required = true),
-                ActionField("var", R.string.catalog_action_file_read_field_var_label, required = true, hintRes = R.string.catalog_action_file_read_field_var_hint),
+                ActionField("path", "File path", required = true),
+                ActionField("var", "Store in variable", required = true, hint = "%var"),
             )
         )
     )
@@ -646,12 +1481,12 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "file.write",
-            nameRes = R.string.catalog_action_file_write_name,
-            descriptionRes = R.string.catalog_action_file_write_description,
-            categoryRes = R.string.catalog_category_file,
+            name = "Write File",
+            description = "Write contents to a file (overwrites)",
+            category = "File",
             fields = listOf(
-                ActionField("path", R.string.catalog_action_file_write_field_path_label, required = true),
-                ActionField("text", R.string.catalog_action_file_write_field_text_label, FieldType.MULTILINE, required = true),
+                ActionField("path", "File path", required = true),
+                ActionField("text", "Content", FieldType.MULTILINE, required = true),
             )
         )
     )
@@ -659,12 +1494,12 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "file.append",
-            nameRes = R.string.catalog_action_file_append_name,
-            descriptionRes = R.string.catalog_action_file_append_description,
-            categoryRes = R.string.catalog_category_file,
+            name = "Append to File",
+            description = "Append contents to a file",
+            category = "File",
             fields = listOf(
-                ActionField("path", R.string.catalog_action_file_append_field_path_label, required = true),
-                ActionField("text", R.string.catalog_action_file_append_field_text_label, FieldType.MULTILINE, required = true),
+                ActionField("path", "File path", required = true),
+                ActionField("text", "Content", FieldType.MULTILINE, required = true),
             )
         )
     )
@@ -672,11 +1507,11 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "file.delete",
-            nameRes = R.string.catalog_action_file_delete_name,
-            descriptionRes = R.string.catalog_action_file_delete_description,
-            categoryRes = R.string.catalog_category_file,
+            name = "Delete File",
+            description = "Delete a file",
+            category = "File",
             fields = listOf(
-                ActionField("path", R.string.catalog_action_file_delete_field_path_label, required = true),
+                ActionField("path", "File path", required = true),
             )
         )
     )
@@ -684,13 +1519,13 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "file.list",
-            nameRes = R.string.catalog_action_file_list_name,
-            descriptionRes = R.string.catalog_action_file_list_description,
-            categoryRes = R.string.catalog_category_file,
+            name = "List Files",
+            description = "List directory contents into a variable",
+            category = "File",
             fields = listOf(
-                ActionField("path", R.string.catalog_action_file_list_field_path_label, required = true),
-                ActionField("var", R.string.catalog_action_file_list_field_var_label, required = true, hintRes = R.string.catalog_action_file_list_field_var_hint),
-                ActionField("pattern", R.string.catalog_action_file_list_field_pattern_label, hintRes = R.string.catalog_action_file_list_field_pattern_hint),
+                ActionField("path", "Directory path", required = true),
+                ActionField("var", "Store in variable", required = true, hint = "%var"),
+                ActionField("pattern", "Filename pattern", hint = "*.txt"),
             )
         )
     )
@@ -698,76 +1533,43 @@ fun registerActionMetadata() {
     // Network actions
     ActionMetadataRegistry.register(
         ActionMetadata(
-            id = "http.request",
-            nameRes = R.string.catalog_action_http_request_name,
-            descriptionRes = R.string.catalog_action_http_request_description,
-            categoryRes = R.string.catalog_category_network,
-            fields = listOf(
-                ActionField("method", R.string.catalog_action_http_request_field_method_label, hintRes = R.string.catalog_action_http_request_field_method_hint),
-                ActionField("url", R.string.catalog_action_http_request_field_url_label, required = true),
-                ActionField("query", R.string.catalog_action_http_request_field_query_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_http_request_field_query_hint),
-                ActionField("headers", R.string.catalog_action_http_request_field_headers_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_http_request_field_headers_hint),
-                ActionField("authorization", R.string.catalog_action_http_request_field_authorization_label, hintRes = R.string.catalog_action_http_request_field_authorization_hint),
-                ActionField("body", R.string.catalog_action_http_request_field_body_label, FieldType.MULTILINE),
-                ActionField("body_file", R.string.catalog_action_http_request_field_body_file_label, hintRes = R.string.catalog_action_http_request_field_body_file_hint),
-                ActionField("content_type", R.string.catalog_action_http_request_field_content_type_label, hintRes = R.string.catalog_action_http_request_field_content_type_hint),
-                ActionField("response_var", R.string.catalog_action_http_request_field_response_var_label, hintRes = R.string.catalog_action_http_request_field_response_var_hint),
-                ActionField("status_var", R.string.catalog_action_http_request_field_status_var_label, hintRes = R.string.catalog_action_http_request_field_status_var_hint),
-                ActionField("headers_var", R.string.catalog_action_http_request_field_headers_var_label, hintRes = R.string.catalog_action_http_request_field_headers_var_hint),
-                ActionField("output_file", R.string.catalog_action_http_request_field_output_file_label, hintRes = R.string.catalog_action_http_request_field_output_file_hint),
-                ActionField("max_response_bytes", R.string.catalog_action_http_request_field_max_response_bytes_label, FieldType.NUMBER, hintRes = R.string.catalog_action_http_request_field_max_response_bytes_hint),
-                ActionField("redirects", R.string.catalog_action_http_request_field_redirects_label, hintRes = R.string.catalog_action_http_request_field_redirects_hint),
-                ActionField("allow_http", R.string.catalog_action_http_request_field_allow_http_label, FieldType.CHECKBOX, hintRes = R.string.catalog_action_http_request_field_allow_http_hint),
-                ActionField("timeout_sec", R.string.catalog_action_http_request_field_timeout_label, FieldType.NUMBER, hintRes = R.string.catalog_action_http_request_field_timeout_hint),
-                ActionField("connect_timeout_sec", R.string.catalog_action_http_request_field_connect_timeout_label, FieldType.NUMBER),
-                ActionField("read_timeout_sec", R.string.catalog_action_http_request_field_read_timeout_label, FieldType.NUMBER),
-                ActionField("write_timeout_sec", R.string.catalog_action_http_request_field_write_timeout_label, FieldType.NUMBER),
-                ActionField("call_timeout_sec", R.string.catalog_action_http_request_field_call_timeout_label, FieldType.NUMBER),
-            ),
-        )
-    )
-
-    ActionMetadataRegistry.register(
-        ActionMetadata(
             id = "http.get",
-            nameRes = R.string.catalog_action_http_get_name,
-            descriptionRes = R.string.catalog_action_http_get_description,
-            categoryRes = R.string.catalog_category_network,
+            name = "HTTP GET",
+            description = "Perform an HTTP GET request",
+            category = "Network",
             fields = listOf(
-                ActionField("url", R.string.catalog_action_http_get_field_url_label, required = true),
-                ActionField("var", R.string.catalog_action_http_get_field_var_label, hintRes = R.string.catalog_action_http_get_field_var_hint),
-                ActionField("allow_http", R.string.catalog_action_http_get_field_allow_http_label, FieldType.CHECKBOX, hintRes = R.string.catalog_action_http_get_field_allow_http_hint),
-            ),
-            pickerVisible = false,
+                ActionField("url", "URL", required = true),
+                ActionField("var", "Store response in", hint = "%var"),
+                ActionField("allow_http", "Allow HTTP", FieldType.CHECKBOX, hint = "Allow plain HTTP for LAN/private-network hosts only"),
+            )
         )
     )
 
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "http.post",
-            nameRes = R.string.catalog_action_http_post_name,
-            descriptionRes = R.string.catalog_action_http_post_description,
-            categoryRes = R.string.catalog_category_network,
+            name = "HTTP POST",
+            description = "Perform an HTTP POST request",
+            category = "Network",
             fields = listOf(
-                ActionField("url", R.string.catalog_action_http_post_field_url_label, required = true),
-                ActionField("data", R.string.catalog_action_http_post_field_data_label, FieldType.MULTILINE),
-                ActionField("var", R.string.catalog_action_http_post_field_var_label, hintRes = R.string.catalog_action_http_post_field_var_hint),
-                ActionField("allow_http", R.string.catalog_action_http_post_field_allow_http_label, FieldType.CHECKBOX, hintRes = R.string.catalog_action_http_post_field_allow_http_hint),
-            ),
-            pickerVisible = false,
+                ActionField("url", "URL", required = true),
+                ActionField("data", "Request body", FieldType.MULTILINE),
+                ActionField("var", "Store response in", hint = "%var"),
+                ActionField("allow_http", "Allow HTTP", FieldType.CHECKBOX, hint = "Allow plain HTTP for LAN/private-network hosts only"),
+            )
         )
     )
 
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "ping",
-            nameRes = R.string.catalog_action_ping_name,
-            descriptionRes = R.string.catalog_action_ping_description,
-            categoryRes = R.string.catalog_category_network,
+            name = "Ping Host",
+            description = "Ping a network host",
+            category = "Network",
             fields = listOf(
-                ActionField("host", R.string.catalog_action_ping_field_host_label, required = true),
-                ActionField("timeout_sec", R.string.catalog_action_ping_field_timeout_label, FieldType.NUMBER, hintRes = R.string.catalog_action_ping_field_timeout_hint),
-                ActionField("var", R.string.catalog_action_ping_field_var_label, hintRes = R.string.catalog_action_ping_field_var_hint),
+                ActionField("host", "Host address", required = true),
+                ActionField("timeout_sec", "Timeout (seconds)", FieldType.NUMBER, hint = "Default: 5 (1-30)"),
+                ActionField("var", "Result variable", hint = "Stores true/false (default: result)"),
             )
         )
     )
@@ -775,15 +1577,15 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "download",
-            nameRes = R.string.catalog_action_download_name,
-            descriptionRes = R.string.catalog_action_download_description,
-            categoryRes = R.string.catalog_category_network,
+            name = "Download File",
+            description = "Download a file from URL",
+            category = "Network",
             fields = listOf(
-                ActionField("url", R.string.catalog_action_download_field_url_label, required = true),
-                ActionField("path", R.string.catalog_action_download_field_path_label, required = true),
-                ActionField("allow_http", R.string.catalog_action_download_field_allow_http_label, FieldType.CHECKBOX, hintRes = R.string.catalog_action_download_field_allow_http_hint),
-                ActionField("timeout_sec", R.string.catalog_action_download_field_timeout_label, FieldType.NUMBER, hintRes = R.string.catalog_action_download_field_timeout_hint),
-                ActionField("max_bytes", R.string.catalog_action_download_field_max_bytes_label, FieldType.NUMBER, hintRes = R.string.catalog_action_download_field_max_bytes_hint),
+                ActionField("url", "URL", required = true),
+                ActionField("path", "Save to path", required = true),
+                ActionField("allow_http", "Allow HTTP", FieldType.CHECKBOX, hint = "Allow plain HTTP for LAN/private-network hosts only"),
+                ActionField("timeout_sec", "Timeout (seconds)", FieldType.NUMBER, hint = "Default: 30 (1-300)"),
+                ActionField("max_bytes", "Size limit (bytes)", FieldType.NUMBER, hint = "Default and maximum: 52428800 (50 MB)"),
             )
         )
     )
@@ -791,13 +1593,13 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "wol",
-            nameRes = R.string.catalog_action_wol_name,
-            descriptionRes = R.string.catalog_action_wol_description,
-            categoryRes = R.string.catalog_category_network,
+            name = "Wake-on-LAN",
+            description = "Send a magic packet to wake a device on the local network",
+            category = "Network",
             fields = listOf(
-                ActionField("mac", R.string.catalog_action_wol_field_mac_label, required = true, hintRes = R.string.catalog_action_wol_field_mac_hint),
-                ActionField("broadcast", R.string.catalog_action_wol_field_broadcast_label, hintRes = R.string.catalog_action_wol_field_broadcast_hint),
-                ActionField("port", R.string.catalog_action_wol_field_port_label, FieldType.NUMBER, hintRes = R.string.catalog_action_wol_field_port_hint),
+                ActionField("mac", "MAC Address", required = true, hint = "e.g. AA:BB:CC:DD:EE:FF"),
+                ActionField("broadcast", "Broadcast IP", hint = "Default: 255.255.255.255"),
+                ActionField("port", "Port", FieldType.NUMBER, hint = "Default: 9"),
             )
         )
     )
@@ -806,12 +1608,12 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "sound.play",
-            nameRes = R.string.catalog_action_sound_play_name,
-            descriptionRes = R.string.catalog_action_sound_play_description,
-            categoryRes = R.string.catalog_category_media,
+            name = "Play Sound",
+            description = "Play a sound file",
+            category = "Media",
             fields = listOf(
-                ActionField("path", R.string.catalog_action_sound_play_field_path_label, required = true),
-                ActionField("volume", R.string.catalog_action_sound_play_field_volume_label, FieldType.NUMBER, hintRes = R.string.catalog_action_sound_play_field_volume_hint),
+                ActionField("path", "Sound file path", required = true),
+                ActionField("volume", "Volume (0-100)", FieldType.NUMBER, hint = "Optional; uses current volume when empty"),
             )
         )
     )
@@ -819,9 +1621,9 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "sound.stop",
-            nameRes = R.string.catalog_action_sound_stop_name,
-            descriptionRes = R.string.catalog_action_sound_stop_description,
-            categoryRes = R.string.catalog_category_media,
+            name = "Stop Sound",
+            description = "Stop playback",
+            category = "Media",
             fields = emptyList()
         )
     )
@@ -829,9 +1631,9 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "sound.pause",
-            nameRes = R.string.catalog_action_sound_pause_name,
-            descriptionRes = R.string.catalog_action_sound_pause_description,
-            categoryRes = R.string.catalog_category_media,
+            name = "Pause Sound",
+            description = "Pause playback",
+            category = "Media",
             fields = emptyList()
         )
     )
@@ -839,9 +1641,9 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "track.next",
-            nameRes = R.string.catalog_action_track_next_name,
-            descriptionRes = R.string.catalog_action_track_next_description,
-            categoryRes = R.string.catalog_category_media,
+            name = "Next Track",
+            description = "Play next track",
+            category = "Media",
             fields = emptyList()
         )
     )
@@ -849,9 +1651,19 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "track.previous",
-            nameRes = R.string.catalog_action_track_previous_name,
-            descriptionRes = R.string.catalog_action_track_previous_description,
-            categoryRes = R.string.catalog_category_media,
+            name = "Previous Track",
+            description = "Play previous track",
+            category = "Media",
+            fields = emptyList()
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "media.playpause",
+            name = "Play/Pause",
+            description = "Toggle media play/pause",
+            category = "Media",
             fields = emptyList()
         )
     )
@@ -859,11 +1671,46 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "media.mute",
-            nameRes = R.string.catalog_action_media_mute_name,
-            descriptionRes = R.string.catalog_action_media_mute_description,
-            categoryRes = R.string.catalog_category_media,
+            name = "Mute",
+            description = "Mute audio",
+            category = "Media",
             fields = listOf(
-                ActionField("stream", R.string.catalog_action_media_mute_field_stream_label, hintRes = R.string.catalog_action_media_mute_field_stream_hint),
+                ActionField("stream", "Stream", hint = "music, ring, notification, alarm, system, call (default: music)"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "audio.record.start",
+            name = "Start Recording",
+            description = "Start a voice recording (AAC/m4a). No-op if already recording.",
+            category = "Media",
+            fields = listOf(
+                ActionField("dir", "Output directory", hint = "e.g. %Pkey_Dir or /sdcard/Recordings; blank = app folder"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "audio.record.stop",
+            name = "Stop Recording",
+            description = "Stop the in-progress voice recording and save it (exposes %path).",
+            category = "Media",
+            fields = emptyList()
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "music.viz.test",
+            name = "Music Viz Test",
+            description = "Diagnostic: tap the output mix via Visualizer for a few seconds (play music!) and report whether live audio data arrives — decides if the audio-reactive 音楽端灯 is buildable",
+            category = "Media",
+            fields = listOf(
+                ActionField("seconds", "Sampling window (s)", FieldType.NUMBER, hint = "default 5, max 30"),
+                ActionField("var", "Report → variable", hint = "default: viz"),
             )
         )
     )
@@ -872,11 +1719,11 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "vibrate",
-            nameRes = R.string.catalog_action_vibrate_name,
-            descriptionRes = R.string.catalog_action_vibrate_description,
-            categoryRes = R.string.catalog_category_system,
+            name = "Vibrate",
+            description = "Vibrate the device",
+            category = "System",
             fields = listOf(
-                ActionField("millis", R.string.catalog_action_vibrate_field_millis_label, FieldType.NUMBER, required = true),
+                ActionField("millis", "Duration (ms)", FieldType.NUMBER, required = true),
             )
         )
     )
@@ -884,9 +1731,19 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "reboot",
-            nameRes = R.string.catalog_action_reboot_name,
-            descriptionRes = R.string.catalog_action_reboot_description,
-            categoryRes = R.string.catalog_category_system,
+            name = "Reboot Device",
+            description = "Reboot the device",
+            category = "System",
+            fields = emptyList()
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "power.off",
+            name = "Power Off",
+            description = "Shut down the device (via Shizuku).",
+            category = "System",
             fields = emptyList()
         )
     )
@@ -894,9 +1751,9 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "lock",
-            nameRes = R.string.catalog_action_lock_name,
-            descriptionRes = R.string.catalog_action_lock_description,
-            categoryRes = R.string.catalog_category_system,
+            name = "Lock Device",
+            description = "Lock the device screen",
+            category = "System",
             fields = emptyList()
         )
     )
@@ -904,9 +1761,9 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "screen.off",
-            nameRes = R.string.catalog_action_screen_off_name,
-            descriptionRes = R.string.catalog_action_screen_off_description,
-            categoryRes = R.string.catalog_category_system,
+            name = "Turn Screen Off",
+            description = "Turn off the display",
+            category = "System",
             fields = emptyList()
         )
     )
@@ -914,9 +1771,9 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "wake",
-            nameRes = R.string.catalog_action_wake_name,
-            descriptionRes = R.string.catalog_action_wake_description,
-            categoryRes = R.string.catalog_category_system,
+            name = "Wake Device",
+            description = "Wake the device (turn on screen)",
+            category = "System",
             fields = emptyList()
         )
     )
@@ -924,11 +1781,11 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "log",
-            nameRes = R.string.catalog_action_log_name,
-            descriptionRes = R.string.catalog_action_log_description,
-            categoryRes = R.string.catalog_category_system,
+            name = "Log Message",
+            description = "Write message to task log",
+            category = "System",
             fields = listOf(
-                ActionField("message", R.string.catalog_action_log_field_message_label, FieldType.MULTILINE, required = true),
+                ActionField("message", "Message", FieldType.MULTILINE, required = true),
             )
         )
     )

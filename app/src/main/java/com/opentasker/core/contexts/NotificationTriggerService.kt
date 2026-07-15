@@ -6,17 +6,50 @@ import android.service.notification.StatusBarNotification
 import com.opentasker.core.logging.AppLogger
 
 class NotificationTriggerService : NotificationListenerService() {
+    override fun onListenerConnected() {
+        instance = this
+    }
+
+    override fun onListenerDisconnected() {
+        if (instance === this) instance = null
+    }
+
+    override fun onDestroy() {
+        if (instance === this) instance = null
+        super.onDestroy()
+    }
+
+    /** Cancel every clearable active notification from [pkg]. Used by the notify.dismiss action so
+     *  entering an app removes its notification (the 通知明滅 edge-light off-trigger). Returns the count. */
+    fun dismissPackage(pkg: String): Int {
+        val active = runCatching { activeNotifications }.getOrNull() ?: return 0
+        var n = 0
+        for (sbn in active) {
+            if (sbn.packageName == pkg && sbn.isClearable) {
+                runCatching { cancelNotification(sbn.key) }.onSuccess { n++ }
+            }
+        }
+        return n
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         sbn ?: return
         val extras = sbn.notification.extras
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)
         val body = extras.getCharSequence(Notification.EXTRA_TEXT)
             ?: extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
+        // Marker set by a sister app on a protected-contact "vague" notification — the key is PER-PACKAGE
+        // ("<pkg>.protected", e.g. shiroikuma.jami.protected / shiroikuma.arcanechat.protected), so every
+        // sister app that adopts the convention works with no per-app change here. 通知明滅 reads it via
+        // %NOTIF_PROTECTED to blink for it without any visible content.
+        val isProtected = extras.getBoolean("${sbn.packageName}.protected", false)
 
         val accepted = NotificationContextEvents.publish(
             packageName = sbn.packageName.orEmpty(),
             title = title,
             body = body,
+            ongoing = sbn.isOngoing,
+            isProtected = isProtected,
         )
         AppLogger.debug(
             TAG,
@@ -26,5 +59,10 @@ class NotificationTriggerService : NotificationListenerService() {
 
     companion object {
         private const val TAG = "NotificationTrigger"
+
+        /** The connected listener instance, or null if the service isn't bound (no notification access). */
+        @Volatile
+        var instance: NotificationTriggerService? = null
+            private set
     }
 }

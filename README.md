@@ -1,216 +1,133 @@
-# OpenTasker
+<div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.2.78-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
-[![Kotlin](https://img.shields.io/badge/kotlin-2.3.21-7f52ff.svg)](https://kotlinlang.org)
+<img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="120" alt="白い熊 自由作業盤"/>
 
-**OpenTasker** is a fully open-source, on-device, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android.
+# 白い熊 自由作業盤
+## ShiroiKuma Jiyūsagyōban
 
----
+**A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-## Features
+**📥 Latest release: [`0.2.75+189`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
-### Automation engine
+</div>
 
-- **Profiles, contexts, tasks, actions** — a complete Room-backed automation pipeline with a Compose UI
-- **7 context families** — Application, Time, Day, Location, State, Event, and Plugin (Locale/Tasker condition)
-- **58 built-in actions** plus engine-handled flow control (`task.run`, `if`/`else`/`end if`, `for each`/`end for`, `stop`)
-- **Template expressions** — bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math/date functions, traces, and strict regex policy
-- **First-class secret variables** — AES-256-GCM Android Keystore storage, deliberate reveal/re-entry UX, and provenance-based redaction for derived action arguments, logs, traces, and failures
-- **Automation modes** — per-profile single, restart, queued, and parallel re-trigger behavior
-- **Profile groups** — organize profiles into named groups with filter chips
+“自由作業盤” *Jiyūsagyōban* means: **“FREE (as in Freedom) task launcher”**!
 
-### Triggers (contexts)
+It is a native **Kotlin + Jetpack Compose** automation engine — profiles bind **triggers** to **tasks**, tasks run **actions**, all persisted in Room, no Hilt, no native code. Built on OpenTasker and extended into a markedly more capable tool than OpenTasker — and, in everyday use, than Tasker itself. It installs **side-by-side** with upstream (application id `shiroikuma.jiyusagyoban`), so both can coexist.
 
-- Time/day schedules with presets, aliases, and ranges
-- Device state (battery, charging, headphones, screen, airplane, power save, Wi-Fi SSID)
-- App foreground detection via UsageStats
-- Wi-Fi and data/internet connectivity via NetworkCallback
-- Notification listener with package/title/body filters
-- NFC tag scans with normalized ID matching and a one-time NDEF write helper
-- Calendar windows with redacted event metadata
-- Sunrise/sunset filters with coordinate, offset, and window support
-- Shake, Bluetooth connect/disconnect, package install/remove/replace
-- Quick Settings tile tap, home-screen widget/shortcut, boot
-- FOSS platform location/geofence — GPS/network fixes, balanced provider cadence, radius/accuracy/dwell evaluation, persisted dwell state, and API 36 background delivery evidence
-- Locale/Tasker condition plugins — polled as first-class context predicates with last-known-state caching
-
-### Actions (59 registered + 7 engine-handled)
-
-| Category | Count | Examples |
-|----------|------:|---------|
-| Settings | 11 | Wi-Fi, Bluetooth, brightness, volume, airplane, mobile data, screen timeout, DND, ringer mode, torch, tile state |
-| App | 7 | launch intent, launch app, kill, go home, open URL, SMS, screenshot |
-| File | 5 | read, write, append, delete, list |
-| Network | 6 | HTTP Request, legacy GET/POST aliases, ping, download, Wake-on-LAN |
-| Media | 6 | play, stop, pause, next, previous, mute |
-| System | 6 | vibrate, reboot, lock, screen off, wake, log |
-| Notification | 3 | notify/toast, cancel, TTS speak |
-| Variable | 10 | set variable, read data (JSON/CSV/XML), date-time (format/parse/add), text (match/replace/split/join/substring) |
-| Flow | 1+7 | wait; engine: task.run, if/else/end if, for each/end for, stop |
-| Plugin | 2 | Locale setting dispatch, Locale condition query |
-| Script | 1 | SHA-256-pinned Termux `RUN_COMMAND` with bounded result capture |
-| Import | 1 | unsupported Tasker action placeholder |
-
-Privileged actions (airplane, mobile data, screenshot, reboot, screen off) are gated to fail honestly. SMS is available in standard/F-Droid builds; Play builds omit SMS/phone-state permissions.
-
-New automations use **HTTP Request** for GET, HEAD, POST, PUT, PATCH, DELETE, and OPTIONS. It accepts structured query/header lines, inline or OpenTasker-file request bodies, per-stage timeouts, status/header/body variables, and atomic file output. Redirects default off and can be enabled only for the same origin; TLS verification cannot be disabled, cleartext remains private-LAN-only, and response/request sizes are bounded. Stored `http.get` and `http.post` actions continue to execute through compatibility aliases. Put credentials in Keystore-backed secret variables and reference them from Authorization or header fields so traces remain redacted.
-
-Variable names follow Tasker's scope rule: an all-lowercase name is local to the current task, while any name containing an uppercase letter is global and durable. `var.persist` promotes an all-lowercase target to a global name, and the Variable vault applies the same normalization. Concurrent runs merge changes to different globals; if two stale snapshots change the same global, the first committed value is kept and the later conflict is recorded in the run log.
-
-### Reliability and observability
-
-- OEM battery-killer detection with per-vendor remediation (Samsung, Xiaomi, OnePlus, Oppo, Realme, Vivo, Huawei, etc.)
-- Alarm-backed time/day reevaluation through Doze, with a persisted engine heartbeat and periodic WorkManager watchdog that re-arms dropped ticks and foreground-service timeout recovery
-- Setup checklist covering notifications, exact alarms, battery optimization, usage access, overlays, location, Bluetooth, SMS, DND, Shizuku, and Termux
-- Context inspector with live source health, latest values, and per-profile match explanations
-- Step-level run logs with action traces, template diagnostics, warning counts, and configurable retention
-- In-app diagnostics for service/foreground-type/standby/exact-alarm/matcher/watchdog health, a bounded process log, and captured crash previews; shared reports include the same evidence with credential redaction
-- Crash log capture and local diagnostic export
-
-### Interoperability
-
-- **Locale/Tasker plugin host** — setting dispatch, condition queries, configuration parsing, request-query events, bundle validation, and last-known-state fallback
-- **Locale/Tasker condition context** — condition plugins as first-class profile predicates polled every 30 seconds
-- **External automation target** — signature-scoped intents to run tasks, toggle profiles, query status, and pass variables
-- **OpenTasker JSON bundles** — schema-versioned export/import with computed action-power manifests, data-to-external-chain warnings, disabled-by-default installation, explicit first-enable acknowledgement, and secret values omitted by design
-- **Tasker XML import** — preview with migration/capability warnings, mapped and unsupported action reporting
-- **Profile sharing** — offline share manifests with safety findings and GitHub Discussions submission text
-
-Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON is capped at 16 Mi characters, 250,000 lexical tokens, and depth 64; Tasker XML is capped at 4 Mi characters, 100,000 nodes, and depth 64. Both formats share decoded limits of 5,000 top-level entities, 20,000 actions, 10,000 contexts, 10,000 scene elements, and 8 MiB of aggregate UTF-8 string data. A named budget violation aborts before the Room transaction.
-
-### UI and theming
-
-- AMOLED-first Catppuccin Mocha (dark) and Latte (light) palettes, high contrast mode
-- Refined mobile shell with clearer primary navigation, bottom-bar contrast, and edge-to-edge system bar theming
-- Accessible Setup theme selector with explicit selected state plus denser, confidence-building backup controls
-- Compact-safe profile, task, and run-log cards with horizontally safe status chips and filtered empty states
-- Variable vault, Flow, Scenes, and Inspector surfaces with summary metrics, clear status language, and polished empty states
-- Guided profile templates with variable slots and safety notes
-- Scene element editor with drag-to-move, resize handles, multi-select, alignment guides, scaled canvas previews, overlay launch, and tap/long-press task bindings
-- Flow graphs with zoom/pan canvas previews, edge routing, branch/subflow markers, node deep links, and picker-backed add commands
-- Profile and task search bars
-- Saveable editor/dialog state across rotation and resize
-
-### Distribution
-
-- F-Droid readiness profile with dependency-policy and metadata verification
-- Play distribution profile with SMS/phone-state manifest policy gate
-- Local release verification scripts for F-Droid metadata, readiness, and APK payload comparison
-- Environment-driven release signing
-- SQLite database backup/restore with WAL-safe validation and atomic staged restore; encrypted `.otbackup` v2 exports use bounded-memory, independently authenticated 64 KiB frames while legacy v1 files remain restorable. Secret rows stay ciphertext and the device-bound Keystore key is never copied, so a restore on another device requires secret re-entry
-- APK payload comparison harness for reproducibility checks
-
-### Power-user backends
-
-- Shizuku manager/service/permission status, a persisted default-on kill switch, and a fail-closed command allowlist; elevated actions remain unsupported until a privileged user-service transport ships
-- Termux 0.109+ `RUN_COMMAND` integration with a user-managed SHA-256 allowlist, pre-run hash verification, timeouts, and bounded output variables
-
-To run a Termux script, place it below `~/.termux/tasker/`, enable Termux's external-app access, and grant OpenTasker `RUN_COMMAND` permission from Setup. Add the script path and the expected 64-character SHA-256 under **Approved Termux scripts**; OpenTasker performs a hash preflight and rechecks inside the fixed execution wrapper before the script can run. A capture prefix such as `%script` writes bounded `%script_stdout`, `%script_stderr`, `%script_exit_code`, and original-length variables; captured content is never written to the run log.
+> A fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions: a generic **Send Intent** action, cross-app **protected contacts** (content-free notifications for private senders), a screen-off **notification wakedance**, **app freeze/unfreeze + launcher-task generation**, a fully app-driven **kanji clock**, **projects + foldable groups + scoped variables**, full **drag-to-reorder** (tasks, projects, project-tabs), a **Review Import** workflow, a **capability-aware action editor**, **home-screen task shortcuts with custom icons**, **Desktop re-freeze bubbles**, home-screen **widgets + a template library**, **living scene overlays** (a charging fire on the battery line, a **natively-rendered, music-reactive, tempo-locked** music edge-light — all screen-off gated), a headless **adb automation bridge** (workspace export/import broadcasts), sub-minute triggers, and a black-and-yellow theme.
 
 ---
 
-## Architecture
+## What it adds over OpenTasker
 
-```
-AutomationService (foreground)
-  ↓
-ProfileMatcher (monitors context streams)
-  ↓
-ContextSources (app, time, state, event, location, plugin)
-  ↓
-TaskRunner (executes action list with flow control)
-  ↓
-ActionRegistry (built-ins + capability gates + Locale plugin dispatch)
-  ↓
-Room DB (persistent storage + StateFlow live queries)
-```
+### 🎯 Send Intent — fire any Android intent
+The reason this fork exists. A generic action that fires arbitrary **explicit or implicit intents** (action, data URI, MIME type, string/int/bool extras, target component, flags) — including the token-gated automation intents exposed by the sister apps (e.g. `白い熊 GNU Jami` / `shiroikuma.jami`: send-message, place-call, open-conversation). `<queries>` manifest entries make the explicit targets resolve on Android 11+.
 
-No Hilt — manual dependency wiring via `OpenTaskerApp_NoHilt`. MVVM with Compose, Room, coroutines, DataStore, and WorkManager.
+### 🔔 通知明滅 — the notification wakedance
+A per-app coloured **edge-light** for incoming notifications. Screen-on, a frame blinks in the app's colour. **Screen-off, it wakes the device *over the lockscreen* and rotates through every unread app** (colour + sender + preview), then sleeps — repeating on a sub-minute timer. It survives EMUI's aggressive service-reaping with a `SCREEN_BRIGHT` wakelock, draw-before-wake, an opaque show-when-locked Activity, and a clean self-sleep. Powered by new engine primitives: a **`sec_tick`** sub-minute trigger, `state.get screen`, and `wake` / `screen.off`.
+
+### ❄️ Freeze / Unfreeze + the launcher-task generator
+**Freeze App** and **Unfreeze App** disable/enable any app through Shizuku (`pm disable-user` / `pm enable`). The **Make Launcher Tasks** action pops a **multi-select grid of app-icon tiles** (all installed user apps, *including frozen ones*, searchable) and, on OK, writes one **unfreeze-then-launch** task per chosen app into a project group — re-sorted alphabetically on every run, with no duplicates. Each generated task takes the app's own icon and is set to show a re-freeze bubble.
+
+### 🫧 Freeze bubbles — re-freeze from the Desktop
+A native port of the Tasker 凍結 融解 idea. Any task flagged **Freeze bubble** (toggleable inline on the task card; on by default for the generated launch tasks) drops a small **draggable bubble** when it runs. The bubbles appear **only while your home launcher (the Desktop) is in the foreground** — nowhere else, so nothing intrudes while you work — each showing the app's icon. **Tap a bubble to freeze that app** and remove it; **long-tap to just dismiss**. Bubbles persist across reboots, keep their position relative to the top-right edge across rotation/fold, and are fully styleable (icon size, roundness, label size/weight/font) with a live preview.
+
+### 🔗 Home-screen task shortcuts + custom icons
+Drop any task onto the home screen as a **one-tap shortcut**. Long-press the launcher → *Shortcuts* → **白い熊 自由作業盤** opens a **floating picker dialog** (a tall, yellow-framed card over a dimmed home screen): each project unfolds into its **groups as bordered folder-boxes** — so a folded group reads as a closed box, never as a parent of the loose tasks below — then its ungrouped tasks, with order preserved and a *Cancel* button at the bottom. Pick a task and it lands as a shortcut that runs it directly — or use the in-task **Pin to home screen**. Give each task its own **icon** from an **installed app**, a **picture**, an **emoji**, or a **song's embedded album art** (pick an mp3/ogg/flac/m4a) — each *snapshotted to a PNG* the moment you pick it, so it keeps showing even if the source is deleted or its app is frozen. The icon appears on the task card (folded and unfolded) and is **baked into the shortcut**; tasks with no icon fall back to the app icon. **Tap a task's icon in the list** to change it without opening the editor. Icons even **travel inside JSON exports**, re-materializing on another device. The picker's font, spacing, indent, and folder-box look are all tunable under *UI customization → Shortcut picker*.
+
+### 🕐 The kanji clock (時間と日付) + 相撲字時計
+A fully app-driven port of 白い熊's Tasker spoken-kanji clock: calc tasks compose the time and date into variables, **勘亭流-font** home-screen widgets render them, a **per-minute trigger** refreshes them, and live WiFi / Airplane / Battery widgets read device state (with Shizuku toggles). Its companion **相撲字時計** is a **fold-aware over-lockscreen overlay clock** in **相撲字 (sumo-script)** style: **folded / semi-folded / unfolded** layouts swap automatically with the device's fold state (published as **`%FOLD`** by a HALL-sensor `fold` context), the time is centre-anchored on the wide layouts, and the overlay is **touch-through**. An **app-multiselect picker** chooses which apps hide it.
+
+### 🗂️ Projects, scoped variables & foldable groups
+Case-based **variable scoping that survives reboots** — `%ALLCAPS` super-global, `%MixedCase` project-global, `%lowercase` task-local — plus **projects** that file profiles, tasks, scenes and widgets, and **foldable, nestable groups** with drag-and-drop on every tab, per-tab search, and per-tab sorting. The **Variables tab** styles each var like the action editor (blue name, bold value, one line, all sizes/colours settable), folds into **per-scope sections** with live counts and **project-filter pills**, and carries a **"Clean up dead globals"** analyzer that finds and sweeps shadow-copies, orphans, and **dangling** project-globals (rows left behind by a deleted project) — with hard guards that keep a project-scoped name from ever leaking into the global bucket.
+
+### ⚙️ A capability-aware action editor
+Every action carries a **live status pill**: red, with a one-tap **deep-link to the exact Settings screen**, when its required permission/service isn't set up; yellow (FYI) when it is — checked against the *same* state the Setup tab uses (accessibility, Shizuku, modify-settings, overlay, Do-Not-Disturb, notifications). An **app-package** field type lets you type a package / `%variable` *or* pick from an installed-apps list. Build action lists fast: **long-press to multi-select** actions, then **clone / copy / cut / delete** them — with **paste before / after** and an **app-wide clipboard** that moves actions **between** tasks.
+
+### 🔗 Robust by-name linking & imports
+Everything links by **name**, not by fragile ids: `scene.show`/`scene.hide` resolve a scene by **`(project, name)`**, and a scene's button/slider/gesture actions resolve their task **by name** too — so re-importing a bundle or recreating a task never silently breaks a link. Imports **overwrite in place** (a re-import keeps each item's id, group and notes), and item names are **unique within a project** (enforced in the editors and at the DB level).
+
+### 🔥 Living overlays — charging fire & the music edge-light
+Scene overlays that are genuinely alive, and free when you can't see them. The **battery line** bursts into a **charging fire**: two red comets glide in from the ends, collide mid-line in a bloom, and breathe back out — red star-glints twinkling at the tips, embers spraying and raining below the line, and a lingering "residual fire" trail where a comet just passed. The **music edge-light** is a **native scene element** (METEOR) drawn by the app's own render thread with GPU-native primitives — no WebView, no per-frame canvas commits, no CPU path rasterization — cutting its playback CPU cost to roughly a **third** while keeping shooting-star head glows, per-ribbon twinkle, and a slow hue drift; a settable **FPS cap** now skips frames for free, **black rounded-corner masks** give the screen physically rounded corners, and every knob applies **live** without re-showing the scene. And it **dances to the actual music**: the engine taps the device's output mix (a `Visualizer` — nothing is ever recorded), tracks the **beat grid** (tempo + phase + confidence) from the bass onsets, and the meteor flow **pumps precisely on each beat** — loudness dynamics (auto-gain normalised, so compressed tracks still swing) set the base speed, bass hits flash the ribbons and swell the heads. Five knobs (`on/off · sensitivity · flash · pump depth · pump shape` — jab ↔ swell) ship as **recipe-style documented variables**, each label cross-linking the others with concrete setting ideas. Every parameter is a **documented variable in the project's 設定 task** (the task doubles as the manual), and everything is strictly **screen-off gated**: overlays stop computing the instant the display goes dark (opt-in per scene, so over-lockscreen effects keep working).
+
+### 📊 Monitor, widgets & theme
+A **Monitor** tab aggregates engine task-activity and widget pulls. A styled-bitmap **home-screen widget engine** with a visual layout editor (Tasker Widget V2 import) and a **named-template library**. A black-and-yellow **AMOLED theme** + a UI-customization page, unified JSON import/export, multi-select, and an in-app Help/Docs tab.
 
 ---
 
-## Build & Run
+## Triggers (contexts)
+
+A profile is active while **all** its contexts match. Seven families:
+
+| Family | Fires on |
+| --- | --- |
+| **Application** | a watched app comes to the foreground (via the accessibility service) |
+| **Time** | a clock window (from–to) |
+| **Day** | a weekly schedule |
+| **Location** | a FOSS geofence (enter / dwell) |
+| **State** | device state — battery level, **charging (plugged-in)**, **screen on/off**, WiFi, airplane, … |
+| **Event** | one-shot triggers (below) |
+| **Plugin** | a Locale/Tasker **condition plugin**'s satisfied/unsatisfied state (polled) |
+
+**Event triggers:** boot · notification posted · NFC tag · calendar event · **app changed** (foreground) · **device orientation / fold** · shake · **sunrise / sunset** · **per-minute tick** · **per-second (sub-minute) tick** · system broadcast · camera / microphone in use · Bluetooth · package added/removed · Quick-Settings tile.
+
+---
+
+## Actions — **115 built-in** (＋ engine flow control)
+
+> Bold = added or materially extended in this fork.
+
+**App (16)** — **Send Intent** · **Launch Intent** · Launch App · **Freeze App** · **Unfreeze App** · **Make Launcher Tasks** · Kill App · Go Home · Next App · Previous App · Open URL · Send SMS · Call · Compose Email · List Apps · Take Screenshot
+
+**System (18)** — **Turn Screen Off** · **Wake Device** · **Run Shell** (Shizuku) · **Show Scene** · **Hide Scene** · **Set Widget** · **Refresh Widgets** · Flash · Vibrate · Reboot Device · Lock Device · Set / Get Clipboard · Set Wallpaper · Set / Pick Keyboard · Profile Status · Log Message
+
+**Settings (18)** — Toggle WiFi · Toggle Bluetooth · Toggle Mobile Data · Toggle Airplane Mode · Toggle Torch · Set / Auto Brightness · Set Volume · Get Volume · Set Ringer Mode · Set Do Not Disturb · Set Screen Timeout · Location Mode · Set Tile State · **Get Device State** (battery / charging-plugged / WiFi / airplane → vars) · Get / Put Setting · WiFi Settings
+
+**Variable (15)** — Set Variable · **Persist Variable** · Variable Clear · **Variable Split** · Variable Join · Variable Add · Variable Convert · Variable Search Replace · Parse/Format DateTime · Array Set / Push / Pop / Clear / Process · Arrays Merge
+
+**Flow (11)** — If · Else · End If · For Each · End For · Run Task · Return Values · Stop · Fail · Wait · Comment
+
+**File (8)** — Read · Write · Append · Move · Delete · List Files · Create Directory · Open File
+
+**Interface (7)** — Back · Recents · Lock Screen · Notifications Panel · Quick Settings · Power Dialog · Take Screenshot *(accessibility global actions)*
+
+**Media (6)** — Play / Stop / Pause Sound · Next / Previous Track · Mute
+
+**Network (5)** — HTTP GET · HTTP POST · Download File · Ping Host · Wake-on-LAN
+
+**Notification (4)** — Show Notification *(tap-task + 3 action buttons)* · Cancel Notification · **Dismiss App Notifications** *(by package)* · Say (Text-to-Speech)
+
+**Alert (3)** — Input Dialog · List Dialog · Text Dialog
+
+**Plugin (2)** — Locale Plugin Setting · Locale Plugin Condition
+
+**Script (1)** — Run Termux Script &nbsp;·&nbsp; **Import (1)** — Unsupported Tasker Action
+
+A **Shizuku-powered elevated tier** unlocks shell, airplane mode, screenshot, location mode, app freeze/unfreeze and more; **Termux** runs hash-pinned scripts.
+
+---
+
+## Also inherited from OpenTasker
+
+So the full surface this builds on is visible: a floating-overlay **Scene** system (11 element types, input→variable binding, a system-wide overlay), a **visual flow editor** (pinch-zoom, edge routing, branch markers), **encrypted DB backup** (AES-256-GCM), **Locale/Tasker plugin** interop (both setting *and* condition), a **Run-Log expression debugger**, dotted/bracketed `var.set` JSON paths, RE2/J linear-time regex, and the full seven-context trigger engine — all retained and carried forward onto upstream **0.2.76**.
+
+---
+
+## Build & install
+
+Installs alongside upstream (id `shiroikuma.jiyusagyoban`, label 白い熊 自由作業盤). Pure Kotlin/Compose, JDK 21:
 
 ```bash
-git clone https://github.com/SysAdminDoc/OpenTasker
-cd OpenTasker
-./gradlew :app:testDebugUnitTest :app:assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew assembleRelease
 ```
 
-Release build (unsigned without keystore env vars):
-```bash
-./gradlew :app:assembleRelease
-```
+`minSdk 26`, `targetSdk 37`. Grab a signed APK from the [releases page](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases).
 
-F-Droid profile:
-```bash
-./gradlew -PopenTaskerDistribution=fdroid :app:assembleRelease :app:verifyFdroidReadiness :app:verifyFdroidMetadata
-```
+## Built on OpenTasker
 
-Play manifest policy check:
-```bash
-./gradlew -PopenTaskerDistribution=play :app:verifyPlayManifestPolicy
-```
-
-Full local release gate (blocking lint, JVM tests, Room schemas, Android-test compilation, resolved dependency/SBOM and OSV policy, configuration-cache reuse, plus Play and F-Droid release builds):
-
-```powershell
-.\tools\verify-local-release.ps1
-```
-
-The gate writes machine-readable reports under `build/reports/opentasker/`. To prove failure propagation without running the full build, run `.\tools\verify-local-release.ps1 -SeedFailure`; success is a nonzero exit with `Seeded local quality-gate failure`.
-
----
-
-## Development
-
-| Property | Value |
-|----------|-------|
-| Kotlin | 2.3.21 |
-| Gradle | 9.4.1 |
-| AGP | 9.2.1 |
-| KSP | 2.3.7 |
-| Build Tools | 36.0.0 |
-| JDK | 17 or 21 |
-| Min SDK | 26 (Android 8.0) |
-| Compile SDK | 37 |
-| Target SDK | 37 |
-| Room | 2.8.4 |
-| Compose BOM | 2026.05.00 |
-| WorkManager | 2.11.2 |
-
-All dependency versions are centralized in `gradle/libs.versions.toml`.
-
----
-
-## Planned
-
-See [ROADMAP.md](ROADMAP.md) for the full backlog. Key remaining work:
-
-- Broad device-verified background geofence reliability evidence
-- API 37 platform readiness pass (FGS, predictive back, large-screen QA)
-- Macrobenchmark and Baseline Profile for cold-start performance
-
----
+A fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) by SysAdminDoc. `master` mirrors upstream (fast-forward only); `custom` carries this fork's work, rebased onto each new upstream release.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
-
-## Contributing
-
-Issues and pull requests welcome. See [ROADMAP.md](ROADMAP.md) for planned features.
-
-### Translations
-
-OpenTasker supports localization. English source copy lives in `app/src/main/res/values/strings.xml`, `action_catalog_strings.xml`, and `dynamic_surface_strings.xml`; locale targets under `app/src/main/res/values-*` are ready for Weblate-style translation workflows. Debug builds enable Android's `en-XA` and `ar-XB` pseudolocales for expansion and right-to-left checks. To contribute a translation:
-
-1. Copy the three translatable XML files from `app/src/main/res/values/` to `app/src/main/res/values-<locale>/`
-2. Translate only the string values (not the `name` attributes)
-3. Omit strings that are identical to English — Android falls back automatically
-4. Submit a PR with your locale directory
-
-Skeleton directories exist for: `ar`, `de`, `es`, `fr`, `hi`, `it`, `ja`, `ko`, `pl`, `pt-rBR`, `ru`, `tr`, `zh-rCN`.
+MIT — inherited from OpenTasker.
