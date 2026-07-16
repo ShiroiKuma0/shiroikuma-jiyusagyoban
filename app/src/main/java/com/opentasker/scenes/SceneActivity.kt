@@ -577,7 +577,9 @@ internal fun SceneElementView(
             ) {
                 Text(
                     v("label", "Button"),
-                    color = sceneColor(cfg["textColor"]) ?: MaterialTheme.colorScheme.onPrimary,
+                    // Via styleLabelColor (v()-expanded) like every other element, so a %var can drive
+                    // the colour/alpha live (e.g. the 音楽端灯 buttons' fade knob %Ongaku_Btncolor).
+                    color = styleLabelColor ?: MaterialTheme.colorScheme.onPrimary,
                     fontFamily = styleFont,
                     fontSize = styleSize,
                     fontWeight = styleWeight,
