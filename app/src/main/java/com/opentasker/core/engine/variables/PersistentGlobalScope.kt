@@ -70,6 +70,20 @@ object PersistentGlobalScope : GlobalVariableScope {
         writeOps.trySend { d.delete(projectId, name) }
     }
 
+    /**
+     * Re-warm the cache from the database and bump [revision]. MUST be called after any path that
+     * writes/deletes variable ROWS directly instead of routing through [set]/[unset] — bundle import
+     * and the DELETE_ITEMS bridge — or imported variables stay invisible to expansion (and deleted
+     * ones linger) until the process restarts. Live scene overlays re-expand on the revision bump.
+     */
+    suspend fun refreshFromDb() {
+        val d = dao ?: return
+        val rows = runCatching { d.getAll() }.getOrDefault(emptyList())
+        buckets.clear()
+        rows.forEach { e -> bucket(e.projectId)[e.name] = e.value }
+        _revision.update { it + 1 }
+    }
+
     override fun snapshot(projectId: Long): Map<String, String> {
         val out = LinkedHashMap<String, String>()
         buckets[SUPER_GLOBAL_PROJECT_ID]?.let(out::putAll)
