@@ -919,48 +919,10 @@ internal fun SceneElementView(
         }
 
         SceneElementType.METEOR -> {
-            // Native meteor band (the 音楽端灯 heat fix, 2026-07-12): the WebView canvas version burned
-            // ~185% CPU in per-frame canvas-commit machinery; this draws the same dance on the window's
-            // own RenderThread (like the 電池線 ChargingFlame). Every config value is %var-live via v(),
-            // so the Ongaku_* knobs retune WITHOUT re-showing the scene. Screen-off drops the whole
-            // element out of composition — the frame loop stops dead, nothing computes in the dark.
-            val screenOn = rememberScreenOn()
-            val reactive = sceneBool(v("musicPulse"))
-            val appContext = LocalContext.current.applicationContext
-            DisposableEffect(reactive && screenOn) {
-                val hold = reactive && screenOn
-                if (hold) com.opentasker.core.media.MusicPulseSource.acquire(appContext)
-                onDispose { if (hold) com.opentasker.core.media.MusicPulseSource.release() }
-            }
-            val knobs = MeteorKnobs(
-                palette = meteorPalette(v("palette")),
-                padDp = meteorNum(v("padding"), 5f),
-                radiusDp = meteorNum(v("radius"), 32f),
-                cornerDp = meteorNum(v("cornerRadius"), meteorNum(v("radius"), 32f)),
-                periodS = meteorNum(v("period"), 5f).coerceAtLeast(0.2f),
-                glowDp = meteorNum(v("glow"), 12f),
-                glowLayers = meteorNum(v("glowLayers"), 2f).toInt().coerceIn(1, 4),
-                glowSpread = meteorNum(v("glowSpread"), 2f),
-                glowStrength = meteorNum(v("glowStrength"), 1f),
-                reverse = v("direction").contains("reverse"),
-                count = meteorNum(v("count"), 16f).toInt().coerceIn(1, 80),
-                spawnMs = meteorNum(v("spawnInterval"), 60f).coerceAtLeast(10f),
-                minLen = meteorNum(v("minLen"), 0.03f),
-                maxLen = meteorNum(v("maxLen"), 0.1f),
-                speedMin = meteorNum(v("speedMin"), 0f),
-                speedMax = meteorNum(v("speedMax"), 1.5f),
-                speedChangeS = meteorNum(v("speedChange"), 5f).coerceAtLeast(0.5f),
-                maxFps = meteorNum(v("maxFps"), 0f),
-                headGlow = meteorNum(v("headGlow"), 1.5f),
-                twinkle = meteorNum(v("twinkle"), 0.35f).coerceIn(0f, 1f),
-                hueDrift = meteorNum(v("hueDrift"), 12f),
-                reactive = reactive,
-                reactGain = meteorNum(v("reactGain"), 1f),
-                reactPulse = meteorNum(v("reactPulse"), 0.6f),
-                reactKick = meteorNum(v("reactKick"), 1f),
-                reactSharp = meteorNum(v("reactSharp"), 5f).coerceIn(0.5f, 12f),
-            )
-            if (screenOn) EdgeMeteors(Modifier.fillMaxSize(), knobs)
+            // Legacy tombstone (2026-07-16): the 音楽端灯 edge meteors moved natively into 白い熊 音楽
+            // (shiroikuma-ongaku) and the renderer/beat-source were removed from this app. The enum
+            // value survives only so archived exports/backups containing METEOR elements still decode;
+            // such an element renders nothing.
         }
 
         SceneElementType.WEB -> {
@@ -991,17 +953,6 @@ internal fun SceneElementView(
             // wakedance draw *while the screen is off/waking*, so they must NOT be paused (they omit the flag).
             val pauseWhenScreenOff = sceneBool(v("pauseWhenScreenOff"))
             val screenOn = rememberScreenOn()
-            // Audio-reactive opt-in (config `musicPulse`, %var-expanded live — the 音楽端灯 scene sets it
-            // to %Ongaku_Reactive): while true AND the screen is on, hold the shared output-mix Visualizer
-            // so the page's rAF loop can poll window.OngakuPulse.level()/beat(). Ref-counted release when
-            // the element hides, the screen goes dark, or the knob turns off — no capture runs otherwise.
-            val musicPulse = sceneBool(v("musicPulse"))
-            val appContext = LocalContext.current.applicationContext
-            DisposableEffect(musicPulse && screenOn) {
-                val hold = musicPulse && screenOn
-                if (hold) com.opentasker.core.media.MusicPulseSource.acquire(appContext)
-                onDispose { if (hold) com.opentasker.core.media.MusicPulseSource.release() }
-            }
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
@@ -1010,8 +961,6 @@ internal fun SceneElementView(
                         isVerticalScrollBarEnabled = false
                         isHorizontalScrollBarEnabled = false
                         settings.javaScriptEnabled = true
-                        // Music-pulse bridge: read-only floats; harmless on non-reactive pages.
-                        addJavascriptInterface(com.opentasker.core.media.MusicPulseSource.Bridge, "OngakuPulse")
                     }
                 },
                 update = { wv ->
