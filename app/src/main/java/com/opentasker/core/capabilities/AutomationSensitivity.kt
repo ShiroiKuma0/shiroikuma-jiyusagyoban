@@ -95,7 +95,6 @@ object AutomationSensitivityRegistry {
         "intent.send",
         "location.mode",
         "media.playpause",
-        "music.viz.test",
         "nav.back",
         "nav.power",
         "nav.recents",
