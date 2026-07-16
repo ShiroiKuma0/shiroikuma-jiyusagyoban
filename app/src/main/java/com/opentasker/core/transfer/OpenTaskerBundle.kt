@@ -823,6 +823,10 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             .map { id -> if (id == null) "Unfiled" else (projectNamesById[id] ?: "Unfiled") }
             .distinct()
 
+        // Imported variable rows were written via the DAO, not PersistentGlobalScope — re-warm the
+        // cache or the new values stay invisible to %var expansion until the process restarts.
+        com.opentasker.core.engine.variables.PersistentGlobalScope.refreshFromDb()
+
         return BundleImportReport(
             insertedTasks = insertedTasks,
             insertedProfiles = insertedProfiles,
