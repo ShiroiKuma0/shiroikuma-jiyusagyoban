@@ -173,6 +173,10 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
             if (db.variableDao().get(0L, name) != null) { db.variableDao().delete(0L, name); hit = true }
             if (hit) variables++ else warnings += "variable not found: $name"
         }
+        // Deletions above bypass PersistentGlobalScope — re-warm so the cache drops them too.
+        if (manifest.variables.isNotEmpty()) {
+            com.opentasker.core.engine.variables.PersistentGlobalScope.refreshFromDb()
+        }
         return DeleteResult(
             "deleted $tasks tasks, $profiles profiles, $scenes scenes, $variables variables from ${project.name}",
             warnings,
