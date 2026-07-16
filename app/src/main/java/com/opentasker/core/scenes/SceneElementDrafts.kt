@@ -16,7 +16,6 @@ object SceneElementDrafts {
         SceneElementType.SPINNER,
         SceneElementType.IMAGE,
         SceneElementType.PROGRESS,
-        SceneElementType.METEOR,
         SceneElementType.WEB,
         SceneElementType.RECTANGLE,
         SceneElementType.OVAL,
@@ -63,16 +62,6 @@ object SceneElementDrafts {
         SceneElementType.SPINNER -> mapOf("label" to "Spinner", "options" to "A, B, C", "value" to "A")
         SceneElementType.IMAGE -> mapOf("source" to "Image")
         SceneElementType.PROGRESS -> mapOf("value" to "50", "fillColor" to "#FFFFC107")
-        // Meteor band: sensible standalone defaults; the 音楽端灯 scene points each key at an %Ongaku_* var.
-        SceneElementType.METEOR -> mapOf(
-            "palette" to "",
-            "padding" to "5",
-            "radius" to "32",
-            "period" to "5",
-            "glow" to "12",
-            "count" to "18",
-            "musicPulse" to "false",
-        )
         SceneElementType.WEB -> mapOf("html" to "<!DOCTYPE html><html><body style=\"margin:0;background:transparent;color:#FFFFFF00;font-family:sans-serif\"><h2>WebView</h2></body></html>")
         // Shapes: blank fill (transparent), a thin theme-yellow outline so they're visible by default.
         SceneElementType.RECTANGLE -> mapOf("borderWidth" to "1")
@@ -91,7 +80,6 @@ object SceneElementDrafts {
         SceneElementType.SPINNER -> 200 to 48
         SceneElementType.IMAGE -> 180 to 120
         SceneElementType.PROGRESS -> 220 to 12
-        SceneElementType.METEOR -> 240 to 160
         SceneElementType.WEB -> 240 to 160
         SceneElementType.RECTANGLE -> 140 to 70
         SceneElementType.OVAL -> 90 to 90

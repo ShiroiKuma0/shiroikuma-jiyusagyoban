@@ -50,6 +50,8 @@ enum class SceneElementType {
     // when `charging` is truthy a highlight sweeps along the filled part. Used by the battery line.
     PROGRESS,
     // Neon meteor ribbons orbiting the element's perimeter in a rounded-rect band — the native port
-    // of the 音楽端灯 WebView canvas (same Ongaku_* knobs via config, %var-live). See EdgeMeteors.kt.
+    // LEGACY tombstone (2026-07-16): meteors moved natively into 白い熊 音楽; kept only so
+    // archived exports/backups with METEOR elements still decode. Renders nothing; not offered
+    // in the editor.
     METEOR,
 }
