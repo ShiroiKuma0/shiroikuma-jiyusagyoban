@@ -1702,19 +1702,6 @@ fun registerActionMetadata() {
         )
     )
 
-    ActionMetadataRegistry.register(
-        ActionMetadata(
-            id = "music.viz.test",
-            name = "Music Viz Test",
-            description = "Diagnostic: tap the output mix via Visualizer for a few seconds (play music!) and report whether live audio data arrives — decides if the audio-reactive 音楽端灯 is buildable",
-            category = "Media",
-            fields = listOf(
-                ActionField("seconds", "Sampling window (s)", FieldType.NUMBER, hint = "default 5, max 30"),
-                ActionField("var", "Report → variable", hint = "default: viz"),
-            )
-        )
-    )
-
     // System actions
     ActionMetadataRegistry.register(
         ActionMetadata(
