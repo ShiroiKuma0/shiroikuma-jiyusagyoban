@@ -15,6 +15,76 @@ This lists what the fork adds; upstream's own history lives in the OpenTasker re
 - **UI**: fixed a Diagnostics crash from duplicate log keys (now keyed on a monotonic sequence) and stopped its polling while backgrounded. The one-time NFC write is disarmed on dialog close, expires after 60 s, and runs its tag I/O off the main thread. `deleteVariable` reports real success/failure instead of an optimistic toast; undo no longer reports false success; `updateTask`/`updateProfile` are transactional. Editing an unknown action type shows a message instead of a dead tap. The context editor blocks saving garbled TIME windows and out-of-range coordinates. New profiles default to disabled, the enter-task selection no longer resets mid-edit, and backup state loads off the main thread.
 - **Theming**: scene warning text follows the applied theme's luminance (was near-invisible in Light-app-on-dark-system), the Locale plugin edit activity honors the persisted theme, run-log detail lines no longer render twice, and the scene overlay is clamped on screen so it can't be dragged fully offscreen. Removed dead duplicate helpers.
 
+## 0.2.75+195 — 2026-07-16
+
+The 白い熊 音楽 migration release: the `音楽端灯` project moves from PowerAmp to the 白い熊 音楽 sister
+app, the audio-reactive meteors move natively INTO that app, and the fork rebases onto 38 new upstream
+commits (see the next section for everything that merge brought in).
+
+### 音楽端灯 → 白い熊 音楽 (shiroikuma.ongaku)
+- **Player contract**: the workspace now listens to `shiroikuma.ongaku.STATUS_CHANGED` /
+  `TRACK_CHANGED` broadcasts (extras: `paused`, `path`, `title`, `artist`, `favorite` → `%INTENT_*`
+  variables) and drives the player through its token-gated `AutomationActivity`
+  (`op` + `token`: `TOGGLE_FAVORITE`, `DELETE_CURRENT`, `PLAY_PLAYLIST` with `playlist` + `track`,
+  transport ops). PowerAmp support was removed entirely — tasks, profiles, scenes and 28 tuning
+  variables — not kept as legacy.
+- **良 (favorite) button**: toggles the current track's favorite in the player; flashes the coming
+  state; self-corrects from the re-broadcast.
+- **削除 (delete) button**: now shows a **confirmation dialog** (song title + artist + human path;
+  削除 / やめる) before firing — and the overlay buttons **hide instantly** when the dialog opens
+  (they float above dialogs; previously they lingered 2–3 s over it). Deletion happens inside the
+  player (skip → SAF delete → library row) instead of the old `NEXT` + raw `shell rm`.
+- **Button scenes tightened to 220×220 dp** — the old 300 dp-tall windows had an invisible tappable
+  band below the glyph that sat exactly over the player's pause button on the folded panel.
+- **Play Tenet / Play Lifting**: rewired to open the player and start the named playlist —
+  `Play Tenet` starts at the track "Freeport" via the `track` extra.
+
+### Meteors moved natively into 白い熊 音楽 — stack removed here (+193)
+- The audio-reactive edge meteors now render **inside the player**, beat-locked from its own decoder
+  tap — sample-accurate beats, working under Android Auto / Bluetooth offload, alive exactly while
+  music plays. The full renderer + beat-grid spec (all tuned values) was handed off to that repo.
+- Removed from this app: `MusicPulseSource` (the output-mix `Visualizer` beat source — **no
+  Visualizer remains, so audio offload is never blocked by this app**), the `EdgeMeteors` GPU
+  renderer, the `OngakuPulse` WebView JS bridge (+ its R8 keep rules), and the `music.viz.test`
+  diagnostic action. `SceneElementType.METEOR` survives as a decode tombstone so archived exports
+  still restore (such an element renders nothing).
+- The short-lived **Android Auto silence fallback** (+191: `Bridge.silentMs()`, meteors falling back
+  to the non-reactive animation when A2DP-offload kept the output mix silent) shipped and was then
+  superseded by the native move within the same release window.
+
+### DELETE_ITEMS bridge action (+192)
+- `WorkspaceTransferReceiver` gains `shiroikuma.jiyusagyoban.action.DELETE_ITEMS`: headless deletion
+  of named workspace items over adb — a JSON manifest (`projectName` + `tasks` / `profiles` /
+  `scenes` / `variables` name lists), resolved by (project, name). A shown scene is hidden first,
+  item notes are cleaned up, and variables are swept from both the project and super buckets.
+  Bundle import can only add/overwrite; this completes the headless dev cycle with removal.
+
+### App picker overhaul (+194, +195)
+- The multi-select app picker (Make Launcher Tasks, app-multiselect fields) is **near-fullscreen**
+  (97% × 94% — still a dialog, not a page).
+- Each tile shows the **package id under the label** — and since search always matched ids as well
+  as names, id-only hits are finally self-explanatory. The search hint says so.
+- **Icons 72 dp** (50% bigger), re-rasterized at true pixel size; the grid's cell width tracks the
+  icon size.
+- A ⚙ panel exposes **persistent sizing knobs**: icon dp (32–160), label sp (7–28, default 14,
+  **bold** by default with a Bold toggle), id sp (6–20), and **Pad↕ / Pad↔** grid + tile padding
+  (0–32 dp; vertical default tightened 12 → 4 dp).
+
+### Upstream resync (0.2.75/77, d4a99f5 — 38 commits)
+- `custom` was flattened and rebased onto the new upstream tip; every fork customization survived.
+  Fork-critical calls made during the merge: upstream's two new DB migrations renumbered onto the
+  fork chain (17→18 `variables.isSecret`, 18→19 `profiles.requiresRiskAcknowledgement`, final
+  version 19); upstream's ASCII-only variable-name policy NOT adopted in the store (it would have
+  silently killed Japanese-named variables); upstream's secret-variable name-pattern backfill
+  dropped (it would have irreversibly encrypted working `Pkey_*` globals); all ~60 fork action ids
+  registered in upstream's new sensitivity catalog so its fail-closed "unknown action" gate never
+  blocks fork tasks; the fork's name-first bundle format, scene pipeline, engine doze-hardening and
+  battery `EXTRA_PLUGGED` semantics kept over upstream's variants.
+- Everything upstream added in that span — the text/regex, date-time and structured-data action
+  packs, the full `http.request` action, off-main-thread task execution, live profile
+  reconciliation, the token-gated Locale receiver, encrypted secret variables, engine diagnostics,
+  fail-closed corrupt-payload storage and the rest — is itemized in the next section.
+
 ## Upstream unreleased work merged on the 0.2.75/77 resync (2026-07-15)
 
 - **Diagnostics**: added a secondary Diagnostics destination with live engine heartbeat, active foreground-service types, app-standby bucket, exact-alarm delivery, last matcher failure, WorkManager watchdog stop reason, bounded process logs, and redacted crash previews. Shared diagnostic reports now include that health snapshot, up to 100 ring-buffer entries, and bounded crash excerpts; Authorization/Bearer credentials are redacted in addition to existing secret patterns.
