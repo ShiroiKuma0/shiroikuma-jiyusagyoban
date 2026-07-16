@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.75+189`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.75+195`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 </div>
 
@@ -22,13 +22,13 @@ It is a native **Kotlin + Jetpack Compose** automation engine — profiles bind 
 ## What it adds over OpenTasker
 
 ### 🎯 Send Intent — fire any Android intent
-The reason this fork exists. A generic action that fires arbitrary **explicit or implicit intents** (action, data URI, MIME type, string/int/bool extras, target component, flags) — including the token-gated automation intents exposed by the sister apps (e.g. `白い熊 GNU Jami` / `shiroikuma.jami`: send-message, place-call, open-conversation). `<queries>` manifest entries make the explicit targets resolve on Android 11+.
+The reason this fork exists. A generic action that fires arbitrary **explicit or implicit intents** (action, data URI, MIME type, string/int/bool extras, target component, flags) — including the token-gated automation intents exposed by the sister apps (e.g. `白い熊 GNU Jami` / `shiroikuma.jami`: send-message, place-call, open-conversation; `白い熊 音楽` / `shiroikuma.ongaku`: favorite-track, delete-track, play-playlist). `<queries>` manifest entries make the explicit targets resolve on Android 11+.
 
 ### 🔔 通知明滅 — the notification wakedance
 A per-app coloured **edge-light** for incoming notifications. Screen-on, a frame blinks in the app's colour. **Screen-off, it wakes the device *over the lockscreen* and rotates through every unread app** (colour + sender + preview), then sleeps — repeating on a sub-minute timer. It survives EMUI's aggressive service-reaping with a `SCREEN_BRIGHT` wakelock, draw-before-wake, an opaque show-when-locked Activity, and a clean self-sleep. Powered by new engine primitives: a **`sec_tick`** sub-minute trigger, `state.get screen`, and `wake` / `screen.off`.
 
 ### ❄️ Freeze / Unfreeze + the launcher-task generator
-**Freeze App** and **Unfreeze App** disable/enable any app through Shizuku (`pm disable-user` / `pm enable`). The **Make Launcher Tasks** action pops a **multi-select grid of app-icon tiles** (all installed user apps, *including frozen ones*, searchable) and, on OK, writes one **unfreeze-then-launch** task per chosen app into a project group — re-sorted alphabetically on every run, with no duplicates. Each generated task takes the app's own icon and is set to show a re-freeze bubble.
+**Freeze App** and **Unfreeze App** disable/enable any app through Shizuku (`pm disable-user` / `pm enable`). The **Make Launcher Tasks** action pops a **near-fullscreen multi-select grid of app-icon tiles** (all installed user apps, *including frozen ones*) — each tile shows the **package id under a bold label**, search matches **name or id**, and a ⚙ panel makes icon size, both text sizes, bold, and grid padding **settable and persistent** — and, on OK, writes one **unfreeze-then-launch** task per chosen app into a project group — re-sorted alphabetically on every run, with no duplicates. Each generated task takes the app's own icon and is set to show a re-freeze bubble.
 
 ### 🫧 Freeze bubbles — re-freeze from the Desktop
 A native port of the Tasker 凍結 融解 idea. Any task flagged **Freeze bubble** (toggleable inline on the task card; on by default for the generated launch tasks) drops a small **draggable bubble** when it runs. The bubbles appear **only while your home launcher (the Desktop) is in the foreground** — nowhere else, so nothing intrudes while you work — each showing the app's icon. **Tap a bubble to freeze that app** and remove it; **long-tap to just dismiss**. Bubbles persist across reboots, keep their position relative to the top-right edge across rotation/fold, and are fully styleable (icon size, roundness, label size/weight/font) with a live preview.
@@ -48,8 +48,11 @@ Every action carries a **live status pill**: red, with a one-tap **deep-link to 
 ### 🔗 Robust by-name linking & imports
 Everything links by **name**, not by fragile ids: `scene.show`/`scene.hide` resolve a scene by **`(project, name)`**, and a scene's button/slider/gesture actions resolve their task **by name** too — so re-importing a bundle or recreating a task never silently breaks a link. Imports **overwrite in place** (a re-import keeps each item's id, group and notes), and item names are **unique within a project** (enforced in the editors and at the DB level).
 
-### 🔥 Living overlays — charging fire & the music edge-light
-Scene overlays that are genuinely alive, and free when you can't see them. The **battery line** bursts into a **charging fire**: two red comets glide in from the ends, collide mid-line in a bloom, and breathe back out — red star-glints twinkling at the tips, embers spraying and raining below the line, and a lingering "residual fire" trail where a comet just passed. The **music edge-light** is a **native scene element** (METEOR) drawn by the app's own render thread with GPU-native primitives — no WebView, no per-frame canvas commits, no CPU path rasterization — cutting its playback CPU cost to roughly a **third** while keeping shooting-star head glows, per-ribbon twinkle, and a slow hue drift; a settable **FPS cap** now skips frames for free, **black rounded-corner masks** give the screen physically rounded corners, and every knob applies **live** without re-showing the scene. And it **dances to the actual music**: the engine taps the device's output mix (a `Visualizer` — nothing is ever recorded), tracks the **beat grid** (tempo + phase + confidence) from the bass onsets, and the meteor flow **pumps precisely on each beat** — loudness dynamics (auto-gain normalised, so compressed tracks still swing) set the base speed, bass hits flash the ribbons and swell the heads. Five knobs (`on/off · sensitivity · flash · pump depth · pump shape` — jab ↔ swell) ship as **recipe-style documented variables**, each label cross-linking the others with concrete setting ideas. Every parameter is a **documented variable in the project's 設定 task** (the task doubles as the manual), and everything is strictly **screen-off gated**: overlays stop computing the instant the display goes dark (opt-in per scene, so over-lockscreen effects keep working).
+### 🔥 Living overlays — the charging fire
+Scene overlays that are genuinely alive, and free when you can't see them. The **battery line** bursts into a **charging fire**: two red comets glide in from the ends, collide mid-line in a bloom, and breathe back out — red star-glints twinkling at the tips, embers spraying and raining below the line, and a lingering "residual fire" trail where a comet just passed. Everything is strictly **screen-off gated**: overlays stop computing the instant the display goes dark (opt-in per scene, so over-lockscreen effects keep working).
+
+### 🎵 白い熊 音楽 — the music-player pairing
+The `音楽端灯` project pairs the workspace with the **白い熊 音楽** player (`shiroikuma.ongaku`, the Felicity fork) through a clean two-way contract: the player broadcasts **play-state and track changes** (title, artist, path, favorite) into `%INTENT_*` variables, and overlay **良 / 削除 buttons** — shown only while the player is foreground and playing — fire its **token-gated automation intents**: toggle-favorite, and a **confirmed delete** (song title + artist in the dialog) that lets the player itself skip, SAF-delete the file, and clean its library. Named **play-playlist tasks** (start playlist X, optionally at track Y) work from home-screen shortcuts. The audio-reactive **edge meteors that used to live here now render natively inside 白い熊 音楽** — beat-locked from the player's own decoder tap (sample-accurate, works under Android Auto and Bluetooth offload) — so this app no longer holds an audio `Visualizer` at all, and playback audio offload is never blocked.
 
 ### 📊 Monitor, widgets & theme
 A **Monitor** tab aggregates engine task-activity and widget pulls. A styled-bitmap **home-screen widget engine** with a visual layout editor (Tasker Widget V2 import) and a **named-template library**. A black-and-yellow **AMOLED theme** + a UI-customization page, unified JSON import/export, multi-select, and an in-app Help/Docs tab.
@@ -74,7 +77,7 @@ A profile is active while **all** its contexts match. Seven families:
 
 ---
 
-## Actions — **115 built-in** (＋ engine flow control)
+## Actions — **124 built-in** (＋ engine flow control)
 
 > Bold = added or materially extended in this fork.
 
@@ -84,7 +87,7 @@ A profile is active while **all** its contexts match. Seven families:
 
 **Settings (18)** — Toggle WiFi · Toggle Bluetooth · Toggle Mobile Data · Toggle Airplane Mode · Toggle Torch · Set / Auto Brightness · Set Volume · Get Volume · Set Ringer Mode · Set Do Not Disturb · Set Screen Timeout · Location Mode · Set Tile State · **Get Device State** (battery / charging-plugged / WiFi / airplane → vars) · Get / Put Setting · WiFi Settings
 
-**Variable (15)** — Set Variable · **Persist Variable** · Variable Clear · **Variable Split** · Variable Join · Variable Add · Variable Convert · Variable Search Replace · Parse/Format DateTime · Array Set / Push / Pop / Clear / Process · Arrays Merge
+**Variable (24)** — Set Variable · **Persist Variable** · Variable Clear · **Variable Split** · Variable Join · Variable Add · Variable Convert · Variable Search Replace · Parse/Format DateTime · Read Data *(JSON/CSV/XML → vars, path selectors)* · Format / Parse / Add Date-Time · Match / Replace / Split / Join / Substring Text *(linear-time RE2 regex)* · Array Set / Push / Pop / Clear / Process · Arrays Merge
 
 **Flow (11)** — If · Else · End If · For Each · End For · Run Task · Return Values · Stop · Fail · Wait · Comment
 
@@ -94,7 +97,7 @@ A profile is active while **all** its contexts match. Seven families:
 
 **Media (6)** — Play / Stop / Pause Sound · Next / Previous Track · Mute
 
-**Network (5)** — HTTP GET · HTTP POST · Download File · Ping Host · Wake-on-LAN
+**Network (6)** — HTTP Request *(any method, headers, body, timeouts, response capture)* · HTTP GET · HTTP POST · Download File · Ping Host · Wake-on-LAN
 
 **Notification (4)** — Show Notification *(tap-task + 3 action buttons)* · Cancel Notification · **Dismiss App Notifications** *(by package)* · Say (Text-to-Speech)
 
