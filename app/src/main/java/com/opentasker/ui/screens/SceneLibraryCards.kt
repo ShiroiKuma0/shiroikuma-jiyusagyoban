@@ -28,6 +28,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -393,9 +394,13 @@ private fun SceneElementNudgeControls(
 
 @Composable
 private fun SceneIssueText(issue: SceneIssue) {
+    // Derive from the APPLIED theme's surface luminance, not the system setting: the app
+    // theme is user-selectable and can diverge from the system theme, which previously left
+    // warnings near-invisible (peach on white) in Light-app-on-dark-system.
+    val darkSurface = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     val color = when (issue.severity) {
         SceneIssueSeverity.ERROR -> MaterialTheme.colorScheme.error
-        SceneIssueSeverity.WARNING -> if (androidx.compose.foundation.isSystemInDarkTheme()) {
+        SceneIssueSeverity.WARNING -> if (darkSurface) {
             DesignSystem.SemanticColor.warningDark
         } else {
             DesignSystem.SemanticColor.warningLight

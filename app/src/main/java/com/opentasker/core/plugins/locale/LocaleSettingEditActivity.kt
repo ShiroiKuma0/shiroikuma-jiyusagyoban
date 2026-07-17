@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -25,10 +26,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.app.R
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.OpenTaskerTheme
+import com.opentasker.ui.theme.ThemeMode
+import com.opentasker.ui.theme.ThemePreference
 import kotlinx.coroutines.flow.map
 
 class LocaleSettingEditActivity : ComponentActivity() {
@@ -43,11 +48,20 @@ class LocaleSettingEditActivity : ComponentActivity() {
         }
 
         setContent {
-            OpenTaskerTheme {
+            // Honor the persisted theme like MainActivity and the widget config activity,
+            // instead of defaulting to the system theme.
+            val themeMode by ThemePreference.observe(this).collectAsState(initial = ThemeMode.System)
+            val darkTheme = when (themeMode) {
+                ThemeMode.Dark -> true
+                ThemeMode.Light -> false
+                ThemeMode.HighContrast -> true
+                ThemeMode.System -> isSystemInDarkTheme()
+            }
+            OpenTaskerTheme(darkTheme = darkTheme, highContrast = themeMode == ThemeMode.HighContrast) {
                 val tasks by tasksFlow.collectAsState(initial = emptyList())
                 Scaffold(
                     topBar = {
-                        TopAppBar(title = { Text("Select task for Locale plugin") })
+                        TopAppBar(title = { Text(stringResource(R.string.locale_select_task_title)) })
                     },
                 ) { padding ->
                     TaskPickerList(

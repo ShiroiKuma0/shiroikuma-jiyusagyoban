@@ -8,6 +8,7 @@
     <string name="widget_task_description">Run an OpenTasker task with one tap</string>
 
     <!-- Navigation -->
+    <string name="locale_select_task_title">Select task for Locale plugin</string>
     <string name="nav_profiles">Profiles</string>
     <string name="nav_tasks">Tasks</string>
     <string name="nav_run_log">Run Log</string>

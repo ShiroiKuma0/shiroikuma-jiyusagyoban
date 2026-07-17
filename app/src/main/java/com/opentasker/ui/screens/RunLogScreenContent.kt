@@ -515,7 +515,9 @@ private fun RunLogCard(entry: RunLogEntry) {
                             )
                         }
                     }
-                } else if (diagnostics.detailLines.isNotEmpty()) {
+                } else if (!hasStructuredDiagnostics && diagnostics.detailLines.isNotEmpty()) {
+                    // Only render detail lines here when they were NOT already shown by the
+                    // structured-diagnostics block above; otherwise the same lines appeared twice.
                     Text(
                         diagnostics.detailLines.joinToString("\n"),
                         style = MaterialTheme.typography.bodyMedium,

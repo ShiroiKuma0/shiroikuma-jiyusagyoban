@@ -633,5 +633,3 @@ internal fun DeleteConfirmationDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
-
-private fun plural(count: Int): String = if (count == 1) "" else "s"

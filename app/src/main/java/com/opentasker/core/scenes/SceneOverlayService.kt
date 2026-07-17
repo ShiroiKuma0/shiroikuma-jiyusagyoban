@@ -276,9 +276,28 @@ class SceneOverlayService : Service() {
             .toInt()
             .coerceAtLeast(1)
 
+        // Keep the window (including its drag handle and close button) on screen, so a stray
+        // drag or repeated accessibility move can't park it entirely offscreen with no recovery.
+        fun clampToDisplay() {
+            val view = overlayView ?: return
+            val metrics = resources.displayMetrics
+            val viewWidth = view.width.takeIf { it > 0 } ?: params.width.coerceAtLeast(0)
+            val viewHeight = view.height.takeIf { it > 0 } ?: params.height.coerceAtLeast(0)
+            // TOP|START gravity: x/y are offsets from the top-left. Keep at least a sliver
+            // (the header) reachable on every edge.
+            val margin = (48 * metrics.density).toInt()
+            val maxX = (metrics.widthPixels - margin).coerceAtLeast(0)
+            val maxY = (metrics.heightPixels - margin).coerceAtLeast(0)
+            val minX = -(viewWidth - margin).coerceAtLeast(0)
+            val minY = 0
+            params.x = params.x.coerceIn(minX, maxX)
+            params.y = params.y.coerceIn(minY, maxY)
+        }
+
         fun moveBy(deltaX: Int, deltaY: Int): Boolean {
             params.x += deltaX
             params.y += deltaY
+            clampToDisplay()
             overlayView?.let { windowManager.updateViewLayout(it, params) }
             return true
         }
@@ -316,6 +335,7 @@ class SceneOverlayService : Service() {
                     moved = moved || kotlin.math.abs(deltaX) > touchSlop || kotlin.math.abs(deltaY) > touchSlop
                     params.x = initialX + deltaX.toInt()
                     params.y = initialY + deltaY.toInt()
+                    clampToDisplay()
                     overlayView?.let { windowManager.updateViewLayout(it, params) }
                     true
                 }
