@@ -132,7 +132,7 @@ object SceneOverlayManager {
      * card and placed by [position] ("top"/"center"/"bottom"). [timeoutMs] > 0 auto-dismisses.
      * Safe to call from any thread.
      */
-    fun show(context: Context, scene: Scene, position: String? = null, modal: Boolean = true, timeoutMs: Long = 0L, dismissOnOutside: Boolean = true, fullWidth: Boolean = false, fullscreen: Boolean = false, edgeCenter: Boolean = false, insetDp: Int = 0, heightFraction: Float = 0f, vAlign: String? = null, widthFraction: Float = 0f, hAlign: String? = null, showWhenLocked: Boolean = false) {
+    fun show(context: Context, scene: Scene, position: String? = null, modal: Boolean = true, timeoutMs: Long = 0L, dismissOnOutside: Boolean = true, fullWidth: Boolean = false, fullscreen: Boolean = false, edgeCenter: Boolean = false, insetDp: Int = 0, heightFraction: Float = 0f, vAlign: String? = null, widthFraction: Float = 0f, hAlign: String? = null, showWhenLocked: Boolean = false, keepScreenOn: Boolean = false) {
         val app = context.applicationContext
         main.post {
             appContext = app
@@ -249,7 +249,12 @@ object SceneOverlayManager {
                     // falls back to a focusable window (NOT_TOUCH_MODAL) — captures, but holds focus.
                     (if (widthFraction > 0f && a11y == null) WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL else WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) or
                         WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or edgeFlags or
-                        (if (dismissOnOutside) WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH else 0),
+                        (if (dismissOnOutside) WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH else 0) or
+                        // keepScreenOn: this window blocks the screen timeout while it is shown. The 音楽
+                        // 良/削除 HUDs use it — they exist exactly while music plays in the foreground
+                        // player, so the display stays on during playback (EMUI ignores the player's own
+                        // KEEP_SCREEN_ON when an overlay sits on top).
+                        (if (keepScreenOn) WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON else 0),
                     PixelFormat.TRANSLUCENT,
                 ).apply {
                     gravity = if (fullscreen) Gravity.TOP or Gravity.START else sceneGravity(position)
@@ -265,10 +270,20 @@ object SceneOverlayManager {
                             // gravity); keeping the horizontal (left/right) part. Falls back to the legacy
                             // edgeCenter / media-HUD fraction when unset.
                             val horiz = gravity and Gravity.HORIZONTAL_GRAVITY_MASK
-                            when (vAlign?.trim()?.lowercase()) {
-                                "top" -> { gravity = horiz or Gravity.TOP; y = 0 }
-                                "bottom" -> { gravity = horiz or Gravity.BOTTOM; y = 0 }
-                                "center", "middle" -> { gravity = horiz or Gravity.CENTER_VERTICAL; y = 0 }
+                            // Numeric vAlign (0..1): the scene's vertical CENTER sits at that fraction of
+                            // the screen height (e.g. 0.8 = centred on the player's progress-bar line) —
+                            // fold-state-proportional, unlike the legacy per-width pixel drop below.
+                            val vFrac = vAlign?.trim()?.toFloatOrNull()
+                            when {
+                                vFrac != null -> {
+                                    gravity = horiz or Gravity.TOP
+                                    val sceneHpx = (scene.heightDp * app.resources.displayMetrics.density).toInt()
+                                    y = ((vFrac.coerceIn(0f, 1f) * real.heightPixels).toInt() - sceneHpx / 2)
+                                        .coerceIn(0, (real.heightPixels - sceneHpx).coerceAtLeast(0))
+                                }
+                                vAlign?.trim()?.lowercase() == "top" -> { gravity = horiz or Gravity.TOP; y = 0 }
+                                vAlign?.trim()?.lowercase() == "bottom" -> { gravity = horiz or Gravity.BOTTOM; y = 0 }
+                                vAlign?.trim()?.lowercase() in setOf("center", "middle") -> { gravity = horiz or Gravity.CENTER_VERTICAL; y = 0 }
                                 else -> {
                                     y = if (edgeCenter) 0 else {
                                         val frac = when {
