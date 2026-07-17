@@ -12,7 +12,6 @@ import java.io.File
 import java.io.InputStream
 import java.net.DatagramPacket
 import java.net.DatagramSocket
-import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.URL
 import java.nio.file.AtomicMoveNotSupportedException
@@ -59,6 +58,12 @@ private val HOST_PATTERN = Regex("^[A-Za-z0-9.-]{1,253}$")
  *   - "url": download URL
  *   - "path": destination file path
  *   - "timeout_sec": optional timeout (default: 30)
+ *   - "max_bytes": optional size cap (default and maximum: 50 MB)
+ *
+ * Runs on OkHttp so the cleartext private-LAN policy and the API 37 LAN-permission
+ * gate are enforced against the DNS answers the connection actually uses — the old
+ * HttpURLConnection path resolved once for the policy check and again (independently)
+ * at connect time, which a short-TTL rebinding host could exploit.
  */
 class DownloadAction : Action {
     override val id = "download"
@@ -67,31 +72,47 @@ class DownloadAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val url = args["url"] ?: return ActionResult.Failure("missing url")
         val path = args["path"] ?: return ActionResult.Failure("missing path")
-        val timeout = (args["timeout_sec"]?.toIntOrNull() ?: 30).coerceIn(1, 300) * 1000
+        val timeoutSec = (args["timeout_sec"]?.toIntOrNull() ?: 30).coerceIn(1, 300).toLong()
         return try {
             val parsedUrl = URL(url)
+            // Fast-fail preflight for clear user feedback; the DNS policy below re-enforces
+            // both rules at the resolution the transport actually uses.
             enforceHttpPolicy(parsedUrl, args)?.let { return it }
             if (urlTargetsLocalNetwork(parsedUrl)) checkLocalNetworkPermission(ctx)?.let { return it }
+            val maxDownload = parseMaxDownloadBytes(args)
+                ?: return ActionResult.Failure("max_bytes must be a positive integer")
+            val effectiveLimit = maxDownload.coerceAtMost(MAX_DOWNLOAD_BYTES)
             val destination = safeDownloadFile(ctx, path)
                 ?: return ActionResult.Failure("path is outside OpenTasker downloads")
             destination.parentFile?.mkdirs()
 
-            val connection = parsedUrl.openConnection() as HttpURLConnection
-            try {
-                connection.connectTimeout = timeout
-                connection.readTimeout = timeout
-                connection.instanceFollowRedirects = false
-                val maxDownload = parseMaxDownloadBytes(args)
-                    ?: return ActionResult.Failure("max_bytes must be a positive integer")
-                val effectiveLimit = maxDownload.coerceAtMost(MAX_DOWNLOAD_BYTES)
+            val client = DOWNLOAD_CLIENT.newBuilder()
+                .connectTimeout(timeoutSec, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(timeoutSec, java.util.concurrent.TimeUnit.SECONDS)
+                .callTimeout(timeoutSec * 2, java.util.concurrent.TimeUnit.SECONDS)
+                .dns(downloadPolicyDns(cleartext = parsedUrl.protocol == "http", ctx = ctx))
+                .build()
+            val request = okhttp3.Request.Builder().url(url).build()
+            executeDownload(client, request) { response ->
+                if (response.code in 300..399) {
+                    return@executeDownload ActionResult.Failure(
+                        "download failed: HTTP ${response.code} redirect (use http.request with redirects=same_origin)",
+                    )
+                }
+                if (response.code !in 200..299) {
+                    return@executeDownload ActionResult.Failure("download failed: HTTP ${response.code}")
+                }
                 val tempFile = File.createTempFile(tempFilePrefix(destination), ".part", destination.parentFile)
                 try {
-                    connection.inputStream.use { input ->
+                    response.body.byteStream().use { input ->
                         tempFile.outputStream().use { output ->
                             val copied = input.copyBounded(output, effectiveLimit)
                             if (copied < 0) {
-                                return ActionResult.Failure("download exceeds $effectiveLimit byte limit")
+                                return@executeDownload ActionResult.Failure("download exceeds $effectiveLimit byte limit")
                             }
+                            // Sync before the atomic rename so a power loss cannot publish a
+                            // zero-length page-cache file over the previous good destination.
+                            output.fd.sync()
                         }
                     }
                     replaceFile(tempFile, destination)
@@ -100,12 +121,62 @@ class DownloadAction : Action {
                 }
                 ctx.logger("Downloaded ${parsedUrl.host} to ${destination.name}")
                 ActionResult.Success
-            } finally {
-                connection.disconnect()
             }
         } catch (e: Exception) {
             ActionResult.Failure("download failed: ${e.message}")
         }
+    }
+
+    private suspend fun executeDownload(
+        client: okhttp3.OkHttpClient,
+        request: okhttp3.Request,
+        handler: (okhttp3.Response) -> ActionResult,
+    ): ActionResult = kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+        val call = client.newCall(request)
+        continuation.invokeOnCancellation { call.cancel() }
+        call.enqueue(object : okhttp3.Callback {
+            override fun onFailure(call: okhttp3.Call, e: java.io.IOException) {
+                continuation.resume(ActionResult.Failure("download failed: ${e.message}")) { _, _, _ -> }
+            }
+
+            override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
+                val result = try {
+                    response.use(handler)
+                } catch (e: Exception) {
+                    ActionResult.Failure("download failed: ${e.message}")
+                }
+                continuation.resume(result) { _, _, _ -> }
+            }
+        })
+    }
+
+    companion object {
+        private val DOWNLOAD_CLIENT = okhttp3.OkHttpClient.Builder()
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .retryOnConnectionFailure(false)
+            .build()
+
+        /**
+         * Enforces the transport policies at the resolution OkHttp actually connects to:
+         * cleartext targets must resolve exclusively to private/LAN addresses, and on
+         * API 37+ any private/LAN answer requires ACCESS_LOCAL_NETWORK.
+         */
+        private fun downloadPolicyDns(cleartext: Boolean, ctx: ActionContext): okhttp3.Dns =
+            okhttp3.Dns { hostname ->
+                val addresses = okhttp3.Dns.SYSTEM.lookup(hostname)
+                if (cleartext && (addresses.isEmpty() || addresses.any { !isPrivateOrLocalAddress(it) })) {
+                    throw java.net.UnknownHostException(
+                        "cleartext target did not resolve exclusively to private/LAN addresses",
+                    )
+                }
+                if (addresses.any(::isPrivateOrLocalAddress) && checkLocalNetworkPermission(ctx) != null) {
+                    throw java.net.UnknownHostException(
+                        "ACCESS_LOCAL_NETWORK permission is required for LAN downloads on Android 17+",
+                    )
+                }
+                addresses
+            }
     }
 }
 
@@ -165,22 +236,7 @@ class WakeOnLanAction : Action {
     }
 }
 
-private const val MAX_RESPONSE_BYTES = 1_048_576L // 1 MB for in-memory response variables
 private const val MAX_DOWNLOAD_BYTES = 52_428_800L // 50 MB for file downloads
-
-private fun InputStream.readBounded(maxBytes: Long): String {
-    val buffer = ByteArray(8192)
-    val result = java.io.ByteArrayOutputStream()
-    var total = 0L
-    while (true) {
-        val n = read(buffer)
-        if (n < 0) break
-        total += n
-        if (total > maxBytes) throw IllegalStateException("response exceeds ${maxBytes / 1024 / 1024} MB limit")
-        result.write(buffer, 0, n)
-    }
-    return result.toByteArray().toString(Charsets.UTF_8)
-}
 
 private fun InputStream.copyBounded(out: java.io.OutputStream, maxBytes: Long): Long {
     val buffer = ByteArray(8192)

@@ -360,23 +360,18 @@ class TileStateAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val state = args["state"] ?: return ActionResult.Failure("missing state argument")
-        val active = when (state.lowercase()) {
-            "active", "on", "true" -> true
-            "inactive", "off", "false" -> false
+        when (state.lowercase()) {
+            "active", "on", "true", "inactive", "off", "false" -> Unit
             else -> return ActionResult.Failure("invalid state: $state (use active/inactive)")
         }
-        val label = args["label"]
-        if (android.os.Build.VERSION.SDK_INT < 33) {
-            ctx.logger("Tile state: $state (update deferred until tile next listens)")
-            return ActionResult.Success
-        }
-        val service = ctx.app.getSystemService(android.app.StatusBarManager::class.java)
-        if (service == null) {
-            ctx.logger("Tile state: $state (update deferred until tile next listens)")
-            return ActionResult.Success
-        }
-        ctx.logger("Tile: ${label ?: "OpenTasker"} → $state")
-        return ActionResult.Success
+        // Nothing consumes tile state yet: there is no tile registry write and no
+        // requestListeningState wiring. Reporting Success here was a lie users could not
+        // detect until their tile never changed. Per-task Quick Settings tiles are a
+        // planned feature; until it lands this action fails honestly like the other
+        // unsupported device-control stubs.
+        return ActionResult.Failure(
+            "tile.set is not functional yet: OpenTasker does not publish updatable Quick Settings tiles",
+        )
     }
 }
 
@@ -394,7 +389,11 @@ private fun streamType(name: String): Int? = when (name.lowercase()) {
  * Set screen timeout (stay-on duration).
  *
  * Args:
- *   - "millis": milliseconds until screen times out (0 = never)
+ *   - "millis": milliseconds until screen times out (minimum 1000)
+ *
+ * Android has no "never" value for SCREEN_OFF_TIMEOUT: 0 turns the screen off
+ * (near-)immediately on real devices, the opposite of what "never" suggests, so
+ * zero and sub-second values are rejected.
  */
 class ScreenTimeoutAction : Action {
     override val id = "screen.timeout"
@@ -403,8 +402,10 @@ class ScreenTimeoutAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val rawMillis = args["millis"] ?: return ActionResult.Failure("missing millis")
         val ms = rawMillis.toLongOrNull() ?: return ActionResult.Failure("invalid millis: $rawMillis")
-        if (ms !in 0L..MAX_SCREEN_TIMEOUT_MS) {
-            return ActionResult.Failure("screen timeout must be between 0 and $MAX_SCREEN_TIMEOUT_MS ms")
+        if (ms !in MIN_SCREEN_TIMEOUT_MS..MAX_SCREEN_TIMEOUT_MS) {
+            return ActionResult.Failure(
+                "screen timeout must be between $MIN_SCREEN_TIMEOUT_MS and $MAX_SCREEN_TIMEOUT_MS ms",
+            )
         }
         if (!Settings.System.canWrite(ctx.app)) {
             return ActionResult.Failure("Write system settings permission is not granted")
@@ -419,6 +420,7 @@ class ScreenTimeoutAction : Action {
     }
 
     companion object {
+        private const val MIN_SCREEN_TIMEOUT_MS = 1_000L
         private const val MAX_SCREEN_TIMEOUT_MS = 1_800_000L // 30 minutes
     }
 }

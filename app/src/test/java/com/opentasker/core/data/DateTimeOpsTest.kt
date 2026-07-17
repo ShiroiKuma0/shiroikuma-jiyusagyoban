@@ -46,6 +46,12 @@ class DateTimeOpsTest {
     }
 
     @Test
+    fun invalidZoneFailsClosedInsteadOfFallingBackToSystemZone() {
+        assertNull(DateTimeOps.format(0L, "yyyy-MM-dd", "Amercia/New_York"))
+        assertNull(DateTimeOps.parse("2026-07-14", "yyyy-MM-dd", "Not/A_Zone"))
+    }
+
+    @Test
     fun addMonthsAdvancesCalendar() {
         // One month from a fixed instant must move strictly forward (calendar-based).
         val base = 1_600_000_000_000L

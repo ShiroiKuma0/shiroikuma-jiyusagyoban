@@ -766,6 +766,8 @@ fun registerActionMetadata() {
             categoryRes = R.string.catalog_category_network,
             fields = listOf(
                 ActionField("host", R.string.catalog_action_ping_field_host_label, required = true),
+                ActionField("timeout_sec", R.string.catalog_action_ping_field_timeout_label, FieldType.NUMBER, hintRes = R.string.catalog_action_ping_field_timeout_hint),
+                ActionField("var", R.string.catalog_action_ping_field_var_label, hintRes = R.string.catalog_action_ping_field_var_hint),
             )
         )
     )
@@ -780,6 +782,8 @@ fun registerActionMetadata() {
                 ActionField("url", R.string.catalog_action_download_field_url_label, required = true),
                 ActionField("path", R.string.catalog_action_download_field_path_label, required = true),
                 ActionField("allow_http", R.string.catalog_action_download_field_allow_http_label, FieldType.CHECKBOX, hintRes = R.string.catalog_action_download_field_allow_http_hint),
+                ActionField("timeout_sec", R.string.catalog_action_download_field_timeout_label, FieldType.NUMBER, hintRes = R.string.catalog_action_download_field_timeout_hint),
+                ActionField("max_bytes", R.string.catalog_action_download_field_max_bytes_label, FieldType.NUMBER, hintRes = R.string.catalog_action_download_field_max_bytes_hint),
             )
         )
     )
@@ -807,6 +811,7 @@ fun registerActionMetadata() {
             categoryRes = R.string.catalog_category_media,
             fields = listOf(
                 ActionField("path", R.string.catalog_action_sound_play_field_path_label, required = true),
+                ActionField("volume", R.string.catalog_action_sound_play_field_volume_label, FieldType.NUMBER, hintRes = R.string.catalog_action_sound_play_field_volume_hint),
             )
         )
     )
@@ -857,7 +862,9 @@ fun registerActionMetadata() {
             nameRes = R.string.catalog_action_media_mute_name,
             descriptionRes = R.string.catalog_action_media_mute_description,
             categoryRes = R.string.catalog_category_media,
-            fields = emptyList()
+            fields = listOf(
+                ActionField("stream", R.string.catalog_action_media_mute_field_stream_label, hintRes = R.string.catalog_action_media_mute_field_stream_hint),
+            )
         )
     )
 

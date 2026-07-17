@@ -442,11 +442,19 @@ enum class ActionTraceStatus {
 private fun actionTimeoutMs(actionType: String): Long = when {
     actionType == "flow.wait" -> MAX_WAIT_TIMEOUT_MS
     actionType.startsWith("http.") || actionType == "download" || actionType == "ping" -> 120_000L
+    // Playback and speech suspend until completion; a long sound file or near-limit TTS
+    // text legitimately outlives the default 60 s budget.
+    actionType == "sound.play" || actionType == "tts.speak" -> MEDIA_ACTION_TIMEOUT_MS
     else -> DEFAULT_ACTION_TIMEOUT_MS
 }
 
 private const val DEFAULT_ACTION_TIMEOUT_MS = 60_000L
-private const val MAX_WAIT_TIMEOUT_MS = 1_800_000L // 30 minutes
+private const val MEDIA_ACTION_TIMEOUT_MS = 600_000L // 10 minutes
+
+// The engine budget must exceed WaitAction.MAX_WAIT_MS (30 min): the timeout clock starts
+// before the action parses its arguments, so an equal budget deterministically failed a
+// wait at the documented maximum.
+private const val MAX_WAIT_TIMEOUT_MS = 1_860_000L // 30 minutes + 60 s margin
 
 const val SUB_TASK_ACTION_ID = "task.run"
 const val MAX_SUBTASK_DEPTH = 8

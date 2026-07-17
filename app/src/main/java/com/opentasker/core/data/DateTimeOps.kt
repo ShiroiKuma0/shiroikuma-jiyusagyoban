@@ -14,13 +14,14 @@ import java.time.temporal.ChronoUnit
 object DateTimeOps {
     /** Format an epoch-millis instant with [pattern] (e.g. `yyyy-MM-dd HH:mm`). */
     fun format(epochMillis: Long, pattern: String, zone: String?): String? = runCatching {
-        DateTimeFormatter.ofPattern(pattern).withZone(zoneId(zone)).format(Instant.ofEpochMilli(epochMillis))
+        val zoneId = zoneId(zone) ?: return null
+        DateTimeFormatter.ofPattern(pattern).withZone(zoneId).format(Instant.ofEpochMilli(epochMillis))
     }.getOrNull()
 
     /** Parse [text] with [pattern] into epoch millis; accepts date-time or date-only patterns. */
     fun parse(text: String, pattern: String, zone: String?): Long? {
         val formatter = runCatching { DateTimeFormatter.ofPattern(pattern) }.getOrNull() ?: return null
-        val zoneId = zoneId(zone)
+        val zoneId = zoneId(zone) ?: return null
         runCatching { LocalDateTime.parse(text, formatter).atZone(zoneId).toInstant().toEpochMilli() }
             .getOrNull()?.let { return it }
         runCatching { LocalDate.parse(text, formatter).atStartOfDay(zoneId).toInstant().toEpochMilli() }
@@ -49,7 +50,9 @@ object DateTimeOps {
         }.getOrNull()
     }
 
-    private fun zoneId(zone: String?): ZoneId =
+    // A typo like "Amercia/New_York" must fail closed (null), not silently produce
+    // system-zone timestamps that look correct.
+    private fun zoneId(zone: String?): ZoneId? =
         if (zone.isNullOrBlank()) ZoneId.systemDefault()
-        else runCatching { ZoneId.of(zone) }.getOrDefault(ZoneId.systemDefault())
+        else runCatching { ZoneId.of(zone.trim()) }.getOrNull()
 }

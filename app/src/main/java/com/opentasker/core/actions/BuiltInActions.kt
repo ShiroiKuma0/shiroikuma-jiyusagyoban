@@ -277,7 +277,12 @@ class SayAction : Action {
                     override fun onError(utteranceId: String?) { completeOnce(ActionResult.Failure("TTS utterance failed")) }
                 })
                 ctx.logger("TTS: ${text.take(80)}${if (text.length > 80) "..." else ""}")
-                engine.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "opentasker_say")
+                val queued = engine.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "opentasker_say")
+                if (queued != android.speech.tts.TextToSpeech.SUCCESS) {
+                    // No utterance callback will ever fire for a failed queue; fail fast
+                    // instead of burning the whole action budget on a silent timeout.
+                    completeOnce(ActionResult.Failure("TTS could not queue the utterance"))
+                }
             }
             cont.invokeOnCancellation { tts.shutdown() }
         }

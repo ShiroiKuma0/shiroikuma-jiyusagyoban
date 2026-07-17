@@ -134,6 +134,7 @@
     <string name="capability_screenshot_unsupported" formatted="false">Screenshots require MediaProjection consent or privileged shell access. No privileged transport is available in this build.</string>
     <string name="capability_reboot_unsupported" formatted="false">Reboot requires privileged device-owner or system-app access. No privileged transport is available in this build.</string>
     <string name="capability_lock_unsupported" formatted="false">Device lock requires configured device-admin support.</string>
+    <string name="capability_tile_unsupported" formatted="false">Quick Settings tile updates are not functional yet; per-task tiles are a planned feature.</string>
     <string name="capability_screen_off_unsupported" formatted="false">Screen-off requires privileged power-management access. No privileged transport is available in this build.</string>
     <string name="capability_wake_unsupported" formatted="false">Wake requires a foreground activity or privileged wake flow. No privileged transport is available in this build.</string>
     <string name="capability_termux_setup" formatted="false">Requires Termux 0.109 or newer, RUN_COMMAND permission, and an approved script hash.</string>

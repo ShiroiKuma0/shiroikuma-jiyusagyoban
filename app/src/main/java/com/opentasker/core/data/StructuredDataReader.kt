@@ -71,10 +71,7 @@ object StructuredDataReader {
     // path "c"        -> column c across all rows
     // path "r,c"      -> single cell at row r, column c
     private fun readCsv(source: String, path: String): List<String>? {
-        val rows = source.split('\n')
-            .map { it.trimEnd('\r') }
-            .filter { it.isNotEmpty() }
-            .map { line -> line.split(',').map { it.trim() } }
+        val rows = parseCsvRows(source)
         if (rows.isEmpty()) return emptyList()
 
         val trimmed = path.trim()
@@ -95,6 +92,58 @@ object StructuredDataReader {
             }
             else -> null
         }
+    }
+
+    /**
+     * RFC 4180-style CSV row parser: double-quoted fields may contain commas, embedded
+     * newlines, and doubled quotes (""). Unquoted fields are trimmed; quoted fields keep
+     * their content verbatim. A naive split(',') returned wrong cells for any quoted CSV.
+     */
+    internal fun parseCsvRows(source: String): List<List<String>> {
+        val rows = mutableListOf<List<String>>()
+        val fields = mutableListOf<String>()
+        val current = StringBuilder()
+        var inQuotes = false
+        var fieldWasQuoted = false
+        var index = 0
+
+        fun endField() {
+            fields.add(if (fieldWasQuoted) current.toString() else current.toString().trim())
+            current.setLength(0)
+            fieldWasQuoted = false
+        }
+
+        fun endRow() {
+            endField()
+            if (fields.size > 1 || fields.first().isNotEmpty()) rows.add(fields.toList())
+            fields.clear()
+        }
+
+        while (index < source.length) {
+            val ch = source[index]
+            when {
+                inQuotes -> when {
+                    ch == '"' && index + 1 < source.length && source[index + 1] == '"' -> {
+                        current.append('"')
+                        index++
+                    }
+                    ch == '"' -> inQuotes = false
+                    else -> current.append(ch)
+                }
+                ch == '"' && current.isBlank() -> {
+                    inQuotes = true
+                    fieldWasQuoted = true
+                    current.setLength(0)
+                }
+                ch == ',' -> endField()
+                ch == '\r' -> if (index + 1 >= source.length || source[index + 1] != '\n') endRow()
+                ch == '\n' -> endRow()
+                else -> current.append(ch)
+            }
+            index++
+        }
+        if (current.isNotEmpty() || fields.isNotEmpty()) endRow()
+        return rows
     }
 
     // ---- XML ----

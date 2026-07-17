@@ -358,12 +358,20 @@
     <string name="catalog_action_ping_name" formatted="false">Ping Host</string>
     <string name="catalog_action_ping_description" formatted="false">Ping a network host</string>
     <string name="catalog_action_ping_field_host_label" formatted="false">Host address</string>
+    <string name="catalog_action_ping_field_timeout_label" formatted="false">Timeout (seconds)</string>
+    <string name="catalog_action_ping_field_timeout_hint" formatted="false">Default: 5 (1-30)</string>
+    <string name="catalog_action_ping_field_var_label" formatted="false">Result variable</string>
+    <string name="catalog_action_ping_field_var_hint" formatted="false">Stores true/false (default: result)</string>
     <string name="catalog_action_download_name" formatted="false">Download File</string>
     <string name="catalog_action_download_description" formatted="false">Download a file from URL</string>
     <string name="catalog_action_download_field_url_label" formatted="false">URL</string>
     <string name="catalog_action_download_field_path_label" formatted="false">Save to path</string>
     <string name="catalog_action_download_field_allow_http_label" formatted="false">Allow HTTP</string>
     <string name="catalog_action_download_field_allow_http_hint" formatted="false">Allow plain HTTP for LAN/private-network hosts only</string>
+    <string name="catalog_action_download_field_timeout_label" formatted="false">Timeout (seconds)</string>
+    <string name="catalog_action_download_field_timeout_hint" formatted="false">Default: 30 (1-300)</string>
+    <string name="catalog_action_download_field_max_bytes_label" formatted="false">Size limit (bytes)</string>
+    <string name="catalog_action_download_field_max_bytes_hint" formatted="false">Default and maximum: 52428800 (50 MB)</string>
     <string name="catalog_action_wol_name" formatted="false">Wake-on-LAN</string>
     <string name="catalog_action_wol_description" formatted="false">Send a magic packet to wake a device on the local network</string>
     <string name="catalog_action_wol_field_mac_label" formatted="false">MAC Address</string>
@@ -376,6 +384,8 @@
     <string name="catalog_action_sound_play_description" formatted="false">Play a sound file</string>
     <string name="catalog_category_media" formatted="false">Media</string>
     <string name="catalog_action_sound_play_field_path_label" formatted="false">Sound file path</string>
+    <string name="catalog_action_sound_play_field_volume_label" formatted="false">Volume (0-100)</string>
+    <string name="catalog_action_sound_play_field_volume_hint" formatted="false">Optional; uses current volume when empty</string>
     <string name="catalog_action_sound_stop_name" formatted="false">Stop Sound</string>
     <string name="catalog_action_sound_stop_description" formatted="false">Stop playback</string>
     <string name="catalog_action_sound_pause_name" formatted="false">Pause Sound</string>
@@ -386,6 +396,8 @@
     <string name="catalog_action_track_previous_description" formatted="false">Play previous track</string>
     <string name="catalog_action_media_mute_name" formatted="false">Mute</string>
     <string name="catalog_action_media_mute_description" formatted="false">Mute audio</string>
+    <string name="catalog_action_media_mute_field_stream_label" formatted="false">Stream</string>
+    <string name="catalog_action_media_mute_field_stream_hint" formatted="false">music, ring, notification, alarm, system, call (default: music)</string>
     <string name="catalog_action_vibrate_name" formatted="false">Vibrate</string>
     <string name="catalog_action_vibrate_description" formatted="false">Vibrate the device</string>
     <string name="catalog_category_system" formatted="false">System</string>

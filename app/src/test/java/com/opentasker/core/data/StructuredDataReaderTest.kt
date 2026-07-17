@@ -59,6 +59,32 @@ class StructuredDataReaderTest {
         assertEquals(emptyList<String>(), read("csv", "a,b", "9")) // no such column -> no values
     }
 
+    @Test
+    fun csvQuotedFieldsKeepCommasAndDoubledQuotes() {
+        assertEquals(
+            listOf("Doe, John", "42"),
+            read("csv", "\"Doe, John\",42", ""),
+        )
+        assertEquals(
+            listOf("say \"hi\"", "b"),
+            read("csv", "\"say \"\"hi\"\"\",b", ""),
+        )
+    }
+
+    @Test
+    fun csvQuotedFieldsKeepEmbeddedNewlines() {
+        assertEquals(
+            listOf("line1\nline2", "x"),
+            read("csv", "\"line1\nline2\",x", ""),
+        )
+    }
+
+    @Test
+    fun csvColumnExtractionWithQuotedCommas() {
+        // Without quote handling this returned " John" for column 1.
+        assertEquals(listOf("42"), read("csv", "\"Doe, John\",42", "1"))
+    }
+
     // ---- XML ----
 
     @Test
