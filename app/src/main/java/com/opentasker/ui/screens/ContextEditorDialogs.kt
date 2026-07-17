@@ -32,6 +32,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -99,6 +100,9 @@ internal fun ContextConfigDialog(
     val saveConfig = contextConfigForSave(state.type, config)
     val missingRequired = fields.any { it.required && config[it.key].isNullOrBlank() } ||
         (state.type == ContextType.DAY && saveConfig["days"].isNullOrBlank())
+    // Block saving contexts that parse to a spec that can never match: a garbled TIME window
+    // or an out-of-range coordinate would otherwise save silently and fail only at runtime.
+    val hasInvalidValues = contextHasInvalidValues(state.type, config)
     val onLabel = stringResource(R.string.label_on)
     val offLabel = stringResource(R.string.label_off)
 
@@ -106,6 +110,11 @@ internal fun ContextConfigDialog(
         NfcTagWriteSession.results.collect { result ->
             nfcWriteMessage = result.message
         }
+    }
+    // Cancel any armed one-time NFC write when this editor leaves composition (dismiss or
+    // save), so a forgotten armed write can't overwrite/format an unrelated tag later.
+    DisposableEffect(Unit) {
+        onDispose { NfcTagWriteSession.disarm() }
     }
 
     AlertDialog(
@@ -197,7 +206,7 @@ internal fun ContextConfigDialog(
         },
         confirmButton = {
             Button(
-                enabled = !missingRequired,
+                enabled = !missingRequired && !hasInvalidValues,
                 onClick = { onSave(ContextSpec(state.type, saveConfig, invert)) },
             ) {
                 Text(stringResource(R.string.action_save))
@@ -205,6 +214,38 @@ internal fun ContextConfigDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
+}
+
+/**
+ * True when a filled-in context config parses to values that can never match, so the save
+ * button should stay disabled (mirrors the DAY context's canonicalize-or-block behavior).
+ * Only non-blank values are checked; required-but-blank is handled by [missingRequired].
+ */
+internal fun contextHasInvalidValues(type: ContextType, config: Map<String, String>): Boolean {
+    fun invalidClock(key: String): Boolean {
+        val raw = config[key]?.trim().orEmpty()
+        if (raw.isBlank()) return false
+        val parts = raw.split(":")
+        val hour = parts.getOrNull(0)?.toIntOrNull() ?: return true
+        val minute = parts.getOrNull(1)?.toIntOrNull() ?: return true
+        return parts.size != 2 || hour !in 0..23 || minute !in 0..59
+    }
+    fun outOfRange(key: String, min: Double, max: Double): Boolean {
+        val raw = config[key]?.trim().orEmpty()
+        if (raw.isBlank()) return false
+        val value = raw.toDoubleOrNull() ?: return true
+        return value < min || value > max
+    }
+    return when (type) {
+        ContextType.TIME -> invalidClock("start") || invalidClock("end")
+        ContextType.LOCATION ->
+            outOfRange("latitude", -90.0, 90.0) ||
+                outOfRange("longitude", -180.0, 180.0) ||
+                outOfRange("radiusMeters", 0.0, Double.MAX_VALUE)
+        ContextType.EVENT ->
+            outOfRange("latitude", -90.0, 90.0) || outOfRange("longitude", -180.0, 180.0)
+        else -> false
+    }
 }
 
 private fun contextFields(type: ContextType): List<ActionField> = when (type) {

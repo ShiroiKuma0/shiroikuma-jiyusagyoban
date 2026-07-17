@@ -8,6 +8,8 @@ data class AppLogEntry(
     val level: AppLogger.Level,
     val tag: String,
     val message: String,
+    /** Monotonic per-process id; timestamps alone are not unique for burst logging. */
+    val sequence: Long = 0,
 )
 
 /** Android logging plus a bounded process-local ring for in-app diagnostics. */
@@ -21,6 +23,7 @@ object AppLogger {
 
     @Volatile private var minimumLevel = Level.DEBUG
     private val ring = ArrayDeque<AppLogEntry>(MAX_BUFFERED_ENTRIES)
+    private var nextSequence = 0L
 
     fun setMinimumLevel(level: Level) {
         minimumLevel = level
@@ -53,7 +56,15 @@ object AppLogger {
         }.take(MAX_BUFFERED_MESSAGE_CHARS)
         synchronized(ring) {
             while (ring.size >= MAX_BUFFERED_ENTRIES) ring.removeFirst()
-            ring.addLast(AppLogEntry(System.currentTimeMillis(), level, tag.take(MAX_TAG_CHARS), bufferedMessage))
+            ring.addLast(
+                AppLogEntry(
+                    System.currentTimeMillis(),
+                    level,
+                    tag.take(MAX_TAG_CHARS),
+                    bufferedMessage,
+                    sequence = nextSequence++,
+                ),
+            )
         }
         // android.util.Log is unavailable in host JVM tests; the diagnostic ring remains testable.
         runCatching {

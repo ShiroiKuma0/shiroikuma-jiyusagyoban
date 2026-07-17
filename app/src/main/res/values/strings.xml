@@ -95,7 +95,7 @@
     <string name="profile_enable_after_save">Enable after saving</string>
     <string name="profile_enter_task">Enter task</string>
     <string name="profile_cooldown_label">Cooldown seconds</string>
-    <string name="profile_cooldown_helper">Minimum seconds between triggers. Default is 60.</string>
+    <string name="profile_cooldown_helper">Minimum seconds between triggers. Default is 0 (no cooldown).</string>
     <string name="profile_retrigger_label">Re-trigger behavior</string>
     <string name="profile_new">New profile</string>
     <string name="profile_delete">Delete Profile</string>
@@ -279,7 +279,7 @@
 
     <!-- Run log -->
     <string name="run_log_retention_title">Retention</string>
-    <string name="run_log_retention_body">Stored run history is pruned automatically. Entries older than 30 days are removed by periodic cleanup.</string>
+    <string name="run_log_retention_body">Stored run history is pruned automatically to the retention policy you choose below.</string>
     <string name="run_log_find_runs">Find runs</string>
     <string name="run_log_shown_count">%1$d of %2$d shown</string>
     <string name="run_log_history_body">Recent runs with duration, status, and action-level traces.</string>

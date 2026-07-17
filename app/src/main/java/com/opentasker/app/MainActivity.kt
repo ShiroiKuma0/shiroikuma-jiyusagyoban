@@ -3,8 +3,11 @@ package com.opentasker.app
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.lifecycle.lifecycleScope
 import com.opentasker.core.logging.AppLogger
 import androidx.activity.compose.setContent
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
@@ -56,9 +59,16 @@ class MainActivity : ComponentActivity() {
 
     private fun handleNfcIntent(intent: Intent?) {
         if (intent == null) return
-        val writeResult = NfcTagWriteSession.writeFromIntent(intent)
-        if (writeResult != null) {
-            AppLogger.debug("MainActivity", writeResult.message)
+        if (NfcTagWriteSession.isArmed()) {
+            // Tag connect/write/format is blocking I/O; running it on the UI thread during
+            // onCreate/onNewIntent risks jank or an ANR. Hop to a background thread and let
+            // the result surface through NfcTagWriteSession.results.
+            lifecycleScope.launch(Dispatchers.IO) {
+                val writeResult = NfcTagWriteSession.writeFromIntent(intent)
+                if (writeResult != null) {
+                    AppLogger.debug("MainActivity", writeResult.message)
+                }
+            }
             return
         }
         if (NfcContextEvents.publishFromIntent(intent)) {

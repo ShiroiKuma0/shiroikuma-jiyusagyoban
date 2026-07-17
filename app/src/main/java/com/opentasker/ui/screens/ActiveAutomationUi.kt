@@ -94,8 +94,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.opentasker.ui.theme.DesignSystem
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.withTransaction
@@ -470,11 +473,17 @@ fun ActiveAutomationUi(
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
+    val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(screen) {
         if (screen == OpenTaskerScreen.Diagnostics) {
-            while (true) {
-                viewModel.refreshDiagnostics()
-                delay(DIAGNOSTICS_REFRESH_INTERVAL_MS)
+            // repeatOnLifecycle: LaunchedEffect is composition-scoped, so without it the
+            // 5-second file/crash-log polling kept running while the app sat backgrounded
+            // with Diagnostics selected.
+            lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (true) {
+                    viewModel.refreshDiagnostics()
+                    delay(DIAGNOSTICS_REFRESH_INTERVAL_MS)
+                }
             }
         }
     }
@@ -652,8 +661,17 @@ fun ActiveAutomationUi(
                 onPinTask = { viewModel.pinTaskShortcut(it) },
                 onAddAction = { openActionPicker(it) },
                 onEditAction = { task, index, action ->
-                    ActionMetadataRegistry.get(action.type)?.let { metadata ->
+                    val metadata = ActionMetadataRegistry.get(action.type)
+                    if (metadata != null) {
                         openActionEdit(task, metadata, index)
+                    } else {
+                        // Unknown/unsupported action types (e.g. from an import on a build that
+                        // lacks the action) have no editor; tell the user instead of dead-tapping.
+                        scope.launch {
+                            snackbarHostState.showSnackbar(
+                                "This action type isn't supported on this build - remove it or re-import.",
+                            )
+                        }
                     }
                 },
                 onDeleteAction = { task, index ->

@@ -46,24 +46,47 @@ object NfcTagWritePlanner {
 object NfcTagWriteSession {
     private val writeResults = MutableSharedFlow<NfcTagWriteResult>(extraBufferCapacity = 8)
 
+    // An armed write must not linger: it overwrites (or formats) the next scanned tag, so it
+    // expires after ARM_TIMEOUT_MS and is disarmed when the editor dialog closes.
+    private const val ARM_TIMEOUT_MS = 60_000L
+
     @Volatile
     private var pendingPlan: NfcTagWritePlan? = null
 
+    @Volatile
+    private var armedAtElapsedMs: Long = 0L
+
     val results: SharedFlow<NfcTagWriteResult> = writeResults.asSharedFlow()
+
+    /** True while a write is armed and unexpired — for surfacing the armed state in the UI. */
+    fun isArmed(): Boolean = pendingPlan != null && !isExpired()
 
     fun armTextRecord(label: String): NfcTagWriteResult {
         val plan = NfcTagWritePlanner.planTextRecord(label)
         pendingPlan = plan
+        armedAtElapsedMs = android.os.SystemClock.elapsedRealtime()
         return publish(
             NfcTagWriteResult(
                 success = true,
-                message = "NFC write armed for a ${plan.estimatedBytes}-byte text record.",
+                message = "NFC write armed for a ${plan.estimatedBytes}-byte text record. Scan a tag within 60 seconds.",
             )
         )
     }
 
+    /** Cancels any pending write; safe to call when the editor dialog is dismissed. */
+    fun disarm() {
+        pendingPlan = null
+    }
+
+    private fun isExpired(): Boolean =
+        android.os.SystemClock.elapsedRealtime() - armedAtElapsedMs > ARM_TIMEOUT_MS
+
     fun writeFromIntent(intent: Intent): NfcTagWriteResult? {
         val plan = pendingPlan ?: return null
+        if (isExpired()) {
+            pendingPlan = null
+            return null
+        }
         val tag = intent.nfcTag()
             ?: return publish(NfcTagWriteResult(false, "NFC write failed: no tag was attached to the scan intent."))
         val result = runCatching {

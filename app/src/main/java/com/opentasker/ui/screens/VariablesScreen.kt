@@ -58,7 +58,7 @@ fun VariablesScreen(
     variables: List<Variable>,
     contentPadding: PaddingValues,
     onUpdate: (name: String, value: String, isSecret: Boolean, successMessage: String) -> Unit,
-    onDelete: (name: String) -> Unit,
+    onDelete: (name: String, successMessage: String) -> Unit,
     onMessage: (String) -> Unit,
 ) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -169,10 +169,11 @@ fun VariablesScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        onDelete(name)
+                        // Success/failure feedback is emitted by the ViewModel after the
+                        // delete actually resolves, not optimistically at click time.
+                        onDelete(name, deletedMsg)
                         pendingDeleteName = null
                         if (editTargetName == name) editTargetName = null
-                        onMessage(deletedMsg)
                     },
                 ) {
                     Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)

@@ -99,8 +99,8 @@ private data class PermissionSetupItem(
 
 data class BackupSetupState(
     val busy: Boolean,
-    val latestBackupName: String?,
-    val pendingRestore: Boolean,
+    val latestBackupName: String? = null,
+    val pendingRestore: Boolean = false,
 )
 
 private sealed interface PermissionAction {

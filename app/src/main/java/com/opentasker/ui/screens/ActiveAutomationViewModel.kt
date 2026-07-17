@@ -188,7 +188,9 @@ class ActiveAutomationViewModel(
     private val _runLogRetentionPolicy = MutableStateFlow(runLogRetentionSettings.load())
     val runLogRetentionPolicy: StateFlow<RunLogRetentionPolicy> = _runLogRetentionPolicy.asStateFlow()
 
-    private val _backupSetupState = MutableStateFlow(loadBackupSetupState(busy = false))
+    // Starts with a cheap placeholder; the real state (which enumerates the filesystem) is
+    // loaded off the main thread in init and refreshed after each backup operation.
+    private val _backupSetupState = MutableStateFlow(BackupSetupState(busy = false))
     val backupSetupState: StateFlow<BackupSetupState> = _backupSetupState.asStateFlow()
 
     private val _diagnosticsState = MutableStateFlow(DiagnosticsUiState())
@@ -210,6 +212,9 @@ class ActiveAutomationViewModel(
     init {
         viewModelScope.launch {
             runCatching { pruneRunLogs(_runLogRetentionPolicy.value) }
+        }
+        viewModelScope.launch {
+            runCatching { refreshBackupSetupState(busy = false) }
         }
         refreshDiagnostics()
     }
@@ -241,21 +246,25 @@ class ActiveAutomationViewModel(
     }
 
     fun updateTask(task: Task, message: String = "Task updated") = launchWithMessage(message) {
-        val previous = db.taskDao().getById(task.id)
-        if (previous != null) {
-            previous.toDomainDecodeResult().issue?.let { issue ->
-                throw CorruptRecordOverwriteException(issue)
+        // Wrapped like updateScene: the corrupt-record check, history snapshot, prune, and
+        // update must be atomic so a concurrent writer can't interleave and lose a revision.
+        db.withTransaction {
+            val previous = db.taskDao().getById(task.id)
+            if (previous != null) {
+                previous.toDomainDecodeResult().issue?.let { issue ->
+                    throw CorruptRecordOverwriteException(issue)
+                }
+                db.editHistoryDao().insert(
+                    EditHistoryEntity(
+                        entityType = EditHistoryDao.TYPE_TASK,
+                        entityId = task.id,
+                        previousJson = previous.actionsJson,
+                    ),
+                )
+                db.editHistoryDao().pruneOld(EditHistoryDao.TYPE_TASK, task.id)
             }
-            db.editHistoryDao().insert(
-                EditHistoryEntity(
-                    entityType = EditHistoryDao.TYPE_TASK,
-                    entityId = task.id,
-                    previousJson = previous.actionsJson,
-                ),
-            )
-            db.editHistoryDao().pruneOld(EditHistoryDao.TYPE_TASK, task.id)
+            db.taskDao().update(task.toEntity())
         }
-        db.taskDao().update(task.toEntity())
     }
 
     fun deleteTask(task: Task) {
@@ -325,32 +334,36 @@ class ActiveAutomationViewModel(
 
     fun updateProfile(profile: Profile, message: String = "Profile updated") =
         launchWithMessage(message) {
-            val previousEntity = profile.id.takeIf { it > 0L }
-                ?.let { db.profileDao().getById(it) }
-            previousEntity?.toDomainDecodeResult()?.issue?.let { issue ->
-                throw CorruptRecordOverwriteException(issue)
+            // Atomic read-check-snapshot-update, matching updateScene, so racing writers
+            // (dialog save vs. notification/external-intent path) can't lose a revision.
+            db.withTransaction {
+                val previousEntity = profile.id.takeIf { it > 0L }
+                    ?.let { db.profileDao().getById(it) }
+                previousEntity?.toDomainDecodeResult()?.issue?.let { issue ->
+                    throw CorruptRecordOverwriteException(issue)
+                }
+                val previous = previousEntity?.toDomain()
+                if (
+                    previous?.requiresRiskAcknowledgement == true &&
+                    (profile.enabled || !profile.requiresRiskAcknowledgement)
+                ) {
+                    throw IllegalStateException("Review imported automation powers before enabling this profile.")
+                }
+                if (previousEntity != null) {
+                    db.editHistoryDao().insert(
+                        EditHistoryEntity(
+                            entityType = EditHistoryDao.TYPE_PROFILE,
+                            entityId = profile.id,
+                            previousJson = previousEntity.contextsJson,
+                        ),
+                    )
+                    db.editHistoryDao().pruneOld(EditHistoryDao.TYPE_PROFILE, profile.id)
+                }
+                if (previous != null && previous.contexts != profile.contexts) {
+                    locationDwellStateStore.clearProfile(profile.id)
+                }
+                db.profileDao().update(profile.toEntity())
             }
-            val previous = previousEntity?.toDomain()
-            if (
-                previous?.requiresRiskAcknowledgement == true &&
-                (profile.enabled || !profile.requiresRiskAcknowledgement)
-            ) {
-                throw IllegalStateException("Review imported automation powers before enabling this profile.")
-            }
-            if (previousEntity != null) {
-                db.editHistoryDao().insert(
-                    EditHistoryEntity(
-                        entityType = EditHistoryDao.TYPE_PROFILE,
-                        entityId = profile.id,
-                        previousJson = previousEntity.contextsJson,
-                    ),
-                )
-                db.editHistoryDao().pruneOld(EditHistoryDao.TYPE_PROFILE, profile.id)
-            }
-            if (previous != null && previous.contexts != profile.contexts) {
-                locationDwellStateStore.clearProfile(profile.id)
-            }
-            db.profileDao().update(profile.toEntity())
         }
 
     fun acknowledgeAndEnableImportedProfile(profileId: Long) =
@@ -581,25 +594,27 @@ class ActiveAutomationViewModel(
 
     private fun launchBackupOperation(block: suspend () -> Unit) {
         viewModelScope.launch {
-            setBackupBusy(true)
+            _backupSetupState.value = _backupSetupState.value.copy(busy = true)
             try {
                 block()
             } finally {
-                setBackupBusy(false)
+                refreshBackupSetupState(busy = false)
             }
         }
     }
 
-    private fun setBackupBusy(busy: Boolean) {
-        _backupSetupState.value = loadBackupSetupState(busy)
+    private suspend fun refreshBackupSetupState(busy: Boolean) {
+        // Backup enumeration and pending-restore checks hit the filesystem; keep them off
+        // the main thread (debug StrictMode flags them otherwise).
+        val loaded = withContext(Dispatchers.IO) {
+            BackupSetupState(
+                busy = busy,
+                latestBackupName = databaseBackupManager.listBackups().firstOrNull()?.name,
+                pendingRestore = databaseBackupManager.hasPendingRestore(),
+            )
+        }
+        _backupSetupState.value = loaded
     }
-
-    private fun loadBackupSetupState(busy: Boolean): BackupSetupState =
-        BackupSetupState(
-            busy = busy,
-            latestBackupName = databaseBackupManager.listBackups().firstOrNull()?.name,
-            pendingRestore = databaseBackupManager.hasPendingRestore(),
-        )
 
     fun runTaskNow(task: Task) {
         viewModelScope.launch {
@@ -629,24 +644,34 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun undoLastTaskEdit(taskId: Long) = launchWithMessage("Edit undone") {
-        val snapshot = db.editHistoryDao().getLatest(EditHistoryDao.TYPE_TASK, taskId) ?: run {
-            events.send("No edit history available")
-            return@launchWithMessage
+    fun undoLastTaskEdit(taskId: Long) {
+        viewModelScope.launch {
+            runCatching {
+                val snapshot = db.editHistoryDao().getLatest(EditHistoryDao.TYPE_TASK, taskId)
+                    ?: return@runCatching false
+                val current = db.taskDao().getById(taskId) ?: return@runCatching false
+                db.taskDao().update(current.copy(actionsJson = snapshot.previousJson))
+                db.editHistoryDao().deleteFor(EditHistoryDao.TYPE_TASK, taskId)
+                true
+            }.onSuccess { undone ->
+                events.send(if (undone) "Edit undone" else "No edit history available")
+            }.onFailure { events.send("Error: ${it.message ?: "Undo failed"}") }
         }
-        val current = db.taskDao().getById(taskId) ?: return@launchWithMessage
-        db.taskDao().update(current.copy(actionsJson = snapshot.previousJson))
-        db.editHistoryDao().deleteFor(EditHistoryDao.TYPE_TASK, taskId)
     }
 
-    fun undoLastProfileEdit(profileId: Long) = launchWithMessage("Edit undone") {
-        val snapshot = db.editHistoryDao().getLatest(EditHistoryDao.TYPE_PROFILE, profileId) ?: run {
-            events.send("No edit history available")
-            return@launchWithMessage
+    fun undoLastProfileEdit(profileId: Long) {
+        viewModelScope.launch {
+            runCatching {
+                val snapshot = db.editHistoryDao().getLatest(EditHistoryDao.TYPE_PROFILE, profileId)
+                    ?: return@runCatching false
+                val current = db.profileDao().getById(profileId) ?: return@runCatching false
+                db.profileDao().update(current.copy(contextsJson = snapshot.previousJson))
+                db.editHistoryDao().deleteFor(EditHistoryDao.TYPE_PROFILE, profileId)
+                true
+            }.onSuccess { undone ->
+                events.send(if (undone) "Edit undone" else "No edit history available")
+            }.onFailure { events.send("Error: ${it.message ?: "Undo failed"}") }
         }
-        val current = db.profileDao().getById(profileId) ?: return@launchWithMessage
-        db.profileDao().update(current.copy(contextsJson = snapshot.previousJson))
-        db.editHistoryDao().deleteFor(EditHistoryDao.TYPE_PROFILE, profileId)
     }
 
     fun updateVariable(name: String, value: String, isSecret: Boolean, successMessage: String) {
@@ -663,9 +688,11 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun deleteVariable(name: String) {
+    fun deleteVariable(name: String, successMessage: String) {
         viewModelScope.launch {
-            variableRepository.delete(name)
+            runCatching { variableRepository.delete(name) }
+                .onSuccess { events.send(successMessage) }
+                .onFailure { events.send("Error: ${it.message ?: "Variable could not be deleted"}") }
         }
     }
 

@@ -253,13 +253,20 @@ internal fun ProfileEditorDialog(
 ) {
     val initialTaskId = profile?.enterTaskId ?: tasks.firstOrNull()?.id ?: 0L
     var name by rememberSaveable(profile?.id) { mutableStateOf(profile?.name.orEmpty()) }
-    var enabled by rememberSaveable(profile?.id) { mutableStateOf(profile?.enabled ?: true) }
-    var enterTaskId by rememberSaveable(profile?.id, tasks) { mutableLongStateOf(initialTaskId) }
+    // New profiles start disabled, matching templates and imports and the "Leave off until
+    // reviewed" helper; every other creation path is review-first.
+    var enabled by rememberSaveable(profile?.id) { mutableStateOf(profile?.enabled ?: false) }
+    // Keyed only on profile identity: re-keying on `tasks` reset the user's selection to the
+    // default whenever the tasks flow re-emitted (a parallel import, a rename re-sorting the
+    // list) mid-edit. A vanished selection is caught by the canSave existence check below.
+    var enterTaskId by rememberSaveable(profile?.id) { mutableLongStateOf(initialTaskId) }
     var cooldown by rememberSaveable(profile?.id) { mutableStateOf((profile?.cooldownSec ?: 0).toString()) }
     var automationMode by rememberSaveable(profile?.id) { mutableStateOf(profile?.automationMode ?: AutomationMode.SINGLE) }
     var group by rememberSaveable(profile?.id) { mutableStateOf(profile?.group.orEmpty()) }
     val parsedCooldown = cooldown.toIntOrNull()
-    val canSave = name.isNotBlank() && enterTaskId > 0 && (cooldown.isBlank() || parsedCooldown != null)
+    val selectedTaskExists = tasks.any { it.id == enterTaskId }
+    val canSave = name.isNotBlank() && enterTaskId > 0 && selectedTaskExists &&
+        (cooldown.isBlank() || parsedCooldown != null)
     val importedReviewRequired = profile?.requiresRiskAcknowledgement == true
     val onLabel = stringResource(R.string.label_on)
     val offLabel = stringResource(R.string.label_off)

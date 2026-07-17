@@ -90,7 +90,10 @@ fun DiagnosticsScreen(
         if (state.appLogs.isEmpty()) {
             item { EmptyDiagnosticCard(stringResource(R.string.diagnostics_no_app_logs)) }
         } else {
-            items(state.appLogs.asReversed(), key = { "${it.timestampMillis}:${it.tag}:${it.message}" }) { entry ->
+            // Keyed on the monotonic sequence: two identical log lines in the same
+            // millisecond previously produced duplicate LazyColumn keys and crashed
+            // this screen mid-diagnosis.
+            items(state.appLogs.asReversed(), key = { it.sequence }) { entry ->
                 AppLogCard(entry, formatter)
             }
         }
