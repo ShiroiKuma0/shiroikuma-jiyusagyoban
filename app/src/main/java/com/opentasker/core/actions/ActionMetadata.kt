@@ -910,6 +910,7 @@ fun registerActionMetadata() {
             category = "System",
             fields = listOf(
                 ActionField("scene", "Scene name", required = true, hint = "the scene's name — resolves within this task's project first, so a name reused in another project still finds the right one (a numeric id also works)"),
+                ActionField("keepScreenOn", "Keep screen on", FieldType.CHECKBOX, hint = "the overlay blocks the screen timeout while it is shown"),
                 ActionField("position", "Position", FieldType.DROPDOWN, hint = "top / center / bottom (default center)"),
                 ActionField("modal", "Modal", FieldType.CHECKBOX, hint = "block the app underneath (on) vs tap-through HUD (off)"),
                 ActionField("dismissOnOutside", "Tap outside closes", FieldType.CHECKBOX, hint = "default on; off = close only via Back, a button, or timeout"),
