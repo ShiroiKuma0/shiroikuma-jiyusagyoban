@@ -2,13 +2,16 @@ package com.opentasker.core.storage
 
 import androidx.room.Dao
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import com.opentasker.core.model.RunLogEntry
 import kotlinx.coroutines.flow.Flow
 
-@Entity("run_logs")
+// timestamp is indexed because getRecentFlow() re-sorts the table on every insert while
+// the Run Log screen is open, and pruneRetention's NOT IN subquery sorts it again.
+@Entity("run_logs", indices = [Index("timestamp")])
 data class RunLogEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val taskId: Long,

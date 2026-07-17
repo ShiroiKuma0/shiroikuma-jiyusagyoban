@@ -233,6 +233,39 @@ class DatabaseMigrationInstrumentedTest {
     }
 
     @Test
+    fun appDatabaseMigratesFrom7To8WithIndexesCreated() {
+        appDatabaseHelper.createDatabase(APP_DATABASE_NAME, 7).apply {
+            execSQL(
+                """
+                INSERT INTO run_logs (id, taskId, taskName, timestamp, durationMs, success, message)
+                VALUES (1, 1, 'Indexed task', 1000, 5, 1, 'ok')
+                """.trimIndent(),
+            )
+            close()
+        }
+
+        val migrated = appDatabaseHelper.runMigrationsAndValidate(
+            APP_DATABASE_NAME,
+            8,
+            true,
+            DatabaseMigrations.MIGRATION_7_8,
+        )
+
+        migrated.query(
+            "SELECT name FROM sqlite_master WHERE type = 'index' AND name IN " +
+                "('index_run_logs_timestamp', 'index_edit_history_entityType_entityId')",
+        ).use { cursor ->
+            var count = 0
+            while (cursor.moveToNext()) count++
+            assertEquals(2, count)
+        }
+        migrated.query("SELECT taskName FROM run_logs WHERE id = 1").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("Indexed task", cursor.getString(0))
+        }
+    }
+
+    @Test
     fun appDatabaseMigratesFullPathFrom1ToCurrent() {
         appDatabaseHelper.createDatabase(APP_DATABASE_NAME, 1).apply {
             execSQL(
@@ -249,7 +282,7 @@ class DatabaseMigrationInstrumentedTest {
 
         val migrated = appDatabaseHelper.runMigrationsAndValidate(
             APP_DATABASE_NAME,
-            7,
+            8,
             true,
             *DatabaseMigrations.getAllMigrations(),
         )

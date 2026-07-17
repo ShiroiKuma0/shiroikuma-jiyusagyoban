@@ -74,6 +74,17 @@ object DatabaseMigrations {
         }
     }
 
+    val MIGRATION_7_8 = object : Migration(7, 8) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Index names must match Room's generated names for the @Entity indices.
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_run_logs_timestamp` ON `run_logs` (`timestamp`)")
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_edit_history_entityType_entityId` " +
+                    "ON `edit_history` (`entityType`, `entityId`)",
+            )
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -82,6 +93,7 @@ object DatabaseMigrations {
             MIGRATION_4_5,
             MIGRATION_5_6,
             MIGRATION_6_7,
+            MIGRATION_7_8,
         )
     }
 }
@@ -111,8 +123,12 @@ object DatabaseMigrations {
  * Version 6:
  *   - variables: adds isSecret; secret rows store authenticated Keystore ciphertext in value
  *
- * Version 7 (current):
+ * Version 7:
  *   - profiles: adds requiresRiskAcknowledgement for imported-profile first-enable gating
+ *
+ * Version 8 (current):
+ *   - run_logs: adds index on timestamp (reactive recent query + retention pruning)
+ *   - edit_history: adds composite index on (entityType, entityId)
  *
  * To add a migration:
  * 1. Increment database version in @Database annotation

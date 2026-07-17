@@ -2,11 +2,12 @@ package com.opentasker.core.storage
 
 import androidx.room.Dao
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
 
-@Entity("edit_history")
+@Entity("edit_history", indices = [Index("entityType", "entityId")])
 data class EditHistoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val entityType: String,
