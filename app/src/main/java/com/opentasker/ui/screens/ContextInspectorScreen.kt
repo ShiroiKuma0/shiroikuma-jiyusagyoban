@@ -119,7 +119,9 @@ class ContextInspectorViewModel(
             sources = sources,
             profiles = inspectProfiles(profiles, sources) { profile, index, spec, observation ->
                 if (spec.type == ContextType.LOCATION) {
-                    observation.copy(event = locationDwellStateStore.enrich(profile.id, index, spec, observation.event))
+                    // observe() is read-only: the Inspector must never persist or clear the
+                    // engine's dwell timers from its own independent location stream.
+                    observation.copy(event = locationDwellStateStore.observe(profile.id, index, spec, observation.event))
                 } else {
                     observation
                 }

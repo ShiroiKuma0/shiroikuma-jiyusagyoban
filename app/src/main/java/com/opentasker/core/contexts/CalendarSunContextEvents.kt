@@ -62,8 +62,10 @@ object CalendarSunContextEvents {
         instances: List<CalendarInstance>,
         nowMs: Long,
         beforeWindowMinutes: Int = DEFAULT_BEFORE_WINDOW_MINUTES,
+        zone: ZoneId = ZoneId.systemDefault(),
     ): ContextEvent {
         val relevant = instances
+            .map { it.withLocalAllDayBounds(zone) }
             .filter { it.endMs > nowMs && it.availability != "free" }
             .sortedBy { it.beginMs }
         val during = relevant.firstOrNull { it.beginMs <= nowMs && it.endMs > nowMs }
@@ -143,6 +145,23 @@ object CalendarSunContextEvents {
             return items
         }
     }
+
+    /**
+     * CalendarProvider stores all-day instance BEGIN/END as midnight-UTC epoch millis.
+     * Comparing those raw values against local wall-clock time shifts every all-day
+     * event by the zone offset (e.g. 19:00 the previous day in UTC-5), so convert the
+     * bounds to local-midnight before windowing.
+     */
+    private fun CalendarInstance.withLocalAllDayBounds(zone: ZoneId): CalendarInstance {
+        if (!allDay) return this
+        return copy(
+            beginMs = beginMs - zoneOffsetMillis(zone, beginMs),
+            endMs = endMs - zoneOffsetMillis(zone, endMs),
+        )
+    }
+
+    private fun zoneOffsetMillis(zone: ZoneId, atMs: Long): Long =
+        zone.rules.getOffset(Instant.ofEpochMilli(atMs)).totalSeconds * 1_000L
 
     private fun CalendarInstance.metadata(state: String, nowMs: Long): Map<String, String> = buildMap {
         put("event", "calendar")

@@ -157,6 +157,35 @@ class LocationDwellStateStore internal constructor(
         }
     }
 
+    /**
+     * Read-only variant of [enrich] for inspection surfaces: computes the same dwell
+     * metadata but never persists or clears state, so keeping the Context Inspector
+     * open cannot reset the engine's dwell timers from its own location stream.
+     */
+    fun observe(
+        profileId: Long,
+        contextIndex: Int,
+        spec: ContextSpec,
+        event: ContextEvent,
+    ): ContextEvent {
+        if (spec.type != ContextType.LOCATION || event.type != LocationContextEvents.TYPE || !event.matched) {
+            return event
+        }
+
+        val key = LocationDwellStateKey.from(profileId, contextIndex, spec.config)
+        return synchronized(preferenceLock) {
+            val existing = storage.getLong(key.storageKey, MISSING_INSIDE_SINCE)
+                .takeIf { it != MISSING_INSIDE_SINCE }
+            val update = LocationDwellStateTracker.apply(
+                config = spec.config,
+                metadata = event.metadata,
+                existingInsideSinceEpochMs = existing,
+                nowEpochMs = clock(),
+            )
+            event.copy(metadata = update.metadata)
+        }
+    }
+
     fun clearProfile(profileId: Long): Int =
         clearKeysWithPrefix(LocationDwellStateKey.profilePrefix(profileId))
 

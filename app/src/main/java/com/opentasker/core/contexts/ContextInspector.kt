@@ -91,7 +91,7 @@ fun inspectProfile(
     val checks = profile.contexts.mapIndexed { index, spec ->
         inspectContextForProfile(profile, index, spec, sourcesByKey, observationTransformer)
     }
-    val contextsMatch = checks.isNotEmpty() && checks.all { it.effectiveMatched }
+    val contextsMatch = checks.isNotEmpty() && evaluateChecksWithOrGroups(checks)
     val matching = profile.enabled && contextsMatch
     val summary = when {
         !profile.enabled -> "Profile is disabled."
@@ -122,6 +122,26 @@ fun inspectContext(
         sourcesByKey = sourcesByKey,
         observationTransformer = { _, _, _, observation -> observation },
     )
+}
+
+/**
+ * Mirrors the engine's evaluateWithOrGroups semantics: contexts sharing an orGroup
+ * need only one member to match; ungrouped contexts are AND terms. The Inspector
+ * must agree with the engine or its "does not match" explanations lie for profiles
+ * that are genuinely active through an OR group.
+ */
+internal fun evaluateChecksWithOrGroups(checks: List<ContextCheck>): Boolean {
+    val andTerms = mutableListOf<Boolean>()
+    val orGroups = mutableMapOf<String, Boolean>()
+    for (check in checks) {
+        val group = check.spec.orGroup
+        if (group != null) {
+            orGroups[group] = orGroups.getOrDefault(group, false) || check.effectiveMatched
+        } else {
+            andTerms.add(check.effectiveMatched)
+        }
+    }
+    return andTerms.all { it } && orGroups.values.all { it }
 }
 
 private fun inspectContextForProfile(

@@ -29,14 +29,20 @@ class StateContextSourceImpl : ContextSource {
     override val type = "state"
 
     override fun events(app: Context): Flow<ContextEvent> = callbackFlow {
+        // Patches arrive from two threads: the BroadcastReceiver (main) and the
+        // DeviceStateEvents collector. Serialize the read-modify-write so a concurrent
+        // battery broadcast cannot drop a Wi-Fi patch computed against a stale map.
+        val stateLock = Any()
         var lastState: Map<String, String> = emptyMap()
 
         fun publishPatch(statePatch: Map<String, String>) {
-            val mergedState = mergeStatePatch(lastState, statePatch)
-            if (mergedState != lastState) {
-                lastState = mergedState
-                trySend(ContextEvent(type, true, mergedState))
+            val mergedState = synchronized(stateLock) {
+                val merged = mergeStatePatch(lastState, statePatch)
+                if (merged == lastState) return
+                lastState = merged
+                merged
             }
+            trySend(ContextEvent(type, true, mergedState))
         }
 
         publishPatch(seedInitialState(app))

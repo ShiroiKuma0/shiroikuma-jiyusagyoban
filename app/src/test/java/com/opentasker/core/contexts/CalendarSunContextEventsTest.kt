@@ -78,6 +78,43 @@ class CalendarSunContextEventsTest {
         assertEquals("idle", event.metadata["state"])
     }
 
+    @Test
+    fun allDayEventsMatchOnLocalDayNotUtcDay() {
+        val zone = java.time.ZoneId.of("America/New_York") // UTC-4 on this date
+        // All-day event for 2026-05-05: provider stores midnight-UTC bounds.
+        val utcMidnightBegin = epochMillis(2026, 5, 5, 0, 0)
+        val utcMidnightEnd = epochMillis(2026, 5, 6, 0, 0)
+        val instance = CalendarInstance(
+            calendarName = "Work",
+            calendarId = 7,
+            beginMs = utcMidnightBegin,
+            endMs = utcMidnightEnd,
+            allDay = true,
+            availability = "busy",
+        )
+
+        // 2026-05-04 23:00 local (03:00 UTC on the 5th): raw UTC bounds would already
+        // report "during", but the local day has not started yet.
+        val beforeLocalMidnight = epochMillis(2026, 5, 5, 3, 0)
+        val early = CalendarSunContextEvents.selectCalendarEvent(
+            instances = listOf(instance),
+            nowMs = beforeLocalMidnight,
+            zone = zone,
+        )
+        assertFalse("all-day event must not be active before local midnight", early.matched && early.metadata["state"] == "during")
+
+        // 2026-05-05 23:00 local (03:00 UTC on the 6th): raw UTC bounds would report the
+        // event already over, but locally it is still the 5th.
+        val lateLocalEvening = epochMillis(2026, 5, 6, 3, 0)
+        val late = CalendarSunContextEvents.selectCalendarEvent(
+            instances = listOf(instance),
+            nowMs = lateLocalEvening,
+            zone = zone,
+        )
+        assertTrue("all-day event must stay active through the local evening", late.matched)
+        assertEquals("during", late.metadata["state"])
+    }
+
     private fun epochMillis(year: Int, month: Int, day: Int, hour: Int, minute: Int): Long =
         LocalDateTime.of(year, month, day, hour, minute).toInstant(ZoneOffset.UTC).toEpochMilli()
 

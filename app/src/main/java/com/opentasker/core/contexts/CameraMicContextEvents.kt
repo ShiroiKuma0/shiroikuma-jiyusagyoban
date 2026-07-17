@@ -17,6 +17,10 @@ object CameraMicContextEvents {
     @Volatile private var micCallback: AppOpsManager.OnOpActiveChangedListener? = null
     private val started = AtomicBoolean(false)
 
+    // start/stop are synchronized so an interleaved stop cannot observe started=true
+    // with the callback fields still unassigned — that would leak both AppOps watchers
+    // and register a duplicate pair on the next start.
+    @Synchronized
     fun start(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return true
         if (!started.compareAndSet(false, true)) return true
@@ -78,6 +82,7 @@ object CameraMicContextEvents {
         }
     }
 
+    @Synchronized
     fun stop(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
         if (!started.compareAndSet(true, false)) return
