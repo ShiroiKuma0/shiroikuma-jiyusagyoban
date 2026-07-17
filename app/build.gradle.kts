@@ -593,26 +593,30 @@ tasks.register("buildFork") {
     group = "build"
     description = "Build the signed release APK, copy it to ~/tmp, and bump BUILD_NUMBER for next time."
     dependsOn("assembleRelease")
+    // Configuration-cache-safe: capture every project-derived value HERE (configuration time) —
+    // the doLast lambda must not touch `layout` / `rootProject` / other project services.
+    val apkName = "shiroikuma-jiyusagyoban_${forkVersionName}_arm64-v8a.apk"
+    val outputDirProvider = layout.buildDirectory.dir("outputs/apk/release")
+    val propsFile = rootProject.file("gradle.properties")
+    val versionCode = forkVersionCode
+    val nextBuildNumber = forkBuildNumber + 1
     doLast {
-        val apkName = "shiroikuma-jiyusagyoban_${forkVersionName}_arm64-v8a.apk"
-        val outputDir = layout.buildDirectory.dir("outputs/apk/release").get().asFile
+        val outputDir = outputDirProvider.get().asFile
         val targetDir = File(System.getProperty("user.home"), "tmp").apply { mkdirs() }
         val apk = outputDir.listFiles { _, name -> name.endsWith(".apk") }?.firstOrNull()
             ?: throw GradleException("No APK found in $outputDir")
         val target = File(targetDir, apkName)
         apk.copyTo(target, overwrite = true)
         println("\u001b[1;36m>>> ${target.absolutePath}\u001b[0m")
-        println("\u001b[1;36m>>> versionCode $forkVersionCode\u001b[0m")
+        println("\u001b[1;36m>>> versionCode $versionCode\u001b[0m")
 
         // Auto-increment BUILD_NUMBER for the next build.
-        val propsFile = rootProject.file("gradle.properties")
-        val next = forkBuildNumber + 1
         val text = propsFile.readText()
         propsFile.writeText(
             if (Regex("(?m)^BUILD_NUMBER=").containsMatchIn(text))
-                text.replace(Regex("(?m)^BUILD_NUMBER=.*$"), "BUILD_NUMBER=$next")
-            else text.trimEnd() + "\n\n# shiroikuma fork: per-build version tail\nBUILD_NUMBER=$next\n"
+                text.replace(Regex("(?m)^BUILD_NUMBER=.*$"), "BUILD_NUMBER=$nextBuildNumber")
+            else text.trimEnd() + "\n\n# shiroikuma fork: per-build version tail\nBUILD_NUMBER=$nextBuildNumber\n"
         )
-        println("\u001b[1;36m>>> BUILD_NUMBER bumped to $next\u001b[0m")
+        println("\u001b[1;36m>>> BUILD_NUMBER bumped to $nextBuildNumber\u001b[0m")
     }
 }
