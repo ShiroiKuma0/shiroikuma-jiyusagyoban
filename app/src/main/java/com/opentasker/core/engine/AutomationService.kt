@@ -135,8 +135,8 @@ class AutomationService : Service() {
     private val profileTaskJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>())
     private val queuedProfileTasks = Collections.synchronizedMap(mutableMapOf<Long, ArrayDeque<Task>>())
     private val profileReloadMutex = Mutex()
-    private var lastRunLogPruneAt = 0L
-    private var audioForegroundServiceEligibility = AudioForegroundServiceEligibility.BACKGROUND_STARTED
+    @Volatile private var lastRunLogPruneAt = 0L
+    @Volatile private var audioForegroundServiceEligibility = AudioForegroundServiceEligibility.BACKGROUND_STARTED
     @Volatile private var engineLoaded = false
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -260,7 +260,8 @@ class AutomationService : Service() {
         val activeIds = profiles.map { it.id }.toSet()
         cooldownStore.pruneDeleted(activeIds)
         synchronized(queuedProfileTasks) {
-            queuedProfileTasks.keys.removeAll { it !in activeIds }
+            // Slots are keyed +id for enter tasks and -id for exit tasks; prune both.
+            queuedProfileTasks.keys.removeAll { kotlin.math.abs(it) !in activeIds }
         }
         registerPluginSubscriptions(profiles)
         for (domain in profiles) {
@@ -350,7 +351,7 @@ class AutomationService : Service() {
             logProfileSkippedRun(profile, decoded.value, "Enter task data is corrupt (${decoded.issue.fieldName}); recover it before it can run.")
             return
         }
-        dispatchTask(profile, decoded.value)
+        dispatchTask(profile, decoded.value, isExit = false)
     }
 
     private suspend fun onProfileDeactivated(profile: com.opentasker.core.model.Profile) {
@@ -366,86 +367,117 @@ class AutomationService : Service() {
             logProfileSkippedRun(profile, decoded.value, "Exit task data is corrupt (${decoded.issue.fieldName}); recover it before it can run.")
             return
         }
-        dispatchTask(profile, decoded.value)
+        dispatchTask(profile, decoded.value, isExit = true)
     }
 
+    /**
+     * Enter and exit tasks are distinct execution units: they use separate job slots (so a
+     * still-running enter task never suppresses or gets cancelled by the exit task) and only
+     * enter dispatch consumes the profile cooldown — cooldown gates re-triggering, not the
+     * cleanup work users rely on when a profile deactivates.
+     */
     private fun dispatchTask(
         profile: Profile,
         task: Task,
+        isExit: Boolean,
     ) {
+        val slot = taskSlotKey(profile.id, isExit)
         when (profile.automationMode) {
             AutomationMode.SINGLE -> {
-                if (profileTaskJobs[profile.id]?.isActive == true) {
+                if (profileTaskJobs[slot]?.isActive == true) {
                     AppLogger.info(TAG, "Profile ${profile.id} already running; SINGLE mode skipped retrigger")
                     logProfileSkippedRun(profile, task, "Profile is already running in SINGLE mode.")
                     return
                 }
-                val reservation = reserveCooldown(profile.id, profile.cooldownSec)
-                if (!reservation.accepted) {
-                    logCooldownSkip(profile, task, reservation.remainingMs)
-                    return
+                if (!isExit) {
+                    val reservation = reserveCooldown(profile.id, profile.cooldownSec)
+                    if (!reservation.accepted) {
+                        logCooldownSkip(profile, task, reservation.remainingMs)
+                        return
+                    }
                 }
-                profileTaskJobs[profile.id] = launchTrackedTask(profile, task)
+                profileTaskJobs[slot] = launchTrackedTask(profile, slot, task)
             }
 
             AutomationMode.RESTART -> {
-                val reservation = reserveCooldown(profile.id, profile.cooldownSec)
-                if (!reservation.accepted) {
-                    logCooldownSkip(profile, task, reservation.remainingMs)
-                    return
+                if (!isExit) {
+                    val reservation = reserveCooldown(profile.id, profile.cooldownSec)
+                    if (!reservation.accepted) {
+                        logCooldownSkip(profile, task, reservation.remainingMs)
+                        return
+                    }
                 }
-                profileTaskJobs[profile.id]?.cancel()
-                profileTaskJobs[profile.id] = launchTrackedTask(profile, task)
+                profileTaskJobs[slot]?.cancel()
+                profileTaskJobs[slot] = launchTrackedTask(profile, slot, task)
             }
 
             AutomationMode.QUEUED -> {
-                val reservation = reserveCooldown(profile.id, profile.cooldownSec)
-                if (!reservation.accepted) {
-                    logCooldownSkip(profile, task, reservation.remainingMs)
-                    return
-                }
-                if (profileTaskJobs[profile.id]?.isActive == true) {
-                    synchronized(queuedProfileTasks) {
-                        val queue = queuedProfileTasks.getOrPut(profile.id) { ArrayDeque() }
-                        if (queue.size >= MAX_QUEUED_TASKS) {
-                            AppLogger.warn(TAG, "Profile ${profile.id} queue full ($MAX_QUEUED_TASKS), dropping retrigger")
-                            logProfileSkippedRun(profile, task, "Task queue is full ($MAX_QUEUED_TASKS pending).")
-                            return
-                        }
-                        queue.add(task)
+                if (!isExit) {
+                    val reservation = reserveCooldown(profile.id, profile.cooldownSec)
+                    if (!reservation.accepted) {
+                        logCooldownSkip(profile, task, reservation.remainingMs)
+                        return
                     }
-                    AppLogger.info(TAG, "Profile ${profile.id} queued retrigger")
-                    return
                 }
-                profileTaskJobs[profile.id] = launchQueuedTasks(profile, task)
+                // The queue check, enqueue, and the consumer's drain-or-deregister decision all
+                // synchronize on queuedProfileTasks, so a task can never be enqueued into a queue
+                // whose consumer has already decided to exit (which would strand it unrun).
+                val outcome = synchronized(queuedProfileTasks) {
+                    if (profileTaskJobs[slot]?.isActive == true) {
+                        val queue = queuedProfileTasks.getOrPut(slot) { ArrayDeque() }
+                        if (queue.size >= MAX_QUEUED_TASKS) {
+                            QueueOutcome.FULL
+                        } else {
+                            queue.add(task)
+                            QueueOutcome.QUEUED
+                        }
+                    } else {
+                        QueueOutcome.START
+                    }
+                }
+                when (outcome) {
+                    QueueOutcome.FULL -> {
+                        AppLogger.warn(TAG, "Profile ${profile.id} queue full ($MAX_QUEUED_TASKS), dropping retrigger")
+                        logProfileSkippedRun(profile, task, "Task queue is full ($MAX_QUEUED_TASKS pending).")
+                    }
+                    QueueOutcome.QUEUED -> AppLogger.info(TAG, "Profile ${profile.id} queued retrigger")
+                    QueueOutcome.START -> profileTaskJobs[slot] = launchQueuedTasks(profile, slot, task)
+                }
             }
 
             AutomationMode.PARALLEL -> {
-                val reservation = reserveCooldown(profile.id, profile.cooldownSec)
-                if (!reservation.accepted) {
-                    logCooldownSkip(profile, task, reservation.remainingMs)
-                    return
+                if (!isExit) {
+                    val reservation = reserveCooldown(profile.id, profile.cooldownSec)
+                    if (!reservation.accepted) {
+                        logCooldownSkip(profile, task, reservation.remainingMs)
+                        return
+                    }
                 }
                 scope.launch { runTask(task, profile) }
             }
         }
     }
 
-    private fun launchTrackedTask(profile: Profile, task: Task): Job =
+    /** Profile ids are positive Room autogenerated keys, so -id is a collision-free exit slot. */
+    private fun taskSlotKey(profileId: Long, isExit: Boolean): Long = if (isExit) -profileId else profileId
+
+    private enum class QueueOutcome { START, QUEUED, FULL }
+
+    private fun launchTrackedTask(profile: Profile, slot: Long, task: Task): Job =
         scope.launch(start = CoroutineStart.DEFAULT) {
             val thisJob = currentCoroutineContext()[Job]
             try {
                 runTask(task, profile)
             } finally {
                 synchronized(profileTaskJobs) {
-                    if (profileTaskJobs[profile.id] == thisJob) {
-                        profileTaskJobs.remove(profile.id)
+                    if (profileTaskJobs[slot] == thisJob) {
+                        profileTaskJobs.remove(slot)
                     }
                 }
             }
         }
 
-    private fun launchQueuedTasks(profile: Profile, firstTask: Task): Job =
+    private fun launchQueuedTasks(profile: Profile, slot: Long, firstTask: Task): Job =
         scope.launch(start = CoroutineStart.DEFAULT) {
             val thisJob = currentCoroutineContext()[Job]
             var nextTask: Task? = firstTask
@@ -453,17 +485,30 @@ class AutomationService : Service() {
                 while (isActive && nextTask != null) {
                     runTask(requireNotNull(nextTask), profile)
                     nextTask = synchronized(queuedProfileTasks) {
-                        queuedProfileTasks[profile.id]?.poll()?.also {
-                            if (queuedProfileTasks[profile.id]?.isEmpty() == true) {
-                                queuedProfileTasks.remove(profile.id)
+                        val polled = queuedProfileTasks[slot]?.poll()
+                        if (polled == null) {
+                            // Deregister inside the queue lock so the producer either sees an
+                            // active consumer (and enqueues into a queue that will be drained)
+                            // or no consumer at all (and starts a fresh one) — never a consumer
+                            // that has already decided to exit.
+                            queuedProfileTasks.remove(slot)
+                            synchronized(profileTaskJobs) {
+                                if (profileTaskJobs[slot] == thisJob) {
+                                    profileTaskJobs.remove(slot)
+                                }
                             }
+                        } else if (queuedProfileTasks[slot]?.isEmpty() == true) {
+                            queuedProfileTasks.remove(slot)
                         }
+                        polled
                     }
                 }
             } finally {
-                synchronized(profileTaskJobs) {
-                    if (profileTaskJobs[profile.id] == thisJob) {
-                        profileTaskJobs.remove(profile.id)
+                synchronized(queuedProfileTasks) {
+                    synchronized(profileTaskJobs) {
+                        if (profileTaskJobs[slot] == thisJob) {
+                            profileTaskJobs.remove(slot)
+                        }
                     }
                 }
             }
