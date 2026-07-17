@@ -7,6 +7,8 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -102,7 +104,7 @@ class CriticalFlowComposeTest {
     }
 
     @Test
-    fun actionAndContextEditorsBlockMissingRequiredFields() {
+    fun actionEditorBlocksMissingRequiredFields() {
         var actionSaved = false
         val metadata = ActionMetadata(
             id = "test.required",
@@ -124,11 +126,15 @@ class CriticalFlowComposeTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Show Notification").assertIsDisplayed()
+        // "Show Notification" is the dialog title and appears again in the action summary.
+        composeTestRule.onAllNodesWithText("Show Notification").onFirst().assertIsDisplayed()
         composeTestRule.onNodeWithText("Required").assertIsDisplayed()
         composeTestRule.onNodeWithText("Save").assertIsNotEnabled()
         assertTrue(!actionSaved)
+    }
 
+    @Test
+    fun contextEditorBlocksMissingRequiredFields() {
         var contextSaved = false
         composeTestRule.setContent {
             TestTheme {

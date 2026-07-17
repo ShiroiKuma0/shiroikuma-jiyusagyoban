@@ -3,6 +3,8 @@ package com.opentasker.ui.screens
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.model.RunLogEntry
@@ -61,7 +63,9 @@ class RunLogScreenContentTest {
                 )
             }
         }
-        composeTestRule.onNodeWithText("Morning Routine", substring = true).assertIsDisplayed()
+        // The task name appears in both the per-task summary ("Latest: …") and the entry card,
+        // so assert the first displayed node rather than requiring a single match.
+        composeTestRule.onAllNodesWithText("Morning Routine", substring = true).onFirst().assertIsDisplayed()
     }
 
     @Test
@@ -90,7 +94,8 @@ class RunLogScreenContentTest {
                 )
             }
         }
-        composeTestRule.onNodeWithText("Backup Task", substring = true).assertIsDisplayed()
-        composeTestRule.onNodeWithText("Failed", substring = true).assertIsDisplayed()
+        composeTestRule.onAllNodesWithText("Backup Task", substring = true).onFirst().assertIsDisplayed()
+        // "Failed" shows on both the status pill and the per-task health summary.
+        composeTestRule.onAllNodesWithText("Failed", substring = true).onFirst().assertIsDisplayed()
     }
 }
