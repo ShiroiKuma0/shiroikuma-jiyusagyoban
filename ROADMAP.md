@@ -1,9 +1,78 @@
 # OpenTasker Roadmap
 
-**Current app version:** 0.2.75
-**Last updated:** 2026-06-27
+**Current app version:** 0.2.76
+**Last updated:** 2026-07-17
 
 Only open work belongs here; git history and `CHANGELOG.md` are the release record.
+
+## Audit-Discovered Additions (2026-07-17 deep audit)
+
+Findings surfaced by the 2026-07-17 audit that were verified but deferred (the audit's
+direct fixes shipped in v0.2.76 across the engine, actions, context, UI, and theming layers).
+
+### P2 — Reliability and product depth
+
+- [ ] P2 — Share one hot calendar/sun ticker across EVENT contexts
+  Why: Every EVENT context instantiates its own 1 Hz clock loop plus a per-minute CalendarProvider query, so N event contexts = N wake loops and N calendar reads per minute even for NFC-only profiles — contradicting the demand-gated monitor contract and reading calendar data profiles never asked for.
+  Where: `app/src/main/java/com/opentasker/core/contexts/EventContextSourceImpl.kt`; `app/src/main/java/com/opentasker/core/contexts/CalendarSunContextEvents.kt`; `app/src/main/java/com/opentasker/core/contexts/StateContextSourceImpl.kt`; `app/src/main/java/com/opentasker/core/contexts/LocationContextSourceImpl.kt`
+  Acceptance: One shared hot ticker (shareIn/SharedFlow) drives sun/calendar pulses; the CalendarProvider query runs only when at least one enabled profile references `event=calendar`.
+
+- [ ] P2 — Wire scene SLIDER controls to a task/variable, or mark them display-only
+  Why: `SceneOverlayService` renders a SeekBar with no OnSeekBarChangeListener, so dragging it does nothing (no variable write, no task fire) even though the scene editor lets users bind tap/long-press tasks to a slider.
+  Where: `app/src/main/java/com/opentasker/core/scenes/SceneOverlayService.kt`; `app/src/main/java/com/opentasker/ui/screens/SceneEditorDialogs.kt`
+  Acceptance: Slider movement writes its value to a configured variable and/or fires the bound task, or the editor clearly marks sliders as display-only and drops the misleading task binding.
+
+- [ ] P2 — Enforce InputValidation at the import/persist boundary, or delete it
+  Why: `InputValidation.validateProfile/validateTask/validateAction` has a passing test suite but zero production callers, so per-field limits (name length, priority range, non-empty actions) are an unenforced boundary that reads as enforced. Imports are bounded only by aggregate size/count budgets.
+  Where: `app/src/main/java/com/opentasker/core/validation/InputValidation.kt`; `app/src/main/java/com/opentasker/core/transfer/OpenTaskerBundle.kt`; `app/src/main/java/com/opentasker/core/transfer/TaskerXmlImport.kt`
+  Acceptance: Either the validator gates the import and editor-save paths (with tests proving rejection), or the module and its test are removed so the surface isn't misrepresented.
+
+- [ ] P2 — Route the `download` action through the shared HttpRequestAction transport
+  Why: v0.2.76 gave `download` a policy-DNS hook, status checks, and fsync, but it still duplicates transport logic. Consolidating onto HttpRequestAction (which already has bounded same-origin redirects, atomic writes, and the 50 MB cap) removes the parity risk permanently.
+  Where: `app/src/main/java/com/opentasker/core/actions/NetworkActions.kt`; `app/src/main/java/com/opentasker/core/actions/HttpRequestAction.kt`
+  Acceptance: `download` delegates to HttpRequestAction with `output_file`; the standalone OkHttp path is removed; tests cover redirect, size cap, and LAN-permission denial.
+
+- [ ] P2 — Localize the remaining hardcoded English on secondary surfaces
+  Why: The app shell nav/top-bar/retention picker, every ViewModel snackbar/toast, and the Context Inspector, Run Log, Diagnostics, Flow, and scene-toast strings are hardcoded English, and the localization guard's file list skips exactly those files — so localized builds show a mixed-language UI. Dead `nav_*`/`empty_profiles_*`/`workspace_*` resources already exist unused.
+  Where: `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationUi.kt`; `ActiveAutomationViewModel.kt`; `ContextInspectorScreen.kt`; `RunLogScreenContent.kt`; `DiagnosticsScreen.kt`; `RunLogFilters.kt`; `AutomationFlowGraph.kt`; `app/src/test/java/com/opentasker/ui/LocalizationSourceTest.kt`
+  Acceptance: These surfaces resolve through `R.string` (VM messages as resource IDs resolved at the collector); the guard covers the added files and its regex catches `body =`/`values =` argument strings.
+
+### P3 — Correctness, a11y, and polish
+
+- [ ] P3 — Move notification-button task execution off the goAsync window into the service
+  Why: `NotificationActionReceiver` runs the whole task inside `goAsync()` on an unscoped scope; tasks can run minutes (flow.wait up to 30 min) but the broadcast window is ~10 s, so the system flags a timeout and process death mid-task loses the run with no run-log entry.
+  Where: `app/src/main/java/com/opentasker/core/actions/NotificationActionReceiver.kt`; `app/src/main/java/com/opentasker/core/engine/AutomationService.kt`
+  Acceptance: The receiver hands the task id to AutomationService (already foreground) and calls `finish()` immediately; long tasks complete and log reliably.
+
+- [ ] P3 — Raise sub-44dp touch targets in the scene editor and expression debugger
+  Why: The scene resize handle is 14×14dp and the Run Log ExpressionDebugger expand row is ~18dp tall, both below the repo's own `DesignSystem.ComponentSize.touchTargetMin = 48.dp`.
+  Where: `app/src/main/java/com/opentasker/ui/screens/SceneEditorCanvas.kt`; `app/src/main/java/com/opentasker/ui/screens/RunLogScreenContent.kt`
+  Acceptance: Both interactive regions meet the 48dp minimum (larger hit target without enlarging the visual glyph is acceptable).
+
+- [ ] P3 — Fix stale multi-select indices and drag-deselect in the scene editor
+  Why: `selectedIndices` is keyed only on `scene.id`, so deleting an element shifts indices while selection survives and a group move then moves the wrong elements; `onDragStart` toggles selection so dragging a selected member first deselects it.
+  Where: `app/src/main/java/com/opentasker/ui/screens/SceneLibraryCards.kt`; `app/src/main/java/com/opentasker/ui/screens/SceneEditorCanvas.kt`
+  Acceptance: Selection is reconciled against the current element list after deletion; dragging a selected member preserves the multi-selection.
+
+- [ ] P3 — Delete or adopt the dead PremiumComponents module
+  Why: None of `TextFieldWithError`, `LoadingButton`, `LoadingSkeleton`, `StateBadge`, `LoadingIndicator`, `ErrorState`, or `disabledAlpha` is referenced anywhere, and several carry latent theme bugs (always-`onPrimary` spinner, near-invisible skeleton) for any future caller.
+  Where: `app/src/main/java/com/opentasker/ui/components/PremiumComponents.kt`
+  Acceptance: The module is either removed or adopted by at least one real caller with its latent color bugs fixed.
+
+- [ ] P3 — Reduce compounded alpha-on-alpha selected-state fills
+  Why: Theme container tokens are already translucent, and several screens apply a second alpha (e.g. `primaryContainer.copy(alpha = 0.42f)`), leaving selected filter chips distinguishable only by border in both themes.
+  Where: `app/src/main/java/com/opentasker/ui/screens/RunLogScreenContent.kt`; `app/src/main/java/com/opentasker/ui/screens/PermissionOnboardingScreen.kt`; `app/src/main/java/com/opentasker/ui/screens/VariablesScreen.kt`; `app/src/main/java/com/opentasker/ui/theme/Theme.kt`
+  Acceptance: Selected states use opaque blended tokens or stop double-alphaing at call sites so the fill is visibly distinct.
+
+- [ ] P3 — Retire deprecated status/navigation bar color setters under edge-to-edge
+  Why: `Theme.kt` sets `window.statusBarColor`/`navigationBarColor`, which are deprecated and ignored on target SDK 35+ (the app targets 37 and calls `enableEdgeToEdge()`); only the `isAppearanceLight*` flags still matter.
+  Where: `app/src/main/java/com/opentasker/ui/theme/Theme.kt`; `app/src/main/java/com/opentasker/app/MainActivity.kt`
+  Acceptance: The dead color assignments are removed; bar icon appearance still tracks the theme via the appearance flags.
+
+- [ ] P3 — Convert flow-canvas connectors from raw px and decouple the sub-task badge from an English literal
+  Why: `AutomationFlowScreen` draws connectors with a px `labelWidth = 72f` against dp-laid-out nodes (`width(68.dp)`), so on any density ≠ 1x the lines land inside the label column; the sub-task badge keys off the English literal `"sub-task"` inside `node.detail`, which will break when flow strings are localized.
+  Where: `app/src/main/java/com/opentasker/ui/screens/AutomationFlowScreen.kt`; `app/src/main/java/com/opentasker/core/flow/AutomationFlowGraph.kt`
+  Acceptance: Connector geometry uses dp/density; the badge keys off a structural flag on the node, not a display string.
 
 ## Research-Driven Additions
 
