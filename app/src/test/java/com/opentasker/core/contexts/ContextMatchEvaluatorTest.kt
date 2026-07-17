@@ -374,4 +374,77 @@ class ContextMatchEvaluatorTest {
         ))
         assertFalse(ContextMatchEvaluator.matches(spec, unsatisfied))
     }
+
+    @Test
+    fun pluginEventAddressingIsolatesSubscriptions() {
+        val spec = ContextSpec(
+            ContextType.PLUGIN,
+            mapOf("package" to "com.example.plugin", "bundleJson" to "{\"a\":\"1\"}"),
+        )
+        val addressed = ContextEvent("plugin", true, mapOf(
+            "package" to "COM.EXAMPLE.PLUGIN",
+            "bundleJson" to "{\"a\":\"1\"}",
+            "state" to "satisfied",
+        ))
+        val otherPackage = ContextEvent("plugin", true, mapOf(
+            "package" to "com.other.plugin",
+            "bundleJson" to "{\"a\":\"1\"}",
+            "state" to "satisfied",
+        ))
+        val otherBundle = ContextEvent("plugin", true, mapOf(
+            "package" to "com.example.plugin",
+            "bundleJson" to "{\"a\":\"2\"}",
+            "state" to "satisfied",
+        ))
+
+        assertTrue(ContextMatchEvaluator.pluginEventAddressesSpec(spec, addressed))
+        assertFalse(ContextMatchEvaluator.pluginEventAddressesSpec(spec, otherPackage))
+        assertFalse(ContextMatchEvaluator.pluginEventAddressesSpec(spec, otherBundle))
+    }
+
+    @Test
+    fun sunTickPulseNeverMatchesGenericEventSpecs() {
+        val sunTick = ContextEvent("event", true, mapOf(
+            "event" to "sun_tick",
+            "date" to "2026-06-21",
+            "time" to "05:27",
+            "zone" to "America/New_York",
+        ))
+
+        // Blank event + blank filter (only reachable via imported bundles) must not
+        // fire on the internal minute pulse.
+        assertFalse(
+            ContextMatchEvaluator.matches(ContextSpec(ContextType.EVENT, emptyMap()), sunTick)
+        )
+        // A filter-only spec must not match against the pulse's date/time metadata.
+        assertFalse(
+            ContextMatchEvaluator.matches(
+                ContextSpec(ContextType.EVENT, mapOf("filter" to "2026")),
+                sunTick,
+            )
+        )
+        // A named non-sun event spec must not match the pulse either.
+        assertFalse(
+            ContextMatchEvaluator.matches(
+                ContextSpec(ContextType.EVENT, mapOf("event" to "sun_tick")),
+                sunTick,
+            )
+        )
+    }
+
+    @Test
+    fun blankEventAndFilterSpecFailsClosedForRealEvents() {
+        val bootEvent = ContextEvent("event", true, mapOf("event" to "boot_completed"))
+
+        assertFalse(
+            ContextMatchEvaluator.matches(ContextSpec(ContextType.EVENT, emptyMap()), bootEvent)
+        )
+        // A filter-only spec still matches real events on their metadata.
+        assertTrue(
+            ContextMatchEvaluator.matches(
+                ContextSpec(ContextType.EVENT, mapOf("filter" to "boot_completed")),
+                bootEvent,
+            )
+        )
+    }
 }

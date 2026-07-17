@@ -90,6 +90,10 @@ object ContextMatchEvaluator {
         if (expectedEvent.isSunEvent()) {
             return matchesSunEvent(spec, event, expectedEvent)
         }
+        // sun_tick is the internal minute pulse that drives sunrise/sunset windows. It must
+        // never satisfy a generic event spec, or blank-event / filter-only contexts (reachable
+        // via imported bundles) fire their enter task every minute.
+        if (actualEvent.equals("sun_tick", ignoreCase = true)) return false
         if (expectedEvent.isNotBlank() && !actualEvent.equals(expectedEvent, ignoreCase = true)) {
             return false
         }
@@ -153,8 +157,25 @@ object ContextMatchEvaluator {
         }
 
         val filter = spec.config["filter"]?.trim().orEmpty()
-        if (filter.isBlank()) return actualEvent.isNotBlank()
+        // A spec with neither an event name nor a filter would match every pulse from any
+        // event bridge; fail closed instead (only imports can produce such a spec).
+        if (filter.isBlank()) return expectedEvent.isNotBlank() && actualEvent.isNotBlank()
         return event.metadata.values.any { textMatches(it, filter, regex) }
+    }
+
+    /**
+     * True when a multiplexed plugin poll result belongs to this spec's subscription.
+     * Results for other plugin/bundle subscriptions must be ignored (state held), not
+     * evaluated to false, or every extra subscription flaps this level context.
+     */
+    fun pluginEventAddressesSpec(spec: ContextSpec, event: ContextEvent): Boolean {
+        val expectedPackage = spec.config["package"]?.trim().orEmpty()
+        if (expectedPackage.isBlank()) return true
+        val actualPackage = event.metadata["package"].orEmpty()
+        if (!actualPackage.equals(expectedPackage, ignoreCase = true)) return false
+        val expectedBundle = spec.config["bundleJson"]?.trim().orEmpty().ifBlank { "{}" }
+        val actualBundle = event.metadata["bundleJson"].orEmpty().ifBlank { "{}" }
+        return expectedBundle == actualBundle
     }
 
     private fun matchesPlugin(spec: ContextSpec, event: ContextEvent): Boolean {

@@ -61,6 +61,13 @@ class ProfileMatcher(
                     source.events(app)
                 }
                 sourceEvents.scan(ContextMatchUpdate.initial(isPulseContext)) { previous, event ->
+                    if (spec.type == ContextType.PLUGIN &&
+                        !ContextMatchEvaluator.pluginEventAddressesSpec(spec, event)
+                    ) {
+                        // The shared plugin source multiplexes every subscription's poll results;
+                        // a result for a different plugin/bundle must not flap this level context.
+                        return@scan previous
+                    }
                     val preparedEvent = if (spec.type == ContextType.LOCATION) {
                         locationDwellStateStore.enrich(profile.id, index, spec, event)
                     } else {
