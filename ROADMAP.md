@@ -76,76 +76,6 @@ Only open work belongs here; git history and `CHANGELOG.md` are the release reco
 
 ### P1 -- Release evidence and device trust
 
-- [ ] P1 - Convert setup and backup visible copy to string resources and seed one real locale
-  Why: Locale skeletons exist but are empty, and `PermissionOnboardingScreen.kt` still contains setup/backup visible literals outside the current localization guard.
-  Evidence: `app/src/main/java/com/opentasker/ui/screens/PermissionOnboardingScreen.kt`; `app/src/test/java/com/opentasker/ui/LocalizationSourceTest.kt`; `app/src/main/res/values-*/strings.xml`; https://hosted.weblate.org/
-  Touches: `strings.xml`, locale resource directories, `PermissionOnboardingScreen.kt`, localization source tests.
-  Acceptance: Setup, backup, and permission card text resolve through `R.string`; the guard covers this file; at least one locale directory has translated non-placeholder strings and Android resource validation passes.
-  Complexity: M
-
-- [ ] P1 - Split the scene editor into focused UI modules
-  Why: `SceneLibraryScreen.kt` is now the largest UI file and owns list, dialogs, canvas projection, drag/resize, multi-select, alignment guides, validation, and overlay actions.
-  Evidence: `app/src/main/java/com/opentasker/ui/screens/SceneLibraryScreen.kt`; `docs/SCENES.md`
-  Touches: scene screen/card/dialog/canvas modules, scene UI tests, source-boundary tests.
-  Acceptance: Scene list, scene card, element editor dialogs, canvas interactions, and overlay controls live in focused files; existing scene behavior and tests still pass; a source test prevents the shell from regrowing broad responsibilities.
-  Complexity: M
-
-- [ ] P1 - Harden Termux script allowlist and bounded output capture
-  Why: Termux dispatch is active, but docs state hash checks are not user-facing and stdout/stderr/exit-code capture is not a completed output pipeline.
-  Evidence: `docs/TERMUX_SCRIPTING.md`; `app/src/main/java/com/opentasker/core/actions/ScriptActions.kt`; https://github.com/termux/termux-app/wiki/RUN_COMMAND-Intent
-  Touches: `TermuxScriptAction`, setup/script UI, action metadata, variable output handling, run-log redaction, device validation harness.
-  Acceptance: Users can manage allowed scripts with displayed SHA-256 hashes; stdout, stderr, and exit code are size-bounded, redacted in logs, and optionally mapped to variables; tests cover permission denial, hash mismatch, rate limit, timeout, and oversized output.
-  Complexity: L
-
-- [ ] P1 — Add first-class secret variables and provenance-based redaction
-  Why: Variable values are plaintext at rest, masking is name-based, and set/persist actions log the full value, so API tokens can leak through logs, traces, diagnostics, or ordinary exports.
-  Evidence: `app/src/main/java/com/opentasker/core/actions/BuiltInActions.kt`; `app/src/main/java/com/opentasker/ui/screens/VariablesScreen.kt`; `app/src/main/java/com/opentasker/core/engine/TaskRunner.kt`; https://developer.android.com/privacy-and-security/keystore
-  Touches: variable Room migration/model/DAO, Keystore-backed secret codec, variable UI/action fields, expansion provenance, AppLogger/run-log/diagnostic redaction, bundle and backup policy, tests.
-  Acceptance: Users can mark/create a secret; its Room value is authenticated ciphertext; UI reveal requires deliberate action; derived expansions remain redacted by provenance even in nonsensitive fields and exceptions; ordinary exports omit secret values; password backups either portably wrap them or clearly require re-entry; migration and key-loss recovery are tested.
-  Complexity: L
-
-- [ ] P1 — Classify sensitive automation capabilities and gate imported recipes
-  Why: Implementation support metadata does not distinguish data access, external transmission, device control, or destructive actions, even though imported recipes run under app-wide permissions.
-  Evidence: `app/src/main/java/com/opentasker/core/capabilities/ActionCapabilities.kt`; `app/src/main/java/com/opentasker/core/transfer/OpenTaskerBundle.kt`; https://www.usenix.org/system/files/usenixsecurity25-zhang-shirley.pdf
-  Touches: action metadata/capability registry, bundle manifest and validator, import review, profile enable flow, run-log risk labels, registry coverage tests.
-  Acceptance: Every registered action has a tested sensitivity classification; import review groups requested powers by task/profile and flags data-to-network chains; imported profiles remain disabled and require explicit acknowledgement before first enable; unknown actions fail closed.
-  Complexity: M
-
-- [ ] P1 — Start context monitors only when enabled profiles need them
-  Why: Wi-Fi/connectivity, app-usage, shake, and camera/microphone sources start for the whole service lifetime even when no enabled profile references those context families.
-  Evidence: `app/src/main/java/com/opentasker/core/engine/AutomationService.kt`; enabled profile contexts in `app/src/main/java/com/opentasker/core/storage/ProfileDao.kt`; https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban
-  Touches: live profile registry, context-source lifecycle coordinator, monitor start/stop APIs, Context Inspector isolation, service tests and battery evidence harness.
-  Acceptance: Each monitor has a reference-counted active-profile dependency; add/edit/disable/delete transitions start or stop it exactly once; Context Inspector cannot silently keep production sources alive; tests prove zero monitored sources with no dependent profiles and no missed first event after activation.
-  Complexity: M
-
-- [ ] P1 — Stream authenticated backup encryption and restore
-  Why: `BackupEncryption` reads the entire bounded database and allocates a second plaintext/ciphertext array, creating avoidable low-memory failure risk near the 100 MB cap.
-  Evidence: `app/src/main/java/com/opentasker/core/storage/BackupEncryption.kt`; `app/src/main/java/com/opentasker/core/storage/DatabaseBackupManager.kt`; Android Keystore/AES-GCM guidance at https://developer.android.com/privacy-and-security/cryptography
-  Touches: backup format version, streaming encrypt/decrypt pipeline, temporary-file publish/cleanup, restore journal, instrumentation and corruption tests.
-  Acceptance: Encryption/decryption use bounded buffers; authentication is verified before a restored database is published; wrong-passphrase, truncation, tag failure, cancellation, low-space, and process-interruption leave the live DB untouched; format v1 remains restorable and peak-memory evidence is recorded near the cap.
-  Complexity: M
-
-- [ ] P1 — Expand release-truth contracts to all capability documents
-  Why: Architecture and dependency docs still describe shipped scenes, visual flow, Shizuku, Termux, Locale configuration, and Compose versions as older baselines that the current README truth test does not cover.
-  Evidence: `docs/ARCHITECTURE.md`; `docs/DEPENDENCY_MODERNIZATION.md`; `docs/LOCALE_PLUGIN_HOST.md`; `app/src/test/java/com/opentasker/docs/ReleaseTruthContractTest.kt`; `gradle/libs.versions.toml`
-  Touches: stale docs, release-truth test, feature/version metadata source, `docs/FDROID_READINESS.md` release contract.
-  Acceptance: Current stale claims are corrected; one deterministic test derives versions and shipped capability states from code/catalog metadata and checks README plus all feature docs; intentionally historical changelog passages are excluded; a failing example proves the gate.
-  Complexity: S
-
-- [ ] P1 — Add Android Developer Verification release evidence
-  Why: OpenTasker distributes outside Play, and Android begins requiring registered packages from verified developers on certified devices in selected regions on September 30, 2026.
-  Evidence: `app/build.gradle.kts`; `docs/FDROID_READINESS.md`; GitHub/F-Droid distribution in `README.md`; https://developer.android.com/developer-verification
-  Touches: `docs/FDROID_READINESS.md`, signing/package evidence script, README distribution notes, release artifact verification.
-  Acceptance: A local command prints and verifies application ID, version, signer SHA-256, and APK provenance for the release artifact; the release contract records the chosen full-registration or advanced-flow posture and its owner without claiming completion prematurely; package/signing drift fails the release gate.
-  Complexity: S
-
-- [ ] P1 — Replace split GET/POST actions with one production-grade HTTP request
-  Why: Current HTTP actions lack method, header, query, auth, status, response-header, file-output, and consistent error semantics that Tasker and MacroDroid expose as table stakes.
-  Evidence: `app/src/main/java/com/opentasker/core/actions/NetworkActions.kt`; https://tasker.joaoapps.com/userguide/en/help/ah_http_request.html; https://macrodroidforum.com/wiki/index.php/Action%3A_HTTP_Request; https://square.github.io/okhttp/changelogs/changelog/
-  Touches: version catalog/dependency verification, OkHttp 5.4.0 transport, action registry/metadata/editor, LAN policy, secret references/redaction, MockWebServer tests, GET/POST migration aliases.
-  Acceptance: `http.request` supports GET/HEAD/POST/PUT/PATCH/DELETE/OPTIONS, structured headers/query/body/file input, bounded body/file output, status and response-header variables, timeouts, and explicit same-origin/redirect policy; TLS verification cannot be disabled; deprecated GET/POST IDs preserve existing bundles; tests cover 2xx/4xx/5xx, cancellation, redirect, oversized data, secret redaction, and LAN denial.
-  Complexity: L
-
 ### P2 -- Migration, sharing, and authoring depth
 
 - [ ] P2 - Expand Tasker XML import/export mappings for the next safe action families
@@ -200,20 +130,6 @@ Only open work belongs here; git history and `CHANGELOG.md` are the release reco
 ## Research-Driven Additions
 
 ### P1 -- Background reliability, observability, and security
-
-- [ ] P1 — Make time triggers Doze-safe and add a service watchdog
-  Why: Time-window profiles are evaluated by an in-service `while(isActive){ delay(1000) }` poll that Doze/App-Standby suspends, while the AlarmManager wake path only logs and feeds nothing; a single dropped self-rescheduling alarm or a killed `START_STICKY` service silently stops all time delivery until process restart.
-  Evidence: `app/src/main/java/com/opentasker/core/contexts/TimeContextSourceImpl.kt:27-43`; `app/src/main/java/com/opentasker/automation/receiver/TimeEventReceiver.kt:21`; `app/src/main/java/com/opentasker/automation/scheduler/TimeEventScheduler.kt`; `app/src/main/java/com/opentasker/core/engine/AutomationService.kt` (`onTimeout`→`stopSelf`); https://developer.android.com/about/versions/15/behavior-changes-15#fgs-timeout; https://developer.android.com/topic/libraries/architecture/workmanager
-  Touches: time context source, `TimeEventReceiver`/`TimeEventScheduler`, a periodic WorkManager watchdog worker, `AutomationService` re-arm path, service/scheduler tests, battery-evidence harness.
-  Acceptance: Time contexts are re-evaluated from the AlarmManager (or expedited-work) wake path, not solely the coroutine poll; a periodic WorkManager heartbeat verifies the service is alive and re-arms it after force-stop/timeout; a dropped single alarm cannot terminate ticks; tests prove a time window fires after a simulated Doze idle and after `onTimeout`.
-  Complexity: M
-
-- [ ] P1 — Surface crash logs and add an in-app diagnostics and engine-health panel
-  Why: `CrashLogHandler` captures uncaught-exception traces to `filesDir/crash_logs` but `getLatestCrashLog` has no caller and the diagnostic export omits them, so crash data is unreachable; the app also exposes no live view of service/FGS/standby/exact-alarm/matcher health.
-  Evidence: `app/src/main/java/com/opentasker/core/diagnostics/CrashLogHandler.kt:64`; `app/src/main/java/com/opentasker/core/logging/AppLogger.kt`; https://developer.android.com/topic/performance/vitals; https://developer.android.com/about/versions/16/behavior-changes-all#jobscheduler-quota-optimizations
-  Touches: diagnostics screen, `AppLogger` bounded ring buffer, crash-log reader/export, WorkManager `WorkInfo.getStopReason()` surfacing, health-status model, tests.
-  Acceptance: A diagnostics screen lists and shares captured crash logs and a bounded in-app log ring buffer; an engine-health panel shows service running, active FGS type, app-standby bucket, exact-alarm permission, last matcher error, and last worker stop reason; the diagnostic export includes crash logs with existing redaction.
-  Complexity: M
 
 - [ ] P1 — Add a live variable inspector for running and finished tasks
   Why: Run logs show per-expression template diagnostics but no snapshot of the resulting variable values, and there is no runtime global-variable view, so users cannot see what a task actually set; the Variables screen reads only the (currently unwritten) persisted vault.
@@ -351,20 +267,6 @@ Only open work belongs here; git history and `CHANGELOG.md` are the release reco
 
 ### P1 -- Variable-runtime correctness (root cause)
 
-- [ ] P1 — Unify the uppercase=global variable-naming convention across every write path
-  Why: `PersistVariableAction` writes an explicit lowercase `global_name` to the transient local scope (never persisted) yet returns Success, and the Variables editor hard-codes `isGlobal=true` for any name, so persisted "globals" that a task later writes never round-trip — three call sites disagree on the rule.
-  Evidence: `app/src/main/java/com/opentasker/core/actions/BuiltInActions.kt:197-201`; `app/src/main/java/com/opentasker/core/engine/VariableStore.kt:43-44`; `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationViewModel.kt:570-580`
-  Touches: a shared name-normalizer, `PersistVariableAction`, `VariableStore.set`, Variables editor validation, variable-store tests.
-  Acceptance: One normalizer enforces the convention; `var.persist` either promotes or rejects a non-global target instead of silently dropping it; the editor stores/labels scope consistently with the engine; a test proves a lowercase-targeted persist round-trips or fails loudly.
-  Complexity: S
-
-- [ ] P1 — Make concurrent global write-back transactional
-  Why: Each run builds its own `VariableStore`, hydrates a baseline, and writes back only its own diff, so under PARALLEL mode or manual/profile overlap two runs read the same baseline and clobber each other's global mutations with no merge or row lock.
-  Evidence: `app/src/main/java/com/opentasker/core/engine/TaskExecutionHelper.kt:31-45`; `app/src/main/java/com/opentasker/core/engine/AutomationService.kt` (`dispatchTask` PARALLEL branch)
-  Touches: global hydrate/persist path, `VariableDao` write, per-variable serialization or a read→run→write transaction, concurrency tests.
-  Acceptance: Two concurrent runs touching disjoint globals both persist; a run reading a global a sibling changed sees a defined, tested result; a race regression is reproduced and locked.
-  Complexity: M
-
 ### P1 -- Platform-survival compliance
 
 - [ ] P1 — Add Advanced Protection Mode awareness and graceful degradation
@@ -405,13 +307,6 @@ Only open work belongs here; git history and `CHANGELOG.md` are the release reco
   Complexity: S
 
 ### P2 -- Engine reliability
-
-- [ ] P2 — Bound the Termux dispatch rate-limit map
-  Why: `lastDispatchTimes` keeps a process-lifetime entry per template-expanded (user-controlled) executable string and never prunes, leaking memory across varying script paths.
-  Evidence: `app/src/main/java/com/opentasker/core/actions/ScriptActions.kt:78-90`
-  Touches: the rate-limit map (LRU cap or age eviction), a bound test.
-  Acceptance: The map is capped or evicts entries older than the dispatch interval; a test drives many distinct executables and asserts a bounded size.
-  Complexity: S
 
 - [ ] P2 — Wire scene SLIDER controls to fire a task and surface the value
   Why: `SceneOverlayService` builds the slider `SeekBar` with no change listener, so a scene slider drives no task and exposes no value, unlike BUTTON tap/long-press.
@@ -517,3 +412,59 @@ Only open work belongs here; git history and `CHANGELOG.md` are the release reco
   Acceptance: On SDK 35+ the action archives/unarchives a named package and reports the outcome, failing closed below it or when denied; tests cover the request and the unsupported path.
   Complexity: M
 
+## Research-Driven Additions
+
+### P0 — Now: data integrity and shipped-runtime truth
+
+### P1 — Next: trust, reliability, and complete authoring
+
+- [ ] P1 — Add a searchable installed-app picker with inspector handoff
+  Why: Application contexts and multiple actions/plugin fields require raw package strings, a documented onboarding failure in Easer and a usability gap compared with Automate's inspector.
+  Evidence: `app/src/main/java/com/opentasker/ui/screens/ContextEditorDialogs.kt:209-245`; `core/actions/ActionMetadata.kt:351,562`; https://github.com/renyuneyun/Easer/issues/486; https://news.ycombinator.com/item?id=42254433.
+  Touches: package/app query repository, shared picker, Context Inspector handoff, application/notification/action/plugin editors, tests.
+  Acceptance: Users can search by app label or package, see icon/label/package, choose from visible installed apps, use the latest observed value where safe, and fall back to validated manual entry without requesting `QUERY_ALL_PACKAGES`; all package-bearing editors share the component.
+  Complexity: M
+
+- [ ] P1 — Expose and reconcile the execution semantics already modeled by the engine
+  Why: Profile exit tasks, action conditions, continue-on-error, and action ordering exist in models/runtime, while task collision mode is stored/displayed but not consumed; authoring cannot control them coherently.
+  Evidence: `app/src/main/java/com/opentasker/core/model/Profile.kt`; `core/model/Task.kt`; `core/engine/TaskRunner.kt:89,265-271`; `core/engine/AutomationService.kt:278-339`; `ui/screens/EditorDialogs.kt`; `ActionEditorDialogs.kt`; https://tasker.joaoapps.com/userguide/en/activity_actionedit.html.
+  Touches: profile/task/action dialogs, reorder mutation/snapshots, execution-mode policy and migrations, engine/editor tests.
+  Acceptance: Users can select/clear an exit task, reorder actions atomically, edit condition and continue-on-error, and choose one documented collision policy; legacy task `collisionMode` is either enforced for manual/nested/external runs or migrated away without contradictory UI; round-trip and behavior tests cover each control.
+  Complexity: M
+
+- [ ] P1 — Make dynamic action forms typed, validated, and lossless
+  Why: `FieldType.DROPDOWN` has no option model and renders as free text, number filtering accepts invalid syntax, validation is mostly nonblank, and editing reconstructs only known keys so forward-compatible arguments are dropped.
+  Evidence: `app/src/main/java/com/opentasker/core/actions/ActionMetadata.kt:7-20`; `ui/screens/ActionEditorDialogs.kt:151-163,203-224,282-302`.
+  Touches: action-field option/validator schema, typed input components, per-action validation, unknown-argument preservation, registry coverage tests.
+  Acceptance: Every dropdown is a real selector with stable stored values; numbers enforce documented ranges/types; task/app/file fields use dedicated pickers; invalid configurations cannot save; editing and saving an action preserves unknown arguments byte-for-byte; registry tests require a renderer and validator for every field.
+  Complexity: M
+
+- [ ] P1 — Show active executions and support cooperative cancellation
+  Why: `AutomationService` tracks running jobs privately while the UI exposes only completed logs, leaving users unable to identify or stop a runaway automation.
+  Evidence: `app/src/main/java/com/opentasker/core/engine/AutomationService.kt:117-118,162-181`; `TaskRunner.kt`; `ui/screens/RunLogScreenContent.kt`; https://github.com/ChaoMixian/vFlow/issues/67.
+  Touches: execution registry/state flow, task-runner step reporting, cancellation propagation through sub-tasks/network/scripts/delays, active-runs UI, run-log outcomes/tests.
+  Acceptance: Active task/profile/source/start time/current step are visible; Cancel reaches nested and bounded blocking actions, runs cleanup, and records a terminal `Cancelled` outcome; completed jobs disappear without leaks; tests cover parallel, queued, nested, timeout, and cancel races without claiming pause or rewind.
+  Complexity: M
+
+### P2 — Later: observability, precision, and staged modernization
+
+- [ ] P2 — Paginate and export every retained run log
+  Why: Retention can keep far more than 100 rows, but `RunLogDao.getRecentFlow()` and the UI make every older retained record unreachable.
+  Evidence: `app/src/main/java/com/opentasker/core/storage/RunLogDao.kt`; `ui/screens/ActiveAutomationViewModel.kt:146-153`; `RunLogScreenContent.kt`.
+  Touches: keyset-paged DAO/query, database-backed filters, run-log UI, redacted JSON/CSV export, tests.
+  Acceptance: Every retained row is reachable with stable timestamp/id keyset pagination; task/status/date/query filters run in SQL and survive refresh; JSON/CSV export includes the selected range with existing secret/redaction policy; concurrent inserts do not duplicate or skip rows.
+  Complexity: M
+
+- [ ] P2 — Add an optional foreground activity/component constraint
+  Why: Package-only application contexts are too broad for apps with multiple activities, and `AppUsageMonitor` currently discards the observed `className`.
+  Evidence: `app/src/main/java/com/opentasker/automation/app/AppUsageMonitor.kt:64-113`; `core/contexts/ApplicationContextEvents.kt`; https://github.com/keymapperorg/KeyMapper/issues/1343.
+  Touches: application context schema/editor/migration, usage event payload and inspector, exact/glob matcher, OEM/device tests.
+  Acceptance: A context can optionally match package plus exact/glob component; Context Inspector shows the observed component; missing OEM data is reported as `component unavailable` and never silently degrades to package-only matching; existing package-only contexts remain unchanged.
+  Complexity: M
+
+- [ ] P2 — Upgrade the synchronized Kotlin/KSP/Compose runtime batch after trust fixes
+  Why: Stable Kotlin 2.4.0, KSP 2.3.10, Compose BOM 2026.06.00, Lifecycle 2.11.0, and Coroutines 1.11.0 include compiler, AGP-9, incremental-cache, flow, and R8 fixes that should move together rather than drift independently.
+  Evidence: `gradle/libs.versions.toml`; https://kotlinlang.org/docs/whatsnew24.html; https://github.com/google/ksp/releases/tag/2.3.10; https://developer.android.com/develop/ui/compose/bom/bom-mapping; https://github.com/Kotlin/kotlinx.coroutines/releases/tag/1.11.0.
+  Touches: version catalog/wrapper compatibility, generated Room/KSP output, Compose/Lifecycle/coroutine call sites, verification metadata, local gate.
+  Acceptance: The synchronized versions resolve without dynamic artifacts; a clean local gate passes JVM tests, blocking lint, Room schema generation, Play/F-Droid release builds, and two configuration-cache runs; Gradle remains 9.4.1 unless a separate compatibility proof justifies a wrapper change; rollback is one catalog commit.
+  Complexity: M
