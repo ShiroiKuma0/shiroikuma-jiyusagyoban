@@ -47,6 +47,18 @@ object CapabilityState {
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
     }
 
+    /**
+     * Badge-truth variant of [isMet]: for Shizuku it verifies the binder is actually up AND access is
+     * granted (what ShizukuShell-backed actions really need), not merely that the manager app is
+     * installed. [isMet] stays lenient on purpose — it also gates the run-time pre-flight dialog, and a
+     * boot-race (task fires before Shizuku's binder is up) must degrade to a run-log failure, not a
+     * dialog storm. UI badges have no such constraint and must tell the truth.
+     */
+    fun isMetLive(req: CapabilityRequirement, context: Context): Boolean = when (req) {
+        CapabilityRequirement.Shizuku -> com.opentasker.core.shizuku.ShizukuShell.available()
+        else -> isMet(req, context)
+    }
+
     /** The settings screen that grants [req], or null when there is nothing to deep-link (e.g. [CapabilityRequirement.None]). */
     fun settingsIntent(req: CapabilityRequirement, context: Context): Intent? {
         val intent = when (req) {

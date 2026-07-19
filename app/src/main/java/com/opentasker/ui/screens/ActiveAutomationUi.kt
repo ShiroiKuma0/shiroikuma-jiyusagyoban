@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -130,6 +131,7 @@ import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.actions.FieldType
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
+import com.opentasker.core.capabilities.WorkspaceHealth
 import com.opentasker.core.contexts.CalendarSunEventPresets
 import com.opentasker.core.contexts.DaySchedule
 import com.opentasker.core.contexts.EventContextPreset
@@ -342,6 +344,32 @@ fun ActiveAutomationUi(
         ProjectFilter.All -> scenes
         ProjectFilter.Unfiled -> scenes.filter { it.projectId == null }
         is ProjectFilter.Of -> scenes.filter { it.projectId == f.projectId }
+    }
+    // Workspace health — evaluated over ALL tasks (not the project-filtered subset) on every resume,
+    // so a permission granted in Settings clears the marks the moment the app comes back. Blocked
+    // tasks drive the red ❗ on task rows, project chips, the Tasks nav tab, and Setup's health card.
+    val healthTick = rememberResumeTick()
+    val blockedTasks = remember(tasks, healthTick) { WorkspaceHealth.blockedTasks(tasks, context) }
+    val brokenTaskIds = remember(blockedTasks) { blockedTasks.map { it.taskId }.toSet() }
+    val alertProjectIds = remember(blockedTasks) {
+        val byId = tasks.associateBy { it.id }
+        blockedTasks.map { byId[it.taskId]?.projectId }.toSet()
+    }
+    // A profile inherits the mark when a task it runs (enter or exit, resolved name-first exactly like
+    // the engine) is blocked — so the Profiles tab shows the same startup breakage at its own level.
+    val brokenProfileIds = remember(blockedTasks, profiles) {
+        if (brokenTaskIds.isEmpty()) emptySet() else {
+            val byName = tasks.associateBy { it.name }
+            val byId = tasks.associateBy { it.id }
+            profiles.filter { p ->
+                val enter = byName[p.enterTaskName] ?: byId[p.enterTaskId]
+                val exit = byName[p.exitTaskName] ?: p.exitTaskId?.let { byId[it] }
+                (enter != null && enter.id in brokenTaskIds) || (exit != null && exit.id in brokenTaskIds)
+            }.map { it.id }.toSet()
+        }
+    }
+    val alertProfileProjectIds = remember(brokenProfileIds) {
+        profiles.filter { it.id in brokenProfileIds }.map { it.projectId }.toSet()
     }
     val runLogs by viewModel.runLogs.collectAsState()
     val globalVariables by viewModel.globalVariables.collectAsState()
@@ -883,7 +911,19 @@ fun ActiveAutomationUi(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(2.dp),
                         ) {
-                            Icon(destination.icon(), contentDescription = null, tint = primary)
+                            Box {
+                                Icon(destination.icon(), contentDescription = null, tint = primary)
+                                // Workspace-health mark: any blocked task puts the red ❗ on the Tasks
+                                // tab so startup breakage is visible without opening anything.
+                                val navAlert = (destination == OpenTaskerScreen.Tasks && brokenTaskIds.isNotEmpty()) ||
+                                    (destination == OpenTaskerScreen.Profiles && brokenProfileIds.isNotEmpty())
+                                if (navAlert) {
+                                    HealthAlertIcon(
+                                        Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-5).dp),
+                                        size = 13.dp,
+                                    )
+                                }
+                            }
                             Text(
                                 destination.label,
                                 style = MaterialTheme.typography.labelMedium,
@@ -934,6 +974,8 @@ fun ActiveAutomationUi(
 
             OpenTaskerScreen.Profiles -> ProfilesScreen(
                 profiles = visibleProfiles,
+                brokenProfileIds = brokenProfileIds,
+                alertProjectIds = alertProfileProjectIds,
                 tasks = tasks,
                 expandedProfiles = expandedProfiles,
                 runLogs = runLogs,
@@ -975,6 +1017,8 @@ fun ActiveAutomationUi(
 
             OpenTaskerScreen.Tasks -> TasksScreen(
                 tasks = visibleTasks,
+                brokenTaskIds = brokenTaskIds,
+                alertProjectIds = alertProjectIds,
                 expandedTasks = expandedTasks,
                 storageDecodeIssues = storageDecodeIssues,
                 projects = projects,
@@ -1105,6 +1149,8 @@ fun ActiveAutomationUi(
             OpenTaskerScreen.Setup -> PermissionOnboardingScreen(
                 contentPadding = innerPadding,
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
+                blockedTasks = blockedTasks,
+                onOpenTasks = { screenOrdinal = OpenTaskerScreen.Tasks.ordinal },
             )
 
             OpenTaskerScreen.Inspector -> ContextInspectorScreen(db = db, contentPadding = innerPadding)
