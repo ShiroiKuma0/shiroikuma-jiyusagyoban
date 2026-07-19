@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.75+195`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.75+203`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 </div>
 
@@ -42,8 +42,8 @@ A fully app-driven port of 白い熊's Tasker spoken-kanji clock: calc tasks com
 ### 🗂️ Projects, scoped variables & foldable groups
 Case-based **variable scoping that survives reboots** — `%ALLCAPS` super-global, `%MixedCase` project-global, `%lowercase` task-local — plus **projects** that file profiles, tasks, scenes and widgets, and **foldable, nestable groups** with drag-and-drop on every tab, per-tab search, and per-tab sorting. The **Variables tab** styles each var like the action editor (blue name, bold value, one line, all sizes/colours settable), folds into **per-scope sections** with live counts and **project-filter pills**, and carries a **"Clean up dead globals"** analyzer that finds and sweeps shadow-copies, orphans, and **dangling** project-globals (rows left behind by a deleted project) — with hard guards that keep a project-scoped name from ever leaking into the global bucket.
 
-### ⚙️ A capability-aware action editor
-Every action carries a **live status pill**: red, with a one-tap **deep-link to the exact Settings screen**, when its required permission/service isn't set up; yellow (FYI) when it is — checked against the *same* state the Setup tab uses (accessibility, Shizuku, modify-settings, overlay, Do-Not-Disturb, notifications). An **app-package** field type lets you type a package / `%variable` *or* pick from an installed-apps list. Build action lists fast: **long-press to multi-select** actions, then **clone / copy / cut / delete** them — with **paste before / after** and an **app-wide clipboard** that moves actions **between** tasks.
+### ⚙️ A capability-aware action editor + workspace health marks
+Every action carries a **live status pill**: red, with a one-tap **deep-link to the exact Settings screen**, when its required permission/service isn't set up; hidden when it is — checked against the *same* state the Setup tab uses (accessibility, Shizuku — verified **binder-up and granted**, not merely installed — modify-settings, overlay, Do-Not-Disturb, notifications), re-evaluated every time the app resumes. Any task that **cannot run right now** (an unsupported action, or a blocking permission that's really missing) gets a **red ❗ that propagates all the way up**: task row → project filter chips → the Tasks icon in the nav bar — and profiles inherit the mark from the task they run, up to the Profiles nav icon. The **Setup tab opens with a Task-health card** listing every blocked task and exactly what it's missing (one-tap jump to Tasks), so startup breakage is visible from the top level without opening anything. An **app-package** field type lets you type a package / `%variable` *or* pick from an installed-apps list. Build action lists fast: **long-press to multi-select** actions, then **clone / copy / cut / delete** them — with **paste before / after** and an **app-wide clipboard** that moves actions **between** tasks.
 
 ### 🔗 Robust by-name linking & imports
 Everything links by **name**, not by fragile ids: `scene.show`/`scene.hide` resolve a scene by **`(project, name)`**, and a scene's button/slider/gesture actions resolve their task **by name** too — so re-importing a bundle or recreating a task never silently breaks a link. Imports **overwrite in place** (a re-import keeps each item's id, group and notes), and item names are **unique within a project** (enforced in the editors and at the DB level).

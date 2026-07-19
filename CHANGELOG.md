@@ -15,6 +15,66 @@ This lists what the fork adds; upstream's own history lives in the OpenTasker re
 - **UI**: fixed a Diagnostics crash from duplicate log keys (now keyed on a monotonic sequence) and stopped its polling while backgrounded. The one-time NFC write is disarmed on dialog close, expires after 60 s, and runs its tag I/O off the main thread. `deleteVariable` reports real success/failure instead of an optimistic toast; undo no longer reports false success; `updateTask`/`updateProfile` are transactional. Editing an unknown action type shows a message instead of a dead tap. The context editor blocks saving garbled TIME windows and out-of-range coordinates. New profiles default to disabled, the enter-task selection no longer resets mid-edit, and backup state loads off the main thread.
 - **Theming**: scene warning text follows the applied theme's luminance (was near-invisible in Light-app-on-dark-system), the Locale plugin edit activity honors the persisted theme, run-log detail lines no longer render twice, and the scene overlay is clamped on screen so it can't be dragged fully offscreen. Removed dead duplicate helpers.
 
+## 0.2.75+203 — 2026-07-19
+
+The workspace-health release: the app now tells you — truthfully, live, and from the top level — which
+tasks cannot run and why, instead of hiding a permanently-wrong "Unsupported" badge inside a task card
+while the task silently failed in 0 ms. Plus overlay quality-of-life for the 音楽端灯 buttons and a
+%variable cache-coherence fix.
+
+### Workspace health marks & truthful capability badges (+201..+203)
+
+- **`wake` un-broken.** Upstream capabilities-mapped `wake` through its "elevated power backend" —
+  which upstream never ships (`hasPrivilegedTransport()` is hardcoded `false`), so the action was
+  *permanently* Unsupported, and the task pre-flight **hard-failed any task containing a wake at
+  0 ms** (the セキュアカメラ / Freeze-bubble wakes). The fork's real `WakeAction` runs
+  `input keyevent 224` through ShizukuShell — so the capability is now a plain Shizuku-gated one,
+  exactly like `shell.run`. (`reboot`/`lock` stay Unsupported: their upstream implementations are
+  stubs that always fail.)
+- **Live action pill.** The capability pill on an action row now reflects reality: **hidden** when
+  the requirement is actually met (a standing "Needs setup" on a working action was a lie), **red +
+  what's missing** ("Needs setup — Shizuku not installed") when it isn't — and **tapping it
+  deep-links** to the settings screen / app that grants the requirement. Shizuku is verified
+  **binder-up + access-granted** (new `CapabilityState.isMetLive`), not upstream's
+  "manager app is installed". Everything re-evaluates on every app resume.
+- **Red ❗ propagation.** A task that cannot run right now — an Unsupported action, or a blocking
+  permission that is live-unmet (the exact pre-flight/0 ms condition) — gets a red ❗ on its **task
+  row**, on its **project filter chip** (All/Unfiled included), and on the **Tasks icon in the bottom
+  nav bar**. **Profiles inherit** the mark from the task they run (enter *and* exit task, resolved
+  name-first with id fallback exactly like the engine) → profile rows, Profiles-tab chips, and the
+  **Profiles nav icon**. All startup breakage is visible from the top level.
+- **Setup tab: Task health card.** Setup now opens with a health card driven by the *same* checks as
+  the marks — red, listing each blocked task and exactly what it's missing, with a "Show in Tasks"
+  jump; a green "all tasks can run" one-liner otherwise. Marks and Setup can no longer disagree.
+- **Setup contradictions fixed.** The "Shizuku power mode" card used to show a **green check** while
+  its body said *"disabled by the persisted kill switch … blocked until the backend is implemented"*.
+  Replaced by a real **Shizuku** card: green only when Shizuku is running *and* granted; distinct
+  states for not-installed / installed-but-not-running / running-but-not-granted — the last with a
+  **one-tap Grant** that pops Shizuku's own permission dialog. The **Termux script bridge** card had
+  the same disease (green on mere installation, body claiming the feature is unimplemented — it is
+  implemented in this fork): it now green-checks only when dispatch is really ready (installed +
+  ≥ 0.109 + RUN_COMMAND granted) and offers a **direct RUN_COMMAND runtime-permission request**.
+
+### Overlay QoL trio (+198..+200)
+
+- **`scene.show` numeric `vAlign`** (0..1): positions the scene's vertical **center** at that
+  fraction of the screen height, proportionally correct across fold states — `%Ongaku_Btny` now
+  drives the 音楽 良/削除 buttons' height as one knob.
+- **`keepScreenOn` arg** on `scene.show`: the overlay holds `FLAG_KEEP_SCREEN_ON` while shown —
+  EMUI let the screen time out over the player's own keep-awake flag whenever an overlay sat on top.
+- **Gradle configuration cache** enabled — `buildFork` made CC-safe (project values captured at
+  configuration time); warm re-runs configure in ~0.6 s.
+
+### %variable cache coherence (+196..+197)
+
+- **`PersistentGlobalScope.refreshFromDb()`** re-warms the %var cache after a bundle import and
+  after `DELETE_ITEMS` variable deletions — direct DAO writes had made imported variables invisible
+  to scene expansion until a process restart (the 音楽端灯 fade knobs rendered as tiny black
+  fallbacks).
+- **BUTTON scene-element `textColor`** is now `v()`-expanded live like every other element, so
+  `%Ongaku_Btncolor` drives the 良/削除 fade continuously.
+
+
 ## 0.2.75+195 — 2026-07-16
 
 The 白い熊 音楽 migration release: the `音楽端灯` project moves from PowerAmp to the 白い熊 音楽 sister
