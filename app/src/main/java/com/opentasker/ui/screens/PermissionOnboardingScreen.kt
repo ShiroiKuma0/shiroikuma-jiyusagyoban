@@ -80,6 +80,8 @@ import com.opentasker.core.permissions.UsageAccess
 import com.opentasker.core.power.ShizukuPowerBackend
 import com.opentasker.core.scheduling.ExactAlarmSupport
 import com.opentasker.core.scripting.TermuxScriptBackend
+import com.opentasker.core.scripting.TermuxScriptState
+import com.opentasker.core.shizuku.ShizukuShell
 
 private data class PermissionSetupItem(
     val title: String,
@@ -107,6 +109,8 @@ private sealed interface PermissionAction {
     ) : PermissionAction
     /** Device-admin add screen — launched for-result so it doesn't blink shut. */
     data object DeviceAdmin : PermissionAction
+    /** Fork: arbitrary side effect (e.g. pop Shizuku's own grant dialog) — refresh happens on resume. */
+    data class Custom(val run: () -> Unit) : PermissionAction
     data object None : PermissionAction
 }
 
@@ -114,6 +118,10 @@ private sealed interface PermissionAction {
 fun PermissionOnboardingScreen(
     contentPadding: PaddingValues,
     onMessage: (String) -> Unit,
+    // Workspace health (from ActiveAutomationUi): tasks that cannot run right now, shown as a red card
+    // at the very top so Setup and the red ❗ marks on the Tasks tab always tell the same story.
+    blockedTasks: List<com.opentasker.core.capabilities.WorkspaceHealth.BlockedTask> = emptyList(),
+    onOpenTasks: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -153,6 +161,54 @@ fun PermissionOnboardingScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // Task health — the same blocked-task set that puts the red ❗ on the Tasks tab. Red card
+        // listing each blocked task and what it's missing; green one-liner when everything can run.
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (blockedTasks.isEmpty()) {
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.66f)
+                    } else {
+                        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
+                    },
+                ),
+                border = BorderStroke(
+                    1.dp,
+                    if (blockedTasks.isEmpty()) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)
+                    else MaterialTheme.colorScheme.error.copy(alpha = 0.65f),
+                ),
+                shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+            ) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Icon(
+                            if (blockedTasks.isEmpty()) Icons.Filled.CheckCircle else Icons.Filled.Error,
+                            contentDescription = null,
+                            tint = if (blockedTasks.isEmpty()) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                        )
+                        Text(
+                            if (blockedTasks.isEmpty()) "Task health — all tasks can run"
+                            else "Task health — ${blockedTasks.size} task${if (blockedTasks.size == 1) "" else "s"} blocked",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    if (blockedTasks.isNotEmpty()) {
+                        blockedTasks.forEach { blocked ->
+                            Text(
+                                "• ${blocked.taskName} — ${blocked.problems.joinToString()}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (onOpenTasks != null) {
+                            OutlinedButton(onClick = onOpenTasks) { Text("Show in Tasks") }
+                        }
+                    }
+                }
+            }
+        }
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -218,6 +274,7 @@ fun PermissionOnboardingScreen(
                                 permissionLauncher.launch(action.permission)
                             }
                         is PermissionAction.SettingsIntent -> openSettingsIntent(context, action.intent, onMessage)
+                        is PermissionAction.Custom -> action.run()
                         is PermissionAction.OemSettings -> openOemSettings(context, action, onMessage)
                         is PermissionAction.DeviceAdmin -> {
                             val admin = android.content.ComponentName(context, com.opentasker.core.admin.DeviceAdmin::class.java)
@@ -591,6 +648,8 @@ private fun PermissionRequirement(label: String) {
 
 private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
     val shizukuStatus = ShizukuPowerBackend.inspect(context)
+    val shizukuRunning = ShizukuShell.isRunning()
+    val shizukuReady = shizukuRunning && ShizukuShell.hasPermission()
     val termuxStatus = TermuxScriptBackend.inspect(context)
     val oem = OemBatteryGuidance.forDevice(Build.MANUFACTURER, Build.BRAND)
     return listOfNotNull(
@@ -778,33 +837,55 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
             action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)),
             requiredFor = "DND actions",
         ),
+        // Fork: this card reports the state ShizukuShell-backed actions REALLY need (binder up +
+        // access granted) — shell.run, wake, screenshot, app freeze/unfreeze, the 物理鍵 grabber.
+        // Upstream's "power mode" card green-checked on mere installation while its body said
+        // "blocked by the kill switch" — a contradiction, and about a backend this fork never uses.
         PermissionSetupItem(
-            title = "Shizuku power mode",
-            body = "${shizukuStatus.summary} Elevated actions remain blocked until the backend is implemented and explicitly enabled.",
-            granted = shizukuStatus.managerInstalled,
-            actionLabel = if (shizukuStatus.managerInstalled) "Open app settings" else "Open setup guide",
-            action = PermissionAction.SettingsIntent(
-                if (shizukuStatus.managerInstalled) {
-                    packageDetailsIntent(ShizukuPowerBackend.MANAGER_PACKAGE)
-                } else {
-                    Intent(Intent.ACTION_VIEW, Uri.parse(ShizukuPowerBackend.SETUP_URL))
-                },
-            ),
-            requiredFor = "Elevated actions",
+            title = "Shizuku",
+            body = when {
+                shizukuReady -> "Shizuku is running and access is granted — shell commands, screen wake, screenshot, app freeze/unfreeze and the 物理鍵 key grabber are ready."
+                shizukuRunning -> "Shizuku is running but 白い熊 自由作業盤 has not been granted access — tap Grant to pop Shizuku's permission dialog."
+                shizukuStatus.managerInstalled -> "Shizuku is installed but not running — start it from the Shizuku app."
+                else -> "Shizuku is not installed. It powers shell commands, screen wake, screenshot, app freeze/unfreeze and the 物理鍵 key grabber."
+            },
+            granted = shizukuReady,
+            actionLabel = when {
+                shizukuReady -> "Open Shizuku"
+                shizukuRunning -> "Grant access"
+                shizukuStatus.managerInstalled -> "Open Shizuku"
+                else -> "Open setup guide"
+            },
+            action = if (shizukuRunning && !shizukuReady) {
+                PermissionAction.Custom { ShizukuShell.requestPermission() }
+            } else {
+                PermissionAction.SettingsIntent(
+                    context.packageManager.getLaunchIntentForPackage(ShizukuPowerBackend.MANAGER_PACKAGE)
+                        ?: Intent(Intent.ACTION_VIEW, Uri.parse(ShizukuPowerBackend.SETUP_URL)),
+                )
+            },
+            requiredFor = "Shell, wake, screenshot, freeze, 物理鍵",
             optional = true,
         ),
         PermissionSetupItem(
             title = "Termux script bridge",
-            body = "${termuxStatus.summary} Script actions remain blocked until permission handling, execution isolation, output capture, and audit logging are implemented.",
-            granted = termuxStatus.termuxInstalled,
-            actionLabel = if (termuxStatus.termuxInstalled) "Open app settings" else "Open setup guide",
-            action = PermissionAction.SettingsIntent(
-                if (termuxStatus.termuxInstalled) {
-                    packageDetailsIntent(TermuxScriptBackend.TERMUX_PACKAGE)
-                } else {
-                    Intent(Intent.ACTION_VIEW, Uri.parse(TermuxScriptBackend.SETUP_URL))
-                },
-            ),
+            // Green only when scripts can actually dispatch (installed + version + RUN_COMMAND granted);
+            // the old card green-checked on installation while claiming the feature was unimplemented.
+            body = "${termuxStatus.summary} Script actions dispatch through Termux's RUN_COMMAND intent.",
+            granted = termuxStatus.isReady,
+            actionLabel = when {
+                !termuxStatus.termuxInstalled -> "Open setup guide"
+                termuxStatus.state == TermuxScriptState.PermissionRequired -> "Grant RUN_COMMAND"
+                else -> "Open app settings"
+            },
+            action = when {
+                !termuxStatus.termuxInstalled ->
+                    PermissionAction.SettingsIntent(Intent(Intent.ACTION_VIEW, Uri.parse(TermuxScriptBackend.SETUP_URL)))
+                termuxStatus.state == TermuxScriptState.PermissionRequired ->
+                    PermissionAction.RuntimePermission(TermuxScriptBackend.RUN_COMMAND_PERMISSION)
+                else ->
+                    PermissionAction.SettingsIntent(packageDetailsIntent(TermuxScriptBackend.TERMUX_PACKAGE))
+            },
             requiredFor = "Script actions",
             optional = true,
         ),

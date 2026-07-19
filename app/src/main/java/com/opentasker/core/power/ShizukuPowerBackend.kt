@@ -20,7 +20,6 @@ object ShizukuPowerBackend {
         "screenshot.take",
         "reboot",
         "screen.off",
-        "wake",
     )
 
     /** Defaults on so a process restart never enables privileged behavior before preferences load. */
