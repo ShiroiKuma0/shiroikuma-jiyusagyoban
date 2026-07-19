@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.zIndex
@@ -97,11 +98,18 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.actions.ActionMetadataRegistry
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
+import com.opentasker.core.capabilities.CapabilityRequirement
+import com.opentasker.core.capabilities.CapabilityState
 import com.opentasker.core.contexts.contextConfigSummary
 import com.opentasker.core.icons.TaskIconStore
 import com.opentasker.core.model.ActionSpec
@@ -129,6 +137,44 @@ import com.opentasker.ui.theme.isNarrowScreen
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+/**
+ * Increments every time the activity resumes — remember() permission/Shizuku checks against this so
+ * they re-evaluate after the user returns from a settings screen or the Shizuku grant dialog.
+ */
+@Composable
+internal fun rememberResumeTick(): Int {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var tick by remember { mutableStateOf(0) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) tick++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    return tick
+}
+
+/** A chip label with the optional red ❗ health mark in front. */
+@Composable
+private fun ChipLabelWithAlert(text: String, alert: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (alert) HealthAlertIcon(size = 16.dp)
+        Text(text)
+    }
+}
+
+/** A small red ❗ marking a blocked task / project chip / nav tab — the workspace-health mark. */
+@Composable
+internal fun HealthAlertIcon(modifier: Modifier = Modifier, size: Dp = 18.dp) {
+    Icon(
+        Icons.Filled.Error,
+        contentDescription = "Contains blocked tasks",
+        tint = MaterialTheme.colorScheme.error,
+        modifier = modifier.size(size),
+    )
+}
+
 /** A pinned filter-chip row that picks the active project (All / Unfiled / a specific project). */
 @Composable
 internal fun ProjectFilterChips(
@@ -137,6 +183,9 @@ internal fun ProjectFilterChips(
     onSelect: (ProjectFilter) -> Unit,
     onReorder: (List<Long>) -> Unit,
     modifier: Modifier = Modifier,
+    // Project ids (null = Unfiled) containing a blocked task — those chips get the red ❗ so broken
+    // automations are visible from the top level without opening anything. Empty = no marks.
+    alertProjectIds: Set<Long?> = emptySet(),
 ) {
     // Tap a chip to filter; LONG-PRESS a project chip then drag left/right to reorder — it swaps with its
     // neighbour once dragged past half that neighbour's width, and the order persists on drop (switching the
@@ -156,14 +205,14 @@ internal fun ProjectFilterChips(
             FilterChip(
                 selected = filter == ProjectFilter.All,
                 onClick = { onSelect(ProjectFilter.All) },
-                label = { Text(stringResource(R.string.label_all)) },
+                label = { ChipLabelWithAlert(stringResource(R.string.label_all), alertProjectIds.isNotEmpty()) },
             )
         }
         item {
             FilterChip(
                 selected = filter == ProjectFilter.Unfiled,
                 onClick = { onSelect(ProjectFilter.Unfiled) },
-                label = { Text("Unfiled") },
+                label = { ChipLabelWithAlert("Unfiled", null in alertProjectIds) },
             )
         }
         items(order, key = { it.id }) { project ->
@@ -171,7 +220,7 @@ internal fun ProjectFilterChips(
             FilterChip(
                 selected = filter is ProjectFilter.Of && filter.projectId == project.id,
                 onClick = { onSelect(ProjectFilter.Of(project.id)) },
-                label = { Text(project.name) },
+                label = { ChipLabelWithAlert(project.name, project.id in alertProjectIds) },
                 modifier = Modifier
                     .onGloballyPositioned { widths[project.id] = it.size.width.toFloat() }
                     .zIndex(if (isDragging) 1f else 0f)
@@ -243,6 +292,10 @@ internal fun ProfilesScreen(
     onDeleteContext: (Profile, Int) -> Unit,
     contentPadding: PaddingValues,
     loaded: Boolean,
+    // Workspace-health marks (from ActiveAutomationUi): profiles whose enter/exit task is blocked get
+    // the red ❗ on their rows; project ids (null = Unfiled) with such profiles get it on their chips.
+    brokenProfileIds: Set<Long> = emptySet(),
+    alertProjectIds: Set<Long?> = emptySet(),
 ) {
     // Item + group multi-selection live here (re-mounting the screen on a tab switch resets them). Set<Long>
     // has no Saver, so plain remember — not rememberSaveable — is correct.
@@ -256,7 +309,7 @@ internal fun ProfilesScreen(
 
     Column(Modifier.fillMaxSize().padding(contentPadding)) {
         if (projects.isNotEmpty()) {
-            ProjectFilterChips(projects, projectFilter, onSelectProject, onReorderProjects, Modifier.padding(vertical = 8.dp))
+            ProjectFilterChips(projects, projectFilter, onSelectProject, onReorderProjects, Modifier.padding(vertical = 8.dp), alertProjectIds)
         }
         if (selectionActive) {
             SelectionBar(
@@ -328,6 +381,7 @@ internal fun ProfilesScreen(
                         ?: stringResource(R.string.workspace_missing_task, profile.enterTaskId)
                     ProfileCard(
                         profile = profile,
+                        broken = profile.id in brokenProfileIds,
                         enterTaskName = enterTaskName,
                         selectionActive = selectionActive,
                         selected = profile.id in selectedIds,
@@ -625,6 +679,7 @@ internal fun TemplatePromptCard(onBrowseTemplates: () -> Unit) {
 @Composable
 private fun ProfileCard(
     profile: Profile,
+    broken: Boolean,
     enterTaskName: String,
     selectionActive: Boolean,
     selected: Boolean,
@@ -672,7 +727,10 @@ private fun ProfileCard(
                     Spacer(Modifier.width(8.dp))
                 }
                 Column(Modifier.weight(1f)) {
-                    Text(profile.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (broken) HealthAlertIcon()
+                        Text(profile.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                     // Collapsed: name + a one-line status summary (state + context count). Expanded: just the task.
                     val statusWord = if (profile.enabled) stringResource(R.string.label_enabled) else stringResource(R.string.label_paused)
                     val contextsText = stringResource(R.string.label_context_count, profile.contexts.size)
@@ -777,6 +835,10 @@ internal fun TasksScreen(
     onPickTaskIcon: (Task) -> Unit,
     contentPadding: PaddingValues,
     loaded: Boolean,
+    // Workspace-health marks (computed over ALL tasks in ActiveAutomationUi, not just the filtered
+    // subset shown here): blocked task ids → red ❗ on their rows; project ids → ❗ on their chips.
+    brokenTaskIds: Set<Long> = emptySet(),
+    alertProjectIds: Set<Long?> = emptySet(),
 ) {
     val themePrefs by ThemeStore.state.collectAsState()
     val focusManager = LocalFocusManager.current
@@ -794,7 +856,7 @@ internal fun TasksScreen(
             .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } },
     ) {
         if (projects.isNotEmpty()) {
-            ProjectFilterChips(projects, projectFilter, onSelectProject, onReorderProjects, Modifier.padding(vertical = 8.dp))
+            ProjectFilterChips(projects, projectFilter, onSelectProject, onReorderProjects, Modifier.padding(vertical = 8.dp), alertProjectIds)
         }
         if (selectionActive) {
             val clipboardTasks by TaskClipboard.tasks.collectAsState()
@@ -846,6 +908,7 @@ internal fun TasksScreen(
             val taskCard: @Composable (Task) -> Unit = { task ->
                 TaskCard(
                     task = task,
+                    broken = task.id in brokenTaskIds,
                     selectionActive = selectionActive,
                     selected = task.id in selectedIds,
                     expanded = expandedTasks[task.id] == true,
@@ -985,6 +1048,7 @@ object TaskClipboard {
 @Composable
 private fun TaskCard(
     task: Task,
+    broken: Boolean,
     selectionActive: Boolean,
     selected: Boolean,
     expanded: Boolean,
@@ -1108,7 +1172,10 @@ private fun TaskCard(
                     }
                 }
                 Column(Modifier.weight(1f)) {
-                    Text(task.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (broken) HealthAlertIcon()
+                        Text(task.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                     // Collapsed: just the task name. Expanded: the priority / collision line.
                     if (expanded) {
                         Text(
@@ -1393,10 +1460,32 @@ private fun ActionRow(
                     }
                 }
                 if (capability.level != CapabilityLevel.Supported) {
-                    StatusPill(
-                        if (capability.level == CapabilityLevel.Unsupported) stringResource(R.string.label_unsupported) else stringResource(R.string.status_needs_setup),
-                        if (capability.level == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                    )
+                    // Live capability pill — same checks as the Setup tab, re-evaluated on every resume.
+                    // Requirement MET → no pill at all (the action just works — a standing "Needs setup"
+                    // there was a lie). Requirement UNMET → red pill naming what's missing; tapping it
+                    // deep-links straight to the settings screen / app that grants it.
+                    val pillContext = LocalContext.current
+                    val resumeTick = rememberResumeTick()
+                    val reqMet = remember(capability.requirement, resumeTick) {
+                        capability.requirement == CapabilityRequirement.None ||
+                            CapabilityState.isMetLive(capability.requirement, pillContext)
+                    }
+                    when {
+                        capability.level == CapabilityLevel.Unsupported ->
+                            StatusPill(stringResource(R.string.label_unsupported), MaterialTheme.colorScheme.error)
+                        !reqMet -> StatusPill(
+                            "${stringResource(R.string.status_needs_setup)} — ${CapabilityState.statusLabel(capability.requirement, false)}",
+                            MaterialTheme.colorScheme.error,
+                            modifier = Modifier.clickable {
+                                CapabilityState.settingsIntent(capability.requirement, pillContext)
+                                    ?.let { runCatching { pillContext.startActivity(it) } }
+                            },
+                        )
+                        // Informational RequiresSetup with no checkable requirement (e.g. clipboard
+                        // background limits): keep the neutral pill, nothing to verify or fix.
+                        capability.requirement == CapabilityRequirement.None ->
+                            StatusPill(stringResource(R.string.status_needs_setup), MaterialTheme.colorScheme.primary)
+                    }
                 }
             }
             // Long-press menu — Clone/Copy/Cut/Delete act on the whole selection; Paste drops the

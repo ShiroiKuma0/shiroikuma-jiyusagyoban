@@ -76,7 +76,10 @@ object ActionCapabilityRegistry {
         "power.off" to ActionCapability(CapabilityLevel.RequiresSetup, "Powers off the device through Shizuku — install and start Shizuku, then grant this app access.", CapabilityRequirement.Shizuku, blocking = true),
         "lock" to ActionCapability(CapabilityLevel.Unsupported, "Device lock requires configured device-admin support."),
         "screen.off" to accessibilityCapability(),
-        "wake" to elevatedUnsupported("wake", "Wake requires a foreground activity or privileged wake flow."),
+        // Fork: WakeAction runs `input keyevent 224` through ShizukuShell — a plain Shizuku-gated
+        // action like shell.run, NOT upstream's (never-shipped) privileged transport. Upstream's
+        // elevatedUnsupported() here made the pre-flight hard-fail every task containing a wake.
+        "wake" to shizukuCapability("Screen wake (KEYCODE_WAKEUP)"),
         "app.freeze" to shizukuCapability("Freeze app (pm disable-user)"),
         "app.unfreeze" to shizukuCapability("Unfreeze app (pm enable)"),
         "tasks.launchers" to shizukuCapability("Create launcher tasks"),
