@@ -3,9 +3,14 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
-## Upstream v0.2.76 merged on the 0.2.76/78 resync (2026-07-20)
+## 0.2.76+1 — 2026-07-20
 
-### Deep audit fixes (2026-07-17)
+The upstream 0.2.76 resync release: the fork rebases onto upstream's v0.2.76 "deep audit" release
+(10 commits, 56 files), the new upstream schema bump is renumbered onto the fork chain, and
+upstream's enter/exit-task engine split is fused with the fork's per-event snapshot queue. No
+workspace (task/profile/scene) changes ride along — this is a pure engine/app release.
+
+### Upstream v0.2.76 — deep audit fixes (2026-07-17, merged 2026-07-20)
 
 - **Engine**: exit tasks now run on their own job slot and never consume the profile cooldown, so a cooldown, SINGLE-mode in-flight enter task, or RESTART can no longer silently drop the exit task. Closed a QUEUED lost-task race where a retrigger could be enqueued into a queue whose consumer had already decided to exit.
 - **Engine**: plugin conditions no longer flap — the shared Locale plugin poll source multiplexes every subscription, so the matcher now holds state for results addressed to a different plugin/bundle instead of driving every plugin context true→false→true each 30 s cycle. The internal `sun_tick` minute pulse can no longer satisfy a generic/blank-filter EVENT context (previously firing imported event profiles every minute); blank-event/blank-filter specs fail closed.
@@ -14,6 +19,35 @@ This lists what the fork adds; upstream's own history lives in the OpenTasker re
 - **Actions**: `download` runs on OkHttp with a policy-DNS hook so the cleartext private-LAN rule and the API 37 `ACCESS_LOCAL_NETWORK` gate are enforced against the addresses actually connected to (closing a DNS-rebinding TOCTOU), fails on non-2xx instead of saving a redirect stub over a good file, and fsyncs before the atomic rename. `tile.set` fails honestly and is capability-gated Unsupported instead of reporting a no-op Success. `screen.timeout` rejects the "0 = never" value that actually turns the screen off immediately. `flow.wait` at its 30-minute maximum no longer always times out; `sound.play`/`tts.speak` get a 10-minute budget and TTS queue failures fail fast. `datetime.*` zone typos fail closed; `data.read` CSV supports RFC 4180 quoted fields. Added missing editor fields for ping, download, sound.play, and media.mute.
 - **UI**: fixed a Diagnostics crash from duplicate log keys (now keyed on a monotonic sequence) and stopped its polling while backgrounded. The one-time NFC write is disarmed on dialog close, expires after 60 s, and runs its tag I/O off the main thread. `deleteVariable` reports real success/failure instead of an optimistic toast; undo no longer reports false success; `updateTask`/`updateProfile` are transactional. Editing an unknown action type shows a message instead of a dead tap. The context editor blocks saving garbled TIME windows and out-of-range coordinates. New profiles default to disabled, the enter-task selection no longer resets mid-edit, and backup state loads off the main thread.
 - **Theming**: scene warning text follows the applied theme's luminance (was near-invisible in Light-app-on-dark-system), the Locale plugin edit activity honors the persisted theme, run-log detail lines no longer render twice, and the scene overlay is clamped on screen so it can't be dragged fully offscreen. Removed dead duplicate helpers.
+
+### Fork-side resync work (+1)
+
+- **Database renumbering**: upstream's v8 (the `run_logs(timestamp)` and `edit_history(entityType,
+  entityId)` indexes) is renumbered onto the fork chain as **migration 19→20** — same scheme as the
+  previous resync (the fork chain occupies 5..17; upstream's 6/7/8 land as 18/19/20). Schema
+  `20.json` exported; an installed device migrates in place by just adding the two indexes.
+- **Engine fusion**: upstream's enter/exit job-slot split is merged INTO the fork's per-invocation
+  event-snapshot dispatch (+106) rather than replacing it — `dispatchTask` now carries both
+  `eventVars` and `isExit`, exit tasks run on the collision-free `-profileId` slot without consuming
+  the cooldown, and the QUEUED enqueue/drain decision sits under one lock while each queued run still
+  carries its own `%NOTIF_*` snapshot (notification bursts keep their per-event values).
+- **Adopted from upstream into fork-owned files**: transactional `updateTask`/`updateProfile`
+  (the fork's task data-loss guard, write tracing, and icon-file cleanup are retained; upstream's
+  corrupt-record-overwrite throw is deliberately NOT adopted — corrupt rows keep surfacing via the
+  decode-issues banner instead of hard-blocking every save), honest `tile.set` failure + an
+  Unsupported capability pill (nothing in the workspace uses it), real success/failure feedback on
+  variable delete, the profile editor refusing to save a dangling enter-task binding, and the new
+  editor fields — ping (timeout, result variable), download (timeout, size limit), sound.play
+  (volume), media.mute (stream).
+- **Kept fork-side where upstream diverged**: the ThemePrefs-driven `OpenTaskerTheme` (upstream's new
+  Locale-plugin theme code re-pointed at it), the rewritten scene library and the removed Diagnostics
+  destination, plain-string action metadata/capabilities (upstream moved to string resources), and
+  name-first task resolution in profile dispatch.
+- **Repairs**: restored the `plural` helper in `ActiveAutomationLists` that upstream's dead-code
+  sweep deleted out from under the fork's still-live call sites.
+- **Verified no-ops for the fork**: the new scene-overlay clamp applies only to drag gestures —
+  programmatically edge-placed fork scenes (電池線, 通知明滅枠, the 音楽 buttons) are unaffected.
+  `BUILD_NUMBER` reset for the 0.2.76 line (versionCode 780001).
 
 ## 0.2.75+203 — 2026-07-19
 
