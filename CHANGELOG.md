@@ -3,6 +3,38 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.76+4 — 2026-07-20
+
+The hands-off-reload release: the adb bridge can now RUN a task, so the dev loop fires a
+project's 71 reload itself right after every settings import (白い熊: "You should be running 71
+yourself in update-situations like this - always"). Plus a 通知明滅 naming normalization and the
+companion-side half of protected-contact picture masking.
+
+### `RUN_TASK` bridge action
+- `WorkspaceTransferReceiver` gains `shiroikuma.jiyusagyoban.action.RUN_TASK` — run a task by
+  name over adb: `--es …extra.TASK '<task name>'` plus optional `--es …extra.PROJECT '<project>'`
+  to disambiguate (name-first, case-insensitive; an ambiguous name errors out instead of picking
+  one). Executes through `executeAndLogTask` exactly like a manual run and answers success +
+  duration in the ordered-broadcast result. Same explicit-component + protocol-extra gate as the
+  other bridge actions.
+
+### 通知明滅 variable normalization (workspace)
+- Every ALLCAPS variable renamed to the project's proper form: `TSUCHI_C_/F_/T_/B_<pkg>` →
+  `Tsuchi_C_/F_/T_/B_<pkg>`, `TSUCHI_HIDE_*` → `Tsuchi_Hide_*`, `TSUCHI_TONE_FILE_*` →
+  `Tsuchi_Tone_File_*` — across 71/01/37, 点灯, 再描画, 消灯, 全消灯, and both 保護試験 tasks
+  (including the literal probe string in the unset-detection). Scope is unchanged: these names
+  all contain lowercase package parts, so they were already project-globals. New-name rows were
+  seeded with current values in the same bundle; the 35 old ALLCAPS rows were swept via
+  `DELETE_ITEMS`; 71 was re-run headlessly over the new `RUN_TASK` action.
+
+### Protected-contact pictures — companion side (workspace)
+- Jami's file-transfer notifications ("Picture from <name>" + avatar + photo preview) bypass the
+  protected-contact masking that text messages already get. The fix lands in shiroikuma-jami
+  (handed off as `hand-off-protected-picture-notifications.md` in that repo); this side is ready:
+  `通知明滅の設定 [01]` defines `%Tsuchi_Hide_Body_Pic` (新着写真。) and `通知明滅 ⇨ 起動 [71]`
+  now pushes it as the `protected_body_picture` extra on the existing `SET_PROTECTED_CONTACTS`
+  broadcast (current Jami builds ignore the unknown extra harmlessly).
+
 ## 0.2.76+3 — 2026-07-20
 
 The quiet-mode release: 通知明滅 now behaves like a real notification channel — the system-bar
