@@ -3,6 +3,42 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.76+3 — 2026-07-20
+
+The quiet-mode release: 通知明滅 now behaves like a real notification channel — the system-bar
+vibrate/silent tile mutes its tone, and every lighting notification also buzzes with a
+message-style vibration pattern (settable in the 01 設定 task), which itself respects silent mode.
+
+### `sound.play` volume streams (+2)
+- New optional `stream` arg: `media` (default — nothing else changes), `notification`, `ring`,
+  `alarm`, `system`, implemented via `AudioAttributes` (sonification content type), with a dropdown
+  in the action editor. Sounds on notification/ring/system follow the ringer mode, so the
+  vibrate/silent tile mutes them at the OS level — no ringer checks needed in tasks; media and
+  alarm keep playing regardless. The `volume` arg composes with any stream.
+- The 通知明滅 per-app tone (`通知明滅点灯`'s `sound.play`) now rides `stream: notification` — it
+  previously played on the media stream and sailed straight through quiet mode. Its loudness now
+  follows the notification volume slider. (Workspace bundle; 話す時計 and all other sounds stay on
+  media by design.)
+
+### Incoming-message vibration for 通知明滅 (+3)
+- `vibrate` gains a `pattern` arg — comma-separated ms alternating OFF,ON starting with an initial
+  delay (the Android waveform convention), e.g. `0,150,100,150` = buzz–pause–buzz. Segments and the
+  total are bounded to the existing 10 s cap; `millis` stays for one-shots.
+- `state.get` gains a `ringer` key → `normal` / `vibrate` / `silent` — the raw vibrator ignores the
+  ringer, so tasks gate themselves.
+- Workspace: `通知明滅点灯` vibrates `%Tsuchi_Vib_Pattern` right after the app-foreground stop (no
+  buzz while that app is open in front), gated on `ringer != silent`. The pattern is defined and
+  documented in `通知明滅の設定 [01]` (白い熊's tuned value: a triple buzz
+  `0,150,100,150,100,150`). Net behavior: normal = tone + buzz, vibrate = buzz only,
+  silent = light only.
+
+### 通知明滅: 白い熊 Jami 自動回復 exclusion (workspace, same day)
+- The `白い熊 Jami 自動回復` notification (the Jami connection watchdog's auto-recovery report)
+  no longer fires the tone, edge light, or wakedance — an early-stop guard in `通知明滅点灯`
+  matches its exact package + title before the tone plays or the unread flags are set.
+- `通知明滅試験` gained stage 0: a simulated 自動回復 notification that must produce no reaction,
+  so the exclusion is testable on demand.
+
 ## 0.2.76+1 — 2026-07-20
 
 The upstream 0.2.76 resync release: the fork rebases onto upstream's v0.2.76 "deep audit" release
