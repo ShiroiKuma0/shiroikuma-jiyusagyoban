@@ -1,6 +1,7 @@
 package com.opentasker.core.actions
 
 import android.content.Context
+import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
@@ -19,6 +20,10 @@ import com.opentasker.core.platform.AudioUsageEligibility
  * Args:
  *   - "path": file path or URI (e.g., content://media/external/audio/media/123)
  *   - "volume": 0-100 (optional)
+ *   - "stream": media (default) / notification / ring / alarm / system — the volume stream the
+ *     sound rides. notification/ring/system follow the ringer mode, so the system-bar
+ *     vibrate/silent tile mutes them (白い熊: 通知明滅 tones must respect quiet mode); media and
+ *     alarm play regardless.
  */
 class PlaySoundAction : Action {
     override val id = "sound.play"
@@ -28,11 +33,21 @@ class PlaySoundAction : Action {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         AndroidAudioHardening.failureIfIneligible(ctx, "sound playback")?.let { return it }
         val volume = args["volume"]?.toFloatOrNull()?.let { (it / 100f).coerceIn(0f, 1f) }
+        val attributes = when (val stream = args["stream"]?.trim()?.lowercase().orEmpty()) {
+            "", "media", "music" -> null // MediaPlayer default: USAGE_MEDIA
+            "notification" -> soundAttributes(AudioAttributes.USAGE_NOTIFICATION)
+            "ring" -> soundAttributes(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+            "alarm" -> soundAttributes(AudioAttributes.USAGE_ALARM)
+            "system" -> soundAttributes(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+            else -> return ActionResult.Failure("unknown stream: $stream (use media, notification, ring, alarm or system)")
+        }
 
         val player = try {
             val uri = if (path.contains("://")) Uri.parse(path) else Uri.parse("file://$path")
-            MediaPlayer.create(ctx.app, uri)
-                ?: return ActionResult.Failure("could not create player for: $path")
+            val created =
+                if (attributes == null) MediaPlayer.create(ctx.app, uri)
+                else MediaPlayer.create(ctx.app, uri, null, attributes, AudioManager.AUDIO_SESSION_ID_GENERATE)
+            created ?: return ActionResult.Failure("could not create player for: $path")
         } catch (ex: Exception) {
             return ActionResult.Failure("failed to open: ${ex.message}", ex)
         }
@@ -152,6 +167,14 @@ class MuteAction : Action {
         }
     }
 }
+
+/** Sonification attributes for a non-media usage, so the sound rides that usage's volume stream
+ *  (and, for notification/ring/system, is muted by the ringer's vibrate/silent modes). */
+private fun soundAttributes(usage: Int): AudioAttributes =
+    AudioAttributes.Builder()
+        .setUsage(usage)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+        .build()
 
 private fun dispatchMediaKey(ctx: ActionContext, keyCode: Int): ActionResult {
     AndroidAudioHardening.failureIfIneligible(ctx, "media-key dispatch")?.let { return it }

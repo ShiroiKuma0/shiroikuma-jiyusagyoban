@@ -1231,6 +1231,7 @@ fun registerActionMetadata() {
                 ActionField("airplane", "Airplane on → variable", hint = "var for true/false (e.g. AIR)"),
                 ActionField("screen", "Screen on → variable", hint = "var for on/off (e.g. SCR)"),
                 ActionField("app", "Foreground app → variable", hint = "var for the package name (e.g. APP)"),
+                ActionField("ringer", "Ringer mode → variable", hint = "var for normal/vibrate/silent (e.g. RNG)"),
             )
         )
     )
@@ -1615,6 +1616,7 @@ fun registerActionMetadata() {
             fields = listOf(
                 ActionField("path", "Sound file path", required = true),
                 ActionField("volume", "Volume (0-100)", FieldType.NUMBER, hint = "Optional; uses current volume when empty"),
+                ActionField("stream", "Stream", FieldType.DROPDOWN, hint = "media (default); notification/ring/system follow the ringer mode — vibrate/silent mutes them", options = listOf("media", "notification", "ring", "alarm", "system")),
             )
         )
     )
@@ -1708,10 +1710,11 @@ fun registerActionMetadata() {
         ActionMetadata(
             id = "vibrate",
             name = "Vibrate",
-            description = "Vibrate the device",
+            description = "Vibrate the device — one-shot, or a message-style multi-buzz pattern",
             category = "System",
             fields = listOf(
-                ActionField("millis", "Duration (ms)", FieldType.NUMBER, required = true),
+                ActionField("millis", "Duration (ms)", FieldType.NUMBER, hint = "One-shot; ignored when a pattern is given"),
+                ActionField("pattern", "Pattern (ms, comma-separated)", hint = "OFF,ON alternating, first = delay — e.g. 0,150,100,150 = buzz-pause-buzz"),
             )
         )
     )
