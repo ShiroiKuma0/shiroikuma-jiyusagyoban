@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.os.Environment
 import com.opentasker.app.BuildConfig
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.widget.SetWidgetNameReceiver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -38,6 +39,10 @@ import java.util.Locale
  *   Items are resolved by (project, name); a shown scene is hidden first; variables are removed from
  *   BOTH the project bucket and the super bucket (pre-project-scoping residue); item notes are
  *   cleaned up. Unknown names are reported as warnings, never failures.
+ * - [ACTION_RUN_TASK]: run a task by name — [EXTRA_TASK] (required) + [EXTRA_PROJECT] (optional
+ *   project name to disambiguate). Runs through [executeAndLogTask] like a manual run and answers
+ *   with success + duration. Exists so the dev loop can trigger a project's 起動/71 reload task
+ *   right after a settings-bundle import (白い熊 2026-07-20: never leave that reload to the user).
  *
  * No permission (adb shell can't hold one): the broadcast must be explicit AND carry the shared
  * protocol extra, same gate as the other bridges. [Activity.RESULT_OK] = done;
@@ -115,6 +120,34 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
                                 putStringArray(EXTRA_WARNINGS, result.warnings.toTypedArray())
                             })
                         }
+                    }
+                    ACTION_RUN_TASK -> {
+                        val taskName = intent.getStringExtra(EXTRA_TASK)?.trim().orEmpty()
+                        require(taskName.isNotEmpty()) { "missing $EXTRA_TASK" }
+                        val projectName = intent.getStringExtra(EXTRA_PROJECT)?.trim().orEmpty()
+                        val db = OpenTaskerApp_NoHilt.db
+                        val projectId = if (projectName.isEmpty()) null else
+                            db.projectDao().getAll().firstOrNull { it.name.equals(projectName, ignoreCase = true) }?.id
+                                ?: throw IllegalArgumentException("no such project: $projectName")
+                        val matches = db.taskDao().getAll().filter {
+                            it.name.equals(taskName, ignoreCase = true) &&
+                                (projectId == null || it.projectId == projectId)
+                        }
+                        require(matches.isNotEmpty()) { "no such task: $taskName" }
+                        require(matches.size == 1) {
+                            "ambiguous task name: $taskName (${matches.size} matches — pass $EXTRA_PROJECT)"
+                        }
+                        val result = executeAndLogTask(
+                            appContext = app,
+                            db = db,
+                            task = matches.single().toDomain(),
+                            source = "adb bridge",
+                            logTag = "WorkspaceTransfer",
+                        )
+                        pending.setResultCode(if (result.report.success) Activity.RESULT_OK else Activity.RESULT_FIRST_USER)
+                        pending.setResultData(
+                            "ran '$taskName': success=${result.report.success} in ${result.report.durationMs}ms"
+                        )
                     }
                     else -> {
                         pending.setResultCode(Activity.RESULT_FIRST_USER)
@@ -198,7 +231,10 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
         const val ACTION_EXPORT_WORKSPACE = "shiroikuma.jiyusagyoban.action.EXPORT_WORKSPACE"
         const val ACTION_IMPORT_BUNDLE = "shiroikuma.jiyusagyoban.action.IMPORT_BUNDLE"
         const val ACTION_DELETE_ITEMS = "shiroikuma.jiyusagyoban.action.DELETE_ITEMS"
+        const val ACTION_RUN_TASK = "shiroikuma.jiyusagyoban.action.RUN_TASK"
         const val EXTRA_PATH = "shiroikuma.jiyusagyoban.extra.PATH"
+        const val EXTRA_TASK = "shiroikuma.jiyusagyoban.extra.TASK"
+        const val EXTRA_PROJECT = "shiroikuma.jiyusagyoban.extra.PROJECT"
         const val EXTRA_ERROR = "shiroikuma.jiyusagyoban.extra.ERROR"
         const val EXTRA_WARNINGS = "shiroikuma.jiyusagyoban.extra.WARNINGS"
         const val EXTRA_COUNT_TASKS = "shiroikuma.jiyusagyoban.extra.COUNT_TASKS"
