@@ -18,18 +18,39 @@ import kotlinx.coroutines.withContext
  * Vibrate device.
  *
  * Args:
- *   - "millis": duration in milliseconds
+ *   - "millis": one-shot duration in milliseconds (ignored when "pattern" is given)
+ *   - "pattern": comma-separated waveform in ms, alternating OFF,ON and starting with an initial
+ *     OFF delay (the Android waveform convention) — e.g. "0,150,100,150" = buzz 150 ms, pause
+ *     100 ms, buzz 150 ms. For incoming-message-style multi-buzz vibrations (白い熊: 通知明滅).
  */
 class VibrateAction : Action {
     override val id = "vibrate"
     override val category = ActionCategory.NOTIFICATION
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val rawMillis = args["millis"] ?: return ActionResult.Failure("missing millis")
+        val patternArg = args["pattern"]?.trim().orEmpty()
+        if (patternArg.isNotEmpty()) {
+            val segments = patternArg.split(",").map { seg ->
+                seg.trim().toLongOrNull()
+                    ?: return ActionResult.Failure("invalid pattern segment: '${seg.trim()}' (comma-separated ms expected)")
+            }
+            if (segments.any { it < 0 || it > MAX_VIBRATE_MS }) {
+                return ActionResult.Failure("pattern segments must be between 0 and $MAX_VIBRATE_MS ms")
+            }
+            if (segments.sum() !in MIN_VIBRATE_MS..MAX_VIBRATE_MS) {
+                return ActionResult.Failure("pattern total must be between $MIN_VIBRATE_MS and $MAX_VIBRATE_MS ms")
+            }
+            return vibrate(ctx, VibrationEffect.createWaveform(segments.toLongArray(), -1), "Vibrate pattern $patternArg")
+        }
+        val rawMillis = args["millis"] ?: return ActionResult.Failure("missing millis (or pattern)")
         val millis = rawMillis.toLongOrNull() ?: return ActionResult.Failure("invalid millis: $rawMillis")
         if (millis !in MIN_VIBRATE_MS..MAX_VIBRATE_MS) {
             return ActionResult.Failure("vibrate duration must be between $MIN_VIBRATE_MS and $MAX_VIBRATE_MS ms")
         }
+        return vibrate(ctx, VibrationEffect.createOneShot(millis, VibrationEffect.DEFAULT_AMPLITUDE), "Vibrate ${millis}ms")
+    }
+
+    private fun vibrate(ctx: ActionContext, effect: VibrationEffect, logLine: String): ActionResult {
         return try {
             val vibrator = if (Build.VERSION.SDK_INT >= 31) {
                 ctx.app.getSystemService(Context.VIBRATOR_MANAGER_SERVICE)?.let {
@@ -40,8 +61,8 @@ class VibrateAction : Action {
                 ctx.app.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
             } ?: return ActionResult.Failure("vibrator not available")
 
-            vibrator.vibrate(VibrationEffect.createOneShot(millis, VibrationEffect.DEFAULT_AMPLITUDE))
-            ctx.logger("Vibrate ${millis}ms")
+            vibrator.vibrate(effect)
+            ctx.logger(logLine)
             ActionResult.Success
         } catch (e: Exception) {
             ActionResult.Failure("vibrate failed: ${e.message}")
