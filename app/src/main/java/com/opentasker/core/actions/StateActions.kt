@@ -3,6 +3,7 @@ package com.opentasker.core.actions
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioManager
 import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import android.os.PowerManager
@@ -24,6 +25,7 @@ import com.opentasker.core.engine.ActionResult
  *   - `airplane` → "true" / "false".
  *   - `screen`   → "on" / "off".
  *   - `app`      → the foreground app's package name ("" if unknown).
+ *   - `ringer`   → "normal" / "vibrate" / "silent".
  */
 class StateGetAction : Action {
     override val id = "state.get"
@@ -66,7 +68,17 @@ class StateGetAction : Action {
         val foreground = ApplicationContextEvents.current
         store("app", foreground)
 
-        ctx.logger("State: battery=$pct% charging=$charging wifi=$wifi airplane=$airplane screen=${if (screenOn) "on" else "off"} app=$foreground")
+        // Ringer mode — "normal" / "vibrate" / "silent". Lets tasks give incoming-message vibration
+        // proper quiet-mode semantics (buzz in normal+vibrate, nothing in silent) — the raw vibrator
+        // ignores the ringer, so the task must gate it itself (白い熊: 通知明滅 vibration).
+        val ringer = when ((app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)?.ringerMode) {
+            AudioManager.RINGER_MODE_VIBRATE -> "vibrate"
+            AudioManager.RINGER_MODE_SILENT -> "silent"
+            else -> "normal"
+        }
+        store("ringer", ringer)
+
+        ctx.logger("State: battery=$pct% charging=$charging wifi=$wifi airplane=$airplane screen=${if (screenOn) "on" else "off"} app=$foreground ringer=$ringer")
         return ActionResult.Success
     }
 }
