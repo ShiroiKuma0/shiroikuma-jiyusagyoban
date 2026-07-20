@@ -1639,3 +1639,5 @@ private fun ContextRow(
         }
     }
 }
+
+private fun plural(count: Int): String = if (count == 1) "" else "s"
