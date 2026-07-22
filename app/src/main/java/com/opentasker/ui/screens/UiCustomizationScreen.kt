@@ -432,6 +432,38 @@ fun UiCustomizationScreen(
             }
             item { FontRow(level = 1, fileName = prefs.bubbleFontFileName, onClick = { showBubbleFontPicker = true }) }
 
+            // Flash bubbles (通知明滅): the left-edge Desktop icons share the freeze bubbles' icon /
+            // label styling above; only the gesture behaviors and kill tasks are their own.
+            item { SectionHeader("Flash bubbles (通知明滅)") }
+            item {
+                FlashBehaviorRow(
+                    level = 1, label = "Tap",
+                    value = prefs.flashTapBehavior,
+                    onPick = { v -> ThemeStore.update { it.copy(flashTapBehavior = v) } },
+                )
+            }
+            item {
+                FlashBehaviorRow(
+                    level = 1, label = "Long-tap",
+                    value = prefs.flashLongTapBehavior,
+                    onPick = { v -> ThemeStore.update { it.copy(flashLongTapBehavior = v) } },
+                )
+            }
+            item {
+                FlashTaskRow(
+                    level = 1, label = "Kill-flash task (gets %APP_PACKAGE)",
+                    value = prefs.flashKillTaskName,
+                    onChange = { v -> ThemeStore.update { it.copy(flashKillTaskName = v) } },
+                )
+            }
+            item {
+                FlashTaskRow(
+                    level = 1, label = "Kill-all task (kill icon / notification tap)",
+                    value = prefs.flashKillAllTaskName,
+                    onChange = { v -> ThemeStore.update { it.copy(flashKillAllTaskName = v) } },
+                )
+            }
+
             item { SectionHeader("Shortcut picker") }
             item {
                 SliderRow(
@@ -712,6 +744,56 @@ private fun WeightRow(level: Int, weight: Int, onPick: (Int) -> Unit) {
                 )
             }
         }
+    }
+}
+
+/** Flash-bubble gesture behavior options: stored value → display label. */
+private val FLASH_BEHAVIOR_OPTIONS = listOf(
+    "open_kill" to "Open app + kill flash",
+    "kill" to "Kill flash only",
+    "open" to "Open app only",
+    "dismiss" to "Dismiss icon only",
+)
+
+@Composable
+private fun FlashBehaviorRow(level: Int, label: String, value: String, onPick: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        RowScaffold(level, onClick = { expanded = true }) {
+            Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Text(
+                FLASH_BEHAVIOR_OPTIONS.firstOrNull { it.first == value }?.second ?: value,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            FLASH_BEHAVIOR_OPTIONS.forEach { (v, text) ->
+                DropdownMenuItem(
+                    text = { Text(text) },
+                    onClick = {
+                        onPick(v)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+/** A workspace task name the flash-bubble layer runs (kill / kill-all), edited inline. */
+@Composable
+private fun FlashTaskRow(level: Int, label: String, value: String, onChange: (String) -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().padding(start = rowStartPadding(level), end = 16.dp, top = 8.dp, bottom = 8.dp),
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onChange,
+            label = { Text(label) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

@@ -18,6 +18,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.opentasker.app.MainActivity
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.core.bubbles.FlashBubbleOverlayManager
 import com.opentasker.core.bubbles.FreezeBubbleOverlayManager
 import com.opentasker.automation.app.AppUsageMonitor
 import com.opentasker.automation.network.ConnectivityMonitor
@@ -133,6 +134,8 @@ class AutomationService : Service() {
         CameraMicContextEvents.start(this)
         // Freeze bubbles: render pending re-freeze bubbles, gated to the Desktop launcher being foreground.
         FreezeBubbleOverlayManager.start(this, scope)
+        // Flash bubbles (通知明滅): per-app flashing icons + kill-all icon, left edge, Desktop-only.
+        FlashBubbleOverlayManager.start(this, scope)
         profileCooldowns.putAll(cooldownStore.loadAll())
         scope.launch { pruneRunLogs(force = true) }
         // Re-arm matchers (and dynamic receivers like the broadcast trigger) whenever profiles change,

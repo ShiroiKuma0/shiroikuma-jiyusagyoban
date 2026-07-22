@@ -48,6 +48,7 @@ class OpenTaskerApp_NoHilt : Application() {
         ThemeStore.init(this)
         com.opentasker.core.icons.TaskIconStore.init(this)
         com.opentasker.core.bubbles.FreezeBubbleStore.init(this)
+        com.opentasker.core.bubbles.FlashBubbleStore.init(this)
         com.opentasker.widget.TemplateStore.init(this)
         com.opentasker.core.storage.ListSortStore.init(this)
         com.opentasker.core.storage.RunLogSeenStore.init(this)

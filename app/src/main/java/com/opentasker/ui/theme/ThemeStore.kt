@@ -75,6 +75,11 @@ data class ThemePrefs(
     val bubbleLabelSizeSp: Int = 11,             // [BUBBLE_LABEL_MIN, BUBBLE_LABEL_MAX]
     val bubbleLabelWeight: Int = 700,            // 100..900 (Bold default)
     val bubbleFontFileName: String = "",         // "" = follow the app font; else MONOSPACE / a .ttf/.otf file
+    // ---- Flash bubbles (通知明滅 Desktop icons; style shared with the freeze bubbles above) --------
+    val flashTapBehavior: String = "open_kill",      // one of FLASH_BEHAVIORS
+    val flashLongTapBehavior: String = "kill",       // one of FLASH_BEHAVIORS
+    val flashKillTaskName: String = "通知明滅消灯",     // per-app kill task; run with %APP_PACKAGE = the bubble's app
+    val flashKillAllTaskName: String = "通知明滅全消灯", // kill-all task (the flash-ongoing notification's tap task)
     // ---- Launcher "add task shortcut" picker (projects → folder-boxes → tasks) --------------------
     val pickerFontSizeSp: Int = 15,              // [PICKER_FONT_MIN, PICKER_FONT_MAX]
     val pickerRowPadDp: Int = 3,                 // vertical padding per row; 0 = tightest [0, PICKER_PAD_MAX]
@@ -128,6 +133,9 @@ data class ThemePrefs(
         const val BUBBLE_ICON_CORNER_MAX = 48
         const val BUBBLE_LABEL_MIN = 8
         const val BUBBLE_LABEL_MAX = 24
+
+        /** Flash-bubble gesture behaviors: open the app + kill its flash / kill only / open only / dismiss the icon only. */
+        val FLASH_BEHAVIORS = setOf("open_kill", "kill", "open", "dismiss")
 
         const val PICKER_FONT_MIN = 11
         const val PICKER_FONT_MAX = 28
@@ -206,6 +214,10 @@ object ThemeStore {
     private const val K_BUBBLE_LABEL_SIZE = "bubble_label_size"
     private const val K_BUBBLE_LABEL_WEIGHT = "bubble_label_weight"
     private const val K_BUBBLE_FONT = "bubble_font"
+    private const val K_FLASH_TAP = "flash_tap_behavior"
+    private const val K_FLASH_LONG_TAP = "flash_long_tap_behavior"
+    private const val K_FLASH_KILL_TASK = "flash_kill_task"
+    private const val K_FLASH_KILL_ALL_TASK = "flash_kill_all_task"
     private const val K_PICKER_FONT_SIZE = "picker_font_size"
     private const val K_PICKER_ROW_PAD = "picker_row_pad"
     private const val K_PICKER_INDENT = "picker_indent"
@@ -283,6 +295,8 @@ object ThemeStore {
         bubbleIconCornerDp = bubbleIconCornerDp.coerceIn(0, ThemePrefs.BUBBLE_ICON_CORNER_MAX),
         bubbleLabelSizeSp = bubbleLabelSizeSp.coerceIn(ThemePrefs.BUBBLE_LABEL_MIN, ThemePrefs.BUBBLE_LABEL_MAX),
         bubbleLabelWeight = bubbleLabelWeight.coerceIn(ThemePrefs.FONT_WEIGHT_MIN, ThemePrefs.FONT_WEIGHT_MAX),
+        flashTapBehavior = flashTapBehavior.takeIf { it in ThemePrefs.FLASH_BEHAVIORS } ?: ThemePrefs.DEFAULT.flashTapBehavior,
+        flashLongTapBehavior = flashLongTapBehavior.takeIf { it in ThemePrefs.FLASH_BEHAVIORS } ?: ThemePrefs.DEFAULT.flashLongTapBehavior,
         pickerFontSizeSp = pickerFontSizeSp.coerceIn(ThemePrefs.PICKER_FONT_MIN, ThemePrefs.PICKER_FONT_MAX),
         pickerRowPadDp = pickerRowPadDp.coerceIn(0, ThemePrefs.PICKER_PAD_MAX),
         pickerIndentDp = pickerIndentDp.coerceIn(0, ThemePrefs.PICKER_INDENT_MAX),
@@ -347,6 +361,10 @@ object ThemeStore {
             bubbleLabelSizeSp = prefs.getInt(K_BUBBLE_LABEL_SIZE, d.bubbleLabelSizeSp),
             bubbleLabelWeight = prefs.getInt(K_BUBBLE_LABEL_WEIGHT, d.bubbleLabelWeight),
             bubbleFontFileName = prefs.getString(K_BUBBLE_FONT, d.bubbleFontFileName) ?: d.bubbleFontFileName,
+            flashTapBehavior = prefs.getString(K_FLASH_TAP, d.flashTapBehavior) ?: d.flashTapBehavior,
+            flashLongTapBehavior = prefs.getString(K_FLASH_LONG_TAP, d.flashLongTapBehavior) ?: d.flashLongTapBehavior,
+            flashKillTaskName = prefs.getString(K_FLASH_KILL_TASK, d.flashKillTaskName) ?: d.flashKillTaskName,
+            flashKillAllTaskName = prefs.getString(K_FLASH_KILL_ALL_TASK, d.flashKillAllTaskName) ?: d.flashKillAllTaskName,
             pickerFontSizeSp = prefs.getInt(K_PICKER_FONT_SIZE, d.pickerFontSizeSp),
             pickerRowPadDp = prefs.getInt(K_PICKER_ROW_PAD, d.pickerRowPadDp),
             pickerIndentDp = prefs.getInt(K_PICKER_INDENT, d.pickerIndentDp),
@@ -412,6 +430,10 @@ object ThemeStore {
             putInt(K_BUBBLE_LABEL_SIZE, p.bubbleLabelSizeSp)
             putInt(K_BUBBLE_LABEL_WEIGHT, p.bubbleLabelWeight)
             putString(K_BUBBLE_FONT, p.bubbleFontFileName)
+            putString(K_FLASH_TAP, p.flashTapBehavior)
+            putString(K_FLASH_LONG_TAP, p.flashLongTapBehavior)
+            putString(K_FLASH_KILL_TASK, p.flashKillTaskName)
+            putString(K_FLASH_KILL_ALL_TASK, p.flashKillAllTaskName)
             putInt(K_PICKER_FONT_SIZE, p.pickerFontSizeSp)
             putInt(K_PICKER_ROW_PAD, p.pickerRowPadDp)
             putInt(K_PICKER_INDENT, p.pickerIndentDp)

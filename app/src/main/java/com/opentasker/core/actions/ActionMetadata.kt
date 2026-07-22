@@ -1372,6 +1372,61 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "bubble.flash_add",
+            name = "Flash Bubble Add",
+            description = "Show a flash bubble for an app down the Desktop's LEFT edge (通知明滅) — new apps stack below existing ones and push the kill-all icon to the bottom. Tap / long-tap behavior is set in UI customization → Flash bubbles.",
+            category = "System",
+            fields = listOf(
+                ActionField("package", "App", FieldType.APP_PACKAGE, required = true, hint = "pick an app, or type a package / %var (usually %NOTIF_PACKAGE)"),
+                ActionField("label", "Label", hint = "bubble label; blank = the app's launcher label"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "bubble.flash_remove",
+            name = "Flash Bubble Remove",
+            description = "Remove one app's flash bubble (no-op if it isn't shown)",
+            category = "System",
+            fields = listOf(
+                ActionField("package", "App", FieldType.APP_PACKAGE, required = true, hint = "pick an app, or type a package / %var (usually %APP_PACKAGE)"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "bubble.flash_clear",
+            name = "Flash Bubbles Clear",
+            description = "Remove every flash bubble AND the kill-all icon (the 無効 / full-reset path)",
+            category = "System",
+            fields = emptyList()
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "bubble.flashkill_show",
+            name = "Flash Kill Icon Show",
+            description = "Show the kill-all-flashes icon below the flash bubbles; tapping it runs the configured kill-all task (same as tapping the flash-ongoing notification) and hides itself, keeping the app bubbles",
+            category = "System",
+            fields = emptyList()
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "bubble.flashkill_hide",
+            name = "Flash Kill Icon Hide",
+            description = "Hide the kill-all-flashes icon (the app bubbles stay)",
+            category = "System",
+            fields = emptyList()
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "tasks.launchers",
             name = "Make Launcher Tasks",
             description = "Pick apps; create an unfreeze-then-launch task for each in a project group.",
