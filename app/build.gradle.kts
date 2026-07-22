@@ -183,6 +183,8 @@ dependencies {
     implementation(libs.re2j)
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
+    // On-device APK signing for the generated per-target share-relay APKs (core/share/relay).
+    implementation(libs.apksig)
 
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)

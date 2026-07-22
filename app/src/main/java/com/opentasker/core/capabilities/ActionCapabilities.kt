@@ -82,6 +82,7 @@ object ActionCapabilityRegistry {
         // elevatedUnsupported() here made the pre-flight hard-fail every task containing a wake.
         "wake" to shizukuCapability("Screen wake (KEYCODE_WAKEUP)"),
         "app.freeze" to shizukuCapability("Freeze app (pm disable-user)"),
+        "share.relays" to shizukuCapability("Generate + install per-app share relays"),
         "app.unfreeze" to shizukuCapability("Unfreeze app (pm enable)"),
         "tasks.launchers" to shizukuCapability("Create launcher tasks"),
         TermuxScriptBackend.ACTION_ID to ActionCapability(

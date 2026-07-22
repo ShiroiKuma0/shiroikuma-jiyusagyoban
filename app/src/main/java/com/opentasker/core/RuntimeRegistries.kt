@@ -28,6 +28,7 @@ import com.opentasker.core.actions.FlashBubbleRemoveAction
 import com.opentasker.core.actions.FlashKillIconHideAction
 import com.opentasker.core.actions.FlashKillIconShowAction
 import com.opentasker.core.actions.FreezeAppAction
+import com.opentasker.core.actions.GenerateShareRelaysAction
 import com.opentasker.core.actions.KillAppAction
 import com.opentasker.core.actions.UnfreezeAppAction
 import com.opentasker.core.actions.LaunchAppAction
@@ -191,6 +192,7 @@ private fun registerBuiltInActions() {
         FlashKillIconShowAction(),
         FlashKillIconHideAction(),
         MakeLauncherTasksAction(),
+        GenerateShareRelaysAction(),
         EditActionAction(),
         GoHomeAction(),
         PreviousAppAction(),
