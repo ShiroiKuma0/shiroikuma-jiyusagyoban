@@ -134,6 +134,27 @@
             </intent-filter>
         </activity>
 
+        <!-- Per-app share targets: the internal handler each generated relay APK forwards into. It
+             unfreezes the picked frozen app (Shizuku) and forwards the shared content to it, then
+             drops a re-freeze bubble. Exported (no permission) so an external relay can call it by
+             explicit component; it deliberately has NO SEND intent-filter, so the main app itself is
+             not a share-sheet tile — only the per-target relays are. -->
+        <activity
+            android:name="com.opentasker.core.share.ShareForwardActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity="" />
+
+        <!-- The "Share apps" screen (relay generator), opened by the share.relays action. -->
+        <activity
+            android:name="com.opentasker.core.share.ShareAppsActivity"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:excludeFromRecents="true"
+            android:taskAffinity="" />
+
         <service
             android:name="com.opentasker.core.engine.AutomationService"
             android:exported="false"

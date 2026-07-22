@@ -1372,6 +1372,16 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "share.relays",
+            name = "Share Apps (relay generator)",
+            description = "Open the Share apps screen: pick an app, edit its name + icon, and generate a per-app share-sheet tile (a tiny relay APK) that unfreezes the app and forwards the shared content to it.",
+            category = "App",
+            fields = emptyList()
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "bubble.flash_add",
             name = "Flash Bubble Add",
             description = "Show a flash bubble for an app down the Desktop's LEFT edge (通知明滅) — new apps stack below existing ones and push the kill-all icon to the bottom. Tap / long-tap behavior is set in UI customization → Flash bubbles.",

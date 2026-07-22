@@ -30,6 +30,14 @@
 -dontwarn com.google.re2j.**
 -keep class com.google.re2j.** { *; }
 
+# apksig (on-device signing of generated share-relay APKs). It reflects over signature-algorithm and
+# signing-block helpers internally; R8 minification broke block encoding at runtime ("Failed to encode
+# signature block"), so keep the whole library and silence its optional-dependency warnings.
+-keep class com.android.apksig.** { *; }
+-dontwarn com.android.apksig.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.conscrypt.**
+
 # kotlinx-serialization
 -keepattributes *Annotation*, InnerClasses
 -dontnote kotlinx.serialization.AnnotationsKt

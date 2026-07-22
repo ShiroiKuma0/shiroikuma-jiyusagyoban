@@ -82,6 +82,13 @@ import com.opentasker.core.scheduling.ExactAlarmSupport
 import com.opentasker.core.scripting.TermuxScriptBackend
 import com.opentasker.core.scripting.TermuxScriptState
 import com.opentasker.core.shizuku.ShizukuShell
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.Switch
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import com.opentasker.core.icons.TaskIconStore
 
 private data class PermissionSetupItem(
     val title: String,
@@ -304,8 +311,10 @@ fun PermissionOnboardingScreen(
                 },
             )
         }
+
     }
 }
+
 
 @Composable
 internal fun ThemeSetupCard() {

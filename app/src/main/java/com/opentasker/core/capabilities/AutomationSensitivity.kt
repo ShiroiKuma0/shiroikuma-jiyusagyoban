@@ -112,6 +112,7 @@ object AutomationSensitivityRegistry {
         "scene.hide",
         "scene.show",
         "screen.lock",
+        "share.relays",
         "screen.lockdown",
         "setting.get",
         "setting.put",

@@ -301,12 +301,15 @@ internal fun TaskEditorDialog(
  * staging/cleanup. Reuses [AppPickerDialog] and [EmojiPickerDialog] (same package).
  */
 @Composable
-private fun TaskIconEditorRow(iconPath: String?, onStage: (String?) -> Unit) {
+internal fun TaskIconEditorRow(iconPath: String?, onStage: (String?) -> Unit, targetPackage: String? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val preview = remember(iconPath) { TaskIconStore.loadBitmap(iconPath) }
     var showAppPicker by remember { mutableStateOf(false) }
     var showEmojiPicker by remember { mutableStateOf(false) }
+    var showActivityIcons by remember { mutableStateOf(false) }
+    var showIconPack by remember { mutableStateOf(false) }
+    var showFramework by remember { mutableStateOf(false) }
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) scope.launch {
             val saved = withContext(Dispatchers.IO) { TaskIconStore.saveFromUri(context, uri) }
@@ -347,8 +350,32 @@ private fun TaskIconEditorRow(iconPath: String?, onStage: (String?) -> Unit) {
                     OutlinedButton(onClick = { audioPicker.launch("audio/*") }) { Text("Audio") }
                     if (iconPath != null) TextButton(onClick = { onStage(null) }) { Text("Clear") }
                 }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (targetPackage != null) OutlinedButton(onClick = { showActivityIcons = true }) { Text("App icons") }
+                    OutlinedButton(onClick = { showIconPack = true }) { Text("Icon pack") }
+                    OutlinedButton(onClick = { showFramework = true }) { Text("System") }
+                }
             }
         }
+    }
+    if (showActivityIcons && targetPackage != null) {
+        ActivityIconPickerDialog(
+            targetPackage = targetPackage,
+            onDismiss = { showActivityIcons = false },
+            onPick = { showActivityIcons = false; onStage(it) },
+        )
+    }
+    if (showIconPack) {
+        IconPackPickerDialog(
+            onDismiss = { showIconPack = false },
+            onPick = { showIconPack = false; onStage(it) },
+        )
+    }
+    if (showFramework) {
+        FrameworkIconPickerDialog(
+            onDismiss = { showFramework = false },
+            onPick = { showFramework = false; onStage(it) },
+        )
     }
     if (showAppPicker) {
         AppPickerDialog(
@@ -774,7 +801,13 @@ private fun plural(count: Int): String = if (count == 1) "" else "s"
 /** Standalone icon picker (used from a task card's clickable icon). Stages files internally and returns
  *  the chosen path via [onConfirm]; the caller persists it (and cleans the old file via updateTask). */
 @Composable
-internal fun TaskIconPickerDialog(initialIconPath: String?, onDismiss: () -> Unit, onConfirm: (String?) -> Unit) {
+internal fun TaskIconPickerDialog(
+    initialIconPath: String?,
+    onDismiss: () -> Unit,
+    onConfirm: (String?) -> Unit,
+    targetPackage: String? = null,
+    title: String = "Task icon",
+) {
     val original = remember { initialIconPath }
     var staged by remember { mutableStateOf(initialIconPath) }
     fun stage(newPath: String?) {
@@ -790,8 +823,8 @@ internal fun TaskIconPickerDialog(initialIconPath: String?, onDismiss: () -> Uni
     AlertDialog(
         modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = cancel,
-        title = { Text("Task icon") },
-        text = { TaskIconEditorRow(iconPath = staged, onStage = { stage(it) }) },
+        title = { Text(title) },
+        text = { TaskIconEditorRow(iconPath = staged, onStage = { stage(it) }, targetPackage = targetPackage) },
         confirmButton = { OutlinedButton(onClick = { onConfirm(staged) }) { Text("Done") } },
         dismissButton = { TextButton(onClick = cancel) { Text(stringResource(R.string.action_cancel)) } },
     )

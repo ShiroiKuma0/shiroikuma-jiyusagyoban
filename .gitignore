@@ -22,6 +22,10 @@ captures/
 *.class
 release/
 
+# EXCEPTION: the share-relay stub's prebuilt dex is a committed fixture (see app/src/relay/REGENERATE.md),
+# not a build output — it ships in the APK as an asset the on-device relay generator reuses verbatim.
+!app/src/main/assets/relay/classes.dex
+
 # Keystores (NEVER commit)
 *.jks
 *.keystore
