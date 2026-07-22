@@ -151,6 +151,11 @@ object TaskIconStore {
     }
 
     /** Remove a saved icon file (on replace, clear, or task delete). No-op for blank/foreign paths. */
+    /** Snapshot any [Drawable] (an activity icon, an icon-pack entry, a framework drawable) to a PNG. */
+    fun saveFromDrawable(context: Context, drawable: Drawable): String? = runCatching {
+        writePng(context, drawableToBitmap(drawable, targetSize(context)))
+    }.getOrNull()
+
     fun delete(path: String?) {
         if (path.isNullOrBlank()) return
         runCatching {
