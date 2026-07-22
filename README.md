@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.76+4`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.76+5`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 </div>
 
@@ -32,6 +32,9 @@ A per-app coloured **edge-light** for incoming notifications. Screen-on, a frame
 
 ### 🫧 Freeze bubbles — re-freeze from the Desktop
 A native port of the Tasker 凍結 融解 idea. Any task flagged **Freeze bubble** (toggleable inline on the task card; on by default for the generated launch tasks) drops a small **draggable bubble** when it runs. The bubbles appear **only while your home launcher (the Desktop) is in the foreground** — nowhere else, so nothing intrudes while you work — each showing the app's icon. **Tap a bubble to freeze that app** and remove it; **long-tap to just dismiss**. Bubbles persist across reboots, keep their position relative to the top-right edge across rotation/fold, and are fully styleable (icon size, roundness, label size/weight/font) with a live preview.
+
+### ⚡ Flash bubbles — the flashing apps, one tap away
+The 通知明滅 layer's Desktop face. While an app's notification is edge-flashing, its **icon appears down the LEFT edge of your home launcher** (the freeze bubbles' mirror — the two stacks never mix), with a single **全消灯 kill-all icon** pinned below the stack; each newly flashing app slots in above it and pushes it back to the bottom. **Tap** an icon to open the app and kill its flash; **long-tap** to kill the flash — and dismiss the app's notification — without opening it; both gestures are **settable** (open + kill / kill only / open only / dismiss only), as are the kill tasks themselves, so the layer stays generic. The kill-all icon's tap does exactly what tapping the flash-ongoing notification does — and deliberately leaves the per-app icons standing, so you still see what demanded attention. Driven from tasks via five `bubble.*` actions; the per-app kill runs the workspace's own 消灯 task with the bubble's package injected per-invocation.
 
 ### 🔗 Home-screen task shortcuts + custom icons
 Drop any task onto the home screen as a **one-tap shortcut**. Long-press the launcher → *Shortcuts* → **白い熊 自由作業盤** opens a **floating picker dialog** (a tall, yellow-framed card over a dimmed home screen): each project unfolds into its **groups as bordered folder-boxes** — so a folded group reads as a closed box, never as a parent of the loose tasks below — then its ungrouped tasks, with order preserved and a *Cancel* button at the bottom. Pick a task and it lands as a shortcut that runs it directly — or use the in-task **Pin to home screen**. Give each task its own **icon** from an **installed app**, a **picture**, an **emoji**, or a **song's embedded album art** (pick an mp3/ogg/flac/m4a) — each *snapshotted to a PNG* the moment you pick it, so it keeps showing even if the source is deleted or its app is frozen. The icon appears on the task card (folded and unfolded) and is **baked into the shortcut**; tasks with no icon fall back to the app icon. **Tap a task's icon in the list** to change it without opening the editor. Icons even **travel inside JSON exports**, re-materializing on another device. The picker's font, spacing, indent, and folder-box look are all tunable under *UI customization → Shortcut picker*.
@@ -77,13 +80,13 @@ A profile is active while **all** its contexts match. Seven families:
 
 ---
 
-## Actions — **124 built-in** (＋ engine flow control)
+## Actions — **129 built-in** (＋ engine flow control)
 
 > Bold = added or materially extended in this fork.
 
 **App (16)** — **Send Intent** · **Launch Intent** · Launch App · **Freeze App** · **Unfreeze App** · **Make Launcher Tasks** · Kill App · Go Home · Next App · Previous App · Open URL · Send SMS · Call · Compose Email · List Apps · Take Screenshot
 
-**System (18)** — **Turn Screen Off** · **Wake Device** · **Run Shell** (Shizuku) · **Show Scene** · **Hide Scene** · **Set Widget** · **Refresh Widgets** · Flash · Vibrate · Reboot Device · Lock Device · Set / Get Clipboard · Set Wallpaper · Set / Pick Keyboard · Profile Status · Log Message
+**System (23)** — **Turn Screen Off** · **Wake Device** · **Run Shell** (Shizuku) · **Show Scene** · **Hide Scene** · **Set Widget** · **Refresh Widgets** · **Flash Bubble Add / Remove / Clear** · **Flash Kill Icon Show / Hide** · Flash · Vibrate · Reboot Device · Lock Device · Set / Get Clipboard · Set Wallpaper · Set / Pick Keyboard · Profile Status · Log Message
 
 **Settings (18)** — Toggle WiFi · Toggle Bluetooth · Toggle Mobile Data · Toggle Airplane Mode · Toggle Torch · Set / Auto Brightness · Set Volume · Get Volume · Set Ringer Mode · Set Do Not Disturb · Set Screen Timeout · Location Mode · Set Tile State · **Get Device State** (battery / charging-plugged / WiFi / airplane → vars) · Get / Put Setting · WiFi Settings
 
