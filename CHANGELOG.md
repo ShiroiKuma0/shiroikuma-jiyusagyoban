@@ -3,6 +3,46 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.76+5 — 2026-07-22
+
+The flash-bubble release: 通知明滅 gets a semi-凍結融解 icon layer — while an app's notification
+is edge-flashing, its icon shows down the Desktop's LEFT edge (the mirror of the freeze bubbles on
+the right), with a single kill-all 全消灯 icon pinned below the stack. Tap and long-tap behaviors
+are UI-settable.
+
+### Flash bubbles — left-edge Desktop icons for flashing apps
+- `FlashBubbleStore` + `FlashBubbleOverlayManager` (`core/bubbles/`): one draggable
+  `TYPE_APPLICATION_OVERLAY` window per flashing app — its launcher icon + ⚡ badge + label —
+  anchored **top+left** and shown **only while the default home launcher (雷起動盤) is
+  foreground**, exactly like the freeze bubbles (which stay on the right; the stacks never mix).
+  Styling (icon size / corner / label size / weight / font) is shared with the existing Freeze
+  bubbles settings. Positions persist across restarts, rotation, and fold changes.
+- **Kill-all icon**: while flashing is ongoing, a single 全消灯 bubble (the app's own icon + ✕
+  badge) sits below the lowest app bubble; each newly flashing app inserts above it and pushes it
+  back to the bottom. Tap = run the kill-all task (same function as tapping the flash-ongoing
+  notification) and hide itself — **the per-app icons deliberately stay**; long-tap = hide it
+  without killing anything; drag to move.
+- **UI-settable gestures** (Settings → UI customization → *Flash bubbles (通知明滅)*): tap and
+  long-tap each pick from *Open app + kill flash* / *Kill flash only* / *Open app only* /
+  *Dismiss icon only* (defaults: tap = open + kill, long-tap = kill without opening). The
+  per-app kill task (default `通知明滅消灯`) and kill-all task (default `通知明滅全消灯`) are
+  also settable, so the layer stays generic. "Kill flash" runs the kill task with the bubble's
+  package injected as the **per-invocation `%APP_PACKAGE`** (the event-locals mechanism), so the
+  same workspace task serves the foreground profile and a bubble gesture — including dismissing
+  the app's notification and dropping the ongoing notification when it was the last flasher.
+- Five new bridge actions (System category) — the workspace's handle on the layer, since the
+  flashing state lives in workspace variables the app can't see: `bubble.flash_add` (package +
+  optional label; dedup, stacks below, pushes the kill icon down), `bubble.flash_remove`,
+  `bubble.flash_clear` (bubbles + kill icon — the 無効 path), `bubble.flashkill_show`,
+  `bubble.flashkill_hide`. Registered in the sensitivity catalog (local-only) and capability
+  map (overlay-permission notes on the two showing actions).
+
+### 通知明滅 workspace wiring (bundle)
+- `通知明滅点灯` adds the app's bubble + shows the kill-all icon right before the ongoing
+  notification; `通知明滅消灯` removes that app's bubble and hides the kill-all icon when the
+  last flash dies; `通知明滅全消灯` hides only the kill-all icon (app icons stay, per spec);
+  `通知明滅 ⇨ 無効 [37]` clears the whole layer. Task notes document the icon behavior.
+
 ## 0.2.76+4 — 2026-07-20
 
 The hands-off-reload release: the adb bridge can now RUN a task, so the dev loop fires a
