@@ -22,6 +22,11 @@ import com.opentasker.core.actions.DownloadAction
 import com.opentasker.core.actions.GoHomeAction
 import com.opentasker.core.actions.HttpGetAction
 import com.opentasker.core.actions.HttpPostAction
+import com.opentasker.core.actions.FlashBubbleAddAction
+import com.opentasker.core.actions.FlashBubbleClearAction
+import com.opentasker.core.actions.FlashBubbleRemoveAction
+import com.opentasker.core.actions.FlashKillIconHideAction
+import com.opentasker.core.actions.FlashKillIconShowAction
 import com.opentasker.core.actions.FreezeAppAction
 import com.opentasker.core.actions.KillAppAction
 import com.opentasker.core.actions.UnfreezeAppAction
@@ -180,6 +185,11 @@ private fun registerBuiltInActions() {
         KillAppAction(),
         FreezeAppAction(),
         UnfreezeAppAction(),
+        FlashBubbleAddAction(),
+        FlashBubbleRemoveAction(),
+        FlashBubbleClearAction(),
+        FlashKillIconShowAction(),
+        FlashKillIconHideAction(),
         MakeLauncherTasksAction(),
         EditActionAction(),
         GoHomeAction(),
