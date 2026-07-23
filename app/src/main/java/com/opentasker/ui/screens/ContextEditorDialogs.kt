@@ -56,6 +56,7 @@ import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.ui.theme.DesignSystem
+import com.opentasker.ui.theme.selectedContainerColor
 
 @Composable
 internal fun ContextTypePickerDialog(onDismiss: () -> Unit, onSelect: (ContextType) -> Unit) {
@@ -404,7 +405,7 @@ internal fun DayPresetButton(
         onClick = onClick,
         modifier = modifier.heightIn(min = 48.dp),
         colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f) else Color.Transparent,
+            containerColor = if (selected) selectedContainerColor() else Color.Transparent,
             contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
         ),
         border = BorderStroke(

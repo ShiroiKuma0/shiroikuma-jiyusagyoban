@@ -59,6 +59,7 @@ import com.opentasker.core.engine.RunLogOutcome
 import com.opentasker.core.engine.RunLogSource
 import com.opentasker.core.engine.RunLogTemplateDiagnostic
 import com.opentasker.ui.theme.DesignSystem
+import com.opentasker.ui.theme.selectedContainerColor
 import com.opentasker.core.engine.outcome
 import com.opentasker.core.engine.toRunLogDiagnostics
 import com.opentasker.core.model.RunLogEntry
@@ -332,7 +333,7 @@ private fun RunLogFilterChip(
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = if (selected) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
+                selectedContainerColor()
             } else {
                 Color.Transparent
             },

@@ -67,6 +67,7 @@ import com.opentasker.core.templates.ProfileTemplate
 import com.opentasker.core.templates.ProfileTemplateCatalog
 import com.opentasker.core.templates.TemplateAvailability
 import com.opentasker.ui.theme.DesignSystem
+import com.opentasker.ui.theme.selectedContainerColor
 
 @Composable
 internal fun TemplatePickerDialog(
@@ -391,7 +392,7 @@ internal fun SelectableOption(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(DesignSystem.Radii.lg),
         colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.36f) else Color.Transparent,
+            containerColor = if (selected) selectedContainerColor() else Color.Transparent,
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         border = BorderStroke(

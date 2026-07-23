@@ -10,6 +10,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -209,3 +210,14 @@ fun OpenTaskerTheme(
         content = content,
     )
 }
+
+/**
+ * Opaque selected-state fill for chips and rows. The container tint is composited over the surface so
+ * a selection reads as a distinct, solid fill in both the AMOLED and light themes, instead of the
+ * alpha-on-alpha wash that left selected chips distinguishable only by their border.
+ */
+@Composable
+fun selectedContainerColor(): Color =
+    MaterialTheme.colorScheme.primary
+        .copy(alpha = 0.42f)
+        .compositeOver(MaterialTheme.colorScheme.surface)

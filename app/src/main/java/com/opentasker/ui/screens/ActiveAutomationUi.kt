@@ -94,6 +94,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.opentasker.ui.theme.DesignSystem
+import com.opentasker.ui.theme.selectedContainerColor
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -981,7 +982,7 @@ private fun OpenTaskerNavigationItem(
         verticalArrangement = Arrangement.Center,
     ) {
         Surface(
-            color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.46f) else Color.Transparent,
+            color = if (selected) selectedContainerColor() else Color.Transparent,
             shape = RoundedCornerShape(6.dp),
             border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)) else null,
         ) {
