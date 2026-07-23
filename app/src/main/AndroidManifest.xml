@@ -198,6 +198,7 @@
         <receiver
             android:name="com.opentasker.core.external.AutomationTargetReceiver"
             android:exported="true"
+            android:intentMatchingFlags="enforceIntentFilter"
             android:permission="com.opentasker.permission.AUTOMATION">
             <intent-filter>
                 <action android:name="com.opentasker.action.RUN_TASK" />
@@ -219,7 +220,8 @@
 
         <receiver
             android:name="com.opentasker.core.plugins.locale.LocaleSettingFireReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:intentMatchingFlags="enforceIntentFilter">
             <intent-filter>
                 <action android:name="com.twofortyfouram.locale.intent.action.FIRE_SETTING" />
             </intent-filter>

@@ -97,6 +97,13 @@ class OpenTaskerApp_NoHilt : Application() {
             StrictMode.VmPolicy.Builder()
                 .detectLeakedClosableObjects()
                 .detectLeakedRegistrationObjects()
+                .apply {
+                    // Flags unsafe intent launches (the classic intent-redirection sink) in debug;
+                    // available from Android 12 (API 31).
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                        detectUnsafeIntentLaunch()
+                    }
+                }
                 .penaltyLog()
                 .build(),
         )
