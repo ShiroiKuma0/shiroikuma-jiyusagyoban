@@ -3,6 +3,35 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.76+31 — 2026-07-23
+
+A 通知明滅 alert-quality pair: the notification tone and the vibration now fire **together** (like a
+normal phone message alert), and Jami's internal auto-recovery notifications are silenced by their
+notification **channel** — display only, no tone, no vibration, no edge light.
+
+### `sound.play` — background playback (`wait=false`)
+- New `wait` arg on `sound.play`: `true` (default) keeps the old behavior — the task blocks until
+  playback finishes; **`false` starts playback and returns immediately**, the player releasing itself
+  on completion/error. Exposed in the action editor as a dropdown.
+- Why: 通知明滅点灯 played the Jami substitute tone to the **end** before reaching its vibrate
+  action — tone-then-buzz instead of the phone's simultaneous tone+buzz. With `wait=false` the tone,
+  the `%Tsuchi_Vib_Pattern` vibration, and the edge light all start together.
+
+### `%NOTIF_CHANNEL` — the notification event exposes the channel id
+- The notification trigger now threads the posting app's **notification-channel id** to the enter
+  task as `%NOTIF_CHANNEL` (per-invocation, alongside `%NOTIF_PACKAGE`/`%NOTIF_TITLE`/…, and as
+  `channel` in the event metadata) — the locale-proof way to tell an app's housekeeping channels
+  from its real message/call channels.
+
+### 通知明滅 workspace wiring (bundle `通知明滅点灯-v2`)
+- 通知明滅点灯 plays the Jami tone with `wait=false` (simultaneous tone + vibration + edge light).
+- The Jami watchdog filter now stops on `%NOTIF_PACKAGE == shiroikuma.jami &&
+  %NOTIF_CHANNEL == shiroikuma_watchdog` — covering **all** the connection watchdog's notifications
+  (auto-recoveries, error storms, network warnings) in every locale — with the old exact-title match
+  (「白い熊 Jami 自動回復」) kept as fallback. These notifications keep their shade entry but get no
+  tone, vibration, or edge light. (The watchdog channel's own system-default sound is silenced
+  device-side: 通知明滅 ⇨ Jami 消音 opens Jami's notification settings to mute the 自動回復 channel.)
+
 ## 0.2.76+30 — 2026-07-23
 
 Two headline features since +5 — per-app share-sheet tiles (each its own on-device-generated relay
