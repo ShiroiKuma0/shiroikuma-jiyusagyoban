@@ -50,6 +50,7 @@ class NotificationTriggerService : NotificationListenerService() {
             body = body,
             ongoing = sbn.isOngoing,
             isProtected = isProtected,
+            channel = sbn.notification.channelId.orEmpty(),
         )
         AppLogger.debug(
             TAG,

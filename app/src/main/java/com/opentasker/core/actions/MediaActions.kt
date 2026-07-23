@@ -24,6 +24,9 @@ import com.opentasker.core.platform.AudioUsageEligibility
  *     sound rides. notification/ring/system follow the ringer mode, so the system-bar
  *     vibrate/silent tile mutes them (白い熊: 通知明滅 tones must respect quiet mode); media and
  *     alarm play regardless.
+ *   - "wait": true (default) blocks the task until playback finishes; false starts playback and
+ *     returns immediately so the next actions (vibration, overlays) run WHILE the sound plays —
+ *     a notification tone must buzz and sound simultaneously, not tone-then-buzz (白い熊: 通知明滅).
  */
 class PlaySoundAction : Action {
     override val id = "sound.play"
@@ -57,6 +60,14 @@ class PlaySoundAction : Action {
         }
 
         ctx.logger("Play: $path")
+        val wait = args["wait"]?.trim()?.lowercase() != "false"
+        if (!wait) {
+            // Fire-and-forget: the player outlives the action and releases itself when done.
+            player.setOnCompletionListener { it.release() }
+            player.setOnErrorListener { mp, _, _ -> mp.release(); true }
+            player.start()
+            return ActionResult.Success
+        }
         return suspendCancellableCoroutine { cont ->
             player.setOnCompletionListener {
                 player.release()
