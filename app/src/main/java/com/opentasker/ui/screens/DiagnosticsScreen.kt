@@ -213,6 +213,10 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
                 stringResource(R.string.diagnostics_worker_stop),
                 health?.lastWorkerStopReason ?: stringResource(R.string.diagnostics_none),
             )
+            HealthRow(
+                stringResource(R.string.diagnostics_pending_jobs),
+                health?.pendingScheduledJobReasons ?: stringResource(R.string.diagnostics_pending_jobs_none),
+            )
         }
     }
 }

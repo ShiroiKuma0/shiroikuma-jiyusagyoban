@@ -26,6 +26,12 @@ data class EngineHealthStatus(
     val lastMatcherError: String?,
     val lastMatcherErrorAtMillis: Long,
     val lastWorkerStopReason: String?,
+    /**
+     * Plain-language reasons this app's scheduled jobs (WorkManager watchdog/prune) are still
+     * pending — e.g. "App standby, Connectivity". Null when nothing is blocked or the signal is
+     * unavailable (below Android 14). Answers the "why hasn't my scheduled automation fired" case.
+     */
+    val pendingScheduledJobReasons: String? = null,
 )
 
 object EngineHealthReader {
@@ -52,7 +58,65 @@ object EngineHealthReader {
             lastMatcherError = persisted.lastMatcherError?.let(DiagnosticExport::redactSensitive),
             lastMatcherErrorAtMillis = persisted.lastMatcherErrorAtMillis,
             lastWorkerStopReason = workerStopReason?.let(::workerStopReasonLabel),
+            pendingScheduledJobReasons = readPendingScheduledJobReasons(context),
         )
+    }
+
+    /**
+     * Reads why this app's currently-scheduled JobScheduler jobs (WorkManager runs its deferrable
+     * workers through JobScheduler) are still pending. Returns a comma-separated set of plain-language
+     * causes, or null when nothing meaningful is blocked or the API is unavailable. Android 14 (API
+     * 34) added `getPendingJobReason`; the whole read is wrapped so it fails closed on any device
+     * that reports differently rather than crashing the diagnostics screen.
+     */
+    private fun readPendingScheduledJobReasons(context: Context): String? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return null
+        return runCatching {
+            val scheduler = context.getSystemService(android.app.job.JobScheduler::class.java)
+                ?: return null
+            scheduler.allPendingJobs
+                .map { scheduler.getPendingJobReason(it.id) }
+                .filter(::isReportablePendingJobReason)
+                .map(::pendingJobReasonLabel)
+                .distinct()
+                .sorted()
+                .takeIf { it.isNotEmpty() }
+                ?.joinToString()
+        }.getOrNull()
+    }
+
+    /**
+     * Drops non-actionable reason codes: a job that is currently running, has no constraint holding
+     * it, or reports an undefined/optimization state is not something the user can act on. Pure so
+     * the filter is unit-testable.
+     */
+    internal fun isReportablePendingJobReason(reason: Int): Boolean = when (reason) {
+        android.app.job.JobScheduler.PENDING_JOB_REASON_UNDEFINED,
+        android.app.job.JobScheduler.PENDING_JOB_REASON_EXECUTING,
+        android.app.job.JobScheduler.PENDING_JOB_REASON_INVALID_JOB_ID,
+        android.app.job.JobScheduler.PENDING_JOB_REASON_JOB_SCHEDULER_OPTIMIZATION,
+        -> false
+        else -> true
+    }
+
+    /**
+     * Maps a `JobScheduler.PENDING_JOB_REASON_*` code to a plain-language cause. Constant values are
+     * inlined at compile time, so this is a pure Int→String mapping that is unit-testable on the JVM
+     * without a JobScheduler.
+     */
+    internal fun pendingJobReasonLabel(reason: Int): String = when (reason) {
+        android.app.job.JobScheduler.PENDING_JOB_REASON_APP_STANDBY -> "App standby bucket"
+        android.app.job.JobScheduler.PENDING_JOB_REASON_BACKGROUND_RESTRICTION -> "Background restricted"
+        android.app.job.JobScheduler.PENDING_JOB_REASON_CONSTRAINT_BATTERY_NOT_LOW -> "Battery low"
+        android.app.job.JobScheduler.PENDING_JOB_REASON_CONSTRAINT_CHARGING -> "Not charging"
+        android.app.job.JobScheduler.PENDING_JOB_REASON_CONSTRAINT_CONNECTIVITY -> "No connectivity"
+        android.app.job.JobScheduler.PENDING_JOB_REASON_CONSTRAINT_CONTENT_TRIGGER -> "Content trigger"
+        android.app.job.JobScheduler.PENDING_JOB_REASON_CONSTRAINT_DEVICE_IDLE -> "Device not idle"
+        android.app.job.JobScheduler.PENDING_JOB_REASON_CONSTRAINT_STORAGE_NOT_LOW -> "Storage low"
+        android.app.job.JobScheduler.PENDING_JOB_REASON_DEVICE_STATE -> "Device state (thermal/power)"
+        android.app.job.JobScheduler.PENDING_JOB_REASON_QUOTA -> "Out of run quota"
+        android.app.job.JobScheduler.PENDING_JOB_REASON_USER -> "User restriction"
+        else -> "Constraint $reason"
     }
 
     internal fun foregroundServiceTypeLabel(types: Int): String {

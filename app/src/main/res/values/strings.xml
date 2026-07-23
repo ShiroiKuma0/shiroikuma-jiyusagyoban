@@ -640,6 +640,8 @@
     <string name="diagnostics_exact_alarm">Time alarm delivery</string>
     <string name="diagnostics_matcher_error">Last matcher error</string>
     <string name="diagnostics_worker_stop">Watchdog stop reason</string>
+    <string name="diagnostics_pending_jobs">Scheduled jobs blocked by</string>
+    <string name="diagnostics_pending_jobs_none">Nothing blocking</string>
     <string name="diagnostics_never">Never</string>
     <string name="diagnostics_none">None recorded</string>
     <string name="diagnostics_loading">Loading…</string>
