@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2.78
 
 - **Diagnostics**: the engine-health panel now flags a throttled app-standby bucket (`RARE`/`RESTRICTED`) with an explicit warning pointing to the battery-optimization exemption, and the overall health indicator treats any throttled bucket (not just `RESTRICTED`) as unhealthy.
 - **Contexts**: Location conditions gain a "Match when outside" toggle for geofence-exit automations ("fire when NOT at a place"), with dwell measured outside the radius. Existing inside-only geofences are unchanged, and the FOSS evaluator, matcher, and dwell tracker all honor the mode through the shared evaluator.
