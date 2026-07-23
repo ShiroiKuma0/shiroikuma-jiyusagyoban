@@ -20,6 +20,12 @@ data class FossGeofenceSpec(
     val radiusMeters: Double,
     val maxAccuracyMeters: Double? = null,
     val dwellMillis: Long = 0L,
+    /**
+     * When true, the match region is *outside* the radius ("fire when NOT at a place"): the context
+     * matches while the device is beyond the radius, and dwell measures time spent outside. Defaults
+     * to inside so existing configs are unchanged.
+     */
+    val outside: Boolean = false,
 ) {
     init {
         require(radiusMeters >= 0.0) { "Radius must be non-negative." }
@@ -37,6 +43,7 @@ data class LocationSample(
 
 data class GeofenceEvaluation(
     val distanceMeters: Double,
+    /** True when the device is in the configured match region (inside the radius, or outside it in outside mode). */
     val withinRadius: Boolean,
     val accuracyAccepted: Boolean,
     val dwellSatisfied: Boolean,
@@ -60,8 +67,9 @@ object FossGeofenceEvaluator {
             spec.center.latitude,
             spec.center.longitude,
         )
-        val withinRadius = distance <= spec.radiusMeters
-        if (!withinRadius) {
+        // The match region is inside the radius normally, or outside it in outside mode.
+        val inMatchRegion = if (spec.outside) distance > spec.radiusMeters else distance <= spec.radiusMeters
+        if (!inMatchRegion) {
             return GeofenceEvaluation(
                 distanceMeters = distance,
                 withinRadius = false,
@@ -112,6 +120,7 @@ object FossGeofenceEvaluator {
             radiusMeters = radiusMeters,
             maxAccuracyMeters = first(config, "maxAccuracyMeters", "maxAccuracy").toDoubleOrNull()?.takeIf { it >= 0.0 },
             dwellMillis = parseDwellMillis(config),
+            outside = first(config, "outside", "inverted").equals("true", ignoreCase = true),
         )
         val sample = LocationSample(
             point = GeoPoint(currentLat, currentLon),

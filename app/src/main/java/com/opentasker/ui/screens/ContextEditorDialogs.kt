@@ -262,6 +262,7 @@ private fun contextFields(type: ContextType): List<ActionField> = when (type) {
         ActionField("radiusMeters", R.string.context_field_location_radius_label, FieldType.NUMBER, required = true, hintRes = R.string.context_field_location_radius_hint),
         ActionField("maxAccuracyMeters", R.string.context_field_location_accuracy_label, FieldType.NUMBER, hintRes = R.string.context_field_location_accuracy_hint),
         ActionField("dwellSeconds", R.string.context_field_location_dwell_label, FieldType.NUMBER, hintRes = R.string.context_field_location_dwell_hint),
+        ActionField("outside", R.string.context_field_location_outside_label, FieldType.CHECKBOX, hintRes = R.string.context_field_location_outside_hint),
     )
     ContextType.STATE -> listOf(
         ActionField("key", R.string.context_field_state_key_label, required = true, hintRes = R.string.context_field_state_key_hint),
