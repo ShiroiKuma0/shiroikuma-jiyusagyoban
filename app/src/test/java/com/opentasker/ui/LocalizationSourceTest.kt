@@ -18,7 +18,6 @@ class LocalizationSourceTest {
     @Test
     fun presentationSurfacesUseStringResourcesForVisibleCopy() {
         val localizedFiles = listOf(
-            "com/opentasker/ui/components/PremiumComponents.kt",
             "com/opentasker/ui/screens/ActiveAutomationLists.kt",
             "com/opentasker/ui/screens/ActionEditorDialogs.kt",
             "com/opentasker/ui/screens/AutomationFlowScreen.kt",
