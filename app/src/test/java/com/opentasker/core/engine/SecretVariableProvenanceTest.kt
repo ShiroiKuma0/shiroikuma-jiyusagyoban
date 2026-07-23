@@ -92,7 +92,7 @@ class SecretVariableProvenanceTest {
     }
 
     @Test
-    fun secretDerivedExceptionsDropMessageAndCause() = runBlocking {
+    fun secretDerivedFailuresRedactSecretValueButKeepErrorClass() = runBlocking {
         val actionId = "test.secret.failure"
         ActionRegistry.register(
             object : Action {
@@ -116,7 +116,11 @@ class SecretVariableProvenanceTest {
         )
 
         val failure = report.results.single() as ActionResult.Failure
-        assertEquals("Action failed; details redacted because an input depends on a secret", failure.message)
+        // The real error class survives so the failure is debuggable...
+        assertTrue(failure.message.contains("request failed for"))
+        assertTrue(failure.message.contains("<redacted>"))
+        // ...but the secret value itself never leaks into the message, cause, or run log.
+        assertFalse(failure.message.contains("secret-token"))
         assertNull(failure.cause)
         assertFalse(report.traces.toRunLogMessage().contains("secret-token"))
     }

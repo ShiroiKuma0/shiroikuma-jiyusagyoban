@@ -293,7 +293,13 @@ class TaskRunner(
             ActionResult.Failure("threw: ${e.message}", e)
         }
         val result = if (rawResult is ActionResult.Failure && expansionReport.hasSecretDerivedValues()) {
-            ActionResult.Failure(SECRET_DERIVED_FAILURE)
+            // Preserve the real error class/context for debuggability but scrub any secret-derived
+            // argument value the action echoed into its message; drop the cause because its message
+            // and stack could also embed the secret and a Throwable cannot be redacted in place.
+            // Only literal echoes of the raw argument are removed — a secret the action transformed
+            // (hashed/encoded/sliced) before failing is not detectable here, so the whole value is
+            // over-redacted rather than partially matched, which errs toward non-disclosure.
+            ActionResult.Failure(expansionReport.redactSecretDerivedValues(rawResult.message))
         } else {
             rawResult
         }
@@ -523,6 +529,25 @@ private data class ActionArgumentExpansionReport(
 
     fun hasSecretDerivedValues(): Boolean = expansions.any { it.isSecretDerived }
 
+    /**
+     * Removes the raw values of secret-derived arguments from [message]. The raw expanded values
+     * live in [args] (what the action actually received); the per-expansion trace already stores a
+     * redacted placeholder, so it cannot be used for scrubbing. Longest values are replaced first so
+     * a secret that contains a shorter secret as a substring is fully removed.
+     */
+    fun redactSecretDerivedValues(message: String): String {
+        val secretValues = expansions
+            .filter { it.isSecretDerived }
+            .mapNotNull { args[it.argName]?.takeIf(String::isNotBlank) }
+            .distinct()
+            .sortedByDescending { it.length }
+        var redacted = message
+        for (value in secretValues) {
+            redacted = redacted.replace(value, REDACTED_VALUE)
+        }
+        return redacted
+    }
+
     fun sensitiveArgumentNames(): Set<String> = expansions
         .filter { it.isSecretDerived }
         .mapTo(linkedSetOf()) { it.argName }
@@ -603,7 +628,6 @@ private val SENSITIVE_ARG_TOKENS = listOf(
 )
 private const val TEMPLATE_TRACE_PREFIX = "Template:"
 private const val REDACTED_VALUE = "<redacted>"
-private const val SECRET_DERIVED_FAILURE = "Action failed; details redacted because an input depends on a secret"
 private const val MAX_SUMMARY_ARGS = 4
 private const val MAX_SUMMARY_VALUE_LENGTH = 80
 private const val MAX_TEMPLATE_TRACE_LINES_PER_ACTION = 8
