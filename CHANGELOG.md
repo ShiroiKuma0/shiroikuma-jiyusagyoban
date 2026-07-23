@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Diagnostics**: the engine-health panel now flags a throttled app-standby bucket (`RARE`/`RESTRICTED`) with an explicit warning pointing to the battery-optimization exemption, and the overall health indicator treats any throttled bucket (not just `RESTRICTED`) as unhealthy.
+
 ## v0.2.77
 
 ### Roadmap drain (correctness, security, and consolidation)

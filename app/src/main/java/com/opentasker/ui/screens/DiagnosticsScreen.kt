@@ -50,7 +50,7 @@ fun DiagnosticsScreen(
 ) {
     val formatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
     val health = state.health
-    val healthy = health?.let { it.serviceRunning && it.standbyBucket != "Restricted" && it.lastMatcherError == null } == true
+    val healthy = health?.let { it.serviceRunning && !it.standbyThrottled && it.lastMatcherError == null } == true
 
     LazyColumn(
         modifier = Modifier
@@ -178,6 +178,13 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
                 stringResource(R.string.diagnostics_standby_bucket),
                 health?.standbyBucket ?: stringResource(R.string.diagnostics_loading),
             )
+            if (health?.standbyThrottled == true) {
+                Text(
+                    stringResource(R.string.diagnostics_standby_throttled),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
             HealthRow(
                 stringResource(R.string.diagnostics_exact_alarm),
                 health?.exactAlarmStatus ?: stringResource(R.string.diagnostics_loading),

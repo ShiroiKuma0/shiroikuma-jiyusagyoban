@@ -30,6 +30,7 @@ class DiagnosticsScreenTest {
                 lastHeartbeatAtMillis = 1_789_000_000_000L,
                 activeForegroundServiceTypes = "special use",
                 standbyBucket = "Active",
+                standbyThrottled = false,
                 exactAlarmStatus = "Exact allowed",
                 lastMatcherError = null,
                 lastMatcherErrorAtMillis = 0L,

@@ -632,6 +632,7 @@
     <string name="diagnostics_last_heartbeat">Last heartbeat</string>
     <string name="diagnostics_fgs_types">Foreground service types</string>
     <string name="diagnostics_standby_bucket">App standby bucket</string>
+    <string name="diagnostics_standby_throttled">This bucket throttles the per-minute trigger alarm and background workers, so time and polling triggers may fire late. Add OpenTasker to the battery-optimization exemption list in Setup to keep it responsive.</string>
     <string name="diagnostics_exact_alarm">Time alarm delivery</string>
     <string name="diagnostics_matcher_error">Last matcher error</string>
     <string name="diagnostics_worker_stop">Watchdog stop reason</string>

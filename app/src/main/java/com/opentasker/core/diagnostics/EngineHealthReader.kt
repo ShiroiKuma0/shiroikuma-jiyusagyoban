@@ -18,6 +18,8 @@ data class EngineHealthStatus(
     val lastHeartbeatAtMillis: Long,
     val activeForegroundServiceTypes: String,
     val standbyBucket: String,
+    /** True when the app-standby bucket (RARE/RESTRICTED) throttles the per-minute alarm/workers. */
+    val standbyThrottled: Boolean,
     val exactAlarmStatus: String,
     val lastMatcherError: String?,
     val lastMatcherErrorAtMillis: Long,
@@ -39,6 +41,7 @@ object EngineHealthReader {
             lastHeartbeatAtMillis = persisted.heartbeat.lastAliveAtMillis,
             activeForegroundServiceTypes = foregroundServiceTypeLabel(persisted.heartbeat.foregroundServiceTypes),
             standbyBucket = standbyBucketLabel(context),
+            standbyThrottled = standbyBucketThrottled(context),
             exactAlarmStatus = when (ExactAlarmSupport.schedulePrecision(context)) {
                 AlarmSchedulePrecision.Exact -> "Exact allowed"
                 AlarmSchedulePrecision.InexactFallback -> "Inexact Doze fallback"
@@ -83,4 +86,19 @@ object EngineHealthReader {
             else -> "Unknown"
         }
     }
+
+    private fun standbyBucketThrottled(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return false
+        val manager = context.getSystemService(UsageStatsManager::class.java) ?: return false
+        return isThrottledStandbyBucket(manager.appStandbyBucket)
+    }
+
+    /**
+     * RARE and RESTRICTED buckets throttle the per-minute alarm and deferrable workers, degrading
+     * trigger latency; ACTIVE/WORKING_SET/FREQUENT do not. Pure so bucket-to-warning mapping is
+     * unit-testable without a UsageStatsManager.
+     */
+    internal fun isThrottledStandbyBucket(bucket: Int): Boolean =
+        bucket == UsageStatsManager.STANDBY_BUCKET_RARE ||
+            bucket == UsageStatsManager.STANDBY_BUCKET_RESTRICTED
 }
