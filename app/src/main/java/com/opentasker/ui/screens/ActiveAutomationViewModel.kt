@@ -17,6 +17,7 @@ import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.Profile
+import com.opentasker.core.validation.InputValidation
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
@@ -320,20 +321,21 @@ class ActiveAutomationViewModel(
 
     fun createProfile(name: String, enabled: Boolean, enterTaskId: Long, cooldownSec: Int, automationMode: AutomationMode, group: String? = null) =
         launchWithMessage("Profile created") {
-            db.profileDao().insert(
-                Profile(
-                    name = name.trim(),
-                    enabled = enabled,
-                    enterTaskId = enterTaskId,
-                    cooldownSec = cooldownSec.coerceAtLeast(0),
-                    automationMode = automationMode,
-                    group = group,
-                ).toEntity()
+            val profile = Profile(
+                name = name.trim(),
+                enabled = enabled,
+                enterTaskId = enterTaskId,
+                cooldownSec = cooldownSec.coerceAtLeast(0),
+                automationMode = automationMode,
+                group = group,
             )
+            requireValidProfileFieldLimits(profile)
+            db.profileDao().insert(profile.toEntity())
         }
 
     fun updateProfile(profile: Profile, message: String = "Profile updated") =
         launchWithMessage(message) {
+            requireValidProfileFieldLimits(profile)
             // Atomic read-check-snapshot-update, matching updateScene, so racing writers
             // (dialog save vs. notification/external-intent path) can't lose a revision.
             db.withTransaction {
@@ -693,6 +695,19 @@ class ActiveAutomationViewModel(
             runCatching { variableRepository.delete(name) }
                 .onSuccess { events.send(successMessage) }
                 .onFailure { events.send("Error: ${it.message ?: "Variable could not be deleted"}") }
+        }
+    }
+
+    /**
+     * Rejects a profile whose per-field limits (name length, cooldown range) are out of bounds
+     * before it is written. Structural completeness (enter task, contexts) is intentionally not
+     * gated here so incremental editing can save partial profiles; the engine no-ops on those.
+     */
+    private fun requireValidProfileFieldLimits(profile: Profile) {
+        val violation = InputValidation.validateProfile(profile)
+            .firstOrNull { it.field == "name" || it.field == "cooldownSec" }
+        if (violation != null) {
+            throw IllegalArgumentException(violation.message)
         }
     }
 

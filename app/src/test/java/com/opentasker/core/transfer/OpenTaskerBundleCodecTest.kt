@@ -8,6 +8,7 @@ import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
+import com.opentasker.core.validation.InputValidation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -163,6 +164,62 @@ class OpenTaskerBundleCodecTest {
         assertTrue(plan.warnings.any { it.contains("unsupported actions") })
         assertTrue(plan.lossyWarnings.any { it.contains("missing enter task") })
         assertTrue(plan.lossyWarnings.any { it.contains("missing exit task") })
+    }
+
+    @Test
+    fun validateBlocksTasksThatViolateFieldLimits() {
+        val plan = OpenTaskerBundleCodec.validate(
+            OpenTaskerBundle(
+                appVersion = "0.2.76",
+                exportedAtEpochMs = 123L,
+                tasks = listOf(
+                    Task(id = 1, name = "Empty", actions = emptyList()),
+                    Task(id = 2, name = "x".repeat(InputValidation.MAX_NAME_LENGTH + 1), actions = listOf(ActionSpec(type = "log"))),
+                ),
+            ),
+        )
+
+        assertFalse(plan.canImport)
+        assertTrue(plan.warnings.any { it.startsWith("Invalid task 'Empty'") && it.contains("at least one action") })
+        assertTrue(plan.warnings.any { it.startsWith("Invalid task") && it.contains("exceeds") })
+    }
+
+    @Test
+    fun validateBlocksBlankActionTypes() {
+        val plan = OpenTaskerBundleCodec.validate(
+            OpenTaskerBundle(
+                appVersion = "0.2.76",
+                exportedAtEpochMs = 123L,
+                tasks = listOf(Task(id = 1, name = "Blank", actions = listOf(ActionSpec(type = "   ")))),
+            ),
+        )
+
+        assertFalse(plan.canImport)
+        assertTrue(plan.warnings.any { it.startsWith("Invalid action") && it.contains("cannot be empty") })
+    }
+
+    @Test
+    fun validateBlocksProfileNameAndCooldownFieldLimits() {
+        val plan = OpenTaskerBundleCodec.validate(
+            OpenTaskerBundle(
+                appVersion = "0.2.76",
+                exportedAtEpochMs = 123L,
+                tasks = listOf(Task(id = 1, name = "T", actions = listOf(ActionSpec(type = "log")))),
+                profiles = listOf(
+                    Profile(
+                        id = 1,
+                        name = "y".repeat(InputValidation.MAX_NAME_LENGTH + 1),
+                        enterTaskId = 1,
+                        cooldownSec = InputValidation.MAX_COOLDOWN_SEC + 1,
+                        contexts = listOf(ContextSpec(ContextType.TIME)),
+                    ),
+                ),
+            ),
+        )
+
+        assertFalse(plan.canImport)
+        assertTrue(plan.warnings.any { it.startsWith("Invalid profile") && it.contains("name") })
+        assertTrue(plan.warnings.any { it.startsWith("Invalid profile") && it.contains("Cooldown") })
     }
 
     @Test

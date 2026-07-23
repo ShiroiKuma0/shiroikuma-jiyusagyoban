@@ -14,6 +14,7 @@ import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.VariableRepository
 import com.opentasker.core.storage.toEntity
+import com.opentasker.core.validation.InputValidation
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromString
@@ -256,6 +257,28 @@ object OpenTaskerBundleCodec {
             warnings += "Bundle contains unsupported actions: ${unsupportedActions.joinToString { "${it.first}:${it.second}" }}."
         }
 
+        // Enforce per-field integrity limits at the import boundary so malformed exports (name
+        // length, task priority range, blank action type, empty action lists) fail closed instead
+        // of writing invalid rows. Profile structural wiring (enter task / contexts) is validated
+        // contextually above and during import remapping, so only field limits are gated here.
+        bundle.tasks.forEach { task ->
+            InputValidation.validateTask(task).forEach { error ->
+                warnings += "Invalid task '${task.name}' (${error.field}): ${error.message}."
+            }
+            task.actions.forEach { action ->
+                InputValidation.validateAction(action).forEach { error ->
+                    warnings += "Invalid action '${action.type}' in task '${task.name}' (${error.field}): ${error.message}."
+                }
+            }
+        }
+        bundle.profiles.forEach { profile ->
+            InputValidation.validateProfile(profile)
+                .filter { it.field == "name" || it.field == "cooldownSec" }
+                .forEach { error ->
+                    warnings += "Invalid profile '${profile.name}' (${error.field}): ${error.message}."
+                }
+        }
+
         return BundleImportPlan(
             canImport = warnings.none { warning -> warning.isBlockingImportWarning() },
             warnings = warnings,
@@ -270,7 +293,10 @@ object OpenTaskerBundleCodec {
             startsWith("Bundle has duplicate task ids") ||
             startsWith("Bundle has duplicate variable names") ||
             startsWith("Bundle contains unknown unclassified actions") ||
-            startsWith("Import budget exceeded")
+            startsWith("Import budget exceeded") ||
+            startsWith("Invalid task ") ||
+            startsWith("Invalid action ") ||
+            startsWith("Invalid profile ")
 
     private fun duplicateLongs(values: List<Long>): List<Long> =
         values.groupingBy { it }
