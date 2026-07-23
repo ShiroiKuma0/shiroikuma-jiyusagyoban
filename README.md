@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.76+5`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.76+30`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 </div>
 
@@ -15,7 +15,7 @@
 
 It is a native **Kotlin + Jetpack Compose** automation engine — profiles bind **triggers** to **tasks**, tasks run **actions**, all persisted in Room, no Hilt, no native code. Built on OpenTasker and extended into a markedly more capable tool than OpenTasker — and, in everyday use, than Tasker itself. It installs **side-by-side** with upstream (application id `shiroikuma.jiyusagyoban`), so both can coexist.
 
-> A fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions: a generic **Send Intent** action, cross-app **protected contacts** (content-free notifications for private senders), a screen-off **notification wakedance**, **app freeze/unfreeze + launcher-task generation**, a fully app-driven **kanji clock**, **projects + foldable groups + scoped variables**, full **drag-to-reorder** (tasks, projects, project-tabs), a **Review Import** workflow, a **capability-aware action editor**, **home-screen task shortcuts with custom icons**, **Desktop re-freeze bubbles**, home-screen **widgets + a template library**, **living scene overlays** (a charging fire on the battery line, a **natively-rendered, music-reactive, tempo-locked** music edge-light — all screen-off gated), a headless **adb automation bridge** (workspace export/import broadcasts), sub-minute triggers, and a black-and-yellow theme.
+> A fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions: a generic **Send Intent** action, cross-app **protected contacts** (content-free notifications for private senders), a screen-off **notification wakedance**, **app freeze/unfreeze + launcher-task generation**, a fully app-driven **kanji clock**, **projects + foldable groups + scoped variables**, full **drag-to-reorder** (tasks, projects, project-tabs), a **Review Import** workflow, a **capability-aware action editor**, **home-screen task shortcuts with custom icons**, **Desktop re-freeze bubbles**, home-screen **widgets + a template library**, **living scene overlays** (a charging fire on the battery line, a **natively-rendered, music-reactive, tempo-locked** music edge-light — all screen-off gated), **per-app share-sheet tiles** (each generated as its own signed relay APK, on-device), a **backup-guarded system language switch**, a headless **adb automation bridge** (workspace export/import broadcasts), sub-minute triggers, and a black-and-yellow theme.
 
 ---
 
@@ -57,6 +57,12 @@ Scene overlays that are genuinely alive, and free when you can't see them. The *
 ### 🎵 白い熊 音楽 — the music-player pairing
 The `音楽端灯` project pairs the workspace with the **白い熊 音楽** player (`shiroikuma.ongaku`, the Felicity fork) through a clean two-way contract: the player broadcasts **play-state and track changes** (title, artist, path, favorite) into `%INTENT_*` variables, and overlay **良 / 削除 buttons** — shown only while the player is foreground and playing — fire its **token-gated automation intents**: toggle-favorite, and a **confirmed delete** (song title + artist in the dialog) that lets the player itself skip, SAF-delete the file, and clean its library. Named **play-playlist tasks** (start playlist X, optionally at track Y) work from home-screen shortcuts. The audio-reactive **edge meteors that used to live here now render natively inside 白い熊 音楽** — beat-locked from the player's own decoder tap (sample-accurate, works under Android Auto and Bluetooth offload) — so this app no longer holds an audio `Visualizer` at all, and playback audio offload is never blocked.
 
+### 🧩 共有アプリ工房 — per-app share-sheet tiles
+EMUI's share sheet renders **one tile per package**, so every share entry point this app exposed collapsed under its single tile. The workaround: give each share target **its own installed package** — a tiny **relay APK generated, signed, and installed entirely on the phone**, no PC rebuild. A fixed relay stub (dex + `resources.arsc` + a binary-manifest template in assets) is specialised per target by rebuilding the manifest string pool, swapping the icon, and assembling a hand-rolled aligned zip, then **apksig-signed with an on-device software key** and installed over a Shizuku streaming session. The relay forwards the share to the app, which **unfreezes the target**, hands off the content, and drops a re-freeze bubble. Manage targets in **共有アプリ工房** (add a frozen-inclusive app, set its tile name + icon, Generate / Reinstall / Remove); icons can come from another app's activity icons, an **installed icon pack**, or curated framework drawables.
+
+### 🌐 System language switch — backup-guarded
+A one-tap **ja ⇄ en system-locale toggle** (root-less, via `CHANGE_CONFIGURATION` + hidden `updatePersistentConfiguration`) that **reorders** the locale list so every other installed language survives — a naive replace once dropped English. Because a locale change on EMUI once **recreated `contacts2.db` empty and wiped every contact**, the switch is **guarded**: it first backs up all contacts via the sister app `白い熊 連絡先` and proceeds **only** if it gets an `OK:` back — otherwise it buzzes, shows a modal, and refuses to switch. The verify round-trip uses a new **`reply_via=receiver`** Send Intent mode: a **binder-free cross-app reply channel** (plain string extras out, a correlated reply broadcast back to an exported receiver) that works where EMUI drops broadcasts carrying a live `ResultReceiver`/`PendingIntent`. On-tap it shows an immediate flash and a persistent "backing up…" notification through the wait.
+
 ### 📊 Monitor, widgets & theme
 A **Monitor** tab aggregates engine task-activity and widget pulls. A styled-bitmap **home-screen widget engine** with a visual layout editor (Tasker Widget V2 import) and a **named-template library**. A black-and-yellow **AMOLED theme** + a UI-customization page, unified JSON import/export, multi-select, and an in-app Help/Docs tab.
 
@@ -80,15 +86,15 @@ A profile is active while **all** its contexts match. Seven families:
 
 ---
 
-## Actions — **129 built-in** (＋ engine flow control)
+## Actions — **132 built-in** (＋ engine flow control)
 
 > Bold = added or materially extended in this fork.
 
-**App (16)** — **Send Intent** · **Launch Intent** · Launch App · **Freeze App** · **Unfreeze App** · **Make Launcher Tasks** · Kill App · Go Home · Next App · Previous App · Open URL · Send SMS · Call · Compose Email · List Apps · Take Screenshot
+**App (17)** — **Send Intent** *(＋ `reply_via=receiver` binder-free reply channel)* · **Launch Intent** · Launch App · **Freeze App** · **Unfreeze App** · **Make Launcher Tasks** · **Generate Share Relays** · Kill App · Go Home · Next App · Previous App · Open URL · Send SMS · Call · Compose Email · List Apps · Take Screenshot
 
 **System (23)** — **Turn Screen Off** · **Wake Device** · **Run Shell** (Shizuku) · **Show Scene** · **Hide Scene** · **Set Widget** · **Refresh Widgets** · **Flash Bubble Add / Remove / Clear** · **Flash Kill Icon Show / Hide** · Flash · Vibrate · Reboot Device · Lock Device · Set / Get Clipboard · Set Wallpaper · Set / Pick Keyboard · Profile Status · Log Message
 
-**Settings (18)** — Toggle WiFi · Toggle Bluetooth · Toggle Mobile Data · Toggle Airplane Mode · Toggle Torch · Set / Auto Brightness · Set Volume · Get Volume · Set Ringer Mode · Set Do Not Disturb · Set Screen Timeout · Location Mode · Set Tile State · **Get Device State** (battery / charging-plugged / WiFi / airplane → vars) · Get / Put Setting · WiFi Settings
+**Settings (20)** — Toggle WiFi · Toggle Bluetooth · Toggle Mobile Data · Toggle Airplane Mode · Toggle Torch · Set / Auto Brightness · Set Volume · Get Volume · Set Ringer Mode · Set Do Not Disturb · Set Screen Timeout · Location Mode · Set Tile State · **Get Locale** · **Set Locale** *(reorders the list — keeps other languages)* · **Get Device State** (battery / charging-plugged / WiFi / airplane → vars) · Get / Put Setting · WiFi Settings
 
 **Variable (24)** — Set Variable · **Persist Variable** · Variable Clear · **Variable Split** · Variable Join · Variable Add · Variable Convert · Variable Search Replace · Parse/Format DateTime · Read Data *(JSON/CSV/XML → vars, path selectors)* · Format / Parse / Add Date-Time · Match / Replace / Split / Join / Substring Text *(linear-time RE2 regex)* · Array Set / Push / Pop / Clear / Process · Arrays Merge
 
