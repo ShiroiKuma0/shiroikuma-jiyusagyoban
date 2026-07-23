@@ -1,8 +1,10 @@
 package com.opentasker.core.actions
 
+import com.opentasker.core.engine.ActionResult
 import java.net.InetAddress
 import java.net.URL
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -47,5 +49,23 @@ class PrivateAddressPolicyTest {
         assertTrue(urlTargetsLocalNetwork(URL("https://[fd00::1]/api")))
         assertFalse(urlTargetsLocalNetwork(URL("http://8.8.8.8/")))
         assertFalse(urlTargetsLocalNetwork(URL("ftp://192.168.1.5/")))
+    }
+
+    @Test
+    fun localNetworkPermissionIsNotEnforcedBelowApi37() {
+        assertNull(localNetworkPermissionDenial(sdkInt = 36, granted = false))
+        assertNull(localNetworkPermissionDenial(sdkInt = 34, granted = false))
+    }
+
+    @Test
+    fun localNetworkPermissionGrantedProceedsOnApi37Plus() {
+        assertNull(localNetworkPermissionDenial(sdkInt = 37, granted = true))
+    }
+
+    @Test
+    fun localNetworkPermissionDeniedOrRevokedFailsClosedOnApi37Plus() {
+        val denial = localNetworkPermissionDenial(sdkInt = 37, granted = false)
+        assertTrue(denial is ActionResult.Failure)
+        assertTrue((denial as ActionResult.Failure).message.contains("ACCESS_LOCAL_NETWORK"))
     }
 }

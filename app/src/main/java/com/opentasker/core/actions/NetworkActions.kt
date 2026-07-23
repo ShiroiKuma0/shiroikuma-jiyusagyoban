@@ -192,15 +192,24 @@ internal fun urlTargetsLocalNetwork(url: URL): Boolean {
     return addresses.any(::isPrivateOrLocalAddress)
 }
 
-internal fun checkLocalNetworkPermission(ctx: ActionContext): ActionResult? {
-    if (Build.VERSION.SDK_INT < ANDROID_17_API) return null
-    if (ContextCompat.checkSelfPermission(ctx.app, "android.permission.ACCESS_LOCAL_NETWORK")
-        != PackageManager.PERMISSION_GRANTED
-    ) {
-        return ActionResult.Failure(
-            "Android 17+ requires ACCESS_LOCAL_NETWORK permission for LAN communication; grant it in Setup"
-        )
-    }
-    return null
+internal fun checkLocalNetworkPermission(ctx: ActionContext): ActionResult? =
+    localNetworkPermissionDenial(
+        sdkInt = Build.VERSION.SDK_INT,
+        granted = ContextCompat.checkSelfPermission(ctx.app, "android.permission.ACCESS_LOCAL_NETWORK") ==
+            PackageManager.PERMISSION_GRANTED,
+    )
+
+/**
+ * Pure ACCESS_LOCAL_NETWORK policy. Below Android 17 (API 37) the permission is not enforced, so LAN
+ * actions proceed regardless. On API 37+ a missing grant (never granted or revoked) fails closed with
+ * a clear message; a granted permission proceeds. Kept pure so granted/denied/revoked mapping is
+ * unit-testable without a Context or a specific SDK level.
+ */
+internal fun localNetworkPermissionDenial(sdkInt: Int, granted: Boolean): ActionResult? {
+    if (sdkInt < ANDROID_17_API) return null
+    if (granted) return null
+    return ActionResult.Failure(
+        "Android 17+ requires ACCESS_LOCAL_NETWORK permission for LAN communication; grant it in Setup",
+    )
 }
 
