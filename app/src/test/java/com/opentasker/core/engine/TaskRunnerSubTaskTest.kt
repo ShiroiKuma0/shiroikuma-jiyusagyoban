@@ -69,6 +69,36 @@ class TaskRunnerSubTaskTest {
     }
 
     @Test
+    fun subTaskInputVariablesDoNotLeakIntoParentScope() = runBlocking {
+        registerRecorderAction("test.sub.recorder")
+        // The parent records whatever it currently sees for the sub-task input name `input`
+        // into a global AFTER the sub-task returns; a leak would surface the child's value.
+        ActionRegistry.register(object : Action {
+            override val id = "test.parent.capture"
+            override val category = ActionCategory.FLOW
+            override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+                ctx.variables.set("PARENT_SAW", ctx.variables.get("input").orEmpty())
+                return ActionResult.Success
+            }
+        })
+        val subTask = Task(name = "Echo", actions = listOf(ActionSpec(type = "test.sub.recorder", args = mapOf("key" to "SUB_RAN"))))
+        val variables = VariableStore()
+        val report = runner(variables) { ref -> subTask.takeIf { ref == "Echo" } }.run(
+            Task(
+                name = "Parent",
+                actions = listOf(
+                    ActionSpec(type = "task.run", args = mapOf("task" to "Echo", "input" to "child-only")),
+                    ActionSpec(type = "test.parent.capture"),
+                ),
+            ),
+        )
+        assertTrue(report.success)
+        assertEquals("true", variables.get("SUB_RAN"))
+        // The child's lowercase input must not survive into the parent's later actions.
+        assertEquals("", variables.get("PARENT_SAW"))
+    }
+
+    @Test
     fun failsWhenSubTaskNotFound() = runBlocking {
         val report = runner(VariableStore()) { null }.run(
             Task(name = "Parent", actions = listOf(ActionSpec(type = "task.run", args = mapOf("task" to "ghost")))),

@@ -322,15 +322,22 @@ class TaskRunner(
             ?: return fail("task.run requires a 'task' (id or name)")
         val target = resolver(ref) ?: return fail("sub-task not found: $ref")
 
-        // Pass any extra args as input variables; the shared store lets global outputs flow back.
-        args.forEach { (key, value) ->
-            if (key !in SUB_TASK_REF_KEYS) {
-                ctx.variables.set(key, value, sensitive = expansionReport.isArgumentSensitive(key))
-            }
-        }
-
+        // Pass any extra args as input variables scoped to the sub-task invocation: a dedicated
+        // scope wraps the child run so local (lowercase) inputs are visible to the child through the
+        // scope chain but are popped when it returns, never leaking into the parent's later actions.
+        // Global (uppercase) outputs still flow back through the shared global namespace.
         val child = TaskRunner(ctx, templateExpressionEngine, resolveTask, depth + 1)
-        val report = child.run(target)
+        ctx.variables.pushScope()
+        val report = try {
+            args.forEach { (key, value) ->
+                if (key !in SUB_TASK_REF_KEYS) {
+                    ctx.variables.set(key, value, sensitive = expansionReport.isArgumentSensitive(key))
+                }
+            }
+            child.run(target)
+        } finally {
+            ctx.variables.popScope()
+        }
         val result = if (report.success) {
             ActionResult.Success
         } else {
