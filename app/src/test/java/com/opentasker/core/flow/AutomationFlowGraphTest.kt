@@ -53,6 +53,29 @@ class AutomationFlowGraphTest {
     }
 
     @Test
+    fun subTaskActionsAreFlaggedStructurallyNotByDetailText() {
+        val enterTask = Task(
+            id = 20,
+            name = "Runner",
+            actions = listOf(
+                ActionSpec(type = "task.run", args = mapOf("task" to "Cleanup")),
+                ActionSpec(type = "notify.show", args = mapOf("title" to "Done")),
+            ),
+        )
+        val profile = Profile(
+            id = 3,
+            name = "Chain",
+            contexts = listOf(ContextSpec(ContextType.STATE, mapOf("wifiSsid" to "Home"))),
+            enterTaskId = enterTask.id,
+        )
+
+        val actions = AutomationFlowGraphBuilder.build(profile, listOf(enterTask)).actionNodesFor("enter-task:20")
+
+        assertTrue("task.run node must be flagged as a sub-task", actions[0].isSubTask)
+        assertTrue("non task.run node must not be flagged", !actions[1].isSubTask)
+    }
+
+    @Test
     fun buildReportsMissingTasksAndEmptyContexts() {
         val profile = Profile(
             id = 2,

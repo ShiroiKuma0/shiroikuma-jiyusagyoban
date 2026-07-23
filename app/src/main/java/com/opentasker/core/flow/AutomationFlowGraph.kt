@@ -59,6 +59,8 @@ data class AutomationFlowNode(
     val muted: Boolean = false,
     val target: AutomationFlowTarget? = null,
     val condition: String? = null,
+    /** Structural flag so the UI can badge sub-task nodes without parsing the localized detail. */
+    val isSubTask: Boolean = false,
 ) {
     fun accessibilityLabel(): String {
         val kindName = kind.name.lowercase().replace('_', ' ')
@@ -265,6 +267,7 @@ private fun ActionSpec.toNode(id: String, taskId: Long, index: Int): AutomationF
         ).joinToString(" - "),
         target = AutomationFlowTarget.Action(taskId, index),
         condition = condition?.trim()?.takeUnless { it.isBlank() },
+        isSubTask = subTaskRef != null,
     )
 }
 

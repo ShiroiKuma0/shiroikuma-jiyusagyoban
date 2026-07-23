@@ -333,23 +333,26 @@ private fun FlowCanvasOverview(
                 ),
         ) {
             Canvas(Modifier.fillMaxSize()) {
+                // Convert dp to px against the real density so connectors line up with the
+                // dp-laid-out lane label column (68.dp) at any density instead of only at 1x.
                 val laneHeight = size.height / lanes.size.coerceAtLeast(1)
-                val labelWidth = 72f
+                val labelWidth = 72.dp.toPx()
+                val trailingPadding = 16.dp.toPx()
                 for (laneIdx in 0 until lanes.size - 1) {
                     val fromY = laneHeight * laneIdx + laneHeight / 2
                     val toY = laneHeight * (laneIdx + 1) + laneHeight / 2
-                    val midX = labelWidth + 40f
-                    drawLine(edgeColor, Offset(midX, fromY), Offset(midX, toY), strokeWidth = 2f)
-                    drawCircle(edgeColor, 3f, Offset(midX, toY))
+                    val midX = labelWidth + 40.dp.toPx()
+                    drawLine(edgeColor, Offset(midX, fromY), Offset(midX, toY), strokeWidth = 2.dp.toPx())
+                    drawCircle(edgeColor, 3.dp.toPx(), Offset(midX, toY))
                 }
                 lanes.forEachIndexed { laneIdx, lane ->
                     val y = laneHeight * laneIdx + laneHeight / 2
-                    val nodeWidth = (size.width - labelWidth - 16f) / lane.nodes.size.coerceAtLeast(1)
+                    val nodeWidth = (size.width - labelWidth - trailingPadding) / lane.nodes.size.coerceAtLeast(1)
                     for (nodeIdx in 0 until lane.nodes.size - 1) {
                         val fromX = labelWidth + nodeWidth * nodeIdx + nodeWidth / 2
                         val toX = labelWidth + nodeWidth * (nodeIdx + 1) + nodeWidth / 2
-                        drawLine(edgeColor, Offset(fromX, y), Offset(toX, y), strokeWidth = 1.5f)
-                        drawCircle(edgeColor, 2.5f, Offset(toX, y))
+                        drawLine(edgeColor, Offset(fromX, y), Offset(toX, y), strokeWidth = 1.5.dp.toPx())
+                        drawCircle(edgeColor, 2.5.dp.toPx(), Offset(toX, y))
                     }
                 }
             }
@@ -509,7 +512,7 @@ private fun FlowNodeView(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (node.detail?.contains("sub-task") == true) {
+            if (node.isSubTask) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
