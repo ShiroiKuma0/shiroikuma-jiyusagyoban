@@ -1716,6 +1716,7 @@ fun registerActionMetadata() {
                 ActionField("path", "Sound file path", required = true),
                 ActionField("volume", "Volume (0-100)", FieldType.NUMBER, hint = "Optional; uses current volume when empty"),
                 ActionField("stream", "Stream", FieldType.DROPDOWN, hint = "media (default); notification/ring/system follow the ringer mode — vibrate/silent mutes them", options = listOf("media", "notification", "ring", "alarm", "system")),
+                ActionField("wait", "Wait for playback to finish", FieldType.DROPDOWN, hint = "true (default) blocks the task until the sound ends; false plays it in the background so vibration/overlays run at the same time", options = listOf("true", "false")),
             )
         )
     )
