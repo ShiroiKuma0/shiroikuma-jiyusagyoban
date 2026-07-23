@@ -2,6 +2,10 @@ package com.opentasker.core.actions
 
 import java.io.File
 import java.nio.file.FileSystems
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.OpenOption
+import java.nio.file.StandardOpenOption
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
@@ -26,7 +30,7 @@ class ReadFileAction : Action {
             if (file.length() > MAX_READ_BYTES) {
                 return ActionResult.Failure("file exceeds ${MAX_READ_BYTES / 1024 / 1024} MB read limit (${file.length()} bytes)")
             }
-            val content = file.readText()
+            val content = readNoFollow(file)
             ctx.variables.set(varName, content)
             ctx.logger("Read ${file.name} to \$$varName")
             ActionResult.Success
@@ -60,8 +64,8 @@ class WriteFileAction : Action {
             if (bytes > MAX_FILE_BYTES) {
                 return ActionResult.Failure("content exceeds ${MAX_FILE_BYTES / 1024 / 1024} MB write limit ($bytes bytes)")
             }
-            file.parentFile?.mkdirs()
-            file.writeText(text)
+            createSandboxDirs(ctx, file)
+            writeNoFollow(file, text, append = false)
             ctx.logger("Write ${file.name}")
             ActionResult.Success
         } catch (e: Exception) {
@@ -94,8 +98,8 @@ class AppendFileAction : Action {
             if (projectedSize > MAX_FILE_BYTES) {
                 return ActionResult.Failure("append would exceed ${MAX_FILE_BYTES / 1024 / 1024} MB file limit ($projectedSize bytes)")
             }
-            file.parentFile?.mkdirs()
-            file.appendText(text)
+            createSandboxDirs(ctx, file)
+            writeNoFollow(file, text, append = true)
             ctx.logger("Append to ${file.name}")
             ActionResult.Success
         } catch (e: Exception) {
@@ -182,12 +186,64 @@ private fun fileNameMatcher(pattern: String): java.nio.file.PathMatcher? {
 
 private fun safeUserFile(ctx: ActionContext, path: String, mustExist: Boolean = false): File? {
     if (path.isBlank() || path.contains('\u0000')) return null
-    val baseDir = File(ctx.app.filesDir, "user_files").canonicalFile
-    val requested = File(baseDir, path.trimStart('/', '\\')).canonicalFile
-    if (!requested.path.startsWith(baseDir.path + File.separator) && requested != baseDir) return null
-    if (mustExist && !requested.exists()) return null
-    return requested
+    return resolveSandboxTarget(File(ctx.app.filesDir, "user_files").canonicalFile, path, mustExist)
 }
+
+/**
+ * Resolves [path] against the sandbox [baseDir] and refuses anything that could escape it,
+ * including symlink-based TOCTOU escapes. The target is resolved lexically (NOT canonicalized) so a
+ * malicious symlink component is detected rather than transparently followed and hidden, then every
+ * existing component from the base down to the target is checked for symlinks. Callers must still
+ * open with no-follow semantics ([writeNoFollow]/[readNoFollow]) to close the residual check-to-open
+ * window.
+ */
+internal fun resolveSandboxTarget(baseDir: File, path: String, mustExist: Boolean = false): File? {
+    if (path.isBlank() || path.any { it.code < 0x20 }) return null
+    // Lexical normalization collapses "." / ".." without touching the filesystem, so an escape via
+    // "../.." is rejected here and a real symlink is left intact for the component scan below.
+    val normalized = File(baseDir, path.trimStart('/', '\\')).toPath().normalize().toFile()
+    if (normalized != baseDir && !normalized.path.startsWith(baseDir.path + File.separator)) return null
+    if (mustExist && !normalized.exists()) return null
+    if (containsSymlinkComponent(baseDir, normalized)) return null
+    return normalized
+}
+
+/** True if any existing path component between [baseDir] (exclusive) and [target] is a symlink. */
+private fun containsSymlinkComponent(baseDir: File, target: File): Boolean {
+    var current: File? = target
+    while (current != null && current != baseDir) {
+        if (current.exists() && Files.isSymbolicLink(current.toPath())) return true
+        current = current.parentFile
+    }
+    return false
+}
+
+/** Creates the sandboxed parent directories, then re-verifies no symlink component slipped in. */
+private fun createSandboxDirs(ctx: ActionContext, file: File) {
+    file.parentFile?.mkdirs()
+    val baseDir = File(ctx.app.filesDir, "user_files").canonicalFile
+    if (containsSymlinkComponent(baseDir, file)) {
+        throw java.io.IOException("path component became a symlink")
+    }
+}
+
+/** Writes [text] to [file] without following a symlink at the final component (O_NOFOLLOW). */
+private fun writeNoFollow(file: File, text: String, append: Boolean) {
+    val lastWriteMode: OpenOption =
+        if (append) StandardOpenOption.APPEND else StandardOpenOption.TRUNCATE_EXISTING
+    val options: Array<OpenOption> = arrayOf(
+        StandardOpenOption.CREATE,
+        StandardOpenOption.WRITE,
+        lastWriteMode,
+        LinkOption.NOFOLLOW_LINKS,
+    )
+    Files.newOutputStream(file.toPath(), *options).use { it.write(text.toByteArray(Charsets.UTF_8)) }
+}
+
+/** Reads [file] without following a symlink at the final component (O_NOFOLLOW). */
+private fun readNoFollow(file: File): String =
+    Files.newInputStream(file.toPath(), LinkOption.NOFOLLOW_LINKS)
+        .use { it.readBytes().toString(Charsets.UTF_8) }
 
 private fun Long?.orZero(): Long = this ?: 0L
 
