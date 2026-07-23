@@ -1,5 +1,6 @@
 package com.opentasker.core.scenes
 
+import com.opentasker.core.external.AutomationTargetContract
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
 import kotlin.math.roundToInt
@@ -59,6 +60,7 @@ data class SceneSliderConfig(
     val min: Int,
     val max: Int,
     val value: Int,
+    val variable: String,
 )
 
 object SceneElementConfigResolver {
@@ -75,6 +77,24 @@ object SceneElementConfigResolver {
             min = min,
             max = max,
             value = value,
+            variable = element.config["variable"].orEmpty(),
         )
     }
+}
+
+/**
+ * Maps a scene slider's live value onto the variable a bound task receives. A slider with a bound
+ * task fires [SceneElement.tapTaskId] when the user releases it, exposing the current progress as a
+ * variable so the task can act on it — otherwise the slider is display-only.
+ */
+object SceneSliderBinding {
+    const val DEFAULT_VARIABLE = "value"
+
+    /** The configured variable name if valid, else the [DEFAULT_VARIABLE] fallback. */
+    fun variableName(config: SceneSliderConfig): String =
+        config.variable.trim().takeIf(AutomationTargetContract::isValidVariableName) ?: DEFAULT_VARIABLE
+
+    /** Broadcast variable extras carrying [progress] under the slider's variable name. */
+    fun taskVariables(config: SceneSliderConfig, progress: Int): Map<String, String> =
+        mapOf(AutomationTargetContract.variableExtraName(variableName(config)) to progress.toString())
 }

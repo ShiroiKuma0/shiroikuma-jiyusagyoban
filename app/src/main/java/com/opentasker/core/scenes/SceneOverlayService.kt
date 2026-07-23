@@ -201,10 +201,22 @@ class SceneOverlayService : Service() {
 
             SceneElementType.SLIDER -> {
                 val config = SceneElementConfigResolver.slider(element)
+                val boundTaskId = element.tapTaskId
                 val seekBar = SeekBar(this).apply {
                     min = config.min
                     max = config.max
                     progress = config.value
+                    // A slider bound to a task fires it on release with the value as a variable;
+                    // an unbound slider is display-only.
+                    if (boundTaskId != null) {
+                        setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) = Unit
+                            override fun onStartTrackingTouch(bar: SeekBar) = Unit
+                            override fun onStopTrackingTouch(bar: SeekBar) {
+                                fireRunTask(boundTaskId, SceneSliderBinding.taskVariables(config, bar.progress))
+                            }
+                        })
+                    }
                 }
                 if (config.label.isBlank()) {
                     seekBar
@@ -349,11 +361,12 @@ class SceneOverlayService : Service() {
         }
     }
 
-    private fun fireRunTask(taskId: Long) {
+    private fun fireRunTask(taskId: Long, variables: Map<String, String> = emptyMap()) {
         AppLogger.info(TAG, message = "Scene element firing task $taskId")
         val intent = Intent(AutomationTargetContract.ACTION_RUN_TASK).apply {
             setPackage(packageName)
             putExtra(AutomationTargetContract.EXTRA_TASK_ID, taskId)
+            variables.forEach { (extraName, value) -> putExtra(extraName, value) }
         }
         sendBroadcast(intent, AutomationTargetContract.PERMISSION)
     }

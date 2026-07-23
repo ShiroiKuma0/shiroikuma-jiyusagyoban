@@ -1,5 +1,8 @@
 package com.opentasker.core.scenes
 
+import com.opentasker.core.external.AutomationTargetContract
+import com.opentasker.core.model.SceneElement
+import com.opentasker.core.model.SceneElementType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -7,6 +10,35 @@ import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 
 class SceneOverlayServiceTest {
+
+    @Test
+    fun sliderValueMapsToConfiguredVariableExtra() {
+        val config = SceneElementConfigResolver.slider(
+            SceneElement(
+                type = SceneElementType.SLIDER,
+                xDp = 0, yDp = 0, widthDp = 100, heightDp = 40,
+                config = mapOf("min" to "0", "max" to "100", "variable" to "Brightness"),
+            ),
+        )
+        val extras = SceneSliderBinding.taskVariables(config, progress = 42)
+        assertEquals(mapOf(AutomationTargetContract.variableExtraName("Brightness") to "42"), extras)
+    }
+
+    @Test
+    fun sliderWithoutValidVariableFallsBackToDefault() {
+        val config = SceneElementConfigResolver.slider(
+            SceneElement(
+                type = SceneElementType.SLIDER,
+                xDp = 0, yDp = 0, widthDp = 100, heightDp = 40,
+                config = mapOf("variable" to "1bad name"),
+            ),
+        )
+        assertEquals(SceneSliderBinding.DEFAULT_VARIABLE, SceneSliderBinding.variableName(config))
+        assertEquals(
+            mapOf(AutomationTargetContract.variableExtraName("value") to "7"),
+            SceneSliderBinding.taskVariables(config, progress = 7),
+        )
+    }
 
     @Test
     fun channelIdIsStable() {
