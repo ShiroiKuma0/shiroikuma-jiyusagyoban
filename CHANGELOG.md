@@ -3,6 +3,67 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.76+30 — 2026-07-23
+
+Two headline features since +5 — per-app share-sheet tiles (each its own on-device-generated relay
+APK), and a backup-guarded system language switch built on a new EMUI-proof cross-app reply channel —
+plus a batch of system-wide editor fixes.
+
+### 共有アプリ工房 — per-app share targets via on-device relay-APK generation
+- EMUI's share sheet renders **one tile per package**, so the fork's earlier ACTION_SEND
+  entry points (sharing shortcuts, activity aliases) all collapsed under the single 自由作業盤 tile.
+  The only way to a separate tile is a separate installed package — so each target now gets its own
+  tiny **relay APK, generated + signed + installed entirely on the phone** (no PC rebuild).
+- On-device APK engine (`core/share/relay/`): a fixed relay stub (`classes.dex` + `resources.arsc` +
+  binary-manifest template in `assets/relay/`) is specialised per target by rebuilding only the
+  manifest **string pool** (package/label/target — `RelayManifestTemplate`), swapping the icon PNG,
+  and assembling a hand-rolled **STORED + 4-byte-aligned zip** (`RelayApkBuilder`). Signed via
+  **apksig** with an on-device software RSA key + self-signed X.509 cert (`RelayKeystore` /
+  `RelayCertBuilder` — no BouncyCastle, nothing secret ships), installed over a **Shizuku streaming
+  `pm install` session** (`RelayInstaller`). The relay (`RelayActivity`) forwards to the exported
+  `ShareForwardActivity`, which **unfreezes the target** (Shizuku `pm enable`), forwards the content,
+  and drops a re-freeze bubble.
+- **共有アプリ工房** screen (`share.relays` action → `ShareAppsActivity`): add a frozen-inclusive app,
+  edit its tile name (prefilled) + icon, Generate / Regenerate / Reinstall / Remove, Shizuku-gated
+  with a copy-streams fallback; `ShareRelayStore` tracks each target (relay package, state, signing
+  fingerprint). New icon sources: the target's **other activity icons**, installed **icon packs**
+  (`appfilter`/`drawable.xml` parsing), and curated **framework drawables**.
+
+### System language switch (白い熊 雷起動盤) — backup-guarded
+- **`system.set_locale`** — persistent, root-less ja⇄en switch (`CHANGE_CONFIGURATION` +
+  `WRITE_SETTINGS`, hidden `updatePersistentConfiguration`). **Reorders** the existing `LocaleList`
+  (target first, keeps every other installed language) rather than replacing it — a naive
+  `LocaleList(target)` replace dropped English from the system.
+- **`system.get_locale`** — current locale tag (+ language-only) into variables, for the toggle and
+  the already-set guard.
+- Registered in the runtime + editor-metadata registries; `system.set_locale` mapped in the
+  capability registry (blocking, Write Settings) and surfaced on the **Setup tab** (Modify system
+  settings + adb-only Change configuration checks).
+- Guard: a locale change on EMUI once recreated `contacts2.db` empty (all contacts lost), so the
+  switch first backs up contacts via `白い熊 連絡先` (`shiroikuma.renrakusaki` `BACKUP_CONTACTS`) and
+  proceeds **only** on an `OK:` reply — otherwise vibrate + modal + refuse. Immediate on-tap flash +
+  persistent "backing up…" notification cover the wait.
+
+### Send Intent — `reply_via=receiver`, a binder-free cross-app reply channel
+- EMUI severs the ordered-broadcast result channel between third-party apps **and** drops a broadcast
+  carrying a live Binder (`ResultReceiver` *or* `PendingIntent`) into another app's manifest receiver.
+  New mode: pass only plain string extras (`reply_action` / `reply_package` / random `reply_id`),
+  sent **ordered** with `FLAG_INCLUDE_STOPPED_PACKAGES`; the target broadcasts the result back to our
+  **exported `IntentReplyReceiver`**, correlated by id (`IntentReplyBridge`). `shiroikuma.renrakusaki`
+  added to `<queries>`.
+
+### System-wide editor & reliability fixes
+- **Run Task** action editor now has a **Parameters** section (add / edit / delete `param:*`) that
+  merges the named parameters back on Save — previously Save rebuilt args from the visible fields and
+  **silently wiped** every parameter.
+- **Set Variable** value (and any field opting into `pathPicker`) gains a **folder icon** that opens
+  the system directory/file picker and fills a real filesystem path — no more typing paths by hand.
+- **Edit Task** dialog gets the yellow border used by the other editors; `dialog.text` can now drop
+  its Cancel button (OK-only acknowledgment).
+- Accessibility pre-flight tolerates the EMUI **unbind→rebind transient** (`awaitConnected`): a task
+  firing during a configuration change (e.g. the locale switch itself) is no longer spuriously blocked
+  with a "permission required" dialog.
+
 ## 0.2.76+5 — 2026-07-22
 
 The flash-bubble release: 通知明滅 gets a semi-凍結融解 icon layer — while an app's notification
