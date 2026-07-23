@@ -64,12 +64,15 @@ class VariableStore {
         val normalizedName = VariableNamePolicy.normalize(name) ?: return
         val shouldRemainSensitive = sensitive || sensitiveWriteDepth.get() > 0 || isSensitive(normalizedName)
         if (VariableNamePolicy.isGlobal(normalizedName)) {
+            // Global taint is monotonic: once a global is declared-secret or tainted it stays
+            // sensitive for the life of the store. The flag is set BEFORE the value is published and
+            // is never cleared here, so a concurrent plain write from another parallel run on the
+            // same global cannot race the flag off and leak the value — the previous read-then-clear
+            // could drop a sensitive flag another thread had just set.
+            if (shouldRemainSensitive || normalizedName in declaredSecretGlobals) {
+                globalSensitiveNames += normalizedName
+            }
             globals[normalizedName] = value
-            updateSensitivity(
-                globalSensitiveNames,
-                normalizedName,
-                shouldRemainSensitive || normalizedName in declaredSecretGlobals,
-            )
         } else {
             synchronized(localStack) {
                 val target = localStack.lastOrNull()
@@ -128,12 +131,12 @@ class VariableStore {
      * Arrays can be accessed via %arrayName(#) for length, %arrayName(0) for index, etc.
      */
     fun setArray(name: String, values: List<String>, sensitive: Boolean = false) {
+        // Array taint is monotonic for the same reason global taint is (see [set]): mark before
+        // publishing and never clear, so a later plain write can't race a secret array's flag off.
+        if (sensitive || sensitiveWriteDepth.get() > 0 || name in sensitiveArrayNames) {
+            sensitiveArrayNames += name
+        }
         arrayStore.put(name, values)
-        updateSensitivity(
-            sensitiveArrayNames,
-            name,
-            sensitive || sensitiveWriteDepth.get() > 0 || name in sensitiveArrayNames,
-        )
     }
 
     /**

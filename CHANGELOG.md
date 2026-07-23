@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Security**: secret/taint flags on global and array variables are now monotonic — once a variable is marked sensitive it stays sensitive for the life of the run. A concurrent plain write from another parallel profile run can no longer race the flag off and leak the value into a later log or trace (the flag is set before the value is published and never cleared by a subsequent write).
 - **Run logs**: an action that fails while consuming a secret-derived argument now records its real error class and location (e.g. `threw: request failed for <redacted>`) instead of the opaque blanket "details redacted" message. The raw secret value is scrubbed from the message and the throwable cause is dropped, so failures stay debuggable without leaking the secret.
 
 ## v0.2.78

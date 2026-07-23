@@ -188,6 +188,52 @@ class VariableStoreTest {
         assertTrue(json.contains("\"y\""))
     }
 
+    @Test
+    fun globalSensitiveFlagIsMonotonicAcrossPlainRewrite() {
+        val store = VariableStore()
+        store.set("TOKEN", "secret", sensitive = true)
+        assertTrue(store.isSensitive("TOKEN"))
+
+        // A later plain (non-sensitive) write to the same global must not clear the flag; the value
+        // stayed derived from a secret, so downgrading it would leak on the next log/trace.
+        store.set("TOKEN", "still-secret", sensitive = false)
+        assertTrue(store.isSensitive("TOKEN"))
+    }
+
+    @Test
+    fun arraySensitiveFlagIsMonotonicAcrossPlainRewrite() {
+        val store = VariableStore()
+        store.setArray("SECRETS", listOf("a", "b"), sensitive = true)
+        assertTrue(store.isArraySensitive("SECRETS"))
+
+        store.setArray("SECRETS", listOf("c"), sensitive = false)
+        assertTrue(store.isArraySensitive("SECRETS"))
+    }
+
+    @Test
+    fun sensitiveGlobalFlagSurvivesConcurrentPlainWrites() {
+        // Simulate two parallel profile runs racing the same global: one marks it secret while the
+        // other repeatedly overwrites it plainly. The flag must never be observed cleared once set.
+        repeat(50) {
+            val store = VariableStore()
+            val start = java.util.concurrent.CountDownLatch(1)
+            val secretWriter = Thread {
+                start.await()
+                store.set("SHARED", "secret", sensitive = true)
+            }
+            val plainWriter = Thread {
+                start.await()
+                repeat(200) { i -> store.set("SHARED", "plain-$i", sensitive = false) }
+            }
+            secretWriter.start()
+            plainWriter.start()
+            start.countDown()
+            secretWriter.join()
+            plainWriter.join()
+            assertTrue("secret flag was lost on iteration $it", store.isSensitive("SHARED"))
+        }
+    }
+
     private fun regexEvalThreadCount(): Int =
         Thread.getAllStackTraces().keys.count { it.name == "regex-eval" }
 }
