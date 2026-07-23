@@ -192,12 +192,14 @@ internal fun urlTargetsLocalNetwork(url: URL): Boolean {
     return addresses.any(::isPrivateOrLocalAddress)
 }
 
-internal fun checkLocalNetworkPermission(ctx: ActionContext): ActionResult? =
-    localNetworkPermissionDenial(
-        sdkInt = Build.VERSION.SDK_INT,
-        granted = ContextCompat.checkSelfPermission(ctx.app, "android.permission.ACCESS_LOCAL_NETWORK") ==
-            PackageManager.PERMISSION_GRANTED,
-    )
+internal fun checkLocalNetworkPermission(ctx: ActionContext): ActionResult? {
+    // Short-circuit before touching the permission API below Android 17 so the permission check is
+    // never evaluated where it does not apply (and cannot NPE against a bare test context).
+    if (Build.VERSION.SDK_INT < ANDROID_17_API) return null
+    val granted = ContextCompat.checkSelfPermission(ctx.app, "android.permission.ACCESS_LOCAL_NETWORK") ==
+        PackageManager.PERMISSION_GRANTED
+    return localNetworkPermissionDenial(Build.VERSION.SDK_INT, granted)
+}
 
 /**
  * Pure ACCESS_LOCAL_NETWORK policy. Below Android 17 (API 37) the permission is not enforced, so LAN
