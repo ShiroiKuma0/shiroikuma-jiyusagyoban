@@ -143,6 +143,39 @@ class TaskerXmlImporterTest {
     }
 
     @Test
+    fun waitFieldsAreReadByArgIndexRegardlessOfOmittedZeroFields() {
+        fun waitMillisFor(intFields: String): String {
+            val report = TaskerXmlImporter.parse(
+                rawXml = """
+                    <TaskerData>
+                        <Task sr="task1">
+                            <id>1</id>
+                            <nme>Delay</nme>
+                            <Action><code>30</code>$intFields</Action>
+                        </Task>
+                    </TaskerData>
+                """.trimIndent(),
+                appVersion = "0.2.21",
+                importedAtEpochMs = 123L,
+            )
+            return report.bundle.tasks.single().actions.single().args.getValue("millis")
+        }
+
+        // A lone milliseconds field (arg0) must stay milliseconds, not be mis-scaled to seconds.
+        assertEquals("500", waitMillisFor("""<Int sr="arg0" val="500"/>"""))
+        // A lone seconds field (arg1) with the zero ms field omitted must scale to seconds.
+        assertEquals("3000", waitMillisFor("""<Int sr="arg1" val="3"/>"""))
+        // Minutes (arg2) and hours (arg3) keep their own units.
+        assertEquals("120000", waitMillisFor("""<Int sr="arg2" val="2"/>"""))
+        assertEquals("3600000", waitMillisFor("""<Int sr="arg3" val="1"/>"""))
+        // Combined fields sum across units.
+        assertEquals(
+            "61500",
+            waitMillisFor("""<Int sr="arg0" val="500"/><Int sr="arg1" val="1"/><Int sr="arg2" val="1"/>"""),
+        )
+    }
+
+    @Test
     fun rejectsDoctypeDeclarationsBeforeParsing() {
         val error = runCatching {
             TaskerXmlImporter.parse(

@@ -216,6 +216,7 @@ object TaskerXmlImporter {
         val code = element.childText("code").ifBlank { element.getAttribute("code") }.ifBlank { "unknown" }
         val strings = element.actionStrings()
         val ints = element.actionInts()
+        val intsByIndex = element.actionIntsByIndex()
         val normalized = code.lowercase()
         val action = when (normalized) {
             "548", "notify", "notify.show" -> ActionSpec(
@@ -237,7 +238,7 @@ object TaskerXmlImporter {
             "30", "wait", "flow.wait" -> ActionSpec(
                 type = "flow.wait",
                 label = "Tasker wait",
-                args = mapOf("millis" to waitMillis(strings, ints).toString()),
+                args = mapOf("millis" to waitMillis(strings, intsByIndex).toString()),
             )
             "log" -> ActionSpec(
                 type = "log",
@@ -299,20 +300,33 @@ object TaskerXmlImporter {
             .sortedBy { it.argIndex() }
             .mapNotNull { it.getAttribute("val").ifBlank { it.textContent.orEmpty() }.trim().toIntOrNull() }
 
-    private fun waitMillis(strings: List<String>, ints: List<Int>): Long {
+    /** Int args keyed by their Tasker `sr` argument index, so fixed-position fields keep their unit. */
+    private fun Element.actionIntsByIndex(): Map<Int, Int> =
+        directChildren("Int").mapNotNull { element ->
+            val index = element.argIndex().takeIf { it != Int.MAX_VALUE } ?: return@mapNotNull null
+            val value = element.getAttribute("val").ifBlank { element.textContent.orEmpty() }.trim().toIntOrNull()
+                ?: return@mapNotNull null
+            index to value
+        }.toMap()
+
+    private fun waitMillis(strings: List<String>, intsByIndex: Map<Int, Int>): Long {
         val explicit = strings.firstOrNull()?.trim()?.toLongOrNull()
         if (explicit != null) return explicit
-        if (ints.isEmpty()) return 1_000L
-        if (ints.size >= 2) {
-            val milliseconds = ints.getOrElse(0) { 0 }.toLong()
-            val seconds = ints.getOrElse(1) { 0 }.toLong()
-            val minutes = ints.getOrElse(2) { 0 }.toLong()
-            val hours = ints.getOrElse(3) { 0 }.toLong()
-            val days = ints.getOrElse(4) { 0 }.toLong()
-            return milliseconds + seconds * 1_000L + minutes * 60_000L + hours * 3_600_000L + days * 86_400_000L
-        }
-        val first = ints.first().toLong()
-        return if (first > 1_000L) first else first * 1_000L
+        // Tasker's Wait action (code 30) stores five fixed Int fields by position:
+        // arg0=milliseconds, arg1=seconds, arg2=minutes, arg3=hours, arg4=days. Reading by argIndex
+        // keeps each field in its own unit regardless of which zero fields Tasker omitted from the
+        // export — the previous dense-list heuristic mis-scaled a lone field by up to 1000x.
+        val milliseconds = (intsByIndex[0] ?: 0).toLong()
+        val seconds = (intsByIndex[1] ?: 0).toLong()
+        val minutes = (intsByIndex[2] ?: 0).toLong()
+        val hours = (intsByIndex[3] ?: 0).toLong()
+        val days = (intsByIndex[4] ?: 0).toLong()
+        val total = milliseconds +
+            seconds * 1_000L +
+            minutes * 60_000L +
+            hours * 3_600_000L +
+            days * 86_400_000L
+        return if (total > 0L) total else 1_000L
     }
 
     private fun sourceId(element: Element, index: Int): Long =
