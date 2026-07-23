@@ -10,7 +10,6 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -194,9 +193,9 @@ fun OpenTaskerTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
+            // Under edge-to-edge (target SDK 35+) window.statusBarColor/navigationBarColor are
+            // deprecated no-ops; only the appearance flags still control bar icon contrast.
             val window = (view.context as Activity).window
-            window.statusBarColor = colors.background.toArgb()
-            window.navigationBarColor = colors.background.toArgb()
             WindowCompat.getInsetsController(window, view).apply {
                 isAppearanceLightStatusBars = !darkTheme && !highContrast
                 isAppearanceLightNavigationBars = !darkTheme && !highContrast
