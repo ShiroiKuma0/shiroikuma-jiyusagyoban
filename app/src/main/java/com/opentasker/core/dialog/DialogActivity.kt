@@ -64,6 +64,10 @@ class DialogActivity : ComponentActivity() {
         val inputType = intent.getStringExtra(EXTRA_INPUT_TYPE).orEmpty()
         val okLabel = intent.getStringExtra(EXTRA_OK)?.takeIf { it.isNotBlank() } ?: "OK"
         val cancelLabel = intent.getStringExtra(EXTRA_CANCEL)?.takeIf { it.isNotBlank() } ?: "Cancel"
+        // A TEXT dialog opts out of the dismiss button entirely by passing an explicitly blank cancel
+        // label; an absent extra (e.g. the permission-block dialog) keeps the default "Cancel".
+        val textCancelLabel: String? =
+            if (intent.hasExtra(EXTRA_CANCEL) && intent.getStringExtra(EXTRA_CANCEL).isNullOrBlank()) null else cancelLabel
         val preselected = intent.getStringExtra(EXTRA_PRESELECTED).orEmpty()
             .split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
         // Optional deep-link pills for a warning dialog: parallel arrays of CapabilityRequirement names and
@@ -88,7 +92,7 @@ class DialogActivity : ComponentActivity() {
                             settle(DialogOutcome.Confirmed(value))
                         },
                         onCancel = { settle(DialogOutcome.Cancelled) })
-                    else -> TextDialog(title, text, okLabel, cancelLabel, settingsTargets,
+                    else -> TextDialog(title, text, okLabel, textCancelLabel, settingsTargets,
                         onOpenSettings = { req -> openSettingsFor(req) },
                         onConfirm = { settle(DialogOutcome.Confirmed("true")) },
                         onCancel = { settle(DialogOutcome.Cancelled) })
@@ -226,7 +230,7 @@ private fun TextDialog(
     title: String,
     text: String,
     okLabel: String,
-    cancelLabel: String,
+    cancelLabel: String?,
     settingsTargets: List<Pair<String, String>>,
     onOpenSettings: (String) -> Unit,
     onConfirm: () -> Unit,
@@ -234,7 +238,9 @@ private fun TextDialog(
 ) {
     AlertDialog(
         modifier = dialogModifier(),
-        onDismissRequest = onCancel,
+        // With no cancel button an outside/back dismissal resolves as OK — the only outcome — so the
+        // dialog can never get stuck; with a cancel button it keeps the distinct Cancelled outcome.
+        onDismissRequest = if (cancelLabel == null) onConfirm else onCancel,
         title = { if (title.isNotBlank()) Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -244,7 +250,9 @@ private fun TextDialog(
             }
         },
         confirmButton = { TextButton(onClick = onConfirm) { Text(okLabel) } },
-        dismissButton = { TextButton(onClick = onCancel) { Text(cancelLabel) } },
+        // An explicitly blank cancel label (dialog.text with cancel="") drops the dismiss button —
+        // for acknowledgment-only dialogs where there is nothing to cancel.
+        dismissButton = cancelLabel?.let { { TextButton(onClick = onCancel) { Text(it) } } },
     )
 }
 

@@ -1,97 +1,73 @@
-# Hand-off — add a generic "Send Intent" action to 白い熊 自由作業盤
+# Hand-off — silence 白い熊 GNU Jami's watchdog (housekeeping/wedge) notifications
 
-Run this from `~/git/shiroikuma-jiyusagyoban` in a fresh chat. Read `CLAUDE.md` and
-`.claude/skills/build-apk/SKILL.md` first.
+**From:** the shiroikuma-jami session, 2026-07-23.
+**Task for jiyusagyoban:** 白い熊 keeps getting the *message-arrival* sound + vibration for Jami's
+internal auto-recovery ("watchdog") notifications — they use the system default notification sound,
+so they are indistinguishable by ear from a real incoming message. Configure notification handling so
+these housekeeping/wedge notifications **never sound or vibrate**. Real messages and calls must keep
+sounding — the match criteria below separate them cleanly.
 
-## Why this fork exists
+## The one channel that covers ALL of them
 
-`白い熊 自由作業盤` (`shiroikuma.jiyusagyoban`) is our fork of
-[OpenTasker](https://github.com/SysAdminDoc/OpenTasker), a FOSS Tasker-style automation app. Upstream
-can launch an app or open a URL, but it has **no action that fires an arbitrary Android intent with a
-custom action, explicit component, and typed extras**. That gap is the whole reason for the fork: we
-add one **generic "Send Intent" action** so an OpenTasker task can drive any app's intents — first and
-foremost the token-gated automation intents exposed by our sister app **`白い熊 GNU Jami`
-(`shiroikuma.jami`)**: send a message, place a call, open a conversation.
+Every watchdog notification — recoveries, wedges, error storms, restricted-network, network-down —
+goes through a single code path (`ConnectionWatchdog.notifyUser`) and therefore a single channel:
 
-State at hand-off: the fork is fully set up (rename, version tail, signing, skills, black-yellow icon)
-and the first build (`0.2.60+1`) is done. This task is the first **feature**.
+| Property | Value |
+|---|---|
+| Package | `shiroikuma.jami` (app label 白い熊 GNU Jami) |
+| Channel ID | `shiroikuma_watchdog` |
+| Channel name | 「自動回復」(ja) / created with name "自動回復" |
+| Channel importance | `IMPORTANCE_DEFAULT` (3), sound = system default notification sound |
+| Notification IDs | **58000–58019** (`58_000 + incidentSeq % 20`) |
+| Title (constant for ALL of them) | 「白い熊 Jami 自動回復」(ja) / "白い熊 Jami · auto-recovery" (en) |
+| Auto-cancel | true (tap dismisses; no action buttons) |
 
-## The task
+**Match rule (recommended):** `package == shiroikuma.jami && channel == shiroikuma_watchdog`.
+Fallbacks if the channel isn't visible to the listener: notification ID in [58000, 58019], or title
+== 「白い熊 Jami 自動回復」/ "白い熊 Jami · auto-recovery".
 
-Add a `SendIntentAction` to OpenTasker's action framework, wire it into the runtime registry and the
-editor-metadata registry, and add package visibility so explicit intents to other apps resolve on
-Android 11+. Then build and test it by firing the Jami `SEND_MESSAGE` intent end-to-end.
+Per-account wedge *recoveries* (strike 1, the frequent ~2–3 min ones) do NOT post notifications at
+all — they only write to the incidents log. What DOES notify is the list below; all on that channel.
 
-## OpenTasker's action framework (already mapped)
+## Complete list of the watchdog notifications (content texts)
 
-- `app/src/main/java/com/opentasker/core/engine/Action.kt` — the interface is tiny:
-  ```kotlin
-  interface Action {
-      val id: String
-      val category: ActionCategory          // enum: SETTINGS, NOTIFICATION, FILE, NET, MEDIA, APP, VARIABLE, FLOW, SYSTEM, PLUGIN
-      suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult   // Success / Failure(msg) / Skip
-  }
-  ```
-  `ActionContext` gives `ctx.app` (Context), `ctx.variables`, `ctx.logger`. `ActionRegistry.register(action)`
-  registers an impl by id.
-- `app/src/main/java/com/opentasker/core/actions/AppActions.kt` — existing APP-category actions
-  (`LaunchAppAction` = `app.launch`, `OpenUrlAction` = `url.open`, etc.). Model the new action here or in a
-  new `IntentActions.kt`.
-- `app/src/main/java/com/opentasker/core/actions/ActionMetadata.kt` — `ActionField` / `FieldType`
-  (TEXT, NUMBER, DROPDOWN, CHECKBOX, MULTILINE) + `ActionMetadataRegistry` + `registerActionMetadata()`
-  builds the editor form. Add a metadata entry so the new action gets editable fields.
-- **Find the built-in registration bootstrap** — grep for where `ActionRegistry.register(` and
-  `registerActionMetadata()` are called at app startup (e.g. an `Application.onCreate` or a
-  `registerBuiltInActions()` function) and add ours alongside the existing ones. Don't assume; locate it.
+The `%s` / `%1$d` etc. are runtime fill-ins (a time stamp like `17:16`, minute counts, account ids).
+Japanese first (the phone's locale), English variant after.
 
-## Suggested implementation
+| Trigger | ja text | en text |
+|---|---|---|
+| Error storm → smart recover | エラーストーム検出 → スマート回復 (%s) | Error storm detected → smart recover (%s) |
+| Error storm repeat → hard reset | エラーストーム再発 → ハードリセット (%s) | Error storm again → hard reset (%s) |
+| Account deaf → recover | アカウント受信沈黙 %d 分 → 回復 (%s) | Account silent %d min → recover (%s) |
+| Account deaf → full-DHT recover | アカウント受信沈黙 %d 分 → フルDHT回復 (%s) | Account silent %d min → full-DHT recover (%s) |
+| Delivery stuck → hard reset | 配信詰まり継続 → ハードリセット (%s) | Delivery still stuck → hard reset (%s) |
+| Delivery failing → stand-down | 配信不能 (%s) — 回復を %d 分停止 | Delivery failing (%s) — pausing recovery %d min |
+| Restricted network entered | 制限ネットワーク検出（UDP遮断）→ プロキシ固定ON・中継モード (%s) | Restricted network (UDP blocked) → proxy pinned ON, relay mode (%s) |
+| Network appears down | ネットワーク切断の可能性 — 接続を確認してください (%s) | Network appears down — check your connection (%s) |
+| Restricted network exited | 通常ネットワーク復帰 — UDP開通 (%s) | Normal network restored — UDP open (%s) |
+| Uniform wedge (all accounts silent, probe unanswered) | 全アカウント沈黙・プローブ無応答 → 回復します (%s) | All accounts silent and probe unanswered → recovering (%s) |
+| Deaf after mode switch | モード切替後に受信なし → 再登録します (%s) | No inbound after the mode switch → re-registering (%s) |
 
-`SendIntentAction` (id e.g. `intent.send`, category `APP`), args map:
-- `action` — intent action string (e.g. `shiroikuma.jami.action.SEND_MESSAGE`, or
-  `android.intent.action.VIEW`).
-- `package` — target package (e.g. `shiroikuma.jami`).
-- `class` — optional explicit component class (e.g. `cx.ring.automation.AutomationActivity`).
-- `data` — optional data URI (e.g. a `jami-cmd://…` deep link).
-- `mime` — optional MIME type.
-- `target` — DROPDOWN: `activity` (default) / `foreground-service` / `service` / `broadcast`.
-- N string extras — fixed slots `extra1_key`/`extra1_value` … `extra6_key`/`extra6_value`
-  (mirror the notification action's button slots), all sent as string extras.
-- Optional `flags` (e.g. always add `FLAG_ACTIVITY_NEW_TASK` for the activity target).
+(A Czech locale set also exists in the app — e.g. title "白い熊 Jami · automatická obnova" — but the
+title always contains 「白い熊 Jami」, so a title-substring match is locale-proof.)
 
-Build the `Intent`, set action/component/data/type/extras, dispatch per `target`
-(`startActivity` / `startForegroundService` / `startService` / `sendBroadcast`), return
-`ActionResult.Success` or `Failure(message)`. Note Android's boolean-extra caveat: extras here are all
-strings; the Jami video flag works via the deep link (`?video=1`) or by sending the
-`PLACE_VIDEO_CALL` action, so string-only extras are fine for v1.
+## What must KEEP sounding (do not over-match)
 
-Then register: `ActionRegistry.register(SendIntentAction())` and an `ActionMetadata(...)` entry in
-`registerActionMetadata()`.
+Everything else from `shiroikuma.jami` is a real user-facing event on OTHER channels — leave these
+fully audible:
 
-## Manifest — package visibility (Android 11+)
+- Messages / conversations (per-conversation channels, upstream "Messages" channel).
+- Incoming calls, missed calls (upstream call channels — the fork recently ADDED a missed-call
+  notification for swarm conversations; it must sound).
+- Trust requests, file transfers (`file_transfer`), sync/foreground-service ones (already silent).
 
-`AndroidManifest.xml` has a `<queries>` block. Add our sister app so explicit intents resolve:
-```xml
-<queries>
-    <package android:name="shiroikuma.jami" />
-    <!-- …existing entries… -->
-</queries>
-```
-(For a truly generic action you may also want a broad `<intent>` query, but pin the Jami package at minimum.)
+So: suppress **only** `channel == shiroikuma_watchdog` (equivalently title 「白い熊 Jami 自動回復」),
+nothing broader. The notifications should still appear visually — 白い熊 wants them gone from the
+*ear*, not from the shade.
 
-## The Jami target contract (what to fire)
+## Context (why they fire often right now)
 
-The Jami automation surface is token-gated (enable + copy the token in Jami's
-**Settings → Appearance → Automation**). Full reference: `~/tmp/jami-automation-intents.org`.
-
-- Component: `shiroikuma.jami` / `cx.ring.automation.AutomationActivity` (note: applicationId
-  `shiroikuma.jami`, but the class namespace is `cx.ring` — use the fully-qualified class).
-- Actions: `shiroikuma.jami.action.SEND_MESSAGE | PLACE_CALL | PLACE_VIDEO_CALL | OPEN_CONVERSATION`.
-- Extras: `account` (or `default`), `peer` (`jami:<hex>` / `swarm:<id>` / `sip:`), `text`, `token`.
-- Or deep link (Send Intent VIEW + data):
-  `jami-cmd://send/<account>/<peer>?text=<urlenc>&token=<token>`.
-
-## Done = 
-
-A "Send Intent" action selectable in the OpenTasker editor with the fields above, that can fire the Jami
-`SEND_MESSAGE` intent and actually deliver a message on-device. Build with the **build-apk** skill;
-build-only until 白い熊 says "Push".
+An account-deafness investigation is running on the Mate XT (4 Jami accounts in one daemon; proxy
+subscriptions wedge every few minutes and the watchdog auto-recovers). Incident rate is elevated
+while this is being root-caused, so the sounds are currently frequent — another reason to silence
+the channel rather than tune the watchdog's thresholds.
