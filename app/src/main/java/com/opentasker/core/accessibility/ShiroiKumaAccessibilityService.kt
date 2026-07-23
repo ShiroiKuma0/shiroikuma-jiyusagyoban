@@ -1,11 +1,17 @@
 package com.opentasker.core.accessibility
 
 import android.accessibilityservice.AccessibilityService
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
+import android.provider.Settings
+import android.text.TextUtils
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityWindowInfo
 import android.view.inputmethod.InputMethodManager
 import com.opentasker.core.contexts.AppForegroundChangedContextEvents
+import kotlinx.coroutines.delay
 
 /**
  * Minimal accessibility service. We use it only for [performGlobalAction] (Back, Recents, the
@@ -75,6 +81,40 @@ class ShiroiKumaAccessibilityService : AccessibilityService() {
 
         /** True when the user has enabled and the system has bound the service. */
         val isConnected: Boolean get() = instance != null
+
+        /**
+         * True when the service is ENABLED in system settings, regardless of whether it is bound right
+         * now. The system toggle and the live [isConnected] binding are two different states: EMUI tears
+         * the service down and rebinds it across a configuration change (a locale switch) or a
+         * memory-pressure reap, so the toggle can read on while [instance] is momentarily null.
+         */
+        fun isEnabledInSettings(context: Context): Boolean {
+            val flat = Settings.Secure.getString(
+                context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+            ) ?: return false
+            val me = ComponentName(context, ShiroiKumaAccessibilityService::class.java)
+            val splitter = TextUtils.SimpleStringSplitter(':').apply { setString(flat) }
+            return splitter.any { ComponentName.unflattenFromString(it) == me }
+        }
+
+        /**
+         * Await the live binding, tolerating the transient unbind→rebind gap. Returns true at once when
+         * already bound; when the toggle is on but the service isn't bound yet (the EMUI config-change /
+         * reap window), polls up to [timeoutMs] for the rebind; returns false immediately when the toggle
+         * is off — genuinely not enabled, so the caller should block honestly rather than stall.
+         */
+        suspend fun awaitConnected(context: Context, timeoutMs: Long = 3000L): Boolean {
+            if (isConnected) return true
+            if (!isEnabledInSettings(context)) return false
+            val deadline = SystemClock.elapsedRealtime() + timeoutMs
+            while (SystemClock.elapsedRealtime() < deadline) {
+                delay(POLL_INTERVAL_MS)
+                if (isConnected) return true
+            }
+            return isConnected
+        }
+
+        private const val POLL_INTERVAL_MS = 100L
 
         /** The connected service (an AccessibilityService Context), for adding a TYPE_ACCESSIBILITY_OVERLAY. */
         val service: AccessibilityService? get() = instance

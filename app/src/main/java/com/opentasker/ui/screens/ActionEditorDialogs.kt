@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -46,6 +47,8 @@ import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.actions.FieldType
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
+import com.opentasker.core.engine.SUB_TASK_ACTION_ID
+import com.opentasker.core.engine.SUB_TASK_PARAM_PREFIX
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.ui.components.RgbaColorPickerDialog
 import com.opentasker.ui.components.ThemedDropdownMenu
@@ -58,8 +61,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Folder
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
+import android.os.Environment
+import android.provider.DocumentsContract
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -181,6 +192,18 @@ internal fun ActionConfigDialog(
     val capability = remember(state.metadata.id) { ActionCapabilityRegistry.get(state.metadata.id) }
     val missingRequired = state.metadata.fields.any { it.required && values[it.key].isNullOrBlank() }
 
+    // Run Task carries dynamic named parameters as `param:<name>` args that no metadata field covers.
+    // Edit them here (seeded from the existing action) and merge them back on Save — without this the
+    // save would rebuild args from the visible fields alone and silently drop every parameter.
+    val isRunTask = state.metadata.id == SUB_TASK_ACTION_ID
+    var params by rememberSaveable(state.existing?.id, state.metadata.id) {
+        mutableStateOf(
+            state.existing?.args.orEmpty()
+                .filterKeys { it.startsWith(SUB_TASK_PARAM_PREFIX) }
+                .map { it.key.removePrefix(SUB_TASK_PARAM_PREFIX) to it.value },
+        )
+    }
+
     AlertDialog(
         // Yellow edge + more height: this is the full editor, so give it room without being a full page.
         modifier = Modifier
@@ -233,18 +256,29 @@ internal fun ActionConfigDialog(
                         onChange = { newValue -> values = values + (field.key to newValue) },
                     )
                 }
+                if (isRunTask) {
+                    item {
+                        RunTaskParametersSection(params = params, onChange = { params = it })
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
                 enabled = !missingRequired && capability.canAdd,
                 onClick = {
+                    val paramArgs = if (isRunTask) {
+                        params.filter { it.first.isNotBlank() }
+                            .associate { "$SUB_TASK_PARAM_PREFIX${it.first.trim()}" to it.second }
+                    } else {
+                        emptyMap()
+                    }
                     onSave(
                         ActionSpec(
                             id = state.existing?.id ?: 0,
                             type = state.metadata.id,
                             label = label.trim().ifBlank { state.metadata.name },
-                            args = values.filterValues { it.isNotBlank() },
+                            args = values.filterValues { it.isNotBlank() } + paramArgs,
                             continueOnError = state.existing?.continueOnError ?: false,
                             condition = state.existing?.condition,
                         )
@@ -256,6 +290,62 @@ internal fun ActionConfigDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
+}
+
+/**
+ * Editor for a Run Task action's named parameters (the `param:<name>` args the sub-task reads as
+ * {{ param.name }}). A row per parameter — name + value + delete — plus an add button. The parent
+ * merges these back into the action's args on Save.
+ */
+@Composable
+private fun RunTaskParametersSection(
+    params: List<Pair<String, String>>,
+    onChange: (List<Pair<String, String>>) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
+        Text(
+            "Parameters",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            "Named values passed to the task; it reads each as {{ param.name }} (or %@name).",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        params.forEachIndexed { index, (name, value) ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { newName ->
+                        onChange(params.toMutableList().also { it[index] = newName to it[index].second })
+                    },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { newValue ->
+                        onChange(params.toMutableList().also { it[index] = it[index].first to newValue })
+                    },
+                    label = { Text("Value") },
+                    modifier = Modifier.weight(1.4f),
+                )
+                IconButton(onClick = { onChange(params.toMutableList().also { it.removeAt(index) }) }) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Remove parameter")
+                }
+            }
+        }
+        OutlinedButton(onClick = { onChange(params + ("" to "")) }) {
+            Icon(Icons.Filled.Add, contentDescription = null)
+            Spacer(Modifier.width(6.dp))
+            Text("Add parameter")
+        }
+    }
 }
 
 @Composable
@@ -447,7 +537,63 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
             // Not single-line: short values stay compact but long ones (a font name, a path, a message)
             // wrap and grow so they stay fully editable rather than scrolling inside one hidden line.
             maxLines = 8,
+            // Opt-in folder icon that fills the field from the system directory/file picker.
+            trailingIcon = if (field.pathPicker) {
+                { PathPickerTrailingIcon(onPath = onChange) }
+            } else {
+                null
+            },
             modifier = Modifier.fillMaxWidth(),
         )
     }
+}
+
+/**
+ * A folder icon whose menu opens the system directory or file picker (SAF) and reports the chosen
+ * item as a plain filesystem path (e.g. /storage/emulated/0/Download/…) — no persistent URI grant is
+ * taken because callers only need the path string. Sits in a field's trailing-icon slot.
+ */
+@Composable
+private fun PathPickerTrailingIcon(onPath: (String) -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    val treeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        documentUriToFsPath(uri, isTree = true)?.let { onPath(if (it.endsWith("/")) it else "$it/") }
+    }
+    val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        documentUriToFsPath(uri, isTree = false)?.let(onPath)
+    }
+    IconButton(onClick = { menu = true }) {
+        Icon(Icons.Filled.Folder, contentDescription = "Pick a folder or file")
+    }
+    ThemedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+        DropdownMenuItem(
+            text = { Text("Pick folder…") },
+            onClick = { menu = false; treeLauncher.launch(null) },
+        )
+        DropdownMenuItem(
+            text = { Text("Pick file…") },
+            onClick = { menu = false; fileLauncher.launch(arrayOf("*/*")) },
+        )
+    }
+}
+
+/**
+ * Convert a Storage Access Framework document/tree Uri from the external-storage provider to a real
+ * filesystem path. Handles the primary volume (/storage/emulated/0) and named secondary volumes
+ * (/storage/<id>). Returns null for other providers (a content Uri that has no filesystem path).
+ */
+private fun documentUriToFsPath(uri: Uri?, isTree: Boolean): String? {
+    if (uri == null || uri.authority != "com.android.externalstorage.documents") return null
+    val docId = runCatching {
+        if (isTree) DocumentsContract.getTreeDocumentId(uri) else DocumentsContract.getDocumentId(uri)
+    }.getOrNull() ?: return null
+    val parts = docId.split(":", limit = 2)
+    val volume = parts[0]
+    val relative = parts.getOrNull(1).orEmpty()
+    val base = if (volume.equals("primary", ignoreCase = true)) {
+        Environment.getExternalStorageDirectory().absolutePath
+    } else {
+        "/storage/$volume"
+    }
+    return if (relative.isEmpty()) base else "$base/$relative"
 }

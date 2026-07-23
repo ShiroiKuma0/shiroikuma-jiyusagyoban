@@ -13,6 +13,15 @@
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- system.set_locale: dev-flagged, so adb-grantable once (pm grant, survives reboots). -->
+    <uses-permission
+        android:name="android.permission.CHANGE_CONFIGURATION"
+        tools:ignore="ProtectedPermissions" />
+    <!-- system.set_locale: updatePersistentConfiguration also enforces the WRITE_SETTINGS appop
+         (adb: appops set … WRITE_SETTINGS allow, or the "modify system settings" toggle). -->
+    <uses-permission
+        android:name="android.permission.WRITE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
@@ -64,8 +73,9 @@
         android:protectionLevel="signature" />
 
     <queries>
-        <!-- Sister app: token-gated automation intents driven by the Send Intent action. -->
+        <!-- Sister apps: token-gated automation intents driven by the Send Intent action. -->
         <package android:name="shiroikuma.jami" />
+        <package android:name="shiroikuma.renrakusaki" />
         <!--
           Broad visibility for the generic Send Intent action. Package visibility is
           all-or-nothing per package, so matching any launchable app's MAIN/LAUNCHER
@@ -328,6 +338,17 @@
             <intent-filter>
                 <action android:name="shiroikuma.jiyusagyoban.action.EXPORT_WORKSPACE" />
                 <action android:name="shiroikuma.jiyusagyoban.action.IMPORT_BUNDLE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Reply channel for Send Intent's "receiver" mode: a sister app broadcasts the result back
+             here (binder-free). Exported so the sister app can reach it; a fake reply would need the
+             random per-call reply id, which is never disclosed to other apps. -->
+        <receiver
+            android:name="com.opentasker.core.actions.IntentReplyReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="shiroikuma.jiyusagyoban.action.INTENT_REPLY" />
             </intent-filter>
         </receiver>
 

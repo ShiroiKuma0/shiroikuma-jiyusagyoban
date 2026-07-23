@@ -13,6 +13,9 @@ data class ActionField(
     // For DROPDOWN: the selectable values. The field stays free-text (so it can be a %variable); these
     // just populate the picker. Empty = a plain text field with no picker.
     val options: List<String> = emptyList(),
+    // When true, a TEXT field also shows a folder icon that opens the system directory/file picker and
+    // fills the field with the chosen filesystem path — so paths don't have to be typed by hand.
+    val pathPicker: Boolean = false,
 )
 
 enum class FieldType {
@@ -112,7 +115,7 @@ fun registerActionMetadata() {
             category = "Variable",
             fields = listOf(
                 ActionField("name", "Variable name", required = true, hint = "%var name"),
-                ActionField("value", "Value", required = true, hint = "Supports %expansion"),
+                ActionField("value", "Value", required = true, hint = "Supports %expansion", pathPicker = true),
             )
         )
     )
@@ -1088,8 +1091,10 @@ fun registerActionMetadata() {
                 ActionField("extra6_key", "Extra 6 key"),
                 ActionField("extra6_value", "Extra 6 value"),
                 ActionField("flags", "Intent flags", hint = "optional; decimal or 0x-hex, OR'd in"),
-                ActionField("result_var", "Result variable (broadcast)", hint = "ordered broadcast; stores the receiver's result data"),
-                ActionField("result_timeout", "Result timeout (s)", FieldType.NUMBER, hint = "default 5"),
+                ActionField("result_var", "Result variable (broadcast)", hint = "stores the receiver's reply"),
+                ActionField("reply_via", "Reply channel", FieldType.DROPDOWN, options = listOf("", "receiver"),
+                    hint = "blank = ordered-broadcast result; 'receiver' = a private ResultReceiver callback (EMUI-proof, the target reads the \"reply_to\" extra and calls back)"),
+                ActionField("result_timeout", "Result timeout (s)", FieldType.NUMBER, hint = "default 5 (30 for receiver)"),
             )
         )
     )
@@ -1268,6 +1273,35 @@ fun registerActionMetadata() {
             category = "Settings",
             fields = listOf(
                 ActionField("millis", "Timeout (ms)", FieldType.NUMBER, required = true, hint = "1000, 30000, etc."),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "system.get_locale",
+            name = "Get Locale",
+            description = "Store the current system locale into a variable (BCP-47 tag, e.g. ja-CZ)",
+            category = "Settings",
+            fields = listOf(
+                ActionField("var", "Store tag into", required = true, hint = "e.g. cur → %cur = ja-CZ"),
+                ActionField("language_var", "Store language into", hint = "e.g. cur_lang → %cur_lang = ja"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "system.set_locale",
+            name = "Set Locale",
+            description = "Change the system locale persistently (no root). Needs two one-time adb grants: " +
+                "pm grant shiroikuma.jiyusagyoban android.permission.CHANGE_CONFIGURATION + " +
+                "appops set shiroikuma.jiyusagyoban WRITE_SETTINGS allow",
+            category = "Settings",
+            fields = listOf(
+                ActionField("locale", "Locale", required = true,
+                    hint = "en-CZ — or ja-CZ,en-CZ to toggle (sets the one not current)"),
+                ActionField("result_var", "Store set tag into", hint = "variable receiving the tag actually set"),
             )
         )
     )

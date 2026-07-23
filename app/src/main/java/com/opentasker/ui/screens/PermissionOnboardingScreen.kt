@@ -761,6 +761,27 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
             requiredFor = "Scenes, freeze bubbles, overlay UI",
         ),
         PermissionSetupItem(
+            title = "Modify system settings",
+            body = "Write Settings special access. The locale switch (system.set_locale) needs it — " +
+                "updatePersistentConfiguration enforces this appop on top of CHANGE_CONFIGURATION.",
+            granted = Settings.System.canWrite(context),
+            actionLabel = "Open settings",
+            action = PermissionAction.SettingsIntent(
+                Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:${context.packageName}")),
+            ),
+            requiredFor = "Locale switch (system.set_locale), brightness, setting.put",
+        ),
+        PermissionSetupItem(
+            title = "Change configuration (locale)",
+            body = "Dev-flagged system permission for the locale switch; only adb can grant it, once, surviving reboots:\n" +
+                "pm grant ${context.packageName} android.permission.CHANGE_CONFIGURATION",
+            granted = hasPermission(context, Manifest.permission.CHANGE_CONFIGURATION),
+            // adb-only — no settings page to deep-link.
+            actionLabel = "",
+            action = PermissionAction.None,
+            requiredFor = "Locale switch (system.set_locale)",
+        ),
+        PermissionSetupItem(
             title = "All files access",
             body = "Needed to read files outside the app — e.g. custom notification tones stored in shared storage (the 通知明滅 Jami tone).",
             granted = Build.VERSION.SDK_INT < 30 || Environment.isExternalStorageManager(),

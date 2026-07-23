@@ -114,6 +114,34 @@ class SendIntentAction : Action {
                 TARGET_SERVICE -> ctx.app.startService(intent)
                 TARGET_BROADCAST -> {
                     val resultVar = args["result_var"]?.trim()?.ifBlank { null }
+                    // "receiver" reply mode — binder-free round-trip. EMUI severs the ordered-broadcast
+                    // RESULT channel between third-party apps AND won't reliably carry a live Binder
+                    // (ResultReceiver / PendingIntent) into another app's manifest receiver (verified
+                    // 2026-07-23), so the reply can't ride the original broadcast at all. Instead we pass
+                    // only plain strings — the reply action, our package, and a random correlation id — and
+                    // the target fires a fresh broadcast BACK to our exported IntentReplyReceiver with the
+                    // result. The random id (a UUID the target echoes) bounds spoofing. The outgoing send is
+                    // ORDERED with FLAG_INCLUDE_STOPPED_PACKAGES — a plain sendBroadcast is dropped for a
+                    // backgrounded / freshly-installed (stopped) target on this device.
+                    if (resultVar != null && args["reply_via"]?.trim()?.lowercase() == "receiver") {
+                        val timeoutSec = args["result_timeout"]?.trim()?.toIntOrNull()?.coerceIn(1, 120) ?: 30
+                        val replyId = java.util.UUID.randomUUID().toString()
+                        val reply = withTimeoutOrNull(timeoutSec * 1000L) {
+                            suspendCancellableCoroutine<String> { cont ->
+                                IntentReplyBridge.register(replyId) { if (cont.isActive) cont.resume(it) }
+                                cont.invokeOnCancellation { IntentReplyBridge.cancel(replyId) }
+                                intent.putExtra(IntentReplyBridge.EXTRA_REPLY_ACTION, IntentReplyBridge.ACTION_INTENT_REPLY)
+                                intent.putExtra(IntentReplyBridge.EXTRA_REPLY_PACKAGE, ctx.app.packageName)
+                                intent.putExtra(IntentReplyBridge.EXTRA_REPLY_ID, replyId)
+                                intent.addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+                                ctx.app.sendOrderedBroadcast(intent, null)
+                            }
+                        }
+                        IntentReplyBridge.cancel(replyId)
+                        ctx.variables.set(resultVar, reply ?: "")
+                        ctx.logger("Send intent (reply): ${action ?: cls ?: pkg} → %$resultVar = ${(reply ?: "").take(80)}")
+                        return ActionResult.Success
+                    }
                     if (resultVar != null) {
                         // Ordered broadcast with a result: the receiver's setResultData() comes back to
                         // us — the round-trip that lets a task VERIFY a sister app's state (e.g. its
