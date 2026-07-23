@@ -84,13 +84,16 @@ class NotifyAction : Action {
                 )
             }
             val label = args["button${i}_label"] ?: resolution.task.name
+            // A unique request code per button guarantees two notifications (even with adjacent
+            // ids) never share a PendingIntent slot, so FLAG_UPDATE_CURRENT can't overwrite an
+            // older button intent and fire the wrong task.
+            val requestCode = PendingIntentRequestCodes.next()
             val buttonIntent = Intent(ctx.app, NotificationActionReceiver::class.java).apply {
                 action = NotificationActionReceiver.ACTION_NOTIFICATION_BUTTON
                 putExtra(NotificationActionReceiver.EXTRA_TASK_ID, resolution.task.id)
                 putExtra(NotificationActionReceiver.EXTRA_BUTTON_LABEL, label)
-                putExtra("_req", (notifId.hashCode() * 31 + i) and 0x7FFFFFFF)
+                putExtra("_req", requestCode)
             }
-            val requestCode = (notifId.hashCode() * 31 + i) and 0x7FFFFFFF
             val pi = PendingIntent.getBroadcast(
                 ctx.app,
                 requestCode,
