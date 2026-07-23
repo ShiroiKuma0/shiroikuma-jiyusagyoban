@@ -3,15 +3,9 @@ package com.opentasker.core.actions
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import com.opentasker.app.OpenTaskerApp_NoHilt
-import com.opentasker.core.engine.executeAndLogTask
-import com.opentasker.core.engine.logSkippedRun
+import androidx.core.content.ContextCompat
+import com.opentasker.core.engine.AutomationService
 import com.opentasker.core.logging.AppLogger
-import com.opentasker.core.storage.recoveryMessage
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 
 class NotificationActionReceiver : BroadcastReceiver() {
 
@@ -19,63 +13,24 @@ class NotificationActionReceiver : BroadcastReceiver() {
         if (intent.action != ACTION_NOTIFICATION_BUTTON) return
         val taskId = intent.getLongExtra(EXTRA_TASK_ID, -1L).takeIf { it > 0 }
         val legacyTaskName = intent.getStringExtra(EXTRA_TASK_NAME)
-        val reference = taskId?.let { NotificationTaskReference.Id(it) }
-            ?: legacyTaskName?.let { NotificationTaskReference.LegacyName(it) }
-            ?: return
+        if (taskId == null && legacyTaskName == null) return
         val buttonLabel = intent.getStringExtra(EXTRA_BUTTON_LABEL)
             ?: legacyTaskName
             ?: "Task ${taskId ?: "unknown"}"
 
-        val pending = goAsync()
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            try {
-                val db = OpenTaskerApp_NoHilt.db
-                val entities = if (taskId != null) {
-                    listOfNotNull(db.taskDao().getById(taskId))
-                } else {
-                    db.taskDao().getAll()
-                }
-                val resolution = NotificationTaskBindings.resolve(
-                    reference = reference,
-                    candidates = entities.map { NotificationTaskCandidate(it.id, it.name) },
-                )
-                if (resolution !is NotificationTaskResolution.Bound) {
-                    AppLogger.warn(
-                        TAG,
-                        "Notification button '$buttonLabel' did not run: ${NotificationTaskBindings.failureMessage(resolution)}",
-                    )
-                    return@launch
-                }
-                val entity = entities.single { it.id == resolution.task.id }
-                val decoded = entity.toDomainDecodeResult()
-                val issue = decoded.issue
-                if (issue != null) {
-                    val reason = issue.recoveryMessage()
-                    AppLogger.error(TAG, "Notification button '$buttonLabel' blocked: $reason")
-                    logSkippedRun(
-                        db = db,
-                        task = decoded.value,
-                        source = SOURCE,
-                        reason = reason,
-                        metadata = listOf("button=$buttonLabel"),
-                    )
-                    return@launch
-                }
-                val task = decoded.value
-                val result = executeAndLogTask(
-                    appContext = context.applicationContext,
-                    db = db,
-                    task = task,
-                    source = SOURCE,
-                    metadata = listOf("button=$buttonLabel"),
-                )
-                val status = if (result.report.success) "succeeded" else "failed"
-                AppLogger.info(TAG, "Notification button '$buttonLabel' -> ${task.name} $status (${result.report.durationMs}ms)")
-            } catch (e: Exception) {
-                AppLogger.error(TAG, "Notification button '$buttonLabel' failed", e)
-            } finally {
-                pending.finish()
-            }
+        // Hand the run to the already-foreground AutomationService and return immediately: the
+        // receiver's ~10 s window is far too short for tasks that can wait up to 30 minutes, and a
+        // receiver killed mid-task would lose the run with no run-log entry.
+        val serviceIntent = Intent(context.applicationContext, AutomationService::class.java).apply {
+            action = AutomationService.ACTION_RUN_NOTIFICATION_TASK
+            if (taskId != null) putExtra(EXTRA_TASK_ID, taskId)
+            if (legacyTaskName != null) putExtra(EXTRA_TASK_NAME, legacyTaskName)
+            putExtra(EXTRA_BUTTON_LABEL, buttonLabel)
+        }
+        try {
+            ContextCompat.startForegroundService(context.applicationContext, serviceIntent)
+        } catch (e: Exception) {
+            AppLogger.error(TAG, "Notification button '$buttonLabel' could not start the engine service", e)
         }
     }
 

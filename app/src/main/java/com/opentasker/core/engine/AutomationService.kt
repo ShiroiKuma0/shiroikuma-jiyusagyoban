@@ -21,7 +21,13 @@ import com.opentasker.automation.network.ConnectivityMonitor
 import com.opentasker.automation.network.WiFiNetworkMonitor
 import com.opentasker.automation.sensor.ShakeDetector
 import com.opentasker.automation.scheduler.TimeEventScheduler
+import com.opentasker.core.actions.NotificationActionReceiver
+import com.opentasker.core.actions.NotificationTaskBindings
+import com.opentasker.core.actions.NotificationTaskCandidate
+import com.opentasker.core.actions.NotificationTaskReference
+import com.opentasker.core.actions.NotificationTaskResolution
 import com.opentasker.core.logging.AppLogger
+import com.opentasker.core.storage.recoveryMessage
 import com.opentasker.core.contexts.BluetoothContextEvents
 import com.opentasker.core.contexts.BootContextEvents
 import com.opentasker.core.contexts.CameraMicContextEvents
@@ -184,6 +190,21 @@ class AutomationService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.getBooleanExtra(EXTRA_STARTED_FROM_VISIBLE_UI, false) == true) {
             audioForegroundServiceEligibility = AudioForegroundServiceEligibility.WHILE_IN_USE
+        }
+        if (intent?.action == ACTION_RUN_NOTIFICATION_TASK) {
+            // Run notification-button tasks inside the foreground service's own scope instead of a
+            // BroadcastReceiver's ~10 s goAsync window, so long tasks (e.g. flow.wait up to 30 min)
+            // complete and log reliably without the system killing the receiver mid-run.
+            val taskId = intent.getLongExtra(NotificationActionReceiver.EXTRA_TASK_ID, -1L).takeIf { it > 0 }
+            val legacyName = intent.getStringExtra(NotificationActionReceiver.EXTRA_TASK_NAME)
+            val buttonLabel = intent.getStringExtra(NotificationActionReceiver.EXTRA_BUTTON_LABEL)
+                ?: legacyName ?: "Task ${taskId ?: "unknown"}"
+            val reference = taskId?.let { NotificationTaskReference.Id(it) }
+                ?: legacyName?.let { NotificationTaskReference.LegacyName(it) }
+            if (reference != null) {
+                scope.launch { runNotificationTask(reference, buttonLabel) }
+            }
+            return START_STICKY
         }
         val bootCompletedTrigger = intent?.action == ACTION_BOOT_COMPLETED_TRIGGER
         val timeTickTrigger = intent?.action == ACTION_TIME_TICK_TRIGGER
@@ -536,6 +557,58 @@ class AutomationService : Service() {
         }
     }
 
+    private suspend fun runNotificationTask(reference: NotificationTaskReference, buttonLabel: String) {
+        try {
+            val entities = when (reference) {
+                is NotificationTaskReference.Id -> listOfNotNull(db.taskDao().getById(reference.taskId))
+                is NotificationTaskReference.LegacyName -> db.taskDao().getAll()
+                is NotificationTaskReference.Invalid -> emptyList()
+            }
+            val resolution = NotificationTaskBindings.resolve(
+                reference = reference,
+                candidates = entities.map { NotificationTaskCandidate(it.id, it.name) },
+            )
+            if (resolution !is NotificationTaskResolution.Bound) {
+                AppLogger.warn(
+                    TAG,
+                    "Notification button '$buttonLabel' did not run: ${NotificationTaskBindings.failureMessage(resolution)}",
+                )
+                return
+            }
+            val entity = entities.single { it.id == resolution.task.id }
+            val decoded = entity.toDomainDecodeResult()
+            val issue = decoded.issue
+            if (issue != null) {
+                val reason = issue.recoveryMessage()
+                AppLogger.error(TAG, "Notification button '$buttonLabel' blocked: $reason")
+                logSkippedRun(
+                    db = db,
+                    task = decoded.value,
+                    source = NotificationActionReceiver.SOURCE,
+                    reason = reason,
+                    metadata = listOf("button=$buttonLabel"),
+                )
+                return
+            }
+            val task = decoded.value
+            val result = executeAndLogTask(
+                appContext = this,
+                db = db,
+                task = task,
+                source = NotificationActionReceiver.SOURCE,
+                metadata = listOf("button=$buttonLabel"),
+                audioForegroundService = audioForegroundServiceEligibility,
+            )
+            if (result.logInserted) pruneRunLogs(force = false)
+            val status = if (result.report.success) "succeeded" else "failed"
+            AppLogger.info(TAG, "Notification button '$buttonLabel' -> ${task.name} $status (${result.report.durationMs}ms)")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.error(TAG, "Notification button '$buttonLabel' failed", e)
+        }
+    }
+
     private fun logCooldownSkip(profile: Profile, task: Task, remainingMs: Long) {
         logProfileSkippedRun(profile, task, "Cooldown active for ${formatRemainingCooldown(remainingMs)}.")
     }
@@ -665,6 +738,7 @@ class AutomationService : Service() {
         private const val TAG = "AutomationService"
         const val ACTION_BOOT_COMPLETED_TRIGGER = "com.opentasker.action.BOOT_COMPLETED_TRIGGER"
         const val ACTION_TIME_TICK_TRIGGER = "com.opentasker.action.TIME_TICK_TRIGGER"
+        const val ACTION_RUN_NOTIFICATION_TASK = "com.opentasker.action.RUN_NOTIFICATION_TASK"
         const val EXTRA_STARTED_FROM_VISIBLE_UI = "com.opentasker.extra.STARTED_FROM_VISIBLE_UI"
         private const val CHANNEL = "opentasker.engine"
         private const val NOTIF_ID = 1001
