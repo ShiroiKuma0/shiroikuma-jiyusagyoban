@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -626,6 +627,9 @@ private fun ExpressionDebugger(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    // Meet the 48dp touch-target minimum for the expand/collapse control; the text
+                    // stays vertically centred so the visual density is unchanged.
+                    .heightIn(min = DesignSystem.ComponentSize.touchTargetMin)
                     .semantics {
                         contentDescription = debuggerDescription
                         stateDescription = stateLabel

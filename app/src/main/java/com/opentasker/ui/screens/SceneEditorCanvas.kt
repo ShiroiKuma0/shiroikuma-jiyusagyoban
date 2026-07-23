@@ -268,10 +268,12 @@ private fun SceneCanvasElement(
                 )
             }
         }
-        Surface(
+        // A 48dp transparent hit area meets the touch-target minimum while the visible resize glyph
+        // stays a compact 14dp square in the corner.
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .size(14.dp)
+                .size(DesignSystem.ComponentSize.touchTargetMin)
                 .pointerInput(scene.id, element.id, projection.width, projection.height, canvasWidth, canvasHeight, density.density) {
                     detectDragGestures(
                         onDrag = { change, dragAmount ->
@@ -299,9 +301,14 @@ private fun SceneCanvasElement(
                         },
                     )
                 },
-            color = color.copy(alpha = 0.62f),
-            shape = RoundedCornerShape(4.dp),
-        ) {}
+            contentAlignment = Alignment.BottomEnd,
+        ) {
+            Surface(
+                modifier = Modifier.size(14.dp),
+                color = color.copy(alpha = 0.62f),
+                shape = RoundedCornerShape(4.dp),
+            ) {}
+        }
     }
 }
 
