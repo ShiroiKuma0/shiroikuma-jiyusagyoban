@@ -412,13 +412,6 @@ class AutomationService : Service() {
             }
 
             AutomationMode.QUEUED -> {
-                if (!isExit) {
-                    val reservation = reserveCooldown(profile.id, profile.cooldownSec)
-                    if (!reservation.accepted) {
-                        logCooldownSkip(profile, task, reservation.remainingMs)
-                        return
-                    }
-                }
                 // The queue check, enqueue, and the consumer's drain-or-deregister decision all
                 // synchronize on queuedProfileTasks, so a task can never be enqueued into a queue
                 // whose consumer has already decided to exit (which would strand it unrun).
@@ -441,7 +434,19 @@ class AutomationService : Service() {
                         logProfileSkippedRun(profile, task, "Task queue is full ($MAX_QUEUED_TASKS pending).")
                     }
                     QueueOutcome.QUEUED -> AppLogger.info(TAG, "Profile ${profile.id} queued retrigger")
-                    QueueOutcome.START -> profileTaskJobs[slot] = launchQueuedTasks(profile, slot, task)
+                    QueueOutcome.START -> {
+                        // Reserve cooldown only when actually starting a fresh run, not when a
+                        // trigger queues behind a running task. Reserving at enqueue time dropped
+                        // a later distinct trigger as "cooldown active" that should have queued.
+                        if (!isExit) {
+                            val reservation = reserveCooldown(profile.id, profile.cooldownSec)
+                            if (!reservation.accepted) {
+                                logCooldownSkip(profile, task, reservation.remainingMs)
+                                return
+                            }
+                        }
+                        profileTaskJobs[slot] = launchQueuedTasks(profile, slot, task)
+                    }
                 }
             }
 
