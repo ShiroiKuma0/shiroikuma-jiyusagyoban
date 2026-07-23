@@ -43,7 +43,9 @@ class SecretVariableUiSourceTest {
             assertTrue("Secret storage is missing $marker", storage.contains(marker))
         }
         assertTrue(runner.contains("isSecretDerived"))
-        assertTrue(runner.contains("SECRET_DERIVED_FAILURE"))
+        // Secret-derived failures must still fail closed by scrubbing the secret from the message
+        // rather than leaking it; the redactor replaced the old blanket SECRET_DERIVED_FAILURE.
+        assertTrue(runner.contains("redactSecretDerivedValues"))
         assertTrue(bundle.contains("filterNot { it.isSecret }"))
         assertTrue(taskerExport.contains("variables.filterNot { it.isSecret }"))
     }
