@@ -233,6 +233,8 @@ internal fun TaskEditorDialog(
     }
 
     AlertDialog(
+        // Yellow edge, matching the action editor and the other editor dialogs.
+        modifier = Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = cleanupAndDismiss,
         title = { Text(if (task == null) stringResource(R.string.dialog_create_task) else stringResource(R.string.dialog_edit_task)) },
         text = {

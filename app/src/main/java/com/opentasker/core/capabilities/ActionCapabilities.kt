@@ -107,6 +107,7 @@ object ActionCapabilityRegistry {
         "call.place" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs the Phone (CALL_PHONE) permission to dial directly; otherwise opens the dialer."),
         "brightness.auto" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access.", CapabilityRequirement.WriteSettings, blocking = true),
         "setting.put" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access; only the System namespace is writable without Shizuku.", CapabilityRequirement.WriteSettings, blocking = true),
+        "system.set_locale" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access plus the adb-granted CHANGE_CONFIGURATION permission (pm grant … android.permission.CHANGE_CONFIGURATION).", CapabilityRequirement.WriteSettings, blocking = true),
         "dialog.input" to dialogCapability(),
         "dialog.list" to dialogCapability(),
         "dialog.text" to dialogCapability(),

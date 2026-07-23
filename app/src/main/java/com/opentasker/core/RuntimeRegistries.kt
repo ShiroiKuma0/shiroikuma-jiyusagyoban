@@ -17,6 +17,8 @@ import com.opentasker.core.actions.AudioRecordStopAction
 import com.opentasker.core.actions.BluetoothToggleAction
 import com.opentasker.core.actions.BrightnessAction
 import com.opentasker.core.actions.DoNotDisturbAction
+import com.opentasker.core.actions.GetLocaleAction
+import com.opentasker.core.actions.SetLocaleAction
 import com.opentasker.core.actions.DeleteFileAction
 import com.opentasker.core.actions.DownloadAction
 import com.opentasker.core.actions.GoHomeAction
@@ -176,6 +178,8 @@ private fun registerBuiltInActions() {
         AirplaneModeAction(),
         MobileDataAction(),
         ScreenTimeoutAction(),
+        GetLocaleAction(),
+        SetLocaleAction(),
         DoNotDisturbAction(),
         RingerModeAction(),
         TorchAction(),

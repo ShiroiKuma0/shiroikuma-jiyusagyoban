@@ -158,13 +158,22 @@ object CapabilityState {
      * Permissions a task needs that are BLOCKING and not currently granted. Empty = the task may run.
      * Used as a pre-flight gate so a task never runs half-broken for lack of a permission.
      */
-    fun missingForTask(task: com.opentasker.core.model.Task, context: Context): List<MissingCapability> {
+    suspend fun missingForTask(task: com.opentasker.core.model.Task, context: Context): List<MissingCapability> {
         val byReq = LinkedHashMap<CapabilityRequirement, MutableList<String>>()
         for (action in task.actions) {
             val cap = ActionCapabilityRegistry.get(action.type)
             if (cap.requirement != CapabilityRequirement.None && cap.blocking && !isMet(cap.requirement, context)) {
                 byReq.getOrPut(cap.requirement) { mutableListOf() }.add(action.type)
             }
+        }
+        // Tolerate the accessibility unbind→rebind transient: EMUI drops the live binding across a
+        // configuration change (a locale switch) or a memory-pressure reap while the system toggle stays
+        // on, so a task firing in that ~1–2 s window would otherwise be blocked spuriously. Wait for the
+        // rebind and drop the requirement if it comes back; a genuinely-off toggle returns at once.
+        if (byReq.containsKey(CapabilityRequirement.Accessibility) &&
+            ShiroiKumaAccessibilityService.awaitConnected(context)
+        ) {
+            byReq.remove(CapabilityRequirement.Accessibility)
         }
         return byReq.map { (req, types) -> MissingCapability(req, types.distinct()) }
     }
