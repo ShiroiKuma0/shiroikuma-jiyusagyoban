@@ -41,6 +41,18 @@ class SceneOverlayServiceTest {
     }
 
     @Test
+    fun taskFiringOverlayControlsFilterObscuredTouches() {
+        // Tapjacking guard: the BUTTON and the task-bound SLIDER both fire tasks, so both must
+        // drop touches delivered while obscured by a malicious overlay.
+        val source = loadMainSource("com/opentasker/core/scenes/SceneOverlayService.kt")
+        val guards = source.split("filterTouchesWhenObscured = true").size - 1
+        assertTrue(
+            "Every task-firing overlay control must set filterTouchesWhenObscured (found $guards)",
+            guards >= 2,
+        )
+    }
+
+    @Test
     fun channelIdIsStable() {
         assertEquals("opentasker.scenes", SceneOverlayService.CHANNEL_ID)
     }

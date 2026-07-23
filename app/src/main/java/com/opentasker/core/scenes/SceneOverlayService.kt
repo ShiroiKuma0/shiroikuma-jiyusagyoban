@@ -182,6 +182,9 @@ class SceneOverlayService : Service() {
         return when (element.type) {
             SceneElementType.BUTTON -> Button(this).apply {
                 text = element.config["label"] ?: getString(R.string.scene_overlay_default_button)
+                // Tapjacking guard: drop taps delivered while a malicious window obscures this
+                // task-firing control (the overlay floats over other apps).
+                filterTouchesWhenObscured = true
                 setOnClickListener {
                     element.tapTaskId?.let { taskId -> fireRunTask(taskId) }
                 }
@@ -209,6 +212,8 @@ class SceneOverlayService : Service() {
                     // A slider bound to a task fires it on release with the value as a variable;
                     // an unbound slider is display-only.
                     if (boundTaskId != null) {
+                        // Tapjacking guard for the task-firing slider.
+                        filterTouchesWhenObscured = true
                         setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                             override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) = Unit
                             override fun onStartTrackingTouch(bar: SeekBar) = Unit
