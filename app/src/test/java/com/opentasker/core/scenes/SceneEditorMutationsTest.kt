@@ -24,6 +24,20 @@ class SceneEditorMutationsTest {
     }
 
     @Test
+    fun moveSelectedIgnoresStaleOutOfRangeIndices() {
+        val first = element(id = 1, x = 10, y = 20, width = 50, height = 40)
+        val second = element(id = 2, x = 100, y = 60, width = 30, height = 30)
+        val scene = Scene(1, "Canvas", 300, 200, listOf(first, second))
+
+        // Index 5 no longer exists (e.g. an element was deleted); it must be ignored, not crash or
+        // shift the wrong element.
+        val updated = SceneEditorMutations.moveSelected(scene, setOf(0, 5), requestedDeltaX = 20, requestedDeltaY = 10)
+
+        assertEquals(first.copy(xDp = 30, yDp = 30), updated.elements[0])
+        assertEquals(second, updated.elements[1])
+    }
+
+    @Test
     fun portraitCanvasResizeUsesIndependentAxisScales() {
         val original = element(id = 1, x = 20, y = 40, width = 100, height = 100)
         val scene = Scene(1, "Portrait", 400, 800, listOf(original))

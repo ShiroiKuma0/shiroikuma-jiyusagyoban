@@ -165,7 +165,11 @@ internal fun SceneCard(
 ) {
     val taskNames = remember(tasks) { tasks.associate { it.id to it.name } }
     val issues = remember(scene, tasks) { SceneValidator.validate(scene, tasks) }
-    var selectedIndices by remember(scene.id) { mutableStateOf(emptySet<Int>()) }
+    // Key the selection on the element identity list, not just scene.id: when an element is added
+    // or deleted the indices shift, so surviving indices would point at the wrong elements and a
+    // group move would move the wrong ones. Resetting on any structural change keeps it honest.
+    val elementIds = scene.elements.map { it.id }
+    var selectedIndices by remember(scene.id, elementIds) { mutableStateOf(emptySet<Int>()) }
     val overlayReady = sceneOverlayReady()
 
     Card(

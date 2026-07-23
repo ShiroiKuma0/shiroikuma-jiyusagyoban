@@ -199,7 +199,10 @@ private fun SceneCanvasElement(
                 .fillMaxSize()
                 .pointerInput(scene.id, element.id, projection.x, projection.y, canvasWidth, canvasHeight, density.density) {
                     detectDragGestures(
-                        onDragStart = { onSelect() },
+                        // Only add to the selection if this member isn't already selected; toggling
+                        // here would deselect a selected element the moment the user starts to drag
+                        // it, silently dropping it from a multi-selection group move.
+                        onDragStart = { if (!selected) onSelect() },
                         onDrag = { change, dragAmount ->
                             change.consume()
                             dragX += dragAmount.x / density.density
