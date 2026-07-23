@@ -633,6 +633,10 @@
     <string name="diagnostics_fgs_types">Foreground service types</string>
     <string name="diagnostics_standby_bucket">App standby bucket</string>
     <string name="diagnostics_standby_throttled">This bucket throttles the per-minute trigger alarm and background workers, so time and polling triggers may fire late. Add OpenTasker to the battery-optimization exemption list in Setup to keep it responsive.</string>
+    <string name="diagnostics_advanced_protection">Advanced Protection</string>
+    <string name="diagnostics_advanced_protection_on">On</string>
+    <string name="diagnostics_advanced_protection_off">Off</string>
+    <string name="diagnostics_advanced_protection_warning">Android Advanced Protection Mode is on. It can revoke Accessibility from apps not registered as an accessibility tool and restrict some automation capabilities. OpenTasker does not use Accessibility, so its triggers keep working, but privileged extensions (such as Shizuku power actions) may be limited until you turn Advanced Protection off.</string>
     <string name="diagnostics_exact_alarm">Time alarm delivery</string>
     <string name="diagnostics_matcher_error">Last matcher error</string>
     <string name="diagnostics_worker_stop">Watchdog stop reason</string>

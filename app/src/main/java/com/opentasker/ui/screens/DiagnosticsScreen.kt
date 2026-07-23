@@ -190,6 +190,22 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
                 health?.exactAlarmStatus ?: stringResource(R.string.diagnostics_loading),
             )
             HealthRow(
+                stringResource(R.string.diagnostics_advanced_protection),
+                health?.let {
+                    stringResource(
+                        if (it.advancedProtectionEnabled) R.string.diagnostics_advanced_protection_on
+                        else R.string.diagnostics_advanced_protection_off,
+                    )
+                } ?: stringResource(R.string.diagnostics_loading),
+            )
+            if (health?.advancedProtectionEnabled == true) {
+                Text(
+                    stringResource(R.string.diagnostics_advanced_protection_warning),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            HealthRow(
                 stringResource(R.string.diagnostics_matcher_error),
                 health?.lastMatcherError ?: stringResource(R.string.diagnostics_none),
             )

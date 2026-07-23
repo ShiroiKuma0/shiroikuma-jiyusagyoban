@@ -20,6 +20,8 @@ data class EngineHealthStatus(
     val standbyBucket: String,
     /** True when the app-standby bucket (RARE/RESTRICTED) throttles the per-minute alarm/workers. */
     val standbyThrottled: Boolean,
+    /** True when Android 16 Advanced Protection Mode is active and may degrade automation features. */
+    val advancedProtectionEnabled: Boolean,
     val exactAlarmStatus: String,
     val lastMatcherError: String?,
     val lastMatcherErrorAtMillis: Long,
@@ -42,6 +44,7 @@ object EngineHealthReader {
             activeForegroundServiceTypes = foregroundServiceTypeLabel(persisted.heartbeat.foregroundServiceTypes),
             standbyBucket = standbyBucketLabel(context),
             standbyThrottled = standbyBucketThrottled(context),
+            advancedProtectionEnabled = AdvancedProtectionReader.isEnabled(context),
             exactAlarmStatus = when (ExactAlarmSupport.schedulePrecision(context)) {
                 AlarmSchedulePrecision.Exact -> "Exact allowed"
                 AlarmSchedulePrecision.InexactFallback -> "Inexact Doze fallback"

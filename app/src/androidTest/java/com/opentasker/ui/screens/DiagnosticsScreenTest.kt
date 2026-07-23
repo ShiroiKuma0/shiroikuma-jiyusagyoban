@@ -31,6 +31,7 @@ class DiagnosticsScreenTest {
                 activeForegroundServiceTypes = "special use",
                 standbyBucket = "Active",
                 standbyThrottled = false,
+                advancedProtectionEnabled = false,
                 exactAlarmStatus = "Exact allowed",
                 lastMatcherError = null,
                 lastMatcherErrorAtMillis = 0L,
