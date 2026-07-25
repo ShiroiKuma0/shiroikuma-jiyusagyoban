@@ -3,6 +3,61 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.78+8 — 2026-07-25
+
+One-tap backup of **every** 白い熊 app: this build is the app-side half of a cross-app export
+contract, plus the pickers, timeouts, and file naming the new **保存復元** workspace project needs.
+
+### The sister-app state-export contract
+- **`StateExportReceiver`** (exported, token-gated) answers two new actions:
+  - `shiroikuma.jiyusagyoban.action.EXPORT_STATE` — runs the full category-ZIP export headlessly
+    (no UI). String extras: `token`, `path` (absolute directory; **overrides** the configured SAF
+    directory), `items` (comma list of category ids; absent = everything), `progress_action`, plus
+    the reply trio `reply_action` / `reply_package` / `reply_id`. Replies
+    `OK:<path>|<bytes>|<human size>|<n> categories` or `ERROR:<reason>`.
+  - `shiroikuma.jiyusagyoban.action.LIST_CATEGORIES` — replies `OK:` + one `id<TAB>label` line per
+    exportable category, so a caller can offer a live item picker.
+- **Replies ride a fresh broadcast** back to the caller (`FLAG_INCLUDE_STOPPED_PACKAGES`), single-fire
+  guarded by an `AtomicBoolean`, sent from `goAsync()` + an IO dispatcher. EMUI severs both live
+  binders and the ordered-broadcast result between third-party apps, so this is the only channel that
+  works — the same shape renrakusaki's contacts backup proved.
+- **Progress broadcasts** while exporting: `app`, `text` (numbers-first display line), and structured
+  `current` / `total` (long) + `unit`. `SettingsBackup.export` takes an optional per-category
+  `onProgress` callback that feeds them.
+- **`AutomationAuth`** — `automation_enabled` (default off) + `automation_token` (24 random bytes,
+  hex, generated lazily, compared constant-time with `MessageDigest.isEqual`). Device-local: its
+  prefs file is deliberately **not** in the export map, so the token never travels in a backup.
+- **UI**: a master switch and a tap-to-copy token row (with Regenerate) appended to the **Export /
+  Import** section of the 白い熊 自由作業盤 UI page — same placement in every sister app.
+
+### Export file naming — the family convention
+- Backups are now named **`shiroikuma-jiyusagyoban_<yyyy-MM-dd_HH-mm-ss>.zip`** — English app name
+  plus datetime, **no version, no `-export` infix** — from both the automation path and the UI page,
+  so every sister app's backups sort and read alike in one shared directory.
+- The "Last export" query accepts the legacy `白い熊 自由作業盤-…` prefix too, so older backups stay
+  recognised.
+
+### Actions
+- **Pick From List → Variable** (`dialog.pickmulti`, Alert) — checkbox multi-select over arbitrary
+  items, with a bold **全選択** master toggle above a divider, optional display labels, and optional
+  parent ids: sub-options indent under their parent and follow its toggle. Current values pre-ticked;
+  cancel leaves the variable untouched.
+- **Pick One App → Variable** (`app.pick`, App) — the icon-tile app grid in one-tap mode, optionally
+  restricted to a package list (e.g. only the apps in a backup target list).
+- **Pick Apps → Variable** (`app.pickmulti`) gains **`include_self`**, so a backup-target list can
+  include 自由作業盤 itself; an own package already in the selection is now always shown.
+- **Send Intent** (`intent.send`) — receiver-mode `result_timeout` raised from 120 s to **600 s**: a
+  sister-app export legitimately runs for minutes.
+
+### Engine
+- Per-action budgets: `intent.send` gets 660 s (its 600 s ceiling plus slack) and `dialog.*` /
+  `app.pickmulti` get 600 s, so a blocking reply or a picker left open is no longer killed at 60 s.
+
+### Fixes
+- **`var.split` with `delete_base` destroyed the array it had just created** — `unset()` clears the
+  array store as well, so `flow.foreach` over a freshly split list saw zero items and silently
+  skipped the whole loop. The scalar is now removed *before* the array is stored.
+
 ## 0.2.78+3 — 2026-07-25
 
 The UI page grows a full app-state Export/Import (Kōjiki-style category ZIP) and takes on the kxkb
