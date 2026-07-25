@@ -325,6 +325,33 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "task.exists",
+            name = "Task Exists",
+            description = "Store true/false for whether a task of this name exists — so a task can generate a missing sub-task instead of failing on it",
+            category = "Tasks",
+            fields = listOf(
+                ActionField("task", "Task name", required = true),
+                ActionField("project", "Project name", hint = "optional — limits the search to one project"),
+                ActionField("store", "Result variable", hint = "gets 'true' or 'false'; default 'exists'"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "tasks.sort",
+            name = "Sort Group Tasks",
+            description = "Put one task group back in alphabetical order, below the project's ungrouped tasks — for groups that grow a generated task per app",
+            category = "Tasks",
+            fields = listOf(
+                ActionField("project", "Project name", required = true),
+                ActionField("group", "Group name", required = true, hint = "a group on the Tasks tab"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "var.persist",
             name = "Persist Variable",
             description = "Copy a variable's current value into the global scope so it survives across task runs",

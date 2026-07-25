@@ -142,3 +142,94 @@ class AddActionAction : Action {
         return ActionResult.Success
     }
 }
+
+/**
+ * `Task Exists` — store `true`/`false` for whether a task of this name exists, optionally scoped to one
+ * [project]. Lets a task decide whether to generate something before calling it: 保存対象選択 checks for
+ * each picked app's `保存 ⇨ <pkg>` wrapper and hands the missing ones to 保存作成, instead of leaving
+ * 保存項目選択 to die on "sub-task not found".
+ */
+class TaskExistsAction : Action {
+    override val id = "task.exists"
+    override val category = ActionCategory.SYSTEM
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val taskName = args["task"].orEmpty().trim()
+        if (taskName.isEmpty()) return ActionResult.Failure("task name is required")
+        val projectName = args["project"].orEmpty().trim()
+        val store = args["store"]?.trim()?.removePrefix("%")?.takeIf { it.isNotEmpty() } ?: "exists"
+
+        val db = OpenTaskerApp_NoHilt.db
+        val found = withContext(Dispatchers.IO) {
+            val pid = if (projectName.isEmpty()) null else
+                db.projectDao().getAll().firstOrNull { it.name.equals(projectName, ignoreCase = true) }?.id
+                    ?: return@withContext null
+            db.taskDao().getAll().any {
+                it.name.equals(taskName, ignoreCase = true) && (pid == null || it.projectId == pid)
+            }
+        } ?: return ActionResult.Failure("no such project: $projectName")
+
+        ctx.variables.set(store, found.toString())
+        ctx.logger("Task \"$taskName\" exists=$found")
+        return ActionResult.Success
+    }
+}
+
+/**
+ * `Sort Group Tasks` — put one group's tasks back in alphabetical order. Needed because tasks generated
+ * one-per-app land wherever they were created: 保存復元's 保存タスク group grows a
+ * `保存 ⇨ <pkg>` wrapper per sister app, so without this the newest app sits at the bottom instead of
+ * next to its neighbours.
+ */
+class SortGroupTasksAction : Action {
+    override val id = "tasks.sort"
+    override val category = ActionCategory.SYSTEM
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val projectName = args["project"].orEmpty().trim()
+        if (projectName.isEmpty()) return ActionResult.Failure("project name is required")
+        val groupName = args["group"].orEmpty().trim()
+        if (groupName.isEmpty()) return ActionResult.Failure("group name is required")
+
+        val db = OpenTaskerApp_NoHilt.db
+        val sorted = withContext(Dispatchers.IO) {
+            val project = db.projectDao().getAll().firstOrNull { it.name.equals(projectName, ignoreCase = true) }
+                ?: return@withContext -1
+            val group = db.itemGroupDao().getForTab("tasks")
+                .firstOrNull { it.projectId == project.id && it.name == groupName }
+                ?: return@withContext -2
+            sortGroupTasksAlphabetically(project.id, group.id)
+        }
+        return when (sorted) {
+            -1 -> ActionResult.Failure("no such project: $projectName")
+            -2 -> ActionResult.Failure("no such task group: $groupName")
+            else -> {
+                ctx.logger("Sorted $sorted tasks in $groupName")
+                ActionResult.Success
+            }
+        }
+    }
+}
+
+/**
+ * Renumber one group's tasks into alphabetical order, positioned BELOW every non-group task of the
+ * project — the layout `tasks.launchers` has always produced for its generated group, lifted out here so
+ * [SortGroupTasksAction] can apply the same rule to a hand-built group. The grouped list orders items by
+ * `TaskEntity.position`; `ItemMetaEntity.position` is kept in step. Returns how many tasks were ordered.
+ */
+internal suspend fun sortGroupTasksAlphabetically(projectId: Long, groupId: Long): Int {
+    val db = OpenTaskerApp_NoHilt.db
+    val idsInGroup = db.itemMetaDao().getForTab("tasks")
+        .filter { it.groupId == groupId }
+        .mapNotNull { it.itemKey.toLongOrNull() }
+        .toSet()
+    val all = db.taskDao().getAll()
+    val maxOther = all.filter { it.projectId == projectId && it.id !in idsInGroup }
+        .maxOfOrNull { it.position } ?: -1
+    val sorted = all.filter { it.id in idsInGroup }.sortedBy { it.name.lowercase() }
+    sorted.forEachIndexed { index, task ->
+        val newPos = maxOther + 1 + index
+        if (task.position != newPos) db.taskDao().setPosition(task.id, newPos)
+        val meta = db.itemMetaDao().get("tasks", task.id.toString())
+        if (meta != null && meta.position != index) db.itemMetaDao().upsert(meta.copy(position = index))
+    }
+    return sorted.size
+}
