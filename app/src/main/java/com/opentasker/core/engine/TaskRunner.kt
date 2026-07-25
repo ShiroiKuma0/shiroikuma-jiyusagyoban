@@ -534,11 +534,18 @@ private fun actionTimeoutMs(actionType: String): Long = when {
     // Playback and speech suspend until completion; a long sound file or near-limit TTS
     // text legitimately outlives the default 60 s budget.
     actionType == "sound.play" || actionType == "tts.speak" -> MEDIA_ACTION_TIMEOUT_MS
+    // intent.send receiver-mode replies wait on real work in the target app (sister-app
+    // state exports run for minutes); its result_timeout caps at 600 s, budget adds slack.
+    actionType == "intent.send" -> INTENT_SEND_TIMEOUT_MS
+    // Interactive dialogs suspend on the user; a picker pondered for over a minute must not
+    // be killed under them (their own `timeout` arg still applies when set).
+    actionType.startsWith("dialog.") || actionType == "app.pickmulti" -> MEDIA_ACTION_TIMEOUT_MS
     else -> DEFAULT_ACTION_TIMEOUT_MS
 }
 
 private const val DEFAULT_ACTION_TIMEOUT_MS = 60_000L
 private const val MEDIA_ACTION_TIMEOUT_MS = 600_000L // 10 minutes
+private const val INTENT_SEND_TIMEOUT_MS = 660_000L // result_timeout max (600 s) + 60 s margin
 
 // The engine budget must exceed WaitAction.MAX_WAIT_MS (30 min): the timeout clock starts
 // before the action parses its arguments, so an equal budget deterministically failed a

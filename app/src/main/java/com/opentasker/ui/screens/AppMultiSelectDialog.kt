@@ -103,11 +103,21 @@ private object AppPickerPrefs {
  * and the package id, and the id line under each label shows *why* a tile matched. A ⚙ panel exposes
  * the tile sizing (icon dp, label sp, id sp), persisted across invocations. The OK button hands back
  * the selected (package, label) pairs.
+ *
+ * [restrictPackages] non-null limits the grid to exactly those packages (own package included —
+ * needed when the caller's list contains this app itself). [singleSelect] turns the grid into a
+ * one-tap chooser: tapping a tile confirms that single app immediately (no OK button).
+ * [includeSelf] keeps THIS app in an unrestricted grid — normally hidden (a task can't sensibly
+ * blacklist its own app), but a backup-target list must be able to include 自由作業盤 itself.
+ * An already-selected own package is always shown, so a stored selection is never invisible.
  */
 @Composable
 internal fun AppMultiSelectDialog(
     title: String,
     preselected: Set<String> = emptySet(),
+    restrictPackages: Set<String>? = null,
+    singleSelect: Boolean = false,
+    includeSelf: Boolean = false,
     onConfirm: (List<Pair<String, String>>) -> Unit,
     onCancel: () -> Unit,
 ) {
@@ -145,11 +155,16 @@ internal fun AppMultiSelectDialog(
                 }
                 all.asSequence()
                     .filter { info ->
-                        // Keep USER apps: non-system, or a user-updated system app.
-                        (info.flags and ApplicationInfo.FLAG_SYSTEM) == 0 ||
-                            (info.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+                        if (restrictPackages != null) {
+                            // Restricted mode shows exactly the caller's list — own package included.
+                            info.packageName in restrictPackages
+                        } else {
+                            // Keep USER apps: non-system, or a user-updated system app.
+                            ((info.flags and ApplicationInfo.FLAG_SYSTEM) == 0 ||
+                                (info.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0) &&
+                                (info.packageName != ownPkg || includeSelf || info.packageName in preselected)
+                        }
                     }
-                    .filter { it.packageName != ownPkg }
                     .map { PickableApp(pm.getApplicationLabel(it).toString(), it.packageName) }
                     .distinctBy { it.pkg }
                     .toList()
@@ -246,8 +261,13 @@ internal fun AppMultiSelectDialog(
                                 padH = padH,
                                 selected = selected.containsKey(app.pkg),
                                 onToggle = {
-                                    if (selected.containsKey(app.pkg)) selected.remove(app.pkg)
-                                    else selected[app.pkg] = app.label
+                                    if (singleSelect) {
+                                        onConfirm(listOf(app.pkg to app.label))
+                                    } else if (selected.containsKey(app.pkg)) {
+                                        selected.remove(app.pkg)
+                                    } else {
+                                        selected[app.pkg] = app.label
+                                    }
                                 },
                             )
                         }
@@ -256,10 +276,12 @@ internal fun AppMultiSelectDialog(
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onCancel) { Text("Cancel") }
-                    Spacer(Modifier.width(8.dp))
-                    TextButton(onClick = {
-                        onConfirm(selected.map { (pkg, label) -> pkg to label })
-                    }) { Text("OK (${selected.size})") }
+                    if (!singleSelect) {
+                        Spacer(Modifier.width(8.dp))
+                        TextButton(onClick = {
+                            onConfirm(selected.map { (pkg, label) -> pkg to label })
+                        }) { Text("OK (${selected.size})") }
+                    }
                 }
             }
         }

@@ -38,7 +38,8 @@ import kotlin.coroutines.resume
  *                 result data into this variable — the query channel for sister-app round-trips
  *                 (e.g. GET_PROTECTED_CONTACTS returns the app's stored protected list). Empty
  *                 when nobody answered within the timeout.
- *   - "result_timeout": seconds to wait for the ordered-broadcast result (default 5).
+ *   - "result_timeout": seconds to wait for the result — ordered mode default 5 (max 60),
+ *                 receiver mode default 30 (max 600, for long sister-app exports).
  *
  * All extras are sent as String extras. Android's boolean-extra caveat (a string
  * "true" reads back as false) doesn't bite here: the Jami video flag travels via
@@ -124,7 +125,10 @@ class SendIntentAction : Action {
                     // ORDERED with FLAG_INCLUDE_STOPPED_PACKAGES — a plain sendBroadcast is dropped for a
                     // backgrounded / freshly-installed (stopped) target on this device.
                     if (resultVar != null && args["reply_via"]?.trim()?.lowercase() == "receiver") {
-                        val timeoutSec = args["result_timeout"]?.trim()?.toIntOrNull()?.coerceIn(1, 120) ?: 30
+                        // Receiver mode may wait on genuinely long work in the target app (a sister-app
+                        // state export can run for minutes), so it gets a 600 s ceiling; the engine's
+                        // per-action budget special-cases intent.send to stay above it (TaskRunner).
+                        val timeoutSec = args["result_timeout"]?.trim()?.toIntOrNull()?.coerceIn(1, 600) ?: 30
                         val replyId = java.util.UUID.randomUUID().toString()
                         val reply = withTimeoutOrNull(timeoutSec * 1000L) {
                             suspendCancellableCoroutine<String> { cont ->

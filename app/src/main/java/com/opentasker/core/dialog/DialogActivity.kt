@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -15,6 +16,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -25,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
@@ -86,11 +90,29 @@ class DialogActivity : ComponentActivity() {
                         onPick = { index -> settle(DialogOutcome.Confirmed(items[index], index)) },
                         onCancel = { settle(DialogOutcome.Cancelled) })
                     TYPE_APP_MULTISELECT -> AppMultiSelectDialog(title, preselected,
+                        includeSelf = intent.getBooleanExtra(EXTRA_INCLUDE_SELF, false),
                         onConfirm = { picked ->
                             // One app per line, "<package>\t<label>".
                             val value = picked.joinToString("\n") { (pkg, label) -> "$pkg\t$label" }
                             settle(DialogOutcome.Confirmed(value))
                         },
+                        onCancel = { settle(DialogOutcome.Cancelled) })
+                    TYPE_APP_SINGLESELECT -> AppMultiSelectDialog(
+                        title,
+                        restrictPackages = intent.getStringExtra(EXTRA_PACKAGES).orEmpty()
+                            .split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
+                        singleSelect = true,
+                        onConfirm = { picked ->
+                            settle(DialogOutcome.Confirmed(picked.firstOrNull()?.first.orEmpty()))
+                        },
+                        onCancel = { settle(DialogOutcome.Cancelled) })
+                    TYPE_LIST_MULTISELECT -> ListMultiSelectDialog(
+                        title, items,
+                        labels = intent.getStringArrayExtra(EXTRA_LABELS)?.toList() ?: emptyList(),
+                        parents = intent.getStringArrayExtra(EXTRA_PARENTS)?.toList() ?: emptyList(),
+                        preselected = preselected, okLabel = okLabel, cancelLabel = cancelLabel,
+                        // One value per line, in item order.
+                        onConfirm = { picked -> settle(DialogOutcome.Confirmed(picked.joinToString("\n"))) },
                         onCancel = { settle(DialogOutcome.Cancelled) })
                     else -> TextDialog(title, text, okLabel, textCancelLabel, settingsTargets,
                         onOpenSettings = { req -> openSettingsFor(req) },
@@ -133,6 +155,10 @@ class DialogActivity : ComponentActivity() {
         const val EXTRA_TEXT = "text"
         const val EXTRA_DEFAULT = "default"
         const val EXTRA_ITEMS = "items"
+        const val EXTRA_LABELS = "labels" // optional display labels parallel to EXTRA_ITEMS
+        const val EXTRA_PARENTS = "parents" // optional parent ids parallel to EXTRA_ITEMS ("" = top-level)
+        const val EXTRA_PACKAGES = "packages" // newline-joined package restriction for the app pickers
+        const val EXTRA_INCLUDE_SELF = "include_self" // keep this app in an unrestricted app grid
         const val EXTRA_PRESELECTED = "preselected"
         const val EXTRA_INPUT_TYPE = "input_type"
         const val EXTRA_OK = "ok"
@@ -144,6 +170,8 @@ class DialogActivity : ComponentActivity() {
         const val TYPE_LIST = "list"
         const val TYPE_TEXT = "text"
         const val TYPE_APP_MULTISELECT = "app_multiselect"
+        const val TYPE_APP_SINGLESELECT = "app_singleselect"
+        const val TYPE_LIST_MULTISELECT = "list_multiselect"
     }
 }
 
@@ -221,6 +249,81 @@ private fun ListDialog(
             }
         },
         confirmButton = {},
+        dismissButton = { TextButton(onClick = onCancel) { Text(cancelLabel) } },
+    )
+}
+
+@Composable
+private fun ListMultiSelectDialog(
+    title: String,
+    items: List<String>,
+    labels: List<String>,
+    parents: List<String>,
+    preselected: Set<String>,
+    okLabel: String,
+    cancelLabel: String,
+    onConfirm: (List<String>) -> Unit,
+    onCancel: () -> Unit,
+) {
+    var checked by remember { mutableStateOf(preselected.filter { it in items.toSet() }.toSet()) }
+    fun childrenOf(id: String): List<String> =
+        items.filterIndexed { i, _ -> parents.getOrNull(i)?.trim() == id }
+    AlertDialog(
+        modifier = dialogModifier(),
+        onDismissRequest = onCancel,
+        title = { if (title.isNotBlank()) Text(title) },
+        text = {
+            Column(Modifier.fillMaxWidth().heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
+                // Pinned master toggle: one tap checks everything (or clears everything when
+                // already complete) — replaces the confusing "leave empty = all" convention.
+                val allChecked = checked.size == items.size
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { checked = if (allChecked) emptySet() else items.toSet() }
+                        .padding(vertical = 4.dp),
+                ) {
+                    Checkbox(checked = allChecked, onCheckedChange = null)
+                    Text(
+                        "全選択",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 6.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                items.forEachIndexed { index, item ->
+                    val isChecked = item in checked
+                    val isChild = parents.getOrNull(index)?.trim().orEmpty().isNotEmpty()
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                // Toggling a parent carries its sub-options with it.
+                                val kids = childrenOf(item)
+                                checked = if (isChecked) checked - item - kids.toSet()
+                                else checked + item + kids
+                            }
+                            .padding(vertical = 4.dp, horizontal = if (isChild) 24.dp else 0.dp),
+                    ) {
+                        Checkbox(checked = isChecked, onCheckedChange = null)
+                        Text(
+                            labels.getOrNull(index)?.takeIf { it.isNotBlank() } ?: item,
+                            style = if (isChild) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(items.filter { it in checked }) }) { Text(okLabel) }
+        },
         dismissButton = { TextButton(onClick = onCancel) { Text(cancelLabel) } },
     )
 }

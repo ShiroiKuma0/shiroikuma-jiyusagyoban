@@ -109,6 +109,10 @@ class PickAppsToVariableAction : Action {
             putExtra(DialogActivity.EXTRA_TYPE, DialogActivity.TYPE_APP_MULTISELECT)
             putExtra(DialogActivity.EXTRA_TITLE, args["title"].orEmpty())
             putExtra(DialogActivity.EXTRA_PRESELECTED, preselected.joinToString("\n"))
+            putExtra(
+                DialogActivity.EXTRA_INCLUDE_SELF,
+                args["include_self"]?.trim()?.lowercase() in setOf("true", "1", "yes", "on"),
+            )
         }
         when (outcome) {
             is DialogOutcome.Confirmed -> {
@@ -118,6 +122,74 @@ class PickAppsToVariableAction : Action {
                 ctx.logger("Picked ${pkgs.size} apps → %$name")
             }
             DialogOutcome.Cancelled -> ctx.logger("App pick cancelled; %$name unchanged")
+        }
+        return ActionResult.Success
+    }
+}
+
+/**
+ * Pick ONE app from the icon-tile grid (the app.pickmulti UI in single-tap mode), optionally
+ * restricted to the packages in [packages] (separator: whitespace). The picked package lands in
+ * [store] (default "picked"); cancel stores "".
+ */
+class PickAppDialogAction : Action {
+    override val id = "app.pick"
+    override val category = ActionCategory.APP
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val store = args["store"]?.trim()?.removePrefix("%")?.takeIf { it.isNotEmpty() } ?: "picked"
+        val packages = args["packages"].orEmpty().split(Regex("\\s+")).map { it.trim() }.filter { it.isNotEmpty() }
+        val outcome = showDialog(ctx, args["timeout"]?.toIntOrNull()) {
+            putExtra(DialogActivity.EXTRA_TYPE, DialogActivity.TYPE_APP_SINGLESELECT)
+            putExtra(DialogActivity.EXTRA_TITLE, args["title"].orEmpty())
+            putExtra(DialogActivity.EXTRA_PACKAGES, packages.joinToString("\n"))
+        }
+        when (outcome) {
+            is DialogOutcome.Confirmed -> ctx.variables.set(store, outcome.value)
+            DialogOutcome.Cancelled -> ctx.variables.set(store, "")
+        }
+        ctx.logger("App pick → %$store")
+        return ActionResult.Success
+    }
+}
+
+/**
+ * Multi-select an arbitrary item list with checkboxes, PRE-TICKING the values already in [variable],
+ * then write the chosen values back to [variable], joined by [separator] (default a comma). Optional
+ * parallel [labels] give each value a display label (e.g. category ids with human names). Cancel
+ * leaves the variable untouched. The string-list sibling of app.pickmulti.
+ */
+class PickListToVariableAction : Action {
+    override val id = "dialog.pickmulti"
+    override val category = ActionCategory.SYSTEM
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val name = args["variable"]?.trim()?.removePrefix("%")?.takeIf { it.isNotEmpty() }
+            ?: return ActionResult.Failure("variable name is required")
+        val separator = args["separator"]?.takeUnless { it.isNullOrEmpty() } ?: ","
+        val items = args["items"].orEmpty().split(separator).map { it.trim() }.filter { it.isNotEmpty() }
+        if (items.isEmpty()) return ActionResult.Failure("no items to show")
+        val labels = args["labels"].orEmpty().split(separator).map { it.trim() }
+        val parents = args["parents"].orEmpty().split(separator).map { it.trim() }
+        val current = ctx.variables.get(name).orEmpty()
+        val preselected = current.split(separator).map { it.trim() }.filter { it.isNotEmpty() }
+        val outcome = showDialog(ctx, args["timeout"]?.toIntOrNull()) {
+            putExtra(DialogActivity.EXTRA_TYPE, DialogActivity.TYPE_LIST_MULTISELECT)
+            putExtra(DialogActivity.EXTRA_TITLE, args["title"].orEmpty())
+            putExtra(DialogActivity.EXTRA_ITEMS, items.toTypedArray())
+            if (labels.any { it.isNotEmpty() }) {
+                putExtra(DialogActivity.EXTRA_LABELS, labels.toTypedArray())
+            }
+            if (parents.any { it.isNotEmpty() }) {
+                putExtra(DialogActivity.EXTRA_PARENTS, parents.toTypedArray())
+            }
+            putExtra(DialogActivity.EXTRA_PRESELECTED, preselected.joinToString("\n"))
+        }
+        when (outcome) {
+            is DialogOutcome.Confirmed -> {
+                val picked = outcome.value.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+                ctx.variables.set(name, picked.joinToString(separator))
+                ctx.logger("Picked ${picked.size} items → %$name")
+            }
+            DialogOutcome.Cancelled -> ctx.logger("List pick cancelled; %$name unchanged")
         }
         return ActionResult.Success
     }

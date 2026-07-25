@@ -348,6 +348,18 @@
             </intent-filter>
         </receiver>
 
+        <!-- Sister-app state-export automation contract (保存復元): headless category-ZIP export +
+             category listing, gated by the automation token (AutomationAuth); replies ride a fresh
+             broadcast back to the caller's reply receiver (renrakusaki shape). -->
+        <receiver
+            android:name="com.opentasker.core.transfer.StateExportReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="shiroikuma.jiyusagyoban.action.EXPORT_STATE" />
+                <action android:name="shiroikuma.jiyusagyoban.action.LIST_CATEGORIES" />
+            </intent-filter>
+        </receiver>
+
         <!-- Reply channel for Send Intent's "receiver" mode: a sister app broadcasts the result back
              here (binder-free). Exported so the sister app can reach it; a fake reply would need the
              random per-call reply id, which is never disclosed to other apps. -->

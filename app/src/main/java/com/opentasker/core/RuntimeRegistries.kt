@@ -124,7 +124,9 @@ import com.opentasker.core.actions.GetSettingAction
 import com.opentasker.core.actions.PutSettingAction
 import com.opentasker.core.actions.InputDialogAction
 import com.opentasker.core.actions.ListDialogAction
+import com.opentasker.core.actions.PickAppDialogAction
 import com.opentasker.core.actions.PickAppsToVariableAction
+import com.opentasker.core.actions.PickListToVariableAction
 import com.opentasker.core.actions.TextDialogAction
 import com.opentasker.core.actions.ShellRunAction
 import com.opentasker.core.actions.LocationModeAction
@@ -272,6 +274,8 @@ private fun registerBuiltInActions() {
         InputDialogAction(),
         ListDialogAction(),
         PickAppsToVariableAction(),
+        PickAppDialogAction(),
+        PickListToVariableAction(),
         TextDialogAction(),
         ShellRunAction(),
         LocationModeAction(),

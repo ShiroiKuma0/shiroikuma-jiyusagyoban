@@ -1094,7 +1094,7 @@ fun registerActionMetadata() {
                 ActionField("result_var", "Result variable (broadcast)", hint = "stores the receiver's reply"),
                 ActionField("reply_via", "Reply channel", FieldType.DROPDOWN, options = listOf("", "receiver"),
                     hint = "blank = ordered-broadcast result; 'receiver' = a private ResultReceiver callback (EMUI-proof, the target reads the \"reply_to\" extra and calls back)"),
-                ActionField("result_timeout", "Result timeout (s)", FieldType.NUMBER, hint = "default 5 (30 for receiver)"),
+                ActionField("result_timeout", "Result timeout (s)", FieldType.NUMBER, hint = "default 5, max 60 (receiver: default 30, max 600)"),
             )
         )
     )
@@ -1493,6 +1493,41 @@ fun registerActionMetadata() {
                 ActionField("variable", "Variable", required = true, hint = "read pre-selection from + write back, e.g. SC_Blacklist"),
                 ActionField("title", "Title", hint = "dialog title"),
                 ActionField("separator", "Separator", hint = "joins the packages (default: space)"),
+                ActionField("include_self", "Include this app", FieldType.DROPDOWN, options = listOf("", "true"),
+                    hint = "true = 白い熊 自由作業盤 itself appears in the grid (for backup-target lists); default hides it"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "dialog.pickmulti",
+            name = "Pick From List → Variable",
+            description = "Multi-select arbitrary items with checkboxes (全選択 master toggle on top, sub-options indented under their parent; the variable's current values pre-ticked); write the chosen values back to the variable.",
+            category = "Alert",
+            fields = listOf(
+                ActionField("variable", "Variable", required = true, hint = "read pre-selection from + write back, e.g. BR_Items_Jami"),
+                ActionField("title", "Title", hint = "dialog title"),
+                ActionField("items", "Items", required = true, hint = "separator-joined values, e.g. workspace,appearance,widgets"),
+                ActionField("labels", "Labels", hint = "optional display labels, parallel to Items"),
+                ActionField("parents", "Parents", hint = "optional parent ids, parallel to Items (blank = top-level); children indent + follow their parent's toggle"),
+                ActionField("separator", "Separator", hint = "splits Items/Labels/Parents and joins the result (default: comma)"),
+                ActionField("timeout", "Timeout (s)", FieldType.NUMBER, hint = "optional; cancel after this many seconds"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "app.pick",
+            name = "Pick One App → Variable",
+            description = "Pick a single app from the icon-tile grid (one tap chooses), optionally restricted to a given package list; the package lands in the store variable.",
+            category = "App",
+            fields = listOf(
+                ActionField("store", "Store variable", hint = "receives the picked package (default: picked); cancel stores empty"),
+                ActionField("title", "Title", hint = "dialog title"),
+                ActionField("packages", "Packages", hint = "optional whitespace-joined restriction, e.g. %BR_Apps; empty = all user apps"),
+                ActionField("timeout", "Timeout (s)", FieldType.NUMBER, hint = "optional; cancel after this many seconds"),
             )
         )
     )
