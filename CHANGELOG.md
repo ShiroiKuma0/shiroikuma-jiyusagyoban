@@ -3,6 +3,42 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.78+11 — 2026-07-25
+
+**Self-registering backup roster.** Adding a sister app to the one-tap backup used to mean three
+manual steps behind one tap: pick the app, then hand-add its two settings rows, then discover the
+per-app wrapper task was missing when the item picker died on `sub-task not found`. Picking the app
+is now the whole job — three new task-editing actions let a task build out its own configuration.
+
+### Actions
+- **Add Action** (`task.addaction`, Tasks) — insert an action into ANOTHER task, but only if it isn't
+  there yet. Identity is *(action type + `name` arg)* — the pair `task.editaction` matches on — so
+  re-running never duplicates a row. Placement (`at`): `end`, `start`, a 0-based index, or **`sorted`**
+  — with `sortPattern`, a regex over the `name` arg whose first capture group is the sort key. A
+  sorted insert appends after the last matching action and then stable-sorts that whole region, so a
+  new entry lands in its alphabetical slot, equal keys keep the order they were added in, and actions
+  outside the region never move. Args are written **verbatim** — deliberately not expanded a second
+  time — so a label built with the literal-`%` trick lands in the target task as a literal
+  `%BR_Token_<App>` rather than that variable's value. Optional `store` reports `added` / `exists`.
+- **Task Exists** (`task.exists`, Tasks) — store `true`/`false` for whether a task of this name exists,
+  optionally scoped to one project, so a task can generate a missing sub-task instead of failing on it.
+- **Sort Group Tasks** (`tasks.sort`, Tasks) — put one Tasks-tab group back in alphabetical order,
+  positioned below the project's ungrouped tasks, for groups that grow a generated task per app.
+
+### Engine
+- The group-ordering rule that `tasks.launchers` applied to its generated group moves into a shared
+  `sortGroupTasksAlphabetically()`, so the launcher generator and `tasks.sort` order groups identically.
+
+### Workspace (保存復元 project)
+- **『保存対象選択』** now finishes the job for every app it picks: each one's `%BR_Token_<App>` /
+  `%BR_Items_<App>` pair is added to the `[979][01]` settings task if absent (whole Token/Items block
+  re-sorted by app name), and any app whose `保存 ⇨ <pkg>` wrapper is missing is handed to
+  『保存作成』 to be generated on the spot. A closing dialog names the apps still awaiting a pasted
+  token. The existence check defaults to *exists*, so a failed lookup can never trigger a regeneration
+  that would overwrite a wrapper's hand-written label.
+- **『保存作成』** ends by sorting the 保存タスク group, so a freshly generated wrapper sits with its
+  neighbours instead of at the bottom.
+
 ## 0.2.78+8 — 2026-07-25
 
 One-tap backup of **every** 白い熊 app: this build is the app-side half of a cross-app export
