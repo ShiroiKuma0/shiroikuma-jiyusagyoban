@@ -118,6 +118,7 @@ object AutomationSensitivityRegistry {
         "setting.put",
         "shell.run",
         "state.get",
+        "task.addaction",
         "task.editaction",
         "tasks.launchers",
         "var.add",

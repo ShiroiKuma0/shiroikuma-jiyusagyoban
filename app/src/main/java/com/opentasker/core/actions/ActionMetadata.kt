@@ -305,6 +305,26 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "task.addaction",
+            name = "Add Action",
+            description = "Insert an action into another task if it isn't there yet (identity = type + name arg), optionally placed alphabetically — lets a picker grow a config task's roster without ever duplicating a line",
+            category = "Tasks",
+            fields = listOf(
+                ActionField("task", "Target task name", required = true, hint = "the task to grow"),
+                ActionField("type", "Action type", required = true, hint = "e.g. var.set"),
+                ActionField("name", "Name arg", hint = "the variable a var.set writes — also the identity key"),
+                ActionField("value", "Value arg", hint = "written verbatim (already expanded once)"),
+                ActionField("label", "Label", hint = "label for the inserted action, written verbatim"),
+                ActionField("at", "Placement", hint = "end (default) / start / sorted / 0-based index"),
+                ActionField("sortPattern", "Sort pattern", hint = "at=sorted: regex over the name arg; capture group 1 = the sort key"),
+                ActionField("onError", "On error", hint = "continue = the inserted action keeps going on failure"),
+                ActionField("store", "Result variable", hint = "gets 'added' or 'exists'"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "var.persist",
             name = "Persist Variable",
             description = "Copy a variable's current value into the global scope so it survives across task runs",
