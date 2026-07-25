@@ -48,8 +48,16 @@ object SettingsBackup {
     const val FORMAT = "jiyusagyoban-export"
     const val VERSION = 1
 
-    /** Export file name prefix — the page's latest-export query matches `PREFIX*.zip`. */
-    const val EXPORT_PREFIX = "白い熊 自由作業盤-"
+    /**
+     * Export file name prefix — the page's latest-export query matches `PREFIX*.zip`.
+     * The family convention (白い熊, 2026-07-25) is the app's English dash-separated name plus a
+     * datetime and NO version, so every sister app's backups sort and read alike:
+     * `shiroikuma-jiyusagyoban_2026-07-25_18-58-23.zip`.
+     */
+    const val EXPORT_PREFIX = "shiroikuma-jiyusagyoban_"
+
+    /** Pre-2026-07-25 name (`白い熊 自由作業盤-<version>-export_<stamp>.zip`), still recognised. */
+    const val LEGACY_EXPORT_PREFIX = "白い熊 自由作業盤-"
 
     /** The workspace bundle entry inside the ZIP (category [Cat.WORKSPACE]). */
     const val WORKSPACE_ENTRY = "workspace.json"
@@ -91,9 +99,8 @@ object SettingsBackup {
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
 
-    fun exportFileName(appVersion: String): String =
-        EXPORT_PREFIX + appVersion + "-export_" +
-            SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.ROOT).format(Date()) + ".zip"
+    fun exportFileName(): String =
+        EXPORT_PREFIX + SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.ROOT).format(Date()) + ".zip"
 
     // ---- directory + latest-export query ----------------------------------------------------
 
@@ -129,8 +136,10 @@ object SettingsBackup {
     fun latestExport(context: Context): LatestExport? {
         val dir = exportDir(context) ?: return null
         val newest = runCatching {
-            dir.listFiles().filter {
-                it.isFile && it.name?.startsWith(EXPORT_PREFIX) == true && it.name?.endsWith(".zip") == true
+            dir.listFiles().filter { file ->
+                val name = file.name.orEmpty()
+                file.isFile && name.endsWith(".zip") &&
+                    (name.startsWith(EXPORT_PREFIX) || name.startsWith(LEGACY_EXPORT_PREFIX))
             }.maxByOrNull { it.lastModified() }
         }.getOrNull() ?: return null
         val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ROOT).format(Date(newest.lastModified()))
@@ -139,15 +148,21 @@ object SettingsBackup {
 
     // ---- export ------------------------------------------------------------------------------
 
-    /** Writes the selected categories to [output]. Returns a one-line summary. */
+    /**
+     * Writes the selected categories to [output]. Returns a one-line summary. [onProgress]
+     * (done, total, category label) fires after each written category — the automation bridge
+     * (StateExportReceiver) forwards it as contract progress broadcasts; UI callers omit it.
+     */
     suspend fun export(
         context: Context,
         db: AppDatabase,
         appVersion: String,
         cats: Set<Cat>,
         output: OutputStream,
+        onProgress: ((done: Int, total: Int, catLabel: String) -> Unit)? = null,
     ): String {
         var count = 0
+        val total = Cat.entries.count { it in cats }
         ZipOutputStream(output.buffered()).use { zip ->
             val manifest = buildJsonObject {
                 put("format", JsonPrimitive(FORMAT))
@@ -176,6 +191,7 @@ object SettingsBackup {
                     }
                 }
                 count++
+                onProgress?.invoke(count, total, cat.label)
             }
         }
         return "$count categor${if (count == 1) "y" else "ies"}"

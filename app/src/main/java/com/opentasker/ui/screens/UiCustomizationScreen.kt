@@ -85,6 +85,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.core.graphics.drawable.toBitmap
 import com.opentasker.app.BuildConfig
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import com.opentasker.core.transfer.AutomationAuth
 import com.opentasker.core.transfer.SettingsBackup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -121,6 +124,10 @@ fun UiCustomizationScreen(
     var showBubbleFontPicker by remember { mutableStateOf(false) }
     var showPickerFontPicker by remember { mutableStateOf(false) }
     var fontsRefresh by remember { mutableIntStateOf(0) }
+
+    // Automation intent surface (StateExportReceiver): master switch + shared secret.
+    var automationEnabled by remember { mutableStateOf(AutomationAuth.enabled(context)) }
+    var automationToken by remember { mutableStateOf(AutomationAuth.token(context)) }
 
     // Export/Import (Kōjiki-style): the settable backup directory + its latest export, re-queried
     // on page open and after every pick/export via the refresh tick.
@@ -217,6 +224,45 @@ fun UiCustomizationScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                }
+            }
+            item {
+                SwitchRow(
+                    level = 1,
+                    label = "Automation export",
+                    description = "Let sister-app tasks trigger this export via the token-gated EXPORT_STATE intent.",
+                    checked = automationEnabled,
+                    onCheckedChange = {
+                        automationEnabled = it
+                        AutomationAuth.setEnabled(context, it)
+                    },
+                )
+            }
+            item {
+                val clipboard = LocalClipboardManager.current
+                RowScaffold(1, onClick = {
+                    clipboard.setText(AnnotatedString(automationToken))
+                    scope.launch { snackbarHostState.showSnackbar("Automation token copied") }
+                }) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Automation token (tap to copy)", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            "${automationToken.take(8)}…${automationToken.takeLast(8)}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    Text(
+                        "Regenerate",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = EximWarnColor,
+                        modifier = Modifier.clickable {
+                            automationToken = AutomationAuth.regenerateToken(context)
+                            scope.launch { snackbarHostState.showSnackbar("Automation token regenerated — update pasted copies") }
+                        },
+                    )
                 }
             }
 
@@ -1485,7 +1531,7 @@ private fun ExportImportPanel(
             return
         }
         val dir = SettingsBackup.exportDir(context)
-        val name = SettingsBackup.exportFileName(BuildConfig.VERSION_NAME)
+        val name = SettingsBackup.exportFileName()
         if (dir == null) {
             saveAsLauncher.launch(name)
         } else {

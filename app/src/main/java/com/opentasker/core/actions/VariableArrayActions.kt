@@ -51,8 +51,12 @@ class SplitVariableAction : Action {
         val splitter = unescape(args["splitter"].orEmpty())
         val value = ctx.variables.get(name).orEmpty()
         val parts = if (splitter.isEmpty()) value.map { it.toString() } else value.split(splitter)
-        ctx.variables.setArray(name, parts)
+        // delete_base removes the scalar BEFORE the array is stored — unset() clears the array
+        // store too, so the old order silently deleted the array the split had just created
+        // (foreach then saw 0 items). The scalar must also go for %name(...) array ops to work:
+        // the expander only takes the array branch when no scalar of that name exists.
         if (truthy(args["delete_base"])) ctx.variables.unset(name)
+        ctx.variables.setArray(name, parts)
         ctx.logger("Split %$name into ${parts.size} part(s)")
         return ActionResult.Success
     }
