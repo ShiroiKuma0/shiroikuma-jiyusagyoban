@@ -3,6 +3,40 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.78+3 — 2026-07-25
+
+The UI page grows a full app-state Export/Import (Kōjiki-style category ZIP) and takes on the kxkb
+look; the Presets section moves to the bottom.
+
+### Export / Import — everything settable, as one ZIP
+- **First section at the top of the 白い熊 自由作業盤 UI page**: a settable export directory (SAF
+  tree picker, persisted device-locally, never itself exported), shown **red while unset, yellow once
+  set**, with a latest-export line beneath it (newest `白い熊 自由作業盤-*.zip` in the directory,
+  re-queried on page open and after every pick/export).
+- **The Export/Import panel** (black box, 2 dp yellow border): directory box + last-export line,
+  "Select all" + seven category checkboxes, and an ArcaneChat-style pill button row — Cancel alone on
+  the left, Import / Export grouped on the right.
+- **Categories** — "Workspace programming" (projects · tasks · profiles · scenes · variables — the
+  standard full JSON export as `workspace.json`) first, then UI theme (colours + font files),
+  Widgets, Bubbles, App settings (sort · projects · logs · picker), Share tiles, Task icons.
+- **Format** (`SettingsBackup`): a ZIP of plain per-category JSON files (type-tagged
+  SharedPreferences dumps that merge on import — never clear), real font/icon files under `fonts/` /
+  `icons/`, and a `manifest.json`. Runtime state and security grants (Locale tokens, Termux
+  allowlist) are deliberately excluded.
+- **The "+" → Import JSON… flow accepts the whole ZIP**: it detects the archive and imports its
+  `workspace.json` exactly as if the plain full-export JSON had been picked.
+- **Dialogs and the auto-close chain**: success dialogs are black-yellow with a yellow border. After
+  export, OK closes the info dialog, the panel, and the UI page; after import, "Later" closes the
+  whole chain and "Restart now" relaunches the app. Failures ("Export failed…", "No categories
+  selected.") leave the panel open.
+
+### UI page restyle (kxkb look) + Presets to the bottom
+- All section headings are 20 sp medium accent, **underlined only as wide as the heading text**,
+  sections separated by thin hairline spacers; rows follow the kxkb 16→32 dp indent cascade.
+- The Presets section (Reset to black & yellow) now sits at the very bottom, like Kōjiki's trailing
+  Reset row.
+- Long-pressing into the UI page (top-bar ⋮ or the Setup tab) now confirms with a short vibration.
+
 ## 0.2.78+1 — 2026-07-25
 
 Upstream resync: the fork rebased onto OpenTasker **0.2.78** (from 0.2.76; 31 upstream commits across
