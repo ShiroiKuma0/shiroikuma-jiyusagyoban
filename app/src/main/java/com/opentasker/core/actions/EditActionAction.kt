@@ -5,6 +5,7 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.storage.toEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -50,5 +51,94 @@ class EditActionAction : Action {
         } else {
             ActionResult.Failure(error)
         }
+    }
+}
+
+/**
+ * `Add Action` — insert an action into ANOTHER task, but only if it isn't there already. Identity is
+ * (action type + `name` arg) — the same pair [EditActionAction] matches on — so a task can GROW a config
+ * task's roster idempotently: 保存対象選択 gives every newly picked app its `%BR_Token_<App>` /
+ * `%BR_Items_<App>` var.set pair in `保存復元の設定 -- [979][01]`, run after run, without ever
+ * duplicating a line. (An action type that has no `name` arg falls back to "same type + identical args".)
+ *
+ * Placement — [at]: `end` (default), `start`, a 0-based index, or `sorted`. `sorted` needs [sortPattern],
+ * a regex applied to the `name` arg of every action of the same type; its first capture group is that
+ * action's sort key. The new action is appended after the last such action and the whole matched region is
+ * then stable-sorted by key, so a new entry lands alphabetically, equal keys keep the order they were added
+ * in (Token before Items), and actions outside the region never move.
+ *
+ * The inserted action's args are [name], [value], plus any `arg:<key>` pass-through; [label] becomes its
+ * label and `onError=continue` its continue-on-error flag. Every arg arrives ALREADY %-expanded from the
+ * runner and is written through verbatim — deliberately NOT expanded a second time, so a label built with
+ * the `%pct☆` trick 保存作成 uses lands in the target task as a LITERAL `%BR_Token_Jami` instead of that
+ * variable's value. [store] receives `added` or `exists`.
+ */
+class AddActionAction : Action {
+    override val id = "task.addaction"
+    override val category = ActionCategory.SYSTEM
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val taskName = args["task"].orEmpty().trim()
+        if (taskName.isEmpty()) return ActionResult.Failure("task name is required")
+        val type = args["type"].orEmpty().trim()
+        if (type.isEmpty()) return ActionResult.Failure("action type is required")
+        val name = args["name"].orEmpty().trim().removePrefix("%")
+        val label = args["label"]?.takeIf { it.isNotEmpty() }
+        val at = args["at"].orEmpty().trim().lowercase().ifEmpty { "end" }
+        val store = args["store"]?.trim()?.removePrefix("%")?.takeIf { it.isNotEmpty() }
+        val sortPattern = args["sortPattern"]?.takeIf { it.isNotEmpty() }?.let {
+            runCatching { Regex(it) }.getOrNull()
+                ?: return ActionResult.Failure("invalid sortPattern: $it")
+        }
+        if (at == "sorted" && sortPattern == null) return ActionResult.Failure("at=sorted needs a sortPattern")
+
+        val newArgs = buildMap {
+            if (name.isNotEmpty()) put("name", name)
+            args["value"]?.let { put("value", it) }
+            args.forEach { (k, v) -> if (k.startsWith("arg:")) put(k.removePrefix("arg:"), v) }
+        }
+        val spec = ActionSpec(
+            type = type,
+            label = label,
+            args = newArgs,
+            continueOnError = args["onError"].orEmpty().trim().lowercase() == "continue",
+        )
+        // A same-type action's sort key, or null when it is outside the sorted region.
+        fun keyOf(a: ActionSpec): String? {
+            if (sortPattern == null || a.type != type) return null
+            val m = sortPattern.find(a.args["name"].orEmpty()) ?: return null
+            return m.groupValues.getOrNull(1)?.takeIf { it.isNotEmpty() } ?: m.value
+        }
+
+        val db = OpenTaskerApp_NoHilt.db
+        val outcome = withContext(Dispatchers.IO) {
+            val task = db.taskDao().getByName(taskName)?.toDomain()
+                ?: return@withContext "no task named \"$taskName\""
+            val already = task.actions.any { a ->
+                a.type == type &&
+                    if (name.isEmpty()) a.args == newArgs
+                    else a.args["name"]?.trim()?.removePrefix("%") == name
+            }
+            if (already) return@withContext "exists"
+            val list = task.actions.toMutableList()
+            when {
+                at == "start" -> list.add(0, spec)
+                at.toIntOrNull() != null -> list.add(at.toInt().coerceIn(0, list.size), spec)
+                at == "sorted" -> {
+                    val last = list.indexOfLast { keyOf(it) != null }
+                    if (last < 0) list.add(spec) else list.add(last + 1, spec)
+                    val slots = list.indices.filter { keyOf(list[it]) != null }
+                    val sorted = slots.map { list[it] }
+                        .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { keyOf(it).orEmpty() })
+                    slots.forEachIndexed { i, slot -> list[slot] = sorted[i] }
+                }
+                else -> list.add(spec)
+            }
+            db.taskDao().update(task.copy(actions = list).toEntity())
+            "added"
+        }
+        if (outcome != "added" && outcome != "exists") return ActionResult.Failure(outcome)
+        store?.let { ctx.variables.set(it, outcome) }
+        ctx.logger("$outcome: $type ${name.ifEmpty { "" }} → $taskName")
+        return ActionResult.Success
     }
 }
