@@ -743,7 +743,7 @@ fun ActiveAutomationUi(
                             .pointerInput(Unit) {
                                 detectTapGestures(
                                     onTap = { showOverflow = true },
-                                    onLongPress = { showUiCustomization = true },
+                                    onLongPress = { vibrateLongPressCue(context); showUiCustomization = true },
                                 )
                             },
                         contentAlignment = Alignment.Center,
@@ -895,7 +895,7 @@ fun ActiveAutomationUi(
                             Modifier.pointerInput(Unit) {
                                 detectTapGestures(
                                     onTap = { screenOrdinal = OpenTaskerScreen.Setup.ordinal },
-                                    onLongPress = { showUiCustomization = true },
+                                    onLongPress = { vibrateLongPressCue(context); showUiCustomization = true },
                                 )
                             }
                         } else {
@@ -1550,5 +1550,19 @@ internal fun InlineNotice(title: String, body: String, color: Color) {
                 Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+    }
+}
+
+/** Short confirm buzz for the long-press jump to the 白い熊 自由作業盤 UI page (白い熊 2026-07-25). */
+private fun vibrateLongPressCue(context: android.content.Context) {
+    val vibrator = if (android.os.Build.VERSION.SDK_INT >= 31) {
+        (context.getSystemService(android.content.Context.VIBRATOR_MANAGER_SERVICE) as? android.os.VibratorManager)
+            ?.defaultVibrator
+    } else {
+        @Suppress("DEPRECATION")
+        context.getSystemService(android.content.Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+    }
+    runCatching {
+        vibrator?.vibrate(android.os.VibrationEffect.createOneShot(35, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
     }
 }

@@ -1,5 +1,7 @@
 package com.opentasker.ui.screens
 
+import android.content.Context
+import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -11,8 +13,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -31,6 +35,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import com.opentasker.ui.components.ThemedDropdownMenu
@@ -56,6 +63,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -70,9 +78,14 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.core.graphics.drawable.toBitmap
+import com.opentasker.app.BuildConfig
+import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.core.transfer.SettingsBackup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.unit.sp
@@ -82,10 +95,11 @@ import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-/** Indent unit; section headers sit flush, individual items step in for orientation. */
-private val INDENT_STEP = 28.dp
+/** Indent unit; section headers sit flush at 16dp, items step to 32dp — the kxkb cascade. */
+private fun rowStartPadding(level: Int) = (16 + level * 16).dp
 
-private fun rowStartPadding(level: Int) = (16 + level * 28).dp
+/** Kōjiki warn red — the directory-unset / failure colour. */
+private val EximWarnColor = Color(0xFFFF5252)
 
 /**
  * "白い熊 自由作業盤 UI" — the appearance-customization page, mirroring the sister apps' theme page:
@@ -98,6 +112,7 @@ fun UiCustomizationScreen(
     onBack: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
+    val context = LocalContext.current
     val prefs by ThemeStore.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -106,6 +121,25 @@ fun UiCustomizationScreen(
     var showBubbleFontPicker by remember { mutableStateOf(false) }
     var showPickerFontPicker by remember { mutableStateOf(false) }
     var fontsRefresh by remember { mutableIntStateOf(0) }
+
+    // Export/Import (Kōjiki-style): the settable backup directory + its latest export, re-queried
+    // on page open and after every pick/export via the refresh tick.
+    var showEximPanel by remember { mutableStateOf(false) }
+    var eximRefresh by remember { mutableIntStateOf(0) }
+    val eximStatus by produceState<Pair<String?, SettingsBackup.LatestExport?>>(
+        initialValue = null to null,
+        eximRefresh,
+    ) {
+        value = withContext(Dispatchers.IO) {
+            SettingsBackup.dirLabel(context) to SettingsBackup.latestExport(context)
+        }
+    }
+    val eximDirPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            SettingsBackup.setDirUri(context, uri)
+            eximRefresh++
+        }
+    }
 
     val fontImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -143,15 +177,47 @@ fun UiCustomizationScreen(
                 .padding(innerPadding),
             contentPadding = PaddingValues(bottom = 28.dp),
         ) {
-            item { SectionHeader("Presets") }
+            // --- Export / Import — first separated section (Kōjiki UI-page flow) ---
+            item { SectionHeader("Export / Import", first = true) }
             item {
-                ActionRow(
-                    level = 1,
-                    label = "Reset to black & yellow",
-                    description = "Restore the default appearance — black background, yellow text and borders.",
-                    actionLabel = "Reset",
-                    onAction = { ThemeStore.resetToDefault() },
+                RowScaffold(1, onClick = { eximDirPicker.launch(SettingsBackup.dirUri(context)) }) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Export directory (tap to choose)", style = MaterialTheme.typography.bodyLarge)
+                        val dirName = eximStatus.first
+                        Text(
+                            dirName ?: "Not set — tap to choose a directory",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (dirName == null) EximWarnColor else MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+            }
+            item {
+                val (dirName, latest) = eximStatus
+                val (message, warn) = when {
+                    dirName == null -> "No directory set yet — pick one to enable one-tap export." to true
+                    latest == null -> "No export in this directory yet." to false
+                    else -> "Last export: ${latest.timestampText}" to false
+                }
+                Text(
+                    message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (warn) EximWarnColor else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = rowStartPadding(1), end = 16.dp, bottom = 8.dp),
                 )
+            }
+            item {
+                RowScaffold(1, onClick = { showEximPanel = true }) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Export / Import…", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            "Back up or restore everything settable — the whole workspace and all app settings — as one ZIP.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
 
             item { SectionHeader("Colors") }
@@ -550,7 +616,31 @@ fun UiCustomizationScreen(
                     onChange = { v -> ThemeStore.update { it.copy(importRowPadDp = v) } },
                 )
             }
+
+            // --- Presets — at the very bottom (白い熊 2026-07-25), like Kōjiki's trailing Reset row ---
+            item { SectionHeader("Presets") }
+            item {
+                ActionRow(
+                    level = 1,
+                    label = "Reset to black & yellow",
+                    description = "Restore the default appearance — black background, yellow text and borders.",
+                    actionLabel = "Reset",
+                    onAction = { ThemeStore.resetToDefault() },
+                )
+            }
         }
+    }
+
+    if (showEximPanel) {
+        ExportImportPanel(
+            onDismiss = { showEximPanel = false },
+            onCloseChain = {
+                // Success acknowledged: close the whole chain — the panel and the UI page beneath it.
+                showEximPanel = false
+                onBack()
+            },
+            onDirChanged = { eximRefresh++ },
+        )
     }
 
     colorTarget?.let { target ->
@@ -622,19 +712,37 @@ fun UiCustomizationScreen(
 
 // ---- section / rows -----------------------------------------------------------------------------
 
+/**
+ * kxkb-style section heading: 20sp medium accent title underlined only as wide as the text
+ * (IntrinsicSize.Min sizes the column to its single line), each section preceded by a thin
+ * full-width hairline spacer (Kōjiki's addSectionSpacer).
+ */
 @Composable
-private fun SectionHeader(title: String) {
-    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp)) {
-        Text(
-            title,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        HorizontalDivider(
-            modifier = Modifier.padding(top = 6.dp),
-            thickness = 1.dp,
-            color = MaterialTheme.colorScheme.outline,
-        )
+private fun SectionHeader(title: String, first: Boolean = false) {
+    Column(Modifier.fillMaxWidth()) {
+        if (!first) {
+            HorizontalDivider(
+                modifier = Modifier.padding(top = 20.dp),
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+            )
+        }
+        Column(
+            Modifier
+                .padding(start = 16.dp, top = if (first) 8.dp else 20.dp, end = 16.dp, bottom = 4.dp)
+                .width(IntrinsicSize.Min),
+        ) {
+            Text(
+                title,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                softWrap = false,
+            )
+            Spacer(Modifier.height(4.dp))
+            HorizontalDivider(thickness = 2.dp, color = MaterialTheme.colorScheme.primary)
+        }
     }
 }
 
@@ -1270,3 +1378,336 @@ private val WEIGHT_OPTIONS = listOf(
 private fun weightLabel(weight: Int): String = WEIGHT_OPTIONS.firstOrNull { it.second == weight }?.first ?: "$weight"
 
 private fun hex6(color: Int): String = "#%06X".format(color and 0xFFFFFF)
+
+// ---- Export / Import panel ----------------------------------------------------------------------
+
+/** Outcome dialogs stacked over the panel; failure leaves the panel open, success closes the chain. */
+private sealed interface EximInfo {
+    data class ExportDone(val message: String) : EximInfo
+    data class ImportDone(val lines: List<String>) : EximInfo
+    data class Failure(val message: String) : EximInfo
+}
+
+/**
+ * The Export/Import panel (Kōjiki's category sheet as a Compose dialog): directory box +
+ * last-export line, category checkboxes (export-everything first), and the ArcaneChat-style pill
+ * button row — Cancel alone on the left, Import / Export grouped on the right.
+ */
+@Composable
+private fun ExportImportPanel(
+    onDismiss: () -> Unit,
+    onCloseChain: () -> Unit,
+    onDirChanged: () -> Unit,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var refresh by remember { mutableIntStateOf(0) }
+    var busy by remember { mutableStateOf(false) }
+    var info by remember { mutableStateOf<EximInfo?>(null) }
+    val selected = remember {
+        mutableStateMapOf<SettingsBackup.Cat, Boolean>().apply {
+            SettingsBackup.Cat.entries.forEach { put(it, true) }
+        }
+    }
+    val status by produceState<Pair<String?, SettingsBackup.LatestExport?>>(
+        initialValue = null to null,
+        refresh,
+    ) {
+        value = withContext(Dispatchers.IO) {
+            SettingsBackup.dirLabel(context) to SettingsBackup.latestExport(context)
+        }
+    }
+
+    fun selectedCats(): Set<SettingsBackup.Cat> = selected.filterValues { it }.keys
+
+    fun runExport(displayName: String, open: () -> java.io.OutputStream?) {
+        scope.launch {
+            busy = true
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val out = open() ?: error("Unable to open the export destination")
+                    out.use {
+                        SettingsBackup.export(
+                            context = context,
+                            db = OpenTaskerApp_NoHilt.db,
+                            appVersion = BuildConfig.VERSION_NAME,
+                            cats = selectedCats(),
+                            output = it,
+                        )
+                    }
+                }
+            }
+                .onSuccess { summary ->
+                    refresh++
+                    onDirChanged()
+                    info = EximInfo.ExportDone("Exported $summary.\n\n$displayName")
+                }
+                .onFailure { info = EximInfo.Failure("Export failed: ${it.message ?: "unknown error"}") }
+            busy = false
+        }
+    }
+
+    val dirPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            SettingsBackup.setDirUri(context, uri)
+            refresh++
+            onDirChanged()
+        }
+    }
+    // No directory set: fall back to a save-as picker so export still works one-off.
+    val saveAsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri ->
+        if (uri != null) {
+            runExport(uri.lastPathSegment ?: "export") { context.contentResolver.openOutputStream(uri) }
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                busy = true
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        val bytes = readBoundedDocumentBytes(context, uri, EXIM_IMPORT_MAX_BYTES, "import")
+                        SettingsBackup.import(context, OpenTaskerApp_NoHilt.db, bytes, selectedCats())
+                    }
+                }
+                    .onSuccess { info = EximInfo.ImportDone(it.summaryLines) }
+                    .onFailure { info = EximInfo.Failure("Import failed: ${it.message ?: "unknown error"}") }
+                busy = false
+            }
+        }
+    }
+
+    fun onExport() {
+        if (selectedCats().isEmpty()) {
+            info = EximInfo.Failure("No categories selected.")
+            return
+        }
+        val dir = SettingsBackup.exportDir(context)
+        val name = SettingsBackup.exportFileName(BuildConfig.VERSION_NAME)
+        if (dir == null) {
+            saveAsLauncher.launch(name)
+        } else {
+            runExport(name) {
+                val file = dir.createFile("application/zip", name)
+                    ?: error("Unable to create a file in the export directory")
+                context.contentResolver.openOutputStream(file.uri)
+            }
+        }
+    }
+
+    Dialog(onDismissRequest = { if (!busy) onDismiss() }) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.background,
+            border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 20.dp, top = 16.dp, end = 20.dp, bottom = 20.dp),
+            ) {
+                Text(
+                    "Export / Import — 白い熊 自由作業盤",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    "Everything settable in the app, category by category, as one ZIP of plain JSON files.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+                    modifier = Modifier.padding(top = 6.dp, bottom = 12.dp),
+                )
+                val (dirName, latest) = status
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
+                        .clickable(enabled = !busy) { dirPicker.launch(SettingsBackup.dirUri(context)) }
+                        .padding(12.dp),
+                ) {
+                    Text("Export directory (tap to choose)", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        dirName ?: "Not set — tap to choose a directory",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (dirName == null) EximWarnColor else MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                val (statusMessage, statusWarn) = when {
+                    dirName == null -> "No directory set yet — pick one to enable one-tap export." to true
+                    latest == null -> "No export in this directory yet." to false
+                    else -> "Last export: ${latest.timestampText}" to false
+                }
+                Text(
+                    statusMessage,
+                    fontSize = 13.sp,
+                    color = if (statusWarn) EximWarnColor else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 10.dp),
+                    thickness = 1.dp,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                )
+                val allSelected = SettingsBackup.Cat.entries.all { selected[it] == true }
+                EximCheckRow("Select all", allSelected, bold = true) { checked ->
+                    SettingsBackup.Cat.entries.forEach { selected[it] = checked }
+                }
+                SettingsBackup.Cat.entries.forEach { cat ->
+                    EximCheckRow(cat.label, selected[cat] == true) { selected[cat] = it }
+                }
+                HorizontalDivider(
+                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                    thickness = 1.dp,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                )
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    EximPill("Cancel", enabled = !busy, onClick = onDismiss)
+                    Spacer(Modifier.weight(1f))
+                    EximPill("Import", enabled = !busy) {
+                        importLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    EximPill("Export", enabled = !busy, onClick = ::onExport)
+                }
+            }
+        }
+    }
+
+    when (val current = info) {
+        is EximInfo.ExportDone -> EximInfoDialog(
+            title = "✓ Export finished",
+            body = current.message,
+            buttons = {
+                EximPill("OK") {
+                    info = null
+                    onCloseChain()
+                }
+            },
+        )
+        is EximInfo.ImportDone -> EximInfoDialog(
+            title = "✓ Import finished",
+            body = "Restored:\n\n${current.lines.joinToString("\n")}\n\nRestart to apply everything.",
+            buttons = {
+                EximPill("Later") {
+                    info = null
+                    onCloseChain()
+                }
+                Spacer(Modifier.width(8.dp))
+                EximPill("Restart now") { restartApp(context) }
+            },
+        )
+        is EximInfo.Failure -> EximInfoDialog(
+            title = "Export / Import",
+            body = current.message,
+            warn = true,
+            // Failure leaves the panel open underneath — only the info dialog closes.
+            buttons = { EximPill("OK") { info = null } },
+        )
+        null -> Unit
+    }
+}
+
+/** Black surface, yellow border, right-aligned pill buttons — the finished/failed info dialog. */
+@Composable
+private fun EximInfoDialog(
+    title: String,
+    body: String,
+    warn: Boolean = false,
+    buttons: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
+) {
+    Dialog(onDismissRequest = {}) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.background,
+            border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
+        ) {
+            Column(Modifier.fillMaxWidth().padding(20.dp)) {
+                Text(
+                    title,
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (warn) EximWarnColor else MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    body,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 10.dp, bottom = 16.dp),
+                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                    content = buttons,
+                )
+            }
+        }
+    }
+}
+
+/** ArcaneChat-style pill: black fill, 1.5dp accent stroke, accent text, fully rounded. */
+@Composable
+private fun EximPill(label: String, enabled: Boolean = true, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(50),
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.4f)),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = MaterialTheme.colorScheme.background,
+            contentColor = MaterialTheme.colorScheme.primary,
+        ),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
+    ) {
+        Text(label)
+    }
+}
+
+@Composable
+private fun EximCheckRow(label: String, checked: Boolean, bold: Boolean = false, onChecked: (Boolean) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable { onChecked(!checked) }
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(
+            checked = checked,
+            onCheckedChange = onChecked,
+            colors = CheckboxDefaults.colors(
+                checkedColor = MaterialTheme.colorScheme.primary,
+                uncheckedColor = MaterialTheme.colorScheme.primary,
+                checkmarkColor = MaterialTheme.colorScheme.background,
+            ),
+        )
+        Text(
+            label,
+            fontSize = 15.sp,
+            fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+/** Import cap for the settings ZIP (fonts + icons ride along, so far above the JSON-only cap). */
+private const val EXIM_IMPORT_MAX_BYTES = 256 * 1024 * 1024
+
+/** Kōjiki's restart: relaunch the launcher activity as a fresh task, then exit this process. */
+private fun restartApp(context: Context) {
+    val pm = context.packageManager
+    val launch = pm.getLaunchIntentForPackage(context.packageName) ?: return
+    context.startActivity(Intent.makeRestartActivityTask(launch.component))
+    Runtime.getRuntime().exit(0)
+}

@@ -1054,15 +1054,25 @@ internal fun readBoundedTaskerXml(context: Context, uri: Uri): String {
 }
 
 internal fun readBoundedOpenTaskerBundle(context: Context, uri: Uri): String {
-    return readBoundedDocumentText(
+    val bytes = readBoundedDocumentBytes(
         context = context,
         uri = uri,
         maxBytes = OPEN_TASKER_BUNDLE_IMPORT_MAX_BYTES,
         label = "import",
     )
+    // A settings ZIP (白い熊 自由作業盤-…-export_….zip) is accepted here too: its workspace.json
+    // entry IS the standard full export, so picking the ZIP behaves exactly like picking that JSON.
+    return if (com.opentasker.core.transfer.SettingsBackup.isZip(bytes)) {
+        com.opentasker.core.transfer.SettingsBackup.workspaceJsonFrom(bytes)
+    } else {
+        String(bytes, Charsets.UTF_8)
+    }
 }
 
-internal fun readBoundedDocumentText(context: Context, uri: Uri, maxBytes: Int, label: String): String {
+internal fun readBoundedDocumentText(context: Context, uri: Uri, maxBytes: Int, label: String): String =
+    String(readBoundedDocumentBytes(context, uri, maxBytes, label), Charsets.UTF_8)
+
+internal fun readBoundedDocumentBytes(context: Context, uri: Uri, maxBytes: Int, label: String): ByteArray {
     val stream = context.contentResolver.openInputStream(uri)
         ?: error("Unable to open selected $label")
     ByteArrayOutputStream().use { output ->
@@ -1079,7 +1089,7 @@ internal fun readBoundedDocumentText(context: Context, uri: Uri, maxBytes: Int, 
                 output.write(buffer, 0, read)
             }
         }
-        return output.toString(Charsets.UTF_8.name())
+        return output.toByteArray()
     }
 }
 
