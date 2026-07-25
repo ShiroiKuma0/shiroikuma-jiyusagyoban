@@ -42,6 +42,7 @@ import com.opentasker.core.contexts.PackageContextEvents
 import com.opentasker.core.contexts.PluginConditionSubscription
 import com.opentasker.core.contexts.PluginConditionSubscriptions
 import com.opentasker.core.model.AutomationMode
+import com.opentasker.core.platform.AudioForegroundServiceEligibility
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
