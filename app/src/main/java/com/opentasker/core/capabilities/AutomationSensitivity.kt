@@ -120,6 +120,8 @@ object AutomationSensitivityRegistry {
         "state.get",
         "task.addaction",
         "task.editaction",
+        "task.exists",
+        "tasks.sort",
         "tasks.launchers",
         "var.add",
         "var.clear",

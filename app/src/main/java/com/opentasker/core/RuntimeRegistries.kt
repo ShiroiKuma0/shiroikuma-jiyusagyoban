@@ -86,6 +86,8 @@ import com.opentasker.core.actions.WriteFileAction
 import com.opentasker.core.actions.ClearVariableAction
 import com.opentasker.core.actions.AddActionAction
 import com.opentasker.core.actions.EditActionAction
+import com.opentasker.core.actions.SortGroupTasksAction
+import com.opentasker.core.actions.TaskExistsAction
 import com.opentasker.core.actions.SplitVariableAction
 import com.opentasker.core.actions.JoinVariableAction
 import com.opentasker.core.actions.SearchReplaceVariableAction
@@ -202,6 +204,8 @@ private fun registerBuiltInActions() {
         GenerateShareRelaysAction(),
         EditActionAction(),
         AddActionAction(),
+        TaskExistsAction(),
+        SortGroupTasksAction(),
         GoHomeAction(),
         PreviousAppAction(),
         NextAppAction(),

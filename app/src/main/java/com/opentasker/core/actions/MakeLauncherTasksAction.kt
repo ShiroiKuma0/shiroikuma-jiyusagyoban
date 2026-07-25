@@ -117,27 +117,9 @@ class MakeLauncherTasksAction : Action {
                 count++
             }
 
-            // 3. Keep the group at the BOTTOM and its tasks in alphabetical order, re-sorted on EVERY
-            // run: give each task in the group a position strictly above every NON-group task in the
-            // project (so the group sits below the standalone generator task), assigned in name order.
-            // The grouped list orders items by TaskEntity.position; ItemMetaEntity.position is set too.
-            val metaNow = db.itemMetaDao().getForTab("tasks")
-            val idsInGroup = metaNow.filter { it.groupId == groupId }
-                .mapNotNull { it.itemKey.toLongOrNull() }
-                .toSet()
-            val allNow = db.taskDao().getAll()
-            val maxOther = allNow
-                .filter { it.projectId == pid && it.id !in idsInGroup }
-                .maxOfOrNull { it.position } ?: -1
-            val sorted = allNow.filter { it.id in idsInGroup }.sortedBy { it.name.lowercase() }
-            sorted.forEachIndexed { index, task ->
-                val newPos = maxOther + 1 + index
-                if (task.position != newPos) db.taskDao().setPosition(task.id, newPos)
-                val meta = db.itemMetaDao().get("tasks", task.id.toString())
-                if (meta != null && meta.position != index) {
-                    db.itemMetaDao().upsert(meta.copy(position = index))
-                }
-            }
+            // 3. Keep the group at the BOTTOM and its tasks in alphabetical order, re-sorted on EVERY run
+            // (shared with the `tasks.sort` action).
+            sortGroupTasksAlphabetically(pid, groupId)
             count
         }
 
