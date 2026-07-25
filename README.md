@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.78+3`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.78+8`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 </div>
 
@@ -15,7 +15,7 @@
 
 It is a native **Kotlin + Jetpack Compose** automation engine — profiles bind **triggers** to **tasks**, tasks run **actions**, all persisted in Room, no Hilt, no native code. Built on OpenTasker and extended into a markedly more capable tool than OpenTasker — and, in everyday use, than Tasker itself. It installs **side-by-side** with upstream (application id `shiroikuma.jiyusagyoban`), so both can coexist.
 
-> A fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions: a generic **Send Intent** action, cross-app **protected contacts** (content-free notifications for private senders), a screen-off **notification wakedance**, **app freeze/unfreeze + launcher-task generation**, a fully app-driven **kanji clock**, **projects + foldable groups + scoped variables**, full **drag-to-reorder** (tasks, projects, project-tabs), a **Review Import** workflow, a **capability-aware action editor**, **home-screen task shortcuts with custom icons**, **Desktop re-freeze bubbles**, home-screen **widgets + a template library**, **living scene overlays** (a charging fire on the battery line, a **natively-rendered, music-reactive, tempo-locked** music edge-light — all screen-off gated), **per-app share-sheet tiles** (each generated as its own signed relay APK, on-device), a **backup-guarded system language switch**, a **full app-state Export/Import** (everything settable as one category ZIP), a headless **adb automation bridge** (workspace export/import broadcasts), sub-minute triggers, and a black-and-yellow theme.
+> A fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions: a generic **Send Intent** action, cross-app **protected contacts** (content-free notifications for private senders), a screen-off **notification wakedance**, **app freeze/unfreeze + launcher-task generation**, a fully app-driven **kanji clock**, **projects + foldable groups + scoped variables**, full **drag-to-reorder** (tasks, projects, project-tabs), a **Review Import** workflow, a **capability-aware action editor**, **home-screen task shortcuts with custom icons**, **Desktop re-freeze bubbles**, home-screen **widgets + a template library**, **living scene overlays** (a charging fire on the battery line, a **natively-rendered, music-reactive, tempo-locked** music edge-light — all screen-off gated), **per-app share-sheet tiles** (each generated as its own signed relay APK, on-device), a **backup-guarded system language switch**, a **full app-state Export/Import** (everything settable as one category ZIP), **one-tap backup of every sister app** (token-gated `EXPORT_STATE` intents, live per-app progress, one summary), a headless **adb automation bridge** (workspace export/import broadcasts), sub-minute triggers, and a black-and-yellow theme.
 
 ---
 
@@ -66,6 +66,19 @@ A one-tap **ja ⇄ en system-locale toggle** (root-less, via `CHANGE_CONFIGURATI
 ### 💾 Full app-state Export/Import — one ZIP, everything settable
 The UI page opens with a Kōjiki-style **Export/Import** section: a settable **export directory** (red until set, then yellow, with a live "Last export:" line queried on page open) and a category panel — **Workspace programming** (projects · tasks · profiles · scenes · variables, as the standard full JSON), UI theme + font files, widgets, bubbles, app settings, share tiles, and task icons — each an independent **plain-JSON entry in one ZIP** that merges on import (never wipes). ArcaneChat-style pill buttons, black-yellow result dialogs that **close the whole chain** on success, a **Restart now / Later** choice after import — and the ordinary "+" → Import JSON… flow **accepts the ZIP itself**, importing its workspace entry like the plain export.
 
+### 🗄️ One-tap backup of **every** sister app (保存復元)
+The same export runs **headlessly, for every 白い熊 app at once**. Each app exposes a token-gated
+`EXPORT_STATE` intent; one task fires them in turn, and each app writes its own category ZIP —
+named uniformly `shiroikuma-<app>_<yyyy-MM-dd_HH-mm-ss>.zip` — into the shared backup directory
+and reports back the path and byte size. A floating **progress panel** shows which app is running
+(*n/m*) and that app's own live counts (「書籍 1234/8942」, 「512 MB / 4.2 GB」 — real numbers, never a
+percentage), relayed by broadcast while it works. The run ends in a summary of ✓/✗ per app with
+individual sizes and a total. Which apps take part, and **which categories** each one exports, are
+picked visually: an icon-tile app grid, then a checkbox list of that app's own categories — fetched
+live from the app via `LIST_CATEGORIES` — with a 全選択 master toggle and sub-options indented under
+their parent. Every request is gated by a per-app automation token (24 random bytes, constant-time
+compared, never included in any backup), off by default.
+
 ### 📊 Monitor, widgets & theme
 A **Monitor** tab aggregates engine task-activity and widget pulls. A styled-bitmap **home-screen widget engine** with a visual layout editor (Tasker Widget V2 import) and a **named-template library**. A black-and-yellow **AMOLED theme** + a kxkb-styled UI-customization page (text-wide underlined headings), unified JSON import/export, multi-select, and an in-app Help/Docs tab.
 
@@ -89,11 +102,11 @@ A profile is active while **all** its contexts match. Seven families:
 
 ---
 
-## Actions — **132 built-in** (＋ engine flow control)
+## Actions — **142 built-in** (＋ engine flow control)
 
 > Bold = added or materially extended in this fork.
 
-**App (17)** — **Send Intent** *(＋ `reply_via=receiver` binder-free reply channel)* · **Launch Intent** · Launch App · **Freeze App** · **Unfreeze App** · **Make Launcher Tasks** · **Generate Share Relays** · Kill App · Go Home · Next App · Previous App · Open URL · Send SMS · Call · Compose Email · List Apps · Take Screenshot
+**App (19)** — **Send Intent** *(＋ `reply_via=receiver` binder-free reply channel, waits up to 600 s)* · **Launch Intent** · Launch App · **Freeze App** · **Unfreeze App** · **Make Launcher Tasks** · **Generate Share Relays** · **Pick Apps → Variable** *(icon-tile grid, pre-ticked)* · **Pick One App → Variable** *(one-tap, restrictable)* · Kill App · Go Home · Next App · Previous App · Open URL · Send SMS · Call · Compose Email · List Apps · Take Screenshot
 
 **System (23)** — **Turn Screen Off** · **Wake Device** · **Run Shell** (Shizuku) · **Show Scene** · **Hide Scene** · **Set Widget** · **Refresh Widgets** · **Flash Bubble Add / Remove / Clear** · **Flash Kill Icon Show / Hide** · Flash · Vibrate · Reboot Device · Lock Device · Set / Get Clipboard · Set Wallpaper · Set / Pick Keyboard · Profile Status · Log Message
 
@@ -113,7 +126,7 @@ A profile is active while **all** its contexts match. Seven families:
 
 **Notification (4)** — Show Notification *(tap-task + 3 action buttons)* · Cancel Notification · **Dismiss App Notifications** *(by package)* · Say (Text-to-Speech)
 
-**Alert (3)** — Input Dialog · List Dialog · Text Dialog
+**Alert (4)** — Input Dialog · List Dialog · Text Dialog · **Pick From List → Variable** *(checkbox multi-select with a 全選択 master toggle and indented sub-options)*
 
 **Plugin (2)** — Locale Plugin Setting · Locale Plugin Condition
 
