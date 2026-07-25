@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.78+8`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.78+11`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 </div>
 
@@ -78,6 +78,15 @@ picked visually: an icon-tile app grid, then a checkbox list of that app's own c
 live from the app via `LIST_CATEGORIES` — with a 全選択 master toggle and sub-options indented under
 their parent. Every request is gated by a per-app automation token (24 random bytes, constant-time
 compared, never included in any backup), off by default.
+
+**Adding an app to the roster is one tap.** Ticking it in the app picker is the entire setup: the
+workspace writes that app's two settings rows into its own `[979][01]` config task, generates the
+per-app wrapper task, and files both alphabetically — because a task can now **edit and extend other
+tasks**. `task.addaction` inserts an action into another task only if it isn't already there
+(identity = action type + `name` arg) and, in `sorted` mode, re-sorts the whole matched block by a
+regex-captured key; `task.exists` lets a task check for a sub-task before calling it; `tasks.sort`
+alphabetises a group that grows a generated task per app. All that's left for you is pasting the
+app's token.
 
 ### 📊 Monitor, widgets & theme
 A **Monitor** tab aggregates engine task-activity and widget pulls. A styled-bitmap **home-screen widget engine** with a visual layout editor (Tasker Widget V2 import) and a **named-template library**. A black-and-yellow **AMOLED theme** + a kxkb-styled UI-customization page (text-wide underlined headings), unified JSON import/export, multi-select, and an in-app Help/Docs tab.
