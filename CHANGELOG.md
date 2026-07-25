@@ -3,6 +3,38 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.78+1 — 2026-07-25
+
+Upstream resync: the fork rebased onto OpenTasker **0.2.78** (from 0.2.76; 31 upstream commits across
+v0.2.77 "roadmap drain" + v0.2.78 + unreleased work). All fork features carry over unchanged;
+`BUILD_NUMBER` restarts at 1 on the new base (versionCode 800001).
+
+### Adopted from upstream
+- **Geofence-exit contexts** — Location conditions gain a "Match when outside" toggle (fire when NOT
+  at a place, dwell measured outside the radius); exposed in the fork's context editor as a checkbox.
+- **QUEUED-mode fix** — retriggers arriving while a task runs now queue instead of being dropped as
+  "cooldown active"; the cooldown is reserved only when a fresh run actually starts (merged with the
+  fork's per-run event-variable snapshots, which are preserved).
+- **Notification-button tasks run in the foreground service** — not the receiver's ~10 s window, so
+  long tasks (e.g. `flow.wait`) complete reliably; collision-free PendingIntent request codes.
+- **`download` via the shared `http.request` transport** — same-origin redirects, atomic fsync'd
+  writes, 50 MB cap, LAN-permission gate; no parallel OkHttp path.
+- **Tasker import `Wait` fix** — the five time fields are read by argument index, fixing imported
+  waits mis-scaled by up to 1000×.
+- **UI/security polish** — opaque selected-chip fill in both themes, intent-filter enforcement on the
+  exported trigger receivers, `FileActions` symlink/TOCTOU hardening, app-standby-bucket and
+  Advanced-Protection-Mode diagnostics readers, density-correct flow connectors.
+
+### Kept fork-side (upstream's counterparts intentionally not taken)
+- The fork's rewritten variable engine (`VariableStore`: project-scoped globals, `childScope`,
+  persistent-global cache), name-first `OpenTaskerBundle` format, and `task.run` sub-task machinery
+  supersede upstream's versions — upstream's sub-task-scoping fix addresses a leak the fork's
+  isolated child scopes never had.
+- Upstream's new import-time field-limit enforcement stays out: it would only endanger the fork's
+  hand-authored bundles.
+- The scene editor stays the fork's monolithic `SceneLibraryScreen`; upstream's split scene modules
+  and secondary Diagnostics screen remain dropped.
+
 ## 0.2.76+31 — 2026-07-23
 
 A 通知明滅 alert-quality pair: the notification tone and the vibration now fire **together** (like a
