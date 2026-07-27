@@ -133,7 +133,7 @@ A profile is active while **all** its contexts match. Seven families:
 
 ---
 
-## Actions — **151 built-in** (＋ engine flow control)
+## Actions — **148 built-in** (＋ engine flow control)
 
 > Bold = added or materially extended in this fork.
 
