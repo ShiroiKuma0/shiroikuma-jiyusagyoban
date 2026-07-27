@@ -63,6 +63,10 @@ object AutomationSensitivityRegistry {
         // imported-profile risk dialog and the unknown-action fail-closed path, and fork bundles are
         // authored locally — leaving fork ids out would classify them "unknown" and block every task.
         "app.freeze",
+        "app.frozen",
+        "backup.categories",
+        "backup.plan",
+        "backup.runitems",
         "app.next",
         "app.pickmulti",
         "app.previous",
@@ -109,6 +113,11 @@ object AutomationSensitivityRegistry {
         "panel.quicksettings",
         "power.off",
         "profile.toggle",
+        "progress.finish",
+        "progress.hide",
+        "progress.item",
+        "progress.row",
+        "progress.show",
         "scene.hide",
         "scene.show",
         "screen.lock",
@@ -161,6 +170,7 @@ object AutomationSensitivityRegistry {
     )
 
     private val deviceControlActionIds = setOf(
+        "backup.prune",
         "notify.show",
         "notify.cancel",
         "tts.speak",
@@ -204,6 +214,7 @@ object AutomationSensitivityRegistry {
     )
 
     private val destructiveActionIds = setOf(
+        "backup.prune",
         "script.termux.run",
         "app.kill",
         "file.write",

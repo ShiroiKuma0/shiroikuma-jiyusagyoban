@@ -1,7 +1,17 @@
 package com.opentasker.core
 
 import com.opentasker.core.actions.AirplaneModeAction
+import com.opentasker.core.actions.AppFrozenAction
+import com.opentasker.core.actions.BackupCategoriesAction
+import com.opentasker.core.actions.BackupPlanAction
+import com.opentasker.core.actions.BackupRunItemsAction
+import com.opentasker.core.actions.PruneBackupsAction
 import com.opentasker.core.actions.DataReadAction
+import com.opentasker.core.actions.FinishProgressPanelAction
+import com.opentasker.core.actions.HideProgressPanelAction
+import com.opentasker.core.actions.ProgressPanelItemAction
+import com.opentasker.core.actions.ProgressPanelStepAction
+import com.opentasker.core.actions.ShowProgressPanelAction
 import com.opentasker.core.actions.DateTimeAddAction
 import com.opentasker.core.actions.DateTimeFormatAction
 import com.opentasker.core.actions.DateTimeParseAction
@@ -290,6 +300,16 @@ private fun registerBuiltInActions() {
         RefreshWidgetsAction(),
         ShowSceneAction(),
         HideSceneAction(),
+        ShowProgressPanelAction(),
+        ProgressPanelStepAction(),
+        ProgressPanelItemAction(),
+        FinishProgressPanelAction(),
+        HideProgressPanelAction(),
+        AppFrozenAction(),
+        BackupCategoriesAction(),
+        BackupPlanAction(),
+        BackupRunItemsAction(),
+        PruneBackupsAction(),
         TermuxScriptAction(),
         TaskerUnsupportedAction(),
     ).forEach(ActionRegistry::register)

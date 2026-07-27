@@ -170,9 +170,14 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
     private suspend fun deleteItems(manifest: DeleteItemsManifest): DeleteResult {
         val db = OpenTaskerApp_NoHilt.db
         val warnings = mutableListOf<String>()
-        val project = db.projectDao().getAll().firstOrNull { it.name.equals(manifest.projectName, ignoreCase = true) }
-            ?: throw IllegalArgumentException("no such project: ${manifest.projectName}")
-        val pid = project.id
+        // An empty name (or "Unfiled") targets the Unfiled bucket — items with no project at all, which
+        // is where a scratch/test task lands. Without this they could only be deleted by hand in the UI.
+        val unfiled = manifest.projectName.isBlank() || manifest.projectName.equals("Unfiled", ignoreCase = true)
+        val project = if (unfiled) null else {
+            db.projectDao().getAll().firstOrNull { it.name.equals(manifest.projectName, ignoreCase = true) }
+                ?: throw IllegalArgumentException("no such project: ${manifest.projectName}")
+        }
+        val pid: Long? = project?.id
         var tasks = 0; var profiles = 0; var scenes = 0; var variables = 0
 
         // Profiles first, so nothing triggers a task while it's being removed; the engine reconciles
@@ -202,7 +207,8 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
         manifest.variables.forEach { name ->
             // Project bucket + super bucket (a pre-project-scoping copy may linger in super).
             var hit = false
-            if (db.variableDao().get(pid, name) != null) { db.variableDao().delete(pid, name); hit = true }
+            val vpid = pid ?: 0L    // Unfiled variables live in the super bucket
+            if (db.variableDao().get(vpid, name) != null) { db.variableDao().delete(vpid, name); hit = true }
             if (db.variableDao().get(0L, name) != null) { db.variableDao().delete(0L, name); hit = true }
             if (hit) variables++ else warnings += "variable not found: $name"
         }
@@ -211,7 +217,7 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
             com.opentasker.core.engine.variables.PersistentGlobalScope.refreshFromDb()
         }
         return DeleteResult(
-            "deleted $tasks tasks, $profiles profiles, $scenes scenes, $variables variables from ${project.name}",
+            "deleted $tasks tasks, $profiles profiles, $scenes scenes, $variables variables from ${project?.name ?: "Unfiled"}",
             warnings,
         )
     }

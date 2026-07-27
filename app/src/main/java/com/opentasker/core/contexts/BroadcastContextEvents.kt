@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import androidx.core.content.ContextCompat
+import com.opentasker.core.actions.IntentReplyBridge
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -82,6 +83,19 @@ object BroadcastContextEvents {
         runCatching { intent.extras }.getOrNull()?.let { extras ->
             for (key in extras.keySet() ?: emptySet()) publish(key, runCatching { extras.get(key) }.getOrNull())
         }
+        // A broadcast echoing a pending request's correlation id (a sister app's progress report) is
+        // that request's heartbeat — it keeps intent.send's watchdog from writing the app off. The
+        // report's own values travel with it, so the watchdog can tell a heartbeat that is merely
+        // repeating itself from one that shows the work moving.
+        runCatching { intent.getStringExtra(IntentReplyBridge.EXTRA_REPLY_ID) }.getOrNull()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { id ->
+                val report = metadata.entries
+                    .filter { it.key != IntentReplyBridge.EXTRA_REPLY_ID }
+                    .sortedBy { it.key }
+                    .joinToString("") { "${it.key}=${it.value}" }
+                IntentReplyBridge.touch(id, report)
+            }
         flow.tryEmit(ContextEvent(type = "event", matched = true, metadata = metadata, vars = vars))
     }
 }
