@@ -971,6 +971,92 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "progress.show",
+            name = "Progress Panel — Show",
+            description = "Raise the two-pane progress panel over everything: the run's steps on top, the current step's items below, real counters, finished work ticked and dimmed above the active line, and an optional 中止 button. Declare the steps once here; afterwards just say which is current.",
+            category = "System",
+            fields = listOf(
+                ActionField("rows", "Steps", required = true, hint = "the outer list (e.g. the packages to back up), joined by the separator"),
+                ActionField("labels", "Step labels", hint = "optional display names parallel to Steps; blank = the step itself (or the app's name when Packages is on)"),
+                ActionField("separator", "Separator", hint = "how Steps / labels / items are split (default a comma)"),
+                ActionField("packages", "Steps are packages", FieldType.CHECKBOX, hint = "resolve each app's name and draw its icon — frozen apps included"),
+                ActionField("title", "Title", hint = "panel heading"),
+                ActionField("unit", "Step counter noun", hint = "e.g. アプリ → 「アプリ 7/31」"),
+                ActionField("item_unit", "Item counter noun", hint = "e.g. 項目 → 「項目 3/7」"),
+                ActionField("lines", "Step lines", FieldType.NUMBER, hint = "rows visible in the top pane (default 10); the active row sits with 4 done above it"),
+                ActionField("item_lines", "Item lines", FieldType.NUMBER, hint = "rows visible in the bottom pane (default 8)"),
+                ActionField("cancel_var", "Cancel variable", hint = "set to 1 when 中止 is pressed — and any waiting Send Intent gives up at once. Blank = no button"),
+                ActionField("cancel_label", "Cancel label", hint = "button text (default 中止)"),
+                ActionField("scale", "Text scale", FieldType.NUMBER, hint = "1 = normal, 1.5 = half again — match the plan window it follows"),
+                ActionField("fill", "Fill the screen", FieldType.CHECKBOX, hint = "take the whole height, dividing it between the two panes, instead of a fixed row count"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "progress.row",
+            name = "Progress Panel — Step",
+            description = "Mark one step of the progress panel. Activating a step scrolls the top pane to it and loads its items into the bottom pane; finishing it (done/fail/cancel/skip) captures those items into the row, which tapping the row later unfolds.",
+            category = "System",
+            fields = listOf(
+                ActionField("index", "Step number", FieldType.NUMBER, required = true, hint = "1-based position in the list given to Show"),
+                ActionField("state", "State", FieldType.DROPDOWN, hint = "active / done / fail / skip / cancel / pending", options = listOf("active", "done", "fail", "skip", "cancel", "pending")),
+                ActionField("detail", "Detail", hint = "right-hand annotation — a size when it worked, a reason when it didn't"),
+                ActionField("items", "Items", hint = "this step's item list, loaded into the bottom pane when the step goes active"),
+                ActionField("item_labels", "Item labels", hint = "optional display names parallel to Items"),
+                ActionField("parents", "Item parents", hint = "optional parent id per item — items with one are sub-options and are left out of the pane"),
+                ActionField("only", "Keep only", hint = "optional — keep just these item keys (the selected ones); blank = all of them"),
+                ActionField("separator", "Separator", hint = "how Items / labels are split (default a comma)"),
+                ActionField("label", "Rename step", hint = "optional — replace the row's display name"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "progress.item",
+            name = "Progress Panel — Item",
+            description = "Mark one item of the current step, and/or refresh the live counter line drawn under it (「書籍 1234/8942」, straight from the app's own progress broadcast).",
+            category = "System",
+            fields = listOf(
+                ActionField("index", "Item number", FieldType.NUMBER, hint = "1-based position in the step's item list; blank = only update the counter line"),
+                ActionField("state", "State", FieldType.DROPDOWN, hint = "active / done / fail / skip / cancel / pending", options = listOf("active", "done", "fail", "skip", "cancel", "pending")),
+                ActionField("note", "Counter line", hint = "the live numbers under the active item — real counts, never a percentage"),
+                ActionField("detail", "Detail", hint = "right-hand annotation for this item"),
+                ActionField("label", "Rename item", hint = "optional — replace the item's display name"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "progress.finish",
+            name = "Progress Panel — Finish",
+            description = "Turn the running panel into the run's report and leave it up: the item pane folds away, the button becomes OK, and the list stays browsable — every row opening to its items, its written path, and, when it failed, the full error plus buttons to grant the app storage access or re-run just that row.",
+            category = "System",
+            fields = listOf(
+                ActionField("summary", "Summary", hint = "appended to the live ✓/✗ counts in the header, e.g. 合計 約 122 MB"),
+                ActionField("retry_task", "Retry task", hint = "task name run by a row's re-run button; {key} is replaced by that row's key (e.g. 保存 ⇨ {key}). Blank = no repair buttons"),
+                ActionField("row_var", "Row number variable", hint = "set to the row's 1-based number just before a retry, so the task updates that row (e.g. BR_N)"),
+                ActionField("cleanup_dir", "Backup directory", hint = "a repair first deletes that app's UNREADABLE archives here (a killed export leaves a ZIP with no end-of-archive record); readable backups are never touched", pathPicker = true),
+                ActionField("ok", "Button label", hint = "default OK"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "progress.hide",
+            name = "Progress Panel — Hide",
+            description = "Take the progress panel down (typically right before the summary dialog).",
+            category = "System",
+            fields = emptyList()
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "scene.hide",
             name = "Hide Scene",
             description = "Dismiss any scene currently shown.",
@@ -1142,6 +1228,7 @@ fun registerActionMetadata() {
                 ActionField("reply_via", "Reply channel", FieldType.DROPDOWN, options = listOf("", "receiver"),
                     hint = "blank = ordered-broadcast result; 'receiver' = a private ResultReceiver callback (EMUI-proof, the target reads the \"reply_to\" extra and calls back)"),
                 ActionField("result_timeout", "Result timeout (s)", FieldType.NUMBER, hint = "default 5, max 60 (receiver: default 30, max 600)"),
+                ActionField("watchdog", "Give up without progress (s)", FieldType.NUMBER, hint = "receiver mode: stop waiting when the target's progress reports have not CHANGED for this long — it was killed, or it is hung and merely heart-beating. Blank = wait out the whole timeout"),
             )
         )
     )
@@ -1447,6 +1534,78 @@ fun registerActionMetadata() {
             category = "App",
             fields = listOf(
                 ActionField("package", "App", FieldType.APP_PACKAGE, required = true, hint = "pick an app, or type a package / %var"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "app.frozen",
+            name = "Is App Frozen?",
+            description = "Store true/false — whether an app is currently frozen (disabled). A frozen app cannot receive broadcasts, so check this before talking to one, then unfreeze, do the work, and re-freeze only what was frozen.",
+            category = "App",
+            fields = listOf(
+                ActionField("package", "App", FieldType.APP_PACKAGE, required = true, hint = "pick an app, or type a package / %var"),
+                ActionField("store", "Store in", hint = "variable for true/false (default %frozen); an app that isn't installed stores empty"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "backup.categories",
+            name = "Parse Backup Categories",
+            description = "Split a sister app's LIST_CATEGORIES reply (id⇥label⇥parent⇥on/off per line) into <store>_ids / _labels / _parents / _defaults — the last being what the item picker pre-ticks.",
+            category = "App",
+            fields = listOf(
+                ActionField("text", "Reply text", FieldType.MULTILINE, required = true, hint = "the payload with OK: already stripped"),
+                ActionField("store", "Store prefix", hint = "default cat → %cat_ids, %cat_labels, %cat_parents, %cat_defaults"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "backup.plan",
+            name = "Backup Plan",
+            description = "Open a backup run as a plan instead of starting it: every app a ticked row that unfolds to its own items, all deselectable, with select/deselect-all at the top and inside each app. The button publishes the choice (%BR_RunApps / %BR_Run_<App>) and runs the task that performs it — the saved per-app selections are left untouched.",
+            category = "App",
+            fields = listOf(
+                ActionField("apps", "Apps", required = true, hint = "the roster, split by Separator"),
+                ActionField("separator", "Separator", hint = "default a space"),
+                ActionField("confirm_task", "Run task", required = true, hint = "the task the button runs, e.g. 保存実行"),
+                ActionField("confirm", "Button label", hint = "default 保存開始"),
+                ActionField("title", "Title", hint = "default 保存"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "backup.runitems",
+            name = "Backup Items For Run",
+            description = "Store what an app should export now: the plan's per-run choice if there is one, else its saved selection, else empty (= the app's own defaults).",
+            category = "App",
+            fields = listOf(
+                ActionField("package", "App", FieldType.APP_PACKAGE, required = true, hint = "pick an app, or type a package / %var"),
+                ActionField("store", "Store in", hint = "default %items_eff"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "backup.prune",
+            name = "Prune Backups",
+            description = "Open the backup directory as a tick-list: one row per app with its archives newest-first, everything but the newest pre-ticked, live totals, and a delete button. Nothing is deleted until you press it.",
+            category = "File",
+            fields = listOf(
+                ActionField("dir", "Backup directory", required = true, hint = "where the .zip archives live", pathPicker = true),
+                ActionField("apps", "Apps", required = true, hint = "the roster, split by Separator — only these apps are listed"),
+                ActionField("separator", "Separator", hint = "how Apps is split (default a space)"),
+                ActionField("keep", "Keep newest", FieldType.NUMBER, hint = "how many newest archives per app start UNticked (default 1)"),
+                ActionField("title", "Title", hint = "panel heading (default 保存の整理)"),
+                ActionField("lines", "Visible rows", FieldType.NUMBER, hint = "default 14"),
             )
         )
     )

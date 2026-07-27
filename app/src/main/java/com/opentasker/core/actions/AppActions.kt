@@ -209,6 +209,51 @@ class UnfreezeAppAction : Action {
 }
 
 /**
+ * Is an app frozen right now? Stores "true" / "false" into [store] (default `%frozen`); an app that
+ * isn't installed stores "" and fails.
+ *
+ * The pre-flight for anything that talks to another app: a `pm disable-user` package cannot receive
+ * broadcasts at all — its manifest receivers stop resolving — so a token-gated request to a frozen
+ * sister app is never delivered and the caller sits out its whole reply timeout in silence. Read the
+ * state, thaw it, do the work, and re-freeze exactly what was frozen. Needs no Shizuku (this is a
+ * plain PackageManager read); only the thaw/re-freeze does.
+ *
+ * Args:
+ *   - "package": package name
+ *   - "store": variable to receive "true"/"false" (default "frozen")
+ */
+class AppFrozenAction : Action {
+    override val id = "app.frozen"
+    override val category = ActionCategory.APP
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val pkg = args["package"]?.trim().orEmpty()
+        if (pkg.isEmpty()) return ActionResult.Failure("missing package")
+        val store = args["store"]?.trim()?.removePrefix("%")?.takeIf { it.isNotEmpty() } ?: "frozen"
+        val pm = ctx.app.packageManager
+        val info = runCatching {
+            pm.getApplicationInfo(pkg, PackageManager.MATCH_DISABLED_COMPONENTS)
+        }.getOrNull()
+        if (info == null) {
+            ctx.variables.set(store, "")
+            return ActionResult.Failure("app not installed: $pkg")
+        }
+        val frozen = when (runCatching { pm.getApplicationEnabledSetting(pkg) }.getOrNull()) {
+            PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+            PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER,
+            PackageManager.COMPONENT_ENABLED_STATE_DISABLED_UNTIL_USED,
+            -> true
+            PackageManager.COMPONENT_ENABLED_STATE_ENABLED -> false
+            // DEFAULT (and an unreadable setting): fall back to the effective flag from the manifest.
+            else -> !info.enabled
+        }
+        ctx.variables.set(store, frozen.toString())
+        ctx.logger("$pkg frozen=$frozen → %$store")
+        return ActionResult.Success
+    }
+}
+
+/**
  * Switch to the previous / next app — like the system quick-switch. Builds an MRU list of recently
  * foregrounded apps from UsageStats and steps a cursor through a stable snapshot: "previous" goes to an
  * older app, "next" comes back toward the current one. The snapshot is retaken whenever the foreground

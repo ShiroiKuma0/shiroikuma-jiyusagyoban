@@ -390,8 +390,9 @@ object SceneOverlayManager {
     }
 }
 
-/** Minimal owner so a [ComposeView] can host Compose outside an Activity (for the overlay window). */
-private class OverlayLifecycleOwner : LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
+/** Minimal owner so a [ComposeView] can host Compose outside an Activity (for the overlay window).
+ *  Shared with the progress panel overlay (`com.opentasker.progress.ProgressPanelManager`). */
+internal class OverlayLifecycleOwner : LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val store = ViewModelStore()
     private val savedStateController = SavedStateRegistryController.create(this)

@@ -68,6 +68,16 @@ uniformly. Update your existing `EXPORT_PREFIX` to `"<english-dash-separated-app
 the version from the name; if your "latest export" query matches that prefix, let it also accept your
 old prefix so previously written backups stay recognised.
 
+**Write it atomically — never leave a half-backup behind.** Write to a temporary name in the target
+directory (`<final-name>.part`) and **rename to the final name only after the archive is closed and
+complete**. If anything fails, times out, or kills you, delete the partial file on the way out. A
+killed export otherwise leaves a file that is indistinguishable from a real backup until someone
+tries to restore it — and 白い熊 keeps every app's backups in one directory, sorted by date, so a
+truncated one silently becomes "the latest backup" of that app. (自由作業盤 sweeps unreadable archives
+before a retry, but that is a safety net, not a substitute: only your app knows the file is doomed at
+the moment it fails.) A complete ZIP ends with the end-of-central-directory signature `50 4b 05 06`;
+a truncated one does not, which is exactly how the caller tells them apart.
+
 **ONE ZIP per app — always.** However many components your app exports (settings, appearance, a
 database, media, learned dictionaries, per-account archives…), a single `EXPORT_STATE` request
 produces **exactly one** `.zip` at that one path, with the components as entries inside it. Never
@@ -82,6 +92,22 @@ renrakusaki already declares for exactly this reason. If your app holds it, writ
 `java.io.File`. If it does not and you should not add it, ignore `path` **only** when you have a
 configured SAF directory, and otherwise reply `ERROR:no-storage-access`.
 
+**Check the grant, don't discover it by failing.** Declaring `MANAGE_EXTERNAL_STORAGE` in the manifest
+is not holding it — on Android 11+ it is granted from a Settings page, per app, and 白い熊 may well
+have declined it. So test `Environment.isExternalStorageManager()` **before** touching `path`, and
+reply exactly `ERROR:no-storage-access` when it is false. That precise string is what 自由作業盤 keys
+on to offer a **「全ファイルアクセスを許可」** button on the failed row, which opens your app's
+All-files-access page directly, so the whole repair is grant → retry, from the report. A raw
+`…/foo.zip: open failed: EACCES (Permission denied)` or a generic `export failed: …` is shown
+verbatim instead and can only be read, not acted on.
+
+**Never persist an "export in progress" flag, and never let one outlive its export.** Guard against
+concurrent exports with a process-local `AtomicBoolean` released in a `finally`. Persist it and a
+single crash wedges the app for good; leave it set on a path that hangs rather than returns, and the
+`finally` never runs — either way every later request answers `ERROR:export already running` and no
+backup is possible until the process is killed. Whatever can hang inside the export must therefore be
+bounded (see the heartbeat rule in §3): a guard is only as good as the work it guards terminating.
+
 ### `<pkg>.action.LIST_CATEGORIES`
 
 Token-gated, instant. Reply `OK:` followed by one line per exportable category:
@@ -94,12 +120,35 @@ books.covers\tCovers\tbooks
 books.notes\tReading notes\tbooks
 ```
 
-That is `id<TAB>label` per line, with an **optional third field `parent-id`** for sub-options —
+That is `id<TAB>label` per line, with an **optional third field `parent-id`** for sub-options and an
+**optional fourth field `default`** (`on` / `off`; absent = `on`) —
 a category that itself has selectable parts lists each part as its own line whose third field is
 the parent's id (parents must appear on their own line too, before their children). The ids are
 exactly the ones accepted in `items` (sub-option ids included, each independently selectable), and
 top-level ids should be the **same stable ids your ZIP already uses as entry names** (your
-`Cat`/`Category` enum's `id`). 自由作業盤 renders the list as a checkbox picker with a 全選択
+`Cat`/`Category` enum's `id`). **The fourth field is how you say "not by default".** The picker is drawn fresh from *your* answer
+every time 白い熊 opens it, so what you mark `off` is what starts unticked — that is the only way an
+opt-out part of your app can be opt-out. Mark `off` anything that is **large, derived, and
+re-creatable**: cover caches, generated thumbnails, downloaded media, anything rebuilt from data that
+is itself in the backup. Everything authored — settings, accounts, notes, annotations, anything that
+cannot be made again — stays `on`. When the field is absent the item is `on`, so existing apps need
+no change.
+
+Because the default lives in your reply, **`items` absent means "your default set", not "everything"**.
+An app 白い熊 has never picked items for exports what you recommend, not your entire footprint.
+
+```
+settings	Settings (theme · behaviour)
+books	Book library (3 shelves)
+books.notes	Reading notes	books
+books.covers	Cover images	books	off
+bulk	Downloaded media		off
+```
+
+(The fourth field is positional: a top-level item that is `off` still needs the empty third field, as
+`bulk` shows.)
+
+自由作業盤 renders the list as a checkbox picker with a 全選択
 master toggle; sub-options appear indented under their parent and follow its toggle. Flat lists
 simply omit the third field. In `items`, treat a parent id WITHOUT its children as "that category's
 own data only", and each child id as exactly that part.
@@ -126,6 +175,11 @@ context.sendBroadcast(Intent(replyAction).apply {
   but it must never be your only reply.
 - Verified on 白い熊's Mate XT, 2026-07-23.
 - `FLAG_INCLUDE_STOPPED_PACKAGES` matters: without it a backgrounded/stopped caller never hears you.
+- **If your app is frozen** (`pm disable-user`, which 白い熊 uses a lot), it cannot receive the
+  request at all — a disabled package's receivers stop resolving. 自由作業盤 handles that itself:
+  it reads the freeze state, thaws the app, runs the export, and re-freezes exactly what it thawed.
+  Nothing is required of you, except not to assume your process outlives the reply — finish writing
+  the ZIP and report the real byte count **before** you reply, never after.
 
 `result` is one line:
 
@@ -150,8 +204,87 @@ Rules for the reply:
 - Report **`automation disabled`** and **`bad token`** as distinct errors (they debug differently).
 - `<bytes>` is the real byte length of the written file; `<human size>` is for display
   (`4.6 MB`, `1.20 GB`); **your app computes both** — the caller cannot stat the file.
-- Hold the broadcast open with `goAsync()` and do the work on a background dispatcher. If your export
-  can exceed ~10 minutes, hand off to a foreground service and reply from there.
+
+### Where the export RUNS — a receiver cannot hold it (this kills apps)
+
+**`goAsync()` does not extend the broadcast timeout.** A manifest receiver — `PendingResult` held or
+not — must reach `finish()` within Android's broadcast window: **~10 s when the app is in the
+foreground, ~60 s when it is not**. Overrun it and the system raises an ANR against *your* app and
+kills the process **mid-export**. Nothing replies, the file is left half-written, and 自由作業盤 waits
+for a reply that can never come.
+
+This is not hypothetical — it has happened in this family, to an app exporting several thousand
+images: the receiver overran the window, the system ANR'd it, and the batch was left waiting on a
+dead process with a half-written archive on disk.
+
+**So: `goAsync()` alone is only ever acceptable for an export that CANNOT exceed a few seconds.** If
+your app holds media, covers, thumbnails, attachments, audio, a large database, or simply thousands
+of rows — assume it can't. The receiver then does **nothing but**: check the switch + token, validate
+`items`, and **start a foreground service** with the request's extras, then return immediately. The
+service does the whole export, sends the progress broadcasts, sends the one terminal reply, and stops
+itself.
+
+```kotlin
+// StateExportReceiver.onReceive — after the token gate, hand off and get out.
+val svc = Intent(context, StateExportService::class.java).apply {
+    putExtra("path", pathOverride); putExtra("items", items)
+    putExtra("progress_action", progressAction)
+    putExtra("reply_action", replyAction); putExtra("reply_package", replyPackage)
+    putExtra("reply_id", replyId)
+}
+ContextCompat.startForegroundService(context, svc)   // returns at once; no ANR window left open
+```
+
+```kotlin
+class StateExportService : Service() {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    override fun onBind(i: Intent?) = null
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        startForeground(NOTIF_ID, buildNotification())   // MUST be within 5 s of starting
+        val i = intent ?: run { stopSelf(); return START_NOT_STICKY }
+        scope.launch {
+            val replied = AtomicBoolean(false)
+            fun reply(result: String) {
+                if (!replied.compareAndSet(false, true)) return
+                sendBroadcast(Intent(i.getStringExtra("reply_action")!!).apply {
+                    setPackage(i.getStringExtra("reply_package"))
+                    addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+                    putExtra("reply_id", i.getStringExtra("reply_id"))
+                    putExtra("result", result)
+                })
+            }
+            try { /* the export, reporting progress as it goes */ reply("OK:$path|$bytes|$human|$n categories") }
+            catch (e: Exception) { reply("ERROR:${e.message ?: e.javaClass.simpleName}") }
+            finally { stopForeground(STOP_FOREGROUND_REMOVE); stopSelf() }
+        }
+        return START_NOT_STICKY
+    }
+}
+```
+
+**An export that runs for minutes needs the OEM to allow it — and will not tell you when it does not.**
+On EMUI a foreground service is *not* enough: the system force-releases the app's partial wakelock
+seconds after it starts and then starves the process, so the export simply stops part-way, at no
+consistent point, with no crash, no ANR and no log. `dumpsys power` shows the giveaway — the wakelock
+in the **"Force Released WakeLocks"** list — and `dumpsys deviceidle whitelist` shows the app absent
+while apps that survive are present. Two consequences:
+
+- **Check whether you are exempt, and ask if you are not**: `PowerManager.isIgnoringBatteryOptimizations(packageName)`,
+  and if false send the user to `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` **before** starting a long
+  export rather than failing halfway. On Huawei the decisive setting is additionally
+  「アプリ起動管理」 → 手動管理 with バックグラウンドで実行 ON, which no app can set for itself — say so
+  in the prompt.
+- **Prefer not needing it.** An export that finishes in a couple of seconds is never touched. Everything
+  that finishes fast in this family does so because it serialises settings and rows; if yours must walk
+  thousands of files, that is what puts it in this territory.
+
+Manifest: `<service android:name=".StateExportService" android:exported="false"
+android:foregroundServiceType="dataSync" />` plus `FOREGROUND_SERVICE` and (API 34+)
+`FOREGROUND_SERVICE_DATA_SYNC`. Call `startForeground()` **inside 5 s** of the service starting or the
+system kills it for the same class of reason. Take a **partial wakelock** around the export if it can
+run for minutes — EMUI will otherwise doze the CPU with the screen off. Keep exactly one terminal
+reply, guarded by the `AtomicBoolean`, wherever it now lives.
 
 ---
 
@@ -218,6 +351,20 @@ context.sendBroadcast(Intent(progressAction).apply {
 - `text` is what 白い熊 reads in the notification; make it specific and countable.
   Good: `書籍 1234/8942`, `512 MB / 4.2 GB`, `区分 3/7 — 設定`. Bad: `Exporting…`, `47%`.
 - `current`/`total` are `long` extras and `unit` a String — send them alongside `text`, not instead.
+- **A progress broadcast is also your HEARTBEAT.** 自由作業盤 treats every one as proof you are still
+  alive and gives up on an app that goes quiet — so send one **at least every 30 s even when the
+  numbers have not moved** (a single long step: zipping a 2 GB library, one huge attachment). An app
+  that reports nothing for two minutes is presumed dead and its slot is failed.
+- **A heartbeat is a promise, not a shield.** Because it keeps the caller waiting, an export that
+  hangs while still ticking is worse than one that dies: it holds its slot until the full timeout.
+  So bound every step that could block — a per-file / per-step timeout, skip-and-continue over what
+  will not read (count the skips in your reply) — and reply `ERROR:…` rather than hang.
+- **`current` counts what is FINISHED, not what is starting** — send `current = 0` while the first
+  category is being written, `1` once it is done, and a final one with `current == total`.
+  自由作業盤's progress panel ticks off items `1..current` and highlights `current + 1`, so an
+  off-by-one here highlights the wrong row. When `current`/`total` count categories, `total` must be
+  the number of categories **actually being exported** (after `items` filtering), not the app's full
+  catalogue — that is the number the panel's item list is built from.
 - Your app **may** also show its own progress UI; the broadcasts are what 自由作業盤 displays and
   are mandatory either way.
 
@@ -252,65 +399,27 @@ skips absent categories. Nearest references: `shiroikuma-kojiki` (`KojikiExport.
 (`helpers/SettingsExport.kt`).
 
 Refactor so the export core is callable **headlessly** — a function taking
-`(categories, OutputStream, onProgress)` — with the UI panel and this receiver as two thin callers.
-Do not duplicate export logic in the receiver.
+`(categories, OutputStream, onProgress)` — with the UI panel, this receiver, and (for anything that
+can run longer than a few seconds) the foreground service of §1 as thin callers. Do not duplicate
+export logic in the receiver, and do not run it there.
 
 ---
 
-## 6. Acceptance checklist
+## 6. How it gets verified — in 自由作業盤, not here
 
-Verify all of these before telling 白い熊 you are done. Substitute your `<pkg>` and token.
+**Do not build a self-test for this.** The contract is exercised where it is actually used: 白い熊
+runs 保存復元's 「保存」, which drives every app in the roster and reports each one in a panel — ✓ with
+size and path, or ✗ with your exact `ERROR:` line. A failed row opens to the full error and offers
+the repair (grant storage access, stop a wedged app, re-run just that app), so a fault in your export
+is seen, diagnosed and retried there.
 
-1. **Build + install** the app the normal way for this repo, then confirm the two automation rows sit
-   **inside the Export/Import section, directly below the existing export rows** (§2), flip the
-   switch **ON**, and tap the token row to copy it.
+What that leaves for you, once the code is written: make sure the two rows are in the Export/Import
+section (§2) and the switch is ON, then tell 白い熊 the token is ready to copy. 白い熊 runs the batch.
 
-2. **Gate works (token empty/wrong):** should reply an error, not hang, not export.
-   ```bash
-   adb shell "am broadcast -a <pkg>.action.LIST_CATEGORIES -p <pkg> \
-     --es token wrong --es reply_action shiroikuma.jiyusagyoban.action.INTENT_REPLY \
-     --es reply_package shiroikuma.jiyusagyoban --es reply_id test-1"
-   ```
-   Watch your own log for `ERROR:bad token`; with the switch off, `ERROR:automation disabled`.
-
-3. **Categories list:** same command with the **real** token → the reply carries `OK:` + one
-   `id<TAB>label` line per category, ids matching your ZIP entry names.
-
-4. **Real export, directory override:**
-   ```bash
-   adb shell "am broadcast -a <pkg>.action.EXPORT_STATE -p <pkg> \
-     --es token <REAL_TOKEN> --es path '/sdcard/tmp' \
-     --es progress_action shiroikuma.jiyusagyoban.action.BR_PROGRESS \
-     --es reply_action shiroikuma.jiyusagyoban.action.INTENT_REPLY \
-     --es reply_package shiroikuma.jiyusagyoban --es reply_id test-2"
-   adb shell ls -la /sdcard/tmp/
-   ```
-   The ZIP must appear in `/sdcard/tmp` (proving `path` overrides the configured directory), and the
-   reply's byte count must equal the real file size. Then **delete the test ZIP from `/sdcard/tmp`** —
-   nothing of ours stays there.
-
-5. **Items subset:** repeat with `--es items '<one id>'` → the ZIP contains only that category and
-   the reply says `1 categories`.
-
-6. **Unknown id:** `--es items 'bogus'` → `ERROR:unknown category in items: bogus`, no file written.
-
-7. **No directory:** with no `path` extra and no configured export directory →
-   `ERROR:no-directory`, no crash.
-
-8. **Progress:** during a large export, confirm progress broadcasts fire with real counts, ≥500 ms
-   apart, and that `current`/`total`/`unit` are populated.
-
-9. **Import still works** from your Export/Import page for a ZIP produced headlessly — the automation
-   path must produce a normal, restorable backup, not a special format.
-
-10. **Token not in the ZIP:** unzip a headless export and grep for the token value — it must be absent.
-
-**Then tell 白い熊:** the app is ready, and the automation token is at
-*UI page → Export / Import → Automation token → tap to copy* — to be pasted into 自由作業盤's
-「保存復元の設定 -- [979][01]」 in the `%BR_Token_<App>` line for this app, followed by running
-「保存復元 ⇨ 起動 -- [979][71]」. If your app is not in 自由作業盤's roster yet, say so — a wrapper
-task and the two settings lines need adding there (自由作業盤 can auto-generate the wrapper from its
-「保存作成」 task).
+If you want a smoke test while developing, the one worth doing is the realistic one — trigger the
+export with the app **in the background** against your largest real data set, and confirm it neither
+ANRs (`adb logcat | grep -i "ANR in <pkg>"`) nor stops reporting; a small export proves nothing about
+the paths that break.
 
 ---
 
