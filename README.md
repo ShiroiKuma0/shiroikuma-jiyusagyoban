@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.78+11`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.78+38`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 </div>
 
@@ -15,7 +15,7 @@
 
 It is a native **Kotlin + Jetpack Compose** automation engine — profiles bind **triggers** to **tasks**, tasks run **actions**, all persisted in Room, no Hilt, no native code. Built on OpenTasker and extended into a markedly more capable tool than OpenTasker — and, in everyday use, than Tasker itself. It installs **side-by-side** with upstream (application id `shiroikuma.jiyusagyoban`), so both can coexist.
 
-> A fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions: a generic **Send Intent** action, cross-app **protected contacts** (content-free notifications for private senders), a screen-off **notification wakedance**, **app freeze/unfreeze + launcher-task generation**, a fully app-driven **kanji clock**, **projects + foldable groups + scoped variables**, full **drag-to-reorder** (tasks, projects, project-tabs), a **Review Import** workflow, a **capability-aware action editor**, **home-screen task shortcuts with custom icons**, **Desktop re-freeze bubbles**, home-screen **widgets + a template library**, **living scene overlays** (a charging fire on the battery line, a **natively-rendered, music-reactive, tempo-locked** music edge-light — all screen-off gated), **per-app share-sheet tiles** (each generated as its own signed relay APK, on-device), a **backup-guarded system language switch**, a **full app-state Export/Import** (everything settable as one category ZIP), **one-tap backup of every sister app** (token-gated `EXPORT_STATE` intents, live per-app progress, one summary), a headless **adb automation bridge** (workspace export/import broadcasts), sub-minute triggers, and a black-and-yellow theme.
+> A fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions: a generic **Send Intent** action, cross-app **protected contacts** (content-free notifications for private senders), a screen-off **notification wakedance**, **app freeze/unfreeze + launcher-task generation**, a fully app-driven **kanji clock**, **projects + foldable groups + scoped variables**, full **drag-to-reorder** (tasks, projects, project-tabs), a **Review Import** workflow, a **capability-aware action editor**, **home-screen task shortcuts with custom icons**, **Desktop re-freeze bubbles**, home-screen **widgets + a template library**, **living scene overlays** (a charging fire on the battery line, a **natively-rendered, music-reactive, tempo-locked** music edge-light — all screen-off gated), **per-app share-sheet tiles** (each generated as its own signed relay APK, on-device), a **backup-guarded system language switch**, a **full app-state Export/Import** (everything settable as one category ZIP), **one-tap backup of every sister app** (a plan → run → report window: pick apps and items, watch two live panes, repair what failed without leaving it), a headless **adb automation bridge** (workspace export/import broadcasts), sub-minute triggers, and a black-and-yellow theme.
 
 ---
 
@@ -67,17 +67,39 @@ A one-tap **ja ⇄ en system-locale toggle** (root-less, via `CHANGE_CONFIGURATI
 The UI page opens with a Kōjiki-style **Export/Import** section: a settable **export directory** (red until set, then yellow, with a live "Last export:" line queried on page open) and a category panel — **Workspace programming** (projects · tasks · profiles · scenes · variables, as the standard full JSON), UI theme + font files, widgets, bubbles, app settings, share tiles, and task icons — each an independent **plain-JSON entry in one ZIP** that merges on import (never wipes). ArcaneChat-style pill buttons, black-yellow result dialogs that **close the whole chain** on success, a **Restart now / Later** choice after import — and the ordinary "+" → Import JSON… flow **accepts the ZIP itself**, importing its workspace entry like the plain export.
 
 ### 🗄️ One-tap backup of **every** sister app (保存復元)
-The same export runs **headlessly, for every 白い熊 app at once**. Each app exposes a token-gated
-`EXPORT_STATE` intent; one task fires them in turn, and each app writes its own category ZIP —
-named uniformly `shiroikuma-<app>_<yyyy-MM-dd_HH-mm-ss>.zip` — into the shared backup directory
-and reports back the path and byte size. A floating **progress panel** shows which app is running
-(*n/m*) and that app's own live counts (「書籍 1234/8942」, 「512 MB / 4.2 GB」 — real numbers, never a
-percentage), relayed by broadcast while it works. The run ends in a summary of ✓/✗ per app with
-individual sizes and a total. Which apps take part, and **which categories** each one exports, are
-picked visually: an icon-tile app grid, then a checkbox list of that app's own categories — fetched
-live from the app via `LIST_CATEGORIES` — with a 全選択 master toggle and sub-options indented under
-their parent. Every request is gated by a per-app automation token (24 random bytes, constant-time
+The same export runs **headlessly, for every 白い熊 app at once** — and the whole job now lives in one
+window that carries it from choosing to reporting.
+
+**It opens as a plan, not a launch.** Every app in the roster is a ticked row; unfold one and its own
+items are listed with the app's labels and sub-option indentation, ticked as that app's saved
+selection has them. Deselect a whole app, drop a single item, or add one the saved selection leaves
+out — with select/deselect-all at both levels. The choice applies to *this run only*; the saved
+per-app selections are never touched.
+
+**Then the same window becomes the run.** Two auto-following panes — the apps on top, the current
+app's items below — with the running row parked five lines down so finished work stays in view,
+finished rows ticked and dimmed, and real counts throughout (「アプリ 7/33」, and the app's own
+「書籍 1234/8942」 or 「512 MB / 4.2 GB」 — never a percentage), relayed by broadcast while it works.
+**中止** stops it within a second, because it also abandons the reply it was waiting on.
+
+**And then the report — in that same window.** Rows stay browsable; open one for its items and the
+path it wrote. Open a failed one for the **whole** error and the repair that fits it: grant the app
+All-files access, **stop an app the OEM is starving and jump to アプリ起動管理**, or **re-run just
+that app** — which first sweeps the half-written archive a killed export leaves behind. Repairs
+update the row and the tally in place, so a run that half-failed is finished from the report instead
+of started over.
+
+Robustness the batch learned the hard way: a **frozen** app is thawed, exported, and re-frozen
+(a `pm disable-user` app cannot receive broadcasts at all, and used to cost the full 600 s timeout in
+silence); a `LIST_CATEGORIES` pre-flight fails a dead app in 20 s; and the watchdog judges **progress,
+not noise** — an app whose reports stop *changing* is given up on, which catches one that heartbeats
+while hung. Every request is gated by a per-app automation token (24 random bytes, constant-time
 compared, never included in any backup), off by default.
+
+**保存整理 — the housekeeping half.** The backup directory as a tick-list: one row per app with its
+archives newest-first, everything but the newest pre-ticked, per-app and grand totals of both count
+and size, and single files toggled by hand. Nothing is deleted until the button, and the same window
+then reports what went.
 
 **Adding an app to the roster is one tap.** Ticking it in the app picker is the entire setup: the
 workspace writes that app's two settings rows into its own `[979][01]` config task, generates the
@@ -111,7 +133,7 @@ A profile is active while **all** its contexts match. Seven families:
 
 ---
 
-## Actions — **142 built-in** (＋ engine flow control)
+## Actions — **151 built-in** (＋ engine flow control)
 
 > Bold = added or materially extended in this fork.
 

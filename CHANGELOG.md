@@ -3,6 +3,97 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.78+38 — 2026-07-28
+
+**The backup batch becomes one window.** 保存復元 used to be two lines of text on a floating panel
+and a wall-of-text summary dialog; a frozen app cost ten silent minutes; a failure could only be read,
+not acted on. The run now opens as a plan, becomes a live two-pane progress view, and ends as a report
+you can repair from — all in the same window.
+
+### The progress panel (new)
+- **Two auto-following panes** — the run's steps on top, the current step's items below. The active
+  row is parked `(lines-1)/2` down, so finished work stays visible above it and what is coming stays
+  visible below; a hand-scroll suspends the follow for 5 s so you can look ahead without being yanked
+  back. Finished rows are ticked and dimmed, failures washed red, the running row highlighted.
+- **Real counters, never a percentage** — 「アプリ 7/33」 in the header and the app's own live line
+  (「書籍 1234/8942」) indented under the item it belongs to.
+- **中止 stops within a second**, not at the end of the current wait: pressing it aborts the pending
+  `intent.send` reply as well as skipping the rest, then goes straight to the report.
+- **Fold-out rows** — a finished app opens to the items it exported and the path it wrote.
+- Actions: `progress.show` / `progress.row` / `progress.item` / `progress.finish` / `progress.hide`.
+  Addressing a panel that is not showing is a silent no-op, never a task failure.
+
+### The plan (new — `backup.plan`)
+- 「保存」 no longer starts anything. It opens the roster as a tick-list: every app selected, each
+  unfolding to its own items **with the app's labels and sub-option indentation**, ticked as that
+  app's saved selection has them. Select/deselect-all for the apps, and for the items inside each app;
+  a group item carries its sub-options with it.
+- The app's line folds it open; only its checkbox selects it. An item's line selects the item.
+- The choice is published to `%BR_RunApps` / `%BR_Run_<App>` and 「保存実行」 runs it — the saved
+  `%BR_Items_<App>` are never overwritten, so narrowing one run (or adding an item the saved selection
+  leaves out) is free.
+- `backup.runitems` resolves what an app should export now: the per-run choice, else the saved
+  selection, else empty — which the contract reads as the app's own defaults.
+
+### The report + repairs
+- At the end the item pane folds away, the button becomes OK, and the list stays browsable with live
+  ✓/✗ counts. A failed row opens to the **full** error text plus the repair that fits it:
+  **「全ファイルアクセスを許可」** (opens that app's All-files-access page), **「停止して起動管理へ」**
+  (force-stops a wedged/starved app and opens Huawei's アプリ起動管理 — it does *not* re-run, because
+  nothing changes until that setting does), and **「保存し直す」** for the app alone, plus
+  「失敗をすべて保存し直す」 for the lot.
+- Every retry first **sweeps that app's unreadable archives** — a killed export leaves a ZIP with no
+  end-of-central-directory record that is indistinguishable from a real backup until you try to
+  restore it.
+
+### 保存整理 — pruning (new — `backup.prune`)
+- The backup directory as a tick-list: one row per app, archives newest-first, everything but the
+  newest pre-ticked, per-app 「(11/12) · 554.8/605.2 MB」 and grand totals of both count and size.
+  Single files toggle by hand; nothing is deleted until 「削除」; the same window then reports what went.
+
+### Frozen apps, and not waiting on the dead
+- **`app.frozen`** (a plain PackageManager read) plus thaw → export → **re-freeze exactly what was
+  frozen**, on every exit path including failure and 中止. A `pm disable-user` app cannot receive
+  broadcasts at all, so a frozen target previously sat out the whole 600 s timeout in silence.
+- A **`LIST_CATEGORIES` pre-flight** doubles as a liveness probe: a dead or unimplemented app fails in
+  20 s instead of 600.
+- **`intent.send` gained a watchdog** that judges **progress, not noise**: each progress broadcast is
+  fingerprinted, and an app whose reports stop *changing* is given up on — which also catches an app
+  that heartbeats while hung. Reported apart as 応答途絶 (nothing arrived) vs 作業停止 (arrived,
+  unchanged).
+
+### Item picker
+- `backup.categories` parses a `LIST_CATEGORIES` reply natively (the optional fourth `on`/`off` field
+  is positional, which a chain of regexes cannot take apart safely), replacing eleven `var.replace`
+  steps in the core task.
+- The picker is now drawn from **the app's own defaults every time** — opening it is not an existing
+  choice, the choice is what you make in it — and it stores the whole catalogue (ids, labels,
+  parent/child structure, defaults) in `%BR_Cat_<App>`, which is what lets the plan window show proper
+  labels and indentation.
+- `param:mode` is gone from all 33 wrapper tasks (it made a hand-run wrapper warn about a missing
+  template value); mode travels in `%BR_Mode`.
+
+### Contract (`hand-off-backup-automation.md`)
+Generalised — no app-specific incidents — and hardened with what this run taught, with the self-test
+checklist replaced by "verification happens in 自由作業盤":
+- **Never export from a receiver.** `goAsync()` does not extend the broadcast window (~10 s foreground,
+  ~60 s background); overrun it and the system ANRs and kills the app mid-export. Foreground service,
+  `startForeground()` within 5 s, wakelock.
+- **A heartbeat is a promise, not a shield** — bound every blocking step (per-file timeout,
+  skip-and-continue with the skips counted in the reply, an overall ceiling that replies `ERROR:`).
+- **Write archives atomically** (`<name>.part` → rename), and delete the partial on every failure path.
+- **Never persist an in-progress flag**, and never let one outlive its export.
+- **Check `isExternalStorageManager()`** and reply exactly `ERROR:no-storage-access` — that string is
+  what arms the grant button; a raw `EACCES` can only be read.
+- **A fourth `LIST_CATEGORIES` field** declares each item's default (`on`/`off`, absent = `on`), so an
+  app can mark large, derived, re-creatable data opt-out; `items` absent now means the app's defaults.
+- An export that runs for minutes needs the OEM to allow it — a foreground service is not enough on
+  EMUI, which force-releases the wakelock and starves the process.
+
+### Fixes
+- `DELETE_ITEMS` can target Unfiled items (it required a real project).
+- The retired 保存進捗盤 scene is gone; the panel replaces it.
+
 ## 0.2.78+11 — 2026-07-25
 
 **Self-registering backup roster.** Adding a sister app to the one-tap backup used to mean three
