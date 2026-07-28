@@ -596,11 +596,25 @@ private fun ProgressPanelUi(state: ProgressPanelState) {
             }
         }
     }
+    // Both counters on one line under the running item: what it has written, and how much of it.
+    // 「ファイル 1234/8942 · 512 MB / 4.2 GB」 — the app supplies the left half as text, the byte pair
+    // is rendered here so the sizes read the same as everywhere else in the panel.
+    val innerCounter = buildString {
+        append(state.innerNote)
+        if (state.innerBytesTotal > 0 || state.innerBytes > 0) {
+            if (isNotEmpty()) append(" · ")
+            append(humanSize(state.innerBytes))
+            if (state.innerBytesTotal > 0) append(" / ").append(humanSize(state.innerBytesTotal))
+        }
+    }
     val innerLines = buildList {
         state.inner.forEachIndexed { index, row ->
             val active = index == state.innerIndex
-            add(PanelLine(row = row, active = active))
-            if (active && state.innerNote.isNotBlank()) add(PanelLine(row = null, note = state.innerNote))
+            // Sub-options sit indented under the group they belong to, as they do in the plan window.
+            add(PanelLine(row = row, active = active, depth = row.depth))
+            if (active && innerCounter.isNotBlank()) {
+                add(PanelLine(row = null, note = innerCounter, depth = row.depth))
+            }
         }
     }
 

@@ -63,6 +63,10 @@ data class ProgressPanelState(
     val innerIndex: Int = -1,
     val innerUnit: String = "",             // counter noun for the inner pane (「項目」)
     val innerNote: String = "",
+    // The second counter, drawn after [innerNote]: an app exporting a corpus reports both how many
+    // pieces it has written and how many bytes, and one without the other is half the picture.
+    val innerBytes: Long = 0,
+    val innerBytesTotal: Long = 0,
     val outerLines: Int = 10,
     val innerLines: Int = 8,
     // A run whose steps have no items of their own — the sweep that only asks each app for its list.
