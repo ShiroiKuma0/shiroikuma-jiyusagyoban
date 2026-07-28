@@ -39,7 +39,7 @@ slice. Top-level fields:
 
 | field | type | notes |
 | --- | --- | --- |
-| `schemaVersion` | int | Format version this build understands (currently **4**). A newer file warns; older files always import (missing fields default). |
+| `schemaVersion` | int | Format version this build writes and reads (currently **5**). A newer file warns and imports what it can. A file **below 5 is refused outright** — v5 made the format name-based and dropped every numeric id, so an older file cannot be resolved; re-export it from an up-to-date build. |
 | `appVersion` | string | App version that wrote the file (informational). |
 | `exportedAtEpochMs` | long | Export timestamp. |
 | `metadata` | object | `name`, `description`, `capabilityRequirements[]`, `warnings[]`. |
@@ -49,7 +49,9 @@ slice. Top-level fields:
 | `variables` | array | Persisted variables. |
 | `scenes` | array | Scenes with their elements. |
 | `templates` | array | Widget-layout templates. |
-| `sort` | object | Per-tab Alphabetical/Manual choice (`profiles`, `tasks`, `scenes`). |
+| `sort` | object | Per-tab Alphabetical/Manual choice (`profiles`, `tasks`, `scenes`, `projects`). |
+| `itemMeta` | array | Per-item note, its fold state, and group membership: `tab`, `itemName`, `projectName`, `note`, `noteExpanded`, `groupName`. **An imported row replaces the whole existing row**, so a bundle that carries notes must also carry `groupName` or it un-groups the item. |
+| `groups` | array | Foldable groups items are filed under: `tab`, `projectName`, `name`, `note`, `position`, `expanded`, `noteExpanded`, `parentGroupName` (for a nested group). Ship these alongside any `itemMeta` that names a group. |
 
 On import, a project whose name already exists prompts **"Import into"** (MERGE — file items under the
 existing project) or **"New project"** (RENAME — make a separate copy, name uniquified). Profiles always
