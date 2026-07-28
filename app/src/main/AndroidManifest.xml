@@ -123,6 +123,15 @@
         tools:targetApi="s">
 
         <activity
+            android:name="com.opentasker.progress.ProgressPanelActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".progress"
+            android:label="@string/app_name"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
+        <activity
             android:name=".MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"

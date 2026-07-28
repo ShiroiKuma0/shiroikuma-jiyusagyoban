@@ -76,79 +76,48 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The live progress panel as a system overlay — two auto-following list panes (the run's steps on top,
- * the current step's items below), real counters, and a 中止 button, all driven by
- * [ProgressPanel]'s state flow so the running task only has to say "row 7 is active now".
+ * The progress panel's controller — two auto-following list panes (the run's steps on top, the current
+ * step's items below), real counters, and a 中止 button, all driven by [ProgressPanel]'s state flow so
+ * the running task only has to say "row 7 is active now".
  *
- * The window is touchable but NOT focusable: taps land on the panel (scroll, unfold a finished row,
- * 中止) while everything outside it still reaches the app underneath, and no key focus is stolen from
- * whatever is in front. Needs "Display over other apps", like a scene overlay.
+ * The window itself is [ProgressPanelActivity]: an ordinary Activity, so Home backgrounds it, recents
+ * lists it, and switching back resumes it. It was a system overlay until 2026-07-28, which floated over
+ * every app and answered to none of those gestures — during an hour-long backup there was no way to put
+ * it aside. Nothing about a run depends on the window: the state flow outlives it.
  */
 object ProgressPanelManager {
     private val main = Handler(Looper.getMainLooper())
-    private var view: ComposeView? = null
-    private var owner: OverlayLifecycleOwner? = null
-    private var windowManager: WindowManager? = null
+    private var activity: ProgressPanelActivity? = null
 
-    fun canOverlay(context: Context): Boolean = Settings.canDrawOverlays(context.applicationContext)
+    /** Kept for callers that still ask; the panel no longer needs the overlay permission. */
+    fun canOverlay(context: Context): Boolean = true
 
-    /** Put the panel on screen (no-op if it is already up — the state flow carries every later change). */
+    /** Bring the panel up, or to the front if it is already running. */
     fun show(context: Context) {
         val app = context.applicationContext
         appContext = app
         main.post {
-            if (view != null) return@post
-            val wm = app.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-            val lifecycleOwner = OverlayLifecycleOwner().apply { onCreate() }
-            val composeView = ComposeView(app).apply {
-                setViewTreeLifecycleOwner(lifecycleOwner)
-                setViewTreeSavedStateRegistryOwner(lifecycleOwner)
-                setViewTreeViewModelStoreOwner(lifecycleOwner)
-                setContent {
-                    val state by ProgressPanel.state.collectAsState()
-                    state?.let { ProgressPanelUi(it) }
-                }
+            // singleTask + NEW_TASK: an existing instance is resumed rather than duplicated, so this is
+            // also how the panel is brought back after Home.
+            runCatching {
+                app.startActivity(
+                    Intent(app, ProgressPanelActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
             }
-            val metrics = android.util.DisplayMetrics().also {
-                @Suppress("DEPRECATION") wm.defaultDisplay.getRealMetrics(it)
-            }
-            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
-            }
-            val params = WindowManager.LayoutParams(
-                (metrics.widthPixels * 0.94f).toInt(),
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                type,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
-                PixelFormat.TRANSLUCENT,
-            ).apply { gravity = Gravity.CENTER }
-            runCatching { wm.addView(composeView, params) }
-                .onSuccess {
-                    lifecycleOwner.onResume()
-                    view = composeView
-                    owner = lifecycleOwner
-                    windowManager = wm
-                }
-                .onFailure { lifecycleOwner.onDestroy() }
         }
     }
 
     /** Take the panel off screen. Safe to call when nothing is showing. */
     fun hide() {
-        main.post {
-            val v = view ?: return@post
-            runCatching { windowManager?.removeView(v) }
-            owner?.onDestroy()
-            view = null
-            owner = null
-            windowManager = null
-        }
+        main.post { activity?.finish() }
     }
 
-    fun isShowing(): Boolean = view != null
+    internal fun attach(a: ProgressPanelActivity) { activity = a }
+
+    internal fun detach(a: ProgressPanelActivity) { if (activity === a) activity = null }
+
+    fun isShowing(): Boolean = activity != null
 
     // ── Repairs from the finished panel ──────────────────────────────────────────────────────────
     private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -389,6 +358,32 @@ object ProgressPanelManager {
         }
     }
 
+    /** Open the folder browser at the pill's current directory. */
+    fun openDirBrowser() {
+        val panel = ProgressPanel.state.value ?: return
+        val start = panel.dirPath.ifBlank { EXTERNAL_ROOT }
+        io.launch { ProgressPanel.openBrowser(listDirs(start)) }
+    }
+
+    /** Walk into a sub-folder, or up out of one. */
+    fun browseInto(name: String) {
+        val panel = ProgressPanel.state.value ?: return
+        val current = java.io.File(panel.browsePath.ifBlank { EXTERNAL_ROOT })
+        val next = if (name == "..") current.parentFile ?: current else java.io.File(current, name)
+        io.launch { ProgressPanel.browseTo(next.absolutePath, listDirs(next.absolutePath)) }
+    }
+
+    /** Sub-folders only, hidden ones left out — this picks a backup destination, not a file. */
+    private fun listDirs(path: String): List<String> = runCatching {
+        java.io.File(path).listFiles()
+            ?.filter { it.isDirectory && !it.isHidden }
+            ?.map { it.name }
+            ?.sortedWith(String.CASE_INSENSITIVE_ORDER)
+            .orEmpty()
+    }.getOrDefault(emptyList())
+
+    private const val EXTERNAL_ROOT = "/storage/emulated/0"
+
     /** Huawei's App launch management screen; falls back to the app's own settings page. */
     fun openAppLaunchManagement(pkg: String = "") {
         val context = appContext ?: return
@@ -514,7 +509,7 @@ private fun isStorageAccessError(detail: String): Boolean {
 }
 
 @Composable
-private fun ProgressPanelUi(state: ProgressPanelState) {
+internal fun ProgressPanelUi(state: ProgressPanelState) {
     // Keep the whole panel inside the screen: if the two panes plus chrome don't fit (the folded cover
     // display), shrink both pane heights proportionally rather than letting it run off the edge.
     val context = LocalContext.current
@@ -650,6 +645,23 @@ private fun ProgressPanelUi(state: ProgressPanelState) {
             },
             emphasise = true,
         )
+        // Where this run will write. Tapping it opens the folder browser; whatever is chosen holds for
+        // THIS run only — it goes to a per-run variable, never over the configured export directory.
+        if (state.selecting && (state.dirPath.isNotBlank() || state.browsePath.isNotBlank())) {
+            // While browsing, the pill follows the folder being walked — it is the only place the
+            // current path is shown, so it has to track it rather than sit on the old destination.
+            DirPill(
+                path = state.browsePath.ifBlank { state.dirPath },
+                changed = state.dirChanged,
+                browsing = state.browsePath.isNotBlank(),
+                scale = state.textScale,
+                onClick = { ProgressPanelManager.openDirBrowser() },
+            )
+        }
+        if (state.browsePath.isNotBlank()) {
+            FolderBrowser(state)
+            return@Column
+        }
         Pane(
             // The report gets the item pane's height as well — the whole panel becomes the list.
             lines = outerLines,
@@ -785,6 +797,7 @@ private fun Pane(
     textScale: Float = 1f,
     lineGap: Dp = 0.dp,
     rowsSelectable: Boolean = false,
+    rowsTappable: Boolean = false,
 ) {
     val listState = rememberLazyListState()
     var lastManualScroll by remember { mutableLongStateOf(0L) }
@@ -810,7 +823,7 @@ private fun Pane(
         contentPadding = PaddingValues(vertical = 2.dp, horizontal = 3.dp),
         verticalArrangement = Arrangement.spacedBy(lineGap),
     ) {
-        items(lines) { line -> PanelLineView(line, rowHeight, icons, expandedKeys, onTapRow, onTapChild, textScale, rowsSelectable) }
+        items(lines) { line -> PanelLineView(line, rowHeight, icons, expandedKeys, onTapRow, onTapChild, textScale, rowsSelectable, rowsTappable) }
     }
 }
 
@@ -824,6 +837,7 @@ private fun PanelLineView(
     onTapChild: ((String, ProgressRow) -> Unit)? = null,
     textScale: Float = 1f,
     rowsSelectable: Boolean = false,
+    rowsTappable: Boolean = false,
 ) {
     val row = line.row
     if (row == null) {
@@ -919,7 +933,9 @@ private fun PanelLineView(
     }
     val selectable = line.parentKey.isNotEmpty() && onTapChild != null
     val rowSelectable = line.depth == 0 && rowsSelectable
-    val tappable = (onTapRow != null && row.expandable) || selectable
+    // A folder-browser entry has no children, so `expandable` is false — but the whole point of
+    // the row is that it is tapped. rowsTappable says so explicitly.
+    val tappable = (onTapRow != null && (row.expandable || rowsTappable)) || selectable
     Row(
         Modifier
             .fillMaxWidth()
@@ -1058,6 +1074,76 @@ private fun ToggleLine(label: String, indent: Dp, rowHeight: Dp, textScale: Floa
 }
 
 /** A panel action — OK, 保存し直す, the storage grant, retry-all. */
+/**
+ * Where this run writes, as a tappable pill above the list. Tapping opens [FolderBrowser]; the choice
+ * lands in a per-run variable, so the configured export directory is never overwritten — hence the
+ * 「今回のみ」 once it has been pointed somewhere else.
+ */
+@Composable
+private fun DirPill(
+    path: String,
+    changed: Boolean,
+    browsing: Boolean = false,
+    scale: Float,
+    onClick: () -> Unit,
+) {
+    Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .weight(1f)
+                .border(2.dp, Accent, RoundedCornerShape(999.dp))
+                .clickable { onClick() }
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+        ) {
+            Text(
+                text = when {
+                    browsing -> "選択中  $path"
+                    changed -> "保存先（今回のみ）  $path"
+                    else -> "保存先  $path"
+                },
+                color = if (changed || browsing) Accent else DoneColor,
+                fontSize = (12f * scale).sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** The folder browser the pill opens: sub-folders of the current path, 「‥ 上へ」, and the two buttons. */
+@Composable
+private fun FolderBrowser(state: ProgressPanelState) {
+    val lines = buildList {
+        add(PanelLine(row = ProgressRow(key = "..", label = "‥ 上へ")))
+        state.browseDirs.forEach { add(PanelLine(row = ProgressRow(key = it, label = it))) }
+    }
+    Pane(
+        lines = lines,
+        visibleLines = 12,
+        rowHeight = listRowHeight(state.textScale),
+        icons = false,
+        expandedKeys = emptySet(),
+        onTapRow = { row -> ProgressPanelManager.browseInto(row.key) },
+        textScale = state.textScale,
+        lineGap = SELECTION_LINE_GAP,
+        rowsTappable = true,
+    )
+    Spacer(Modifier.height(8.dp))
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        PanelButton(
+            label = "戻る",
+            modifier = Modifier.weight(1f),
+            onClick = { ProgressPanel.closeBrowser() },
+        )
+        PanelButton(
+            label = "ここに保存",
+            modifier = Modifier.weight(1f),
+            emphasise = true,
+            onClick = { ProgressPanel.chooseBrowsedDir() },
+        )
+    }
+}
+
 @Composable
 private fun PanelButton(
     label: String,

@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.78+40`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.78+46`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 </div>
 
@@ -78,12 +78,16 @@ per-app selections are never touched.
 
 **「個別保存」 opens that same plan with nothing chosen** — for the times you want one or two apps and
 not the roster. Tick them, press 保存開始; their items come already ticked from what each app has saved.
+A pill above the list shows where the run will write, and tapping it turns the panel into a folder
+browser: whatever you pick holds **for that run only**, leaving the configured export directory alone.
 
 **Then the same window becomes the run.** Two auto-following panes — the apps on top, the current
 app's items below — with the running row parked five lines down so finished work stays in view,
 finished rows ticked and dimmed, and real counts throughout (「アプリ 7/33」, and the app's own
 「書籍 1234/8942」 or 「512 MB / 4.2 GB」 — never a percentage), relayed by broadcast while it works.
-**中止** stops it within a second, because it also abandons the reply it was waiting on.
+**中止** stops it within a second — it abandons the reply it was waiting on *and* tells the app to stop,
+so the export deletes its half-written archive instead of finishing a backup you cancelled. The whole
+window is an ordinary Activity: Home puts it aside while the run continues, and recents brings it back.
 
 **And then the report — in that same window.** Rows stay browsable; open one for its items and the
 path it wrote. Open a failed one for the **whole** error and the repair that fits it: grant the app

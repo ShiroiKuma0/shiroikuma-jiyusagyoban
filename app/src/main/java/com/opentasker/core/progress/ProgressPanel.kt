@@ -95,6 +95,12 @@ data class ProgressPanelState(
     val itemsMode: Boolean = false,         // confirm SAVES each app's ticked items as its default
                                             // selection instead of starting a run
     val settingsTask: String = "",          // itemsMode: the 01 task the selections are persisted into
+    // ── the destination pill: where this run writes, changeable for THIS run only ──
+    val dirPath: String = "",               // shown in the pill; blank = no pill
+    val dirVar: String = "",                // variable the per-run choice is written to (never %BR_Dir)
+    val dirChanged: Boolean = false,        // the pill has been pointed somewhere else than the setting
+    val browsePath: String = "",            // non-blank = the folder browser is open at this path
+    val browseDirs: List<String> = emptyList(), // sub-folder names of browsePath, in display order
     val emptyNote: String = "",             // shown instead of the list when there is nothing to do
     val textScale: Float = 1f,              // 1.5 for the prune list — it is read, not glanced at
     val fillHeight: Boolean = false,        // take the whole window, splitting it between the panes
@@ -276,6 +282,34 @@ object ProgressPanel {
         }
         pairs.forEach { (name, value) -> writeVar(panel, name, value) }
         return pairs
+    }
+
+    /**
+     * The destination pill: open the folder browser, walk it, and choose. The chosen path is written to
+     * [ProgressPanelState.dirVar] — a per-run variable — so the configured export directory in the
+     * settings task is never touched: change it here and it holds for this run only.
+     */
+    fun openBrowser(entries: List<String>) = update { panel ->
+        panel.copy(browsePath = panel.dirPath.ifBlank { "/storage/emulated/0" }, browseDirs = entries)
+    }
+
+    fun browseTo(path: String, entries: List<String>) = update { panel ->
+        panel.copy(browsePath = path, browseDirs = entries)
+    }
+
+    fun closeBrowser() = update { panel -> panel.copy(browsePath = "", browseDirs = emptyList()) }
+
+    /** Take the browsed folder as this run's destination and close the browser. */
+    fun chooseBrowsedDir() {
+        val panel = _state.value ?: return
+        val chosen = panel.browsePath.ifBlank { return }
+        writeVar(panel, panel.dirVar, chosen)
+        _state.value = panel.copy(
+            dirPath = chosen,
+            dirChanged = true,
+            browsePath = "",
+            browseDirs = emptyList(),
+        )
     }
 
     /** Publish the 1-based row number a repair is about to re-run, so the task updates the right row. */

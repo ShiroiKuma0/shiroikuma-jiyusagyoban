@@ -61,6 +61,10 @@ class BackupPlanAction : Action {
         if (!ProgressPanelManager.canOverlay(ctx.app)) {
             return ActionResult.Failure("the panel needs \"Display over other apps\"")
         }
+        // A destination chosen in a previous run must never leak into this one: the override is
+        // cleared on every open, and only the pill puts it back.
+        val dirVar = args["dir_var"]?.trim()?.removePrefix("%")?.takeIf { it.isNotEmpty() } ?: "BR_RunDir"
+        ctx.variables.set(dirVar, "")
         ProgressPanel.show(
             ProgressPanelState(
                 title = args["title"]?.trim()?.ifBlank { null } ?: "保存",
@@ -75,6 +79,8 @@ class BackupPlanAction : Action {
                 confirmTask = args["confirm_task"]?.trim().orEmpty(),
                 cancelLabel = "キャンセル",
                 textScale = 1.5f,
+                dirPath = args["dir"]?.trim().orEmpty(),
+                dirVar = dirVar,
                 projectId = ctx.variables.projectId,
             ),
         )

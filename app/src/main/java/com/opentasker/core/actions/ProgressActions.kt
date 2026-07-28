@@ -256,7 +256,22 @@ class ProgressPanelItemAction : Action {
                 indexTotal != null && indexTotal != panel.inner.size -> -1
                 else -> rawIndex - 1
             }
-            val row = panel.inner.getOrNull(index)
+            // The highlight only ever moves DOWN.
+            //
+            // An app may legitimately come back to a category it has already been in: Jami loops over
+            // ACCOUNTS and writes each one's chat texts and then its files, so with four accounts the
+            // reported item goes texts→files four times over. Faithfully following that made the marker
+            // jump between the 2nd and 3rd rows repeatedly during what looks, from outside, like one
+            // long file-writing phase — which reads as a fault rather than as progress
+            // (白い熊, 2026-07-28).
+            //
+            // So a report for an item already passed still updates the counters underneath; it just
+            // does not drag the marker back up. The rows above the marker stay ticked, which is true:
+            // that category's work is not finished, but the run is past it in the only order the panel
+            // can show.
+            val backwards = index >= 0 && index < panel.innerIndex &&
+                parseState(args["state"]) == ProgressRowState.ACTIVE
+            val row = if (backwards) null else panel.inner.getOrNull(index)
             if (row != null) {
                 val state = parseState(args["state"])
                 val updated = row.copy(
