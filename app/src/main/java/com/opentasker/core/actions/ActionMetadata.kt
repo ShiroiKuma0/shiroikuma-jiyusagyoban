@@ -1018,11 +1018,11 @@ fun registerActionMetadata() {
         ActionMetadata(
             id = "progress.item",
             name = "Progress Panel — Item",
-            description = "Mark one item of the current step, and/or refresh the live counter line drawn under it (「書籍 1234/8942 · 512 MB / 4.2 GB」, straight from the app's own progress broadcast). Address the item by Item id whenever the app reports one — a number cannot be trusted as a position, because an app counts whatever it is working through at the time. Activating an item marks the still-pending ones above it done.",
+            description = "Mark one item of the current step, and/or refresh the live counter line drawn under it (「書籍 1234/8942 · 512 MB / 4.2 GB」, straight from the app's own progress broadcast). Address the item by Item id whenever the app reports one — a number cannot be trusted as a position, because an app counts whatever it is working through at the time. Activating an item marks the ones above it done.",
             category = "System",
             fields = listOf(
                 ActionField("key", "Item id", hint = "the category id the app says it is on — the reliable way to address a row"),
-                ActionField("index", "Item number", FieldType.NUMBER, hint = "1-based position; only used when there is no Item id"),
+                ActionField("index", "Item number", FieldType.NUMBER, hint = "1-based position of the item being written NOW; only used when there is no Item id"),
                 ActionField("index_total", "Item number is out of", FieldType.NUMBER, hint = "the app's own total — Item number is honoured only if this equals the number of items on the pane"),
                 ActionField("state", "State", FieldType.DROPDOWN, hint = "active / done / fail / skip / cancel / pending", options = listOf("active", "done", "fail", "skip", "cancel", "pending")),
                 ActionField("note", "Counter line", hint = "the live numbers under the active item — real counts, never a percentage"),

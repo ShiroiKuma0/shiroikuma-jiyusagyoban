@@ -3,6 +3,26 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.78+47 — 2026-07-28
+
+**The progress highlight lands on the category the app is actually writing.**
+
+### The number was read one row too low
+A backup of 白い熊 Handy RSS drew 「UI fonts」 as the running item while the counter beneath it read
+「区分 4/9 — Downloaded images 883/3680」. The contract said `current` **counted what was finished**, so
+the relay activated `current + 1` — but no app in the family was ever written that way: Handy RSS,
+白い熊 音楽, 空中線 and 応用管理 all send the **position of the category they are writing**, paired with
+that category's own name in `text`. The contract line was the error, and it has been corrected: a number
+that survives the `index_total` guard is the 1-based position of the item being written now. Every app
+that sends numbers only — around fifteen of them — was drawn one row low; all of them are fixed by the
+same change. (An app that sends `item` was never affected: the id addresses the row directly.)
+
+### A row the marker has left keeps a ✓, not a ▶
+Activating an item ticked off the **pending** rows above it and left previously-active ones alone, so
+each row the marker passed through kept its ▶ and a nine-row pane could claim four categories were
+running at once. Rows above the marker are now finished, whatever they were — except a failure or a skip,
+which is a verdict rather than a leftover.
+
 ## 0.2.78+46 — 2026-07-28
 
 **The backup window becomes an ordinary window, gains a destination, and learns to stop.**
