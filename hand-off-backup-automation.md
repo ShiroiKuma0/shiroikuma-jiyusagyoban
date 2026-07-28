@@ -340,12 +340,38 @@ context.sendBroadcast(Intent(progressAction).apply {
     addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
     putExtra("reply_id", replyId)
     putExtra("app", "<your app's display label>")
+    putExtra("item", "books")             // WHICH category id you are writing right now
     putExtra("text", "書籍 1234/8942")   // numbers-first display line
-    putExtra("current", 1234L)            // structured, for logic/bars later
+    putExtra("current", 1234L)            // how far through whatever you are counting
     putExtra("total", 8942L)
     putExtra("unit", "書籍")              // what is being counted
+    putExtra("bytes", 536_870_912L)       // the second counter: bytes written so far
+    putExtra("bytes_total", 4_509_715_660L)
 })
 ```
+
+**`item` is how the panel knows which row is running — send it.** 自由作業盤 draws your categories as a
+list and highlights the one in progress. It cannot work that out from `current`, because `current` is
+whatever *you* are counting at that moment: categories while you walk them, files or messages while you
+write one of them. An app that reported `1234/8942` files while the panel had nine category rows put a
+four-digit count against row 1235 and ticked nothing (Jami's chat corpus, 白い熊 2026-07-28). So:
+
+- **`item`** — the **category id** (an `id` from your `LIST_CATEGORIES` reply, sub-option ids included)
+  you are writing right now. Send it on every progress broadcast. When the panel sees it, it highlights
+  that row and ticks off everything above it.
+- **`current`/`total`** are display numbers, **never an index**. Count whatever is honest for the step
+  you are on.
+- Without `item`, the panel falls back to reading `current` as a position — but only when `total`
+  happens to equal the number of categories it is showing, which is exactly the case where your number
+  really is a walk through them. Any other shape is shown as text and moves no highlight.
+
+**`bytes`/`bytes_total` are the second counter** — send them whenever you know them (a file corpus, a
+media export, anything measured in megabytes). 自由作業盤 renders both pairs on one line —
+「ファイル 1234/8942 · 512 MB / 4.2 GB」 — matching what your own export screen shows, so 白い熊 sees
+the same two numbers whether the export was started by hand or by the batch. Omit them for a settings
+export where the byte count means nothing.
+
+All three are **optional and additive**: an app that sends none behaves exactly as it did before.
 
 - Throttle to **at most one every 500 ms** (and always send a final one at completion).
 - `text` is what 白い熊 reads in the notification; make it specific and countable.
@@ -359,12 +385,14 @@ context.sendBroadcast(Intent(progressAction).apply {
   hangs while still ticking is worse than one that dies: it holds its slot until the full timeout.
   So bound every step that could block — a per-file / per-step timeout, skip-and-continue over what
   will not read (count the skips in your reply) — and reply `ERROR:…` rather than hang.
-- **`current` counts what is FINISHED, not what is starting** — send `current = 0` while the first
-  category is being written, `1` once it is done, and a final one with `current == total`.
-  自由作業盤's progress panel ticks off items `1..current` and highlights `current + 1`, so an
-  off-by-one here highlights the wrong row. When `current`/`total` count categories, `total` must be
-  the number of categories **actually being exported** (after `items` filtering), not the app's full
-  catalogue — that is the number the panel's item list is built from.
+- **`current` counts what is FINISHED, not what is starting** — `0` while the first thing is being
+  written, `1` once it is done, and a final one with `current == total`.
+- **When you do count categories**, `total` must be the number **actually being exported** (after
+  `items` filtering), not your full catalogue — that is the number the panel's item list is built
+  from, and matching it is what lets the fallback recognise the count as a walk through the list.
+- **Name sub-options in `item` too.** The panel now lists selected sub-options indented under their
+  group, so an app writing `books.covers` should say so rather than reporting its parent — the row
+  that lights up is the part actually being written.
 - Your app **may** also show its own progress UI; the broadcasts are what 自由作業盤 displays and
   are mandatory either way.
 

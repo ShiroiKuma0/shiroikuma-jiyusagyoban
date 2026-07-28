@@ -3,6 +3,37 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.78+41 — 2026-07-28
+
+**Two counters, and a highlight that points at the right thing.** The batch's progress pane was
+reading one number as two different things, and an app with a corpus made that visible.
+
+### The bug
+An app reports real counts as it works — but *what* it counts changes with the step: categories while
+it walks them, files or messages while it writes one of them. The relay read that number as a row
+index, so when 白い熊 GNU Jami exported its chat corpus and reported 「ファイル 1234/8942」, the panel
+tried to tick row 1234 and highlight row 1235 of a **nine-row** list. Nothing ticked, and a four-digit
+count sat under a row that was never the thing being written.
+
+### The contract gains three optional extras
+- **`item`** — the category id being written *right now*. The panel highlights that row and ticks off
+  everything above it, with no arithmetic. This is the fix; everything else is fallback.
+- **`bytes` / `bytes_total`** — the second counter.
+
+All additive: an app that sends none behaves exactly as before.
+
+### This side
+- `progress.item` gains **`key`** (address a row by category id) and **`index_total`** — a number is
+  honoured as a position only when the app's own total equals the number of rows on the pane, which is
+  precisely the case where the count really is a walk through the categories. Any other shape moves no
+  highlight, so a corpus count can no longer point at nothing.
+- Activating an item marks the still-pending items above it done — an export walks its items in order.
+- **Both counters on one line**: 「ファイル 1234/8942 · 512 MB / 4.2 GB」, byte sizes formatted as
+  everywhere else in the panel.
+- **Sub-options are no longer dropped from the item pane.** `progress.row` used to keep top-level rows
+  only; selected sub-options now appear indented under their group, so an app's parts (Jami's
+  `chat_texts` / `chat_files`) are visible as the rows they are.
+
 ## 0.2.78+40 — 2026-07-28
 
 **Picking a couple of apps, and deciding once what each app backs up.** Two entries either side of

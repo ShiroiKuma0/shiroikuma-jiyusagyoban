@@ -1006,7 +1006,7 @@ fun registerActionMetadata() {
                 ActionField("detail", "Detail", hint = "right-hand annotation — a size when it worked, a reason when it didn't"),
                 ActionField("items", "Items", hint = "this step's item list, loaded into the bottom pane when the step goes active"),
                 ActionField("item_labels", "Item labels", hint = "optional display names parallel to Items"),
-                ActionField("parents", "Item parents", hint = "optional parent id per item — items with one are sub-options and are left out of the pane"),
+                ActionField("parents", "Item parents", hint = "optional parent id per item — one with a parent is drawn indented under its group"),
                 ActionField("only", "Keep only", hint = "optional — keep just these item keys (the selected ones); blank = all of them"),
                 ActionField("separator", "Separator", hint = "how Items / labels are split (default a comma)"),
                 ActionField("label", "Rename step", hint = "optional — replace the row's display name"),
@@ -1018,12 +1018,16 @@ fun registerActionMetadata() {
         ActionMetadata(
             id = "progress.item",
             name = "Progress Panel — Item",
-            description = "Mark one item of the current step, and/or refresh the live counter line drawn under it (「書籍 1234/8942」, straight from the app's own progress broadcast).",
+            description = "Mark one item of the current step, and/or refresh the live counter line drawn under it (「書籍 1234/8942 · 512 MB / 4.2 GB」, straight from the app's own progress broadcast). Address the item by Item id whenever the app reports one — a number cannot be trusted as a position, because an app counts whatever it is working through at the time. Activating an item marks the still-pending ones above it done.",
             category = "System",
             fields = listOf(
-                ActionField("index", "Item number", FieldType.NUMBER, hint = "1-based position in the step's item list; blank = only update the counter line"),
+                ActionField("key", "Item id", hint = "the category id the app says it is on — the reliable way to address a row"),
+                ActionField("index", "Item number", FieldType.NUMBER, hint = "1-based position; only used when there is no Item id"),
+                ActionField("index_total", "Item number is out of", FieldType.NUMBER, hint = "the app's own total — Item number is honoured only if this equals the number of items on the pane"),
                 ActionField("state", "State", FieldType.DROPDOWN, hint = "active / done / fail / skip / cancel / pending", options = listOf("active", "done", "fail", "skip", "cancel", "pending")),
                 ActionField("note", "Counter line", hint = "the live numbers under the active item — real counts, never a percentage"),
+                ActionField("bytes", "Bytes done", FieldType.NUMBER, hint = "second counter: bytes written so far"),
+                ActionField("bytes_total", "Bytes total", FieldType.NUMBER, hint = "second counter: bytes expected in total"),
                 ActionField("detail", "Detail", hint = "right-hand annotation for this item"),
                 ActionField("label", "Rename item", hint = "optional — replace the item's display name"),
             )

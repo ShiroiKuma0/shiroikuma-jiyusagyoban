@@ -111,7 +111,7 @@ class ShowProgressPanelAction : Action {
  * cancel) captures the inner pane into the row, which is what tapping it later unfolds.
  *
  * Args: "index", "state" (active|done|fail|skip|cancel|pending), "detail", "items", "item_labels",
- * "parents" (positional parent id per item — a non-empty one marks a sub-option, which is dropped),
+ * "parents" (positional parent id per item — a non-empty one indents that item under its parent),
  * "only" (keep just these item keys; empty = all), "separator", "label".
  */
 class ProgressPanelStepAction : Action {
@@ -124,18 +124,20 @@ class ProgressPanelStepAction : Action {
         val state = parseState(args["state"])
         val separator = args["separator"]?.takeUnless { it.isEmpty() } ?: ","
         // The item list is filtered here rather than in the calling task, which has no set arithmetic:
-        // "parents" drops sub-options (a row per top-level item only, which is what an app counts as it
-        // exports), and "only" keeps just what was selected. Empty "only" = everything.
+        // "only" keeps just what was selected (empty = everything), and "parents" indents each
+        // sub-option under its group. Sub-options used to be dropped outright, on the theory that an
+        // app counts top-level categories as it exports — but an app with a corpus reports its way
+        // through the PARTS (Jami's chat texts and files), so a list without them showed a four-digit
+        // count against a row that was never the thing being written (白い熊, 2026-07-28).
         val rawKeys = splitList(args["items"], separator)
         // Labels and parents are positional (an empty entry is meaningful), so they are NOT compacted.
         val rawLabels = args["item_labels"]?.split(separator)?.map { it.trim() } ?: emptyList()
         val rawParents = args["parents"]?.split(separator)?.map { it.trim() } ?: emptyList()
         val only = splitList(args["only"], separator).toSet()
-        val keep = rawKeys.indices.filter { i ->
-            rawParents.getOrNull(i).isNullOrEmpty() && (only.isEmpty() || rawKeys[i] in only)
-        }
+        val keep = rawKeys.indices.filter { i -> only.isEmpty() || rawKeys[i] in only }
         val itemKeys = keep.map { rawKeys[it] }
         val itemLabels = keep.map { rawLabels.getOrNull(it).orEmpty() }
+        val itemDepths = keep.map { if (rawParents.getOrNull(it).isNullOrEmpty()) 0 else 1 }
         var applied = false
         ProgressPanel.update { panel ->
             val row = panel.outer.getOrNull(index) ?: return@update panel
@@ -182,13 +184,20 @@ class ProgressPanelStepAction : Action {
                 // clears it (so a step's leftovers never show under the next one).
                 inner = when {
                     activating && itemKeys.isNotEmpty() -> itemKeys.mapIndexed { i, key ->
-                        ProgressRow(key = key, label = itemLabels.getOrNull(i)?.takeIf { it.isNotBlank() } ?: key)
+                        ProgressRow(
+                            key = key,
+                            label = itemLabels.getOrNull(i)?.takeIf { it.isNotBlank() } ?: key,
+                            depth = itemDepths.getOrNull(i) ?: 0,
+                        )
                     }
                     activating -> emptyList()
                     else -> settledInner
                 },
                 innerIndex = if (activating) -1 else panel.innerIndex,
                 innerNote = if (activating) "" else panel.innerNote,
+                // A new step's byte counter starts at zero, or the previous app's total lingers.
+                innerBytes = if (activating) 0 else panel.innerBytes,
+                innerBytesTotal = if (activating) 0 else panel.innerBytesTotal,
             )
         }
         // Addressing a panel that isn't up (or a row it doesn't have) is a NO-OP, never a failure: the
@@ -207,39 +216,75 @@ class ProgressPanelStepAction : Action {
 }
 
 /**
- * `Progress Panel — Item` — set the state of one inner row (1-based "index"), or, with "note" alone,
- * just refresh the live counter line under the active item (「書籍 1234/8942」 straight from the
- * app's own progress broadcast).
+ * `Progress Panel — Item` — set the state of one inner row, or, with "note" alone, just refresh the
+ * live counter line under the active item (「書籍 1234/8942」 straight from the app's own progress
+ * broadcast).
  *
- * Args: "index", "state", "detail", "label", "note".
+ * **Address by "key" whenever the app says which item it is on.** A number cannot: the reporting
+ * contract lets an app count whatever it is working through at that moment — categories while it walks
+ * them, files or messages while it writes one — so treating that number as a row index put a
+ * four-digit count against row 1235 of a nine-row list and ticked nothing (Jami's chat corpus, 白い熊
+ * 2026-07-28). "index_total" is the safety net for apps that send no key: the app's own total, honoured
+ * as an index ONLY when it matches the number of items on the pane, which is exactly the case where
+ * the number really is a walk through the categories.
+ *
+ * Activating a row also marks every still-pending row above it done — an export walks its items in
+ * order, so "I am on this one" means the earlier ones are finished.
+ *
+ * "bytes"/"bytes_total" draw the second counter after the note (「… · 512 MB / 4.2 GB」).
+ *
+ * Args: "key", "index", "index_total", "state", "detail", "label", "note", "bytes", "bytes_total".
  */
 class ProgressPanelItemAction : Action {
     override val id = "progress.item"
     override val category = ActionCategory.SYSTEM
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val key = args["key"]?.trim().orEmpty()
         val rawIndex = args["index"]?.trim()?.toIntOrNull()
+        val indexTotal = args["index_total"]?.trim()?.toIntOrNull()
         val note = args["note"]
+        val bytes = args["bytes"]?.trim()?.toLongOrNull()
+        val bytesTotal = args["bytes_total"]?.trim()?.toLongOrNull()
         ProgressPanel.update { panel ->
             var next = panel
-            if (rawIndex != null && rawIndex >= 1) {
-                val index = rawIndex - 1
-                val row = panel.inner.getOrNull(index)
-                if (row != null) {
-                    val state = parseState(args["state"])
-                    val updated = row.copy(
-                        label = args["label"]?.trim()?.takeIf { it.isNotBlank() } ?: row.label,
-                        state = state,
-                        detail = args["detail"]?.trim() ?: row.detail,
-                    )
-                    val inner = panel.inner.toMutableList().also { it[index] = updated }
-                    next = next.copy(
-                        inner = inner,
-                        innerIndex = if (state == ProgressRowState.ACTIVE) index else panel.innerIndex,
-                    )
+            val index = when {
+                key.isNotEmpty() -> panel.inner.indexOfFirst { it.key == key }
+                rawIndex == null || rawIndex < 1 -> -1
+                // The app is counting something other than the items on this pane — its number says
+                // nothing about which row is running, so leave the highlight where it is.
+                indexTotal != null && indexTotal != panel.inner.size -> -1
+                else -> rawIndex - 1
+            }
+            val row = panel.inner.getOrNull(index)
+            if (row != null) {
+                val state = parseState(args["state"])
+                val updated = row.copy(
+                    label = args["label"]?.trim()?.takeIf { it.isNotBlank() } ?: row.label,
+                    state = state,
+                    detail = args["detail"]?.trim() ?: row.detail,
+                )
+                val inner = panel.inner.toMutableList()
+                inner[index] = updated
+                if (state == ProgressRowState.ACTIVE) {
+                    for (i in 0 until index) {
+                        if (inner[i].state == ProgressRowState.PENDING) {
+                            inner[i] = inner[i].copy(state = ProgressRowState.DONE)
+                        }
+                    }
                 }
+                next = next.copy(
+                    inner = inner,
+                    innerIndex = if (state == ProgressRowState.ACTIVE) index else panel.innerIndex,
+                )
             }
             if (note != null) next = next.copy(innerNote = note.trim())
+            if (bytes != null || bytesTotal != null) {
+                next = next.copy(
+                    innerBytes = bytes ?: next.innerBytes,
+                    innerBytesTotal = bytesTotal ?: next.innerBytesTotal,
+                )
+            }
             next
         }
         return ActionResult.Success
