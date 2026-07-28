@@ -226,10 +226,12 @@ class ProgressPanelStepAction : Action {
  * four-digit count against row 1235 of a nine-row list and ticked nothing (Jami's chat corpus, 白い熊
  * 2026-07-28). "index_total" is the safety net for apps that send no key: the app's own total, honoured
  * as an index ONLY when it matches the number of items on the pane, which is exactly the case where
- * the number really is a walk through the categories.
+ * the number really is a walk through the categories. That number is the **1-based position of the
+ * item being written now** — the same thing the app's own text names (「区分 4/9 — Downloaded images」),
+ * which is what every sister app sends — never a count of what it has finished.
  *
- * Activating a row also marks every still-pending row above it done — an export walks its items in
- * order, so "I am on this one" means the earlier ones are finished.
+ * Activating a row also marks every row above it done — an export walks its items in order, so "I am
+ * on this one" means the earlier ones are finished. A failed or skipped row keeps its own mark.
  *
  * "bytes"/"bytes_total" draw the second counter after the note (「… · 512 MB / 4.2 GB」).
  *
@@ -282,8 +284,13 @@ class ProgressPanelItemAction : Action {
                 val inner = panel.inner.toMutableList()
                 inner[index] = updated
                 if (state == ProgressRowState.ACTIVE) {
+                    // Everything above the marker is finished — including whatever was running a
+                    // moment ago. Only PENDING rows used to be ticked, so each row the marker left
+                    // behind kept its ▶ and the pane ended up claiming four categories were running
+                    // at once (白い熊, 2026-07-28). A row that FAILED or was SKIPPED keeps its own
+                    // mark: that is a verdict, not a leftover.
                     for (i in 0 until index) {
-                        if (inner[i].state == ProgressRowState.PENDING) {
+                        if (inner[i].state == ProgressRowState.PENDING || inner[i].state == ProgressRowState.ACTIVE) {
                             inner[i] = inner[i].copy(state = ProgressRowState.DONE)
                         }
                     }

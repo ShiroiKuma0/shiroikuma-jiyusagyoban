@@ -410,9 +410,10 @@ four-digit count against row 1235 and ticked nothing (Jami's chat corpus, 白い
   that row and ticks off everything above it.
 - **`current`/`total`** are display numbers, **never an index**. Count whatever is honest for the step
   you are on.
-- Without `item`, the panel falls back to reading `current` as a position — but only when `total`
-  happens to equal the number of categories it is showing, which is exactly the case where your number
-  really is a walk through them. Any other shape is shown as text and moves no highlight.
+- Without `item`, the panel falls back to reading `current` as the **1-based position of the category
+  being written** — but only when `total` happens to equal the number of categories it is showing,
+  which is exactly the case where your number really is a walk through them. Any other shape is shown
+  as text and moves no highlight.
 
 **`bytes`/`bytes_total` are the second counter** — send them whenever you know them (a file corpus, a
 media export, anything measured in megabytes). 自由作業盤 renders both pairs on one line —
@@ -434,8 +435,15 @@ All three are **optional and additive**: an app that sends none behaves exactly 
   hangs while still ticking is worse than one that dies: it holds its slot until the full timeout.
   So bound every step that could block — a per-file / per-step timeout, skip-and-continue over what
   will not read (count the skips in your reply) — and reply `ERROR:…` rather than hang.
-- **`current` counts what is FINISHED, not what is starting** — `0` while the first thing is being
-  written, `1` once it is done, and a final one with `current == total`.
+- **When you count categories, `current` is the POSITION of the one you are writing** — `1` while the
+  first is being written, and a final one with `current == total`. It must agree with the label beside
+  it in `text`: 「区分 4/9 — Downloaded images」 means image writing is category 4, not that four are
+  done. (This line used to say the opposite — that `current` counted what was FINISHED — and the relay
+  added 1 to it accordingly, so every app that sends numbers only had its highlight drawn one row too
+  far down. No app in the family ever implemented it that way: Handy RSS, 白い熊 音楽, 空中線 and
+  応用管理 all report the position. Corrected 2026-07-28.)
+- **When you count anything else** — files, messages, rows — count what is FINISHED, and say so in
+  `unit`. Those numbers are display only; they never move the highlight.
 - **When you do count categories**, `total` must be the number **actually being exported** (after
   `items` filtering), not your full catalogue — that is the number the panel's item list is built
   from, and matching it is what lets the fallback recognise the count as a walk through the list.
