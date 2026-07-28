@@ -3,6 +3,45 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.78+46 — 2026-07-28
+
+**The backup window becomes an ordinary window, gains a destination, and learns to stop.**
+
+### The panel is an Activity now, not a system overlay
+It floated over every app and answered to none of Android's gestures: Home did not put it away, it never
+appeared in recents, and during a backup that can run for an hour there was no way to set it aside and
+use the phone. It is now `ProgressPanelActivity` — **Home backgrounds it and the run carries on, recents
+lists it, tapping it there resumes exactly where it was**, and Back backgrounds rather than abandons.
+`singleTask` with its own task affinity, so it is a separate entry from the workspace UI and can never
+stack a second copy. Nothing about a run depended on the window: it is driven by the task and the app's
+broadcasts, and the panel only renders the state flow — so being backgrounded, folded or rotated changes
+nothing. The panel no longer needs "Display over other apps" (bubbles and scenes still do).
+
+### A destination you can change for one run (個別保存)
+A tappable pill above the list shows where this run will write. Tapping it turns the panel into a
+**folder browser** — sub-folders, 「‥ 上へ」, 「ここに保存」 — and the choice lands in `%BR_RunDir`:
+**the configured export directory and 01 are never touched**, and the override is cleared every time the
+plan opens, so it cannot leak into a later run. The pill tracks the folder being walked and says which
+of the three states it is in (`保存先` / `選択中` / `保存先（今回のみ）`). 保存中核 writes to
+`%BR_Dir` unless the pill overrode it; the repair sweep follows the same resolution.
+
+### 中止 actually stops the app
+It used to stop 自由作業盤 *listening* — the app carried on to the end, renamed its part-file into place
+and delivered a backup that had been cancelled. 保存中核 now fires **`CANCEL_EXPORT`** at the app, which
+deletes its partial and answers `ERROR:cancelled`. The wire contract gained the action, including the
+requirement that it be reachable from the **exported receiver**: a stop path on a non-exported service
+cannot be triggered by the app that started the export, which is exactly why Jami's three working stop
+buttons were useless to the batch.
+
+### Progress-panel fixes
+- **The highlight only moves down.** An app may revisit a category — Jami loops over accounts writing
+  each one's chat texts then its files — and following that faithfully made the marker jump between rows
+  during one apparent phase, which reads as a fault. Counters still update; the marker does not go back.
+- **The item pane lists what is actually being exported.** It was built from the saved selection while
+  the export ran the plan's per-run choice, so a category ticked in the plan was written but never shown.
+- **Folder-browser rows take taps.** The shared row renderer only attached a click handler to rows that
+  could unfold, which a folder entry cannot.
+
 ## 0.2.78+41 — 2026-07-28
 
 **Two counters, and a highlight that points at the right thing.** The batch's progress pane was

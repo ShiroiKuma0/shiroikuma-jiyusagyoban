@@ -1582,6 +1582,8 @@ fun registerActionMetadata() {
                 ActionField("confirm", "Button label", hint = "default 保存開始"),
                 ActionField("title", "Title", hint = "default 保存"),
                 ActionField("preselect", "Apps ticked", hint = "saved (default) = every app ticked · none = nothing ticked, pick one or two"),
+                ActionField("dir", "Destination", hint = "shown as a tappable pill above the list, e.g. %BR_Dir; blank = no pill"),
+                ActionField("dir_var", "Destination variable", hint = "where a folder chosen from the pill is written — this run only, never over the setting (default BR_RunDir)"),
             )
         )
     )

@@ -108,6 +108,55 @@ single crash wedges the app for good; leave it set on a path that hangs rather t
 backup is possible until the process is killed. Whatever can hang inside the export must therefore be
 bounded (see the heartbeat rule in §3): a guard is only as good as the work it guards terminating.
 
+### `<pkg>.action.CANCEL_EXPORT` — required for anything that can run for minutes
+
+白い熊 must be able to stop a long export from where he started it. The panel's 中止 button used to
+only stop 自由作業盤 *listening*: the app carried on to the end, renamed its part-file into place and
+delivered a backup that had been cancelled, while its reply arrived with nobody waiting. So an export
+that can outlast a few seconds **must** be stoppable from outside.
+
+Declare this action on the **same exported receiver** as the other two. Incoming extras:
+
+| extra | required | meaning |
+| --- | --- | --- |
+| `token` | yes | must match your stored automation token (§2) |
+| `reply_id` | no | the run to stop. Absent = **the export you are running**, which is unambiguous because §1 forbids two at once |
+
+On receipt, and in this order:
+
+1. **Stop the export promptly** — set a `@Volatile` flag the write loop checks between entries/files,
+   so it unwinds at the next boundary rather than being torn down mid-write. Do not `System.exit`, do
+   not kill your own process, do not interrupt a thread mid-`write()`.
+2. **Delete the partial file.** This is the point of the whole action. Whatever you were writing —
+   `<final-name>.part` per §1 — is removed on the way out, in the same `finally` that handles any
+   other failure. A cancelled export must leave the backup directory **exactly as it found it**: no
+   short archive, no stray `.part`, nothing for a later restore to find.
+3. **Send the terminal reply for the original request** — `ERROR:cancelled` — through the normal reply
+   channel, guarded by the same `AtomicBoolean` so it cannot double-fire with a success. Send it even
+   though nobody may still be listening: 自由作業盤 stops waiting the moment it presses 中止, and the
+   reply is what proves the run really ended rather than continuing unseen.
+4. **Stop the foreground service and release the wakelock**, exactly as on the success path.
+
+The cancel action itself **sends no reply of its own** — it is fire-and-forget. Do not answer it with
+`OK:`; the one terminal reply belongs to the export request it stopped.
+
+**It must be safe to send at any time.** A cancel that arrives when nothing is running, or after the
+export already finished, is a **silent no-op** — not an error, not a reply, not a crash. 自由作業盤
+fires it whenever 白い熊 presses 中止, without knowing how far you got.
+
+```kotlin
+// In the receiver — instant, no work, no service handoff needed beyond the signal.
+"${'$'}{app.packageName}.action.CANCEL_EXPORT" -> {
+    if (!AutomationAuth.enabled(app)) return          // silent: nothing to report to
+    if (!AutomationAuth.isTokenValid(app, token)) return
+    StateExportService.requestCancel(app)             // sets the volatile flag on the running export
+}
+```
+
+If your app's own UI already has a stop button (a notification action, a panel button), route both
+through the same cancel path so there is exactly one way to unwind — and make sure that path deletes
+the partial too. A stop that leaves a `.part` behind is the same bug wearing different clothes.
+
 ### `<pkg>.action.LIST_CATEGORIES`
 
 Token-gated, instant. Reply `OK:` followed by one line per exportable category:
@@ -407,11 +456,18 @@ All three are **optional and additive**: an app that sends none behaves exactly 
     <intent-filter>
         <action android:name="<pkg>.action.EXPORT_STATE" />
         <action android:name="<pkg>.action.LIST_CATEGORIES" />
+        <action android:name="<pkg>.action.CANCEL_EXPORT" />
     </intent-filter>
 </receiver>
 ```
 
 No `android:permission` (the caller cannot hold one) — the token is the gate.
+
+**The cancel must be reachable from outside.** If your stop path lives on a service, that service is
+almost certainly `android:exported="false"` — correctly so — and a third-party app cannot start it.
+Jami's did, which is why its three local stop buttons could not be triggered by the batch that started
+the export. Route the cancel through the **exported receiver** above and have it signal the service
+internally.
 
 ---
 
