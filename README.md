@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.78+46`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.78+47`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 </div>
 
@@ -85,6 +85,8 @@ browser: whatever you pick holds **for that run only**, leaving the configured e
 app's items below — with the running row parked five lines down so finished work stays in view,
 finished rows ticked and dimmed, and real counts throughout (「アプリ 7/33」, and the app's own
 「書籍 1234/8942」 or 「512 MB / 4.2 GB」 — never a percentage), relayed by broadcast while it works.
+Which row lights up comes from the app itself — the category id it names as it writes it — so the
+marker and the counter under it are always the same thing, and every row the run has passed is ticked.
 **中止** stops it within a second — it abandons the reply it was waiting on *and* tells the app to stop,
 so the export deletes its half-written archive instead of finishing a backup you cancelled. The whole
 window is an ordinary Activity: Home puts it aside while the run continues, and recents brings it back.
