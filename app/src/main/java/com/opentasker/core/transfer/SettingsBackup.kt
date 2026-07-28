@@ -68,7 +68,12 @@ object SettingsBackup {
     private const val MAX_TOTAL_BYTES = 256 * 1024 * 1024
 
     /** A selectable export/import category. [id] is the JSON entry name (`<id>.json`) in the ZIP. */
-    enum class Cat(val id: String, val label: String) {
+    /**
+     * [defaultSelected] is the fourth field of the `LIST_CATEGORIES` reply — whether the item starts
+     * ticked in 保存復元's picker. Mark `false` only what is large, derived AND re-creatable (a
+     * regenerable cache); everything this app exports is authored, so all of it stays on.
+     */
+    enum class Cat(val id: String, val label: String, val defaultSelected: Boolean = true) {
         WORKSPACE("workspace", "Workspace programming — projects · tasks · profiles · scenes · variables"),
         APPEARANCE("appearance", "UI theme (colours · fonts)"),
         WIDGETS("widgets", "Widgets (templates · bindings)"),

@@ -57,6 +57,7 @@ import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.core.actions.FlashOverlay
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.engine.resolveTaskByName
 import com.opentasker.core.progress.ProgressPanel
@@ -64,12 +65,15 @@ import com.opentasker.core.progress.ProgressPanelState
 import com.opentasker.core.progress.ProgressRow
 import com.opentasker.core.progress.ProgressRowState
 import com.opentasker.core.shizuku.ShizukuShell
+import com.opentasker.core.storage.toEntity
 import com.opentasker.scenes.OverlayLifecycleOwner
+import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * The live progress panel as a system overlay — two auto-following list panes (the run's steps on top,
@@ -309,9 +313,80 @@ object ProgressPanelManager {
     fun confirmSelection() {
         val panel = ProgressPanel.state.value ?: return
         val apps = panel.markedRows
-        if (apps.isEmpty() || panel.confirmTask.isBlank()) return
+        // Silence here reads as a dead button. Say which of the two it is.
+        if (apps.isEmpty()) {
+            flash(if (panel.itemsMode) "アプリが選ばれていません — 保存する項目がありません" else "アプリが選ばれていません")
+            return
+        }
+        if (panel.itemsMode) {
+            val pairs = ProgressPanel.publishItemSelection()
+            hide()
+            ProgressPanel.hide()
+            io.launch {
+                val saved = persistItemSelection(panel.settingsTask, pairs)
+                flash(
+                    if (saved < 0) "保存しました（${pairs.size} アプリ）— 設定[01]に書き戻せませんでした"
+                    else "保存項目を保存しました — ${pairs.size} アプリ",
+                )
+            }
+            return
+        }
+        if (panel.confirmTask.isBlank()) return
         ProgressPanel.publishRunSelection()
         io.launch { runTaskByName(panel.confirmTask, panel.projectId) }
+    }
+
+    /**
+     * Bake each `%BR_Items_<Suffix>` into the settings task's matching `var.set`, so the choice
+     * survives the next startup instead of being clobbered by the baked-in default — the same
+     * write-back `task.editaction` does for one app, done here for the whole roster in one pass.
+     *
+     * Returns how many lines were rewritten, or -1 when the settings task could not be found. A name
+     * with no `var.set` in that task is skipped rather than added: the roster's lines are created by
+     * 「保存対象選択」, and inventing one here would hide a missing app instead of showing it.
+     */
+    private suspend fun persistItemSelection(taskName: String, pairs: List<Pair<String, String>>): Int {
+        val name = taskName.trim()
+        if (name.isEmpty() || pairs.isEmpty()) return 0
+        return withContext(Dispatchers.IO) {
+            val db = OpenTaskerApp_NoHilt.db
+            val task = db.taskDao().getByName(name)?.toDomain() ?: return@withContext -1
+            val wanted = pairs.toMap()
+            var changed = 0
+            val updated = task.actions.map { action ->
+                if (action.type != "var.set") return@map action
+                val varName = action.args["name"]?.trim()?.removePrefix("%") ?: return@map action
+                val value = wanted[varName] ?: return@map action
+                if (action.args["value"] == value) return@map action
+                changed++
+                action.copy(args = action.args + ("value" to value))
+            }
+            if (changed > 0) db.taskDao().update(task.copy(actions = updated).toEntity())
+            changed
+        }
+    }
+
+    /** The engine's own flash, so panel feedback looks like every other flash 白い熊 sees. */
+    private fun flash(text: String) {
+        val context = appContext ?: return
+        val prefs = ThemeStore.state.value
+        main.post {
+            FlashOverlay.show(
+                context = context,
+                text = text,
+                backgroundColor = prefs.flashBackground,
+                textColor = prefs.flashText,
+                borderColor = prefs.flashBorder,
+                borderWidthDp = prefs.flashBorderWidthDp,
+                cornerRadiusDp = prefs.flashCornerRadiusDp,
+                textSizeSp = prefs.flashTextSizeSp,
+                fontWeight = prefs.flashFontWeight,
+                gravity = Gravity.CENTER,
+                xDp = 0,
+                yDp = 0,
+                longDuration = false,
+            )
+        }
     }
 
     /** Huawei's App launch management screen; falls back to the app's own settings page. */
@@ -566,8 +641,9 @@ private fun ProgressPanelUi(state: ProgressPanelState) {
             lines = outerLines,
             visibleLines = when {
                 state.selecting -> fillLines
-                state.finished && state.fillHeight -> runOuterLines + runInnerLines
-                state.finished -> state.outerLines + state.innerLines
+                // Report and single-pane runs both own the item pane's height: the list is the panel.
+                (state.finished || state.singlePane) && state.fillHeight -> runOuterLines + runInnerLines
+                state.finished || state.singlePane -> state.outerLines + state.innerLines
                 state.fillHeight -> runOuterLines
                 else -> state.outerLines
             },
@@ -583,7 +659,7 @@ private fun ProgressPanelUi(state: ProgressPanelState) {
             onTapRow = { row -> if (row.expandable) ProgressPanel.toggleExpanded(row.key) },
             onTapChild = { parentKey, child -> ProgressPanel.toggleMark(parentKey, child.key) },
         )
-        if (!state.finished && !state.selecting) {
+        if (!state.finished && !state.selecting && !state.singlePane) {
             Spacer(Modifier.height(10.dp))
             PaneHeader(
                 title = state.outer.getOrNull(state.outerIndex)?.label.orEmpty(),

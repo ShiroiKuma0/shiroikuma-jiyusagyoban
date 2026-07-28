@@ -76,6 +76,9 @@ selection has them. Deselect a whole app, drop a single item, or add one the sav
 out — with select/deselect-all at both levels. The choice applies to *this run only*; the saved
 per-app selections are never touched.
 
+**「個別保存」 opens that same plan with nothing chosen** — for the times you want one or two apps and
+not the roster. Tick them, press 保存開始; their items come already ticked from what each app has saved.
+
 **Then the same window becomes the run.** Two auto-following panes — the apps on top, the current
 app's items below — with the running row parked five lines down so finished work stays in view,
 finished rows ticked and dimmed, and real counts throughout (「アプリ 7/33」, and the app's own
@@ -95,6 +98,13 @@ silence); a `LIST_CATEGORIES` pre-flight fails a dead app in 20 s; and the watch
 not noise** — an app whose reports stop *changing* is given up on, which catches one that heartbeats
 while hung. Every request is gated by a per-app automation token (24 random bytes, constant-time
 compared, never included in any backup), off by default.
+
+**「保存項目一括選択」 — deciding once what each app backs up.** A sweep asks every app in the roster
+what it can export right now (frozen ones thawed and re-frozen, 中止 available, one progress row each),
+so new items and changed labels appear; the same window then becomes an editor with every app's saved
+selection ticked. 保存 writes each ticked app's choice back into both the variable and the `[979][01]`
+config task, making it the default every later backup starts from — and unticking an app leaves its
+saved selection alone, so one app is edited without disturbing the rest.
 
 **保存整理 — the housekeeping half.** The backup directory as a tick-list: one row per app with its
 archives newest-first, everything but the newest pre-ticked, per-app and grand totals of both count

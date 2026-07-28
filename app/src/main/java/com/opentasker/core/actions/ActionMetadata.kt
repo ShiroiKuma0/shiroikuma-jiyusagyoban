@@ -989,6 +989,7 @@ fun registerActionMetadata() {
                 ActionField("cancel_label", "Cancel label", hint = "button text (default 中止)"),
                 ActionField("scale", "Text scale", FieldType.NUMBER, hint = "1 = normal, 1.5 = half again — match the plan window it follows"),
                 ActionField("fill", "Fill the screen", FieldType.CHECKBOX, hint = "take the whole height, dividing it between the two panes, instead of a fixed row count"),
+                ActionField("single", "No item pane", FieldType.CHECKBOX, hint = "the steps have no items of their own — drop the lower pane and give the step list the whole window"),
             )
         )
     )
@@ -1576,6 +1577,23 @@ fun registerActionMetadata() {
                 ActionField("confirm_task", "Run task", required = true, hint = "the task the button runs, e.g. 保存実行"),
                 ActionField("confirm", "Button label", hint = "default 保存開始"),
                 ActionField("title", "Title", hint = "default 保存"),
+                ActionField("preselect", "Apps ticked", hint = "saved (default) = every app ticked · none = nothing ticked, pick one or two"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "backup.edititems",
+            name = "Backup Items — Edit All",
+            description = "The whole roster as one item editor: every app unfolds to the items it last reported, ticked as its saved selection has them. The button writes each ticked app's choice back into %BR_Items_<App> AND into the settings task, so it becomes the default every later backup starts from. Unticking an app leaves its saved selection alone.",
+            category = "App",
+            fields = listOf(
+                ActionField("apps", "Apps", required = true, hint = "the roster, split by Separator"),
+                ActionField("separator", "Separator", hint = "default a space"),
+                ActionField("settings_task", "Settings task", required = true, hint = "the 01 task the choices are baked into, e.g. 保存復元の設定 -- [979][01]"),
+                ActionField("confirm", "Button label", hint = "default 保存"),
+                ActionField("title", "Title", hint = "default 保存項目"),
             )
         )
     )

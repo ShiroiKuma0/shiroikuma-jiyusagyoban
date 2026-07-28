@@ -1,5 +1,6 @@
 package com.opentasker.core.progress
 
+import com.opentasker.core.actions.backupVarSuffix
 import com.opentasker.core.engine.variables.PersistentGlobalScope
 import com.opentasker.core.storage.SUPER_GLOBAL_PROJECT_ID
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -64,6 +65,10 @@ data class ProgressPanelState(
     val innerNote: String = "",
     val outerLines: Int = 10,
     val innerLines: Int = 8,
+    // A run whose steps have no items of their own — the sweep that only asks each app for its list.
+    // Drawing the item pane there leaves an empty box under the list, so it is dropped entirely and
+    // the step list takes the whole window.
+    val singlePane: Boolean = false,
     val icons: Boolean = false,             // outer keys are packages → draw each app's icon
     val cancelLabel: String = "",           // blank = no 中止 button
     val cancelVar: String = "",             // variable set to "1" when 中止 is pressed
@@ -83,6 +88,9 @@ data class ProgressPanelState(
                                             // just their children (the prune list)
     val confirmTask: String = "",           // task the confirm button runs (blank = act natively)
     val confirmLabel: String = "",          // the action button, e.g. 「削除」 / 「保存開始」
+    val itemsMode: Boolean = false,         // confirm SAVES each app's ticked items as its default
+                                            // selection instead of starting a run
+    val settingsTask: String = "",          // itemsMode: the 01 task the selections are persisted into
     val emptyNote: String = "",             // shown instead of the list when there is nothing to do
     val textScale: Float = 1f,              // 1.5 for the prune list — it is read, not glanced at
     val fillHeight: Boolean = false,        // take the whole window, splitting it between the panes
@@ -233,10 +241,11 @@ object ProgressPanel {
         val apps = panel.outer.filter { it.marked }
         writeVar(panel, "BR_RunApps", apps.joinToString(" ") { it.key })
         apps.forEach { app ->
-            val suffix = app.key.removePrefix("shiroikuma.")
-                .map { if (it.isLetterOrDigit()) it else '_' }.joinToString("")
-                .replaceFirstChar { it.uppercase() }
-            writeVar(panel, "BR_Run_$suffix", app.children.filter { it.marked }.joinToString(",") { it.key })
+            writeVar(
+                panel,
+                "BR_Run_${backupVarSuffix(app.key)}",
+                app.children.filter { it.marked }.joinToString(",") { it.key },
+            )
         }
         // From plan to progress: same window, no flicker, the rows already in place.
         _state.value = panel.copy(
@@ -245,6 +254,24 @@ object ProgressPanel {
             textScale = 1f,
             outer = apps.map { it.copy(marked = false, children = emptyList()) },
         )
+    }
+
+    /**
+     * The item editor's counterpart: write each ticked app's ticked items into its SAVED selection,
+     * `%BR_Items_<Suffix>` — the defaults every later run starts from, not a per-run override.
+     *
+     * Only ticked apps are touched, so unticking one leaves its saved selection exactly as it was.
+     * Returns the (variable, value) pairs written, which the caller persists into the settings task
+     * so they outlive the process.
+     */
+    fun publishItemSelection(): List<Pair<String, String>> {
+        val panel = _state.value ?: return emptyList()
+        val pairs = panel.outer.filter { it.marked }.map { app ->
+            "BR_Items_${backupVarSuffix(app.key)}" to
+                app.children.filter { it.marked }.joinToString(",") { it.key }
+        }
+        pairs.forEach { (name, value) -> writeVar(panel, name, value) }
+        return pairs
     }
 
     /** Publish the 1-based row number a repair is about to re-run, so the task updates the right row. */
