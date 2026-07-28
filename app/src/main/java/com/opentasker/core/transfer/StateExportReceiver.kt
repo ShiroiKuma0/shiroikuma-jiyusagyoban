@@ -72,11 +72,19 @@ class StateExportReceiver : BroadcastReceiver() {
 
         when (action) {
             ACTION_LIST_CATEGORIES -> {
-                reply("OK:" + SettingsBackup.Cat.entries.joinToString("\n") { "${it.id}\t${it.label}" })
+                // id⇥label⇥parent⇥on|off — the fourth field says whether the item starts ticked in the
+                // caller's picker. No category here has parts, so the third field is always empty.
+                reply(
+                    "OK:" + SettingsBackup.Cat.entries.joinToString("\n") {
+                        "${it.id}\t${it.label}\t\t${if (it.defaultSelected) "on" else "off"}"
+                    },
+                )
             }
             ACTION_EXPORT_STATE -> {
+                // Absent items = OUR default set (the `on` ones), which the contract distinguishes from
+                // "everything" — the two coincide here only because nothing in this app is opt-out.
                 val cats: Set<SettingsBackup.Cat> = if (items.isEmpty()) {
-                    SettingsBackup.Cat.entries.toSet()
+                    SettingsBackup.Cat.entries.filter { it.defaultSelected }.toSet()
                 } else {
                     val ids = items.split(",").map { it.trim() }.filter { it.isNotEmpty() }
                     val resolved = ids.mapNotNull { SettingsBackup.Cat.byId(it) }

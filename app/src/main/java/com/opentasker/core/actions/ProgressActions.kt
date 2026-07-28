@@ -90,6 +90,8 @@ class ShowProgressPanelAction : Action {
                 textScale = args["scale"]?.trim()?.toFloatOrNull()?.coerceIn(0.8f, 2.5f) ?: 1f,
                 // Same window as the plan it followed: starting the run must not shrink it.
                 fillHeight = args["fill"]?.trim()?.lowercase() in setOf("true", "1", "yes", "on"),
+                // No item pane at all — for a run whose steps have nothing to list under them.
+                singlePane = args["single"]?.trim()?.lowercase() in setOf("true", "1", "yes", "on"),
                 projectId = ctx.variables.projectId,
             ),
         )

@@ -3,6 +3,43 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.78+40 — 2026-07-28
+
+**Picking a couple of apps, and deciding once what each app backs up.** Two entries either side of
+「保存」: one that opens the same plan with nothing chosen, and one that edits every app's saved item
+selection in a single window.
+
+### 個別保存 — the plan, opened empty (`backup.plan` gains `preselect`)
+- The same window and the same behaviour as 「保存」, but **no app is ticked**. Tick one or two, press
+  保存開始. Backing up a single app no longer means opening the roster and deselecting thirty-two.
+- The items inside are unchanged: ticking an app brings its saved selection with it, already ticked,
+  and the run still writes only `%BR_RunApps` / `%BR_Run_<App>`, so saved defaults survive untouched.
+- `preselect` = `saved` (the default, what 「保存」 uses) or `none`.
+- Pressing the button with nothing ticked used to do nothing, silently; it now says so.
+
+### 保存項目一括選択 — the whole roster's items in one window (`backup.edititems`)
+- **A sweep, then an editor, in the same window.** Every app is asked for its current
+  `LIST_CATEGORIES` — one progress row each, 中止 available, frozen apps thawed and re-frozen — which
+  refreshes `%BR_Cat_<App>` so newly added items and changed labels appear. The window then becomes
+  the editor: each app unfolds to its items, ticked as its saved selection has them.
+- **保存 writes both places**: `%BR_Items_<App>` for every ticked app, and the matching line in
+  「保存復元の設定 -- [979][01]」, so the choice outlives a restart. It becomes the default every later
+  backup starts from.
+- **An app's own tick means "save this app"** — unticking one leaves its saved selection exactly as it
+  was, so editing a single app never disturbs the rest.
+- 保存中核 gains `%BR_Mode=list`: fetch the list, re-freeze, return — no dialog, no export.
+
+### The progress panel
+- `progress.show` gains **No item pane** (`single`): a run whose steps have nothing to list under them
+  drops the lower pane entirely and gives the step list the whole window, instead of drawing an empty
+  frame under a stray header.
+
+### The export contract, in this app too
+- This app's own `LIST_CATEGORIES` now sends the fourth field — `id⇥label⇥parent⇥on|off` — like the
+  sister apps it collects. Nothing here is large-derived-and-re-creatable, so every category is `on`.
+- An absent `items` extra now means **this app's default set** rather than "everything", which is what
+  the contract has always specified; the two coincide here only because nothing is opt-out.
+
 ## 0.2.78+38 — 2026-07-28
 
 **The backup batch becomes one window.** 保存復元 used to be two lines of text on a floating panel

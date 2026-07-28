@@ -3,6 +3,7 @@ package com.opentasker.core
 import com.opentasker.core.actions.AirplaneModeAction
 import com.opentasker.core.actions.AppFrozenAction
 import com.opentasker.core.actions.BackupCategoriesAction
+import com.opentasker.core.actions.BackupEditItemsAction
 import com.opentasker.core.actions.BackupPlanAction
 import com.opentasker.core.actions.BackupRunItemsAction
 import com.opentasker.core.actions.PruneBackupsAction
@@ -307,6 +308,7 @@ private fun registerBuiltInActions() {
         HideProgressPanelAction(),
         AppFrozenAction(),
         BackupCategoriesAction(),
+        BackupEditItemsAction(),
         BackupPlanAction(),
         BackupRunItemsAction(),
         PruneBackupsAction(),
