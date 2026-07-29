@@ -464,6 +464,10 @@
     <string name="a11y_edit_context">Edit context %1$d, %2$s</string>
     <string name="a11y_delete_context">Delete context %1$d, %2$s</string>
     <string name="a11y_expression_details">Expression details for %1$s</string>
+    <string name="a11y_variable_changes">Variables set by %1$s</string>
+    <string name="run_log_variable_added">added</string>
+    <string name="run_log_variable_updated">updated</string>
+    <string name="run_log_variable_more">%1$d more</string>
     <string name="action_expand">Expand</string>
     <string name="action_collapse">Collapse</string>
 

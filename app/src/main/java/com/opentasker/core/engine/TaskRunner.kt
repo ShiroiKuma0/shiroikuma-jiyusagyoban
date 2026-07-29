@@ -4,6 +4,7 @@ import com.opentasker.core.actions.ActionArgumentSensitivity
 import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.expressions.TemplateExpansionTrace
+import com.opentasker.core.expressions.TemplateScope
 import com.opentasker.core.expressions.TemplateExpressionEngine
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
@@ -280,6 +281,7 @@ class TaskRunner(
             }
         val expansionReport = expandArgs(spec.type, spec.args)
         val timeoutMs = actionTimeoutMs(spec.type)
+        val before = ctx.variables.toTemplateScope()
         val rawResult = try {
             withTimeout(timeoutMs) {
                 ctx.variables.withSensitiveWrites(expansionReport.hasSecretDerivedValues()) {
@@ -304,7 +306,8 @@ class TaskRunner(
         } else {
             rawResult
         }
-        return result to traceFor(index, spec, started, result, expansionReport)
+        val changes = variableChangesBetween(before, ctx.variables.toTemplateScope())
+        return result to traceFor(index, spec, started, result, expansionReport, changes)
     }
 
     private suspend fun runSubTask(
@@ -374,6 +377,7 @@ class TaskRunner(
         started: Long,
         result: ActionResult,
         expansionReport: ActionArgumentExpansionReport,
+        variableChanges: List<ActionVariableChange> = emptyList(),
     ): ActionExecutionTrace = ActionExecutionTrace(
         index = index,
         actionType = spec.type,
@@ -392,6 +396,7 @@ class TaskRunner(
         expandedArgSummary = expansionReport.summary(),
         templateWarnings = expansionReport.templateWarnings(),
         argumentExpansions = expansionReport.expansions,
+        variableChanges = variableChanges,
     )
 
     private fun expandArgs(actionType: String, args: Map<String, String>): ActionArgumentExpansionReport {
@@ -488,7 +493,61 @@ data class ActionExecutionTrace(
     val expandedArgSummary: String? = null,
     val templateWarnings: List<String> = emptyList(),
     val argumentExpansions: List<ActionArgumentExpansionTrace> = emptyList(),
+    val variableChanges: List<ActionVariableChange> = emptyList(),
 )
+
+/**
+ * One variable an action added or modified. Captured per step so a finished run answers "what did
+ * this task actually set?" — the run log previously showed only what went *into* each action.
+ */
+data class ActionVariableChange(
+    val scope: VariableChangeScope,
+    val name: String,
+    val value: String,
+    val added: Boolean,
+    val sensitive: Boolean = false,
+)
+
+enum class VariableChangeScope { TASK, GLOBAL, ARRAY }
+
+/**
+ * Variables an action added or modified, derived by diffing the store around the call.
+ *
+ * Deltas are used rather than a full snapshot because a run's interesting output is what changed,
+ * and a snapshot per step would grow the run log with the same untouched globals over and over.
+ * Sensitive names carry the flag so the value is redacted at the serialization boundary — the
+ * value itself is never written to the log.
+ */
+internal fun variableChangesBetween(
+    before: TemplateScope,
+    after: TemplateScope,
+): List<ActionVariableChange> = buildList {
+    fun diff(
+        scope: VariableChangeScope,
+        beforeValues: Map<String, String>,
+        afterValues: Map<String, String>,
+        sensitiveNames: Set<String>,
+    ) {
+        afterValues.entries
+            .sortedBy { it.key }
+            .forEach { (name, value) ->
+                if (!beforeValues.containsKey(name)) {
+                    add(ActionVariableChange(scope, name, value, added = true, sensitive = name in sensitiveNames))
+                } else if (beforeValues[name] != value) {
+                    add(ActionVariableChange(scope, name, value, added = false, sensitive = name in sensitiveNames))
+                }
+            }
+    }
+
+    diff(VariableChangeScope.TASK, before.task, after.task, after.sensitiveTask)
+    diff(VariableChangeScope.GLOBAL, before.global, after.global, after.sensitiveGlobal)
+    diff(
+        VariableChangeScope.ARRAY,
+        before.arrays.mapValues { (_, items) -> items.joinToString(", ") },
+        after.arrays.mapValues { (_, items) -> items.joinToString(", ") },
+        after.sensitiveArrays,
+    )
+}
 
 data class ActionArgumentExpansionTrace(
     val argName: String,
@@ -578,7 +637,19 @@ private fun ActionExecutionTrace.toRunLogLines(): List<String> = buildList {
         .flatMap { it.toTemplateDiagnosticLines(actionType) }
         .take(MAX_TEMPLATE_TRACE_LINES_PER_ACTION)
         .forEach(::add)
+    variableChanges
+        .take(MAX_VARIABLE_CHANGE_LINES_PER_ACTION)
+        .map { it.toRunLogLine() }
+        .forEach(::add)
 }
+
+private fun ActionVariableChange.toRunLogLine(): String = listOf(
+    VARIABLE_CHANGE_PREFIX,
+    scope.name.lowercase(),
+    name.toLogField(),
+    if (added) VARIABLE_CHANGE_ADDED else VARIABLE_CHANGE_UPDATED,
+    if (sensitive) REDACTED_VALUE else value.toLogField(),
+).joinToString("	")
 
 private fun ActionArgumentExpansionTrace.toTemplateDiagnosticLines(actionType: String?): List<String> =
     expressions.map { expressionTrace ->
@@ -627,4 +698,8 @@ private const val REDACTED_VALUE = ActionArgumentSensitivity.REDACTED
 private const val MAX_SUMMARY_ARGS = 4
 private const val MAX_SUMMARY_VALUE_LENGTH = 80
 private const val MAX_TEMPLATE_TRACE_LINES_PER_ACTION = 8
+private const val MAX_VARIABLE_CHANGE_LINES_PER_ACTION = 8
+private const val VARIABLE_CHANGE_PREFIX = "Var:"
+private const val VARIABLE_CHANGE_ADDED = "added"
+private const val VARIABLE_CHANGE_UPDATED = "updated"
 private const val MAX_TEMPLATE_TRACE_FIELD_LENGTH = 120

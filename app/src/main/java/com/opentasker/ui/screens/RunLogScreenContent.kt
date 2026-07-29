@@ -43,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -58,6 +59,7 @@ import com.opentasker.core.engine.RunLogActionDiagnostic
 import com.opentasker.core.engine.RunLogOutcome
 import com.opentasker.core.engine.RunLogSource
 import com.opentasker.core.engine.RunLogTemplateDiagnostic
+import com.opentasker.core.engine.RunLogVariableChange
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.selectedContainerColor
 import com.opentasker.core.engine.outcome
@@ -583,6 +585,13 @@ private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
                     traceLabel = trace.label,
                 )
             }
+            if (trace.variableChanges.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                VariableChangeInspector(
+                    changes = trace.variableChanges,
+                    traceLabel = trace.label,
+                )
+            }
         }
     }
 }
@@ -691,6 +700,104 @@ private fun ExpressionDebugger(
             if (!expanded && expressions.size > 3) {
                 Text(
                     "${expressions.size - 3} more",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * What this step actually wrote. Traces show the values that went *into* an action; without this,
+ * a finished run never answers "what did the task set?".
+ *
+ * Values arrive already redacted from the engine when the variable is secret-derived, so nothing
+ * here can reveal a secret it was not already allowed to show.
+ */
+@Composable
+private fun VariableChangeInspector(
+    changes: List<RunLogVariableChange>,
+    traceLabel: String,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val visible = if (expanded) changes else changes.take(3)
+    val stateLabel = if (expanded) stringResource(R.string.a11y_expanded) else stringResource(R.string.a11y_collapsed)
+    val actionLabel = if (expanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand)
+    val inspectorDescription = stringResource(R.string.a11y_variable_changes, traceLabel)
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.10f),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.16f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = DesignSystem.ComponentSize.touchTargetMin)
+                    .semantics {
+                        contentDescription = inspectorDescription
+                        stateDescription = stateLabel
+                    }
+                    .clickable(role = Role.Button, onClickLabel = actionLabel) { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    pluralStringResource(R.plurals.run_log_variable_changes, changes.size, changes.size),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    actionLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            visible.forEach { change ->
+                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            change.name,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            maxLines = 1,
+                        )
+                        Text(
+                            change.scope,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                        Text(
+                            if (change.added) {
+                                stringResource(R.string.run_log_variable_added)
+                            } else {
+                                stringResource(R.string.run_log_variable_updated)
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
+                    Text(
+                        change.value,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = if (expanded) 4 else 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            if (!expanded && changes.size > 3) {
+                Text(
+                    stringResource(R.string.run_log_variable_more, changes.size - 3),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -29,6 +29,15 @@ data class RunLogActionDiagnostic(
     val argumentSummary: String? = null,
     val templateWarningCount: Int = 0,
     val templateExpressions: List<RunLogTemplateDiagnostic> = emptyList(),
+    val variableChanges: List<RunLogVariableChange> = emptyList(),
+)
+
+/** A variable this step added or modified, as recovered from the stored run log. */
+data class RunLogVariableChange(
+    val scope: String,
+    val name: String,
+    val value: String,
+    val added: Boolean,
 )
 
 data class RunLogTemplateDiagnostic(
@@ -93,6 +102,15 @@ fun String.toRunLogDiagnostics(): RunLogDiagnostics {
                 line.startsWith(SOURCE_PREFIX, ignoreCase = true) -> source = line.valueAfterPrefix(SOURCE_PREFIX)
                 line.startsWith(DECISION_PREFIX, ignoreCase = true) -> decision = line.valueAfterPrefix(DECISION_PREFIX)
                 line.startsWith(REASON_PREFIX, ignoreCase = true) -> reason = line.valueAfterPrefix(REASON_PREFIX)
+                line.startsWith(VARIABLE_CHANGE_PREFIX, ignoreCase = true) -> {
+                    val change = parseVariableChangeLine(line)
+                    if (change != null && traces.isNotEmpty()) {
+                        val previous = traces.removeAt(traces.lastIndex)
+                        traces += previous.copy(variableChanges = previous.variableChanges + change)
+                    } else {
+                        details.add(line)
+                    }
+                }
                 line.startsWith(TEMPLATE_TRACE_PREFIX, ignoreCase = true) -> {
                     val template = parseTemplateTraceLine(line)
                     if (template != null && traces.isNotEmpty()) {
@@ -180,6 +198,19 @@ private fun parseTemplateTraceLine(line: String): RunLogTemplateDiagnostic? {
     )
 }
 
+private fun parseVariableChangeLine(line: String): RunLogVariableChange? {
+    val parts = line.split('	', limit = VARIABLE_CHANGE_SPLIT_LIMIT)
+    if (parts.size < VARIABLE_CHANGE_FIELD_COUNT || !parts.first().equals(VARIABLE_CHANGE_PREFIX, ignoreCase = true)) {
+        return null
+    }
+    return RunLogVariableChange(
+        scope = parts[1].trim().takeIf { it.isNotBlank() } ?: return null,
+        name = parts[2].trim().takeIf { it.isNotBlank() } ?: return null,
+        added = parts[3].trim().equals(VARIABLE_CHANGE_ADDED, ignoreCase = true),
+        value = parts[4].trim(),
+    )
+}
+
 private data class ParsedTraceMessage(
     val message: String,
     val argumentSummary: String? = null,
@@ -193,6 +224,10 @@ private const val REASON_PREFIX = "Reason:"
 private const val ARGUMENTS_DETAIL_PREFIX = "args:"
 private const val TEMPLATE_WARNINGS_DETAIL_PREFIX = "template warnings:"
 private const val TEMPLATE_TRACE_PREFIX = "Template:"
+private const val VARIABLE_CHANGE_PREFIX = "Var:"
+private const val VARIABLE_CHANGE_ADDED = "added"
+private const val VARIABLE_CHANGE_FIELD_COUNT = 5
+private const val VARIABLE_CHANGE_SPLIT_LIMIT = 5
 private const val TEMPLATE_TRACE_MIN_FIELD_COUNT = 5
 private const val TEMPLATE_TRACE_SPLIT_LIMIT = 6
 private const val SKIPPED_DECISION = "Skipped"

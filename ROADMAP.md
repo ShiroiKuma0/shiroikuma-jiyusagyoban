@@ -152,14 +152,6 @@ direct fixes shipped in v0.2.76 across the engine, actions, context, UI, and the
 
 ### P1 -- Background reliability, observability, and security
 
-- [ ] P1 — Add a live variable inspector for running and finished tasks
-  Why: Run logs show per-expression template diagnostics but no snapshot of the resulting variable values, and there is no runtime global-variable view, so users cannot see what a task actually set; the Variables screen reads only the (currently unwritten) persisted vault.
-  Evidence: `app/src/main/java/com/opentasker/ui/screens/RunLogScreenContent.kt` (`ExpressionDebugger`); `app/src/main/java/com/opentasker/ui/screens/VariablesScreen.kt`; `app/src/main/java/com/opentasker/core/engine/VariableStore.kt`; CLAUDE.md "Later roadmap ideas" (variable inspector)
-  Touches: task-run variable snapshot capture, run-log/inspector UI, global-variable runtime view, redaction of secret provenance, inspector tests.
-  Acceptance: After a manual or triggered run, users can inspect task/event/global variable values with per-step deltas and redaction; a live global view reflects the durable global runtime; depends on the durable-globals P0.
-  Complexity: M
-
-
 - [ ] P2 — Add HTML support to the data.read action
   Why: data.read parses JSON/CSV/XML on-device, but HTML extraction still needs a real parser (jsoup), which is a dependency + F-Droid-policy decision deferred from the original reader item.
   Evidence: `app/src/main/java/com/opentasker/core/data/StructuredDataReader.kt`; https://jsoup.org/

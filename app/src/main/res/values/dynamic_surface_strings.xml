@@ -103,6 +103,10 @@
     <string name="widget_action_title" formatted="false">Widget action</string>
     <string name="widget_run_selected_task" formatted="false">Run selected task</string>
     <string name="widget_tap_to_run" formatted="false">Tap to run</string>
+    <plurals name="run_log_variable_changes">
+        <item quantity="one">%1$d variable set</item>
+        <item quantity="other">%1$d variables set</item>
+    </plurals>
     <plurals name="widget_action_count">
         <item quantity="one">%1$d action</item>
         <item quantity="other">%1$d actions</item>
