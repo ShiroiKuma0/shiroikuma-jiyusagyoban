@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import com.opentasker.app.BuildConfig
 import com.opentasker.app.R
 import com.opentasker.core.platform.AndroidAudioHardening
+import com.opentasker.core.platform.AndroidAudioHardening.ANDROID_17_API
 import com.opentasker.core.power.ShizukuPowerBackend
 import com.opentasker.core.scripting.TermuxScriptBackend
 
@@ -30,6 +31,60 @@ object ActionCapabilityRegistry {
         R.string.capability_unknown_action,
     )
 
+    /**
+     * Actions reviewed as ordinary: they run under the app's own manifest permissions with no
+     * special access, no distribution gate, and no permanent platform block.
+     *
+     * This set exists so [get] has no permissive default. An action that is registered but appears
+     * in neither this set nor [capabilities] resolves to [unknown] and cannot be added, imported,
+     * or executed — the contract fails closed while it is unreviewed instead of silently
+     * advertising itself as Ready.
+     */
+    private val ordinaryActionIds = setOf(
+        // Variables, text, and date-time: pure in-process transforms.
+        "var.set",
+        "var.persist",
+        "data.read",
+        "datetime.format",
+        "datetime.parse",
+        "datetime.add",
+        "text.match",
+        "text.replace",
+        "text.split",
+        "text.join",
+        "text.substring",
+        // Flow control: engine-handled markers plus the runtime wait.
+        "flow.wait",
+        "task.run",
+        "flow.if",
+        "flow.else",
+        "flow.endif",
+        "flow.foreach",
+        "flow.endfor",
+        "flow.stop",
+        // App and intent dispatch: uses ordinary intent resolution.
+        "intent.launch",
+        "app.launch",
+        "home.go",
+        "url.open",
+        // Scoped file access inside the app's own sandbox.
+        "file.read",
+        "file.write",
+        "file.append",
+        "file.delete",
+        "file.list",
+        // Network: INTERNET is a normal permission. Private-LAN destinations are gated at
+        // runtime by the ACCESS_LOCAL_NETWORK policy, which fails closed with a Setup pointer.
+        "http.request",
+        "http.get",
+        "http.post",
+        "ping",
+        "download",
+        // Device feedback covered by normal manifest permissions.
+        "vibrate",
+        "log",
+    )
+
     private val capabilities = mapOf(
         "notify.show" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires notification permission on Android 13+.", R.string.capability_notification_permission),
         "notify.cancel" to ActionCapability(CapabilityLevel.RequiresSetup, "Cancels a posted notification by tag and/or ID. Requires notification permission on Android 13+.", R.string.capability_notification_cancel_permission),
@@ -38,6 +93,9 @@ object ActionCapabilityRegistry {
         "wifi.toggle" to ActionCapability(CapabilityLevel.Unsupported, "Android 10+ blocks direct WiFi toggles for normal apps.", R.string.capability_wifi_unsupported),
         "bluetooth.toggle" to bluetoothCapability(),
         "brightness.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access.", R.string.capability_write_settings),
+        "screen.timeout" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access.", R.string.capability_write_settings),
+        "app.kill" to ActionCapability(CapabilityLevel.Unsupported, "Force-stopping another app requires privileged app-management access that no normal app can hold.", R.string.capability_app_kill_unsupported),
+        "wol" to wakeOnLanCapability(),
         "volume.set" to volumeCapability("May be blocked by Do Not Disturb policy access."),
         "dnd.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Do Not Disturb access.", R.string.capability_dnd_access),
         "ringer.set" to volumeCapability("May require Do Not Disturb access on some devices when switching to silent mode."),
@@ -68,13 +126,31 @@ object ActionCapabilityRegistry {
     )
 
     fun get(actionId: String): ActionCapability = capabilities[actionId]
-        ?: if (AutomationSensitivityRegistry.isKnown(actionId)) supported else unknown
+        ?: if (actionId in ordinaryActionIds) supported else unknown
+
+    /** Every action id with an explicit contract, used by the contract completeness test. */
+    internal fun contractedActionIds(): Set<String> = capabilities.keys + ordinaryActionIds
 
     private fun bluetoothCapability(): ActionCapability =
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             ActionCapability(CapabilityLevel.Unsupported, "Android 13+ blocks direct Bluetooth enable/disable for normal apps.", R.string.capability_bluetooth_unsupported)
         } else {
             ActionCapability(CapabilityLevel.RequiresSetup, "Requires Bluetooth permission.", R.string.capability_bluetooth_permission)
+        }
+
+    /**
+     * Wake-on-LAN only ever targets a private address, so on Android 17+ it is permanently gated
+     * on ACCESS_LOCAL_NETWORK rather than failing at run time like the general HTTP actions.
+     */
+    private fun wakeOnLanCapability(): ActionCapability =
+        if (android.os.Build.VERSION.SDK_INT >= ANDROID_17_API) {
+            ActionCapability(
+                CapabilityLevel.RequiresSetup,
+                "Android 17+ requires local network access for the LAN broadcast; grant it in Setup.",
+                R.string.capability_local_network_setup,
+            )
+        } else {
+            ActionCapability(CapabilityLevel.Supported, "Sends a magic packet on the local network.", R.string.capability_ready)
         }
 
     private fun smsCapability(): ActionCapability =

@@ -129,6 +129,8 @@
     <string name="capability_bluetooth_unsupported" formatted="false">Android 13+ blocks direct Bluetooth enable/disable for normal apps.</string>
     <string name="capability_bluetooth_permission" formatted="false">Requires Bluetooth permission.</string>
     <string name="capability_write_settings" formatted="false">Requires Write Settings special access.</string>
+    <string name="capability_app_kill_unsupported" formatted="false">Force-stopping another app requires privileged app-management access that no normal app can hold.</string>
+    <string name="capability_local_network_setup" formatted="false">Android 17+ requires local network access for the LAN broadcast; grant it in Setup.</string>
     <string name="capability_dnd_access" formatted="false">Requires Do Not Disturb access.</string>
     <string name="capability_torch_ready" formatted="false">Uses the camera flashlight.</string>
     <string name="capability_airplane_unsupported" formatted="false">Airplane mode changes require system or device-owner privileges. No privileged transport is available in this build.</string>

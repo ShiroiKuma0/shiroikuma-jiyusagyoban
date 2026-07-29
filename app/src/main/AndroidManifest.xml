@@ -36,6 +36,13 @@
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!--
+        Special access, granted only through Settings > Modify system settings. Required by the
+        brightness.set and screen.timeout actions, which advertise it as their setup requirement;
+        without the declaration Settings.System.canWrite() can never become true and both actions
+        would fail forever while claiming to be one grant away.
+    -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
     <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
 
     <uses-feature

@@ -737,6 +737,17 @@ private fun buildPermissionItems(
             requiredFor = context.getString(R.string.setup_overlay_access_required_for),
         ),
         PermissionSetupItem(
+            title = context.getString(R.string.setup_write_settings_title),
+            body = context.getString(R.string.setup_write_settings_body),
+            granted = Settings.System.canWrite(context),
+            actionLabel = openSettings,
+            action = PermissionAction.SettingsIntent(
+                Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:${context.packageName}")),
+            ),
+            requiredFor = context.getString(R.string.setup_write_settings_required_for),
+            optional = true,
+        ),
+        PermissionSetupItem(
             title = context.getString(R.string.setup_foreground_location_title),
             body = context.getString(R.string.setup_foreground_location_body),
             granted = hasAnyLocationPermission(context),

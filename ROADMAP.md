@@ -473,13 +473,6 @@ As of 2026-07-29, the app sets `targetSdk = 37`; the P1 items below are mandator
 
 ### P0 — Data integrity and runtime truth
 
-- [ ] P0 — Make the action capability contract total and executable
-  Why: Known-but-unlisted actions default to `Supported`; `app.kill` always fails, `screen.timeout` needs unexposed Write Settings access, and implementation/metadata/setup/distribution truth can drift independently.
-  Evidence: `app/src/main/java/com/opentasker/core/capabilities/ActionCapabilities.kt:33-71`; `app/src/main/java/com/opentasker/core/actions/AppActions.kt:46-54`; `app/src/main/java/com/opentasker/core/actions/SettingsActions.kt:101-124,398-420`; `app/src/main/AndroidManifest.xml`; Android `Settings.ACTION_MANAGE_WRITE_SETTINGS`.
-  Touches: `RuntimeRegistries.kt`, `ActionMetadata.kt`, `ActionCapabilities.kt`, `AutomationSensitivity.kt`, manifest variants, `PermissionOnboardingScreen.kt`, README truth tests.
-  Acceptance: Every runtime or engine-handled action has exactly one metadata/capability/sensitivity/distribution/setup contract; `Supported` actions can succeed under a satisfiable fixture, permanent stubs are `Unsupported`, and special-access actions expose a working grant/deep-link and revoked-state failure; the registry-derived action count cannot drift from README.
-  Complexity: M
-
 ### P1 — Reliability, recovery, and explainability
 
 - [ ] P1 — Add execution admission, feedback-loop warnings, and a storm circuit breaker

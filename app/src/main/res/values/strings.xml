@@ -200,6 +200,9 @@
     <string name="setup_overlay_access_title">Overlay access</string>
     <string name="setup_overlay_access_body">Needed for scene overlays and controls displayed over other apps.</string>
     <string name="setup_overlay_access_required_for">Scenes, overlay UI</string>
+    <string name="setup_write_settings_title">Modify system settings</string>
+    <string name="setup_write_settings_body">Special access that lets tasks change screen brightness and the screen timeout. Without it both actions fail closed.</string>
+    <string name="setup_write_settings_required_for">Set brightness, Set screen timeout</string>
     <string name="setup_foreground_location_title">Foreground location</string>
     <string name="setup_foreground_location_body">Needed for live Location contexts and Wi-Fi SSID visibility on modern Android. Approximate access can emit lower-precision fixes; background precision cannot exceed the foreground precision the user grants.</string>
     <string name="setup_foreground_location_required_for">Location and Wi-Fi contexts</string>
