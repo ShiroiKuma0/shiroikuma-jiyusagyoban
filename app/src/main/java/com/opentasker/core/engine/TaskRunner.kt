@@ -27,6 +27,11 @@ class TaskRunner(
     private val templateExpressionEngine: TemplateExpressionEngine = TemplateExpressionEngine(),
     private val resolveTask: SubTaskResolver? = null,
     private val depth: Int = 0,
+    /**
+     * Reports the step about to run so an in-flight execution can say what it is doing. Nested
+     * sub-task runners inherit it, so a run stuck inside a sub-task still names the real step.
+     */
+    private val onStep: ((index: Int, label: String) -> Unit)? = null,
 ) {
     /** A live `flow.foreach` iteration in progress. */
     private class LoopFrame(
@@ -153,6 +158,7 @@ class TaskRunner(
                     continue
                 }
 
+                onStep?.invoke(pc, spec.label ?: spec.type)
                 val (result, trace) = runOne(pc, spec)
                 results += result
                 traces += trace
@@ -336,7 +342,7 @@ class TaskRunner(
         // scope wraps the child run so local (lowercase) inputs are visible to the child through the
         // scope chain but are popped when it returns, never leaking into the parent's later actions.
         // Global (uppercase) outputs still flow back through the shared global namespace.
-        val child = TaskRunner(ctx, templateExpressionEngine, resolveTask, depth + 1)
+        val child = TaskRunner(ctx, templateExpressionEngine, resolveTask, depth + 1, onStep)
         ctx.variables.pushScope()
         val report = try {
             args.forEach { (key, value) ->

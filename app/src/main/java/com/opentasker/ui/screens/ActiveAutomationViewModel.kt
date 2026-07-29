@@ -13,6 +13,8 @@ import com.opentasker.core.diagnostics.CrashLogHandler
 import com.opentasker.core.diagnostics.CrashLogRecord
 import com.opentasker.core.diagnostics.EngineHealthReader
 import com.opentasker.core.diagnostics.EngineHealthStatus
+import com.opentasker.core.engine.ActiveExecution
+import com.opentasker.core.engine.ActiveExecutionRegistry
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.model.AutomationMode
@@ -193,6 +195,18 @@ class ActiveAutomationViewModel(
         .getRecentFlow()
         .map { entities -> entities.map { it.toDomain() }.toImmutableList() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
+
+    /** Runs in flight right now, so the Run Log can show and stop them. */
+    val activeExecutions: StateFlow<ImmutableList<ActiveExecution>> = ActiveExecutionRegistry.active
+        .map { it.toImmutableList() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
+
+    fun cancelExecution(executionId: Long) {
+        viewModelScope.launch {
+            val cancelled = ActiveExecutionRegistry.cancel(executionId)
+            events.send(if (cancelled) "Cancelling automation" else "That automation already finished")
+        }
+    }
 
     val globalVariables: StateFlow<ImmutableList<Variable>> = variableRepository
         .observeGlobals()

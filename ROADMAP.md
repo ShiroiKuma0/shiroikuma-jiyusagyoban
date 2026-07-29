@@ -369,13 +369,6 @@ direct fixes shipped in v0.2.76 across the engine, actions, context, UI, and the
   Acceptance: Every dropdown is a real selector with stable stored values; numbers enforce documented ranges/types; task/app/file fields use dedicated pickers; invalid configurations cannot save; editing and saving an action preserves unknown arguments byte-for-byte; registry tests require a renderer and validator for every field.
   Complexity: M
 
-- [ ] P1 — Show active executions and support cooperative cancellation
-  Why: `AutomationService` tracks running jobs privately while the UI exposes only completed logs, leaving users unable to identify or stop a runaway automation.
-  Evidence: `app/src/main/java/com/opentasker/core/engine/AutomationService.kt:117-118,162-181`; `TaskRunner.kt`; `ui/screens/RunLogScreenContent.kt`; https://github.com/ChaoMixian/vFlow/issues/67.
-  Touches: execution registry/state flow, task-runner step reporting, cancellation propagation through sub-tasks/network/scripts/delays, active-runs UI, run-log outcomes/tests.
-  Acceptance: Active task/profile/source/start time/current step are visible; Cancel reaches nested and bounded blocking actions, runs cleanup, and records a terminal `Cancelled` outcome; completed jobs disappear without leaks; tests cover parallel, queued, nested, timeout, and cancel races without claiming pause or rewind.
-  Complexity: M
-
 ### P2 — Later: observability, precision, and staged modernization
 
 - [ ] P2 — Paginate and export every retained run log

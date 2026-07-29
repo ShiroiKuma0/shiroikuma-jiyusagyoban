@@ -6,6 +6,9 @@ enum class RunLogOutcome(val label: String) {
     Succeeded("Succeeded"),
     Failed("Failed"),
     Skipped("Skipped"),
+
+    /** The run started and was stopped on purpose; distinct from a run that never started. */
+    Cancelled("Cancelled"),
 }
 
 data class RunLogDiagnostics(
@@ -17,6 +20,9 @@ data class RunLogDiagnostics(
 ) {
     val isSkipped: Boolean
         get() = decision.equals(SKIPPED_DECISION, ignoreCase = true)
+
+    val isCancelled: Boolean
+        get() = decision.equals(CANCELLED_DECISION, ignoreCase = true)
 }
 
 data class RunLogActionDiagnostic(
@@ -51,6 +57,7 @@ data class RunLogTemplateDiagnostic(
 fun RunLogEntry.outcome(): RunLogOutcome {
     val diagnostics = message.toRunLogDiagnostics()
     return when {
+        diagnostics.isCancelled -> RunLogOutcome.Cancelled
         diagnostics.isSkipped -> RunLogOutcome.Skipped
         success -> RunLogOutcome.Succeeded
         else -> RunLogOutcome.Failed
@@ -77,6 +84,24 @@ fun skippedRunLogMessage(
 ): String = buildList {
     add("Source: ${source.trim()}")
     add("Decision: $SKIPPED_DECISION")
+    add("Reason: ${reason.trim()}")
+    metadata
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .forEach(::add)
+}.joinToString("\n")
+
+/**
+ * A run that started and was stopped on purpose. Kept distinct from the skipped message so the
+ * Run Log can tell "never ran" apart from "was running and I stopped it".
+ */
+fun cancelledRunLogMessage(
+    source: String,
+    reason: String,
+    metadata: List<String> = emptyList(),
+): String = buildList {
+    add("Source: ${source.trim()}")
+    add("Decision: $CANCELLED_DECISION")
     add("Reason: ${reason.trim()}")
     metadata
         .map { it.trim() }
@@ -231,4 +256,5 @@ private const val VARIABLE_CHANGE_SPLIT_LIMIT = 5
 private const val TEMPLATE_TRACE_MIN_FIELD_COUNT = 5
 private const val TEMPLATE_TRACE_SPLIT_LIMIT = 6
 private const val SKIPPED_DECISION = "Skipped"
+private const val CANCELLED_DECISION = "Cancelled"
 private const val LEGACY_EXTERNAL_SOURCE = "External intent"

@@ -244,6 +244,7 @@ fun ActiveAutomationUi(
     val tasks by viewModel.tasks.collectAsState()
     val scenes by viewModel.scenes.collectAsState()
     val runLogs by viewModel.runLogs.collectAsState()
+    val activeExecutions by viewModel.activeExecutions.collectAsState()
     val globalVariables by viewModel.globalVariables.collectAsState()
     val runLogRetentionPolicy by viewModel.runLogRetentionPolicy.collectAsState()
     val backupSetupState by viewModel.backupSetupState.collectAsState()
@@ -751,6 +752,8 @@ fun ActiveAutomationUi(
                 onRetentionPolicyChange = viewModel::updateRunLogRetention,
                 onShareDiagnostic = viewModel::shareDiagnosticReport,
                 contentPadding = innerPadding,
+                activeExecutions = activeExecutions,
+                onCancelExecution = viewModel::cancelExecution,
             )
 
             OpenTaskerScreen.Diagnostics -> DiagnosticsScreen(

@@ -13,7 +13,11 @@ import com.opentasker.core.storage.RuntimeVariableSeed
 import com.opentasker.core.storage.RuntimeVariableValue
 import com.opentasker.core.storage.VariableRepository
 import com.opentasker.core.storage.toEntity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 
 data class TaskExecutionResult(
@@ -70,8 +74,50 @@ suspend fun executeAndLogTask(
         variables = variables,
         audioEligibility = audioEligibility,
     ) { msg -> AppLogger.info(logTag, msg) }
-    val runner = TaskRunner(ctx, resolveTask = dbSubTaskResolver(db))
-    val report = runner.run(task)
+    // Publish the run so it is visible and cancellable while it is in flight. Cancellation
+    // unwinds this coroutine tree (including nested task.run sub-tasks and any bounded blocking
+    // action suspended inside it) and is recorded as a terminal Cancelled outcome below.
+    val executionId = ActiveExecutionRegistry.register(
+        taskId = task.id,
+        taskName = task.name,
+        source = source,
+        job = currentCoroutineContext()[Job],
+        startedAtMs = System.currentTimeMillis(),
+    )
+    val runner = TaskRunner(
+        ctx,
+        resolveTask = dbSubTaskResolver(db),
+        onStep = { index, label -> ActiveExecutionRegistry.reportStep(executionId, index, label) },
+    )
+    val report = try {
+        runner.run(task)
+    } catch (cancellation: CancellationException) {
+        // withContext(NonCancellable): the surrounding scope is already cancelled, so an ordinary
+        // suspending write here would be dropped and the run would vanish without a trace.
+        withContext(NonCancellable) {
+            ActiveExecutionRegistry.unregister(executionId)
+            insertRunLog(
+                db,
+                RunLogEntry(
+                    taskId = task.id,
+                    taskName = task.name,
+                    timestamp = System.currentTimeMillis(),
+                    durationMs = 0,
+                    success = false,
+                    message = cancelledRunLogMessage(
+                        source = source,
+                        reason = cancellation.message ?: ActiveExecutionRegistry.CANCELLED_BY_USER,
+                        metadata = metadata,
+                    ),
+                    source = RunLogSource.classify(source).key,
+                    sourceLabel = RunLogSource.classify(source).label,
+                ),
+            )
+        }
+        throw cancellation
+    } finally {
+        ActiveExecutionRegistry.unregister(executionId)
+    }
     val globalCommitMetadata = persistChangedGlobals(
         variableRepository,
         persistedBaseline,

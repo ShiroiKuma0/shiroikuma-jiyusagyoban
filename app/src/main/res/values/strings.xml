@@ -50,6 +50,10 @@
     <string name="status_succeeded">Succeeded</string>
     <string name="status_failed">Failed</string>
     <string name="status_skipped">Skipped</string>
+    <string name="status_cancelled">Cancelled</string>
+    <string name="run_log_active_execution_detail">%1$s · step %2$d: %3$s · %4$ds elapsed</string>
+    <string name="run_log_active_execution_starting">starting</string>
+    <string name="run_log_active_execution_cancelling">Cancelling…</string>
     <string name="status_detected">Detected</string>
     <string name="status_optional">Optional</string>
     <string name="status_needs_setup">Needs setup</string>
