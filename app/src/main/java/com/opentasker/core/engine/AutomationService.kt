@@ -136,7 +136,7 @@ class AutomationService : Service() {
     
     private val cooldownStore by lazy { CooldownStore(this) }
     private val matchers = Collections.synchronizedMap(mutableMapOf<Long, ProfileMatcher>())
-    private val profileCooldowns = Collections.synchronizedMap(mutableMapOf<Long, Long>()) // profileId -> cooldownUntilMs
+    private val cooldowns = CooldownReservations(persist = { profileId, deadline -> cooldownStore.set(profileId, deadline) })
     private val matcherJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>()) // Track jobs for cleanup
     private val profileTaskJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>())
     private val queuedProfileTasks = Collections.synchronizedMap(mutableMapOf<Long, ArrayDeque<Task>>())
@@ -158,7 +158,7 @@ class AutomationService : Service() {
                 delay(ENGINE_HEARTBEAT_INTERVAL_MS)
             }
         }
-        profileCooldowns.putAll(cooldownStore.loadAll())
+        cooldowns.seed(cooldownStore.loadAll())
         scope.launch { pruneRunLogs(force = true) }
         observeProfileRegistry()
     }
@@ -249,7 +249,7 @@ class AutomationService : Service() {
         taskJobSnapshot.forEach { it.cancel() }
         matcherJobs.clear()
         matchers.clear()
-        profileCooldowns.clear()
+        cooldowns.clear()
         profileTaskJobs.clear()
         queuedProfileTasks.clear()
         engineHeartbeatStore.recordStopped()
@@ -403,91 +403,72 @@ class AutomationService : Service() {
         isExit: Boolean,
     ) {
         val slot = taskSlotKey(profile.id, isExit)
-        when (profile.automationMode) {
-            AutomationMode.SINGLE -> {
-                if (profileTaskJobs[slot]?.isActive == true) {
-                    AppLogger.info(TAG, "Profile ${profile.id} already running; SINGLE mode skipped retrigger")
-                    logProfileSkippedRun(profile, task, "Profile is already running in SINGLE mode.")
-                    return
-                }
-                if (!isExit) {
-                    val reservation = reserveCooldown(profile.id, profile.cooldownSec)
-                    if (!reservation.accepted) {
-                        logCooldownSkip(profile, task, reservation.remainingMs)
-                        return
-                    }
-                }
-                profileTaskJobs[slot] = launchTrackedTask(profile, slot, task)
-            }
 
-            AutomationMode.RESTART -> {
-                if (!isExit) {
-                    val reservation = reserveCooldown(profile.id, profile.cooldownSec)
-                    if (!reservation.accepted) {
-                        logCooldownSkip(profile, task, reservation.remainingMs)
-                        return
-                    }
+        // QUEUED decides and enqueues under one lock so a task can never be appended to a queue
+        // whose consumer has already decided to exit (which would strand it unrun). The other
+        // modes have no shared queue state to protect.
+        val plan = if (profile.automationMode == AutomationMode.QUEUED) {
+            synchronized(queuedProfileTasks) {
+                val decision = TaskDispatchPolicy.plan(
+                    mode = profile.automationMode,
+                    isExit = isExit,
+                    slotActive = profileTaskJobs[slot]?.isActive == true,
+                    queuedCount = queuedProfileTasks[slot]?.size ?: 0,
+                    queueCap = MAX_QUEUED_TASKS,
+                )
+                if (decision.step == DispatchStep.ENQUEUE) {
+                    queuedProfileTasks.getOrPut(slot) { ArrayDeque() }.add(task)
                 }
+                decision
+            }
+        } else {
+            TaskDispatchPolicy.plan(
+                mode = profile.automationMode,
+                isExit = isExit,
+                slotActive = profileTaskJobs[slot]?.isActive == true,
+            )
+        }
+
+        when (plan.step) {
+            DispatchStep.SKIP_ALREADY_RUNNING -> {
+                AppLogger.info(TAG, "Profile ${profile.id} already running; SINGLE mode skipped retrigger")
+                logProfileSkippedRun(profile, task, "Profile is already running in SINGLE mode.")
+                return
+            }
+            DispatchStep.SKIP_QUEUE_FULL -> {
+                AppLogger.warn(TAG, "Profile ${profile.id} queue full ($MAX_QUEUED_TASKS), dropping retrigger")
+                logProfileSkippedRun(profile, task, "Task queue is full ($MAX_QUEUED_TASKS pending).")
+                return
+            }
+            DispatchStep.ENQUEUE -> {
+                AppLogger.info(TAG, "Profile ${profile.id} queued retrigger")
+                return
+            }
+            else -> Unit
+        }
+
+        if (plan.reservesCooldown) {
+            val reservation = reserveCooldown(profile.id, profile.cooldownSec)
+            if (!reservation.accepted) {
+                logCooldownSkip(profile, task, reservation.remainingMs)
+                return
+            }
+        }
+
+        when (plan.step) {
+            DispatchStep.START -> profileTaskJobs[slot] = launchTrackedTask(profile, slot, task)
+            DispatchStep.RESTART -> {
                 profileTaskJobs[slot]?.cancel()
                 profileTaskJobs[slot] = launchTrackedTask(profile, slot, task)
             }
-
-            AutomationMode.QUEUED -> {
-                // The queue check, enqueue, and the consumer's drain-or-deregister decision all
-                // synchronize on queuedProfileTasks, so a task can never be enqueued into a queue
-                // whose consumer has already decided to exit (which would strand it unrun).
-                val outcome = synchronized(queuedProfileTasks) {
-                    if (profileTaskJobs[slot]?.isActive == true) {
-                        val queue = queuedProfileTasks.getOrPut(slot) { ArrayDeque() }
-                        if (queue.size >= MAX_QUEUED_TASKS) {
-                            QueueOutcome.FULL
-                        } else {
-                            queue.add(task)
-                            QueueOutcome.QUEUED
-                        }
-                    } else {
-                        QueueOutcome.START
-                    }
-                }
-                when (outcome) {
-                    QueueOutcome.FULL -> {
-                        AppLogger.warn(TAG, "Profile ${profile.id} queue full ($MAX_QUEUED_TASKS), dropping retrigger")
-                        logProfileSkippedRun(profile, task, "Task queue is full ($MAX_QUEUED_TASKS pending).")
-                    }
-                    QueueOutcome.QUEUED -> AppLogger.info(TAG, "Profile ${profile.id} queued retrigger")
-                    QueueOutcome.START -> {
-                        // Reserve cooldown only when actually starting a fresh run, not when a
-                        // trigger queues behind a running task. Reserving at enqueue time dropped
-                        // a later distinct trigger as "cooldown active" that should have queued.
-                        if (!isExit) {
-                            val reservation = reserveCooldown(profile.id, profile.cooldownSec)
-                            if (!reservation.accepted) {
-                                logCooldownSkip(profile, task, reservation.remainingMs)
-                                return
-                            }
-                        }
-                        profileTaskJobs[slot] = launchQueuedTasks(profile, slot, task)
-                    }
-                }
-            }
-
-            AutomationMode.PARALLEL -> {
-                if (!isExit) {
-                    val reservation = reserveCooldown(profile.id, profile.cooldownSec)
-                    if (!reservation.accepted) {
-                        logCooldownSkip(profile, task, reservation.remainingMs)
-                        return
-                    }
-                }
-                scope.launch { runTask(task, profile) }
-            }
+            DispatchStep.START_QUEUE -> profileTaskJobs[slot] = launchQueuedTasks(profile, slot, task)
+            DispatchStep.LAUNCH_PARALLEL -> scope.launch { runTask(task, profile) }
+            else -> Unit
         }
     }
 
     /** Profile ids are positive Room autogenerated keys, so -id is a collision-free exit slot. */
     private fun taskSlotKey(profileId: Long, isExit: Boolean): Long = if (isExit) -profileId else profileId
-
-    private enum class QueueOutcome { START, QUEUED, FULL }
 
     private fun launchTrackedTask(profile: Profile, slot: Long, task: Task): Job =
         scope.launch(start = CoroutineStart.DEFAULT) {
@@ -649,20 +630,11 @@ class AutomationService : Service() {
     }
 
     private fun reserveCooldown(profileId: Long, cooldownSec: Int): CooldownReservation {
-        val now = System.currentTimeMillis()
-        synchronized(profileCooldowns) {
-            val cooldownUntil = profileCooldowns[profileId] ?: 0
-            if (now < cooldownUntil) {
-                AppLogger.info(TAG, "Profile $profileId on cooldown, skipping")
-                return CooldownReservation(accepted = false, remainingMs = cooldownUntil - now)
-            }
-            if (cooldownSec > 0) {
-                val deadline = now + (cooldownSec * 1000L)
-                profileCooldowns[profileId] = deadline
-                cooldownStore.set(profileId, deadline)
-            }
-            return CooldownReservation(accepted = true)
+        val reservation = cooldowns.reserve(profileId, cooldownSec)
+        if (!reservation.accepted) {
+            AppLogger.info(TAG, "Profile $profileId on cooldown, skipping")
         }
+        return reservation
     }
 
     private fun profileRunMetadata(profile: Profile): List<String> = buildList {
@@ -771,7 +743,3 @@ internal fun profileRegistrySignature(profiles: List<ProfileEntity>): List<Strin
         }
         .toList()
 
-private data class CooldownReservation(
-    val accepted: Boolean,
-    val remainingMs: Long = 0,
-)

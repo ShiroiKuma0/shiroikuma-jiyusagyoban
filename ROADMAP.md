@@ -160,13 +160,6 @@ direct fixes shipped in v0.2.76 across the engine, actions, context, UI, and the
   Complexity: M
 
 
-- [ ] P1 — Add behavioral test coverage for automation-mode dispatch, cooldown, and per-action execution
-  Why: The most correctness-sensitive engine code — SINGLE/RESTART/QUEUED/PARALLEL dispatch, cooldown reservation, and queue-cap logic — plus concrete action implementations have only source-level or cross-cutting guard tests.
-  Evidence: `app/src/main/java/com/opentasker/core/engine/AutomationService.kt` (`dispatchTask`); `app/src/main/java/com/opentasker/core/engine/TaskExecutionHelper.kt`; `app/src/main/java/com/opentasker/core/engine/CooldownStore.kt`; existing `ActionGuardsTest`/`PermissionDenialTest`
-  Touches: JVM/instrumented tests for automation modes, cooldown races, queue caps, and representative actions in `BuiltInActions`/`NetworkActions`/`SystemActions`.
-  Acceptance: Tests cover each automation mode's concurrency behavior, cooldown reservation under re-trigger, queue-cap enforcement, and success/failure paths for a representative action per family; a race regression is reproduced and locked.
-  Complexity: M
-
 - [ ] P2 — Add HTML support to the data.read action
   Why: data.read parses JSON/CSV/XML on-device, but HTML extraction still needs a real parser (jsoup), which is a dependency + F-Droid-policy decision deferred from the original reader item.
   Evidence: `app/src/main/java/com/opentasker/core/data/StructuredDataReader.kt`; https://jsoup.org/
