@@ -467,13 +467,6 @@ As of 2026-07-29, the app sets `targetSdk = 37`; the P1 items below are mandator
   Acceptance: Configured global and per-profile concurrency/burst limits bound every mode; repeated direct cycles trip a persisted cooldown/circuit state and log the causal chain; the analyzer warns only on explainable high-confidence feedback/data-to-power paths with an explicit acknowledgement; ordinary independent profiles remain unaffected.
   Complexity: L
 
-- [ ] P1 — Broker external task runs outside the broadcast lifetime
-  Why: `AutomationTargetReceiver` holds `goAsync()` until the entire task finishes, but Android expects broadcast work to complete in roughly 10 seconds and tasks may wait for 30 minutes.
-  Evidence: `app/src/main/java/com/opentasker/core/external/AutomationTargetReceiver.kt:50-95`; `app/src/main/java/com/opentasker/core/actions/NotificationActionReceiver.kt`; `app/src/main/java/com/opentasker/core/actions/BuiltInActions.kt:304-327`; https://developer.android.com/develop/background-work/background-tasks/broadcasts.
-  Touches: versioned external contract, `AutomationTargetReceiver`, `AutomationService`, execution IDs/status storage (reuse the active-execution registry item), Locale fire bridge, manifest, IPC/service tests.
-  Acceptance: A versioned asynchronous run request authenticates and validates, enqueues to service-owned execution, returns `accepted` plus an execution ID, and finishes promptly without claiming terminal success; callers can query terminal status by ID and the normal redacted Run Log records it; legacy callers get an explicit protocol response; a task waiting longer than 10 seconds survives receiver completion; unknown/unauthorized callers remain denied.
-  Complexity: M
-
 - [ ] P1 — Derive Setup requirements from enabled automations
   Why: Setup presents a broad platform checklist even for an empty workspace, obscuring the difference between a blocker for an enabled profile, an optional integration, and a reliability optimization.
   Evidence: `app/src/main/java/com/opentasker/ui/screens/PermissionOnboardingScreen.kt`; `app/src/main/java/com/opentasker/core/capabilities/ActionCapabilities.kt`; registered context-source requirements; Android in-context permission guidance.

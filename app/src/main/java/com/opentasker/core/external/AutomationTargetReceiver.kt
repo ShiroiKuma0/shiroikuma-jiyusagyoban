@@ -6,7 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import com.opentasker.app.OpenTaskerApp_NoHilt
-import com.opentasker.core.engine.executeAndLogTask
+import androidx.core.content.ContextCompat
+import com.opentasker.core.engine.AutomationService
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.storage.toEntity
 import kotlinx.coroutines.CoroutineScope
@@ -20,6 +21,18 @@ object AutomationTargetContract {
     const val ACTION_RUN_TASK = "com.opentasker.action.RUN_TASK"
     const val ACTION_SET_PROFILE_ENABLED = "com.opentasker.action.SET_PROFILE_ENABLED"
     const val ACTION_QUERY_STATUS = "com.opentasker.action.QUERY_STATUS"
+    const val ACTION_QUERY_EXECUTION = "com.opentasker.action.QUERY_EXECUTION"
+
+    /**
+     * Protocol version a RUN_TASK caller must declare.
+     *
+     * v1 held the broadcast open with goAsync() until the whole task finished and returned its
+     * terminal success. Android expects broadcast work to finish in roughly 10 seconds while a
+     * task can wait up to 30 minutes, so a v1 caller was reading a result the system could kill
+     * mid-run. v2 validates, enqueues to the foreground service, and returns "accepted" plus an
+     * execution id the caller polls with ACTION_QUERY_EXECUTION.
+     */
+    const val PROTOCOL_VERSION = 2
 
     const val EXTRA_TASK_ID = "com.opentasker.extra.TASK_ID"
     const val EXTRA_TASK_NAME = "com.opentasker.extra.TASK_NAME"
@@ -35,6 +48,11 @@ object AutomationTargetContract {
     const val EXTRA_TASK_COUNT = "com.opentasker.extra.TASK_COUNT"
     const val EXTRA_PROFILE_COUNT = "com.opentasker.extra.PROFILE_COUNT"
     const val EXTRA_ENABLED_PROFILE_COUNT = "com.opentasker.extra.ENABLED_PROFILE_COUNT"
+    const val EXTRA_PROTOCOL_VERSION = "com.opentasker.extra.PROTOCOL_VERSION"
+    const val EXTRA_ACCEPTED = "com.opentasker.extra.ACCEPTED"
+    const val EXTRA_EXECUTION_ID = "com.opentasker.extra.EXECUTION_ID"
+    const val EXTRA_EXECUTION_STATE = "com.opentasker.extra.EXECUTION_STATE"
+    const val EXTRA_EXECUTION_TERMINAL = "com.opentasker.extra.EXECUTION_TERMINAL"
 
     const val VARIABLE_EXTRA_PREFIX = "com.opentasker.var."
     private val variableNamePattern = Regex("^[A-Za-z][A-Za-z0-9_]{0,63}$")
@@ -56,6 +74,7 @@ class AutomationTargetReceiver : BroadcastReceiver() {
                     AutomationTargetContract.ACTION_RUN_TASK -> runTask(context.applicationContext, intent)
                     AutomationTargetContract.ACTION_SET_PROFILE_ENABLED -> setProfileEnabled(intent)
                     AutomationTargetContract.ACTION_QUERY_STATUS -> queryStatus(intent)
+                    AutomationTargetContract.ACTION_QUERY_EXECUTION -> queryExecution(context.applicationContext, intent)
                     else -> failure("Unsupported action: ${intent.action}")
                 }
             }.getOrElse { failure(it.message ?: "Automation target request failed") }
@@ -70,27 +89,103 @@ class AutomationTargetReceiver : BroadcastReceiver() {
         }
     }
 
+    /**
+     * Validates and hands the run to the foreground service, then returns immediately.
+     *
+     * The receiver never waits for the task: a run that outlives the broadcast window would be
+     * killed mid-task with no run-log entry, and returning its "success" from inside that window
+     * meant returning a result that had not happened yet.
+     */
     private suspend fun runTask(appContext: Context, intent: Intent): TargetResponse {
-        val db = OpenTaskerApp_NoHilt.db
+        val requestedVersion = intent.getIntExtra(AutomationTargetContract.EXTRA_PROTOCOL_VERSION, 0)
+        if (requestedVersion != AutomationTargetContract.PROTOCOL_VERSION) {
+            return failure(
+                "RUN_TASK requires ${AutomationTargetContract.EXTRA_PROTOCOL_VERSION}=" +
+                    "${AutomationTargetContract.PROTOCOL_VERSION}. Runs are asynchronous: the reply " +
+                    "carries an execution id to poll with ${AutomationTargetContract.ACTION_QUERY_EXECUTION}, " +
+                    "not a task result.",
+                extras = Bundle().apply {
+                    putInt(AutomationTargetContract.EXTRA_PROTOCOL_VERSION, AutomationTargetContract.PROTOCOL_VERSION)
+                },
+            )
+        }
+
         val task = resolveTask(intent)
             ?: return failure("Task not found. Provide ${AutomationTargetContract.EXTRA_TASK_ID} or ${AutomationTargetContract.EXTRA_TASK_NAME}.")
 
         val suppliedVariables = extractVariables(intent.extras)
-        val result = executeAndLogTask(
-            appContext = appContext,
-            db = db,
-            task = task,
-            source = "External intent",
-            metadata = listOf("Variables: ${suppliedVariables.size} provided"),
-            initialVariables = suppliedVariables,
-            logTag = TAG,
-        )
+        val executionId = ExternalExecutions.accept(appContext, task.id, task.name)
 
+        val serviceIntent = Intent(appContext, AutomationService::class.java).apply {
+            action = AutomationService.ACTION_RUN_EXTERNAL_TASK
+            putExtra(AutomationTargetContract.EXTRA_EXECUTION_ID, executionId)
+            putExtra(AutomationTargetContract.EXTRA_TASK_ID, task.id)
+            suppliedVariables.forEach { (name, value) ->
+                putExtra(AutomationTargetContract.VARIABLE_EXTRA_PREFIX + name, value)
+            }
+        }
+        return try {
+            ContextCompat.startForegroundService(appContext, serviceIntent)
+            TargetResponse(
+                Activity.RESULT_OK,
+                Bundle().apply {
+                    putInt(AutomationTargetContract.EXTRA_PROTOCOL_VERSION, AutomationTargetContract.PROTOCOL_VERSION)
+                    putBoolean(AutomationTargetContract.EXTRA_ACCEPTED, true)
+                    putString(AutomationTargetContract.EXTRA_EXECUTION_ID, executionId)
+                    putString(
+                        AutomationTargetContract.EXTRA_EXECUTION_STATE,
+                        ExternalExecutionState.ACCEPTED.name,
+                    )
+                    putBoolean(AutomationTargetContract.EXTRA_EXECUTION_TERMINAL, false)
+                },
+            )
+        } catch (e: Exception) {
+            ExternalExecutions.update(
+                appContext,
+                executionId,
+                ExternalExecutionState.FAILED,
+                error = "Engine service could not be started",
+            )
+            failure("Engine service could not be started: ${e.message}")
+        }
+    }
+
+    private fun queryExecution(appContext: Context, intent: Intent): TargetResponse {
+        val executionId = intent.getStringExtra(AutomationTargetContract.EXTRA_EXECUTION_ID)
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: return failure("Provide ${AutomationTargetContract.EXTRA_EXECUTION_ID}.")
+
+        val record = ExternalExecutions.get(appContext, executionId)
+        val state = record?.state ?: ExternalExecutionState.UNKNOWN
         return TargetResponse(
-            if (result.report.success) Activity.RESULT_OK else Activity.RESULT_CANCELED,
+            // An unknown id is a caller error, not a task failure; a still-running execution is a
+            // valid answer, so only a genuinely failed run reports CANCELED.
+            if (state == ExternalExecutionState.UNKNOWN || state == ExternalExecutionState.FAILED) {
+                Activity.RESULT_CANCELED
+            } else {
+                Activity.RESULT_OK
+            },
             Bundle().apply {
-                putBoolean(AutomationTargetContract.EXTRA_TASK_SUCCESS, result.report.success)
-                putLong(AutomationTargetContract.EXTRA_TASK_DURATION_MS, result.report.durationMs)
+                putInt(AutomationTargetContract.EXTRA_PROTOCOL_VERSION, AutomationTargetContract.PROTOCOL_VERSION)
+                putString(AutomationTargetContract.EXTRA_EXECUTION_ID, executionId)
+                putString(AutomationTargetContract.EXTRA_EXECUTION_STATE, state.name)
+                putBoolean(AutomationTargetContract.EXTRA_EXECUTION_TERMINAL, state.isTerminal)
+                record?.let {
+                    putLong(AutomationTargetContract.EXTRA_TASK_ID, it.taskId)
+                    putLong(AutomationTargetContract.EXTRA_TASK_DURATION_MS, it.durationMs)
+                    putBoolean(
+                        AutomationTargetContract.EXTRA_TASK_SUCCESS,
+                        it.state == ExternalExecutionState.SUCCEEDED,
+                    )
+                    it.error?.let { error -> putString(AutomationTargetContract.EXTRA_ERROR, error) }
+                }
+                if (record == null) {
+                    putString(
+                        AutomationTargetContract.EXTRA_ERROR,
+                        "Unknown execution id (never issued, or aged out of the retained results).",
+                    )
+                }
             },
         )
     }
@@ -180,11 +275,11 @@ class AutomationTargetReceiver : BroadcastReceiver() {
             .toMap()
     }
 
-    private fun failure(message: String): TargetResponse {
+    private fun failure(message: String, extras: Bundle = Bundle()): TargetResponse {
         AppLogger.warn(TAG, message)
         return TargetResponse(
             Activity.RESULT_CANCELED,
-            Bundle().apply { putString(AutomationTargetContract.EXTRA_ERROR, message) },
+            extras.apply { putString(AutomationTargetContract.EXTRA_ERROR, message) },
         )
     }
 

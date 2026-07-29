@@ -211,6 +211,7 @@
                 <action android:name="com.opentasker.action.RUN_TASK" />
                 <action android:name="com.opentasker.action.SET_PROFILE_ENABLED" />
                 <action android:name="com.opentasker.action.QUERY_STATUS" />
+                <action android:name="com.opentasker.action.QUERY_EXECUTION" />
             </intent-filter>
         </receiver>
 

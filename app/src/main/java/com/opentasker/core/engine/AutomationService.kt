@@ -22,6 +22,9 @@ import com.opentasker.automation.network.WiFiNetworkMonitor
 import com.opentasker.automation.sensor.ShakeDetector
 import com.opentasker.automation.scheduler.TimeEventScheduler
 import com.opentasker.core.actions.NotificationActionReceiver
+import com.opentasker.core.external.AutomationTargetContract
+import com.opentasker.core.external.ExternalExecutionState
+import com.opentasker.core.external.ExternalExecutions
 import com.opentasker.core.actions.NotificationTaskBindings
 import com.opentasker.core.actions.NotificationTaskCandidate
 import com.opentasker.core.actions.NotificationTaskReference
@@ -159,6 +162,9 @@ class AutomationService : Service() {
             }
         }
         cooldowns.seed(cooldownStore.loadAll())
+        // Executions that were accepted or in flight when the process died can never finish; a
+        // caller polling them would otherwise wait forever on a non-terminal state.
+        ExternalExecutions.failInterrupted(this)
         scope.launch { pruneRunLogs(force = true) }
         observeProfileRegistry()
     }
@@ -203,6 +209,18 @@ class AutomationService : Service() {
                 ?: legacyName?.let { NotificationTaskReference.LegacyName(it) }
             if (reference != null) {
                 scope.launch { runNotificationTask(reference, buttonLabel) }
+            }
+            return START_STICKY
+        }
+        if (intent?.action == ACTION_RUN_EXTERNAL_TASK) {
+            // Same reason as notification-button runs: the external RUN_TASK broadcast cannot hold
+            // its window open for a task that may wait minutes, so the receiver validates and
+            // hands the run here, where the foreground service owns it to completion.
+            val executionId = intent.getStringExtra(AutomationTargetContract.EXTRA_EXECUTION_ID)
+            val taskId = intent.getLongExtra(AutomationTargetContract.EXTRA_TASK_ID, -1L).takeIf { it > 0 }
+            val variables = externalVariables(intent)
+            if (executionId != null && taskId != null) {
+                scope.launch { runExternalTask(executionId, taskId, variables) }
             }
             return START_STICKY
         }
@@ -538,6 +556,66 @@ class AutomationService : Service() {
         }
     }
 
+    /** Variable extras a validated external request forwarded, already name-checked and capped. */
+    private fun externalVariables(intent: Intent): Map<String, String> {
+        val extras = intent.extras ?: return emptyMap()
+        return extras.keySet()
+            .asSequence()
+            .filter { it.startsWith(AutomationTargetContract.VARIABLE_EXTRA_PREFIX) }
+            .mapNotNull { key ->
+                val name = key.removePrefix(AutomationTargetContract.VARIABLE_EXTRA_PREFIX)
+                if (!AutomationTargetContract.isValidVariableName(name)) return@mapNotNull null
+                extras.getString(key)?.let { name to it }
+            }
+            .toMap()
+    }
+
+    private suspend fun runExternalTask(executionId: String, taskId: Long, variables: Map<String, String>) {
+        fun fail(reason: String) {
+            AppLogger.warn(TAG, "External execution $executionId failed: $reason")
+            ExternalExecutions.update(this, executionId, ExternalExecutionState.FAILED, error = reason)
+        }
+
+        try {
+            val entity = db.taskDao().getById(taskId) ?: return fail("Task $taskId no longer exists.")
+            val decoded = entity.toDomainDecodeResult()
+            decoded.issue?.let { issue ->
+                val reason = issue.recoveryMessage()
+                logSkippedRun(
+                    db = db,
+                    task = decoded.value,
+                    source = EXTERNAL_RUN_SOURCE,
+                    reason = reason,
+                    metadata = listOf("execution=$executionId"),
+                )
+                return fail(reason)
+            }
+            ExternalExecutions.update(this, executionId, ExternalExecutionState.RUNNING)
+            val result = executeAndLogTask(
+                appContext = this,
+                db = db,
+                task = decoded.value,
+                source = EXTERNAL_RUN_SOURCE,
+                metadata = listOf("execution=$executionId", "Variables: ${variables.size} provided"),
+                initialVariables = variables,
+                audioForegroundService = audioForegroundServiceEligibility,
+                logTag = TAG,
+            )
+            ExternalExecutions.update(
+                context = this,
+                executionId = executionId,
+                state = if (result.report.success) ExternalExecutionState.SUCCEEDED else ExternalExecutionState.FAILED,
+                durationMs = result.report.durationMs,
+                error = if (result.report.success) null else "Task reported a failure; see the run log.",
+            )
+        } catch (e: CancellationException) {
+            ExternalExecutions.update(this, executionId, ExternalExecutionState.FAILED, error = "The run was cancelled.")
+            throw e
+        } catch (e: Exception) {
+            fail(e.message ?: "The run threw an unexpected error.")
+        }
+    }
+
     private suspend fun runNotificationTask(reference: NotificationTaskReference, buttonLabel: String) {
         try {
             val entities = when (reference) {
@@ -711,6 +789,8 @@ class AutomationService : Service() {
         const val ACTION_BOOT_COMPLETED_TRIGGER = "com.opentasker.action.BOOT_COMPLETED_TRIGGER"
         const val ACTION_TIME_TICK_TRIGGER = "com.opentasker.action.TIME_TICK_TRIGGER"
         const val ACTION_RUN_NOTIFICATION_TASK = "com.opentasker.action.RUN_NOTIFICATION_TASK"
+        const val ACTION_RUN_EXTERNAL_TASK = "com.opentasker.action.RUN_EXTERNAL_TASK"
+        const val EXTERNAL_RUN_SOURCE = "External intent"
         const val EXTRA_STARTED_FROM_VISIBLE_UI = "com.opentasker.extra.STARTED_FROM_VISIBLE_UI"
         private const val CHANNEL = "opentasker.engine"
         private const val NOTIF_ID = 1001
