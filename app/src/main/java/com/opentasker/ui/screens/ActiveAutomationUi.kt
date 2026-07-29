@@ -352,6 +352,16 @@ fun ActiveAutomationUi(
     }
     val importedProfileReview = importedProfileReviewId.takeIf { it != NO_DIALOG_ENTITY_ID }
         ?.let { profileId -> profiles.firstOrNull { it.id == profileId } }
+
+    // Task deletes are gated on a dependency scan: a task referenced by a profile, another task's
+    // `task.run`/notification button, or a scene gesture needs an explicit reassign-or-clear
+    // decision before it can go away, so the plain confirmation dialog is not enough.
+    val pendingTaskDelete = (pendingDelete as? DeleteTarget.TaskTarget)?.task
+    var taskDeletionPreview by remember { mutableStateOf<TaskDeletionPreview?>(null) }
+    LaunchedEffect(pendingTaskDelete?.id, tasks, profiles, scenes) {
+        taskDeletionPreview = pendingTaskDelete?.let { viewModel.taskDeletionPreview(it) }
+    }
+
     fun clearPendingDelete() {
         pendingDeleteKind = null
         pendingDeleteOwnerId = NO_DIALOG_ENTITY_ID
@@ -752,7 +762,22 @@ fun ActiveAutomationUi(
         }
     }
 
-    pendingDelete?.let { target ->
+    val blockedTaskDelete = taskDeletionPreview
+        ?.takeIf { preview -> preview.hasDependents && preview.task.id == pendingTaskDelete?.id }
+
+    blockedTaskDelete?.let { preview ->
+        TaskDeleteReferencesDialog(
+            preview = preview,
+            tasks = tasks,
+            onDismiss = { clearPendingDelete() },
+            onConfirm = { resolution ->
+                viewModel.deleteTask(preview.task, resolution)
+                clearPendingDelete()
+            },
+        )
+    }
+
+    pendingDelete?.takeIf { blockedTaskDelete == null }?.let { target ->
         DeleteConfirmationDialog(
             target = target,
             onDismiss = { clearPendingDelete() },

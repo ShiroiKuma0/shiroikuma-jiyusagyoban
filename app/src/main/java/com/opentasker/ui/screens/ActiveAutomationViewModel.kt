@@ -26,6 +26,10 @@ import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.logging.AppLogEntry
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.plugins.locale.LocaleGrantStore
+import com.opentasker.core.references.AutomationReferenceIndex
+import com.opentasker.core.references.AutomationReferenceRewriter
+import com.opentasker.core.references.ReferenceResolution
+import com.opentasker.core.references.TaskReference
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.EditHistoryDao
@@ -95,6 +99,18 @@ internal data class OpenTaskerBundleReviewState(
     val bundle: OpenTaskerBundle,
     val plan: BundleImportPlan,
 )
+
+/**
+ * What a task delete would break: every dependent object, plus whether any of them holds a
+ * reference that cannot legally be cleared (a profile's enter task).
+ */
+data class TaskDeletionPreview(
+    val task: Task,
+    val references: List<TaskReference> = emptyList(),
+    val requiresReassignment: Boolean = false,
+) {
+    val hasDependents: Boolean get() = references.isNotEmpty()
+}
 
 data class DiagnosticsUiState(
     val health: EngineHealthStatus? = null,
@@ -263,24 +279,87 @@ class ActiveAutomationViewModel(
                     ),
                 )
                 db.editHistoryDao().pruneOld(EditHistoryDao.TYPE_TASK, task.id)
+
+                // A rename breaks every reference that still names this task ("task.run" targets,
+                // legacy notification bindings). Pin those to the stable id in the same
+                // transaction so they cannot dangle or be captured by a future task that takes the
+                // old name.
+                val previousTask = previous.toDomain()
+                if (!previousTask.name.equals(task.name, ignoreCase = true)) {
+                    val rewrite = AutomationReferenceRewriter.stabilizeNameReferences(
+                        target = previousTask,
+                        profiles = db.profileDao().getAll().map { it.toDomain() },
+                        tasks = db.taskDao().getAll().map { it.toDomain() },
+                        scenes = db.sceneDao().getAll().map { it.toDomain() },
+                    )
+                    rewrite.profiles.forEach { db.profileDao().update(it.toEntity()) }
+                    rewrite.tasks.filterNot { it.id == task.id }.forEach { db.taskDao().update(it.toEntity()) }
+                    rewrite.scenes.forEach { db.sceneDao().update(it.toEntity()) }
+                }
             }
             db.taskDao().update(task.toEntity())
         }
     }
 
-    fun deleteTask(task: Task) {
+    /**
+     * Every object that still points at [task], resolved through the shared reference index so
+     * `task.run` arguments, notification buttons, and scene gestures are surfaced alongside the
+     * profile columns that used to be the only thing checked.
+     */
+    suspend fun taskDeletionPreview(task: Task): TaskDeletionPreview = withContext(Dispatchers.IO) {
+        val references = runCatching {
+            AutomationReferenceIndex.referencesTo(
+                task = task,
+                profiles = db.profileDao().getAll().map { it.toDomain() },
+                tasks = db.taskDao().getAll().map { it.toDomain() },
+                scenes = db.sceneDao().getAll().map { it.toDomain() },
+            )
+        }.getOrElse { emptyList() }
+        TaskDeletionPreview(
+            task = task,
+            references = references,
+            requiresReassignment = references.any { it.isRequired },
+        )
+    }
+
+    /**
+     * Deletes [task] and applies [resolution] to every dependent reference in one transaction, so
+     * the workspace can never be observed with a dangling or half-rewritten reference.
+     */
+    fun deleteTask(task: Task, resolution: ReferenceResolution = ReferenceResolution.Block) {
         viewModelScope.launch {
             runCatching {
-                val profilesUsingTask = db.profileDao().getAll().map { it.toDomain() }
-                    .filter { it.enterTaskId == task.id || it.exitTaskId == task.id }
-                if (profilesUsingTask.isNotEmpty()) {
-                    events.send("Task is used by ${profilesUsingTask.size} profile(s). Reassign or delete those profiles first.")
-                    return@launch
+                var blockedCount = 0
+                db.withTransaction {
+                    val profiles = db.profileDao().getAll().map { it.toDomain() }
+                    val tasks = db.taskDao().getAll().map { it.toDomain() }
+                    val scenes = db.sceneDao().getAll().map { it.toDomain() }
+                    val rewrite = AutomationReferenceRewriter.retarget(
+                        target = task,
+                        resolution = resolution,
+                        profiles = profiles,
+                        tasks = tasks,
+                        scenes = scenes,
+                    )
+                    if (!rewrite.canCommit) {
+                        blockedCount = rewrite.blocked.size
+                        return@withTransaction
+                    }
+                    rewrite.profiles.forEach { db.profileDao().update(it.toEntity()) }
+                    rewrite.tasks.forEach { db.taskDao().update(it.toEntity()) }
+                    rewrite.scenes.forEach { db.sceneDao().update(it.toEntity()) }
+                    db.taskDao().delete(task.toEntity())
                 }
-                db.taskDao().delete(task.toEntity())
-                LocaleGrantStore(appContext).revokeAllForTask(task.id)
+                blockedCount
             }
-                .onSuccess { events.send("Task deleted") }
+                .onSuccess { blocked ->
+                    if (blocked > 0) {
+                        events.send("Task is still used by $blocked automation(s). Reassign or clear those references first.")
+                    } else {
+                        LocaleGrantStore(appContext).revokeAllForTask(task.id)
+                        events.send("Task deleted")
+                    }
+                }
                 .onFailure { events.send("Error: ${it.message ?: "Task delete failed"}") }
         }
     }

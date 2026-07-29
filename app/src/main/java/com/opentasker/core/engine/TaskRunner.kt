@@ -472,7 +472,8 @@ private const val MAX_WAIT_TIMEOUT_MS = 1_860_000L // 30 minutes + 60 s margin
 
 const val SUB_TASK_ACTION_ID = "task.run"
 const val MAX_SUBTASK_DEPTH = 8
-private val SUB_TASK_REF_KEYS = listOf("task", "name", "id")
+/** Argument keys `task.run` accepts as its target, in precedence order. */
+val SUB_TASK_REF_KEYS = listOf("task", "name", "id")
 
 /** Safety cap on total interpreted steps to bound pathological flow.foreach loops. */
 private const val MAX_FLOW_STEPS = 100_000

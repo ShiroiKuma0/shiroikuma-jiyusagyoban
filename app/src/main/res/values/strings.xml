@@ -590,6 +590,17 @@
     <string name="delete_context_body">This removes the %1$s condition from &quot;%2$s&quot;.</string>
     <string name="delete_cannot_undo">This action cannot be undone.</string>
 
+    <string name="delete_task_references_title">Task is still in use</string>
+    <string name="delete_task_references_body">&quot;%1$s&quot; is referenced by %2$d other automation(s). Choose what happens to those references before it is deleted.</string>
+    <string name="delete_task_references_required">A profile runs this task on activation and cannot be left without one, so these references must be reassigned.</string>
+    <string name="delete_task_references_option_reassign">Reassign them to another task</string>
+    <string name="delete_task_references_option_clear">Clear the references</string>
+    <string name="delete_task_references_clear_hint">Profile exit tasks, scene gestures, and notification buttons that pointed here are removed.</string>
+    <string name="delete_task_references_pick_replacement">Replacement task</string>
+    <string name="delete_task_references_no_replacement">No other task is available to reassign to.</string>
+    <string name="delete_task_references_confirm">Delete and apply</string>
+    <string name="delete_task_references_more">and %1$d more</string>
+
     <string name="context_invert_helper">Run when this context is not true.</string>
     <string name="context_days_select_one">Select at least one day.</string>
     <string name="context_days_invalid_helper">Use weekdays, weekends, every day, or day tokens/ranges.</string>

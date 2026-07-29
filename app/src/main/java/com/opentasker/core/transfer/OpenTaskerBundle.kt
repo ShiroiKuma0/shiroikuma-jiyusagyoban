@@ -5,6 +5,7 @@ import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.AutomationPower
 import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
+import com.opentasker.core.references.AutomationReferenceRewriter
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
@@ -394,11 +395,22 @@ class OpenTaskerBundleRepository(
 
         db.withTransaction {
             val taskIdMap = mutableMapOf<Long, Long>()
+            val insertedTaskRecords = mutableListOf<Task>()
             bundle.tasks.sortedWith(compareBy<Task> { it.name.lowercase() }.thenBy { it.id }).forEach { task ->
                 val newId = db.taskDao().insert(task.copy(id = 0).toEntity())
                 taskIdMap[task.id] = newId
+                insertedTaskRecords += task.copy(id = newId)
                 insertedTasks++
             }
+
+            // Task-to-task references (`task.run` targets and notification-button bindings) live
+            // inside action arguments, so they can only be remapped once every task has its new id.
+            // Skipping this pass is how imported sub-task calls used to point at whatever task
+            // happened to own the exporter's id in this database.
+            AutomationReferenceRewriter
+                .remapIds(idMap = taskIdMap, tasks = insertedTaskRecords)
+                .tasks
+                .forEach { db.taskDao().update(it.toEntity()) }
 
             bundle.variables.sortedWith(compareBy<Variable> { it.name.lowercase() }.thenBy { it.name }).forEach { variable ->
                 val storageName = VariableNamePolicy.normalizeForScope(variable.name, variable.isGlobal)

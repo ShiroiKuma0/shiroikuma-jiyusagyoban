@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -32,13 +33,17 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -55,6 +60,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
+import com.opentasker.core.references.ReferenceResolution
+import com.opentasker.core.references.describe
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.ContextSpec
@@ -634,3 +641,195 @@ internal fun DeleteConfirmationDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
+
+/**
+ * Shown when a task delete would leave dangling references. Every dependent object is listed and
+ * the user picks one outcome that the view model applies in a single transaction: reassign all
+ * references to another task, or clear the optional ones. A profile's enter task cannot be
+ * cleared, so when one is present only reassignment is offered.
+ */
+@Composable
+internal fun TaskDeleteReferencesDialog(
+    preview: TaskDeletionPreview,
+    tasks: List<Task>,
+    onDismiss: () -> Unit,
+    onConfirm: (ReferenceResolution) -> Unit,
+) {
+    val replacements = remember(tasks, preview.task.id) {
+        tasks.filterNot { it.id == preview.task.id }.sortedBy { it.name.lowercase() }
+    }
+    var reassign by rememberSaveable(preview.task.id) { mutableStateOf(true) }
+    var replacementId by rememberSaveable(preview.task.id) {
+        mutableLongStateOf(replacements.firstOrNull()?.id ?: 0L)
+    }
+    val replacement = replacements.firstOrNull { it.id == replacementId }
+    val reassignPossible = replacements.isNotEmpty()
+    val effectiveReassign = reassign || preview.requiresReassignment
+    val confirmEnabled = if (effectiveReassign) replacement != null else true
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                Icons.Filled.Delete,
+                contentDescription = stringResource(R.string.action_delete),
+                tint = MaterialTheme.colorScheme.error,
+            )
+        },
+        title = { Text(stringResource(R.string.delete_task_references_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    stringResource(
+                        R.string.delete_task_references_body,
+                        preview.task.name,
+                        preview.references.size,
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+                    shape = RoundedCornerShape(DesignSystem.Radii.lg),
+                ) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        preview.references.take(MAX_LISTED_REFERENCES).forEach { reference ->
+                            Text(reference.describe(), style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (preview.references.size > MAX_LISTED_REFERENCES) {
+                            Text(
+                                stringResource(
+                                    R.string.delete_task_references_more,
+                                    preview.references.size - MAX_LISTED_REFERENCES,
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                if (preview.requiresReassignment) {
+                    Text(
+                        stringResource(R.string.delete_task_references_required),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                ReferenceResolutionOption(
+                    label = stringResource(R.string.delete_task_references_option_reassign),
+                    selected = effectiveReassign,
+                    enabled = reassignPossible,
+                    onSelect = { reassign = true },
+                )
+                if (effectiveReassign) {
+                    if (reassignPossible) {
+                        TaskReplacementPicker(
+                            tasks = replacements,
+                            selectedId = replacementId,
+                            onSelect = { replacementId = it },
+                        )
+                    } else {
+                        Text(
+                            stringResource(R.string.delete_task_references_no_replacement),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+                ReferenceResolutionOption(
+                    label = stringResource(R.string.delete_task_references_option_clear),
+                    selected = !effectiveReassign,
+                    enabled = !preview.requiresReassignment,
+                    onSelect = { reassign = false },
+                )
+                if (!effectiveReassign) {
+                    Text(
+                        stringResource(R.string.delete_task_references_clear_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val resolution = if (effectiveReassign) {
+                        replacement?.let(ReferenceResolution::Reassign)
+                    } else {
+                        ReferenceResolution.Clear
+                    }
+                    resolution?.let(onConfirm)
+                },
+                enabled = confirmEnabled,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+            ) {
+                Text(stringResource(R.string.delete_task_references_confirm))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
+}
+
+@Composable
+private fun ReferenceResolutionOption(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onSelect: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = DesignSystem.ComponentSize.touchTargetMin)
+            .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onSelect),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        RadioButton(selected = selected, onClick = null, enabled = enabled)
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun TaskReplacementPicker(
+    tasks: List<Task>,
+    selectedId: Long,
+    onSelect: (Long) -> Unit,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val selectedName = tasks.firstOrNull { it.id == selectedId }?.name
+        ?: stringResource(R.string.label_none)
+    Box(Modifier.fillMaxWidth()) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = DesignSystem.ComponentSize.touchTargetMin),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.delete_task_references_pick_replacement),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Text(selectedName, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            tasks.forEach { task ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.action_task_picker_option, task.name, task.id)) },
+                    onClick = {
+                        onSelect(task.id)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+private const val MAX_LISTED_REFERENCES = 8
