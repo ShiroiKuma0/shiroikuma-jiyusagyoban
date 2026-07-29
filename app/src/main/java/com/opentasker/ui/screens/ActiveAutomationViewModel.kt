@@ -34,6 +34,7 @@ import com.opentasker.core.references.ReferenceResolution
 import com.opentasker.core.references.TaskReference
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseBackupManager
+import com.opentasker.core.storage.RestoreCandidate
 import com.opentasker.core.storage.EditHistoryDao
 import com.opentasker.core.storage.EditHistoryEntity
 import com.opentasker.core.storage.RunLogRetentionPolicy
@@ -113,6 +114,15 @@ data class TaskDeletionPreview(
 ) {
     val hasDependents: Boolean get() = references.isNotEmpty()
 }
+
+/**
+ * A validated restore candidate awaiting an explicit Stage decision, plus whatever restore it
+ * would replace, so the user is never silently overwriting an earlier staged restore.
+ */
+data class RestoreReviewState(
+    val candidate: RestoreCandidate,
+    val replacesPending: RestoreCandidate? = null,
+)
 
 data class DiagnosticsUiState(
     val health: EngineHealthStatus? = null,
@@ -679,11 +689,52 @@ class ActiveAutomationViewModel(
         }
     }
 
+    private val _restoreReview = MutableStateFlow<RestoreReviewState?>(null)
+    val restoreReview: StateFlow<RestoreReviewState?> = _restoreReview.asStateFlow()
+
+    /**
+     * Validates and summarizes the selected database, then waits for an explicit Stage decision.
+     * Nothing is staged here: selection used to replace the pending journal outright, so a user
+     * could not inspect the candidate, tell it apart from an earlier staged restore, or back out.
+     */
     fun importDatabaseBackup(uri: Uri) {
         launchBackupOperation {
-            databaseBackupManager.stageRestore(uri)
-                .onSuccess { events.send("Backup imported. Restart OpenTasker to apply the restore.") }
+            databaseBackupManager.inspectRestore(uri)
+                .onSuccess { candidate ->
+                    _restoreReview.value = RestoreReviewState(
+                        candidate = candidate,
+                        replacesPending = databaseBackupManager.pendingRestoreSummary(),
+                    )
+                }
                 .onFailure { events.send("Error: ${it.message ?: "Database backup import failed"}") }
+        }
+    }
+
+    fun confirmStageRestore() {
+        launchBackupOperation {
+            databaseBackupManager.stageInspectedRestore()
+                .onSuccess {
+                    _restoreReview.value = null
+                    events.send("Restore staged. Restart OpenTasker to apply it.")
+                }
+                .onFailure { events.send("Error: ${it.message ?: "Staging the restore failed"}") }
+        }
+    }
+
+    fun dismissRestoreReview() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { databaseBackupManager.discardInspectedRestore() }
+            _restoreReview.value = null
+        }
+    }
+
+    /** Removes only the validated pending journal; backups and the live database are untouched. */
+    fun cancelPendingRestore() {
+        launchBackupOperation {
+            val cancelled = withContext(Dispatchers.IO) { databaseBackupManager.cancelPendingRestore() }
+            events.send(
+                if (cancelled) "Staged restore cancelled" else "There is no staged restore to cancel",
+            )
         }
     }
 
@@ -706,6 +757,7 @@ class ActiveAutomationViewModel(
                 busy = busy,
                 latestBackupName = databaseBackupManager.listBackups().firstOrNull()?.name,
                 pendingRestore = databaseBackupManager.hasPendingRestore(),
+                pendingRestoreSummary = databaseBackupManager.pendingRestoreSummary(),
             )
         }
         _backupSetupState.value = loaded

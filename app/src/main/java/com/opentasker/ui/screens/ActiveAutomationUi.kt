@@ -248,6 +248,7 @@ fun ActiveAutomationUi(
     val globalVariables by viewModel.globalVariables.collectAsState()
     val runLogRetentionPolicy by viewModel.runLogRetentionPolicy.collectAsState()
     val backupSetupState by viewModel.backupSetupState.collectAsState()
+    val restoreReview by viewModel.restoreReview.collectAsState()
     val diagnosticsState by viewModel.diagnosticsState.collectAsState()
     val storageDecodeIssues by viewModel.storageDecodeIssues.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -741,6 +742,7 @@ fun ActiveAutomationUi(
                 onCreateBackup = viewModel::createDatabaseBackup,
                 onExportBackup = { databaseBackupExportLauncher.launch(databaseBackupExportName()) },
                 onImportBackup = { databaseBackupImportLauncher.launch(DATABASE_BACKUP_MIME_TYPES) },
+                onCancelPendingRestore = viewModel::cancelPendingRestore,
             )
 
             OpenTaskerScreen.Inspector -> ContextInspectorScreen(db = db, contentPadding = innerPadding)
@@ -800,6 +802,15 @@ fun ActiveAutomationUi(
                 }
                 clearPendingDelete()
             },
+        )
+    }
+
+    restoreReview?.let { review ->
+        RestoreReviewDialog(
+            state = review,
+            busy = backupSetupState.busy,
+            onDismiss = viewModel::dismissRestoreReview,
+            onStage = viewModel::confirmStageRestore,
         )
     }
 

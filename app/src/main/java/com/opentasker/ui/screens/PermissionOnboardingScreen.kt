@@ -71,6 +71,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.opentasker.app.BuildConfig
 import com.opentasker.app.R
+import com.opentasker.core.storage.RestoreCandidate
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import com.opentasker.core.permissions.OemBatteryGuidance
@@ -101,6 +102,8 @@ data class BackupSetupState(
     val busy: Boolean,
     val latestBackupName: String? = null,
     val pendingRestore: Boolean = false,
+    /** What the staged restore would install, so the pending banner is specific rather than generic. */
+    val pendingRestoreSummary: RestoreCandidate? = null,
 )
 
 private sealed interface PermissionAction {
@@ -124,6 +127,7 @@ fun PermissionOnboardingScreen(
     onCreateBackup: () -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
+    onCancelPendingRestore: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -229,6 +233,7 @@ fun PermissionOnboardingScreen(
                 onCreateBackup = onCreateBackup,
                 onExportBackup = onExportBackup,
                 onImportBackup = onImportBackup,
+                onCancelPendingRestore = onCancelPendingRestore,
             )
         }
 
@@ -382,6 +387,7 @@ private fun BackupSetupCard(
     onCreateBackup: () -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
+    onCancelPendingRestore: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -428,6 +434,16 @@ private fun BackupSetupCard(
                         Text(stringResource(R.string.action_import), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
+                if (state.pendingRestore) {
+                    OutlinedButton(
+                        onClick = onCancelPendingRestore,
+                        enabled = !state.busy,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Text(stringResource(R.string.setup_backup_restore_cancel))
+                    }
+                }
             }
         }
     }
@@ -446,7 +462,17 @@ private fun BackupStateBanner(state: BackupSetupState) {
         else -> stringResource(R.string.setup_backup_none)
     }
     val body = when {
-        state.pendingRestore -> stringResource(R.string.setup_backup_restore_body)
+        state.pendingRestore -> state.pendingRestoreSummary?.let { summary ->
+            summary.error?.let { error -> stringResource(R.string.setup_backup_restore_unreadable, error) }
+                ?: stringResource(
+                    R.string.setup_backup_restore_summary,
+                    summary.sourceLabel,
+                    summary.schemaVersion,
+                    summary.profileCount,
+                    summary.taskCount,
+                    summary.sceneCount,
+                )
+        } ?: stringResource(R.string.setup_backup_restore_body)
         state.latestBackupName != null -> stringResource(R.string.setup_backup_latest, state.latestBackupName)
         else -> stringResource(R.string.setup_backup_none_body)
     }

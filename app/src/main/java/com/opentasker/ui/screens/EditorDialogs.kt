@@ -833,3 +833,91 @@ private fun TaskReplacementPicker(
 }
 
 private const val MAX_LISTED_REFERENCES = 8
+
+/**
+ * Review gate for a staged database restore.
+ *
+ * Selecting a database used to replace the pending-restart journal immediately, so a user could
+ * not inspect the candidate, could not tell it apart from a restore staged earlier, and had no way
+ * to back out. Nothing is staged until Stage is pressed here.
+ */
+@Composable
+internal fun RestoreReviewDialog(
+    state: RestoreReviewState,
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    onStage: () -> Unit,
+) {
+    val candidate = state.candidate
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                Icons.Filled.Info,
+                contentDescription = stringResource(R.string.restore_review_title),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        },
+        title = { Text(stringResource(R.string.restore_review_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    stringResource(
+                        R.string.restore_review_summary,
+                        candidate.sourceLabel,
+                        formatBytes(candidate.sizeBytes),
+                        candidate.schemaVersion,
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    stringResource(
+                        R.string.restore_review_counts,
+                        candidate.profileCount,
+                        candidate.taskCount,
+                        candidate.sceneCount,
+                        candidate.variableCount,
+                        candidate.runLogCount,
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (!candidate.compatible) {
+                    Text(
+                        stringResource(R.string.restore_review_incompatible),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                state.replacesPending?.let { existing ->
+                    Text(
+                        stringResource(
+                            R.string.restore_review_replaces,
+                            existing.sourceLabel,
+                            existing.schemaVersion,
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                Text(
+                    stringResource(R.string.restore_review_body),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onStage, enabled = !busy && candidate.compatible) {
+                Text(stringResource(R.string.restore_review_stage))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
+}
+
+private fun formatBytes(bytes: Long): String = when {
+    bytes >= 1_048_576 -> "%.1f MB".format(bytes / 1_048_576.0)
+    bytes >= 1_024 -> "%.0f KB".format(bytes / 1_024.0)
+    else -> "$bytes B"
+}

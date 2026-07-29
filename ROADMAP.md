@@ -474,13 +474,6 @@ As of 2026-07-29, the app sets `targetSdk = 37`; the P1 items below are mandator
   Acceptance: Every subsystem reports Loading/Ready/Stale/Error with observation age and a concrete reason; aggregate Healthy is impossible while required evidence is loading, stale, or failed; exact-alarm fallback, standby bucket, foreground-service state, Advanced Protection, permissions, pending executions, and monitor errors are represented; refresh/retry and setup links are testable.
   Complexity: M
 
-- [ ] P1 — Add review and cancellation to staged database restore
-  Why: Selecting a database immediately replaces the pending restart journal, so users cannot inspect the candidate, cancel it, or distinguish it from a prior staged restore.
-  Evidence: `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationViewModel.kt:589-615`; `app/src/main/java/com/opentasker/core/storage/DatabaseBackupManager.kt:123-201,267-330`.
-  Touches: backup inspector/summary DTO, Setup restore review dialog, pending-journal cancellation/replacement, rollback surfacing, backup tests and UI tests.
-  Acceptance: Selection shows source, schema version, compatibility, and entity counts before an explicit Stage action; an existing pending restore must be kept, replaced with confirmation, or canceled; cancellation removes only the validated pending journal; apply retains the current atomic replacement, pre-restore snapshot, and failed-restore recovery evidence.
-  Complexity: M
-
 ### P2 — Authoring and resilience depth
 
 - [ ] P2 — Add bounded failure-catch and retry/backoff flow blocks

@@ -161,6 +161,16 @@
     <string name="setup_backup_helper_full">Create a local database snapshot, export a copy, or stage an import for the next restart.</string>
     <string name="setup_backup_working">Working…</string>
     <string name="setup_backup_restore_body">Restart OpenTasker to apply the staged restore before the database opens.</string>
+    <string name="setup_backup_restore_summary">%1$s · schema v%2$d · %3$d profiles, %4$d tasks, %5$d scenes. Restart OpenTasker to apply it.</string>
+    <string name="setup_backup_restore_unreadable">The staged restore can no longer be read (%1$s). Cancel it so the next start is not blocked.</string>
+    <string name="setup_backup_restore_cancel">Cancel staged restore</string>
+    <string name="restore_review_title">Review restore</string>
+    <string name="restore_review_summary">%1$s · %2$s · schema v%3$d</string>
+    <string name="restore_review_counts">%1$d profiles · %2$d tasks · %3$d scenes · %4$d variables · %5$d run log entries</string>
+    <string name="restore_review_incompatible">The schema version of this database is outside the range this build can open.</string>
+    <string name="restore_review_replaces">This replaces a restore already staged: %1$s (schema v%2$d). Staging discards it.</string>
+    <string name="restore_review_body">Nothing has been staged yet. Staging queues this database to replace the live one at the next start; the current database is snapshotted first.</string>
+    <string name="restore_review_stage">Stage restore</string>
     <string name="setup_backup_latest">Latest backup: %1$s</string>
     <string name="setup_backup_none_body">Create a local backup before testing imports or risky automation changes.</string>
     <string name="setup_action_request">Request</string>

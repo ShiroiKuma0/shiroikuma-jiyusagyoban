@@ -173,6 +173,122 @@ class DatabaseBackupManager(
         }
     }
 
+    /**
+     * Validates a candidate database and reports what it contains, **without** touching the
+     * pending-restore journal.
+     *
+     * Selecting a file used to replace the journal immediately, so a user could not inspect the
+     * candidate, could not tell it apart from a restore staged earlier, and could not back out.
+     * The validated bytes are parked in a separate candidate file that [stageInspectedRestore]
+     * promotes and [discardInspectedRestore] removes.
+     */
+    suspend fun inspectRestore(uri: Uri, sourceLabel: String? = null): Result<RestoreCandidate> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val input = context.contentResolver.openInputStream(uri)
+                    ?: throw IOException("Could not open backup file")
+                val candidate = candidateRestoreFile(context, databaseName)
+                writeValidatedCopy(input, candidate, "restore candidate")
+                summarize(candidate, sourceLabel ?: uri.lastPathSegment ?: candidate.name)
+            }.onFailure { error ->
+                candidateRestoreFile(context, databaseName).delete()
+                AppLogger.error(tag, "Restore inspection failed: ${error.message}", error)
+            }
+        }
+
+    /** Inspects a managed backup already in the app's backup directory. */
+    suspend fun inspectManagedBackup(backupFile: File): Result<RestoreCandidate> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val managedBackup = requireManagedBackupFile(backupFile)
+                val candidate = candidateRestoreFile(context, databaseName)
+                writeValidatedCopy(managedBackup.inputStream(), candidate, "restore candidate")
+                summarize(candidate, managedBackup.name)
+            }.onFailure { error ->
+                candidateRestoreFile(context, databaseName).delete()
+                AppLogger.error(tag, "Restore inspection failed: ${error.message}", error)
+            }
+        }
+
+    /** Promotes the inspected candidate to the pending-restore journal applied at next start. */
+    suspend fun stageInspectedRestore(): Result<File> = withContext(Dispatchers.IO) {
+        runCatching {
+            val candidate = candidateRestoreFile(context, databaseName)
+            if (!candidate.exists()) throw IOException("No inspected restore candidate to stage")
+            val pending = pendingRestoreFile(context, databaseName)
+            replaceFileAtomically(candidate, pending, "pending restore")
+            AppLogger.warn(tag, "Restore staged at ${pending.absolutePath}; restart OpenTasker to apply it")
+            pending
+        }.onFailure { error ->
+            AppLogger.error(tag, "Restore staging failed: ${error.message}", error)
+        }
+    }
+
+    /** Drops an inspected candidate the user decided not to stage. */
+    fun discardInspectedRestore(): Boolean = candidateRestoreFile(context, databaseName).delete()
+
+    /**
+     * Cancels a staged restore. Only the validated pending journal is removed — backups, the live
+     * database, and any pre-restore snapshot are untouched.
+     */
+    fun cancelPendingRestore(): Boolean {
+        val pending = pendingRestoreFile(context, databaseName)
+        if (!pending.exists()) return false
+        return pending.delete().also { deleted ->
+            if (deleted) AppLogger.info(tag, "Pending restore cancelled")
+            else AppLogger.warn(tag, "Could not cancel the pending restore journal")
+        }
+    }
+
+    /** What the currently staged restore would install, or null when nothing is staged. */
+    suspend fun pendingRestoreSummary(): RestoreCandidate? = withContext(Dispatchers.IO) {
+        val pending = pendingRestoreFile(context, databaseName)
+        if (!pending.exists()) return@withContext null
+        runCatching { summarize(pending, pending.name) }.getOrElse { error ->
+            RestoreCandidate(
+                sourceLabel = pending.name,
+                sizeBytes = pending.length(),
+                schemaVersion = 0,
+                error = error.message ?: "The staged restore could not be read",
+            )
+        }
+    }
+
+    private fun writeValidatedCopy(input: InputStream, destination: File, description: String) {
+        val temp = File(backupDir, "${destination.name}.tmp")
+        try {
+            input.use { source ->
+                FileOutputStream(temp).use { output ->
+                    source.copyBoundedTo(output, MAX_BACKUP_IMPORT_BYTES)
+                    output.fd.sync()
+                }
+            }
+            if (temp.length() == 0L) throw IOException("Backup file is empty")
+            validateDatabaseFile(temp)
+            replaceFileAtomically(temp, destination, description)
+        } catch (error: Exception) {
+            temp.delete()
+            throw error
+        }
+    }
+
+    private fun summarize(file: File, sourceLabel: String): RestoreCandidate =
+        SQLiteDatabase.openDatabase(file.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { sqlite ->
+            RestoreCandidate(
+                sourceLabel = sourceLabel,
+                sizeBytes = file.length(),
+                schemaVersion = readLong(sqlite, "PRAGMA user_version").toInt(),
+                profileCount = countOrZero(sqlite, "profiles"),
+                taskCount = countOrZero(sqlite, "tasks"),
+                sceneCount = countOrZero(sqlite, "scenes"),
+                variableCount = countOrZero(sqlite, "variables"),
+                runLogCount = countOrZero(sqlite, "run_logs"),
+            )
+        }
+
+    private fun countOrZero(sqlite: SQLiteDatabase, table: String): Int =
+        runCatching { readLong(sqlite, "SELECT COUNT(*) FROM $table").toInt() }.getOrDefault(0)
+
     suspend fun stageRestore(uri: Uri): Result<File> = withContext(Dispatchers.IO) {
         runCatching {
             val input = context.contentResolver.openInputStream(uri)
@@ -329,6 +445,10 @@ class DatabaseBackupManager(
                 PendingRestoreApplyResult.Failed(error, failedBackup)
             }
         }
+
+        /** Validated-but-unstaged bytes awaiting the user's explicit Stage decision. */
+        fun candidateRestoreFile(context: Context, databaseName: String = DATABASE_NAME): File =
+            File(backupDir(context).apply { mkdirs() }, "${databaseName.removeSuffix(".db")}_restore_candidate.db")
 
         fun pendingRestoreFile(context: Context, databaseName: String = DATABASE_NAME): File =
             File(backupDir(context).apply { mkdirs() }, "${databaseName.removeSuffix(".db")}_restore_pending.db")
@@ -497,6 +617,26 @@ internal fun replaceFileAtomically(source: File, target: File, purpose: String) 
     } catch (error: IOException) {
         throw IOException("Atomic $purpose failed; the existing file was left unchanged", error)
     }
+}
+
+/**
+ * What a candidate (or already-staged) database would install. [error] is set when the file could
+ * not be read, so the UI can offer to cancel a staged restore that has since become unreadable
+ * rather than leaving it queued to fail at next start.
+ */
+data class RestoreCandidate(
+    val sourceLabel: String,
+    val sizeBytes: Long,
+    val schemaVersion: Int,
+    val profileCount: Int = 0,
+    val taskCount: Int = 0,
+    val sceneCount: Int = 0,
+    val variableCount: Int = 0,
+    val runLogCount: Int = 0,
+    val error: String? = null,
+) {
+    val compatible: Boolean
+        get() = error == null && schemaVersion in 1..OPEN_TASKER_DATABASE_SCHEMA_VERSION
 }
 
 sealed interface PendingRestoreApplyResult {
