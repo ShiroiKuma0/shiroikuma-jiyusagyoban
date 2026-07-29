@@ -1,7 +1,7 @@
 # OpenTasker Roadmap
 
-**Current app version:** 0.2.76
-**Last updated:** 2026-07-17
+**Current app version:** 0.2.78
+**Last updated:** 2026-07-29
 
 Only open work belongs here; git history and `CHANGELOG.md` are the release record.
 
@@ -16,21 +16,7 @@ direct fixes shipped in v0.2.76 across the engine, actions, context, UI, and the
   Why: Every EVENT context instantiates its own 1 Hz clock loop plus a per-minute CalendarProvider query, so N event contexts = N wake loops and N calendar reads per minute even for NFC-only profiles — contradicting the demand-gated monitor contract and reading calendar data profiles never asked for.
   Where: `app/src/main/java/com/opentasker/core/contexts/EventContextSourceImpl.kt`; `app/src/main/java/com/opentasker/core/contexts/CalendarSunContextEvents.kt`; `app/src/main/java/com/opentasker/core/contexts/StateContextSourceImpl.kt`; `app/src/main/java/com/opentasker/core/contexts/LocationContextSourceImpl.kt`
   Acceptance: One shared hot ticker (shareIn/SharedFlow) drives sun/calendar pulses; the CalendarProvider query runs only when at least one enabled profile references `event=calendar`.
-
-- [ ] P2 — Wire scene SLIDER controls to a task/variable, or mark them display-only
-  Why: `SceneOverlayService` renders a SeekBar with no OnSeekBarChangeListener, so dragging it does nothing (no variable write, no task fire) even though the scene editor lets users bind tap/long-press tasks to a slider.
-  Where: `app/src/main/java/com/opentasker/core/scenes/SceneOverlayService.kt`; `app/src/main/java/com/opentasker/ui/screens/SceneEditorDialogs.kt`
-  Acceptance: Slider movement writes its value to a configured variable and/or fires the bound task, or the editor clearly marks sliders as display-only and drops the misleading task binding.
-
-- [ ] P2 — Enforce InputValidation at the import/persist boundary, or delete it
-  Why: `InputValidation.validateProfile/validateTask/validateAction` has a passing test suite but zero production callers, so per-field limits (name length, priority range, non-empty actions) are an unenforced boundary that reads as enforced. Imports are bounded only by aggregate size/count budgets.
-  Where: `app/src/main/java/com/opentasker/core/validation/InputValidation.kt`; `app/src/main/java/com/opentasker/core/transfer/OpenTaskerBundle.kt`; `app/src/main/java/com/opentasker/core/transfer/TaskerXmlImport.kt`
-  Acceptance: Either the validator gates the import and editor-save paths (with tests proving rejection), or the module and its test are removed so the surface isn't misrepresented.
-
-- [ ] P2 — Route the `download` action through the shared HttpRequestAction transport
-  Why: v0.2.76 gave `download` a policy-DNS hook, status checks, and fsync, but it still duplicates transport logic. Consolidating onto HttpRequestAction (which already has bounded same-origin redirects, atomic writes, and the 50 MB cap) removes the parity risk permanently.
-  Where: `app/src/main/java/com/opentasker/core/actions/NetworkActions.kt`; `app/src/main/java/com/opentasker/core/actions/HttpRequestAction.kt`
-  Acceptance: `download` delegates to HttpRequestAction with `output_file`; the standalone OkHttp path is removed; tests cover redirect, size cap, and LAN-permission denial.
+  Research update (2026-07-29): Broaden the shared source into a demand-gated observation bus used by both the engine and Context Inspector; Inspector must subscribe only while visible and expose Loading/Ready/Stale/Error plus observation age instead of creating permanent duplicate collectors.
 
 - [ ] P2 — Localize the remaining hardcoded English on secondary surfaces
   Why: The app shell nav/top-bar/retention picker, every ViewModel snackbar/toast, and the Context Inspector, Run Log, Diagnostics, Flow, and scene-toast strings are hardcoded English, and the localization guard's file list skips exactly those files — so localized builds show a mixed-language UI. Dead `nav_*`/`empty_profiles_*`/`workspace_*` resources already exist unused.
@@ -38,41 +24,6 @@ direct fixes shipped in v0.2.76 across the engine, actions, context, UI, and the
   Acceptance: These surfaces resolve through `R.string` (VM messages as resource IDs resolved at the collector); the guard covers the added files and its regex catches `body =`/`values =` argument strings.
 
 ### P3 — Correctness, a11y, and polish
-
-- [ ] P3 — Move notification-button task execution off the goAsync window into the service
-  Why: `NotificationActionReceiver` runs the whole task inside `goAsync()` on an unscoped scope; tasks can run minutes (flow.wait up to 30 min) but the broadcast window is ~10 s, so the system flags a timeout and process death mid-task loses the run with no run-log entry.
-  Where: `app/src/main/java/com/opentasker/core/actions/NotificationActionReceiver.kt`; `app/src/main/java/com/opentasker/core/engine/AutomationService.kt`
-  Acceptance: The receiver hands the task id to AutomationService (already foreground) and calls `finish()` immediately; long tasks complete and log reliably.
-
-- [ ] P3 — Raise sub-44dp touch targets in the scene editor and expression debugger
-  Why: The scene resize handle is 14×14dp and the Run Log ExpressionDebugger expand row is ~18dp tall, both below the repo's own `DesignSystem.ComponentSize.touchTargetMin = 48.dp`.
-  Where: `app/src/main/java/com/opentasker/ui/screens/SceneEditorCanvas.kt`; `app/src/main/java/com/opentasker/ui/screens/RunLogScreenContent.kt`
-  Acceptance: Both interactive regions meet the 48dp minimum (larger hit target without enlarging the visual glyph is acceptable).
-
-- [ ] P3 — Fix stale multi-select indices and drag-deselect in the scene editor
-  Why: `selectedIndices` is keyed only on `scene.id`, so deleting an element shifts indices while selection survives and a group move then moves the wrong elements; `onDragStart` toggles selection so dragging a selected member first deselects it.
-  Where: `app/src/main/java/com/opentasker/ui/screens/SceneLibraryCards.kt`; `app/src/main/java/com/opentasker/ui/screens/SceneEditorCanvas.kt`
-  Acceptance: Selection is reconciled against the current element list after deletion; dragging a selected member preserves the multi-selection.
-
-- [ ] P3 — Delete or adopt the dead PremiumComponents module
-  Why: None of `TextFieldWithError`, `LoadingButton`, `LoadingSkeleton`, `StateBadge`, `LoadingIndicator`, `ErrorState`, or `disabledAlpha` is referenced anywhere, and several carry latent theme bugs (always-`onPrimary` spinner, near-invisible skeleton) for any future caller.
-  Where: `app/src/main/java/com/opentasker/ui/components/PremiumComponents.kt`
-  Acceptance: The module is either removed or adopted by at least one real caller with its latent color bugs fixed.
-
-- [ ] P3 — Reduce compounded alpha-on-alpha selected-state fills
-  Why: Theme container tokens are already translucent, and several screens apply a second alpha (e.g. `primaryContainer.copy(alpha = 0.42f)`), leaving selected filter chips distinguishable only by border in both themes.
-  Where: `app/src/main/java/com/opentasker/ui/screens/RunLogScreenContent.kt`; `app/src/main/java/com/opentasker/ui/screens/PermissionOnboardingScreen.kt`; `app/src/main/java/com/opentasker/ui/screens/VariablesScreen.kt`; `app/src/main/java/com/opentasker/ui/theme/Theme.kt`
-  Acceptance: Selected states use opaque blended tokens or stop double-alphaing at call sites so the fill is visibly distinct.
-
-- [ ] P3 — Retire deprecated status/navigation bar color setters under edge-to-edge
-  Why: `Theme.kt` sets `window.statusBarColor`/`navigationBarColor`, which are deprecated and ignored on target SDK 35+ (the app targets 37 and calls `enableEdgeToEdge()`); only the `isAppearanceLight*` flags still matter.
-  Where: `app/src/main/java/com/opentasker/ui/theme/Theme.kt`; `app/src/main/java/com/opentasker/app/MainActivity.kt`
-  Acceptance: The dead color assignments are removed; bar icon appearance still tracks the theme via the appearance flags.
-
-- [ ] P3 — Convert flow-canvas connectors from raw px and decouple the sub-task badge from an English literal
-  Why: `AutomationFlowScreen` draws connectors with a px `labelWidth = 72f` against dp-laid-out nodes (`width(68.dp)`), so on any density ≠ 1x the lines land inside the label column; the sub-task badge keys off the English literal `"sub-task"` inside `node.detail`, which will break when flow strings are localized.
-  Where: `app/src/main/java/com/opentasker/ui/screens/AutomationFlowScreen.kt`; `app/src/main/java/com/opentasker/core/flow/AutomationFlowGraph.kt`
-  Acceptance: Connector geometry uses dp/density; the badge keys off a structural flag on the node, not a display string.
 
 ## Research-Driven Additions
 
@@ -111,7 +62,7 @@ direct fixes shipped in v0.2.76 across the engine, actions, context, UI, and the
 ### P3 -- Evaluations
 
 - [ ] P3 — Evaluate Glance widget migration
-  Why: Widgets use RemoteViews XML today; Glance could reduce widget/UI divergence but may add dependency and capability tradeoffs.
+  Why: As of 2026-07-29, widgets use RemoteViews XML; Glance could reduce widget/UI divergence but may add dependency and capability tradeoffs.
   Evidence: `app/src/main/java/com/opentasker/widget/TaskWidgetProvider.kt`; `app/src/main/res/layout/widget_task.xml`; https://developer.android.com/jetpack/androidx/releases/glance
   Touches: widget package, Gradle dependencies, widget tests.
   Acceptance: Recommendation records APK-size impact, missing Glance features, testability gains, and migration steps; no production rewrite happens before the decision is accepted.
@@ -174,6 +125,7 @@ direct fixes shipped in v0.2.76 across the engine, actions, context, UI, and the
   Touches: version-specific transfer DTOs, migration chain, codec/validator, import review, fixture corpus, export docs/tests.
   Acceptance: Golden schema-1 exports import after a schema-2 implementation; migrations are ordered, deterministic, and lossy fields are reported; unsupported future schemas and failed migrations perform zero Room writes; round-trip and ID/reference remap tests cover tasks, profiles, variables, and scenes.
   Complexity: M
+  Research update (2026-07-29): The exporter now emits schema 2 and accepts schemas 1–2, so the original premise is stale; treat the remaining item as P0 data integrity. Import review must enumerate same-name variable conflicts with preserve/rename/explicit-replace choices, never declassify an existing secret implicitly, and remap every task reference inside profiles, scenes, `task.run`, and notification buttons before one atomic write.
 
 - [ ] P2 — Add a side-effect-free automation preflight runner
   Why: Manual Run executes real actions, while users need to validate contexts, variable expansion, branches, permissions, and targets before a profile can change device or external state.
@@ -208,13 +160,6 @@ direct fixes shipped in v0.2.76 across the engine, actions, context, UI, and the
   Complexity: M
 
 
-- [ ] P1 — Add tapjacking protection to scene overlay controls that run tasks
-  Why: The app both draws overlays (`SceneOverlayService`, `SYSTEM_ALERT_WINDOW`) and renders single-tap controls that execute tasks or toggle profiles, so a malicious overlay could proxy consequential taps.
-  Evidence: `app/src/main/java/com/opentasker/core/scenes/SceneOverlayService.kt`; scene control bindings in `app/src/main/java/com/opentasker/ui/screens/SceneLibraryScreen.kt`; https://developer.android.com/privacy-and-security/risks/tapjacking
-  Touches: scene overlay control composables/views, obscured-touch filtering, scene UI tests.
-  Acceptance: Scene controls that run a task or change a profile set `filterTouchesWhenObscured=true` (or the Compose equivalent) and drop taps received while obscured; a test verifies obscured taps do not trigger execution.
-  Complexity: S
-
 - [ ] P1 — Add behavioral test coverage for automation-mode dispatch, cooldown, and per-action execution
   Why: The most correctness-sensitive engine code — SINGLE/RESTART/QUEUED/PARALLEL dispatch, cooldown reservation, and queue-cap logic — plus concrete action implementations have only source-level or cross-cutting guard tests.
   Evidence: `app/src/main/java/com/opentasker/core/engine/AutomationService.kt` (`dispatchTask`); `app/src/main/java/com/opentasker/core/engine/TaskExecutionHelper.kt`; `app/src/main/java/com/opentasker/core/engine/CooldownStore.kt`; existing `ActionGuardsTest`/`PermissionDenialTest`
@@ -246,6 +191,7 @@ direct fixes shipped in v0.2.76 across the engine, actions, context, UI, and the
   Touches: profile/context data model + migration, matcher boolean evaluator, context editor grouping UI, Context Inspector explanations, bundle schema/migration, tests.
   Acceptance: A profile can express nested AND/OR/NOT groups over its contexts; existing implicit-AND profiles migrate unchanged; the matcher and Context Inspector evaluate and explain the tree; export/import preserves grouping; tests cover nested and inverted cases.
   Complexity: L
+  Research update (2026-07-29): Flat `ContextSpec.invert` and `orGroup` already execute and are explained by the Inspector; narrow this item to nested-tree authoring, a backward-compatible model/bundle migration, accessible group editing, and nested explanation tests.
 
 - [ ] P2 — Add a unified global search across profiles, tasks, actions, variables, and scenes
   Why: Only per-list filters exist; as automation count grows, finding which task/profile references an action or variable requires manual scanning, unlike Tasker/MacroDroid.
@@ -273,13 +219,6 @@ direct fixes shipped in v0.2.76 across the engine, actions, context, UI, and the
   Evidence: `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationViewModel.kt:171-247,513-530`; `app/src/main/java/com/opentasker/core/storage/EditHistoryDao.kt`
   Touches: `EditHistoryDao` cursor/redo state, undo/redo view-model APIs, scene edit snapshots, undo/redo UI, tests.
   Acceptance: Users can step back and forward across up to five edits per task/profile/scene without wiping history; scene edits are snapshotted; a redo after undo restores the newer state; tests cover multi-step undo/redo and scene recovery.
-  Complexity: S
-
-- [ ] P2 — Surface app-standby bucket and prompt for battery-optimization exemption when throttled
-  Why: A `RARE`/`RESTRICTED` standby bucket throttles the per-minute alarm and workers; a 2026 automation app should detect this and guide the user, distinct from the existing OEM battery-killer copy.
-  Evidence: `app/src/main/java/com/opentasker/ui/screens/PermissionOnboardingScreen.kt` (OEM battery guidance); https://developer.android.com/topic/performance/appstandby
-  Touches: `UsageStatsManager.getAppStandbyBucket()` read, health-status model, Setup/health warning + `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` intent, tests.
-  Acceptance: The app reads the current standby bucket, warns in Setup/health when it is `RARE`/`RESTRICTED`, and offers the battery-optimization exemption flow; the state is shown in the engine-health panel; tests cover bucket-to-warning mapping.
   Complexity: S
 
 
@@ -320,17 +259,10 @@ direct fixes shipped in v0.2.76 across the engine, actions, context, UI, and the
   Touches: `@Database` autoMigrations list + spec classes, DAO `@Upsert` conversions, schema-JSON verification, migration tests.
   Acceptance: Additive schema bumps use `@AutoMigration` with committed schema JSON; profile/variable/cooldown writes use `@Upsert`; existing manual migrations remain for non-additive changes; round-trip and migration tests pass.
   Complexity: M
+  Research update (2026-07-29): Correct the stale baseline to Room schema 8; adopt these APIs only where exported schema JSON proves the change is additive, retaining explicit migrations for semantic rewrites.
 
 
 ## Audit-Discovered Additions
-
-- [ ] P2 — Fix Tasker `Wait` import seconds-vs-milliseconds interpretation
-  Why: `waitMillis` treats the same numeric field as milliseconds when the action has ≥2 Ints but as seconds (×1000) when it has exactly one Int ≤1000, so imported Tasker Wait durations are frequently off by 1000×. Needs confirmation of Tasker's fixed Seconds/Minutes/Hours/Days/MS field layout before changing.
-  Where: `app/src/main/java/com/opentasker/core/transfer/TaskerXmlImport.kt` (`waitMillis`, ~298-312)
-
-- [ ] P3 — QUEUED profiles consume cooldown at enqueue time, not run time
-  Why: In QUEUED mode the cooldown reservation is applied before a trigger is enqueued, so a later distinct trigger during that window is dropped as "cooldown active" even though it would otherwise queue behind the running task — cooldown and queueing interact unintuitively.
-  Where: `app/src/main/java/com/opentasker/core/engine/AutomationService.kt` (`dispatchTask` QUEUED branch)
 
 ## Research-Driven Additions (2026-07-14 pass)
 
@@ -338,64 +270,15 @@ direct fixes shipped in v0.2.76 across the engine, actions, context, UI, and the
 
 ### P1 -- Platform-survival compliance
 
-- [ ] P1 — Add Advanced Protection Mode awareness and graceful degradation
-  Why: Android 16 `AdvancedProtectionManager` revokes Accessibility from apps not declaring the "Accessibility Tool" use, degrading automation-class apps, and OpenTasker has no detection or fallback path.
-  Evidence: no `AdvancedProtectionManager`/`QUERY_ADVANCED_PROTECTION_MODE` usage in `app/src/main`; https://developer.android.com/privacy-and-security/advanced-protection-mode
-  Touches: an APM status reader, Setup/engine-health surfacing, feature gating for APM-affected capabilities, SDK-gated tests.
-  Acceptance: When APM is on the app detects it, warns in Setup/health, and disables/relabels affected features with a documented manual fallback instead of failing opaquely; below API 36 the check is a no-op; tests cover on/off mapping.
-  Complexity: M
-
-- [ ] P1 — Implement the ACCESS_LOCAL_NETWORK runtime request and graceful-denial path
-  Why: Once enforced for target-37 LAN traffic, HTTP-to-private-IP, Ping, WoL, and future MQTT/HA bridges `EPERM` without the permission; only the device-evidence matrix is tracked (blocked) — the request/fallback code is not implemented.
-  Evidence: `app/src/main/java/com/opentasker/core/actions/NetworkActions.kt` (`enforceHttpPolicy`); `app/src/main/AndroidManifest.xml`; https://developer.android.com/privacy-and-security/local-network-permission
-  Touches: manifest permission, Setup permission row, LAN action pre-checks, denial/revocation UX, JVM policy tests.
-  Acceptance: LAN actions request `ACCESS_LOCAL_NETWORK` when targeting a private host, fail closed with a clear message when denied/revoked, and re-request cleanly; non-LAN actions are unaffected; tests cover granted/denied/revoked mapping (device evidence remains separately blocked).
-  Complexity: M
-
 ### P2 -- Exported-surface and intent hardening
 
-- [ ] P2 — Sweep PendingIntent immutability, explicit components, and unique request codes
-  Why: `NotifyAction` derives notification-button request codes from `notifId.hashCode()*31+i` over a user-controllable `Int` id, so with `FLAG_UPDATE_CURRENT` a colliding code lets a newer notification overwrite an older button intent and fire the wrong task; a full immutability/explicit-target sweep is not tracked.
-  Evidence: `app/src/main/java/com/opentasker/core/actions/BuiltInActions.kt:74-83`; https://mas.owasp.org/MASTG/tests/android/MASVS-PLATFORM/MASTG-TEST-0030/
-  Touches: notification/tile/alarm PendingIntent construction, an atomic request-code source, a source guard for mutable/implicit PendingIntents, tests.
-  Acceptance: Every PendingIntent is immutable with an explicit component and a collision-free request code; a test proves two notifications with adjacent ids keep independent button intents; a source guard fails on a mutable/implicit PendingIntent.
-  Complexity: S
-
-- [ ] P2 — Adopt Safer-Intents and unsafe-intent-launch detection for the external-trigger surface
-  Why: The engine unparcels and re-dispatches intents from triggers; API 36 `intentMatchingFlags="enforceIntentFilter"` and StrictMode `detectUnsafeIntentLaunch()` close the classic redirection sink before intent dispatch is generalized.
-  Evidence: exported receivers in `app/src/main/AndroidManifest.xml`; existing debug StrictMode in `app/src/main/java/com/opentasker/app/OpenTaskerApp_NoHilt.kt`; https://developer.android.com/privacy-and-security/risks/intent-redirection
-  Touches: exported-receiver manifest attributes, debug StrictMode VmPolicy, forwarded-intent sanitization, contract tests.
-  Acceptance: Exported receivers enforce their intent filters where supported, debug builds add `detectUnsafeIntentLaunch()`, forwarded extras are validated before dispatch, and tests cover a rejected non-matching/redirected intent.
-  Complexity: S
-
-- [ ] P2 — Harden FileActions against symlink TOCTOU
-  Why: `safeUserFile` canonicalizes and containment-checks the path, but `file.write`/`file.append` then `mkdirs()` and stream through components that can be swapped for symlinks between check and I/O.
-  Evidence: `app/src/main/java/com/opentasker/core/actions/FileActions.kt:183-190`
-  Touches: file open path (`NOFOLLOW_LINKS`/`O_NOFOLLOW`), post-open canonical re-verification, path-escape tests.
-  Acceptance: File I/O opens with no-follow semantics and re-verifies containment immediately before read/write; a test proves a symlink inside the sandbox pointing outside it is refused.
-  Complexity: S
-
 ### P2 -- Engine reliability
-
-- [ ] P2 — Wire scene SLIDER controls to fire a task and surface the value
-  Why: `SceneOverlayService` builds the slider `SeekBar` with no change listener, so a scene slider drives no task and exposes no value, unlike BUTTON tap/long-press.
-  Evidence: `app/src/main/java/com/opentasker/core/scenes/SceneOverlayService.kt:186-193`
-  Touches: slider element binding, task-fire-with-value path, scene element metadata/docs, overlay tests.
-  Acceptance: Dragging a scene slider fires its bound task with the value as a variable (or the element is explicitly documented as display-only and rendered as such); tests cover the value-to-task mapping.
-  Complexity: S
 
 - [ ] P3 — Preserve event-pulse continuity across matcher reconcile
   Why: `pulseSequence` is seeded at 0 per matcher rebuild, and every `reloadProfiles` resets both the sequence and the compared baseline, so an event-context pulse in flight during an edit/reconcile can drop or a buffered replay double-fire.
   Evidence: `app/src/main/java/com/opentasker/core/engine/ProfileMatcherImpl.kt:41-59,137-147`
   Touches: pulse-sequence carry-over across rebuilds (or reconcile debounce away from pulse boundaries), matcher reconcile tests.
   Acceptance: An event fired during a reconcile is delivered exactly once; a test simulates edit-during-pulse and asserts no drop or duplicate.
-  Complexity: S
-
-- [ ] P3 — Scope sub-task input variables to the child task
-  Why: `runSubTask` sets extra args into the parent's current scope before the child scope is pushed, so lowercase inputs remain in the parent task's later actions after the sub-task returns.
-  Evidence: `app/src/main/java/com/opentasker/core/engine/TaskRunner.kt:250-255`
-  Touches: sub-task scope ordering, sub-task variable tests.
-  Acceptance: Sub-task inputs are visible to the child and cleaned up when its scope pops; a test proves the parent's later actions do not see the child's input names.
   Complexity: S
 
 ### P2 -- Local-first authoring primitives
@@ -427,13 +310,6 @@ direct fixes shipped in v0.2.76 across the engine, actions, context, UI, and the
   Touches: clipboard/QR-text bundle decode, existing import-review pipeline reuse, size/format validation, import tests.
   Acceptance: A valid bundle pasted from the clipboard (or scanned) routes through the existing disabled-by-default import review before any Room write; malformed/oversized input is rejected; tests cover paste import and rejection.
   Complexity: M
-
-- [ ] P3 — Add an inverted / outside-geofence location condition
-  Why: "fire when NOT at a place" needs geofence-exit semantics distinct from generic AND/OR/NOT grouping and is a recurring FOSS request.
-  Evidence: `app/src/main/java/com/opentasker/core/contexts/FossGeofenceEvaluator.kt`; `app/src/main/java/com/opentasker/core/location/LocationDwellState.kt`; https://github.com/henrichg/PhoneProfilesPlus/discussions/62
-  Touches: Location context inversion flag, matcher/dwell handling for outside state, editor toggle, inspector copy, tests.
-  Acceptance: A Location context can match while outside its radius (with dwell), migrates existing inside-only configs unchanged, and is explained in the Context Inspector; tests cover inside/outside/dwell transitions.
-  Complexity: S
 
 - [ ] P3 — Add an "all Bluetooth devices disconnected" state
   Why: Firing only when the final BT device drops (not per-device) is a small, well-scoped Easer request the current per-device contexts cannot express.
@@ -523,6 +399,7 @@ direct fixes shipped in v0.2.76 across the engine, actions, context, UI, and the
   Touches: keyset-paged DAO/query, database-backed filters, run-log UI, redacted JSON/CSV export, tests.
   Acceptance: Every retained row is reachable with stable timestamp/id keyset pagination; task/status/date/query filters run in SQL and survive refresh; JSON/CSV export includes the selected range with existing secret/redaction policy; concurrent inserts do not duplicate or skip rows.
   Complexity: M
+  Research update (2026-07-29): Include a count/age preview plus export-or-confirm before a retention reduction prunes rows, and replace `diagnostics.traces.take(4)` with an accessible expand/collapse path for every retained trace.
 
 - [ ] P2 — Add an optional foreground activity/component constraint
   Why: Package-only application contexts are too broad for apps with multiple activities, and `AppUsageMonitor` currently discards the observed `className`.
@@ -536,4 +413,129 @@ direct fixes shipped in v0.2.76 across the engine, actions, context, UI, and the
   Evidence: `gradle/libs.versions.toml`; https://kotlinlang.org/docs/whatsnew24.html; https://github.com/google/ksp/releases/tag/2.3.10; https://developer.android.com/develop/ui/compose/bom/bom-mapping; https://github.com/Kotlin/kotlinx.coroutines/releases/tag/1.11.0.
   Touches: version catalog/wrapper compatibility, generated Room/KSP output, Compose/Lifecycle/coroutine call sites, verification metadata, local gate.
   Acceptance: The synchronized versions resolve without dynamic artifacts; a clean local gate passes JVM tests, blocking lint, Room schema generation, Play/F-Droid release builds, and two configuration-cache runs; Gradle remains 9.4.1 unless a separate compatibility proof justifies a wrapper change; rollback is one catalog commit.
+  Complexity: M
+  Research update (2026-07-29): Target Kotlin 2.4.10, not 2.4.0, and include migration from pre-release `kotlinx.collections.immutable` 0.3.8 to stable 0.5.1; keep KSP 2.3.10, Compose BOM 2026.06, Lifecycle 2.11, and Coroutines 1.11 synchronized.
+
+## Research-Driven Additions (2026-07-23 pass)
+
+As of 2026-07-29, the app sets `targetSdk = 37`; the P1 items below are mandatory Android 17 behavior changes that are only partially handled (code-actionable now, no device required to migrate the APIs). Items already present in ROADMAP.md or Roadmap_Blocked.md (clipboard/contacts, share-target, companion-device, USB, screen-recording, app-archive, ProgressStyle, predictive-back, 16 KB alignment, MQTT/UnifiedPush/HA, dry-run preflight, media-active context, global search, AND/OR/NOT groups, live variable inspector, active-execution cancellation, automation-mode test coverage, dependency batch) are intentionally NOT repeated here.
+
+### P1 — Android 17 (target SDK 37) platform survival
+
+### P2 — Observability, debuggability, and reliability
+
+- [ ] P2 — Add unit coverage for the context monitors and core Compose form state
+  Why: The most correctness-sensitive untested code is the monitor lifecycle (WiFi/AppUsage/shake/scheduler) and the large Compose editors' validation/state; engine and context sources are well covered but these seams have <5 test files.
+  Evidence: `app/src/main/java/com/opentasker/automation/network/WiFiNetworkMonitor.kt`; `app/src/main/java/com/opentasker/automation/app/AppUsageMonitor.kt`; `app/src/main/java/com/opentasker/automation/scheduler/TimeEventScheduler.kt`; `app/src/main/java/com/opentasker/ui/screens/EditorDialogs.kt`; existing thin `app/src/test/java/com/opentasker/ui/screens` set
+  Touches: JVM/Robolectric or fake-driven tests for monitor register/unregister/permission-loss/re-register, and editor validation/state-restore tests.
+  Acceptance: Each monitor has tests for start, permission-missing pause, and teardown-without-leak; representative editors have validation and rotation/state-restore tests; a regression in monitor teardown or editor validation is reproduced and locked.
+  Complexity: M
+
+
+### P3 — New platform triggers and actions no FOSS competitor exposes
+
+- [ ] P3 — Author real system Zen rules with device effects (AutomaticZenRule + ZenDeviceEffects)
+  Why: `dnd.set` only calls `setInterruptionFilter`, a transient global toggle; `AutomaticZenRule` lets a task create/own a named Zen rule and `ZenDeviceEffects` (grayscale, dim wallpaper, night mode) as first-class actions competitors mostly lack.
+  Evidence: `app/src/main/java/com/opentasker/core/actions/SettingsActions.kt:222` (`setInterruptionFilter`); https://developer.android.com/about/versions/15/features; https://developer.android.com/reference/android/app/NotificationManager#addAutomaticZenRule(android.app.AutomaticZenRule)
+  Touches: `zen.rule.set`/`zen.rule.clear` actions with SDK gating, `ZenDeviceEffects` options, notification-policy-access setup copy, action metadata, tests.
+  Acceptance: On supported SDKs a task can create/update/own a named Zen rule with selected device effects and remove it, falling back to the existing `dnd.set` behavior below the floor; policy-access is checked and fails closed; tests cover rule create/clear and the low-SDK fallback.
+  Complexity: M
+
+- [ ] P3 — Add Bluetooth key-loss / encryption-change security triggers
+  Why: Android 16 adds `ACTION_KEY_MISSING` (bond broken by remote) and `ACTION_ENCRYPTION_CHANGE` intents — purpose-built for security automations (e.g. lock/notify when a paired device loses its bond) that the current per-device connect/disconnect contexts cannot express.
+  Evidence: `app/src/main/java/com/opentasker/core/contexts/BluetoothContextEvents.kt`; https://developer.android.com/about/versions/16/behavior-changes-16
+  Touches: `event=bluetooth_key_missing`/`bluetooth_encryption_change` context mappings with SDK gating, receiver registration/teardown, editor options, tests.
+  Acceptance: On SDK 36+ a task fires on bond-loss / encryption-change for a matching device with device attributes as sanitized variables; registration is torn down with the source; tests cover the state mapping and the low-SDK no-op.
+  Complexity: S
+
+- [ ] P3 — Turn Advanced Protection detection into a live callback and trigger
+  Why: `AdvancedProtectionReader` reads APM state once via reflection for a static warning; `registerAdvancedProtectionCallback` gives live state changes, enabling an `event=advanced_protection` trigger and an accurate "N profiles degraded" banner instead of a stale poll — and it gates the roadmap's bounded-accessibility eval.
+  Evidence: `app/src/main/java/com/opentasker/core/diagnostics/AdvancedProtectionReader.kt`; `app/src/main/java/com/opentasker/core/diagnostics/EngineHealthReader.kt`; https://developer.android.com/privacy-and-security/advanced-protection-mode
+  Touches: reflection-safe callback registration/teardown, an `event=advanced_protection` context, Diagnostics/Setup live banner, pure mapping tests.
+  Acceptance: On SDK 36+ APM enable/disable updates the UI live and can fire a task; registration fails closed and is torn down; below the floor it is a labeled no-op; the state mapping is unit-tested.
+  Complexity: S
+
+- [ ] P3 — Re-add an SMS/MMS-received trigger with Android 17 OTP-delay handling
+  Why: The SMS-received trigger was removed as unsupported; it is a top everyday automation, but at API 37 standard-SMS OTP content is withheld for 3 hours from non-default-SMS apps, so it can only be re-added correctly with explicit delay/exemption handling.
+  Evidence: CHANGELOG entry removing "unsupported SMS-received trigger advertising"; `app/src/main/AndroidManifest.xml` (SMS permission policy, Play build omits it); https://developer.android.com/about/versions/17/behavior-changes-17 (SMS OTP protection)
+  Touches: `event=sms_received` context with sender/body filters (standard/F-Droid track only), sanitized extras, an in-UI note about the API-37 OTP delay and default-SMS/companion exemption, SDK-gated behavior, tests.
+  Acceptance: On the SMS-permitted build a filtered SMS triggers a task with sanitized sender/body variables; the editor discloses the API-37 OTP-delay limitation; Play builds keep the trigger absent; tests cover filter matching and the permission-absent path.
+  Complexity: M
+
+- [ ] P3 — Assert read-only native libraries in the release gate (Android 17 System.load)
+  Why: API 37 throws `UnsatisfiedLinkError` for any `.so` loaded via `System.load()` that is not read-only; if SQLCipher or a native MQTT client ever ships (both on the roadmap), a non-read-only `.so` would crash at load — cheap to gate alongside the existing 16 KB-alignment check.
+  Evidence: `app/build.gradle.kts`; existing 16 KB-alignment roadmap item; https://developer.android.com/about/versions/17/behavior-changes-17 (Safer native DCL)
+  Touches: the release-gate `.so` inspection (extend the 16 KB check), a pure-JVM trivial-pass path, gate reporting.
+  Acceptance: The release gate reports whether any packaged `.so` is not read-only and fails on a regression; a pure-JVM build with no native libs passes trivially and is recorded as such.
+  Complexity: S
+
+## Research-Driven Additions
+
+### P0 — Data integrity and runtime truth
+
+- [ ] P0 — Make the action capability contract total and executable
+  Why: Known-but-unlisted actions default to `Supported`; `app.kill` always fails, `screen.timeout` needs unexposed Write Settings access, and implementation/metadata/setup/distribution truth can drift independently.
+  Evidence: `app/src/main/java/com/opentasker/core/capabilities/ActionCapabilities.kt:33-71`; `app/src/main/java/com/opentasker/core/actions/AppActions.kt:46-54`; `app/src/main/java/com/opentasker/core/actions/SettingsActions.kt:101-124,398-420`; `app/src/main/AndroidManifest.xml`; Android `Settings.ACTION_MANAGE_WRITE_SETTINGS`.
+  Touches: `RuntimeRegistries.kt`, `ActionMetadata.kt`, `ActionCapabilities.kt`, `AutomationSensitivity.kt`, manifest variants, `PermissionOnboardingScreen.kt`, README truth tests.
+  Acceptance: Every runtime or engine-handled action has exactly one metadata/capability/sensitivity/distribution/setup contract; `Supported` actions can succeed under a satisfiable fixture, permanent stubs are `Unsupported`, and special-access actions expose a working grant/deep-link and revoked-state failure; the registry-derived action count cannot drift from README.
+  Complexity: M
+
+- [ ] P0 — Centralize task references and make deletion reference-safe
+  Why: Task deletion checks only profile enter/exit IDs, leaving `task.run`, notification-button, and scene tap/long-press references dangling or silently retargetable.
+  Evidence: `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationViewModel.kt:271-281`; `app/src/main/java/com/opentasker/core/actions/ActionMetadata.kt` task fields; `app/src/main/java/com/opentasker/core/model/Scene.kt`; `app/src/main/java/com/opentasker/core/transfer/OpenTaskerBundle.kt`.
+  Touches: a typed `AutomationReferenceIndex`/rewriter in `core`, task/profile/scene repositories, delete/rename dialogs, bundle import, global search, transaction tests.
+  Acceptance: One index enumerates ID- and name-based references from profiles, `task.run`, all notification buttons, and scene gestures; delete/rename previews every dependent object and offers block/reassign/clear in one transaction; import and deletion use the same rewriter; tests prove no dangling or accidentally retargeted reference remains.
+  Complexity: M
+
+### P1 — Reliability, recovery, and explainability
+
+- [ ] P1 — Add execution admission, feedback-loop warnings, and a storm circuit breaker
+  Why: `PARALLEL` retriggers launch without a concurrency ceiling, and direct task/context feedback chains can repeatedly exercise powerful actions; automation-security studies find these interactions both common and difficult for users to diagnose.
+  Evidence: `app/src/main/java/com/opentasker/core/engine/AutomationService.kt:474-483`; `app/src/main/java/com/opentasker/core/capabilities/AutomationSensitivity.kt`; USENIX Security 2025 automation-app abusability study; TAPInspector; SOUPS 2023 conflict study.
+  Touches: engine admission controller, profile/task dependency graph, risk analyzer, run-log skip reasons, Diagnostics, profile-enable/import review, engine tests.
+  Acceptance: Configured global and per-profile concurrency/burst limits bound every mode; repeated direct cycles trip a persisted cooldown/circuit state and log the causal chain; the analyzer warns only on explainable high-confidence feedback/data-to-power paths with an explicit acknowledgement; ordinary independent profiles remain unaffected.
+  Complexity: L
+
+- [ ] P1 — Broker external task runs outside the broadcast lifetime
+  Why: `AutomationTargetReceiver` holds `goAsync()` until the entire task finishes, but Android expects broadcast work to complete in roughly 10 seconds and tasks may wait for 30 minutes.
+  Evidence: `app/src/main/java/com/opentasker/core/external/AutomationTargetReceiver.kt:50-95`; `app/src/main/java/com/opentasker/core/actions/NotificationActionReceiver.kt`; `app/src/main/java/com/opentasker/core/actions/BuiltInActions.kt:304-327`; https://developer.android.com/develop/background-work/background-tasks/broadcasts.
+  Touches: versioned external contract, `AutomationTargetReceiver`, `AutomationService`, execution IDs/status storage (reuse the active-execution registry item), Locale fire bridge, manifest, IPC/service tests.
+  Acceptance: A versioned asynchronous run request authenticates and validates, enqueues to service-owned execution, returns `accepted` plus an execution ID, and finishes promptly without claiming terminal success; callers can query terminal status by ID and the normal redacted Run Log records it; legacy callers get an explicit protocol response; a task waiting longer than 10 seconds survives receiver completion; unknown/unauthorized callers remain denied.
+  Complexity: M
+
+- [ ] P1 — Derive Setup requirements from enabled automations
+  Why: Setup presents a broad platform checklist even for an empty workspace, obscuring the difference between a blocker for an enabled profile, an optional integration, and a reliability optimization.
+  Evidence: `app/src/main/java/com/opentasker/ui/screens/PermissionOnboardingScreen.kt`; `app/src/main/java/com/opentasker/core/capabilities/ActionCapabilities.kt`; registered context-source requirements; Android in-context permission guidance.
+  Touches: the P0 capability contract, capability/context requirement resolver, Setup sections/progress, action/context editor prompts, profile-enable preflight, permission-revocation observer, UI tests.
+  Acceptance: Setup separates Engine baseline, Needed by enabled automations, Optional integrations, and Reliability; each row names the dependent profiles/actions and deep-links to a working grant path; an empty workspace has no automation-specific blockers; add/enable/run and revocation update requirements immediately.
+  Complexity: M
+
+- [ ] P1 — Make Diagnostics health freshness- and failure-aware
+  Why: A prior observation can leave a source looking active, and aggregate health can hide loading, stale, failed, or retrying subsystems.
+  Evidence: `app/src/main/java/com/opentasker/core/diagnostics/EngineHealthReader.kt`; `app/src/main/java/com/opentasker/ui/screens/DiagnosticsScreen.kt`; `app/src/main/java/com/opentasker/ui/screens/ContextInspectorScreen.kt`; engine heartbeat and monitor state stores.
+  Touches: the existing demand-gated observation-bus item, pure health-reason model, timestamped source states, heartbeat/monitor readers, Diagnostics and Inspector status UI, retry/deep-link actions, active-execution state, tests.
+  Acceptance: Every subsystem reports Loading/Ready/Stale/Error with observation age and a concrete reason; aggregate Healthy is impossible while required evidence is loading, stale, or failed; exact-alarm fallback, standby bucket, foreground-service state, Advanced Protection, permissions, pending executions, and monitor errors are represented; refresh/retry and setup links are testable.
+  Complexity: M
+
+- [ ] P1 — Add review and cancellation to staged database restore
+  Why: Selecting a database immediately replaces the pending restart journal, so users cannot inspect the candidate, cancel it, or distinguish it from a prior staged restore.
+  Evidence: `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationViewModel.kt:589-615`; `app/src/main/java/com/opentasker/core/storage/DatabaseBackupManager.kt:123-201,267-330`.
+  Touches: backup inspector/summary DTO, Setup restore review dialog, pending-journal cancellation/replacement, rollback surfacing, backup tests and UI tests.
+  Acceptance: Selection shows source, schema version, compatibility, and entity counts before an explicit Stage action; an existing pending restore must be kept, replaced with confirmation, or canceled; cancellation removes only the validated pending journal; apply retains the current atomic replacement, pre-restore snapshot, and failed-restore recovery evidence.
+  Complexity: M
+
+### P2 — Authoring and resilience depth
+
+- [ ] P2 — Add bounded failure-catch and retry/backoff flow blocks
+  Why: `continueOnError` can suppress a failure but cannot recover a span, retry transient work, or expose structured failure details, while Automate and mature workflow engines make that control flow explicit.
+  Evidence: engine flow markers in `app/src/main/java/com/opentasker/core/engine/TaskRunner.kt`; https://llamalab.com/automate/doc/block/failure_catch.html; https://assets.temporal.io/durable-execution.pdf; Node-RED, n8n, and Activepieces execution semantics.
+  Touches: versioned flow metadata/markers, validator, task runner, action retry-safety metadata, action editor and graph, trace/failure variables, bundle/Tasker migration, tests.
+  Acceptance: A bounded try/catch span can expose sanitized failure type/message/step variables; retry supports fixed maximum attempts, exponential backoff cap, and optional jitter, but defaults to actions classified idempotent or failures proven to occur before a side effect; non-idempotent retries require an explicit warning/acknowledgement and an idempotency mechanism where supported; cancellation and engine timeout are never swallowed; invalid nesting is rejected before save/import; traces show each attempt without secrets.
+  Complexity: L
+
+- [ ] P2 — Make scene images and value controls valid and accessible by construction
+  Why: Image drafts start with unsupported source `"Image"` and can save without a decodable persistent URI or accessible description; slider/bounds validation is split across editor and runtime.
+  Evidence: `app/src/main/java/com/opentasker/core/scenes/SceneElementDrafts.kt:34-43`; `app/src/main/java/com/opentasker/core/scenes/SceneImageLoader.kt:12-47`; `app/src/main/java/com/opentasker/ui/screens/SceneEditorDialogs.kt`; `app/src/main/java/com/opentasker/core/scenes/SceneOverlayService.kt`.
+  Touches: scene draft defaults/validator, document picker and persisted URI grants, image preview/error state, description/decorative metadata, slider and bounds validation, overlay semantics, tests.
+  Acceptance: Image drafts start empty and cannot save until a supported decodable URI is retained or the element is removed; revoked/invalid sources show a repair action; every image is decorative or has a description used by semantics; slider min/value/max and element bounds validate identically in editor, import, and runtime.
   Complexity: M

@@ -56,6 +56,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
+import com.opentasker.core.actions.ActionArgumentSensitivity
 import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
@@ -760,7 +761,8 @@ private fun ActionRow(
             Column(Modifier.weight(1f)) {
                 Text(actionLabel, style = MaterialTheme.typography.titleSmall)
                 Text(
-                    action.args.entries.joinToString { "${it.key}=${it.value}" }.ifBlank { metadataDescription ?: stringResource(R.string.workspace_no_arguments) },
+                    ActionArgumentSensitivity.summarize(action.type, action.args)
+                        .ifBlank { metadataDescription ?: stringResource(R.string.workspace_no_arguments) },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,

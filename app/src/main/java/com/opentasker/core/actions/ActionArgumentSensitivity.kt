@@ -1,0 +1,116 @@
+package com.opentasker.core.actions
+
+/**
+ * Single source of truth for which action arguments are sensitive and how an action's stored
+ * arguments are rendered for display.
+ *
+ * Runtime traces already redact secret-derived values, but the task list, flow graph, and
+ * import/share previews render the *stored* arguments, so an HTTP `authorization` header or a
+ * request body typed by the user could otherwise appear on screen, in a screenshot, and in
+ * accessibility semantics. Every one of those surfaces resolves through this object.
+ *
+ * Resolution order for a single argument:
+ *  1. explicit [ActionField.sensitive] on the action's registered metadata (true or false), then
+ *  2. the shared argument-name heuristic in [SENSITIVE_NAME_TOKENS].
+ *
+ * Unknown action types and unknown argument keys therefore fall back to the heuristic and are
+ * masked rather than printed — new or forward-compatible sensitive keys fail closed.
+ */
+object ActionArgumentSensitivity {
+
+    const val REDACTED = "<redacted>"
+
+    const val DEFAULT_MAX_VALUE_LENGTH = 80
+    const val DEFAULT_SUMMARY_LIMIT = 4
+
+    /**
+     * Argument-name substrings treated as sensitive for any action, registered or not. Kept
+     * deliberately broad: over-masking a structural field is recoverable, printing a credential
+     * is not.
+     */
+    val SENSITIVE_NAME_TOKENS: List<String> = listOf(
+        "authorization",
+        "body",
+        "cookie",
+        "credential",
+        "headers",
+        "key",
+        "passphrase",
+        "password",
+        "query",
+        "secret",
+        "token",
+    )
+
+    /**
+     * Actions whose value argument only becomes sensitive because of what a sibling argument
+     * names. `var.set name=api_token value=...` stores a credential under an innocuous key.
+     */
+    private val NAME_KEYED_VALUE_ARGS: Map<String, Pair<String, String>> = mapOf(
+        "var.set" to ("name" to "value"),
+    )
+
+    /** True when [argName] itself reads as a credential-bearing key. */
+    fun isSensitiveArgumentName(argName: String): Boolean =
+        SENSITIVE_NAME_TOKENS.any { token -> argName.contains(token, ignoreCase = true) }
+
+    /**
+     * True when [argName] must be masked for [actionType]. Pass a null [actionType] for
+     * non-action argument maps (context configs, plugin bundles) to use the heuristic alone.
+     */
+    fun isSensitive(actionType: String?, argName: String, args: Map<String, String> = emptyMap()): Boolean {
+        declaredSensitivity(actionType, argName)?.let { return it }
+        if (isSensitiveArgumentName(argName)) return true
+        val keyed = actionType?.let { NAME_KEYED_VALUE_ARGS[it] } ?: return false
+        val (nameArg, valueArg) = keyed
+        if (!argName.equals(valueArg, ignoreCase = true)) return false
+        val referencedName = args[nameArg].orEmpty()
+        return referencedName.isNotBlank() && isSensitiveArgumentName(referencedName)
+    }
+
+    /** The explicit metadata declaration for [argName], or null when the field is not declared. */
+    fun declaredSensitivity(actionType: String?, argName: String): Boolean? = actionType
+        ?.let(ActionMetadataRegistry::get)
+        ?.fields
+        ?.firstOrNull { it.key.equals(argName, ignoreCase = true) }
+        ?.sensitive
+
+    /** Masks or shortens a single stored argument value for display. */
+    fun maskValue(
+        actionType: String?,
+        argName: String,
+        value: String,
+        args: Map<String, String> = emptyMap(),
+        maxLength: Int = DEFAULT_MAX_VALUE_LENGTH,
+    ): String {
+        if (isSensitive(actionType, argName, args)) return REDACTED
+        return value.collapseWhitespace().ellipsize(maxLength)
+    }
+
+    /**
+     * Deterministic, redacted, single-line summary of [args] suitable for list rows, flow nodes,
+     * and previews. Returns an empty string when there is nothing to show so callers can fall
+     * back to their own placeholder copy.
+     */
+    fun summarize(
+        actionType: String?,
+        args: Map<String, String>,
+        limit: Int = DEFAULT_SUMMARY_LIMIT,
+        maxValueLength: Int = DEFAULT_MAX_VALUE_LENGTH,
+    ): String {
+        if (args.isEmpty()) return ""
+        val ordered = args.entries.sortedBy { it.key }
+        val visible = ordered.take(limit).joinToString(", ") { (key, value) ->
+            "$key=${maskValue(actionType, key, value, args, maxValueLength)}"
+        }
+        val hidden = ordered.size - limit
+        return if (hidden > 0) "$visible, +$hidden more" else visible
+    }
+
+    private fun String.collapseWhitespace(): String = replace(WHITESPACE, " ").trim()
+
+    private fun String.ellipsize(maxLength: Int): String =
+        if (length <= maxLength) this else take(maxLength) + "..."
+
+    private val WHITESPACE = Regex("""\s+""")
+}

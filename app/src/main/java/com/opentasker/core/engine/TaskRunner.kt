@@ -1,5 +1,6 @@
 package com.opentasker.core.engine
 
+import com.opentasker.core.actions.ActionArgumentSensitivity
 import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.expressions.TemplateExpansionTrace
@@ -277,7 +278,7 @@ class TaskRunner(
             ?: ActionResult.Failure("unknown action: ${spec.type}").let { result ->
                 return result to traceFor(index, spec, started, result, ActionArgumentExpansionReport.Empty)
             }
-        val expansionReport = expandArgs(spec.args)
+        val expansionReport = expandArgs(spec.type, spec.args)
         val timeoutMs = actionTimeoutMs(spec.type)
         val rawResult = try {
             withTimeout(timeoutMs) {
@@ -311,7 +312,7 @@ class TaskRunner(
         spec: ActionSpec,
         started: Long,
     ): Pair<ActionResult, ActionExecutionTrace> {
-        val expansionReport = expandArgs(spec.args)
+        val expansionReport = expandArgs(spec.type, spec.args)
         val args = expansionReport.args
 
         fun fail(message: String): Pair<ActionResult, ActionExecutionTrace> {
@@ -393,7 +394,7 @@ class TaskRunner(
         argumentExpansions = expansionReport.expansions,
     )
 
-    private fun expandArgs(args: Map<String, String>): ActionArgumentExpansionReport {
+    private fun expandArgs(actionType: String, args: Map<String, String>): ActionArgumentExpansionReport {
         if (args.isEmpty()) return ActionArgumentExpansionReport.Empty
 
         val templateScope = ctx.variables.toTemplateScope(ctx.eventVariables)
@@ -431,7 +432,7 @@ class TaskRunner(
             result.value
         }
 
-        return ActionArgumentExpansionReport(expandedArgs, expansions)
+        return ActionArgumentExpansionReport(expandedArgs, expansions, actionType)
     }
 }
 
@@ -510,6 +511,7 @@ fun List<ActionExecutionTrace>.toRunLogMessage(maxLines: Int = 8): String {
 private data class ActionArgumentExpansionReport(
     val args: Map<String, String>,
     val expansions: List<ActionArgumentExpansionTrace>,
+    val actionType: String? = null,
 ) {
     fun templateWarnings(): List<String> =
         expansions.flatMap { expansion -> expansion.warnings.map { "${expansion.argName}: $it" } }.distinct()
@@ -519,7 +521,7 @@ private data class ActionArgumentExpansionReport(
         return expansions
             .take(MAX_SUMMARY_ARGS)
             .joinToString(", ") { expansion ->
-                "${expansion.argName}=${summarizeArgValue(expansion.argName, expansion.expandedValue, expansion.isSecretDerived)}"
+                "${expansion.argName}=${summarizeArgValue(actionType, expansion.argName, expansion.expandedValue, expansion.isSecretDerived)}"
             }
             .let { summary ->
                 val remaining = expansions.size - MAX_SUMMARY_ARGS
@@ -572,14 +574,16 @@ private fun ActionExecutionTrace.traceDetailSuffix(): String {
 private fun ActionExecutionTrace.toRunLogLines(): List<String> = buildList {
     add(toSummaryLine())
     argumentExpansions
-        .flatMap { it.toTemplateDiagnosticLines() }
+        .flatMap { it.toTemplateDiagnosticLines(actionType) }
         .take(MAX_TEMPLATE_TRACE_LINES_PER_ACTION)
         .forEach(::add)
 }
 
-private fun ActionArgumentExpansionTrace.toTemplateDiagnosticLines(): List<String> =
+private fun ActionArgumentExpansionTrace.toTemplateDiagnosticLines(actionType: String?): List<String> =
     expressions.map { expressionTrace ->
-        val sensitive = isSecretDerived || isSensitiveArgName(argName) || expressionTrace.isSecretDerived
+        val sensitive = isSecretDerived ||
+            ActionArgumentSensitivity.isSensitive(actionType, argName) ||
+            expressionTrace.isSecretDerived
         listOf(
             TEMPLATE_TRACE_PREFIX,
             argName.toLogField(),
@@ -590,8 +594,13 @@ private fun ActionArgumentExpansionTrace.toTemplateDiagnosticLines(): List<Strin
         ).joinToString("\t")
     }
 
-private fun summarizeArgValue(argName: String, value: String, forceRedact: Boolean = false): String {
-    if (forceRedact || isSensitiveArgName(argName)) {
+private fun summarizeArgValue(
+    actionType: String?,
+    argName: String,
+    value: String,
+    forceRedact: Boolean = false,
+): String {
+    if (forceRedact || ActionArgumentSensitivity.isSensitive(actionType, argName)) {
         return REDACTED_VALUE
     }
     val singleLine = value.replace(Regex("""\s+"""), " ").trim()
@@ -612,22 +621,8 @@ private fun String.toLogField(): String =
             if (value.length <= MAX_TEMPLATE_TRACE_FIELD_LENGTH) value else value.take(MAX_TEMPLATE_TRACE_FIELD_LENGTH) + "..."
         }
 
-private fun isSensitiveArgName(argName: String): Boolean =
-    SENSITIVE_ARG_TOKENS.any { token -> argName.contains(token, ignoreCase = true) }
-
-private val SENSITIVE_ARG_TOKENS = listOf(
-    "authorization",
-    "cookie",
-    "body",
-    "headers",
-    "key",
-    "password",
-    "query",
-    "secret",
-    "token",
-)
 private const val TEMPLATE_TRACE_PREFIX = "Template:"
-private const val REDACTED_VALUE = "<redacted>"
+private const val REDACTED_VALUE = ActionArgumentSensitivity.REDACTED
 private const val MAX_SUMMARY_ARGS = 4
 private const val MAX_SUMMARY_VALUE_LENGTH = 80
 private const val MAX_TEMPLATE_TRACE_LINES_PER_ACTION = 8

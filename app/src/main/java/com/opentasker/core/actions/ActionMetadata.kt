@@ -13,6 +13,12 @@ data class ActionField(
     val fieldType: FieldType = FieldType.TEXT,
     val required: Boolean = false,
     @get:StringRes val hintRes: Int? = null,
+    /**
+     * Explicit display sensitivity for this argument. `null` defers to the shared argument-name
+     * heuristic in [ActionArgumentSensitivity], so unknown keys still fail closed; `false` marks a
+     * structurally useful field the heuristic would over-mask (a variable name, a file path).
+     */
+    val sensitive: Boolean? = null,
 )
 
 enum class FieldType {
@@ -402,7 +408,7 @@ fun registerActionMetadata() {
                 ActionField("executable", R.string.catalog_action_script_termux_run_field_executable_label, required = true, hintRes = R.string.catalog_action_script_termux_run_field_executable_hint),
                 ActionField("arguments", R.string.catalog_action_script_termux_run_field_arguments_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_script_termux_run_field_arguments_hint),
                 ActionField("workingDirectory", R.string.catalog_action_script_termux_run_field_workingdirectory_label, hintRes = R.string.catalog_action_script_termux_run_field_workingdirectory_hint),
-                ActionField("stdin", R.string.catalog_action_script_termux_run_field_stdin_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_script_termux_run_field_stdin_hint),
+                ActionField("stdin", R.string.catalog_action_script_termux_run_field_stdin_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_script_termux_run_field_stdin_hint, sensitive = true),
                 ActionField("capturePrefix", R.string.catalog_action_script_termux_run_field_captureprefix_label, hintRes = R.string.catalog_action_script_termux_run_field_captureprefix_hint),
                 ActionField("timeoutMs", R.string.catalog_action_script_termux_run_field_timeoutms_label, FieldType.NUMBER, hintRes = R.string.catalog_action_script_termux_run_field_timeoutms_hint),
             )
@@ -612,7 +618,7 @@ fun registerActionMetadata() {
             categoryRes = R.string.catalog_category_app,
             fields = listOf(
                 ActionField("number", R.string.catalog_action_sms_send_field_number_label, required = true),
-                ActionField("message", R.string.catalog_action_sms_send_field_message_label, FieldType.MULTILINE, required = true),
+                ActionField("message", R.string.catalog_action_sms_send_field_message_label, FieldType.MULTILINE, required = true, sensitive = true),
             )
         )
     )
@@ -705,15 +711,15 @@ fun registerActionMetadata() {
             fields = listOf(
                 ActionField("method", R.string.catalog_action_http_request_field_method_label, hintRes = R.string.catalog_action_http_request_field_method_hint),
                 ActionField("url", R.string.catalog_action_http_request_field_url_label, required = true),
-                ActionField("query", R.string.catalog_action_http_request_field_query_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_http_request_field_query_hint),
-                ActionField("headers", R.string.catalog_action_http_request_field_headers_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_http_request_field_headers_hint),
-                ActionField("authorization", R.string.catalog_action_http_request_field_authorization_label, hintRes = R.string.catalog_action_http_request_field_authorization_hint),
-                ActionField("body", R.string.catalog_action_http_request_field_body_label, FieldType.MULTILINE),
-                ActionField("body_file", R.string.catalog_action_http_request_field_body_file_label, hintRes = R.string.catalog_action_http_request_field_body_file_hint),
+                ActionField("query", R.string.catalog_action_http_request_field_query_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_http_request_field_query_hint, sensitive = true),
+                ActionField("headers", R.string.catalog_action_http_request_field_headers_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_http_request_field_headers_hint, sensitive = true),
+                ActionField("authorization", R.string.catalog_action_http_request_field_authorization_label, hintRes = R.string.catalog_action_http_request_field_authorization_hint, sensitive = true),
+                ActionField("body", R.string.catalog_action_http_request_field_body_label, FieldType.MULTILINE, sensitive = true),
+                ActionField("body_file", R.string.catalog_action_http_request_field_body_file_label, hintRes = R.string.catalog_action_http_request_field_body_file_hint, sensitive = false),
                 ActionField("content_type", R.string.catalog_action_http_request_field_content_type_label, hintRes = R.string.catalog_action_http_request_field_content_type_hint),
                 ActionField("response_var", R.string.catalog_action_http_request_field_response_var_label, hintRes = R.string.catalog_action_http_request_field_response_var_hint),
                 ActionField("status_var", R.string.catalog_action_http_request_field_status_var_label, hintRes = R.string.catalog_action_http_request_field_status_var_hint),
-                ActionField("headers_var", R.string.catalog_action_http_request_field_headers_var_label, hintRes = R.string.catalog_action_http_request_field_headers_var_hint),
+                ActionField("headers_var", R.string.catalog_action_http_request_field_headers_var_label, hintRes = R.string.catalog_action_http_request_field_headers_var_hint, sensitive = false),
                 ActionField("output_file", R.string.catalog_action_http_request_field_output_file_label, hintRes = R.string.catalog_action_http_request_field_output_file_hint),
                 ActionField("max_response_bytes", R.string.catalog_action_http_request_field_max_response_bytes_label, FieldType.NUMBER, hintRes = R.string.catalog_action_http_request_field_max_response_bytes_hint),
                 ActionField("redirects", R.string.catalog_action_http_request_field_redirects_label, hintRes = R.string.catalog_action_http_request_field_redirects_hint),
@@ -750,7 +756,7 @@ fun registerActionMetadata() {
             categoryRes = R.string.catalog_category_network,
             fields = listOf(
                 ActionField("url", R.string.catalog_action_http_post_field_url_label, required = true),
-                ActionField("data", R.string.catalog_action_http_post_field_data_label, FieldType.MULTILINE),
+                ActionField("data", R.string.catalog_action_http_post_field_data_label, FieldType.MULTILINE, sensitive = true),
                 ActionField("var", R.string.catalog_action_http_post_field_var_label, hintRes = R.string.catalog_action_http_post_field_var_hint),
                 ActionField("allow_http", R.string.catalog_action_http_post_field_allow_http_label, FieldType.CHECKBOX, hintRes = R.string.catalog_action_http_post_field_allow_http_hint),
             ),

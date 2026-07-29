@@ -239,7 +239,7 @@ class PersistVariableAction : Action {
     }
 }
 
-private const val REDACTED_VARIABLE_VALUE = "<redacted>"
+private const val REDACTED_VARIABLE_VALUE = ActionArgumentSensitivity.REDACTED
 
 /**
  * Say (text-to-speech) action.

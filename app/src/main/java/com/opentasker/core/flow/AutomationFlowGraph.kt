@@ -1,5 +1,6 @@
 package com.opentasker.core.flow
 
+import com.opentasker.core.actions.ActionArgumentSensitivity
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.Profile
@@ -239,7 +240,7 @@ private fun ContextSpec.toNode(id: String, profileId: Long, index: Int): Automat
         title = "Context ${index + 1}: ${type.name.lowercase().replaceFirstChar { it.uppercase() }}",
         detail = listOfNotNull(
             if (invert) "Inverted" else null,
-            config.summaryOrNull(),
+            config.summaryOrNull(actionType = null),
         ).joinToString(" - ").ifBlank { "No parameters" },
         muted = invert,
         target = AutomationFlowTarget.Context(profileId, index),
@@ -262,7 +263,7 @@ private fun ActionSpec.toNode(id: String, taskId: Long, index: Int): AutomationF
         title = title,
         detail = listOfNotNull(
             if (subTaskRef != null) "sub-task -> $subTaskRef" else type,
-            args.summaryOrNull(),
+            args.summaryOrNull(actionType = type),
             if (continueOnError) "continues after error" else null,
         ).joinToString(" - "),
         target = AutomationFlowTarget.Action(taskId, index),
@@ -276,17 +277,25 @@ private fun ActionSpec.edgeLabel(index: Int): String {
     return trimmedCondition?.let { "if ${it.safePreview()}" } ?: if (index == 0) "step 1" else "then"
 }
 
-private fun Map<String, String>.summaryOrNull(limit: Int = 3): String? {
+/**
+ * Renders an argument/config map for a flow node. Values resolve through
+ * [ActionArgumentSensitivity] so a credential stored in an action argument is masked here exactly
+ * as it is in the task list and the run log. Pass a null [actionType] for context configs, which
+ * have no registered field metadata and fall back to the shared name heuristic.
+ */
+private fun Map<String, String>.summaryOrNull(actionType: String?, limit: Int = 3): String? {
     if (isEmpty()) return null
-    val visible = entries
-        .sortedBy { it.key }
-        .take(limit)
-        .joinToString(", ") { (key, value) -> "$key=${value.safePreview()}" }
-    val hiddenCount = size - limit
-    return if (hiddenCount > 0) "$visible, +$hiddenCount more" else visible
+    return ActionArgumentSensitivity.summarize(
+        actionType = actionType,
+        args = this,
+        limit = limit,
+        maxValueLength = ARG_PREVIEW_LENGTH,
+    ).takeUnless(String::isBlank)
 }
 
-private fun String.safePreview(maxLength: Int = 36): String =
+private const val ARG_PREVIEW_LENGTH = 36
+
+private fun String.safePreview(maxLength: Int = ARG_PREVIEW_LENGTH): String =
     replace(Regex("\\s+"), " ")
         .let { value -> if (value.length <= maxLength) value else value.take(maxLength - 1) + "..." }
 
