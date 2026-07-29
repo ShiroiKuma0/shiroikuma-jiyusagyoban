@@ -480,13 +480,6 @@ As of 2026-07-29, the app sets `targetSdk = 37`; the P1 items below are mandator
   Acceptance: Every runtime or engine-handled action has exactly one metadata/capability/sensitivity/distribution/setup contract; `Supported` actions can succeed under a satisfiable fixture, permanent stubs are `Unsupported`, and special-access actions expose a working grant/deep-link and revoked-state failure; the registry-derived action count cannot drift from README.
   Complexity: M
 
-- [ ] P0 — Centralize task references and make deletion reference-safe
-  Why: Task deletion checks only profile enter/exit IDs, leaving `task.run`, notification-button, and scene tap/long-press references dangling or silently retargetable.
-  Evidence: `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationViewModel.kt:271-281`; `app/src/main/java/com/opentasker/core/actions/ActionMetadata.kt` task fields; `app/src/main/java/com/opentasker/core/model/Scene.kt`; `app/src/main/java/com/opentasker/core/transfer/OpenTaskerBundle.kt`.
-  Touches: a typed `AutomationReferenceIndex`/rewriter in `core`, task/profile/scene repositories, delete/rename dialogs, bundle import, global search, transaction tests.
-  Acceptance: One index enumerates ID- and name-based references from profiles, `task.run`, all notification buttons, and scene gestures; delete/rename previews every dependent object and offers block/reassign/clear in one transaction; import and deletion use the same rewriter; tests prove no dangling or accidentally retargeted reference remains.
-  Complexity: M
-
 ### P1 — Reliability, recovery, and explainability
 
 - [ ] P1 — Add execution admission, feedback-loop warnings, and a storm circuit breaker
