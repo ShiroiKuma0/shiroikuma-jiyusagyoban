@@ -1,6 +1,6 @@
 # OpenTasker Roadmap
 
-**Current app version:** 0.2.78
+**Current app version:** 0.2.79
 **Last updated:** 2026-07-29
 
 Only open work belongs here; git history and `CHANGELOG.md` are the release record.

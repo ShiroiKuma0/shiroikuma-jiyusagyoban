@@ -3,7 +3,7 @@ Date: 2026-07-29 — replaces all prior research.
 
 ## Executive Summary
 
-OpenTasker 0.2.78 is already a substantial local-first Android automation system: 60 registered actions plus seven engine-handled flow actions, seven context families, Room-backed state, Keystore-backed secrets, bounded imports, encrypted backups, diagnostics, and separate F-Droid/Play release policies. Its strongest direction is not a broader action count; it is becoming the automation tool users can trust to explain, preserve, and safely execute complex local workflows. The immediate gaps are import/reference integrity, capability claims that diverge from runtime reality, secret-bearing editor summaries, unbounded external/parallel execution, and state surfaces that report health without freshness.
+OpenTasker 0.2.79 is already a substantial local-first Android automation system: 60 registered actions plus seven engine-handled flow actions, seven context families, Room-backed state, Keystore-backed secrets, bounded imports, encrypted backups, diagnostics, and separate F-Droid/Play release policies. Its strongest direction is not a broader action count; it is becoming the automation tool users can trust to explain, preserve, and safely execute complex local workflows. The immediate gaps are import/reference integrity, capability claims that diverge from runtime reality, secret-bearing editor summaries, unbounded external/parallel execution, and state surfaces that report health without freshness.
 
 Top opportunities, in priority order:
 
