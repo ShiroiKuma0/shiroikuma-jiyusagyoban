@@ -18,6 +18,7 @@
 - **60 built-in actions** plus engine-handled flow control (`task.run`, `if`/`else`/`end if`, `for each`/`end for`, `stop`)
 - **Template expressions** — bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math/date functions, traces, and strict regex policy
 - **First-class secret variables** — AES-256-GCM Android Keystore storage, deliberate reveal/re-entry UX, and provenance-based redaction for derived action arguments, logs, traces, and failures
+- **One redaction boundary for stored arguments** — credential-bearing action arguments (HTTP authorization/headers/query/body, request payloads, script stdin, SMS text) are masked wherever they are displayed, including the task list, flow graph, and previews, so they cannot leak through a screenshot or accessibility semantics; unregistered actions and unknown keys fail closed
 - **Automation modes** — per-profile single, restart, queued, and parallel re-trigger behavior
 - **Profile groups** — organize profiles into named groups with filter chips
 
@@ -53,7 +54,7 @@
 | Script | 1 | SHA-256-pinned Termux `RUN_COMMAND` with bounded result capture |
 | Import | 1 | unsupported Tasker action placeholder |
 
-Privileged actions (airplane, mobile data, screenshot, reboot, screen off) are gated to fail honestly. SMS is available in standard/F-Droid builds; Play builds omit SMS/phone-state permissions.
+Every action carries an explicit capability contract; an action with no reviewed contract resolves to unsupported rather than defaulting to available. Privileged actions (airplane, mobile data, screenshot, reboot, screen off, kill app) are gated to fail honestly. Set brightness and set screen timeout require the **Modify system settings** special access granted from Setup, and Wake-on-LAN requires local network access on Android 17+. SMS is available in standard/F-Droid builds; Play builds omit SMS/phone-state permissions.
 
 New automations use **HTTP Request** for GET, HEAD, POST, PUT, PATCH, DELETE, and OPTIONS. It accepts structured query/header lines, inline or OpenTasker-file request bodies, per-stage timeouts, status/header/body variables, and atomic file output. Redirects default off and can be enabled only for the same origin; TLS verification cannot be disabled, cleartext remains private-LAN-only, and response/request sizes are bounded. Stored `http.get` and `http.post` actions continue to execute through compatibility aliases. Put credentials in Keystore-backed secret variables and reference them from Authorization or header fields so traces remain redacted.
 
@@ -63,9 +64,10 @@ Variable names follow Tasker's scope rule: an all-lowercase name is local to the
 
 - OEM battery-killer detection with per-vendor remediation (Samsung, Xiaomi, OnePlus, Oppo, Realme, Vivo, Huawei, etc.)
 - Alarm-backed time/day reevaluation through Doze, with a persisted engine heartbeat and periodic WorkManager watchdog that re-arms dropped ticks and foreground-service timeout recovery
-- Setup checklist covering notifications, exact alarms, battery optimization, usage access, overlays, location, Bluetooth, SMS, DND, Shizuku, and Termux
+- Setup checklist covering notifications, exact alarms, battery optimization, usage access, overlays, location, Bluetooth, SMS, DND, modify system settings, Shizuku, and Termux
 - Context inspector with live source health, latest values, and per-profile match explanations
-- Step-level run logs with action traces, template diagnostics, warning counts, and configurable retention
+- Step-level run logs with action traces, template diagnostics, warning counts, per-step variable writes, and configurable retention
+- Live view of in-flight automations — task, origin, current step, and elapsed time — with per-run cancellation that unwinds nested sub-tasks and records a terminal `Cancelled` outcome
 - In-app diagnostics for service/foreground-type/standby/exact-alarm/matcher/watchdog health, a bounded process log, and captured crash previews; shared reports include the same evidence with credential redaction
 - Crash log capture and local diagnostic export
 
@@ -73,7 +75,7 @@ Variable names follow Tasker's scope rule: an all-lowercase name is local to the
 
 - **Locale/Tasker plugin host** — setting dispatch, condition queries, configuration parsing, request-query events, bundle validation, and last-known-state fallback
 - **Locale/Tasker condition context** — condition plugins as first-class profile predicates polled every 30 seconds
-- **External automation target** — signature-scoped intents to run tasks, toggle profiles, query status, and pass variables
+- **External automation target** — signature-scoped intents to run tasks, toggle profiles, query status, and pass variables. Task runs are asynchronous (protocol v2): the receiver validates and enqueues, then returns an execution ID that callers poll with `QUERY_EXECUTION`, because a broadcast cannot stay open for a task that may wait minutes. Callers must send `PROTOCOL_VERSION=2`; see [docs/EXTERNAL_INTENTS.md](docs/EXTERNAL_INTENTS.md)
 - **OpenTasker JSON bundles** — schema-versioned export/import with computed action-power manifests, data-to-external-chain warnings, disabled-by-default installation, explicit first-enable acknowledgement, and secret values omitted by design
 - **Tasker XML import** — preview with migration/capability warnings, mapped and unsupported action reporting
 - **Profile sharing** — offline share manifests with safety findings and GitHub Discussions submission text
@@ -99,7 +101,7 @@ Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON 
 - Play distribution profile with SMS/phone-state manifest policy gate
 - Local release verification scripts for F-Droid metadata, readiness, and APK payload comparison
 - Environment-driven release signing
-- SQLite database backup/restore with WAL-safe validation and atomic staged restore; encrypted `.otbackup` v2 exports use bounded-memory, independently authenticated 64 KiB frames while legacy v1 files remain restorable. Secret rows stay ciphertext and the device-bound Keystore key is never copied, so a restore on another device requires secret re-entry
+- SQLite database backup/restore with WAL-safe validation and atomic staged restore, reviewed before staging (source, schema version, compatibility, entity counts) and cancellable afterwards; encrypted `.otbackup` v2 exports use bounded-memory, independently authenticated 64 KiB frames while legacy v1 files remain restorable. Secret rows stay ciphertext and the device-bound Keystore key is never copied, so a restore on another device requires secret re-entry
 - APK payload comparison harness for reproducibility checks
 
 ### Power-user backends
