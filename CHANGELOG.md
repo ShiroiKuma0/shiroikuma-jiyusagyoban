@@ -3,6 +3,52 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.79+1 — 2026-07-31
+
+**Rebased onto upstream OpenTasker 0.2.79.** The first build of the new line. Two upstream designs
+collided with fork designs and the fork's were kept; everything else upstream shipped came across.
+
+### What the fork kept
+The **action catalog stays inline-string** — our 158 entries with the `COLOR`, `WIDGET_LAYOUT` and
+`APP_PACKAGE` field types. Upstream converted its 69 entries to `@StringRes`; adopting that would have
+meant rewriting every fork action into string resources for a translation that will never exist.
+
+The **bundle format stays schema 5, id-free and name-based**. Upstream is still on id-bearing schema 2,
+and 0.2.79 added a rewriter that remaps task-to-task ids on import — a bug name-based linking does not
+have. Keeping ours also keeps `scene.show`, notification buttons and sub-task steps resolving by name
+across re-imports.
+
+### What came from upstream
+**External intents are protocol v2 and asynchronous.** `RUN_TASK` no longer holds the broadcast open
+for a task that may run for half an hour: the receiver validates, hands the run to the foreground
+service, and replies `ACCEPTED` with an execution id the caller polls via `QUERY_EXECUTION`. Callers
+must declare `PROTOCOL_VERSION=2`. The fork's shutdown gate sits ahead of that handshake, so a stopped
+app answers 「is stopped」 rather than a version complaint the caller cannot act on; `QUERY_STATUS`
+stays ungated and still reports `STOPPED`.
+
+**Stored action arguments are redacted wherever they are displayed** — the task list and flow graph
+were joining raw arguments into their subtitles, so an `authorization` header or request body typed
+into an action appeared on screen and in screenshots. Nine credential-bearing fields now declare their
+sensitivity explicitly (`http.request` authorization/headers/query/body, `http.post` data, `sms.send`
+message, `script.termux.run` stdin), with `headers_var` and `body_file` marked structural so the
+name heuristic stops over-masking them. One canonical `<redacted>` placeholder replaces the copy the
+task runner kept.
+
+**A run can be cancelled**, and a cancelled run is its own outcome in the run log — distinct from
+Skipped, which means the run never started. Upstream's execution registry replaces the fork's
+equivalent, which was written the same week and did the same job.
+
+Also inherited: reference-safe task deletion and rename, per-step variable-write records, the
+"scheduled jobs blocked by" diagnostic, `WRITE_SETTINGS` finally declared (so Set brightness and screen
+timeout can actually be granted), and `app.kill` marked Unsupported rather than advertising a
+force-stop it never had the privilege to perform.
+
+### Known gaps from the merge
+Upstream's **restore review is unwired** — its manager API is present, but the fork's ViewModel still
+stages a selected database immediately instead of showing the review-and-confirm step. And nothing now
+forces an explicit capability entry per action; unknown ids still fail closed, but the fork's 96
+unclassified actions rely on the shipped-action default.
+
 ## 0.2.78+54 — 2026-07-31
 
 **The app can be shut down, and it stays shut down.**
