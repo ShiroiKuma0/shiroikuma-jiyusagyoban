@@ -8,7 +8,6 @@ import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.os.PowerManager
-import android.util.Log
 import com.opentasker.app.BuildConfig
 import com.opentasker.core.contexts.HardwareKeyContextEvents
 import com.opentasker.core.engine.variables.PersistentGlobalScope
@@ -21,6 +20,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import rikka.shizuku.Shizuku
 import java.util.concurrent.ConcurrentHashMap
+import com.opentasker.core.logging.AppLogger
 
 /**
  * Watches physical hardware keys through Shizuku (uid 2000).
@@ -78,7 +78,7 @@ class ShizukuKeyEventListener {
                 else -> HardwareKeyContextEvents.PRESS_SHORT
             }
             HardwareKeyContextEvents.publish(mapped.first, press, mapped.second)
-            Log.i(TAG, "${mapped.first} $press press (grab)")
+            AppLogger.info(TAG, "${mapped.first} $press press (grab)")
         }
     }
 
@@ -87,20 +87,20 @@ class ShizukuKeyEventListener {
             bindInFlight = false
             val svc = IKeyGrabberService.Stub.asInterface(binder)
             if (svc == null || binder?.pingBinder() != true) {
-                Log.w(TAG, "grabber bound but binder dead"); grabUnavailable = true; return
+                AppLogger.warn(TAG, "grabber bound but binder dead"); grabUnavailable = true; return
             }
             service = svc
             bound = true
             val devs = runCatching { svc.start(longPressMs(), doublePressMs(), WATCHED_CODES, DOUBLE_CODES, TRIPLE_CODES, callback) }
-                .onFailure { Log.w(TAG, "grabber.start failed: ${it.message}") }
+                .onFailure { AppLogger.warn(TAG, "grabber.start failed: ${it.message}") }
                 .getOrDefault(-1)
             if (devs <= 0) {
-                Log.w(TAG, "grab unavailable (start=$devs) — falling back to detect-only")
+                AppLogger.warn(TAG, "grab unavailable (start=$devs) — falling back to detect-only")
                 grabUnavailable = true
                 teardownBind()
             } else {
                 runCatching { svc.setScreenOn(screenOn) }  // seed the fresh service with the current screen state
-                Log.i(TAG, "grab mode active on $devs device(s)")
+                AppLogger.info(TAG, "grab mode active on $devs device(s)")
             }
         }
 
@@ -148,7 +148,7 @@ class ShizukuKeyEventListener {
                 }
             }
         }
-        Log.i(TAG, "Hardware-key listener started")
+        AppLogger.info(TAG, "Hardware-key listener started")
     }
 
     fun stop() {
@@ -159,7 +159,7 @@ class ShizukuKeyEventListener {
         runCatching { currentProcess?.destroy() }; currentProcess = null
         states.values.forEach { it.longJob?.cancel() }
         states.clear()
-        Log.i(TAG, "Hardware-key listener stopped")
+        AppLogger.info(TAG, "Hardware-key listener stopped")
     }
 
     private suspend fun runLoop(scope: CoroutineScope) {
@@ -170,7 +170,7 @@ class ShizukuKeyEventListener {
                 grabUnavailable -> {
                     // Detect-only fallback: blocks while the stream is alive; respawns after it ends.
                     runCatching { streamGetevent(scope) }
-                        .onFailure { Log.w(TAG, "getevent stream ended: ${it.message}") }
+                        .onFailure { AppLogger.warn(TAG, "getevent stream ended: ${it.message}") }
                     if (scope.isActive) delay(RESPAWN_DELAY_MS)
                 }
                 else -> {
@@ -225,10 +225,10 @@ class ShizukuKeyEventListener {
                 override fun onServiceDisconnected(name: ComponentName?) = Unit
             }
             runCatching { Shizuku.unbindUserService(userServiceArgs(ctx, stale), scratch, true) }
-                .onFailure { Log.w(TAG, "Could not reap key-grabber $stale: ${it.message}") }
+                .onFailure { AppLogger.warn(TAG, "Could not reap key-grabber $stale: ${it.message}") }
         }
         prefs.edit().putString(GRABBER_KEY_VERSIONS, current.toString()).apply()
-        Log.i(TAG, "Swept stale key-grabbers below version $current")
+        AppLogger.info(TAG, "Swept stale key-grabbers below version $current")
     }
 
     private fun bindGrabber() {
@@ -236,7 +236,7 @@ class ShizukuKeyEventListener {
         reapStaleGrabbers(ctx)
         bindInFlight = true
         val ok = runCatching { Shizuku.bindUserService(userServiceArgs(ctx), connection); true }
-            .onFailure { Log.w(TAG, "bindUserService failed: ${it.message}"); grabUnavailable = true }
+            .onFailure { AppLogger.warn(TAG, "bindUserService failed: ${it.message}"); grabUnavailable = true }
             .getOrDefault(false)
         if (!ok) bindInFlight = false
     }

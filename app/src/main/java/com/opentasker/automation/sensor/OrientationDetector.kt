@@ -2,11 +2,11 @@ package com.opentasker.automation.sensor
 
 import android.content.Context
 import android.graphics.Point
-import android.util.Log
 import android.view.OrientationEventListener
 import android.view.Surface
 import android.view.WindowManager
 import com.opentasker.core.contexts.OrientationContextEvents
+import com.opentasker.core.logging.AppLogger
 
 /**
  * Watches device orientation and fires an "orientation" event when it settles into a new quadrant
@@ -45,7 +45,7 @@ class OrientationDetector(context: Context) {
             }
             if (name == last) return
             last = name
-            Log.i(TAG, "Orientation -> $name")
+            AppLogger.info(TAG, "Orientation -> $name")
             OrientationContextEvents.publish(name)
         }
     }
@@ -64,15 +64,15 @@ class OrientationDetector(context: Context) {
     fun start() {
         if (listener.canDetectOrientation()) {
             listener.enable()
-            Log.i(TAG, "Orientation detector started")
+            AppLogger.info(TAG, "Orientation detector started")
         } else {
-            Log.w(TAG, "Orientation cannot be detected on this device")
+            AppLogger.warn(TAG, "Orientation cannot be detected on this device")
         }
     }
 
     fun stop() {
         listener.disable()
-        Log.i(TAG, "Orientation detector stopped")
+        AppLogger.info(TAG, "Orientation detector stopped")
     }
 
     companion object {

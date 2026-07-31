@@ -6,7 +6,6 @@ import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.util.Log
 import android.view.Gravity
 import android.widget.Toast
 import com.opentasker.app.OpenTaskerApp_NoHilt
@@ -18,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import com.opentasker.core.logging.AppLogger
 
 class TaskRunActivity : Activity() {
 
@@ -28,15 +28,13 @@ class TaskRunActivity : Activity() {
         val taskName = intent.getStringExtra(EXTRA_TASK_NAME)?.trim().orEmpty()
         val source = intent.getStringExtra(EXTRA_SOURCE) ?: SOURCE_SHORTCUT
         if (taskId < 0 && taskName.isEmpty()) {
-            Toast.makeText(this, "Invalid task", Toast.LENGTH_SHORT).show()
-            finish()
+            finishWithMessage("Invalid task")
             return
         }
         // A widget or launcher-shortcut tap must not resurrect an app the user has exited — say so
         // instead of running the task, which would drag the whole engine back up with it.
         if (EngineShutdown.refuse(this, "widget / shortcut tap")) {
-            Toast.makeText(this, "白い熊 自由作業盤 は停止中 — open the app to start it", Toast.LENGTH_SHORT).show()
-            finish()
+            finishWithMessage("白い熊 自由作業盤 は停止中 — open the app to start it")
             return
         }
 
@@ -50,10 +48,7 @@ class TaskRunActivity : Activity() {
                 // Resolve by name first (survives re-imports), else by id.
                 val entity = if (taskName.isNotEmpty()) db.taskDao().getByName(taskName) else db.taskDao().getById(taskId)
                 if (entity == null) {
-                    runOnUiThread {
-                        Toast.makeText(this@TaskRunActivity, "Task not found", Toast.LENGTH_SHORT).show()
-                        finish()
-                    }
+                    runOnUiThread { finishWithMessage("Task not found") }
                     return@launch
                 }
                 val task = entity.toDomain()
@@ -62,6 +57,10 @@ class TaskRunActivity : Activity() {
                     db = db,
                     task = task,
                     source = source,
+                    // This IS a visible Activity — the tap opened it. Saying so is what lets a task run
+                    // from a widget or shortcut play audio, dispatch a media key or change volume on
+                    // Android 17+, which restricts those to a visible app or an eligible service.
+                    visibleActivity = true,
                 )
                 runOnUiThread {
                     // Themed (black/yellow) confirmation overlay — a system Toast can't be recoloured on
@@ -70,13 +69,20 @@ class TaskRunActivity : Activity() {
                     finish()
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Task run failed", e)
-                runOnUiThread {
-                    Toast.makeText(this@TaskRunActivity, "Task run failed", Toast.LENGTH_SHORT).show()
-                    finish()
-                }
+                AppLogger.error(TAG, "Task run failed", e)
+                runOnUiThread { finishWithMessage("Task run failed") }
             }
         }
+    }
+
+    /**
+     * The single exit. Every outcome — bad intent, stopped app, missing task, thrown task — leaves
+     * through here, so none can toast without finishing (a transparent Activity left on screen) or
+     * finish without saying why. The success path uses the themed flash instead.
+     */
+    private fun finishWithMessage(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        finish()
     }
 
     private fun vibrateTap() {

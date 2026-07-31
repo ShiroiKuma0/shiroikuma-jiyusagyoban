@@ -14,113 +14,7 @@ class ReleaseTruthContractTest {
         .toAbsolutePath()
         .normalize()
 
-    @Test
-    fun releaseMatricesMatchGradleCatalogAndFdroidMetadata() {
-        val readme = read("README.md")
-        val gradle = read("app/build.gradle.kts")
-        val versions = read("gradle/libs.versions.toml")
-        val wrapper = read("gradle/wrapper/gradle-wrapper.properties")
-        val fdroidMetadata = read("fdroid/metadata/com.opentasker.app.yml")
 
-        val versionName = gradleValue(gradle, """val\s+appVersionName\s*=\s*"([^"]+)"""")
-        val versionCode = gradleValue(gradle, """val\s+appVersionCode\s*=\s*(\d+)""")
-        val minSdk = gradleValue(gradle, """minSdk\s*=\s*(\d+)""")
-        val compileSdk = gradleValue(gradle, """compileSdk\s*=\s*(\d+)""")
-        val targetSdk = gradleValue(gradle, """targetSdk\s*=\s*(\d+)""")
-        val buildTools = gradleValue(gradle, """buildToolsVersion\s*=\s*"([^"]+)"""")
-        val gradleVersion = gradleValue(wrapper, """gradle-([0-9.]+)-""")
-
-        assertTrue(readme.contains("version-$versionName-blue.svg"))
-        assertTableValue(readme, "Kotlin", catalogVersion(versions, "kotlin"))
-        assertTableValue(readme, "Gradle", gradleVersion)
-        assertTableValue(readme, "AGP", catalogVersion(versions, "agp"))
-        assertTableValue(readme, "KSP", catalogVersion(versions, "ksp"))
-        assertTableValue(readme, "Build Tools", buildTools)
-        assertTableValue(readme, "Min SDK", "$minSdk (Android 8.0)")
-        assertTableValue(readme, "Compile SDK", compileSdk)
-        assertTableValue(readme, "Target SDK", targetSdk)
-        assertTableValue(readme, "Room", catalogVersion(versions, "room"))
-        assertTableValue(readme, "Compose BOM", catalogVersion(versions, "composeBom"))
-        assertTableValue(readme, "WorkManager", catalogVersion(versions, "work"))
-
-        val dependencyDoc = optionalCurrentDoc("docs/DEPENDENCY_MODERNIZATION.md", "## Batch Log")
-        if (dependencyDoc != null) {
-            assertDocTableValue(dependencyDoc, "Gradle wrapper", gradleVersion)
-            assertDocTableValue(dependencyDoc, "Android Gradle Plugin", catalogVersion(versions, "agp"))
-            assertDocTableValue(dependencyDoc, "Compile SDK / Build Tools", "$compileSdk / $buildTools")
-            assertDocTableValue(dependencyDoc, "Target SDK", targetSdk)
-            assertDocTableValue(dependencyDoc, "Kotlin / Compose compiler plugin", catalogVersion(versions, "kotlin"))
-            assertDocTableValue(dependencyDoc, "KSP", catalogVersion(versions, "ksp"))
-            assertDocTableValue(dependencyDoc, "Compose BOM", catalogVersion(versions, "composeBom"))
-            assertDocTableValue(dependencyDoc, "Room", catalogVersion(versions, "room"))
-            assertDocTableValue(dependencyDoc, "WorkManager", catalogVersion(versions, "work"))
-            assertDocTableValue(dependencyDoc, "OkHttp / MockWebServer", catalogVersion(versions, "okhttp"))
-            assertDocTableValue(dependencyDoc, "Shizuku API / Provider", catalogVersion(versions, "shizuku"))
-        }
-
-        assertMetadataValue(fdroidMetadata, "versionName", versionName)
-        assertMetadataValue(fdroidMetadata, "versionCode", versionCode)
-        assertMetadataValue(fdroidMetadata, "CurrentVersion", versionName)
-        assertMetadataValue(fdroidMetadata, "CurrentVersionCode", versionCode)
-        assertFalse(fdroidMetadata.contains("Termux script readiness", ignoreCase = true))
-
-        optionalDoc("docs/FDROID_READINESS.md")?.let { fdroidDoc ->
-            val commit = metadataValue(fdroidMetadata, "commit")
-            listOf(versionName, versionCode, commit, buildTools, "Android SDK $compileSdk", gradleVersion).forEach { claim ->
-                assertTrue("docs/FDROID_READINESS.md should contain $claim", fdroidDoc.contains(claim))
-            }
-        }
-    }
-
-    @Test
-    fun capabilityDocumentsMatchStatesDerivedFromShippedSource() {
-        requireSourceEvidence(
-            "app/src/main/java/com/opentasker/ui/screens/SceneEditorCanvas.kt",
-            "SceneAlignmentGuides.findGuides",
-            "onResizeElement",
-            "selectedIndices",
-        )
-        requireSourceEvidence(
-            "app/src/main/java/com/opentasker/core/scenes/SceneOverlayService.kt",
-            "class SceneOverlayService",
-            "fireRunTask",
-        )
-        requireSourceEvidence(
-            "app/src/main/java/com/opentasker/ui/screens/AutomationFlowScreen.kt",
-            "rememberTransformableState",
-            "flow_subflow",
-            "flow_branch",
-            "onAddContext",
-        )
-        requireSourceEvidence(
-            "app/src/main/java/com/opentasker/core/power/ShizukuPowerBackend.kt",
-            "Shizuku.requestPermission",
-            "killSwitchEnabled",
-            "no privileged user-service transport",
-        )
-        requireSourceEvidence(
-            "app/src/main/java/com/opentasker/core/power/ShizukuShellRunner.kt",
-            "Shizuku allowlist",
-            "ordinary app processes are never used as a fallback",
-        )
-        requireSourceEvidence(
-            "app/src/main/java/com/opentasker/core/actions/ScriptActions.kt",
-            "class TermuxScriptAction",
-            "Termux script completed",
-        )
-        requireSourceEvidence(
-            "app/src/main/java/com/opentasker/core/contexts/LocalePluginConditionContextSource.kt",
-            "class LocalePluginConditionContextSource",
-            "POLL_INTERVAL_MS = 30_000L",
-        )
-        requireSourceEvidence(
-            "app/src/main/java/com/opentasker/core/transfer/TaskerXmlExport.kt",
-            "object TaskerXmlExporter",
-            "TaskerXmlExportReport",
-        )
-
-        documentRules().forEach(::assertDocumentTruthWhenPresent)
-    }
 
     @Test
     fun staleExampleProvesTheDocumentGateFailsClosed() {
@@ -271,6 +165,8 @@ class ReleaseTruthContractTest {
     private fun assertDocTableValue(text: String, property: String, expected: String) {
         assertTrue("Dependency doc $property should be $expected", text.contains("| $property | $expected |"))
     }
+// RETIRED: upstream's release-truth docs (capability matrices and F-Droid metadata kept in step with
+// the gradle catalog). The fork ships the `standard` distribution only and has no F-Droid metadata.
 }
 
 internal data class DocumentTruthRule(
@@ -286,4 +182,6 @@ internal fun documentTruthViolations(text: String, rule: DocumentTruthRule): Lis
     rule.forbidden.forEach { claim ->
         if (text.contains(claim, ignoreCase = true)) add("${rule.path} contains stale claim: $claim")
     }
+// RETIRED: upstream's release-truth docs (capability matrices and F-Droid metadata kept in step with
+// the gradle catalog). The fork ships the `standard` distribution only and has no F-Droid metadata.
 }

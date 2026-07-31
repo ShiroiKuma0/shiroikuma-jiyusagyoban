@@ -321,14 +321,14 @@ class AutomationService : Service() {
                             } catch (e: CancellationException) {
                                 throw e
                             } catch (e: Exception) {
-                                android.util.Log.e("OpenTasker", "Failed handling state change for ${domain.name}", e)
+                                AppLogger.error("OpenTasker", "Failed handling state change for ${domain.name}", e)
                             }
                         }
                         false
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
-                        android.util.Log.e("OpenTasker", "Profile matcher errored for ${domain.name}; restarting", e)
+                        AppLogger.error("OpenTasker", "Profile matcher errored for ${domain.name}; restarting", e)
                         EngineHeartbeat.markMatcherRestart(domain.name)
                         true
                     }
@@ -374,7 +374,7 @@ class AutomationService : Service() {
         if (profile.enterTaskName.isBlank() && profile.enterTaskId <= 0) return
         val domain = resolveTask(profile.enterTaskName, profile.enterTaskId)
         if (domain == null) {
-            android.util.Log.w("OpenTasker", "Enter task not found for profile ${profile.name} (name='${profile.enterTaskName}', id=${profile.enterTaskId})")
+            AppLogger.warn("OpenTasker", "Enter task not found for profile ${profile.name} (name='${profile.enterTaskName}', id=${profile.enterTaskId})")
             return
         }
         dispatchTask(profile, domain, eventVars, isExit = false)
@@ -384,7 +384,7 @@ class AutomationService : Service() {
         if (profile.exitTaskName.isBlank() && (profile.exitTaskId == null || profile.exitTaskId <= 0)) return
         val domain = resolveTask(profile.exitTaskName, profile.exitTaskId ?: 0L)
         if (domain == null) {
-            android.util.Log.w("OpenTasker", "Exit task not found for profile ${profile.name} (name='${profile.exitTaskName}', id=${profile.exitTaskId})")
+            AppLogger.warn("OpenTasker", "Exit task not found for profile ${profile.name} (name='${profile.exitTaskName}', id=${profile.exitTaskId})")
             return
         }
         dispatchTask(profile, domain, emptyMap(), isExit = true)

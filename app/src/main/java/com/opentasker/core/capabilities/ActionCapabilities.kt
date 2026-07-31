@@ -116,7 +116,25 @@ object ActionCapabilityRegistry {
         "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported 白い熊 自由作業盤 action."),
     )
 
-    fun get(actionId: String): ActionCapability = capabilities[actionId] ?: supported
+    /**
+     * An action's capability. Only ~60 actions need an explicit entry; the rest are ordinary and
+     * default to [supported] — but ONLY if this app actually ships them.
+     *
+     * An id the app has never heard of fails **closed**. It reaches here from an imported bundle
+     * written by a newer build or another app, or from a typo, and answering "Ready" for it meant the
+     * editor offered it and the import review waved it through. [AutomationSensitivityRegistry.isKnown]
+     * is the oracle rather than the metadata registry, because it is a static set with no
+     * registration-order hazard: a capability query before `registerActionMetadata()` must not turn
+     * every action unsupported.
+     */
+    fun get(actionId: String): ActionCapability = capabilities[actionId]
+        ?: if (AutomationSensitivityRegistry.isKnown(actionId)) supported else unknownAction
+
+    private val unknownAction = ActionCapability(
+        CapabilityLevel.Unsupported,
+        "This build does not know this action — it may come from a newer version. Re-export the bundle " +
+            "from a build that has it, or remove the action.",
+    )
 
     private fun bluetoothCapability(): ActionCapability =
         if (android.os.Build.VERSION.SDK_INT >= 33) {
@@ -132,9 +150,13 @@ object ActionCapabilityRegistry {
             ActionCapability(CapabilityLevel.Unsupported, "SMS action is unavailable in this distribution because SMS and phone-state permissions are omitted for Play policy compliance.")
         }
 
+    // Android 17+ restricts these to "app visible, or a while-in-use eligible foreground service, or the
+    // alarm stream with exact-alarm access" — a CONDITION, not an impossibility, and this fork ships the
+    // eligible foreground service plus the runtime check (AudioRuntimeEligibility) that enforces it.
+    // Unsupported would make them un-addable even though they work; setup-gated is the honest level.
     internal fun audioOutputCapabilityForSdk(sdkInt: Int, reason: String): ActionCapability =
         if (AndroidAudioHardening.isRestricted(sdkInt)) {
-            ActionCapability(CapabilityLevel.Unsupported, AndroidAudioHardening.outputCapabilityReason(reason))
+            ActionCapability(CapabilityLevel.RequiresSetup, AndroidAudioHardening.outputCapabilityReason(reason))
         } else {
             ActionCapability(CapabilityLevel.Supported, reason)
         }
@@ -150,14 +172,14 @@ object ActionCapabilityRegistry {
 
     internal fun mediaKeyCapabilityForSdk(sdkInt: Int, reason: String): ActionCapability =
         if (AndroidAudioHardening.isRestricted(sdkInt)) {
-            ActionCapability(CapabilityLevel.Unsupported, AndroidAudioHardening.mediaKeyCapabilityReason(reason))
+            ActionCapability(CapabilityLevel.RequiresSetup, AndroidAudioHardening.mediaKeyCapabilityReason(reason))
         } else {
             ActionCapability(CapabilityLevel.Supported, reason)
         }
 
     internal fun volumeCapabilityForSdk(sdkInt: Int, reason: String): ActionCapability =
         if (AndroidAudioHardening.isRestricted(sdkInt)) {
-            ActionCapability(CapabilityLevel.Unsupported, AndroidAudioHardening.volumeCapabilityReason(reason))
+            ActionCapability(CapabilityLevel.RequiresSetup, AndroidAudioHardening.volumeCapabilityReason(reason))
         } else {
             ActionCapability(CapabilityLevel.RequiresSetup, reason)
         }

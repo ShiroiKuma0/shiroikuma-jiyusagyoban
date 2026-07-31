@@ -5,8 +5,8 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.util.Log
 import com.opentasker.core.contexts.FoldContextEvents
+import com.opentasker.core.logging.AppLogger
 
 /**
  * Exposes the foldable posture as the super-global %FOLD (folded / semi / unfolded) by watching the
@@ -37,7 +37,7 @@ class FoldDetector(context: Context) {
             val isChange = seeded
             last = fold
             seeded = true
-            Log.i(TAG, "Fold (HALL=${event.values.firstOrNull()}) -> $fold")
+            AppLogger.info(TAG, "Fold (HALL=${event.values.firstOrNull()}) -> $fold")
             if (isChange) FoldContextEvents.publish(fold) else FoldContextEvents.setCurrent(fold)
         }
 
@@ -56,18 +56,18 @@ class FoldDetector(context: Context) {
         seeded = false
         val sensor = hallSensor
         if (sensor == null) {
-            Log.w(TAG, "No HALL sensor on this device — %FOLD unavailable")
+            AppLogger.warn(TAG, "No HALL sensor on this device — %FOLD unavailable")
             return
         }
         // On-change sensor: registering delivers the current value once, then only on posture change. The
         // dedupe on `last` means even a chatty sensor does no work unless the posture actually changed.
         sensorManager?.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
-        Log.i(TAG, "Fold detector started (HALL sensor: ${sensor.name})")
+        AppLogger.info(TAG, "Fold detector started (HALL sensor: ${sensor.name})")
     }
 
     fun stop() {
         sensorManager?.unregisterListener(listener)
-        Log.i(TAG, "Fold detector stopped")
+        AppLogger.info(TAG, "Fold detector stopped")
     }
 
     companion object {

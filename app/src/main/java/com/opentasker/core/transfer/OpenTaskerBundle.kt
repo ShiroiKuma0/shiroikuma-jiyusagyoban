@@ -2,6 +2,7 @@ package com.opentasker.core.transfer
 
 import androidx.room.withTransaction
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
+import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.icons.TaskIconStore
 import com.opentasker.core.model.Profile
@@ -179,6 +180,10 @@ object OpenTaskerBundleCodec {
         explicitNulls = false
         // Tolerate keys this build doesn't know yet, so future (v3+) bundles still decode.
         ignoreUnknownKeys = true
+        // Bundles are routinely hand-authored here (and hand-edited before an import), so accept the
+        // two things a human writing JSON by hand actually produces: // comments and a trailing comma.
+        allowComments = true
+        allowTrailingComma = true
     }
 
     fun build(
@@ -200,7 +205,13 @@ object OpenTaskerBundleCodec {
         // item also carries its own `position`, which is what import restores.
         val sortedTasks = tasks.sortedWith(compareBy<Task> { it.position }.thenBy { it.name.lowercase() }.thenBy { it.id })
         val sortedProfiles = profiles.sortedWith(compareBy<Profile> { it.position }.thenBy { it.name.lowercase() }.thenBy { it.id })
-        val sortedVariables = variables.sortedWith(compareBy<Variable> { it.name.lowercase() }.thenBy { it.name })
+        // Secrets never enter a bundle. They are dropped HERE, at the one place every export funnels
+        // through, and the drop is announced — an import that silently lost a token would look like a
+        // successful restore right up until the task using it failed.
+        val secretNames = variables.filter { it.isSecret }.map { it.name }.sorted()
+        val sortedVariables = variables
+            .filterNot { it.isSecret }
+            .sortedWith(compareBy<Variable> { it.name.lowercase() }.thenBy { it.name })
         val sortedScenes = scenes.sortedWith(compareBy<Scene> { it.position }.thenBy { it.name.lowercase() }.thenBy { it.id })
         val sortedTemplates = templates.sortedBy { it.name.lowercase() }
         val sortedProjects = projects.sortedWith(compareBy<Project> { it.sortOrder }.thenBy { it.name.lowercase() })
@@ -219,16 +230,33 @@ object OpenTaskerBundleCodec {
             groups = groups,
         )
         val plan = validate(base)
+        val secretWarning = if (secretNames.isEmpty()) {
+            emptyList()
+        } else {
+            listOf(
+                "${secretNames.size} secret variable${if (secretNames.size == 1) "" else "s"} " +
+                    "(${secretNames.joinToString()}) were not exported and must be re-entered after import.",
+            )
+        }
         return base.copy(
             metadata = base.metadata.copy(
                 capabilityRequirements = capabilityRequirements(sortedTasks),
-                warnings = plan.warnings + plan.lossyWarnings,
+                warnings = plan.warnings + plan.lossyWarnings + secretWarning,
             )
         )
     }
 
     // Export writes the NAME-ONLY [BundleFile] (no ids), converted from the freshly-built domain bundle.
-    fun encode(bundle: OpenTaskerBundle): String = json.encodeToString(BundleFile.fromDomain(bundle))
+    fun encode(bundle: OpenTaskerBundle): String {
+        // Fail closed on the way to the file, not just on the way into the bundle. [build] already
+        // strips secrets, so reaching here with one means a caller assembled an OpenTaskerBundle by
+        // hand — refuse rather than serialise a token into a backup somebody will share.
+        require(bundle.variables.none { it.isSecret }) {
+            "Secret variables must never be serialised into a bundle: " +
+                bundle.variables.filter { it.isSecret }.joinToString { it.name }
+        }
+        return json.encodeToString(BundleFile.fromDomain(bundle))
+    }
 
     @Throws(SerializationException::class, IllegalArgumentException::class)
     fun decode(rawJson: String): OpenTaskerBundle {
@@ -258,6 +286,18 @@ object OpenTaskerBundleCodec {
 
         if (bundle.schemaVersion > OPEN_TASKER_BUNDLE_SCHEMA_VERSION) {
             warnings += "Unsupported schema version ${bundle.schemaVersion}; this build reads up to $OPEN_TASKER_BUNDLE_SCHEMA_VERSION."
+        }
+
+        // Actions this build has never heard of block the import. They arrive from a bundle written by a
+        // newer build (or a typo), and importing them silently produces a task that looks fine in the
+        // editor and fails at the first run — after the profile that owns it has already been enabled.
+        val unknownActions = bundle.tasks
+            .flatMap { task -> task.actions.map { it.type } }
+            .filterNot(AutomationSensitivityRegistry::isKnown)
+            .distinct()
+            .sorted()
+        if (unknownActions.isNotEmpty()) {
+            warnings += "Bundle contains unknown unclassified actions: ${unknownActions.joinToString()}."
         }
 
         // Names are the identity now (the format carries no ids), so duplicate NAMES are the blocking
@@ -319,6 +359,7 @@ object OpenTaskerBundleCodec {
 
     private fun String.isBlockingImportWarning(): Boolean =
         startsWith("Unsupported schema version") ||
+            startsWith("Bundle contains unknown unclassified actions") ||
             startsWith("Bundle has duplicate task names") ||
             startsWith("Bundle has duplicate variable names")
 
@@ -357,7 +398,18 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
         val tasks = db.taskDao().getAll().map { it.toDomain() }
             .map { it.copy(iconData = TaskIconStore.encodeIcon(it.iconPath)) }
         val profiles = db.profileDao().getAll().map { it.toDomain() }
-        val variables = db.variableDao().getAll().map { it.toDomain() }
+        // A secret row's `toDomain()` throws by design (ciphertext must never reach the domain), so
+        // mapping the table wholesale made ONE secret variable break every export there is: "Export
+        // everything", the adb bridge's EXPORT_WORKSPACE, and 保存復元's whole app-state ZIP. Carry
+        // secrets as name-only placeholders instead; [OpenTaskerBundleCodec.build] drops them and says
+        // so in the bundle's warnings.
+        val variables = db.variableDao().getAll().map { entity ->
+            if (entity.isSecret) {
+                Variable(name = entity.name, value = "", projectId = entity.projectId, isSecret = true)
+            } else {
+                entity.toDomain()
+            }
+        }
         val taskNameById = db.taskDao().getAll().associate { it.id to it.name }
         val scenes = backfillSceneTaskNames(db.sceneDao().getAll().map { it.toDomain() }, taskNameById)
         val projects = db.projectDao().getAll().map { it.toDomain() }

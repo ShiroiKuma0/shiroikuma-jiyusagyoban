@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.media.MediaRecorder
 import android.os.Build
-import android.util.Log
 import androidx.core.content.ContextCompat
 import com.opentasker.core.contexts.DeviceStateEvents
 import com.opentasker.core.shizuku.ShizukuShell
@@ -13,6 +12,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.opentasker.core.logging.AppLogger
 
 /**
  * Single in-process voice recorder shared across task invocations — `audio.record.start` and
@@ -59,7 +59,7 @@ object AudioRecorderManager {
             tmpFile = tmp
             targetDir = dir.trim()
             DeviceStateEvents.publishRecording(true)
-            Log.i(TAG, "Recording started → ${tmp.absolutePath}")
+            AppLogger.info(TAG, "Recording started → ${tmp.absolutePath}")
             Result.success(Unit)
         } catch (e: Exception) {
             runCatching { recorder?.release() }
@@ -87,7 +87,7 @@ object AudioRecorderManager {
             val name = "物理鍵_$stamp.m4a"
             val dir = targetDir.ifBlank { defaultDir(app) }
             val finalPath = relocate(tmp, dir, name, app)
-            Log.i(TAG, "Recording saved → $finalPath")
+            AppLogger.info(TAG, "Recording saved → $finalPath")
             Result.success(finalPath)
         } catch (e: Exception) {
             recorder = null
@@ -119,7 +119,7 @@ object AudioRecorderManager {
                 ShizukuShell.exec("mkdir -p ${sq(dir)} && cp -f ${sq(tmp.absolutePath)} ${sq(destPath)} && rm -f ${sq(tmp.absolutePath)}")
             }.getOrNull()
             if (res != null && res.exitCode == 0) return destPath
-            Log.w(TAG, "Shizuku relocate failed: ${res?.stderr}")
+            AppLogger.warn(TAG, "Shizuku relocate failed: ${res?.stderr}")
         }
         // 3) Fallback: keep it in the app-external Recordings dir so nothing is lost.
         val fallbackDir = File(defaultDir(app)).apply { mkdirs() }

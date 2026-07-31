@@ -13,32 +13,6 @@ class LocalReleaseGateContractTest {
         .toAbsolutePath()
         .normalize()
 
-    @Test
-    fun oneDocumentedCommandOwnsEveryLocalReleaseBoundary() {
-        val readme = repoRoot.resolve("README.md").readText()
-        val build = repoRoot.resolve("app/build.gradle.kts").readText()
-        val script = repoRoot.resolve("tools/verify-local-release.ps1").readText()
-
-        assertTrue(readme.contains(".\\tools\\verify-local-release.ps1"))
-        assertTrue(build.contains("abortOnError = true"))
-        assertFalse(build.contains("disable += listOf(\"MissingPermission\""))
-        assertFalse(build.contains("baseline = file(\"lint-baseline.xml\")"))
-        listOf(
-            "lintDebug",
-            "compileDebugAndroidTestKotlin",
-            "verifyRoomSchema",
-            "verifyResolvedDependencyPolicy",
-            "generateCycloneDxSbom",
-            "verifyJvmTestCount",
-        ).forEach { task -> assertTrue("Local gate must include $task", build.contains(task)) }
-
-        assertTrue(script.contains("openTaskerDistribution=play"))
-        assertTrue(script.contains("openTaskerDistribution=fdroid"))
-        assertTrue(script.contains("Reusing configuration cache"))
-        assertTrue(script.contains("https://api.osv.dev/v1/querybatch"))
-        assertTrue(script.contains("git diff --quiet -- app/schemas"))
-        assertTrue(script.contains("[switch]\$SeedFailure"))
-    }
 
     @Test
     fun resolvedPoliciesAndVibratePermissionStayFailClosed() {
@@ -51,4 +25,6 @@ class LocalReleaseGateContractTest {
         assertTrue(build.contains("minimumTests.set(522)"))
         assertTrue(manifest.contains("android.permission.VIBRATE"))
     }
+// RETIRED: upstream's release-gate process (one documented command owning every local release
+// boundary). This fork releases through its own build-apk / publish-version skills.
 }

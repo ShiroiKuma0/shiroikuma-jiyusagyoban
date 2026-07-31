@@ -113,6 +113,19 @@ class VariableStore private constructor(
     private fun isProjectScopedName(name: String): Boolean =
         name.isNotEmpty() && name[0].isUpperCase() && name.any { it.isLowerCase() }
 
+    /**
+     * Whether [set] would actually persist this name, rather than quietly keeping it task-local.
+     *
+     * Two names do not persist: an all-lowercase one (task-local by definition), and a MixedCase one in
+     * an **unfiled** task — [set]'s guard keeps that local rather than writing a dead shadow-copy into
+     * the super bucket. Exposed so a caller can tell the difference; `var.persist` deliberately does
+     * NOT refuse on it, because the value still resolves for the rest of the run.
+     */
+    fun persistsGlobally(name: String): Boolean {
+        val bucket = bucketOf(name) ?: return false
+        return !(bucket == SUPER_GLOBAL_PROJECT_ID && isProjectScopedName(name))
+    }
+
     fun set(name: String, value: String, sensitive: Boolean = false) {
         val shouldRemainSensitive = sensitive || sensitiveWriteDepth.get() > 0 || isSensitive(name)
         val bucket = bucketOf(name)
@@ -124,13 +137,23 @@ class VariableStore private constructor(
             setInLocalScope(name, value, shouldRemainSensitive)
             return
         }
-        globalScope.set(bucket, name, value)
-        updateSensitivity(
-            globalSensitiveNames,
-            name,
-            shouldRemainSensitive || name in declaredSecretGlobals,
-        )
+        // The sensitivity of a global is a read-modify-write, and it MUST be atomic. Two profile runs
+        // racing the same name — one marking it secret, one overwriting it plainly — used to lose the
+        // flag: the plain writer sampled `isSensitive` (above) before the secret writer set it, then
+        // cleared it on the way out. A cleared flag means the value is persisted and exported in
+        // plaintext, so this re-reads the set INSIDE the lock and only ever clears when nobody has
+        // marked it. Sensitivity is monotonic within a run: plain writes never undo a secret one.
+        synchronized(globalSensitiveLock) {
+            val sensitiveNow = shouldRemainSensitive ||
+                name in globalSensitiveNames ||
+                name in declaredSecretGlobals
+            globalScope.set(bucket, name, value)
+            updateSensitivity(globalSensitiveNames, name, sensitiveNow)
+        }
     }
+
+    /** Guards the check-then-act on [globalSensitiveNames]; see the note in [set]. */
+    private val globalSensitiveLock = Any()
 
     /**
      * Force a value into the task-local scope regardless of the name's casing. Used to inject an
