@@ -8,9 +8,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.ui.draw.clip
@@ -50,12 +52,15 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -137,6 +142,7 @@ import com.opentasker.core.contexts.DaySchedule
 import com.opentasker.core.contexts.EventContextPreset
 import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.contexts.contextConfigSummary
+import com.opentasker.core.engine.AppShutdown
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.widget.TaskShortcutHelper
 import com.opentasker.core.flow.AutomationFlowTarget
@@ -414,6 +420,11 @@ fun ActiveAutomationUi(
     val expandedHelpSections = remember { mutableStateMapOf<String, Boolean>() }
     // UI customization is a full-screen overlay reached from the top-bar overflow. (Projects is now a tab.)
     var showUiCustomization by rememberSaveable { mutableStateOf(false) }
+    // "Exit app fully": run-on-exit tasks in flight, then the report the user confirms before anything
+    // is forced down. Not rememberSaveable — a shutdown must never be resumed across a config change.
+    var exitBusy by remember { mutableStateOf(false) }
+    var exitReport by remember { mutableStateOf<AppShutdown.Report?>(null) }
+    val hostActivity = LocalContext.current.findHostActivity()
     val sortPrefs by ListSortStore.state.collectAsState()
     // A selective export ("Export profiles/tasks/…") waiting for the SAF create-document URI.
     var pendingExport by remember { mutableStateOf<PendingExport?>(null) }
@@ -693,6 +704,96 @@ fun ActiveAutomationUi(
         return
     }
 
+    if (exitBusy) {
+        AlertDialog(
+            modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+            onDismissRequest = { /* the exit tasks are already running — no way back from here */ },
+            title = { Text("Shutting down") },
+            text = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                    Text("Running the run-on-exit tasks…")
+                }
+            },
+            confirmButton = {},
+        )
+    }
+
+    // The shutdown report. Raised BEFORE anything is torn down, because a dialog shown after the app is
+    // gone can't be read — and its whole value is naming what should already have stopped but hadn't.
+    exitReport?.let { report ->
+        AlertDialog(
+            modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+            onDismissRequest = { exitReport = null },
+            title = { Text(if (report.clean) "Ready to exit" else "Still running") },
+            text = {
+                Column(
+                    Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        if (report.ran.isEmpty()) {
+                            "No run-on-exit tasks are configured (set them under Monitor ⇨ Run on exit)."
+                        } else {
+                            "Ran on exit: ${report.ran.joinToString()}."
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    if (report.timedOut.isNotEmpty()) {
+                        Text(
+                            "Gave up waiting after 30s (still going): ${report.timedOut.joinToString()}.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    if (report.missing.isNotEmpty()) {
+                        Text(
+                            "Configured but no longer exist — stale “Run on exit” entries: " +
+                                "${report.missing.joinToString()}.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
+                    if (report.leftovers.isEmpty()) {
+                        Text(
+                            "Nothing is left running. Only the engine service remains, and it is stopped next.",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    } else {
+                        Text(
+                            "${report.leftovers.size} thing${if (report.leftovers.size == 1) "" else "s"} " +
+                                "should already have stopped and did not — they are forced down on OK:",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        report.leftovers.forEach { entry ->
+                            Text(
+                                "• ${entry.kind.title}: ${entry.label} — ${entry.detail}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    Text(
+                        "This report is also written to the run log. Nothing will restart the app by itself " +
+                            "afterwards — not the per-minute alarm, a widget, the tile or a sister app; open " +
+                            "白い熊 自由作業盤 to start it again.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    exitReport = null
+                    AppShutdown.finish(context, report)
+                    hostActivity?.finishAndRemoveTask()
+                }) { Text("Stop everything & exit") }
+            },
+            dismissButton = { TextButton(onClick = { exitReport = null }) { Text("Cancel") } },
+        )
+    }
+
     Scaffold(
         modifier = modifier
             .fillMaxSize()
@@ -755,6 +856,35 @@ fun ActiveAutomationUi(
                             text = { Text("白い熊 自由作業盤 UI") },
                             leadingIcon = { Icon(Icons.Filled.Settings, contentDescription = null) },
                             onClick = { showOverflow = false; showUiCustomization = true },
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
+                        // Restart is the everyday one: the same teardown as an exit, minus the stop flag,
+                        // followed by a fresh start — re-establishes the context layer after a bad state.
+                        DropdownMenuItem(
+                            text = { Text("Restart engine") },
+                            leadingIcon = { Icon(Icons.Filled.RestartAlt, contentDescription = null) },
+                            onClick = {
+                                showOverflow = false
+                                AppShutdown.restartEngine(context)
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("Engine restarted — run-on-start tasks will re-run.")
+                                }
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Exit app fully") },
+                            leadingIcon = { Icon(Icons.Filled.PowerSettingsNew, contentDescription = null) },
+                            onClick = {
+                                showOverflow = false
+                                exitBusy = true
+                                scope.launch {
+                                    // prepare() only RUNS the exit tasks and takes stock — nothing is torn
+                                    // down and nothing is stopped until the report below is confirmed.
+                                    val report = AppShutdown.prepare(context)
+                                    exitBusy = false
+                                    exitReport = report
+                                }
+                            },
                         )
                     }
                 },
@@ -1551,6 +1681,20 @@ internal fun InlineNotice(title: String, body: String, color: Color) {
             }
         }
     }
+}
+
+/**
+ * The hosting Activity behind a Compose LocalContext — needed by "Exit app fully" to call
+ * `finishAndRemoveTask()`. The context is usually a ContextWrapper chain (theme wrappers), so unwrap
+ * rather than casting; null when there is genuinely no Activity (a preview).
+ */
+private fun android.content.Context.findHostActivity(): android.app.Activity? {
+    var current: android.content.Context? = this
+    while (current is android.content.ContextWrapper) {
+        if (current is android.app.Activity) return current
+        current = current.baseContext
+    }
+    return null
 }
 
 /** Short confirm buzz for the long-press jump to the 白い熊 自由作業盤 UI page (白い熊 2026-07-25). */

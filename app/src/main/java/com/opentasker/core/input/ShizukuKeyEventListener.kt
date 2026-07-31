@@ -51,6 +51,8 @@ class ShizukuKeyEventListener {
     @Volatile private var bound = false
     @Volatile private var bindInFlight = false
     @Volatile private var grabUnavailable = false
+    /** The stale-grabber sweep is a once-per-process job, not a per-bind one. */
+    @Volatile private var reaped = false
 
     // detect-only fallback state
     @Volatile private var currentProcess: Process? = null
@@ -184,15 +186,54 @@ class ShizukuKeyEventListener {
 
     // ---- grab mode (Shizuku UserService) ----
 
-    private fun userServiceArgs(ctx: Context): Shizuku.UserServiceArgs =
+    private fun userServiceArgs(ctx: Context, version: Int = BuildConfig.VERSION_CODE): Shizuku.UserServiceArgs =
         Shizuku.UserServiceArgs(ComponentName(ctx.packageName, KeyGrabberService::class.java.name))
             .daemon(false)
             .processNameSuffix("keygrab")
             .debuggable(BuildConfig.DEBUG)
-            .version(BuildConfig.VERSION_CODE)
+            .version(version)
+
+    /**
+     * Destroy grabber processes left over from earlier builds.
+     *
+     * Shizuku keys a UserService by (component, **version**), and we pass the app's versionCode so a new
+     * build always gets fresh code rather than a stale process holding the old APK's `libevgrab.so`. The
+     * cost is that after an update the previous version is a different identity — `unbindUserService`
+     * with today's args can no longer name it, so it was orphaned and ran forever as a privileged `shell`
+     * process. One per install accumulated (five were alive after a single morning's builds).
+     *
+     * So: remember every version we have ever bound, and unbind each non-current one by rebuilding ITS
+     * args. Only the current version is kept in the record afterwards.
+     */
+    private fun reapStaleGrabbers(ctx: Context) {
+        if (reaped) return
+        reaped = true
+        val prefs = ctx.getSharedPreferences(GRABBER_PREFS, Context.MODE_PRIVATE)
+        val current = BuildConfig.VERSION_CODE
+        val recorded = prefs.getString(GRABBER_KEY_VERSIONS, "").orEmpty()
+            .split(",").mapNotNull { it.trim().toIntOrNull() }
+        // The recorded versions, plus a bounded window of recent build numbers below this one. The window
+        // exists because the versions leaked BEFORE this reaper shipped were never recorded anywhere —
+        // and it self-heals a cleared record. Unbinding a version that has no live process just fails
+        // harmlessly, so over-asking is safe; doing it once per process keeps the IPC cost trivial.
+        val window = (current - REAP_WINDOW until current).toList()
+        for (stale in (recorded + window).filter { it != current }.distinct().sortedDescending()) {
+            // A THROWAWAY connection, never the live one: unbinding deregisters the ServiceConnection it
+            // is handed, so reusing ours here would tear down the binding we are about to make.
+            val scratch = object : ServiceConnection {
+                override fun onServiceConnected(name: ComponentName?, binder: IBinder?) = Unit
+                override fun onServiceDisconnected(name: ComponentName?) = Unit
+            }
+            runCatching { Shizuku.unbindUserService(userServiceArgs(ctx, stale), scratch, true) }
+                .onFailure { Log.w(TAG, "Could not reap key-grabber $stale: ${it.message}") }
+        }
+        prefs.edit().putString(GRABBER_KEY_VERSIONS, current.toString()).apply()
+        Log.i(TAG, "Swept stale key-grabbers below version $current")
+    }
 
     private fun bindGrabber() {
         val ctx = appContext ?: return
+        reapStaleGrabbers(ctx)
         bindInFlight = true
         val ok = runCatching { Shizuku.bindUserService(userServiceArgs(ctx), connection); true }
             .onFailure { Log.w(TAG, "bindUserService failed: ${it.message}"); grabUnavailable = true }
@@ -316,6 +357,10 @@ class ShizukuKeyEventListener {
         private const val POLL_NO_SHIZUKU_MS = 4_000L
         private const val RESPAWN_DELAY_MS = 1_500L
         private const val BOUND_IDLE_MS = 3_000L
+        private const val GRABBER_PREFS = "keygrab_versions"
+        private const val GRABBER_KEY_VERSIONS = "versions"
+        /** How many build numbers below the current one the one-off sweep reaches back. */
+        private const val REAP_WINDOW = 30
         private val WHITESPACE = Regex("\\s+")
 
         // Volume keys only (114 vol-down, 115 vol-up). Power is intentionally NOT grabbed: an injected

@@ -89,6 +89,10 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
         <package android:name="com.termux" />
+        <!-- Both Shizuku managers: 白い熊's fork is the one actually installed; upstream's id is kept
+             so a stock install still resolves. Without these pins getLaunchIntentForPackage answers
+             null on Android 11+ and "Open Shizuku settings" falls through to the setup web page. -->
+        <package android:name="shiroikuma.shizuku" />
         <package android:name="moe.shizuku.privileged.api" />
         <intent>
             <action android:name="com.twofortyfouram.locale.intent.action.EDIT_SETTING" />

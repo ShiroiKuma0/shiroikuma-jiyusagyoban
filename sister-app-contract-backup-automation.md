@@ -1,11 +1,22 @@
-# Hand-off — implement the 保存復元 state-export automation contract in THIS app
+# Sister-app contract — the 保存復元 state-export automation, to be implemented in a SISTER app
 
-> **Canonical location:** `~/git/shiroikuma-jiyusagyoban/hand-off-backup-automation.md`
-> **How it is invoked:** 白い熊 says *«Process jiyusagyoban's backup-automation hand-off»* in a sister
-> app's chat — read this file from that path (it is not copied into the target repo) and implement it
-> there. Any sister app can be brought onto the 保存復元 batch this way.
+> ## ⚠ NOT a to-do for this repo
+>
+> **自由作業盤 is the *caller* here, and already implements its own side**
+> (`core/transfer/StateExportReceiver.kt` + `AutomationAuth.kt`). Nothing in this file is outstanding
+> work for `shiroikuma-jiyusagyoban`. It lives here because this is the app that defines the contract,
+> and it is **tracked on purpose** — unlike an `hand-off-*.md`, it is permanent and never self-destructs.
+>
+> **Who implements it:** a **sister app**, typically once it has just been built or is being brought
+> onto the 保存復元 batch for the first time.
+>
+> **Canonical location:** `~/git/shiroikuma-jiyusagyoban/sister-app-contract-backup-automation.md`
+> **How it is invoked:** 白い熊 says *«Process jiyusagyoban's backup-automation contract»* in **a sister
+> app's chat** — that chat reads this file from the path above (it is never copied into the target repo)
+> and implements it *there*. Any sister app can be brought onto the 保存復元 batch this way.
 
-**Read this whole file, then implement it in the repo this chat is working on.** It is self-contained:
+**Read this whole file, then implement it in the repo this chat is working on** — which, if you are
+reading this correctly, is a sister app and **not** `shiroikuma-jiyusagyoban`. It is self-contained:
 nothing else needs to be consulted, and no part of it needs editing per app. Every app-specific value
 (action strings, category ids, labels) is *derived* from the app itself, as described below.
 

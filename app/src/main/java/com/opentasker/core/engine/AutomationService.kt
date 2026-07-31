@@ -106,12 +106,26 @@ class AutomationService : Service() {
     private var foldOn = false
     private var appUsageOn = false
     private var autoStartDone = false
+    /** Set when onCreate refused to start (the app is stopped) — onDestroy then has nothing to undo. */
+    @Volatile private var refusedStart = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         startForegroundCompat()
+        // The shutdown gate has to bite HERE, not just in onStartCommand: onCreate is what subscribes
+        // every context source and spawns the Shizuku key-grabber process, and it runs first. Gating
+        // only the later callback meant a refused start still built the whole engine up and tore it
+        // down again — observed leaving an orphaned :keygrab process behind. startForeground above is
+        // not optional even on this path: we were launched with startForegroundService and must go
+        // foreground before stopping, or the system kills the process for not doing so in time.
+        if (EngineShutdown.isStopped(this)) {
+            AppLogger.info(TAG, "Engine create ignored — the app is stopped")
+            refusedStart = true
+            stopSelf()
+            return
+        }
         // No engine wakelock: the per-minute clock rides a Doze-exempt exact alarm and triggers ride
         // their own event sources, so the CPU is free to deep-sleep when idle (白い熊 freezes Powergenie).
         timeEventScheduler.scheduleNextMinute()
@@ -150,6 +164,14 @@ class AutomationService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Backstop for the shutdown flag: every caller is gated at its own entry point (so the run log
+        // names what tried), but a path we missed — or a system-initiated restart — must not quietly
+        // undo an "Exit app fully" either.
+        if (EngineShutdown.isStopped(this)) {
+            AppLogger.info(TAG, "Engine start ignored — the app is stopped")
+            stopSelf()
+            return START_NOT_STICKY
+        }
         if (intent?.getBooleanExtra(EXTRA_STARTED_FROM_VISIBLE_UI, false) == true) {
             audioForegroundServiceEligibility = AudioForegroundServiceEligibility.WHILE_IN_USE
         }
@@ -211,6 +233,14 @@ class AutomationService : Service() {
     }
 
     override fun onDestroy() {
+        // Nothing was ever subscribed on the refused-start path, so stopping monitors that never
+        // started would be the only thing that could throw here. Cancel the alarm and leave.
+        if (refusedStart) {
+            runCatching { timeEventScheduler.cancel() }
+            job.cancel()
+            super.onDestroy()
+            return
+        }
         val matcherJobSnapshot = matcherJobs.values.toList()
         val taskJobSnapshot = profileTaskJobs.values.toList()
         matcherJobSnapshot.forEach { it.cancel() }
@@ -228,6 +258,11 @@ class AutomationService : Service() {
         orientationDetector.stop()
         foldDetector.stop()
         hardwareKeyListener.stop()
+        // The bubble layers' collectors live on this service's scope, but their windows belong to the
+        // WindowManager: without an explicit teardown they stayed on screen after the engine stopped,
+        // with `started` still true so a restart never re-subscribed them.
+        FreezeBubbleOverlayManager.stop()
+        FlashBubbleOverlayManager.stop()
         runCatching { unregisterReceiver(PackageContextEvents.receiver) }
         runCatching { unregisterReceiver(BluetoothContextEvents.receiver) }
         CameraMicContextEvents.stop(this)
@@ -748,6 +783,13 @@ class AutomationService : Service() {
         /** (Re)start the foreground engine service. Safe to call when it is already running. */
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, AutomationService::class.java))
+        }
+
+        /** Stop the engine outright — the last step of the shutdown teardown, and half of a restart. */
+        fun stop(context: Context) {
+            val app = context.applicationContext
+            runCatching { app.stopService(Intent(app, AutomationService::class.java)) }
+                .onFailure { AppLogger.warn(TAG, "Failed to stop the automation service: ${it.message}") }
         }
 
         /** Ask a running engine to re-arm its matchers — used by the heartbeat when the tick went stale. */

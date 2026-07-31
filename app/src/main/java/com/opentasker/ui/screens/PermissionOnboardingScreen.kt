@@ -877,22 +877,19 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
                 shizukuReady -> "Shizuku is running and access is granted — shell commands, screen wake, screenshot, app freeze/unfreeze and the 物理鍵 key grabber are ready."
                 shizukuRunning -> "Shizuku is running but 白い熊 自由作業盤 has not been granted access — tap Grant to pop Shizuku's permission dialog."
                 shizukuStatus.managerInstalled -> "Shizuku is installed but not running — start it from the Shizuku app."
-                else -> "Shizuku is not installed. It powers shell commands, screen wake, screenshot, app freeze/unfreeze and the 物理鍵 key grabber."
+                else -> "Shizuku is not installed. It powers shell commands, screen wake, screenshot, app freeze/unfreeze and the 物理鍵 key grabber. The button opens 白い熊 Shizuku's GitHub page."
             },
             granted = shizukuReady,
             actionLabel = when {
                 shizukuReady -> "Open Shizuku"
                 shizukuRunning -> "Grant access"
                 shizukuStatus.managerInstalled -> "Open Shizuku"
-                else -> "Open setup guide"
+                else -> "Get 白い熊 Shizuku"
             },
             action = if (shizukuRunning && !shizukuReady) {
                 PermissionAction.Custom { ShizukuShell.requestPermission() }
             } else {
-                PermissionAction.SettingsIntent(
-                    context.packageManager.getLaunchIntentForPackage(ShizukuPowerBackend.MANAGER_PACKAGE)
-                        ?: Intent(Intent.ACTION_VIEW, Uri.parse(ShizukuPowerBackend.SETUP_URL)),
-                )
+                PermissionAction.SettingsIntent(ShizukuPowerBackend.openManagerIntent(context))
             },
             requiredFor = "Shell, wake, screenshot, freeze, 物理鍵",
             optional = true,

@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.core.engine.EngineShutdown
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.storage.toEntity
@@ -36,6 +37,13 @@ object AutomationTargetContract {
     const val EXTRA_PROFILE_COUNT = "com.opentasker.extra.PROFILE_COUNT"
     const val EXTRA_ENABLED_PROFILE_COUNT = "com.opentasker.extra.ENABLED_PROFILE_COUNT"
 
+    /**
+     * True in a [ACTION_QUERY_STATUS] reply when the user has shut the app down from its overflow menu.
+     * While it is true, [ACTION_RUN_TASK] is refused with [Activity.RESULT_CANCELED] + [EXTRA_ERROR];
+     * only opening 白い熊 自由作業盤 (or a reboot, when its boot setting is on) clears it.
+     */
+    const val EXTRA_STOPPED = "com.opentasker.extra.STOPPED"
+
     const val VARIABLE_EXTRA_PREFIX = "com.opentasker.var."
     private val variableNamePattern = Regex("^[A-Za-z][A-Za-z0-9_]{0,63}$")
 
@@ -55,7 +63,7 @@ class AutomationTargetReceiver : BroadcastReceiver() {
                 when (intent.action) {
                     AutomationTargetContract.ACTION_RUN_TASK -> runTask(context.applicationContext, intent)
                     AutomationTargetContract.ACTION_SET_PROFILE_ENABLED -> setProfileEnabled(intent)
-                    AutomationTargetContract.ACTION_QUERY_STATUS -> queryStatus(intent)
+                    AutomationTargetContract.ACTION_QUERY_STATUS -> queryStatus(context.applicationContext, intent)
                     else -> failure("Unsupported action: ${intent.action}")
                 }
             }.getOrElse { failure(it.message ?: "Automation target request failed") }
@@ -71,6 +79,11 @@ class AutomationTargetReceiver : BroadcastReceiver() {
     }
 
     private suspend fun runTask(appContext: Context, intent: Intent): TargetResponse {
+        // Sister-app token intents do not wake a stopped app: they are told so, rather than silently
+        // failing or quietly restarting the engine behind the user's back.
+        if (EngineShutdown.refuse(appContext, "external intent (run task)")) {
+            return failure("白い熊 自由作業盤 is stopped — open the app to start it again.")
+        }
         val db = OpenTaskerApp_NoHilt.db
         val task = resolveTask(intent)
             ?: return failure("Task not found. Provide ${AutomationTargetContract.EXTRA_TASK_ID} or ${AutomationTargetContract.EXTRA_TASK_NAME}.")
@@ -113,7 +126,7 @@ class AutomationTargetReceiver : BroadcastReceiver() {
         )
     }
 
-    private suspend fun queryStatus(intent: Intent): TargetResponse {
+    private suspend fun queryStatus(appContext: Context, intent: Intent): TargetResponse {
         val db = OpenTaskerApp_NoHilt.db
         val profileEntities = db.profileDao().getAll()
         val tasks = db.taskDao().getAll()
@@ -121,6 +134,11 @@ class AutomationTargetReceiver : BroadcastReceiver() {
         return TargetResponse(
             Activity.RESULT_OK,
             Bundle().apply {
+                // Deliberately NOT gated by the shutdown flag: a status query is a read, and asking
+                // "are you stopped?" has to be answerable precisely when the answer is yes. This is how
+                // a caller (e.g. the 雷起動盤 launcher) can grey out a task shortcut instead of firing
+                // one that will be refused.
+                putBoolean(AutomationTargetContract.EXTRA_STOPPED, EngineShutdown.isStopped(appContext))
                 putInt(AutomationTargetContract.EXTRA_TASK_COUNT, tasks.size)
                 putInt(AutomationTargetContract.EXTRA_PROFILE_COUNT, profileEntities.size)
                 putInt(

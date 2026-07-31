@@ -3,6 +3,78 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.78+54 — 2026-07-31
+
+**The app can be shut down, and it stays shut down.**
+
+### Exit app fully
+The top-bar ⋮ menu gains 「Exit app fully」 and 「Restart engine」. Exit runs the tasks listed under
+Monitor ⇨ Run on exit — the mirror of Run on start, so the app never has to know a project name — then
+raises a report of everything **still** live, and only tears down once that is confirmed. The report
+comes first on purpose: a dialog shown after the app is gone cannot be read, and its whole value is
+naming what should already have stopped and had not. It is written to the run log too, so it survives
+the dialog.
+
+Stopping the engine is not enough on its own to keep this app down. The per-minute exact alarm
+resurrects it, and the accessibility and notification-listener services are bound by the system, so the
+process returns within seconds however it is killed. Exit therefore sets a **persisted flag**, and every
+way back in — the resurrect alarm, boot, the quick-settings tile, widget and shortcut taps, notification
+buttons, sister-app token intents, the adb bridge's `RUN_TASK` — declines while it is set, writing a
+`停止中 — refused …` row to the run log rather than failing invisibly. Export, import and status queries
+are deliberately **not** gated: they start nothing.
+
+The process itself does not die, and cannot be made to. The accessibility service goes dormant instead —
+never `disableSelf()`, which would drop the grant and cost a trip through system settings — and the
+notification listener `requestUnbind()`s, which keeps its grant and rebinds silently when the app is
+opened again. Opening the app lifts the stop; so does a reboot, unless the new 「Start engine on boot」
+switch is off.
+
+### Live now
+Monitor gains an honest list of everything the app is holding open — in-flight tasks, scenes, bubbles,
+the progress panel, the engine — each row stoppable on the spot. It is the same inventory the shutdown
+report draws from, deliberately: the moment you want to look at something that should not be running is
+usually not the moment you want to exit.
+
+### Bubbles outlived the engine that owned them
+Freeze and flash bubbles were never torn down when the engine stopped. Their collectors died with its
+scope, but the windows belong to the WindowManager and stayed on screen — with `started` still true, so
+a restart never re-subscribed them. Both now stop properly, which is also why a restart re-establishes
+the whole overlay layer.
+
+### One privileged process leaked per install
+Shizuku keys a UserService by (component, **version**), and the 物理鍵 key grabber passes the app's
+versionCode so each build gets fresh code instead of a stale process holding the previous APK's
+`libevgrab.so`. The cost was that after an update the old version could no longer be named, so it was
+never unbound: five `shell`-owned `:keygrab` processes were alive after a single morning of builds.
+Every version ever bound is now recorded and swept, with a one-off window of recent build numbers to
+clear an existing backlog.
+
+### The permission dialog's settings buttons did nothing
+Four separate faults, all of them old. `DialogActivity` is declared with an empty `taskAffinity` and
+`excludeFromRecents`, so launching a settings page backgrounded its own task, and the destroy that
+followed reported a `Cancelled` the user never chose; a per-minute profile then re-raised the modal on
+top of Settings within the minute, which is what made the button look broken. The Shizuku button pointed
+at upstream's `moe.shizuku.privileged.api`, which is not the fork installed here, so it silently fell
+through to a web page — and the missing `<queries>` pin would have hidden the fork anyway on Android 11+.
+Every failure was swallowed by a bare `runCatching {}`.
+
+Now: the pill settles deliberately after a successful launch, a three-minute quiet window per requirement
+keeps the modal from stacking on the page it just opened (the task stays blocked and still logs), Shizuku
+resolves fork-first with both ids pinned, and anything that will not open says so. The setup guide URL is
+our own `shiroikuma-shizuku` page rather than upstream's, which describes a different app and a different
+APK. The manifest contract test now asserts the whole manager list, since it was only ever checking the
+id that was not the problem.
+
+### Also
+- `SET_STARTUP_TASKS` on the adb bridge sets run-on-start / run-on-exit / start-on-boot **by task name**,
+  so the dev loop configures them instead of handing 白い熊 device steps.
+- `QUERY_STATUS` answers a new `STOPPED` boolean, ungated, so a caller can ask before firing something
+  that would be refused.
+- The stop flag is cached in memory: it is read from `onAccessibilityEvent`, which the framework calls on
+  the main thread for every window-state change on the device, and disk I/O does not belong there.
+- `hand-off-backup-automation.md` is now `sister-app-contract-backup-automation.md`, with a header saying
+  plainly that it is implemented **by a sister app** and is not outstanding work here.
+
 ## 0.2.78+47 — 2026-07-28
 
 **The progress highlight lands on the category the app is actually writing.**
@@ -200,7 +272,7 @@ you can repair from — all in the same window.
 - `param:mode` is gone from all 33 wrapper tasks (it made a hand-run wrapper warn about a missing
   template value); mode travels in `%BR_Mode`.
 
-### Contract (`hand-off-backup-automation.md`)
+### Contract (`sister-app-contract-backup-automation.md`)
 Generalised — no app-specific incidents — and hardened with what this run taught, with the self-test
 checklist replaced by "verification happens in 自由作業盤":
 - **Never export from a receiver.** `goAsync()` does not extend the broadcast window (~10 s foreground,

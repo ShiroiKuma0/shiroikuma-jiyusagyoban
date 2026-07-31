@@ -72,9 +72,7 @@ object CapabilityState {
             CapabilityRequirement.Dnd -> Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
             CapabilityRequirement.PostNotifications ->
                 Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-            CapabilityRequirement.Shizuku ->
-                context.packageManager.getLaunchIntentForPackage(ShizukuPowerBackend.MANAGER_PACKAGE)
-                    ?: Intent(Intent.ACTION_VIEW, Uri.parse(ShizukuPowerBackend.SETUP_URL))
+            CapabilityRequirement.Shizuku -> ShizukuPowerBackend.openManagerIntent(context)
             CapabilityRequirement.AllFiles ->
                 if (Build.VERSION.SDK_INT >= 30)
                     Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + context.packageName))
