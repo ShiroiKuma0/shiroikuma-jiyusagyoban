@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.78+47`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.78+54`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 </div>
 
@@ -47,6 +47,29 @@ Case-based **variable scoping that survives reboots** — `%ALLCAPS` super-globa
 
 ### ⚙️ A capability-aware action editor + workspace health marks
 Every action carries a **live status pill**: red, with a one-tap **deep-link to the exact Settings screen**, when its required permission/service isn't set up; hidden when it is — checked against the *same* state the Setup tab uses (accessibility, Shizuku — verified **binder-up and granted**, not merely installed — modify-settings, overlay, Do-Not-Disturb, notifications), re-evaluated every time the app resumes. Any task that **cannot run right now** (an unsupported action, or a blocking permission that's really missing) gets a **red ❗ that propagates all the way up**: task row → project filter chips → the Tasks icon in the nav bar — and profiles inherit the mark from the task they run, up to the Profiles nav icon. The **Setup tab opens with a Task-health card** listing every blocked task and exactly what it's missing (one-tap jump to Tasks), so startup breakage is visible from the top level without opening anything. An **app-package** field type lets you type a package / `%variable` *or* pick from an installed-apps list. Build action lists fast: **long-press to multi-select** actions, then **clone / copy / cut / delete** them — with **paste before / after** and an **app-wide clipboard** that moves actions **between** tasks.
+
+### 🛑 An exit that actually exits — and a live inventory of what's running
+An automation app is the hardest kind to switch off: stopping the engine achieves nothing when a
+Doze-exempt per-minute alarm resurrects it, and the accessibility and notification-listener services are
+bound by the *system*, so the process returns within seconds however it is killed. **Exit app fully**
+(top-bar ⋮) does it properly. It runs your own teardown tasks — a **Run on exit** list mirroring **Run on
+start**, so the app never has to know a project name — then shows you **everything still live** and only
+tears down once you confirm. The report comes *before* the shutdown on purpose: a dialog raised after the
+app is gone can't be read, and its whole value is naming what should already have stopped. It lands in
+the run log too.
+
+Then a **persisted stop flag** holds the line: the resurrect alarm, boot, the quick-settings tile, widget
+and shortcut taps, notification buttons, sister-app token intents and the adb bridge all *decline* while
+it's set — each writing a `停止中 — refused …` row, so a refused trigger stays debuggable instead of
+silently missing. The accessibility service goes **dormant rather than disabled** (disabling would drop
+the grant and cost a trip through system settings) and the notification listener unbinds while *keeping*
+its grant, rebinding silently on next open. Widgets keep rendering from persisted globals throughout — a
+stopped app can be woken to **draw**, never to **run**. Opening the app lifts it; so does a reboot, unless
+**Start engine on boot** is off.
+
+The same inventory powers a **Live now** section on the Monitor tab — in-flight tasks, scene overlays,
+bubbles, the progress panel, the engine itself, each row stoppable on the spot. Because the moment you
+want to look at something that shouldn't be running is rarely the moment you want to quit.
 
 ### 🔗 Robust by-name linking & imports
 Everything links by **name**, not by fragile ids: `scene.show`/`scene.hide` resolve a scene by **`(project, name)`**, and a scene's button/slider/gesture actions resolve their task **by name** too — so re-importing a bundle or recreating a task never silently breaks a link. Imports **overwrite in place** (a re-import keeps each item's id, group and notes), and item names are **unique within a project** (enforced in the editors and at the DB level).
