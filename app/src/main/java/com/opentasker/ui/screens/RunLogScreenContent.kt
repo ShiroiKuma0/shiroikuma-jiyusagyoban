@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
@@ -436,6 +437,7 @@ private fun RunLogCard(entry: RunLogEntry) {
         RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.primary
         RunLogOutcome.Failed -> MaterialTheme.colorScheme.error
         RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondary
+        RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiary
     }
     val sourceText = entry.source?.let { key ->
         val name = RunLogSource.displayName(key)
@@ -448,6 +450,7 @@ private fun RunLogCard(entry: RunLogEntry) {
                 RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
                 RunLogOutcome.Failed -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.32f)
                 RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.36f)
+                RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.36f)
             }
         ),
         border = BorderStroke(
@@ -456,6 +459,7 @@ private fun RunLogCard(entry: RunLogEntry) {
                 RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)
                 RunLogOutcome.Failed -> MaterialTheme.colorScheme.error.copy(alpha = 0.30f)
                 RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.34f)
+                RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.34f)
             },
         ),
         shape = RoundedCornerShape(16.dp),
@@ -473,11 +477,13 @@ private fun RunLogCard(entry: RunLogEntry) {
                         RunLogOutcome.Succeeded -> Icons.Filled.CheckCircle
                         RunLogOutcome.Failed -> Icons.Filled.Error
                         RunLogOutcome.Skipped -> Icons.Filled.Info
+                        RunLogOutcome.Cancelled -> Icons.Filled.Cancel
                     },
                     contentDescription = when (outcome) {
                         RunLogOutcome.Succeeded -> stringResource(R.string.status_succeeded)
                         RunLogOutcome.Failed -> stringResource(R.string.status_failed)
                         RunLogOutcome.Skipped -> stringResource(R.string.status_skipped)
+                        RunLogOutcome.Cancelled -> stringResource(R.string.status_cancelled)
                     },
                     tint = accent,
                     modifier = Modifier

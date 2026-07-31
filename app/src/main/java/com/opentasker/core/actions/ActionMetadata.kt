@@ -16,6 +16,13 @@ data class ActionField(
     // When true, a TEXT field also shows a folder icon that opens the system directory/file picker and
     // fills the field with the chosen filesystem path — so paths don't have to be typed by hand.
     val pathPicker: Boolean = false,
+    /**
+     * Explicit display sensitivity, from upstream's argument-redaction work. `null` defers to the name
+     * heuristic in [ActionArgumentSensitivity] so unknown keys still fail closed; `false` marks a
+     * structurally useful field the heuristic would over-mask (a variable name, a file path). Adopted
+     * WITHOUT upstream's @StringRes conversion — the fork keeps its inline copy.
+     */
+    val sensitive: Boolean? = null,
 )
 
 enum class FieldType {
@@ -264,15 +271,15 @@ fun registerActionMetadata() {
             fields = listOf(
                 ActionField("method", "Method", FieldType.DROPDOWN, hint = "Default GET", options = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD")),
                 ActionField("url", "URL", required = true),
-                ActionField("query", "Query parameters", FieldType.MULTILINE, hint = "name=value, one per line"),
-                ActionField("headers", "Headers", FieldType.MULTILINE, hint = "Name: value, one per line"),
-                ActionField("authorization", "Authorization", hint = "Value for the Authorization header"),
-                ActionField("body", "Body", FieldType.MULTILINE),
-                ActionField("body_file", "Body from file", hint = "Path to a file to send as the body"),
+                ActionField("query", "Query parameters", FieldType.MULTILINE, hint = "name=value, one per line", sensitive = true),
+                ActionField("headers", "Headers", FieldType.MULTILINE, hint = "Name: value, one per line", sensitive = true),
+                ActionField("authorization", "Authorization", hint = "Value for the Authorization header", sensitive = true),
+                ActionField("body", "Body", FieldType.MULTILINE, sensitive = true),
+                ActionField("body_file", "Body from file", hint = "Path to a file to send as the body", sensitive = false),
                 ActionField("content_type", "Content type", hint = "e.g. application/json"),
                 ActionField("response_var", "Response variable", hint = "Stores the response body"),
                 ActionField("status_var", "Status variable", hint = "Stores the HTTP status code"),
-                ActionField("headers_var", "Headers variable", hint = "Stores the response headers"),
+                ActionField("headers_var", "Headers variable", hint = "Stores the response headers", sensitive = false),
                 ActionField("output_file", "Response to file", hint = "Write the response body to this path"),
                 ActionField("max_response_bytes", "Max response bytes", FieldType.NUMBER),
                 ActionField("redirects", "Follow redirects", hint = "true/false"),
@@ -1280,7 +1287,7 @@ fun registerActionMetadata() {
                 ActionField("executable", "Executable", required = true, hint = "~/.termux/tasker/my_script"),
                 ActionField("arguments", "Arguments", FieldType.MULTILINE, hint = "Optional shell-style arguments"),
                 ActionField("workingDirectory", "Working directory", hint = "Optional Termux working directory"),
-                ActionField("stdin", "Standard input", FieldType.MULTILINE, hint = "Optional stdin payload"),
+                ActionField("stdin", "Standard input", FieldType.MULTILINE, hint = "Optional stdin payload", sensitive = true),
                 ActionField("capturePrefix", "Output variable prefix", hint = "%script"),
             )
         )
@@ -1812,7 +1819,7 @@ fun registerActionMetadata() {
             category = "App",
             fields = listOf(
                 ActionField("number", "Phone number", required = true),
-                ActionField("message", "Message", FieldType.MULTILINE, required = true),
+                ActionField("message", "Message", FieldType.MULTILINE, required = true, sensitive = true),
             )
         )
     )
@@ -1919,7 +1926,7 @@ fun registerActionMetadata() {
             category = "Network",
             fields = listOf(
                 ActionField("url", "URL", required = true),
-                ActionField("data", "Request body", FieldType.MULTILINE),
+                ActionField("data", "Request body", FieldType.MULTILINE, sensitive = true),
                 ActionField("var", "Store response in", hint = "%var"),
                 ActionField("allow_http", "Allow HTTP", FieldType.CHECKBOX, hint = "Allow plain HTTP for LAN/private-network hosts only"),
             )

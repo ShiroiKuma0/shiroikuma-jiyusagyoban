@@ -32,6 +32,9 @@ import com.opentasker.core.actions.NotificationTaskBindings
 import com.opentasker.core.actions.NotificationTaskCandidate
 import com.opentasker.core.actions.NotificationTaskReference
 import com.opentasker.core.actions.NotificationTaskResolution
+import com.opentasker.core.external.AutomationTargetContract
+import com.opentasker.core.external.ExternalExecutions
+import com.opentasker.core.external.ExternalExecutionState
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.storage.recoveryMessage
 import com.opentasker.core.contexts.BluetoothContextEvents
@@ -187,6 +190,18 @@ class AutomationService : Service() {
                 ?: legacyName?.let { NotificationTaskReference.LegacyName(it) }
             if (reference != null) {
                 scope.launch { runNotificationTask(reference, buttonLabel) }
+            }
+            return START_STICKY
+        }
+        if (intent?.action == ACTION_RUN_EXTERNAL_TASK) {
+            // Upstream's protocol-v2 broker: the external RUN_TASK broadcast cannot hold its window
+            // open for a task that may wait minutes, so the receiver validates and hands the run here,
+            // where the foreground service owns it to completion and the caller polls QUERY_EXECUTION.
+            val executionId = intent.getStringExtra(AutomationTargetContract.EXTRA_EXECUTION_ID)
+            val taskId = intent.getLongExtra(AutomationTargetContract.EXTRA_TASK_ID, -1L).takeIf { it > 0 }
+            val variables = externalVariables(intent)
+            if (executionId != null && taskId != null) {
+                scope.launch { runExternalTask(executionId, taskId, variables) }
             }
             return START_STICKY
         }
@@ -678,6 +693,66 @@ class AutomationService : Service() {
         return if (seconds == 1L) "1 second" else "$seconds seconds"
     }
 
+    private fun externalVariables(intent: Intent): Map<String, String> {
+        val extras = intent.extras ?: return emptyMap()
+        return extras.keySet()
+            .asSequence()
+            .filter { it.startsWith(AutomationTargetContract.VARIABLE_EXTRA_PREFIX) }
+            .mapNotNull { key ->
+                val name = key.removePrefix(AutomationTargetContract.VARIABLE_EXTRA_PREFIX)
+                if (!AutomationTargetContract.isValidVariableName(name)) return@mapNotNull null
+                extras.getString(key)?.let { name to it }
+            }
+            .toMap()
+    }
+
+    private suspend fun runExternalTask(executionId: String, taskId: Long, variables: Map<String, String>) {
+        fun fail(reason: String) {
+            AppLogger.warn(TAG, "External execution $executionId failed: $reason")
+            ExternalExecutions.update(this, executionId, ExternalExecutionState.FAILED, error = reason)
+        }
+
+        try {
+            val entity = db.taskDao().getById(taskId) ?: return fail("Task $taskId no longer exists.")
+            val decoded = entity.toDomainDecodeResult()
+            decoded.issue?.let { issue ->
+                val reason = issue.recoveryMessage()
+                logSkippedRun(
+                    db = db,
+                    task = decoded.value,
+                    source = EXTERNAL_RUN_SOURCE,
+                    reason = reason,
+                    metadata = listOf("execution=$executionId"),
+                )
+                return fail(reason)
+            }
+            ExternalExecutions.update(this, executionId, ExternalExecutionState.RUNNING)
+            val result = executeAndLogTask(
+                appContext = this,
+                db = db,
+                task = decoded.value,
+                source = EXTERNAL_RUN_SOURCE,
+                metadata = listOf("execution=$executionId", "Variables: ${variables.size} provided"),
+                initialVariables = variables,
+                audioForegroundService = audioForegroundServiceEligibility,
+                logTag = TAG,
+            )
+            ExternalExecutions.update(
+                context = this,
+                executionId = executionId,
+                state = if (result.report.success) ExternalExecutionState.SUCCEEDED else ExternalExecutionState.FAILED,
+                durationMs = result.report.durationMs,
+                error = if (result.report.success) null else "Task reported a failure; see the run log.",
+            )
+        } catch (e: CancellationException) {
+            ExternalExecutions.update(this, executionId, ExternalExecutionState.FAILED, error = "The run was cancelled.")
+            throw e
+        } catch (e: Exception) {
+            fail(e.message ?: "The run threw an unexpected error.")
+        }
+    }
+
+
     /** Run the user's configured auto-start tasks once per process (after a fresh start / resurrect),
      *  so overlays and state come back without manually running the master "起動" task. */
     private fun runAutoStartTasks() {
@@ -768,6 +843,8 @@ class AutomationService : Service() {
         const val ACTION_TIME_TICK_TRIGGER = "com.opentasker.action.TIME_TICK_TRIGGER"
         const val ACTION_RUN_NOTIFICATION_TASK = "com.opentasker.action.RUN_NOTIFICATION_TASK"
         const val ACTION_REARM = "com.opentasker.action.ENGINE_REARM"
+        const val ACTION_RUN_EXTERNAL_TASK = "com.opentasker.action.RUN_EXTERNAL_TASK"
+        private const val EXTERNAL_RUN_SOURCE = "External intent"
         /** Set by MainActivity when it (re)starts the engine from a visible UI — upstream uses this to
          *  promote audio-action eligibility (Android 17 hardening); accepted here for compatibility. */
         const val EXTRA_STARTED_FROM_VISIBLE_UI = "com.opentasker.extra.STARTED_FROM_VISIBLE_UI"

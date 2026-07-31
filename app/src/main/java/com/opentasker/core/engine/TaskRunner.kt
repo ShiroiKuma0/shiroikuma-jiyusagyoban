@@ -2,6 +2,7 @@ package com.opentasker.core.engine
 
 import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
+import com.opentasker.core.actions.ActionArgumentSensitivity
 import com.opentasker.core.capabilities.CapabilityPrompt
 import com.opentasker.core.capabilities.CapabilityState
 import com.opentasker.core.dialog.DialogActivity
@@ -486,7 +487,7 @@ class TaskRunner(
                     expansions += ActionArgumentExpansionTrace(
                         argName = name,
                         rawValue = rawValue,
-                        expandedValue = REDACTED_VALUE,
+                        expandedValue = ActionArgumentSensitivity.REDACTED,
                         expressions = emptyList(),
                         warnings = emptyList(),
                         isSecretDerived = true,
@@ -501,9 +502,9 @@ class TaskRunner(
                 expansions += ActionArgumentExpansionTrace(
                     argName = name,
                     rawValue = rawValue,
-                    expandedValue = if (isSecretDerived) REDACTED_VALUE else result.value,
+                    expandedValue = if (isSecretDerived) ActionArgumentSensitivity.REDACTED else result.value,
                     expressions = result.traces.map { trace ->
-                        if (trace.isSecretDerived) trace.copy(value = REDACTED_VALUE) else trace
+                        if (trace.isSecretDerived) trace.copy(value = ActionArgumentSensitivity.REDACTED) else trace
                     },
                     warnings = result.warnings,
                     isSecretDerived = isSecretDerived,
@@ -559,7 +560,7 @@ private const val MAX_WAIT_TIMEOUT_MS = 1_860_000L // 30 minutes + 60 s margin
 
 const val SUB_TASK_ACTION_ID = "task.run"
 const val MAX_SUBTASK_DEPTH = 8
-private val SUB_TASK_REF_KEYS = listOf("task", "name", "id")
+internal val SUB_TASK_REF_KEYS = listOf("task", "name", "id")
 
 /** Run Task arg keys: each `param:<name>` is a named parameter; results land under this prefix. */
 const val SUB_TASK_PARAM_PREFIX = "param:"
@@ -641,7 +642,7 @@ private data class ActionArgumentExpansionReport(
             .sortedByDescending { it.length }
         var redacted = message
         for (value in secretValues) {
-            redacted = redacted.replace(value, REDACTED_VALUE)
+            redacted = redacted.replace(value, ActionArgumentSensitivity.REDACTED)
         }
         return redacted
     }
@@ -682,15 +683,15 @@ private fun ActionArgumentExpansionTrace.toTemplateDiagnosticLines(): List<Strin
             TEMPLATE_TRACE_PREFIX,
             argName.toLogField(),
             expressionTrace.source.name.lowercase().toLogField(),
-            if (sensitive) REDACTED_VALUE else expressionTrace.expression.toLogField(),
-            if (sensitive) REDACTED_VALUE else expressionTrace.value.toLogField(),
+            if (sensitive) ActionArgumentSensitivity.REDACTED else expressionTrace.expression.toLogField(),
+            if (sensitive) ActionArgumentSensitivity.REDACTED else expressionTrace.value.toLogField(),
             expressionTrace.warning.orEmpty().toLogField(),
         ).joinToString("\t")
     }
 
 private fun summarizeArgValue(argName: String, value: String, forceRedact: Boolean = false): String {
     if (forceRedact || isSensitiveArgName(argName)) {
-        return REDACTED_VALUE
+        return ActionArgumentSensitivity.REDACTED
     }
     val singleLine = value.replace(Regex("""\s+"""), " ").trim()
     return if (singleLine.length <= MAX_SUMMARY_VALUE_LENGTH) {
@@ -725,7 +726,6 @@ private val SENSITIVE_ARG_TOKENS = listOf(
     "token",
 )
 private const val TEMPLATE_TRACE_PREFIX = "Template:"
-private const val REDACTED_VALUE = "<redacted>"
 private const val MAX_SUMMARY_ARGS = 4
 private const val MAX_SUMMARY_VALUE_LENGTH = 80
 private const val MAX_TEMPLATE_TRACE_LINES_PER_ACTION = 8
