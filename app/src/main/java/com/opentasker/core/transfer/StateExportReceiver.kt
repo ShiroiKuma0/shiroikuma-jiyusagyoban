@@ -23,6 +23,12 @@ import java.util.concurrent.atomic.AtomicBoolean
  *   [SettingsBackup.Cat] ids; absent/empty = all), `progress_action` (optional — see below),
  *   plus the reply trio `reply_action` / `reply_package` / `reply_id`.
  * - [ACTION_LIST_CATEGORIES]: token-gated category enumeration for the caller's item picker.
+ * - [ACTION_CANCEL_EXPORT]: stop the running export at the next category boundary, delete its partial
+ *   output, and let it answer `ERROR:cancelled`. Extras: `token` (required) + optional `reply_id`
+ *   (absent = whatever is running). Fire-and-forget — it sends no reply of its own, and arriving with
+ *   nothing running is a silent no-op. There is no foreground service or wakelock to release here: the
+ *   export rides `goAsync()` + an IO coroutine, and `pending.finish()` in the `finally` is the
+ *   equivalent of the contract's step 4.
  *
  * Reply: a FRESH broadcast to `reply_package` with action `reply_action`, extras `reply_id`
  * (echoed) + `result` = `OK:<path>|<bytes>|<human size>|<n> categories` (EXPORT_STATE),
@@ -80,6 +86,12 @@ class StateExportReceiver : BroadcastReceiver() {
                     },
                 )
             }
+            ACTION_CANCEL_EXPORT -> {
+                // Fire-and-forget: the cancel sends NO reply of its own. The one terminal reply belongs
+                // to the export it stops, which answers ERROR:cancelled through its own single-fire
+                // guard. Safe to send at any time — nothing running is a silent no-op.
+                StateExportRun.requestCancel(replyId)
+            }
             ACTION_EXPORT_STATE -> {
                 // Absent items = OUR default set (the `on` ones), which the contract distinguishes from
                 // "everything" — the two coincide here only because nothing in this app is opt-out.
@@ -111,6 +123,13 @@ class StateExportReceiver : BroadcastReceiver() {
                     })
                 }
 
+                // One export at a time — the contract forbids two, and CANCEL_EXPORT's "the one you are
+                // running" only means anything while that holds.
+                if (!StateExportRun.begin(replyId)) {
+                    reply("ERROR:export already running")
+                    return
+                }
+
                 // The export writes ZIP entries + walks Room — go async and finish from IO.
                 val pending = goAsync()
                 CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
@@ -124,27 +143,51 @@ class StateExportReceiver : BroadcastReceiver() {
                             val dir = File(pathOverride)
                             dir.mkdirs()
                             if (!dir.isDirectory) throw IllegalArgumentException("not a directory: $pathOverride")
+                            // Write to <final>.part and rename only on success, so a cancelled or failed
+                            // run can leave the directory EXACTLY as it found it — no short archive
+                            // sitting at the real name for a later restore to pick up.
+                            val part = File(dir, "$fileName.part")
                             val file = File(dir, fileName)
-                            file.outputStream().use { out ->
-                                SettingsBackup.export(app, db, BuildConfig.VERSION_NAME, cats, out, ::progress)
+                            StateExportRun.onDiscard { part.delete() }
+                            part.outputStream().use { out ->
+                                SettingsBackup.export(
+                                    app, db, BuildConfig.VERSION_NAME, cats, out, ::progress,
+                                    isCancelled = StateExportRun::isCancelled,
+                                )
                             }
+                            if (!part.renameTo(file)) throw IllegalStateException("cannot finalise ${file.name}")
                             bytes = file.length()
                             shownPath = file.absolutePath
                         } else {
                             val dir = SettingsBackup.exportDir(app)
                                 ?: throw IllegalStateException("no-directory (no path extra and no export directory configured)")
+                            // SAF: a ".part" display name gets mangled by providers that re-derive the
+                            // extension, so the document is created under its final name and DELETED on
+                            // the way out instead. Same guarantee, different mechanism.
                             val doc = dir.createFile("application/zip", fileName)
                                 ?: throw IllegalStateException("cannot create $fileName in export directory")
+                            StateExportRun.onDiscard { doc.delete() }
                             app.contentResolver.openOutputStream(doc.uri)?.use { out ->
-                                SettingsBackup.export(app, db, BuildConfig.VERSION_NAME, cats, out, ::progress)
+                                SettingsBackup.export(
+                                    app, db, BuildConfig.VERSION_NAME, cats, out, ::progress,
+                                    isCancelled = StateExportRun::isCancelled,
+                                )
                             } ?: throw IllegalStateException("cannot open $fileName for writing")
                             bytes = doc.length()
                             shownPath = "${SettingsBackup.dirLabel(app)}/${doc.name ?: fileName}"
                         }
                         reply("OK:$shownPath|$bytes|${humanSize(bytes)}|${cats.size} categories")
+                    } catch (e: ExportCancelledException) {
+                        // The terminal reply for the stopped request, sent even though 自由作業盤 stopped
+                        // listening the moment 中止 was pressed: it is what proves the run really ended
+                        // rather than carrying on unseen.
+                        StateExportRun.discard()
+                        reply("ERROR:cancelled")
                     } catch (e: Exception) {
+                        StateExportRun.discard()
                         reply("ERROR:${e.message ?: e.javaClass.simpleName}")
                     } finally {
+                        StateExportRun.end()
                         pending.finish()
                     }
                 }
@@ -156,6 +199,7 @@ class StateExportReceiver : BroadcastReceiver() {
     companion object {
         const val ACTION_EXPORT_STATE = "shiroikuma.jiyusagyoban.action.EXPORT_STATE"
         const val ACTION_LIST_CATEGORIES = "shiroikuma.jiyusagyoban.action.LIST_CATEGORIES"
+        const val ACTION_CANCEL_EXPORT = "shiroikuma.jiyusagyoban.action.CANCEL_EXPORT"
 
         // Contract extras — deliberately bare names, shared verbatim by every sister app.
         const val EXTRA_TOKEN = "token"

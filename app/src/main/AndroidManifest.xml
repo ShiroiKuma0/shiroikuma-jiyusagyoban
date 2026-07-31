@@ -370,6 +370,7 @@
             <intent-filter>
                 <action android:name="shiroikuma.jiyusagyoban.action.EXPORT_STATE" />
                 <action android:name="shiroikuma.jiyusagyoban.action.LIST_CATEGORIES" />
+                <action android:name="shiroikuma.jiyusagyoban.action.CANCEL_EXPORT" />
             </intent-filter>
         </receiver>
 

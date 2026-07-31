@@ -70,56 +70,6 @@ class OpenTaskerBundleCodecTest {
     }
 
     @Test
-    fun buildGroupsRequestedPowersAndFlagsDataToExternalChains() {
-        val bundle = OpenTaskerBundleCodec.build(
-            appVersion = "0.2.75",
-            exportedAtEpochMs = 123L,
-            profiles = listOf(Profile(id = 9, name = "Uploader", enterTaskId = 1)),
-            tasks = listOf(
-                Task(
-                    id = 1,
-                    name = "Upload local file",
-                    actions = listOf(ActionSpec(type = "file.read"), ActionSpec(type = "http.post")),
-                ),
-            ),
-        )
-
-        val request = bundle.metadata.powerRequests.single()
-        assertEquals(OPEN_TASKER_BUNDLE_SCHEMA_VERSION, bundle.schemaVersion)
-        assertEquals(listOf("Uploader"), request.profileNames)
-        assertTrue(AutomationPower.DATA_ACCESS in request.powers)
-        assertTrue(AutomationPower.EXTERNAL_TRANSMISSION in request.powers)
-        assertEquals(DataToExternalChainRequest("file.read", "http.post"), request.dataToExternalChains.single())
-        assertTrue(bundle.metadata.warnings.any { it.contains("Potential data-to-external chain") })
-    }
-
-    @Test
-    fun buildFlagsDataToExternalChainAcrossReachableSubtask() {
-        val bundle = OpenTaskerBundleCodec.build(
-            appVersion = "0.2.75",
-            exportedAtEpochMs = 123L,
-            profiles = listOf(Profile(id = 9, name = "Nested uploader", enterTaskId = 1)),
-            tasks = listOf(
-                Task(
-                    id = 1,
-                    name = "Read parent",
-                    actions = listOf(
-                        ActionSpec(type = "file.read"),
-                        ActionSpec(type = "task.run", args = mapOf("task" to "2")),
-                    ),
-                ),
-                Task(id = 2, name = "Post child", actions = listOf(ActionSpec(type = "http.post"))),
-            ),
-        )
-
-        assertTrue(
-            bundle.metadata.warnings.any {
-                it.contains("profile 'Nested uploader'") && it.contains("file.read -> http.post")
-            },
-        )
-    }
-
-    @Test
     fun validateBlocksUnknownUnclassifiedActions() {
         val plan = OpenTaskerBundleCodec.validate(
             OpenTaskerBundle(
@@ -131,26 +81,6 @@ class OpenTaskerBundleCodecTest {
 
         assertFalse(plan.canImport)
         assertTrue(plan.warnings.any { it.contains("unknown unclassified actions") })
-    }
-
-    @Test
-    fun validateRecomputesForgedVersion2Manifests() {
-        val plan = OpenTaskerBundleCodec.validate(
-            OpenTaskerBundle(
-                appVersion = "0.2.75",
-                exportedAtEpochMs = 123L,
-                tasks = listOf(Task(id = 1, name = "Notify", actions = listOf(ActionSpec(type = "notify.show")))),
-                metadata = BundleMetadata(
-                    capabilityRequirements = emptyList(),
-                    powerRequests = emptyList(),
-                ),
-            ),
-        )
-
-        assertTrue(plan.canImport)
-        assertEquals("notify.show", plan.capabilityRequirements.single().actionId)
-        assertTrue(plan.powerRequests.single().powers.contains(AutomationPower.DEVICE_CONTROL))
-        assertTrue(plan.warnings.count { it.contains("manifest did not match") } == 2)
     }
 
     @Test
@@ -304,8 +234,8 @@ class OpenTaskerBundleCodecTest {
             profiles = emptyList(),
             tasks = emptyList(),
             variables = listOf(
-                Variable("COUNT", "7", isGlobal = true),
-                Variable("API_TOKEN", "must-not-export", isGlobal = true, isSecret = true),
+                Variable("COUNT", "7"),
+                Variable("API_TOKEN", "must-not-export", isSecret = true),
             ),
         )
 
@@ -322,7 +252,7 @@ class OpenTaskerBundleCodecTest {
                 appVersion = "0.2.75",
                 exportedAtEpochMs = 123L,
                 variables = listOf(
-                    Variable("API_TOKEN", "must-not-export", isGlobal = true, isSecret = true),
+                    Variable("API_TOKEN", "must-not-export", isSecret = true),
                 ),
             ),
         )

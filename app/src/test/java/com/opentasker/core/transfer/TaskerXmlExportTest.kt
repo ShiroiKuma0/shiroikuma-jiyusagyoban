@@ -84,8 +84,8 @@ class TaskerXmlExportTest {
             emptyList(),
             emptyList(),
             listOf(
-                Variable("MODE", "silent", isGlobal = true),
-                Variable("API_TOKEN", "must-not-export", isGlobal = true, isSecret = true),
+                Variable("MODE", "silent"),
+                Variable("API_TOKEN", "must-not-export", isSecret = true),
             ),
         )
 

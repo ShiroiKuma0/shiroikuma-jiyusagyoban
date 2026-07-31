@@ -157,6 +157,11 @@ object SettingsBackup {
      * Writes the selected categories to [output]. Returns a one-line summary. [onProgress]
      * (done, total, category label) fires after each written category — the automation bridge
      * (StateExportReceiver) forwards it as contract progress broadcasts; UI callers omit it.
+     *
+     * [isCancelled] is polled at each **category boundary** and, when it answers true, throws
+     * [ExportCancelledException]. Checking between entries rather than mid-`write()` is the contract's
+     * requirement and the safe reading: the stream unwinds normally and the caller deletes the partial,
+     * instead of a thread being interrupted with a half-flushed ZIP behind it.
      */
     suspend fun export(
         context: Context,
@@ -165,6 +170,7 @@ object SettingsBackup {
         cats: Set<Cat>,
         output: OutputStream,
         onProgress: ((done: Int, total: Int, catLabel: String) -> Unit)? = null,
+        isCancelled: (() -> Boolean)? = null,
     ): String {
         var count = 0
         val total = Cat.entries.count { it in cats }
@@ -180,6 +186,7 @@ object SettingsBackup {
             writeEntry(zip, "manifest.json", json.encodeToString(JsonObject.serializer(), manifest).toByteArray())
 
             for (cat in Cat.entries.filter { it in cats }) {
+                if (isCancelled?.invoke() == true) throw ExportCancelledException()
                 when (cat) {
                     Cat.WORKSPACE -> {
                         val bundle = OpenTaskerBundleRepository(db).exportBundle(

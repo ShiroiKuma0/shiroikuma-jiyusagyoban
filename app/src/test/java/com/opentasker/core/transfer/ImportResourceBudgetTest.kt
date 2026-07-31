@@ -55,8 +55,14 @@ class ImportResourceBudgetTest {
         )
     }
 
+    /**
+     * The budget is no longer threaded through `decode`/`validate` — those enforce a flat JSON size
+     * cap and the schema floor, and the resource budget lives entirely in [ImportResourceGuard]. So the
+     * entity limit is asserted where it is actually applied; a round-trip through the codec would now
+     * be testing the codec, not the budget.
+     */
     @Test
-    fun decodedJsonAcceptsExactEntityLimitAndRejectsOneOver() {
+    fun entityBudgetAcceptsTheExactLimitAndRejectsOneOver() {
         val exact = OpenTaskerBundle(
             appVersion = "test",
             exportedAtEpochMs = 0,
@@ -65,13 +71,8 @@ class ImportResourceBudgetTest {
         val over = exact.copy(tasks = exact.tasks + Task(id = 2, name = "Two"))
         val oneEntity = budget().copy(maxEntities = 1)
 
-        assertEquals(exact, OpenTaskerBundleCodec.decode(OpenTaskerBundleCodec.encode(exact), oneEntity))
-        assertBudget("entities") {
-            OpenTaskerBundleCodec.decode(OpenTaskerBundleCodec.encode(over), oneEntity)
-        }
-        val plan = OpenTaskerBundleCodec.validate(over, oneEntity)
-        assertTrue(!plan.canImport)
-        assertTrue(plan.warnings.single().contains("entities"))
+        assertNull(ImportResourceGuard.bundleViolation(exact, oneEntity))
+        assertEquals("entities", ImportResourceGuard.bundleViolation(over, oneEntity)?.budgetName)
     }
 
     @Test
@@ -89,7 +90,7 @@ class ImportResourceBudgetTest {
                     enterTaskId = 1,
                 )
             ),
-            variables = listOf(Variable(name = "", value = "", isGlobal = true)),
+            variables = listOf(Variable(name = "", value = "")),
             scenes = listOf(
                 Scene(
                     id = 1,
@@ -127,7 +128,7 @@ class ImportResourceBudgetTest {
             appVersion = "",
             exportedAtEpochMs = 0,
             metadata = BundleMetadata(name = "", description = ""),
-            variables = listOf(Variable(name = "a", value = "é", isGlobal = true)),
+            variables = listOf(Variable(name = "a", value = "é")),
         )
 
         assertNull(ImportResourceGuard.bundleViolation(bundle, budget().copy(maxAggregateStringBytes = 3)))
