@@ -11,6 +11,7 @@ import android.view.Gravity
 import android.widget.Toast
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.actions.FlashOverlay
+import com.opentasker.core.engine.EngineShutdown
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.CoroutineScope
@@ -28,6 +29,13 @@ class TaskRunActivity : Activity() {
         val source = intent.getStringExtra(EXTRA_SOURCE) ?: SOURCE_SHORTCUT
         if (taskId < 0 && taskName.isEmpty()) {
             Toast.makeText(this, "Invalid task", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+        // A widget or launcher-shortcut tap must not resurrect an app the user has exited — say so
+        // instead of running the task, which would drag the whole engine back up with it.
+        if (EngineShutdown.refuse(this, "widget / shortcut tap")) {
+            Toast.makeText(this, "白い熊 自由作業盤 は停止中 — open the app to start it", Toast.LENGTH_SHORT).show()
             finish()
             return
         }

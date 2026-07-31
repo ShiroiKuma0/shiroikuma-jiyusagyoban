@@ -1,13 +1,22 @@
 package com.opentasker.core.contexts
 
 import android.app.Notification
+import android.content.ComponentName
+import android.content.Context
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import com.opentasker.core.engine.EngineShutdown
 import com.opentasker.core.logging.AppLogger
 
 class NotificationTriggerService : NotificationListenerService() {
     override fun onListenerConnected() {
         instance = this
+        // Go quiet while the app is stopped. requestUnbind() — unlike disabling the service — keeps the
+        // user's grant, so [requestRebindIfEnabled] can bring it back with no trip to system settings.
+        if (EngineShutdown.isStopped(this)) {
+            AppLogger.info(TAG, "Notification listener unbinding — the app is stopped")
+            runCatching { requestUnbind() }
+        }
     }
 
     override fun onListenerDisconnected() {
@@ -34,6 +43,7 @@ class NotificationTriggerService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         sbn ?: return
+        if (EngineShutdown.isStopped(this)) return
         val extras = sbn.notification.extras
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)
         val body = extras.getCharSequence(Notification.EXTRA_TEXT)
@@ -65,5 +75,29 @@ class NotificationTriggerService : NotificationListenerService() {
         @Volatile
         var instance: NotificationTriggerService? = null
             private set
+
+        /**
+         * Let go of the binding as part of "Exit app fully". requestUnbind() keeps the user's grant —
+         * unlike disabling the listener, which would need a trip through system settings to undo — so
+         * [requestRebindIfEnabled] can pick it straight back up. NOT used by an engine restart, which
+         * wants the listener to stay where it is.
+         */
+        fun unbindForShutdown() {
+            val live = instance ?: return
+            AppLogger.info(TAG, "Notification listener unbinding for shutdown")
+            runCatching { live.requestUnbind() }
+        }
+
+        /**
+         * Ask the system to bind the listener again after a shutdown unbound it. The grant was never
+         * given up, so this is silent — no system-settings trip for the user. A no-op when the listener
+         * was never enabled, or is already bound.
+         */
+        fun requestRebindIfEnabled(context: Context) {
+            if (instance != null) return
+            runCatching {
+                requestRebind(ComponentName(context.applicationContext, NotificationTriggerService::class.java))
+            }.onFailure { AppLogger.debug(TAG, "Notification listener rebind not possible: ${it.message}") }
+        }
     }
 }

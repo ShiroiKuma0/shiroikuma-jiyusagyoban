@@ -178,6 +178,17 @@ object FlashBubbleOverlayManager {
         windows.clear()
     }
 
+    /** Keys of the flash bubbles on screen right now — for the Monitor / shutdown inventory. */
+    fun shownKeys(): List<String> = synchronized(windows) { windows.keys.toList() }
+
+    /** Tear the flash-bubble layer down and allow a later [start] to re-register. See the freeze twin. */
+    fun stop() {
+        main.post { removeAll() }
+        visible = false
+        started = false
+        scope = null
+    }
+
     private fun dp(v: Int): Int = ((appContext?.resources?.displayMetrics?.density ?: 1f) * v).toInt()
 
     // ---- views -----------------------------------------------------------------------------------

@@ -296,6 +296,9 @@ open class SceneActivity : ComponentActivity() {
         const val EXTRA_FULLSCREEN = "com.opentasker.scenes.FULLSCREEN"
         private val open = mutableListOf<WeakReference<SceneActivity>>()
 
+        /** How many scene Activities are open right now — for the Monitor / shutdown inventory. */
+        fun openCount(): Int = open.count { it.get() != null }
+
         /** Dismiss every open scene (the `scene.hide` action). Returns how many were closed. */
         fun dismissAll(): Int {
             val activities = open.mapNotNull { it.get() }

@@ -37,6 +37,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.ui.screens.AppMultiSelectDialog
 import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemeStore
@@ -123,12 +124,41 @@ class DialogActivity : ComponentActivity() {
         }
     }
 
-    /** Open the System settings page that grants the named [CapabilityRequirement]. */
+    /**
+     * Open the System settings page that grants the named [CapabilityRequirement], then settle.
+     *
+     * Settling here is the fix for the dialog "doing nothing". This Activity is declared with an empty
+     * `taskAffinity` and `excludeFromRecents`, so once Settings takes the foreground its task is liable
+     * to be destroyed — and [onDestroy] would then report a Cancelled the user never chose, failing the
+     * task. Worse, a per-minute profile re-raised the modal on top of Settings a moment later, which is
+     * what made the button look broken. So: launch, settle explicitly, start the requirement's quiet
+     * window, and get out of the way.
+     *
+     * A settings page that does not resolve is reported rather than swallowed — silence here was the
+     * other half of "nothing happens".
+     */
     private fun openSettingsFor(reqName: String) {
-        runCatching {
-            val req = com.opentasker.core.capabilities.CapabilityRequirement.valueOf(reqName)
-            com.opentasker.core.capabilities.CapabilityState.settingsIntent(req, this)?.let { startActivity(it) }
+        val req = runCatching {
+            com.opentasker.core.capabilities.CapabilityRequirement.valueOf(reqName)
+        }.getOrNull() ?: return
+        val intent = com.opentasker.core.capabilities.CapabilityState.settingsIntent(req, this)
+        if (intent == null) {
+            toast("No settings page for ${com.opentasker.core.capabilities.CapabilityState.shortLabel(req)}")
+            return
         }
+        val launched = runCatching { startActivity(intent); true }
+            .onFailure { AppLogger.warn(TAG, "Could not open settings for $reqName: ${it.message}") }
+            .getOrDefault(false)
+        if (!launched) {
+            toast("Couldn't open ${com.opentasker.core.capabilities.CapabilityState.shortLabel(req)} settings")
+            return
+        }
+        com.opentasker.core.capabilities.CapabilityPrompt.markSentToSettings(req)
+        settle(DialogOutcome.Cancelled)
+    }
+
+    private fun toast(message: String) {
+        android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_LONG).show()
     }
 
     private fun settle(outcome: DialogOutcome) {
@@ -149,6 +179,7 @@ class DialogActivity : ComponentActivity() {
     }
 
     companion object {
+        private const val TAG = "DialogActivity"
         const val EXTRA_ID = "id"
         const val EXTRA_TYPE = "type"
         const val EXTRA_TITLE = "title"

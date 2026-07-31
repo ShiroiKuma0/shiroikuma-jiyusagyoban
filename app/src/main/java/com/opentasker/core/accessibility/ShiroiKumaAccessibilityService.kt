@@ -11,6 +11,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityWindowInfo
 import android.view.inputmethod.InputMethodManager
 import com.opentasker.core.contexts.AppForegroundChangedContextEvents
+import com.opentasker.core.engine.EngineShutdown
 import kotlinx.coroutines.delay
 
 /**
@@ -39,6 +40,10 @@ class ShiroiKumaAccessibilityService : AccessibilityService() {
     // Maintain a foreground-app history from window-state changes — accurate for ALL apps (UsageStats
     // misses some, e.g. emacs). Only real launchable apps are recorded; overlays / IME / dialogs are skipped.
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        // Dormant, not disabled, while the app is stopped. disableSelf() would work, but it drops the
+        // accessibility grant — 白い熊 would have to re-enable the service by hand in system settings —
+        // so the service stays bound and simply stops feeding the engine.
+        if (EngineShutdown.isStopped(this)) return
         if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
         // Record only real APPLICATION windows — never the IME (keyboard), system tools (screenshot), or

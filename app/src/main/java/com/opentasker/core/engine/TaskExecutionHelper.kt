@@ -58,7 +58,9 @@ suspend fun executeAndLogTask(
         resolveTask = dbSubTaskResolver(db),
         projectNameResolver = { pid -> pid?.let { db.projectDao().getById(it)?.name } },
     )
-    val report = runner.run(task)
+    // Registered for the duration of the run: this is the ONE funnel every source goes through, so the
+    // Monitor's "Live now" list and the shutdown report see every in-flight task from here alone.
+    val report = RunningTasks.track(task.id, task.name, source) { runner.run(task) }
     AppLogger.info(logTag, "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)")
     maybeQueueFreezeBubble(appContext, task, variables)
     val classified = RunLogSource.classify(source)

@@ -150,6 +150,23 @@ object FreezeBubbleOverlayManager {
         windows.clear()
     }
 
+    /** Packages whose bubbles are on screen right now — for the Monitor / shutdown inventory. */
+    fun shownPackages(): List<String> = synchronized(windows) { windows.keys.toList() }
+
+    /**
+     * Tear the bubble layer down and allow a later [start] to re-register its collectors.
+     *
+     * The engine's scope owns those collectors, so stopping the service kills them — but the windows
+     * themselves are held by the WindowManager and would stay on screen, with `started` still true so a
+     * restart never re-subscribed. Called from the engine's onDestroy and the shutdown teardown.
+     */
+    fun stop() {
+        main.post { removeAll() }
+        visible = false
+        started = false
+        scope = null
+    }
+
     private fun dp(v: Int): Int = ((appContext?.resources?.displayMetrics?.density ?: 1f) * v).toInt()
 
     // ---- view ------------------------------------------------------------------------------------

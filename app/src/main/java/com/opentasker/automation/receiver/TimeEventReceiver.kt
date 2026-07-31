@@ -6,6 +6,7 @@ import android.content.Intent
 import com.opentasker.automation.scheduler.TimeEventScheduler
 import com.opentasker.core.engine.AutomationService
 import com.opentasker.core.engine.EngineHeartbeat
+import com.opentasker.core.engine.EngineShutdown
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.scheduling.ExactAlarmSupport
 
@@ -19,6 +20,13 @@ class TimeEventReceiver : BroadcastReceiver() {
         when (intent.action) {
             TimeEventScheduler.ACTION_TIME_TICK,
             Intent.ACTION_TIME_TICK -> {
+                // The single most important gate: this alarm is what resurrects a killed engine, so
+                // without it an "Exit app fully" would last less than a minute. Break the chain here —
+                // do not resurrect, and do not schedule the next tick.
+                if (EngineShutdown.refuse(context, "per-minute tick")) {
+                    runCatching { TimeEventScheduler(context).cancel() }
+                    return
+                }
                 try {
                     AppLogger.debug(TAG, "Time tick event")
                     // This exact alarm fires through Doze. If EMUI reaped the process, resurrect the service;

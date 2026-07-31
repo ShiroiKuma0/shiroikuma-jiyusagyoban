@@ -26,10 +26,12 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -54,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.opentasker.core.engine.AutomationService
 import com.opentasker.core.engine.EngineHeartbeat
+import com.opentasker.core.engine.RuntimeInventory
 import com.opentasker.core.engine.WidgetRefreshLog
 import com.opentasker.core.engine.variables.PersistentGlobalScope
 import com.opentasker.core.model.Profile
@@ -61,6 +64,8 @@ import com.opentasker.core.model.Project
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.AutoStartSettings
+import com.opentasker.core.storage.BootStartSettings
+import com.opentasker.core.storage.ShutdownSettings
 import com.opentasker.scenes.SceneOverlayManager
 import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.delay
@@ -94,9 +99,16 @@ fun MonitorScreen(
 ) {
     val context = LocalContext.current
     val themePrefs by ThemeStore.state.collectAsState()
-    LaunchedEffect(Unit) { AutoStartSettings.load(context) }
+    LaunchedEffect(Unit) {
+        AutoStartSettings.load(context)
+        ShutdownSettings.load(context)
+        BootStartSettings.load(context)
+    }
     val autoIds by AutoStartSettings.ids.collectAsState()
-    var showPicker by remember { mutableStateOf(false) }
+    val exitIds by ShutdownSettings.ids.collectAsState()
+    val bootStart by BootStartSettings.enabled.collectAsState()
+    // Which list the task picker is filling — "start" (run on start) or "exit" (run on exit); null = closed.
+    var pickerFor by remember { mutableStateOf<String?>(null) }
 
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -117,6 +129,10 @@ fun MonitorScreen(
     val enabled = profiles.filter { it.enabled }
     val overlays = SceneOverlayManager.shownSceneNames()
     val autoTasks = autoIds.mapNotNull { id -> tasks.firstOrNull { it.id == id } }
+    val exitTasks = exitIds.mapNotNull { id -> tasks.firstOrNull { it.id == id } }
+    // Re-taken every second with `now`: the same list the shutdown report uses, so a stray overlay or a
+    // task that never finished can be found (and stopped) WITHOUT exiting the app.
+    val live = remember(now) { RuntimeInventory.snapshot(context) }
     // Per-section fold state (default open). The engine vitals card stays always visible.
     val sectionOpen = remember { mutableStateMapOf<String, Boolean>() }
     fun toggle(key: String) { sectionOpen[key] = !(sectionOpen[key] ?: true) }
@@ -126,6 +142,8 @@ fun MonitorScreen(
     val openGlobals = sectionOpen["globals"] ?: false   // verbose — default collapsed
     val openRuns = sectionOpen["runs"] ?: true
     val openWidgets = sectionOpen["widgets"] ?: true
+    val openLive = sectionOpen["live"] ?: true
+    val openRunExit = sectionOpen["runexit"] ?: false  // like "runstart": only the note folds
     val openRunStart = sectionOpen["runstart"] ?: false   // only the explanatory note folds; default collapsed
 
     LazyColumn(
@@ -158,6 +176,47 @@ fun MonitorScreen(
                     Vital("Uptime", if (startedAt <= 0L) "—" else rel(now - startedAt), null)
                     Vital("Overlays on screen", overlays.size.toString(), if (overlays.isEmpty()) AMBER else GREEN)
                     Vital("Enabled profiles", enabled.size.toString(), null)
+                }
+            }
+        }
+
+        // --- live now: the one honest list of what this app currently has up, each row stoppable. Same
+        //     data the shutdown report shows, deliberately — but available without exiting, which is
+        //     when you actually want to look at something that shouldn't be running. ---
+        item { FoldHeader("Live now (${live.size})", openLive) { toggle("live") } }
+        if (openLive) {
+            item {
+                Hint(
+                    "In-flight tasks, scenes, bubbles and panels — everything the app is holding open right " +
+                        "now, with the engine itself at the top. Tap ✕ to stop one. After a teardown this " +
+                        "should be empty except the engine; anything else left here is a leak.",
+                )
+            }
+            if (live.isEmpty()) {
+                item { Hint("Nothing is running — not even the engine.") }
+            }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(themePrefs.monitorRowPadDp.dp)) {
+                    live.forEach { entry ->
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Dot(if (entry.expected) GREEN else AMBER, 10.dp)
+                            Text(
+                                entry.label,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                fontSize = 15.sp,
+                                maxLines = 1,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text("${entry.kind.title} · ${entry.detail}", color = GREY, fontSize = 13.sp)
+                            IconButton(onClick = { entry.stop(context) }) {
+                                Icon(Icons.Filled.Close, contentDescription = "Stop ${entry.label}", tint = RED)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -215,10 +274,98 @@ fun MonitorScreen(
                         }
                     }
                 }
-                TextButton(onClick = { showPicker = true }) {
+                TextButton(onClick = { pickerFor = "start" }) {
                     Icon(Icons.Filled.Add, contentDescription = null)
                     Spacer(Modifier.size(4.dp))
                     Text("Add task…")
+                }
+            }
+        }
+
+        // --- run-on-exit: the mirror of run-on-start, so the app never has to know a project name.
+        //     "Exit app fully" runs these first, then reports whatever is still up. ---
+        item {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().clickable { toggle("runexit") },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        if (openRunExit) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(Modifier.size(4.dp))
+                    Text(
+                        "Run on exit",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        textDecoration = TextDecoration.Underline,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                if (openRunExit) {
+                    Text(
+                        "These run — in order, up to 30s each — when you pick “Exit app fully” from the top-bar " +
+                            "⋮ menu, before anything is forced down. Add your master teardown (e.g. 起動完了 ⇨ 終了). " +
+                            "Whatever is still running afterwards is listed for you, and written to the run log.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp,
+                    )
+                }
+                if (exitTasks.isEmpty()) {
+                    Text(
+                        "Nothing set to run on exit — the shutdown will just force everything down.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp,
+                    )
+                }
+                exitTasks.forEach { t ->
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Dot(AMBER, 8.dp)
+                        Text(t.name, color = MaterialTheme.colorScheme.onBackground, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                        IconButton(onClick = { ShutdownSettings.remove(context, t.id) }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Remove", tint = RED)
+                        }
+                    }
+                }
+                TextButton(onClick = { pickerFor = "exit" }) {
+                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Spacer(Modifier.size(4.dp))
+                    Text("Add task…")
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
+                // Boot behaviour lives here because it is the other half of the same question: does the
+                // app come back by itself? On = a reboot also lifts an "Exit app fully".
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Start engine on boot", color = MaterialTheme.colorScheme.onBackground, fontSize = 15.sp)
+                        Text(
+                            if (bootStart) {
+                                "On — a reboot starts the engine, and lifts a shutdown."
+                            } else {
+                                "Off — after a reboot nothing runs until you open the app."
+                            },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 13.sp,
+                        )
+                    }
+                    Switch(checked = bootStart, onCheckedChange = { BootStartSettings.set(context, it) })
                 }
             }
         }
@@ -368,8 +515,11 @@ fun MonitorScreen(
 
     }
 
-    if (showPicker) {
-        val pickable = tasks.filter { it.id !in autoIds }
+    val pickerTarget = pickerFor
+    if (pickerTarget != null) {
+        val forExit = pickerTarget == "exit"
+        val alreadyPicked = if (forExit) exitIds else autoIds
+        val pickable = tasks.filter { it.id !in alreadyPicked }
         val knownIds = projects.map { it.id }.toSet()
         // Group by project (display order); within each project keep the tasks' own order (their manual
         // `position` — so 71 before 37, etc.), NOT alphabetical. Unfiled bucket for the rest.
@@ -384,7 +534,7 @@ fun MonitorScreen(
         var expanded by remember { mutableStateOf(setOf<String>()) }
         val allOpen = groups.isNotEmpty() && expanded.size == groups.size
         // A plain Surface dialog (not AlertDialog) so we can draw the yellow border around it.
-        Dialog(onDismissRequest = { showPicker = false }) {
+        Dialog(onDismissRequest = { pickerFor = null }) {
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.surface,
@@ -394,7 +544,7 @@ fun MonitorScreen(
                 Column(Modifier.fillMaxWidth().padding(18.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            "Run on start — pick a task",
+                            if (forExit) "Run on exit — pick a task" else "Run on start — pick a task",
                             fontWeight = FontWeight.Bold,
                             fontSize = 17.sp,
                             color = MaterialTheme.colorScheme.primary,
@@ -433,7 +583,11 @@ fun MonitorScreen(
                                         color = MaterialTheme.colorScheme.onSurface,
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .clickable { AutoStartSettings.add(context, t.id); showPicker = false }
+                                            .clickable {
+                                                if (forExit) ShutdownSettings.add(context, t.id)
+                                                else AutoStartSettings.add(context, t.id)
+                                                pickerFor = null
+                                            }
                                             .padding(start = 30.dp, top = 10.dp, bottom = 10.dp),
                                     )
                                 }
@@ -441,7 +595,7 @@ fun MonitorScreen(
                         }
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { showPicker = false }) { Text("Close") }
+                        TextButton(onClick = { pickerFor = null }) { Text("Close") }
                     }
                 }
             }

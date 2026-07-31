@@ -8,6 +8,7 @@ import android.os.Bundle
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import androidx.core.content.ContextCompat
 import com.opentasker.core.engine.AutomationService
+import com.opentasker.core.engine.EngineShutdown
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.storage.toEntity
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +55,13 @@ object AutomationTargetContract {
     const val EXTRA_EXECUTION_STATE = "com.opentasker.extra.EXECUTION_STATE"
     const val EXTRA_EXECUTION_TERMINAL = "com.opentasker.extra.EXECUTION_TERMINAL"
 
+    /**
+     * Fork: true in a [ACTION_QUERY_STATUS] reply when the user has shut the app down from its
+     * overflow menu. While it is true [ACTION_RUN_TASK] is refused; only opening 白い熊 自由作業盤
+     * (or a reboot, when its boot setting is on) clears it.
+     */
+    const val EXTRA_STOPPED = "com.opentasker.extra.STOPPED"
+
     const val VARIABLE_EXTRA_PREFIX = "com.opentasker.var."
     private val variableNamePattern = Regex("^[A-Za-z][A-Za-z0-9_]{0,63}$")
 
@@ -73,7 +81,7 @@ class AutomationTargetReceiver : BroadcastReceiver() {
                 when (intent.action) {
                     AutomationTargetContract.ACTION_RUN_TASK -> runTask(context.applicationContext, intent)
                     AutomationTargetContract.ACTION_SET_PROFILE_ENABLED -> setProfileEnabled(intent)
-                    AutomationTargetContract.ACTION_QUERY_STATUS -> queryStatus(intent)
+                    AutomationTargetContract.ACTION_QUERY_STATUS -> queryStatus(context.applicationContext, intent)
                     AutomationTargetContract.ACTION_QUERY_EXECUTION -> queryExecution(context.applicationContext, intent)
                     else -> failure("Unsupported action: ${intent.action}")
                 }
@@ -97,6 +105,12 @@ class AutomationTargetReceiver : BroadcastReceiver() {
      * meant returning a result that had not happened yet.
      */
     private suspend fun runTask(appContext: Context, intent: Intent): TargetResponse {
+        // Fork: a sister-app intent does not wake an app the user has shut down from the overflow
+        // menu. Checked before the protocol handshake, so a stopped app answers "I am stopped"
+        // rather than a version complaint the caller cannot act on.
+        if (EngineShutdown.refuse(appContext, "external intent (run task)")) {
+            return failure("白い熊 自由作業盤 is stopped — open the app to start it again.")
+        }
         val requestedVersion = intent.getIntExtra(AutomationTargetContract.EXTRA_PROTOCOL_VERSION, 0)
         if (requestedVersion != AutomationTargetContract.PROTOCOL_VERSION) {
             return failure(
@@ -208,7 +222,7 @@ class AutomationTargetReceiver : BroadcastReceiver() {
         )
     }
 
-    private suspend fun queryStatus(intent: Intent): TargetResponse {
+    private suspend fun queryStatus(appContext: Context, intent: Intent): TargetResponse {
         val db = OpenTaskerApp_NoHilt.db
         val profileEntities = db.profileDao().getAll()
         val tasks = db.taskDao().getAll()
@@ -216,6 +230,9 @@ class AutomationTargetReceiver : BroadcastReceiver() {
         return TargetResponse(
             Activity.RESULT_OK,
             Bundle().apply {
+                // Fork: deliberately NOT gated — "are you stopped?" has to be answerable precisely
+                // when the answer is yes, so a caller can dim its shortcuts instead of firing.
+                putBoolean(AutomationTargetContract.EXTRA_STOPPED, EngineShutdown.isStopped(appContext))
                 putInt(AutomationTargetContract.EXTRA_TASK_COUNT, tasks.size)
                 putInt(AutomationTargetContract.EXTRA_PROFILE_COUNT, profileEntities.size)
                 putInt(

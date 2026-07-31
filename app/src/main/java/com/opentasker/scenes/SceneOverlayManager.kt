@@ -55,6 +55,9 @@ object SceneOverlayManager {
     /** Names of the scenes currently displayed as overlays — what's actually on screen right now. */
     fun shownSceneNames(): List<String> = ArrayList(shownNames.values)
 
+    /** The same list keyed by scene id, so the Monitor can offer a per-overlay 停止. */
+    fun shownScenes(): List<Pair<Long, String>> = shownNames.entries.map { it.key to it.value }
+
     private class Overlay(
         val view: ComposeView,
         val owner: OverlayLifecycleOwner,

@@ -2,6 +2,7 @@ package com.opentasker.core.engine
 
 import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
+import com.opentasker.core.capabilities.CapabilityPrompt
 import com.opentasker.core.capabilities.CapabilityState
 import com.opentasker.core.dialog.DialogActivity
 import com.opentasker.core.dialog.DialogBridge
@@ -48,7 +49,11 @@ class TaskRunner(
         if (missing.isNotEmpty()) {
             val preStart = System.currentTimeMillis()
             val project = runCatching { projectNameResolver?.invoke(task.projectId) }.getOrNull() ?: "Unfiled"
-            showPermissionBlockDialog(project, task.name, missing)
+            // Still blocked, still logged — but don't stack another modal on top of the settings page
+            // the user was just sent to. A per-minute profile would otherwise re-raise it immediately.
+            if (!CapabilityPrompt.allQuiet(missing.map { it.requirement })) {
+                showPermissionBlockDialog(project, task.name, missing)
+            }
             val summary = missing.joinToString(", ") { CapabilityState.shortLabel(it.requirement) }
             val failure = ActionResult.Failure("Not run — missing permission(s): $summary")
             return TaskRunReport(

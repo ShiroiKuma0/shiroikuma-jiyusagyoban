@@ -18,7 +18,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.core.content.ContextCompat
 import com.opentasker.core.contexts.NfcContextEvents
 import com.opentasker.core.contexts.NfcTagWriteSession
+import com.opentasker.core.contexts.NotificationTriggerService
 import com.opentasker.core.engine.AutomationService
+import com.opentasker.core.engine.EngineShutdown
 import com.opentasker.ui.screens.ActiveAutomationUi
 import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemeStore
@@ -69,6 +71,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startAutomationService() {
+        // Opening the app by hand is the unambiguous "I want it back" signal, so it lifts an
+        // "Exit app fully" and re-binds the notification listener the shutdown had unbound. To look at
+        // the stopped state without ending it, poke the app over adb rather than opening it.
+        EngineShutdown.clear(this)
+        NotificationTriggerService.requestRebindIfEnabled(this)
         runCatching {
             ContextCompat.startForegroundService(
                 this,
