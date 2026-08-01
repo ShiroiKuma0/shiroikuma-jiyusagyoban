@@ -2,6 +2,7 @@ package com.opentasker.docs
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.security.MessageDigest
 import kotlin.io.path.readText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -70,6 +71,30 @@ class ReleaseTruthContractTest {
                 assertTrue("docs/FDROID_READINESS.md should contain $claim", fdroidDoc.contains(claim))
             }
         }
+    }
+
+    @Test
+    fun gradleBootstrapMatchesPinnedOfficialChecksums() {
+        val wrapper = read("gradle/wrapper/gradle-wrapper.properties")
+        val gate = read("tools/verify-local-release.ps1")
+        val wrapperJar = Files.readAllBytes(repoRoot.resolve("gradle/wrapper/gradle-wrapper.jar"))
+        val wrapperJarHash = MessageDigest.getInstance("SHA-256")
+            .digest(wrapperJar)
+            .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+
+        val distributionHash = gradleValue(
+            wrapper,
+            """(?m)^distributionSha256Sum=([0-9a-f]{64})$""",
+        )
+        val pinnedJarHash = gradleValue(
+            gate,
+            """\${'$'}ExpectedGradleWrapperJarSha256 = "([0-9a-f]{64})""",
+        )
+
+        assertEquals(OFFICIAL_GRADLE_9_4_1_BIN_SHA256, distributionHash)
+        assertEquals(OFFICIAL_GRADLE_9_4_1_WRAPPER_JAR_SHA256, pinnedJarHash)
+        assertEquals(pinnedJarHash, wrapperJarHash)
+        assertTrue(gate.contains("\$ExpectedGradleDistributionSha256 = \"$distributionHash\""))
     }
 
     @Test
@@ -270,6 +295,13 @@ class ReleaseTruthContractTest {
 
     private fun assertDocTableValue(text: String, property: String, expected: String) {
         assertTrue("Dependency doc $property should be $expected", text.contains("| $property | $expected |"))
+    }
+
+    private companion object {
+        const val OFFICIAL_GRADLE_9_4_1_BIN_SHA256 =
+            "2ab2958f2a1e51120c326cad6f385153bb11ee93b3c216c5fccebfdfbb7ec6cb"
+        const val OFFICIAL_GRADLE_9_4_1_WRAPPER_JAR_SHA256 =
+            "55243ef57851f12b070ad14f7f5bb8302daceeebc5bce5ece5fa6edb23e1145c"
     }
 }
 

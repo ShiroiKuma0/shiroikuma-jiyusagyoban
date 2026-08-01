@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [switch]$SeedFailure
+    [switch]$SeedFailure,
+    [switch]$BootstrapOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -8,13 +9,80 @@ Set-StrictMode -Version Latest
 
 $Root = Split-Path -Parent $PSScriptRoot
 $Gradlew = Join-Path $Root "gradlew.bat"
+$GradleWrapperProperties = Join-Path $Root "gradle\wrapper\gradle-wrapper.properties"
+$GradleWrapperJar = Join-Path $Root "gradle\wrapper\gradle-wrapper.jar"
 $ReportDirectory = Join-Path $Root "build\reports\opentasker"
 $SbomPath = Join-Path $ReportDirectory "sbom.cdx.json"
 $OsvReportPath = Join-Path $ReportDirectory "osv-advisories.json"
 $SummaryPath = Join-Path $ReportDirectory "local-release-gate.json"
+$ExpectedGradleVersion = "9.4.1"
+$ExpectedGradleDistributionSha256 = "2ab2958f2a1e51120c326cad6f385153bb11ee93b3c216c5fccebfdfbb7ec6cb"
+$ExpectedGradleWrapperJarSha256 = "55243ef57851f12b070ad14f7f5bb8302daceeebc5bce5ece5fa6edb23e1145c"
+
+function Resolve-GitSafeDirectory {
+    $rootPath = [IO.Path]::GetFullPath($Root)
+    $pathRoot = [IO.Path]::GetPathRoot($rootPath)
+    if ($pathRoot -match "^[A-Za-z]:\\$") {
+        $driveName = $pathRoot.Substring(0, 1)
+        $drive = Get-PSDrive -Name $driveName -ErrorAction SilentlyContinue
+        if ($null -ne $drive -and -not [string]::IsNullOrWhiteSpace($drive.DisplayRoot)) {
+            $relative = $rootPath.Substring($pathRoot.Length)
+            return (Join-Path $drive.DisplayRoot $relative).Replace("\", "/")
+        }
+    }
+    return $rootPath.Replace("\", "/")
+}
+
+$GitSafeDirectory = Resolve-GitSafeDirectory
+# Gradle release tasks also launch Git. Propagate this one exact repository identity only to child
+# processes; the caller's global Git trust configuration remains untouched.
+$env:GIT_CONFIG_COUNT = "1"
+$env:GIT_CONFIG_KEY_0 = "safe.directory"
+$env:GIT_CONFIG_VALUE_0 = $GitSafeDirectory
 
 if (-not (Test-Path -LiteralPath $Gradlew -PathType Leaf)) {
     throw "Gradle wrapper not found at $Gradlew"
+}
+
+function Assert-GradleBootstrapIntegrity {
+    foreach ($path in @($GradleWrapperProperties, $GradleWrapperJar)) {
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw "Gradle bootstrap file not found at $path"
+        }
+    }
+
+    $properties = @{}
+    foreach ($line in Get-Content -LiteralPath $GradleWrapperProperties) {
+        $trimmed = $line.Trim()
+        if ($trimmed.Length -eq 0 -or $trimmed.StartsWith("#")) { continue }
+        $separator = $trimmed.IndexOf("=")
+        if ($separator -le 0) { throw "Malformed Gradle wrapper property: $line" }
+        $key = $trimmed.Substring(0, $separator)
+        $value = $trimmed.Substring($separator + 1)
+        if ($properties.ContainsKey($key)) { throw "Duplicate Gradle wrapper property: $key" }
+        $properties[$key] = $value
+    }
+
+    $expectedDistributionUrl = "https\://services.gradle.org/distributions/gradle-$ExpectedGradleVersion-bin.zip"
+    if ($properties["distributionUrl"] -ne $expectedDistributionUrl) {
+        throw "Gradle distribution URL is not the pinned $ExpectedGradleVersion binary distribution."
+    }
+    if ($properties["distributionSha256Sum"] -ne $ExpectedGradleDistributionSha256) {
+        throw "Gradle distribution SHA-256 is absent or does not match the pinned official checksum."
+    }
+
+    $actualWrapperHash = (Get-FileHash -LiteralPath $GradleWrapperJar -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actualWrapperHash -ne $ExpectedGradleWrapperJarSha256) {
+        throw "Gradle wrapper JAR SHA-256 mismatch. Expected $ExpectedGradleWrapperJarSha256; actual $actualWrapperHash."
+    }
+    Write-Host "Gradle bootstrap verified: $ExpectedGradleVersion distribution and wrapper JAR checksums match."
+}
+
+# The wrapper JAR is executable, so verify it and its distribution pin before invoking Gradle.
+Assert-GradleBootstrapIntegrity
+if ($BootstrapOnly) {
+    Write-Host "Gradle bootstrap-only verification passed."
+    return
 }
 
 function Invoke-Gradle {
@@ -71,25 +139,22 @@ if (-not ($reuseOutput -match "Reusing configuration cache")) {
     throw "The second local quality-gate invocation did not reuse the Gradle configuration cache."
 }
 
-Push-Location $Root
-try {
-    & git diff --quiet -- app/schemas
-    $schemaDiffExit = $LASTEXITCODE
-    if ($schemaDiffExit -eq 1) {
-        throw "Room schema generation changed tracked files. Review and commit the schema update."
-    }
-    if ($schemaDiffExit -ne 0) {
-        throw "Unable to verify tracked Room schema state (git exit $schemaDiffExit)."
-    }
-    $untrackedSchemas = @(& git ls-files --others --exclude-standard -- app/schemas)
-    if ($LASTEXITCODE -ne 0) {
-        throw "Unable to verify untracked Room schema state."
-    }
-    if ($untrackedSchemas.Count -gt 0) {
-        throw "Room schema generation created untracked files: $($untrackedSchemas -join ', ')"
-    }
-} finally {
-    Pop-Location
+& git -c "safe.directory=$GitSafeDirectory" -C $Root diff --quiet -- app/schemas
+$schemaDiffExit = $LASTEXITCODE
+if ($schemaDiffExit -eq 1) {
+    throw "Room schema generation changed tracked files. Review and commit the schema update."
+}
+if ($schemaDiffExit -ne 0) {
+    throw "Unable to verify tracked Room schema state (git exit $schemaDiffExit)."
+}
+$untrackedSchemas = @(
+    & git -c "safe.directory=$GitSafeDirectory" -C $Root ls-files --others --exclude-standard -- app/schemas
+)
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to verify untracked Room schema state."
+}
+if ($untrackedSchemas.Count -gt 0) {
+    throw "Room schema generation created untracked files: $($untrackedSchemas -join ', ')"
 }
 
 Invoke-Gradle -Arguments (@(
@@ -184,6 +249,9 @@ $summary = [ordered]@{
     schemaVersion = 1
     generatedAtUtc = [DateTime]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "passed"
+    gradleBootstrapVerified = $true
+    gradleDistributionSha256 = $ExpectedGradleDistributionSha256
+    gradleWrapperJarSha256 = $ExpectedGradleWrapperJarSha256
     minimumJvmTests = 522
     configurationCacheReused = $true
     resolvedComponentCount = $components.Count

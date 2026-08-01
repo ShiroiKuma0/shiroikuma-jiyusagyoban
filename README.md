@@ -157,13 +157,15 @@ Play manifest policy check:
 ./gradlew -PopenTaskerDistribution=play :app:verifyPlayManifestPolicy
 ```
 
-Full local release gate (blocking lint, JVM tests, Room schemas, Android-test compilation, resolved dependency/SBOM and OSV policy, configuration-cache reuse, plus Play and F-Droid release builds):
+Full local release gate (pinned Gradle bootstrap verification, blocking lint, JVM tests, Room schemas, Android-test compilation, resolved dependency/SBOM and OSV policy, configuration-cache reuse, plus Play and F-Droid release builds):
 
 ```powershell
 .\tools\verify-local-release.ps1
 ```
 
-The gate writes machine-readable reports under `build/reports/opentasker/`. To prove failure propagation without running the full build, run `.\tools\verify-local-release.ps1 -SeedFailure`; success is a nonzero exit with `Seeded local quality-gate failure`.
+Before it executes Gradle, the gate checks that `distributionSha256Sum` matches the configured binary distribution and that the checked-in `gradle-wrapper.jar` matches Gradle's published SHA-256. Use `.\tools\verify-local-release.ps1 -BootstrapOnly` for that fast preflight alone. The full gate writes those verified hashes into the machine-readable report under `build/reports/opentasker/`. To prove failure propagation without running the full build, run `.\tools\verify-local-release.ps1 -SeedFailure`; success is a nonzero exit with `Seeded local quality-gate failure`.
+
+Treat a wrapper upgrade as one atomic change: run `gradlew wrapper --gradle-version <version> --distribution-type bin --gradle-distribution-sha256-sum <official-bin-sha256>`, verify the regenerated JAR against Gradle's published wrapper-JAR checksum, update both expected hashes in `tools/verify-local-release.ps1` and `ReleaseTruthContractTest`, then run a clean wrapper bootstrap and the full local release gate. Never update only the distribution URL or only the executable JAR.
 
 ---
 
