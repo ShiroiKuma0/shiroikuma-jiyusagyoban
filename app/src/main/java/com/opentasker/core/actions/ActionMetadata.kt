@@ -19,7 +19,30 @@ data class ActionField(
      * structurally useful field the heuristic would over-mask (a variable name, a file path).
      */
     val sensitive: Boolean? = null,
+    val options: List<ActionFieldOption> = emptyList(),
+    val numberRule: ActionNumberRule? = null,
+    val fileRule: ActionFileRule? = null,
 )
+
+data class ActionFieldOption(
+    val value: String,
+    @get:StringRes val labelRes: Int,
+)
+
+data class ActionNumberRule(
+    val kind: ActionNumberKind = ActionNumberKind.INTEGER,
+    val minimum: Double? = null,
+    val maximum: Double? = null,
+    val allowedLiterals: Set<String> = emptySet(),
+)
+
+enum class ActionNumberKind { INTEGER, DECIMAL }
+
+data class ActionFileRule(
+    val scope: ActionFileScope = ActionFileScope.OPENTASKER,
+)
+
+enum class ActionFileScope { OPENTASKER, DEVICE_OR_URI }
 
 enum class FieldType {
     TEXT,           // plain text input
@@ -29,6 +52,7 @@ enum class FieldType {
     MULTILINE,      // multi-line text area
     TASK,           // stable task-ID picker
     APP,            // validated package input with scoped installed-app picker
+    FILE,           // file/URI input with a dedicated picker
 }
 
 data class ActionMetadata(
@@ -58,6 +82,39 @@ object ActionMetadataRegistry {
         byId.values.filter { it.categoryRes == categoryRes }
 }
 
+private fun option(value: String, @StringRes labelRes: Int) = ActionFieldOption(value, labelRes)
+
+private val toggleOptions = listOf(
+    option("on", R.string.label_on),
+    option("off", R.string.label_off),
+    option("toggle", R.string.action_option_toggle),
+)
+
+private val audioStreamOptions = listOf(
+    option("music", R.string.action_option_stream_music),
+    option("alarm", R.string.action_option_stream_alarm),
+    option("ring", R.string.action_option_stream_ring),
+    option("notification", R.string.action_option_stream_notification),
+    option("system", R.string.action_option_stream_system),
+    option("voice", R.string.action_option_stream_voice),
+)
+
+private fun integerRule(
+    minimum: Long? = null,
+    maximum: Long? = null,
+    vararg allowedLiterals: String,
+) = ActionNumberRule(
+    minimum = minimum?.toDouble(),
+    maximum = maximum?.toDouble(),
+    allowedLiterals = allowedLiterals.toSet(),
+)
+
+private fun decimalRule(minimum: Double? = null, maximum: Double? = null) =
+    ActionNumberRule(ActionNumberKind.DECIMAL, minimum, maximum)
+
+private val openTaskerFileRule = ActionFileRule(ActionFileScope.OPENTASKER)
+private val deviceFileRule = ActionFileRule(ActionFileScope.DEVICE_OR_URI)
+
 // ============ Built-in Action Metadata ============
 
 fun registerActionMetadata() {
@@ -71,10 +128,10 @@ fun registerActionMetadata() {
             fields = listOf(
                 ActionField("title", R.string.catalog_action_notify_show_field_title_label, required = true, hintRes = R.string.catalog_action_notify_show_field_title_hint),
                 ActionField("text", R.string.catalog_action_notify_show_field_text_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_notify_show_field_text_hint),
-                ActionField("channel", R.string.catalog_action_notify_show_field_channel_label, FieldType.DROPDOWN, hintRes = R.string.catalog_action_notify_show_field_channel_hint),
+                ActionField("channel", R.string.catalog_action_notify_show_field_channel_label, hintRes = R.string.catalog_action_notify_show_field_channel_hint),
                 ActionField("persistent", R.string.catalog_action_notify_show_field_persistent_label, FieldType.CHECKBOX, hintRes = R.string.catalog_action_notify_show_field_persistent_hint),
                 ActionField("tag", R.string.catalog_action_notify_show_field_tag_label, hintRes = R.string.catalog_action_notify_show_field_tag_hint),
-                ActionField("id", R.string.catalog_action_notify_show_field_id_label, FieldType.NUMBER, hintRes = R.string.catalog_action_notify_show_field_id_hint),
+                ActionField("id", R.string.catalog_action_notify_show_field_id_label, FieldType.NUMBER, hintRes = R.string.catalog_action_notify_show_field_id_hint, numberRule = integerRule(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong())),
                 ActionField("button1_label", R.string.catalog_action_notify_show_field_button1_label_label, hintRes = R.string.catalog_action_notify_show_field_button1_label_hint),
                 ActionField("button1_task_id", R.string.catalog_action_notify_show_field_button1_task_id_label, FieldType.TASK, hintRes = R.string.catalog_action_notify_show_field_button1_task_id_hint),
                 ActionField("button2_label", R.string.catalog_action_notify_show_field_button2_label_label, hintRes = R.string.catalog_action_notify_show_field_button2_label_hint),
@@ -92,7 +149,7 @@ fun registerActionMetadata() {
             categoryRes = R.string.catalog_category_notification,
             fields = listOf(
                 ActionField("tag", R.string.catalog_action_notify_cancel_field_tag_label, hintRes = R.string.catalog_action_notify_cancel_field_tag_hint),
-                ActionField("id", R.string.catalog_action_notify_cancel_field_id_label, FieldType.NUMBER, hintRes = R.string.catalog_action_notify_cancel_field_id_hint),
+                ActionField("id", R.string.catalog_action_notify_cancel_field_id_label, FieldType.NUMBER, hintRes = R.string.catalog_action_notify_cancel_field_id_hint, numberRule = integerRule(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong())),
             )
         )
     )
@@ -131,7 +188,7 @@ fun registerActionMetadata() {
             categoryRes = R.string.catalog_category_variable,
             fields = listOf(
                 ActionField("source", R.string.catalog_action_data_read_field_source_label, required = true, hintRes = R.string.catalog_action_data_read_field_source_hint),
-                ActionField("format", R.string.catalog_action_data_read_field_format_label, hintRes = R.string.catalog_action_data_read_field_format_hint),
+                ActionField("format", R.string.catalog_action_data_read_field_format_label, FieldType.DROPDOWN, hintRes = R.string.catalog_action_data_read_field_format_hint, options = listOf(option("json", R.string.action_option_json), option("csv", R.string.action_option_csv), option("xml", R.string.action_option_xml))),
                 ActionField("path", R.string.catalog_action_data_read_field_path_label, hintRes = R.string.catalog_action_data_read_field_path_hint),
                 ActionField("var", R.string.catalog_action_data_read_field_var_label, hintRes = R.string.catalog_action_data_read_field_var_hint),
             )
@@ -176,8 +233,8 @@ fun registerActionMetadata() {
             categoryRes = R.string.catalog_category_variable,
             fields = listOf(
                 ActionField("time", R.string.catalog_action_datetime_add_field_time_label, hintRes = R.string.catalog_action_datetime_add_field_time_hint),
-                ActionField("amount", R.string.catalog_action_datetime_add_field_amount_label, required = true, hintRes = R.string.catalog_action_datetime_add_field_amount_hint),
-                ActionField("unit", R.string.catalog_action_datetime_add_field_unit_label, required = true, hintRes = R.string.catalog_action_datetime_add_field_unit_hint),
+                ActionField("amount", R.string.catalog_action_datetime_add_field_amount_label, FieldType.NUMBER, required = true, hintRes = R.string.catalog_action_datetime_add_field_amount_hint, numberRule = integerRule()),
+                ActionField("unit", R.string.catalog_action_datetime_add_field_unit_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_datetime_add_field_unit_hint, options = listOf(option("seconds", R.string.action_option_seconds), option("minutes", R.string.action_option_minutes), option("hours", R.string.action_option_hours), option("days", R.string.action_option_days), option("weeks", R.string.action_option_weeks), option("months", R.string.action_option_months), option("years", R.string.action_option_years))),
                 ActionField("var", R.string.catalog_action_datetime_add_field_var_label, hintRes = R.string.catalog_action_datetime_add_field_var_hint),
             )
         )
@@ -249,8 +306,8 @@ fun registerActionMetadata() {
             categoryRes = R.string.catalog_category_variable,
             fields = listOf(
                 ActionField("source", R.string.catalog_action_text_substring_field_source_label, required = true),
-                ActionField("start", R.string.catalog_action_text_substring_field_start_label, required = true, hintRes = R.string.catalog_action_text_substring_field_start_hint),
-                ActionField("end", R.string.catalog_action_text_substring_field_end_label, hintRes = R.string.catalog_action_text_substring_field_end_hint),
+                ActionField("start", R.string.catalog_action_text_substring_field_start_label, FieldType.NUMBER, required = true, hintRes = R.string.catalog_action_text_substring_field_start_hint, numberRule = integerRule(0)),
+                ActionField("end", R.string.catalog_action_text_substring_field_end_label, FieldType.NUMBER, hintRes = R.string.catalog_action_text_substring_field_end_hint, numberRule = integerRule(0)),
                 ActionField("var", R.string.catalog_action_text_substring_field_var_label, hintRes = R.string.catalog_action_text_substring_field_var_hint),
             )
         )
@@ -275,7 +332,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_flow_wait_description,
             categoryRes = R.string.catalog_category_flow,
             fields = listOf(
-                ActionField("millis", R.string.catalog_action_flow_wait_field_millis_label, FieldType.NUMBER, required = true, hintRes = R.string.catalog_action_flow_wait_field_millis_hint),
+                ActionField("millis", R.string.catalog_action_flow_wait_field_millis_label, FieldType.NUMBER, required = true, hintRes = R.string.catalog_action_flow_wait_field_millis_hint, numberRule = integerRule(0, 1_800_000)),
             )
         )
     )
@@ -287,7 +344,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_task_run_description,
             categoryRes = R.string.catalog_category_flow,
             fields = listOf(
-                ActionField("task", R.string.catalog_action_task_run_field_task_label, required = true, hintRes = R.string.catalog_action_task_run_field_task_hint),
+                ActionField("task", R.string.catalog_action_task_run_field_task_label, FieldType.TASK, required = true, hintRes = R.string.catalog_action_task_run_field_task_hint),
             )
         )
     )
@@ -377,7 +434,7 @@ fun registerActionMetadata() {
                 ActionField("package", R.string.catalog_action_plugin_locale_fire_field_package_label, FieldType.APP, required = true, hintRes = R.string.catalog_action_plugin_locale_fire_field_package_hint),
                 ActionField("bundleJson", R.string.catalog_action_plugin_locale_fire_field_bundlejson_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_plugin_locale_fire_field_bundlejson_hint),
                 ActionField("blurb", R.string.catalog_action_plugin_locale_fire_field_blurb_label, hintRes = R.string.catalog_action_plugin_locale_fire_field_blurb_hint),
-                ActionField("timeoutMs", R.string.catalog_action_plugin_locale_fire_field_timeoutms_label, FieldType.NUMBER, hintRes = R.string.catalog_action_plugin_locale_fire_field_timeoutms_hint),
+                ActionField("timeoutMs", R.string.catalog_action_plugin_locale_fire_field_timeoutms_label, FieldType.NUMBER, hintRes = R.string.catalog_action_plugin_locale_fire_field_timeoutms_hint, numberRule = integerRule(1_000, 30_000)),
             )
         )
     )
@@ -392,7 +449,7 @@ fun registerActionMetadata() {
                 ActionField("package", R.string.catalog_action_plugin_locale_query_field_package_label, FieldType.APP, required = true, hintRes = R.string.catalog_action_plugin_locale_query_field_package_hint),
                 ActionField("bundleJson", R.string.catalog_action_plugin_locale_query_field_bundlejson_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_plugin_locale_query_field_bundlejson_hint),
                 ActionField("blurb", R.string.catalog_action_plugin_locale_query_field_blurb_label, hintRes = R.string.catalog_action_plugin_locale_query_field_blurb_hint),
-                ActionField("timeoutMs", R.string.catalog_action_plugin_locale_query_field_timeoutms_label, FieldType.NUMBER, hintRes = R.string.catalog_action_plugin_locale_query_field_timeoutms_hint),
+                ActionField("timeoutMs", R.string.catalog_action_plugin_locale_query_field_timeoutms_label, FieldType.NUMBER, hintRes = R.string.catalog_action_plugin_locale_query_field_timeoutms_hint, numberRule = integerRule(1_000, 30_000)),
                 ActionField("resultVariable", R.string.catalog_action_plugin_locale_query_field_resultvariable_label, hintRes = R.string.catalog_action_plugin_locale_query_field_resultvariable_hint),
                 ActionField("requireSatisfied", R.string.catalog_action_plugin_locale_query_field_requiresatisfied_label, FieldType.CHECKBOX),
             )
@@ -411,7 +468,7 @@ fun registerActionMetadata() {
                 ActionField("workingDirectory", R.string.catalog_action_script_termux_run_field_workingdirectory_label, hintRes = R.string.catalog_action_script_termux_run_field_workingdirectory_hint),
                 ActionField("stdin", R.string.catalog_action_script_termux_run_field_stdin_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_script_termux_run_field_stdin_hint, sensitive = true),
                 ActionField("capturePrefix", R.string.catalog_action_script_termux_run_field_captureprefix_label, hintRes = R.string.catalog_action_script_termux_run_field_captureprefix_hint),
-                ActionField("timeoutMs", R.string.catalog_action_script_termux_run_field_timeoutms_label, FieldType.NUMBER, hintRes = R.string.catalog_action_script_termux_run_field_timeoutms_hint),
+                ActionField("timeoutMs", R.string.catalog_action_script_termux_run_field_timeoutms_label, FieldType.NUMBER, hintRes = R.string.catalog_action_script_termux_run_field_timeoutms_hint, numberRule = integerRule(1_000, 120_000)),
             )
         )
     )
@@ -437,7 +494,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_wifi_toggle_description,
             categoryRes = R.string.catalog_category_settings,
             fields = listOf(
-                ActionField("state", R.string.catalog_action_wifi_toggle_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_wifi_toggle_field_state_hint),
+                ActionField("state", R.string.catalog_action_wifi_toggle_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_wifi_toggle_field_state_hint, options = toggleOptions),
             )
         )
     )
@@ -449,7 +506,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_bluetooth_toggle_description,
             categoryRes = R.string.catalog_category_settings,
             fields = listOf(
-                ActionField("state", R.string.catalog_action_bluetooth_toggle_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_bluetooth_toggle_field_state_hint),
+                ActionField("state", R.string.catalog_action_bluetooth_toggle_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_bluetooth_toggle_field_state_hint, options = toggleOptions),
             )
         )
     )
@@ -461,7 +518,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_brightness_set_description,
             categoryRes = R.string.catalog_category_settings,
             fields = listOf(
-                ActionField("brightness", R.string.catalog_action_brightness_set_field_brightness_label, FieldType.NUMBER, required = true),
+                ActionField("brightness", R.string.catalog_action_brightness_set_field_brightness_label, FieldType.NUMBER, required = true, numberRule = integerRule(0, 255, "auto")),
             )
         )
     )
@@ -473,8 +530,8 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_volume_set_description,
             categoryRes = R.string.catalog_category_settings,
             fields = listOf(
-                ActionField("stream", R.string.catalog_action_volume_set_field_stream_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_volume_set_field_stream_hint),
-                ActionField("level", R.string.catalog_action_volume_set_field_level_label, FieldType.NUMBER, required = true),
+                ActionField("stream", R.string.catalog_action_volume_set_field_stream_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_volume_set_field_stream_hint, options = audioStreamOptions),
+                ActionField("level", R.string.catalog_action_volume_set_field_level_label, FieldType.NUMBER, required = true, numberRule = integerRule(0, allowedLiterals = arrayOf("mute", "unmute"))),
             )
         )
     )
@@ -486,7 +543,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_airplane_toggle_description,
             categoryRes = R.string.catalog_category_settings,
             fields = listOf(
-                ActionField("state", R.string.catalog_action_airplane_toggle_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_airplane_toggle_field_state_hint),
+                ActionField("state", R.string.catalog_action_airplane_toggle_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_airplane_toggle_field_state_hint, options = toggleOptions),
             )
         )
     )
@@ -498,7 +555,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_mobile_toggle_description,
             categoryRes = R.string.catalog_category_settings,
             fields = listOf(
-                ActionField("state", R.string.catalog_action_mobile_toggle_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_mobile_toggle_field_state_hint),
+                ActionField("state", R.string.catalog_action_mobile_toggle_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_mobile_toggle_field_state_hint, options = toggleOptions),
             )
         )
     )
@@ -510,7 +567,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_screen_timeout_description,
             categoryRes = R.string.catalog_category_settings,
             fields = listOf(
-                ActionField("millis", R.string.catalog_action_screen_timeout_field_millis_label, FieldType.NUMBER, required = true, hintRes = R.string.catalog_action_screen_timeout_field_millis_hint),
+                ActionField("millis", R.string.catalog_action_screen_timeout_field_millis_label, FieldType.NUMBER, required = true, hintRes = R.string.catalog_action_screen_timeout_field_millis_hint, numberRule = integerRule(1_000, 1_800_000)),
             )
         )
     )
@@ -522,7 +579,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_dnd_set_description,
             categoryRes = R.string.catalog_category_settings,
             fields = listOf(
-                ActionField("mode", R.string.catalog_action_dnd_set_field_mode_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_dnd_set_field_mode_hint),
+                ActionField("mode", R.string.catalog_action_dnd_set_field_mode_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_dnd_set_field_mode_hint, options = listOf(option("off", R.string.label_off), option("priority", R.string.action_option_dnd_priority), option("alarms", R.string.action_option_dnd_alarms), option("total_silence", R.string.action_option_dnd_total_silence))),
             )
         )
     )
@@ -534,7 +591,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_ringer_set_description,
             categoryRes = R.string.catalog_category_settings,
             fields = listOf(
-                ActionField("mode", R.string.catalog_action_ringer_set_field_mode_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_ringer_set_field_mode_hint),
+                ActionField("mode", R.string.catalog_action_ringer_set_field_mode_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_ringer_set_field_mode_hint, options = listOf(option("normal", R.string.action_option_ringer_normal), option("vibrate", R.string.action_option_ringer_vibrate), option("silent", R.string.action_option_ringer_silent))),
             )
         )
     )
@@ -546,7 +603,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_torch_set_description,
             categoryRes = R.string.catalog_category_settings,
             fields = listOf(
-                ActionField("state", R.string.catalog_action_torch_set_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_torch_set_field_state_hint),
+                ActionField("state", R.string.catalog_action_torch_set_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_torch_set_field_state_hint, options = toggleOptions),
             )
         )
     )
@@ -558,7 +615,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_tile_set_description,
             categoryRes = R.string.catalog_category_settings,
             fields = listOf(
-                ActionField("state", R.string.catalog_action_tile_set_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_tile_set_field_state_hint),
+                ActionField("state", R.string.catalog_action_tile_set_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_tile_set_field_state_hint, options = listOf(option("active", R.string.action_option_active), option("inactive", R.string.action_option_inactive))),
                 ActionField("label", R.string.catalog_action_tile_set_field_label_label, required = false, hintRes = R.string.catalog_action_tile_set_field_label_hint),
             )
         )
@@ -631,7 +688,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_screenshot_take_description,
             categoryRes = R.string.catalog_category_app,
             fields = listOf(
-                ActionField("path", R.string.catalog_action_screenshot_take_field_path_label, hintRes = R.string.catalog_action_screenshot_take_field_path_hint),
+                ActionField("path", R.string.catalog_action_screenshot_take_field_path_label, FieldType.FILE, hintRes = R.string.catalog_action_screenshot_take_field_path_hint, fileRule = deviceFileRule),
             )
         )
     )
@@ -644,7 +701,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_file_read_description,
             categoryRes = R.string.catalog_category_file,
             fields = listOf(
-                ActionField("path", R.string.catalog_action_file_read_field_path_label, required = true),
+                ActionField("path", R.string.catalog_action_file_read_field_path_label, FieldType.FILE, required = true, fileRule = openTaskerFileRule),
                 ActionField("var", R.string.catalog_action_file_read_field_var_label, required = true, hintRes = R.string.catalog_action_file_read_field_var_hint),
             )
         )
@@ -657,7 +714,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_file_write_description,
             categoryRes = R.string.catalog_category_file,
             fields = listOf(
-                ActionField("path", R.string.catalog_action_file_write_field_path_label, required = true),
+                ActionField("path", R.string.catalog_action_file_write_field_path_label, FieldType.FILE, required = true, fileRule = openTaskerFileRule),
                 ActionField("text", R.string.catalog_action_file_write_field_text_label, FieldType.MULTILINE, required = true),
             )
         )
@@ -670,7 +727,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_file_append_description,
             categoryRes = R.string.catalog_category_file,
             fields = listOf(
-                ActionField("path", R.string.catalog_action_file_append_field_path_label, required = true),
+                ActionField("path", R.string.catalog_action_file_append_field_path_label, FieldType.FILE, required = true, fileRule = openTaskerFileRule),
                 ActionField("text", R.string.catalog_action_file_append_field_text_label, FieldType.MULTILINE, required = true),
             )
         )
@@ -683,7 +740,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_file_delete_description,
             categoryRes = R.string.catalog_category_file,
             fields = listOf(
-                ActionField("path", R.string.catalog_action_file_delete_field_path_label, required = true),
+                ActionField("path", R.string.catalog_action_file_delete_field_path_label, FieldType.FILE, required = true, fileRule = openTaskerFileRule),
             )
         )
     )
@@ -695,7 +752,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_file_list_description,
             categoryRes = R.string.catalog_category_file,
             fields = listOf(
-                ActionField("path", R.string.catalog_action_file_list_field_path_label, required = true),
+                ActionField("path", R.string.catalog_action_file_list_field_path_label, FieldType.FILE, required = true, fileRule = openTaskerFileRule),
                 ActionField("var", R.string.catalog_action_file_list_field_var_label, required = true, hintRes = R.string.catalog_action_file_list_field_var_hint),
                 ActionField("pattern", R.string.catalog_action_file_list_field_pattern_label, hintRes = R.string.catalog_action_file_list_field_pattern_hint),
             )
@@ -710,26 +767,26 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_http_request_description,
             categoryRes = R.string.catalog_category_network,
             fields = listOf(
-                ActionField("method", R.string.catalog_action_http_request_field_method_label, hintRes = R.string.catalog_action_http_request_field_method_hint),
+                ActionField("method", R.string.catalog_action_http_request_field_method_label, FieldType.DROPDOWN, hintRes = R.string.catalog_action_http_request_field_method_hint, options = listOf(option("GET", R.string.action_option_http_get), option("HEAD", R.string.action_option_http_head), option("POST", R.string.action_option_http_post), option("PUT", R.string.action_option_http_put), option("PATCH", R.string.action_option_http_patch), option("DELETE", R.string.action_option_http_delete), option("OPTIONS", R.string.action_option_http_options))),
                 ActionField("url", R.string.catalog_action_http_request_field_url_label, required = true),
                 ActionField("query", R.string.catalog_action_http_request_field_query_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_http_request_field_query_hint, sensitive = true),
                 ActionField("headers", R.string.catalog_action_http_request_field_headers_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_http_request_field_headers_hint, sensitive = true),
                 ActionField("authorization", R.string.catalog_action_http_request_field_authorization_label, hintRes = R.string.catalog_action_http_request_field_authorization_hint, sensitive = true),
                 ActionField("body", R.string.catalog_action_http_request_field_body_label, FieldType.MULTILINE, sensitive = true),
-                ActionField("body_file", R.string.catalog_action_http_request_field_body_file_label, hintRes = R.string.catalog_action_http_request_field_body_file_hint, sensitive = false),
+                ActionField("body_file", R.string.catalog_action_http_request_field_body_file_label, FieldType.FILE, hintRes = R.string.catalog_action_http_request_field_body_file_hint, sensitive = false, fileRule = openTaskerFileRule),
                 ActionField("content_type", R.string.catalog_action_http_request_field_content_type_label, hintRes = R.string.catalog_action_http_request_field_content_type_hint),
                 ActionField("response_var", R.string.catalog_action_http_request_field_response_var_label, hintRes = R.string.catalog_action_http_request_field_response_var_hint),
                 ActionField("status_var", R.string.catalog_action_http_request_field_status_var_label, hintRes = R.string.catalog_action_http_request_field_status_var_hint),
                 ActionField("headers_var", R.string.catalog_action_http_request_field_headers_var_label, hintRes = R.string.catalog_action_http_request_field_headers_var_hint, sensitive = false),
-                ActionField("output_file", R.string.catalog_action_http_request_field_output_file_label, hintRes = R.string.catalog_action_http_request_field_output_file_hint),
-                ActionField("max_response_bytes", R.string.catalog_action_http_request_field_max_response_bytes_label, FieldType.NUMBER, hintRes = R.string.catalog_action_http_request_field_max_response_bytes_hint),
-                ActionField("redirects", R.string.catalog_action_http_request_field_redirects_label, hintRes = R.string.catalog_action_http_request_field_redirects_hint),
+                ActionField("output_file", R.string.catalog_action_http_request_field_output_file_label, FieldType.FILE, hintRes = R.string.catalog_action_http_request_field_output_file_hint, fileRule = openTaskerFileRule),
+                ActionField("max_response_bytes", R.string.catalog_action_http_request_field_max_response_bytes_label, FieldType.NUMBER, hintRes = R.string.catalog_action_http_request_field_max_response_bytes_hint, numberRule = integerRule(1, 52_428_800)),
+                ActionField("redirects", R.string.catalog_action_http_request_field_redirects_label, FieldType.DROPDOWN, hintRes = R.string.catalog_action_http_request_field_redirects_hint, options = listOf(option("none", R.string.label_none), option("same_origin", R.string.action_option_same_origin))),
                 ActionField("allow_http", R.string.catalog_action_http_request_field_allow_http_label, FieldType.CHECKBOX, hintRes = R.string.catalog_action_http_request_field_allow_http_hint),
-                ActionField("timeout_sec", R.string.catalog_action_http_request_field_timeout_label, FieldType.NUMBER, hintRes = R.string.catalog_action_http_request_field_timeout_hint),
-                ActionField("connect_timeout_sec", R.string.catalog_action_http_request_field_connect_timeout_label, FieldType.NUMBER),
-                ActionField("read_timeout_sec", R.string.catalog_action_http_request_field_read_timeout_label, FieldType.NUMBER),
-                ActionField("write_timeout_sec", R.string.catalog_action_http_request_field_write_timeout_label, FieldType.NUMBER),
-                ActionField("call_timeout_sec", R.string.catalog_action_http_request_field_call_timeout_label, FieldType.NUMBER),
+                ActionField("timeout_sec", R.string.catalog_action_http_request_field_timeout_label, FieldType.NUMBER, hintRes = R.string.catalog_action_http_request_field_timeout_hint, numberRule = integerRule(1, 120)),
+                ActionField("connect_timeout_sec", R.string.catalog_action_http_request_field_connect_timeout_label, FieldType.NUMBER, numberRule = integerRule(1, 120)),
+                ActionField("read_timeout_sec", R.string.catalog_action_http_request_field_read_timeout_label, FieldType.NUMBER, numberRule = integerRule(1, 120)),
+                ActionField("write_timeout_sec", R.string.catalog_action_http_request_field_write_timeout_label, FieldType.NUMBER, numberRule = integerRule(1, 120)),
+                ActionField("call_timeout_sec", R.string.catalog_action_http_request_field_call_timeout_label, FieldType.NUMBER, numberRule = integerRule(1, 120)),
             ),
         )
     )
@@ -773,7 +830,7 @@ fun registerActionMetadata() {
             categoryRes = R.string.catalog_category_network,
             fields = listOf(
                 ActionField("host", R.string.catalog_action_ping_field_host_label, required = true),
-                ActionField("timeout_sec", R.string.catalog_action_ping_field_timeout_label, FieldType.NUMBER, hintRes = R.string.catalog_action_ping_field_timeout_hint),
+                ActionField("timeout_sec", R.string.catalog_action_ping_field_timeout_label, FieldType.NUMBER, hintRes = R.string.catalog_action_ping_field_timeout_hint, numberRule = integerRule(1, 30)),
                 ActionField("var", R.string.catalog_action_ping_field_var_label, hintRes = R.string.catalog_action_ping_field_var_hint),
             )
         )
@@ -787,10 +844,10 @@ fun registerActionMetadata() {
             categoryRes = R.string.catalog_category_network,
             fields = listOf(
                 ActionField("url", R.string.catalog_action_download_field_url_label, required = true),
-                ActionField("path", R.string.catalog_action_download_field_path_label, required = true),
+                ActionField("path", R.string.catalog_action_download_field_path_label, FieldType.FILE, required = true, fileRule = openTaskerFileRule),
                 ActionField("allow_http", R.string.catalog_action_download_field_allow_http_label, FieldType.CHECKBOX, hintRes = R.string.catalog_action_download_field_allow_http_hint),
-                ActionField("timeout_sec", R.string.catalog_action_download_field_timeout_label, FieldType.NUMBER, hintRes = R.string.catalog_action_download_field_timeout_hint),
-                ActionField("max_bytes", R.string.catalog_action_download_field_max_bytes_label, FieldType.NUMBER, hintRes = R.string.catalog_action_download_field_max_bytes_hint),
+                ActionField("timeout_sec", R.string.catalog_action_download_field_timeout_label, FieldType.NUMBER, hintRes = R.string.catalog_action_download_field_timeout_hint, numberRule = integerRule(1, 120)),
+                ActionField("max_bytes", R.string.catalog_action_download_field_max_bytes_label, FieldType.NUMBER, hintRes = R.string.catalog_action_download_field_max_bytes_hint, numberRule = integerRule(1, 52_428_800)),
             )
         )
     )
@@ -804,7 +861,7 @@ fun registerActionMetadata() {
             fields = listOf(
                 ActionField("mac", R.string.catalog_action_wol_field_mac_label, required = true, hintRes = R.string.catalog_action_wol_field_mac_hint),
                 ActionField("broadcast", R.string.catalog_action_wol_field_broadcast_label, hintRes = R.string.catalog_action_wol_field_broadcast_hint),
-                ActionField("port", R.string.catalog_action_wol_field_port_label, FieldType.NUMBER, hintRes = R.string.catalog_action_wol_field_port_hint),
+                ActionField("port", R.string.catalog_action_wol_field_port_label, FieldType.NUMBER, hintRes = R.string.catalog_action_wol_field_port_hint, numberRule = integerRule(1, 65_535)),
             )
         )
     )
@@ -817,8 +874,8 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_sound_play_description,
             categoryRes = R.string.catalog_category_media,
             fields = listOf(
-                ActionField("path", R.string.catalog_action_sound_play_field_path_label, required = true),
-                ActionField("volume", R.string.catalog_action_sound_play_field_volume_label, FieldType.NUMBER, hintRes = R.string.catalog_action_sound_play_field_volume_hint),
+                ActionField("path", R.string.catalog_action_sound_play_field_path_label, FieldType.FILE, required = true, fileRule = deviceFileRule),
+                ActionField("volume", R.string.catalog_action_sound_play_field_volume_label, FieldType.NUMBER, hintRes = R.string.catalog_action_sound_play_field_volume_hint, numberRule = decimalRule(0.0, 100.0)),
             )
         )
     )
@@ -870,7 +927,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_media_mute_description,
             categoryRes = R.string.catalog_category_media,
             fields = listOf(
-                ActionField("stream", R.string.catalog_action_media_mute_field_stream_label, hintRes = R.string.catalog_action_media_mute_field_stream_hint),
+                ActionField("stream", R.string.catalog_action_media_mute_field_stream_label, FieldType.DROPDOWN, hintRes = R.string.catalog_action_media_mute_field_stream_hint, options = audioStreamOptions),
             )
         )
     )
@@ -883,7 +940,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_vibrate_description,
             categoryRes = R.string.catalog_category_system,
             fields = listOf(
-                ActionField("millis", R.string.catalog_action_vibrate_field_millis_label, FieldType.NUMBER, required = true),
+                ActionField("millis", R.string.catalog_action_vibrate_field_millis_label, FieldType.NUMBER, required = true, numberRule = integerRule(1, 10_000)),
             )
         )
     )

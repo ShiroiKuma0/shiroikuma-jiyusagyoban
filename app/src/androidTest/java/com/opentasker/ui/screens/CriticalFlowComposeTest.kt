@@ -22,7 +22,10 @@ import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.actions.ActionField
+import com.opentasker.core.actions.ActionFieldOption
 import com.opentasker.core.actions.ActionMetadata
+import com.opentasker.core.actions.ActionNumberRule
+import com.opentasker.core.actions.FieldType
 import com.opentasker.core.apps.InstalledApp
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.CollisionMode
@@ -251,6 +254,112 @@ class CriticalFlowComposeTest {
         assertEquals("%armed == true", saved?.condition)
         assertTrue(saved?.continueOnError == true)
         assertEquals(mapOf("millis" to "1"), saved?.args)
+    }
+
+    @Test
+    fun actionEditorDropdownStoresTheStableOptionValue() {
+        var saved: ActionSpec? = null
+        val metadata = ActionMetadata(
+            id = "flow.wait",
+            nameRes = R.string.catalog_action_wifi_toggle_name,
+            descriptionRes = R.string.catalog_action_wifi_toggle_description,
+            categoryRes = R.string.catalog_category_settings,
+            fields = listOf(
+                ActionField(
+                    key = "state",
+                    labelRes = R.string.catalog_action_wifi_toggle_field_state_label,
+                    fieldType = FieldType.DROPDOWN,
+                    required = true,
+                    options = listOf(
+                        ActionFieldOption("enabled_wire_value", R.string.label_on),
+                        ActionFieldOption("disabled_wire_value", R.string.label_off),
+                    ),
+                ),
+            ),
+        )
+        composeTestRule.setContent {
+            TestTheme {
+                ActionConfigDialog(
+                    state = ActionEditState(Task(id = 7, name = "Task"), metadata),
+                    onDismiss = {},
+                    onSave = { saved = it },
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Save").assertIsNotEnabled()
+        composeTestRule.onNode(hasText("State *") and hasClickAction()).performClick()
+        composeTestRule.onNodeWithText("On").performClick()
+        composeTestRule.onNodeWithText("Save").assertIsEnabled().performClick()
+
+        assertEquals("enabled_wire_value", saved?.args?.get("state"))
+    }
+
+    @Test
+    fun actionEditorBlocksInvalidNumberSyntax() {
+        val metadata = ActionMetadata(
+            id = "flow.wait",
+            nameRes = R.string.catalog_action_flow_wait_name,
+            descriptionRes = R.string.catalog_action_flow_wait_description,
+            categoryRes = R.string.catalog_category_flow,
+            fields = listOf(
+                ActionField(
+                    key = "millis",
+                    labelRes = R.string.catalog_action_flow_wait_field_millis_label,
+                    fieldType = FieldType.NUMBER,
+                    required = true,
+                    numberRule = ActionNumberRule(minimum = 0.0, maximum = 10.0),
+                ),
+            ),
+        )
+        composeTestRule.setContent {
+            TestTheme {
+                ActionConfigDialog(
+                    state = ActionEditState(Task(id = 7, name = "Task"), metadata),
+                    onDismiss = {},
+                    onSave = {},
+                )
+            }
+        }
+
+        composeTestRule.onNode(hasText("Milliseconds *") and hasSetTextAction()).performTextInput("1e3")
+        composeTestRule.onNodeWithText("Enter a valid number.").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Save").assertIsNotEnabled()
+    }
+
+    @Test
+    fun actionEditorPreservesArgumentsUnknownToItsMetadata() {
+        var saved: ActionSpec? = null
+        val metadata = ActionMetadata(
+            id = "log",
+            nameRes = R.string.catalog_action_log_name,
+            descriptionRes = R.string.catalog_action_log_description,
+            categoryRes = R.string.catalog_category_system,
+            fields = listOf(ActionField("message", R.string.catalog_action_log_field_message_label, required = true)),
+        )
+        val opaque = "  newer-format\u0000value\r\n  "
+        composeTestRule.setContent {
+            TestTheme {
+                ActionConfigDialog(
+                    state = ActionEditState(
+                        task = Task(id = 7, name = "Task"),
+                        metadata = metadata,
+                        existing = ActionSpec(
+                            id = 9,
+                            type = metadata.id,
+                            args = linkedMapOf("future.argument" to opaque, "message" to "hello"),
+                        ),
+                    ),
+                    onDismiss = {},
+                    onSave = { saved = it },
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Save").assertIsEnabled().performClick()
+
+        assertEquals(opaque, saved?.args?.get("future.argument"))
+        assertEquals("hello", saved?.args?.get("message"))
     }
 
     @Test

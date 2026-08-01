@@ -1,5 +1,8 @@
 package com.opentasker.ui.screens
 
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -47,6 +51,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.actions.ActionField
+import com.opentasker.core.actions.ActionFieldPolicy
+import com.opentasker.core.actions.ActionFileScope
 import com.opentasker.core.actions.ActionMetadata
 import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.actions.FieldType
@@ -54,7 +60,7 @@ import com.opentasker.core.actions.NotificationTaskBindings
 import com.opentasker.core.actions.NotificationTaskCandidate
 import com.opentasker.core.actions.NotificationTaskReference
 import com.opentasker.core.actions.NotificationTaskResolution
-import com.opentasker.core.apps.PackageNamePolicy
+import com.opentasker.core.actions.mergeActionArguments
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.model.ActionSpec
@@ -250,12 +256,8 @@ internal fun ActionConfigDialog(
     }
     val taskBindingIssues = initialTaskBindingIssues.filterKeys { it !in addressedTaskBindingKeys }
     val capability = remember(state.metadata.id) { ActionCapabilityRegistry.get(state.metadata.id) }
-    val missingRequired = state.metadata.fields.any { it.required && values[it.key].isNullOrBlank() }
-    val invalidPackageValue = state.metadata.fields
-        .filter { it.fieldType == FieldType.APP }
-        .any { field ->
-            values[field.key]?.trim()?.takeIf(String::isNotBlank)?.let(PackageNamePolicy::isValid) == false
-        }
+    val availableTaskIds = remember(tasks) { tasks.mapTo(mutableSetOf()) { it.id } }
+    val validationIssues = ActionFieldPolicy.validateForm(state.metadata, values, availableTaskIds)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -347,6 +349,7 @@ internal fun ActionConfigDialog(
                             }
                         },
                         tasks = tasks,
+                        issue = validationIssues[field.key],
                     )
                     taskBindingIssues[field.key]?.let { issue ->
                         Text(
@@ -360,22 +363,18 @@ internal fun ActionConfigDialog(
         },
         confirmButton = {
             Button(
-                enabled = !missingRequired && !invalidPackageValue && taskBindingIssues.isEmpty() && capability.canAdd,
+                enabled = validationIssues.isEmpty() && taskBindingIssues.isEmpty() && capability.canAdd,
                 onClick = {
                     onSave(
                         ActionSpec(
                             id = state.existing?.id ?: 0,
                             type = state.metadata.id,
                             label = label.trim().takeUnless { it.isBlank() || it == metadataName },
-                            args = values
-                                .filterValues { it.isNotBlank() }
-                                .mapValues { (key, value) ->
-                                    if (state.metadata.fields.any { it.key == key && it.fieldType == FieldType.APP }) {
-                                        value.trim()
-                                    } else {
-                                        value
-                                    }
-                                },
+                            args = mergeActionArguments(
+                                existing = state.existing?.args.orEmpty(),
+                                fields = state.metadata.fields,
+                                editedValues = values,
+                            ),
                             continueOnError = continueOnError,
                             condition = condition.trim().ifBlank { null },
                         )
@@ -396,6 +395,7 @@ internal fun ActionFieldInput(
     onChange: (String) -> Unit,
     tasks: List<Task> = emptyList(),
     suggestedPackage: String? = null,
+    issue: ActionFieldPolicy.Issue? = null,
 ) {
     val label = stringResource(field.labelRes) + if (field.required) " *" else ""
     val hint = field.hintRes?.let { stringResource(it) }
@@ -438,18 +438,22 @@ internal fun ActionFieldInput(
             onValueChange = onChange,
             label = { Text(label) },
             placeholder = hint?.let { { Text(it) } },
-            supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
+            supportingText = actionFieldSupportingText(field, issue),
+            isError = issue != null,
             minLines = 3,
             modifier = Modifier.fillMaxWidth(),
         )
 
         FieldType.NUMBER -> OutlinedTextField(
             value = value,
-            onValueChange = { onChange(it.filter { ch -> ch.isDigit() || ch == '-' || ch == '.' }) },
+            onValueChange = onChange,
             label = { Text(label) },
             placeholder = hint?.let { { Text(it) } },
-            supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            supportingText = actionFieldSupportingText(field, issue),
+            isError = issue != null,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = if (field.numberRule?.allowedLiterals.isNullOrEmpty()) KeyboardType.Decimal else KeyboardType.Text,
+            ),
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -471,16 +475,209 @@ internal fun ActionFieldInput(
             onChange = onChange,
         )
 
-        FieldType.DROPDOWN,
+        FieldType.DROPDOWN -> ActionDropdownFieldInput(
+            field = field,
+            label = label,
+            hint = hint,
+            value = value,
+            issue = issue,
+            onChange = onChange,
+        )
+
+        FieldType.FILE -> ActionFileFieldInput(
+            field = field,
+            label = label,
+            hint = hint,
+            value = value,
+            issue = issue,
+            onChange = onChange,
+        )
+
         FieldType.TEXT -> OutlinedTextField(
             value = value,
             onValueChange = onChange,
             label = { Text(label) },
             placeholder = hint?.let { { Text(it) } },
-            supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
-            singleLine = field.fieldType != FieldType.MULTILINE,
+            supportingText = actionFieldSupportingText(field, issue),
+            isError = issue != null,
+            singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+    }
+
+    if (issue != null && field.fieldType in setOf(FieldType.TASK, FieldType.APP, FieldType.CHECKBOX)) {
+        ActionFieldErrorText(issue)
+    }
+}
+
+@Composable
+private fun actionFieldSupportingText(
+    field: ActionField,
+    issue: ActionFieldPolicy.Issue?,
+): (@Composable () -> Unit)? = when {
+    issue != null -> {{ ActionFieldErrorText(issue) }}
+    field.required -> {{ Text(stringResource(R.string.label_required)) }}
+    else -> null
+}
+
+@Composable
+private fun ActionFieldErrorText(issue: ActionFieldPolicy.Issue) {
+    val text = when (issue.error) {
+        ActionFieldPolicy.Error.REQUIRED -> stringResource(R.string.label_required)
+        ActionFieldPolicy.Error.INVALID_NUMBER -> stringResource(R.string.action_field_error_invalid_number)
+        ActionFieldPolicy.Error.BELOW_MINIMUM -> stringResource(
+            R.string.action_field_error_below_minimum,
+            formatActionNumberLimit(issue.limit),
+        )
+        ActionFieldPolicy.Error.ABOVE_MAXIMUM -> stringResource(
+            R.string.action_field_error_above_maximum,
+            formatActionNumberLimit(issue.limit),
+        )
+        ActionFieldPolicy.Error.INVALID_OPTION -> stringResource(R.string.action_field_error_invalid_option)
+        ActionFieldPolicy.Error.INVALID_BOOLEAN -> stringResource(R.string.action_field_error_invalid_boolean)
+        ActionFieldPolicy.Error.INVALID_TASK -> stringResource(R.string.action_field_error_invalid_task)
+        ActionFieldPolicy.Error.INVALID_APP -> stringResource(R.string.action_field_error_invalid_app)
+        ActionFieldPolicy.Error.INVALID_FILE -> stringResource(R.string.action_field_error_invalid_file)
+        ActionFieldPolicy.Error.CONFLICTING_VALUE -> stringResource(R.string.action_field_error_conflicting_value)
+        ActionFieldPolicy.Error.BODY_NOT_ALLOWED -> stringResource(R.string.action_field_error_body_not_allowed)
+        ActionFieldPolicy.Error.INVALID_DEFINITION -> stringResource(R.string.action_field_error_invalid_definition)
+    }
+    Text(text, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+}
+
+private fun formatActionNumberLimit(limit: Double?): String = when {
+    limit == null -> ""
+    limit % 1.0 == 0.0 -> limit.toLong().toString()
+    else -> limit.toString()
+}
+
+@Composable
+private fun ActionDropdownFieldInput(
+    field: ActionField,
+    label: String,
+    hint: String?,
+    value: String,
+    issue: ActionFieldPolicy.Issue?,
+    onChange: (String) -> Unit,
+) {
+    var expanded by rememberSaveable(field.key) { mutableStateOf(false) }
+    val selectedLabel = field.options.firstOrNull { it.value == value }?.let { stringResource(it.labelRes) }
+        ?: if (value.isBlank()) stringResource(R.string.label_none)
+        else stringResource(R.string.action_field_unknown_option, value)
+    Box(Modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.weight(1f)) {
+                    Text(label, style = MaterialTheme.typography.labelLarge)
+                    Text(selectedLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    hint?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            issue?.let { ActionFieldErrorText(it) }
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            if (!field.required) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.label_none)) },
+                    onClick = {
+                        onChange("")
+                        expanded = false
+                    },
+                )
+            }
+            field.options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(option.labelRes)) },
+                    onClick = {
+                        onChange(option.value)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActionFileFieldInput(
+    field: ActionField,
+    label: String,
+    hint: String?,
+    value: String,
+    issue: ActionFieldPolicy.Issue?,
+    onChange: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    var expanded by rememberSaveable(field.key) { mutableStateOf(false) }
+    val openDocument = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            onChange(uri.toString())
+        }
+    }
+    val savedPaths = remember(context.filesDir, field.fileRule?.scope) {
+        if (field.fileRule?.scope != ActionFileScope.OPENTASKER) {
+            emptyList()
+        } else {
+            val root = java.io.File(context.filesDir, "user_files")
+            runCatching {
+                if (!root.exists()) emptyList() else root.walkTopDown()
+                    .drop(1)
+                    .take(100)
+                    .map { file ->
+                        file.relativeTo(root).invariantSeparatorsPath + if (file.isDirectory) "/" else ""
+                    }
+                    .toList()
+            }.getOrDefault(emptyList())
+        }
+    }
+    Column(Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onChange,
+            label = { Text(label) },
+            placeholder = hint?.let { { Text(it) } },
+            supportingText = actionFieldSupportingText(field, issue),
+            isError = issue != null,
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Box {
+            TextButton(
+                onClick = {
+                    if (field.fileRule?.scope == ActionFileScope.OPENTASKER) expanded = true
+                    else openDocument.launch(arrayOf("*/*"))
+                },
+            ) { Text(stringResource(R.string.action_browse)) }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                if (savedPaths.isEmpty()) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_file_picker_empty)) },
+                        onClick = { expanded = false },
+                        enabled = false,
+                    )
+                } else {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_file_picker_saved_files)) },
+                        onClick = {},
+                        enabled = false,
+                    )
+                    savedPaths.forEach { path ->
+                        DropdownMenuItem(
+                            text = { Text(path) },
+                            onClick = {
+                                onChange(path.trimEnd('/'))
+                                expanded = false
+                            },
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
