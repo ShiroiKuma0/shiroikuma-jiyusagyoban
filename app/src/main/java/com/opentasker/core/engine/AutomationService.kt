@@ -614,7 +614,11 @@ class AutomationService : Service() {
                 executionId = executionId,
                 state = if (result.report.success) ExternalExecutionState.SUCCEEDED else ExternalExecutionState.FAILED,
                 durationMs = result.report.durationMs,
-                error = if (result.report.success) null else "Task reported a failure; see the run log.",
+                error = when {
+                    result.report.success -> null
+                    result.skippedReason != null -> result.skippedReason
+                    else -> "Task reported a failure; see the run log."
+                },
             )
         } catch (e: CancellationException) {
             ExternalExecutions.update(this, executionId, ExternalExecutionState.FAILED, error = "The run was cancelled.")
@@ -667,7 +671,11 @@ class AutomationService : Service() {
                 audioForegroundService = audioForegroundServiceEligibility,
             )
             if (result.logInserted) pruneRunLogs(force = false)
-            val status = if (result.report.success) "succeeded" else "failed"
+            val status = when {
+                result.skippedReason != null -> "skipped"
+                result.report.success -> "succeeded"
+                else -> "failed"
+            }
             AppLogger.info(TAG, "Notification button '$buttonLabel' -> ${task.name} $status (${result.report.durationMs}ms)")
         } catch (e: CancellationException) {
             throw e

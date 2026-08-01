@@ -1,6 +1,7 @@
 package com.opentasker.core.storage
 
 import com.opentasker.core.model.CollisionMode
+import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -14,6 +15,15 @@ class TaskEntityTest {
             id = 8,
             name = "Notify",
             collisionMode = CollisionMode.WAIT,
+            actions = listOf(
+                ActionSpec(
+                    id = 3,
+                    type = "notify.show",
+                    args = mapOf("text" to "hello"),
+                    continueOnError = true,
+                    condition = "%armed == true",
+                ),
+            ),
         )
 
         assertEquals(task, task.toEntity().toDomain())

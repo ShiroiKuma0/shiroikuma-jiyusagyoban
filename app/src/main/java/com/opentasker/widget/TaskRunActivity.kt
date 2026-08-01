@@ -49,7 +49,11 @@ class TaskRunActivity : Activity() {
                             source = source,
                             visibleActivity = true,
                         )
-                        val status = if (result.report.success) "succeeded" else "failed"
+                        val status = when {
+                            result.skippedReason != null -> "skipped"
+                            result.report.success -> "succeeded"
+                            else -> "failed"
+                        }
                         "${task.name} $status (${result.report.durationMs}ms)"
                     }
                 }

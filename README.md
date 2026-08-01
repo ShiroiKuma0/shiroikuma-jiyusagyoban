@@ -19,7 +19,8 @@
 - **Template expressions** — bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math/date functions, traces, and strict regex policy
 - **First-class secret variables** — AES-256-GCM Android Keystore storage, deliberate reveal/re-entry UX, and provenance-based redaction for derived action arguments, logs, traces, and failures
 - **One redaction boundary for stored arguments** — credential-bearing action arguments (HTTP authorization/headers/query/body, request payloads, script stdin, SMS text) are masked wherever they are displayed, including the task list, flow graph, and previews, so they cannot leak through a screenshot or accessibility semantics; unregistered actions and unknown keys fail closed
-- **Automation modes** — per-profile single, restart, queued, and parallel re-trigger behavior
+- **Coherent execution controls** — per-profile single/restart/queued/parallel re-trigger behavior, followed by a global per-task abort-new/abort-existing/run-both/wait collision policy across profile, manual, nested, widget, notification, and external runs
+- **Action-level flow controls** — atomic action reordering plus optional conditions and continue-after-failure behavior, with those semantics preserved through storage and bundle round trips
 - **Profile groups** — organize profiles into named groups with filter chips
 
 ### Triggers (contexts)

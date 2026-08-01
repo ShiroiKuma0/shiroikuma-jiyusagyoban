@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -529,6 +531,7 @@ internal fun TasksScreen(
     onAddAction: (Task) -> Unit,
     onEditAction: (Task, Int, ActionSpec) -> Unit,
     onDeleteAction: (Task, Int) -> Unit,
+    onMoveAction: (Task, Int, Int) -> Unit,
     contentPadding: PaddingValues,
 ) {
     if (tasks.isEmpty()) {
@@ -593,6 +596,7 @@ internal fun TasksScreen(
                 onAddAction = { onAddAction(task) },
                 onEditAction = { index, action -> onEditAction(task, index, action) },
                 onDeleteAction = { index -> onDeleteAction(task, index) },
+                onMoveAction = { fromIndex, toIndex -> onMoveAction(task, fromIndex, toIndex) },
             )
         }
     }
@@ -608,6 +612,7 @@ private fun TaskCard(
     onAddAction: () -> Unit,
     onEditAction: (Int, ActionSpec) -> Unit,
     onDeleteAction: (Int) -> Unit,
+    onMoveAction: (Int, Int) -> Unit,
 ) {
     val editDescription = stringResource(R.string.a11y_edit_task, task.name)
     val addActionDescription = stringResource(R.string.a11y_add_action_to_task, task.name)
@@ -649,6 +654,10 @@ private fun TaskCard(
                     ActionRow(
                         index = index,
                         action = action,
+                        canMoveUp = index > 0,
+                        canMoveDown = index < task.actions.lastIndex,
+                        onMoveUp = { onMoveAction(index, index - 1) },
+                        onMoveDown = { onMoveAction(index, index + 1) },
                         onEdit = { onEditAction(index, action) },
                         onDelete = { onDeleteAction(index) },
                     )
@@ -736,6 +745,10 @@ private fun TaskCard(
 private fun ActionRow(
     index: Int,
     action: ActionSpec,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -746,6 +759,8 @@ private fun ActionRow(
     val actionLabel = action.label ?: metadataName ?: action.type
     val editDescription = stringResource(R.string.a11y_edit_action, index + 1, actionLabel)
     val deleteDescription = stringResource(R.string.a11y_delete_action, index + 1, actionLabel)
+    val moveUpDescription = stringResource(R.string.a11y_move_action_up, index + 1, actionLabel)
+    val moveDownDescription = stringResource(R.string.a11y_move_action_down, index + 1, actionLabel)
     Surface(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
         shape = RoundedCornerShape(DesignSystem.Radii.lg),
@@ -775,6 +790,44 @@ private fun ActionRow(
                         if (capability.level == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                     )
                 }
+                action.condition?.takeIf(String::isNotBlank)?.let { condition ->
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        stringResource(R.string.action_condition_summary, condition),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                if (action.continueOnError) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        stringResource(R.string.action_continue_on_error_summary),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+            }
+            IconButton(
+                onClick = onMoveUp,
+                enabled = canMoveUp,
+                modifier = Modifier.semantics { contentDescription = moveUpDescription },
+            ) {
+                Icon(
+                    Icons.Filled.ArrowUpward,
+                    contentDescription = moveUpDescription,
+                    modifier = Modifier.clearAndSetSemantics { },
+                )
+            }
+            IconButton(
+                onClick = onMoveDown,
+                enabled = canMoveDown,
+                modifier = Modifier.semantics { contentDescription = moveDownDescription },
+            ) {
+                Icon(
+                    Icons.Filled.ArrowDownward,
+                    contentDescription = moveDownDescription,
+                    modifier = Modifier.clearAndSetSemantics { },
+                )
             }
             IconButton(
                 onClick = onEdit,

@@ -6,18 +6,26 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.actions.ActionField
 import com.opentasker.core.actions.ActionMetadata
 import com.opentasker.core.apps.InstalledApp
+import com.opentasker.core.model.ActionSpec
+import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
@@ -28,6 +36,7 @@ import com.opentasker.core.transfer.VariableConflictResolution
 import com.opentasker.core.transfer.VariableImportConflict
 import com.opentasker.ui.theme.OpenTaskerTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -69,7 +78,7 @@ class CriticalFlowComposeTest {
                 TaskEditorDialog(
                     task = null,
                     onDismiss = {},
-                    onSave = { name, _ -> savedName = name },
+                    onSave = { name, _, mode -> savedName = "$name:$mode" },
                 )
             }
         }
@@ -79,7 +88,7 @@ class CriticalFlowComposeTest {
         composeTestRule.onAllNodes(hasSetTextAction())[0].performTextInput("Morning focus")
         composeTestRule.onNodeWithText("Save").assertIsEnabled().performClick()
 
-        assertEquals("Morning focus", savedName)
+        assertEquals("Morning focus:${CollisionMode.ABORT_NEW}", savedName)
     }
 
     @Test
@@ -92,7 +101,7 @@ class CriticalFlowComposeTest {
                     profile = null,
                     tasks = listOf(task),
                     onDismiss = {},
-                    onSave = { name, _, enterTaskId, _, _, _ ->
+                    onSave = { name, _, enterTaskId, _, _, _, _ ->
                         savedName = "$name:$enterTaskId"
                     },
                 )
@@ -106,6 +115,71 @@ class CriticalFlowComposeTest {
         composeTestRule.onNodeWithText("Save").assertIsEnabled().performClick()
 
         assertEquals("At work:42", savedName)
+    }
+
+    @Test
+    fun profileEditorCanSelectAndClearAnExitTask() {
+        val enter = Task(id = 42, name = "Enter")
+        val cleanup = Task(id = 43, name = "Cleanup")
+        var savedExitTaskId: Long? = null
+        composeTestRule.setContent {
+            TestTheme {
+                ProfileEditorDialog(
+                    profile = Profile(id = 7, name = "Work", enterTaskId = enter.id),
+                    tasks = listOf(enter, cleanup),
+                    onDismiss = {},
+                    onSave = { _, _, _, exitTaskId, _, _, _ -> savedExitTaskId = exitTaskId },
+                )
+            }
+        }
+
+        composeTestRule.onNode(hasText("Exit task") and hasClickAction()).performScrollTo().performClick()
+        composeTestRule.onNode(hasText("Cleanup (43)") and hasClickAction()).performClick()
+        composeTestRule.onNodeWithText("Save").performClick()
+
+        assertEquals(43L, savedExitTaskId)
+
+        composeTestRule.onNode(hasText("Exit task") and hasClickAction()).performScrollTo().performClick()
+        composeTestRule.onNode(hasText("None") and hasClickAction()).performClick()
+        composeTestRule.onNodeWithText("Save").performClick()
+        assertNull(savedExitTaskId)
+    }
+
+    @Test
+    fun taskListExposesAtomicActionReorderControls() {
+        var moved: Pair<Int, Int>? = null
+        val task = Task(
+            id = 7,
+            name = "Ordered",
+            actions = listOf(
+                ActionSpec(type = "test.first", label = "First"),
+                ActionSpec(type = "test.second", label = "Second"),
+            ),
+        )
+        composeTestRule.setContent {
+            TestTheme {
+                TasksScreen(
+                    tasks = listOf(task),
+                    storageDecodeIssues = emptyList(),
+                    onCreateTask = {},
+                    onEditTask = {},
+                    onDeleteTask = {},
+                    onRunTask = {},
+                    onPinTask = {},
+                    onAddAction = {},
+                    onEditAction = { _, _, _ -> },
+                    onDeleteAction = { _, _ -> },
+                    onMoveAction = { _, fromIndex, toIndex -> moved = fromIndex to toIndex },
+                    contentPadding = PaddingValues(0.dp),
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Move action 2, Second, up")
+            .performScrollTo()
+            .performClick()
+
+        assertEquals(1 to 0, moved)
     }
 
     @Test
@@ -136,6 +210,47 @@ class CriticalFlowComposeTest {
         composeTestRule.onNodeWithText("Required").assertIsDisplayed()
         composeTestRule.onNodeWithText("Save").assertIsNotEnabled()
         assertTrue(!actionSaved)
+    }
+
+    @Test
+    fun actionEditorRoundTripsConditionAndContinueOnError() {
+        var saved: ActionSpec? = null
+        val metadata = ActionMetadata(
+            id = "flow.wait",
+            nameRes = R.string.catalog_action_flow_wait_name,
+            descriptionRes = R.string.catalog_action_flow_wait_description,
+            categoryRes = R.string.catalog_category_flow,
+            fields = listOf(
+                ActionField("millis", R.string.catalog_action_flow_wait_field_millis_label, required = true),
+            ),
+        )
+        composeTestRule.setContent {
+            TestTheme {
+                ActionConfigDialog(
+                    state = ActionEditState(
+                        task = Task(id = 7, name = "Task"),
+                        metadata = metadata,
+                        existing = ActionSpec(
+                            id = 9,
+                            type = "flow.wait",
+                            args = mapOf("millis" to "1"),
+                            condition = "%old == true",
+                        ),
+                    ),
+                    onDismiss = {},
+                    onSave = { saved = it },
+                )
+            }
+        }
+
+        composeTestRule.onAllNodes(hasSetTextAction())[1].performTextClearance()
+        composeTestRule.onAllNodes(hasSetTextAction())[1].performTextInput("%armed == true")
+        composeTestRule.onNodeWithTag(ACTION_CONTINUE_ON_ERROR_TAG).performClick()
+        composeTestRule.onNodeWithText("Save").performClick()
+
+        assertEquals("%armed == true", saved?.condition)
+        assertTrue(saved?.continueOnError == true)
+        assertEquals(mapOf("millis" to "1"), saved?.args)
     }
 
     @Test

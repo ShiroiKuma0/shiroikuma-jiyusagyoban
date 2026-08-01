@@ -23,6 +23,7 @@ import kotlinx.coroutines.withContext
 data class TaskExecutionResult(
     val report: TaskRunReport,
     val logInserted: Boolean,
+    val skippedReason: String? = null,
 )
 
 suspend fun executeAndLogTask(
@@ -74,28 +75,37 @@ suspend fun executeAndLogTask(
         variables = variables,
         audioEligibility = audioEligibility,
     ) { msg -> AppLogger.info(logTag, msg) }
-    // Publish the run so it is visible and cancellable while it is in flight. Cancellation
-    // unwinds this coroutine tree (including nested task.run sub-tasks and any bounded blocking
-    // action suspended inside it) and is recorded as a terminal Cancelled outcome below.
-    val executionId = ActiveExecutionRegistry.register(
-        taskId = task.id,
-        taskName = task.name,
-        source = source,
-        job = currentCoroutineContext()[Job],
-        startedAtMs = System.currentTimeMillis(),
-    )
-    val runner = TaskRunner(
-        ctx,
-        resolveTask = dbSubTaskResolver(db),
-        onStep = { index, label -> ActiveExecutionRegistry.reportStep(executionId, index, label) },
-    )
-    val report = try {
-        runner.run(task)
+    val collisionCoordinator = TaskCollisionCoordinator.Default
+    var executionId: Long? = null
+    val collisionOutcome = try {
+        collisionCoordinator.execute(task) {
+            // Publish only admitted work. A WAIT invocation is not shown as active until it owns
+            // the task slot, and ABORT_NEW never flashes a run that will immediately be skipped.
+            val admittedExecutionId = ActiveExecutionRegistry.register(
+                taskId = task.id,
+                taskName = task.name,
+                source = source,
+                job = currentCoroutineContext()[Job],
+                startedAtMs = System.currentTimeMillis(),
+            )
+            executionId = admittedExecutionId
+            try {
+                TaskRunner(
+                    ctx,
+                    resolveTask = dbSubTaskResolver(db),
+                    onStep = { index, label -> ActiveExecutionRegistry.reportStep(admittedExecutionId, index, label) },
+                    collisionCoordinator = collisionCoordinator,
+                    executionChain = setOf(task.id).filterTo(linkedSetOf()) { it > 0L },
+                ).run(task)
+            } finally {
+                ActiveExecutionRegistry.unregister(admittedExecutionId)
+            }
+        }
     } catch (cancellation: CancellationException) {
         // withContext(NonCancellable): the surrounding scope is already cancelled, so an ordinary
         // suspending write here would be dropped and the run would vanish without a trace.
         withContext(NonCancellable) {
-            ActiveExecutionRegistry.unregister(executionId)
+            executionId?.let(ActiveExecutionRegistry::unregister)
             insertRunLog(
                 db,
                 RunLogEntry(
@@ -115,8 +125,23 @@ suspend fun executeAndLogTask(
             )
         }
         throw cancellation
-    } finally {
-        ActiveExecutionRegistry.unregister(executionId)
+    }
+    val report = when (collisionOutcome) {
+        is TaskCollisionOutcome.Executed -> collisionOutcome.value
+        is TaskCollisionOutcome.Skipped -> {
+            val inserted = logSkippedRun(
+                db = db,
+                task = task,
+                source = source,
+                reason = collisionOutcome.reason,
+                metadata = metadata,
+            )
+            return@withContext TaskExecutionResult(
+                report = collisionSkippedReport(task, collisionOutcome.reason),
+                logInserted = inserted,
+                skippedReason = collisionOutcome.reason,
+            )
+        }
     }
     val globalCommitMetadata = persistChangedGlobals(
         variableRepository,
@@ -146,6 +171,28 @@ suspend fun executeAndLogTask(
     )
     val inserted = insertRunLog(db, logEntry)
     TaskExecutionResult(report, inserted)
+}
+
+private fun collisionSkippedReport(task: Task, reason: String): TaskRunReport {
+    val startedAt = System.currentTimeMillis()
+    return TaskRunReport(
+        taskId = task.id,
+        taskName = task.name,
+        startedAt = startedAt,
+        durationMs = 0,
+        results = listOf(ActionResult.Skip),
+        traces = listOf(
+            ActionExecutionTrace(
+                index = 0,
+                actionType = "admission",
+                label = "collision policy",
+                durationMs = 0,
+                status = ActionTraceStatus.SKIPPED,
+                message = reason,
+            ),
+        ),
+        success = false,
+    )
 }
 
 internal fun taskPowerRunLogMetadata(task: Task): List<String> {

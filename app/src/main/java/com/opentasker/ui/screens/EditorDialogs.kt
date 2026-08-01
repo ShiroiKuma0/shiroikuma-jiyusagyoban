@@ -1,6 +1,7 @@
 package com.opentasker.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -64,6 +66,7 @@ import com.opentasker.core.references.ReferenceResolution
 import com.opentasker.core.references.describe
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.AutomationMode
+import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.RunLogEntry
@@ -202,10 +205,13 @@ internal fun TemplateSlotDialog(
 internal fun TaskEditorDialog(
     task: Task?,
     onDismiss: () -> Unit,
-    onSave: (String, Int) -> Unit,
+    onSave: (String, Int, CollisionMode) -> Unit,
 ) {
     var name by rememberSaveable(task?.id) { mutableStateOf(task?.name.orEmpty()) }
     var priority by rememberSaveable(task?.id) { mutableStateOf((task?.priority ?: 5).toString()) }
+    var collisionMode by rememberSaveable(task?.id) {
+        mutableStateOf(task?.collisionMode ?: CollisionMode.ABORT_NEW)
+    }
     val parsedPriority = priority.toIntOrNull()
     val canSave = name.isNotBlank() && parsedPriority != null && parsedPriority in 0..10
 
@@ -241,10 +247,19 @@ internal fun TaskEditorDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                Text(stringResource(R.string.task_collision_label), style = MaterialTheme.typography.labelLarge)
+                CollisionMode.entries.forEach { mode ->
+                    SelectableOption(
+                        title = collisionModeTitle(mode),
+                        body = collisionModeDescription(mode),
+                        selected = collisionMode == mode,
+                        onClick = { collisionMode = mode },
+                    )
+                }
             }
         },
         confirmButton = {
-            Button(enabled = canSave, onClick = { onSave(name, parsedPriority ?: 5) }) {
+            Button(enabled = canSave, onClick = { onSave(name, parsedPriority ?: 5, collisionMode) }) {
                 Text(stringResource(R.string.action_save))
             }
         },
@@ -257,7 +272,7 @@ internal fun ProfileEditorDialog(
     profile: Profile?,
     tasks: List<Task>,
     onDismiss: () -> Unit,
-    onSave: (String, Boolean, Long, Int, AutomationMode, String?) -> Unit,
+    onSave: (String, Boolean, Long, Long?, Int, AutomationMode, String?) -> Unit,
 ) {
     val initialTaskId = profile?.enterTaskId ?: tasks.firstOrNull()?.id ?: 0L
     var name by rememberSaveable(profile?.id) { mutableStateOf(profile?.name.orEmpty()) }
@@ -268,13 +283,15 @@ internal fun ProfileEditorDialog(
     // default whenever the tasks flow re-emitted (a parallel import, a rename re-sorting the
     // list) mid-edit. A vanished selection is caught by the canSave existence check below.
     var enterTaskId by rememberSaveable(profile?.id) { mutableLongStateOf(initialTaskId) }
+    var exitTaskId by rememberSaveable(profile?.id) { mutableStateOf(profile?.exitTaskId) }
     var cooldown by rememberSaveable(profile?.id) { mutableStateOf((profile?.cooldownSec ?: 0).toString()) }
     var automationMode by rememberSaveable(profile?.id) { mutableStateOf(profile?.automationMode ?: AutomationMode.SINGLE) }
     var group by rememberSaveable(profile?.id) { mutableStateOf(profile?.group.orEmpty()) }
     val parsedCooldown = cooldown.toIntOrNull()
     val selectedTaskExists = tasks.any { it.id == enterTaskId }
+    val selectedExitTaskExists = exitTaskId == null || tasks.any { it.id == exitTaskId }
     val canSave = name.isNotBlank() && enterTaskId > 0 && selectedTaskExists &&
-        (cooldown.isBlank() || parsedCooldown != null)
+        selectedExitTaskExists && (cooldown.isBlank() || parsedCooldown != null)
     val importedReviewRequired = profile?.requiresRiskAcknowledgement == true
     val onLabel = stringResource(R.string.label_on)
     val offLabel = stringResource(R.string.label_off)
@@ -283,7 +300,12 @@ internal fun ProfileEditorDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (profile == null) stringResource(R.string.dialog_create_profile) else stringResource(R.string.dialog_edit_profile)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 520.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
+            ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -348,6 +370,13 @@ internal fun ProfileEditorDialog(
                         onClick = { enterTaskId = task.id },
                     )
                 }
+                TaskActionFieldInput(
+                    label = stringResource(R.string.profile_exit_task),
+                    hint = stringResource(R.string.profile_exit_task_helper),
+                    value = exitTaskId?.toString().orEmpty(),
+                    tasks = tasks,
+                    onChange = { exitTaskId = it.toLongOrNull() },
+                )
                 OutlinedTextField(
                     value = cooldown,
                     onValueChange = { cooldown = it.filter(Char::isDigit).take(5) },
@@ -379,7 +408,7 @@ internal fun ProfileEditorDialog(
             }
         },
         confirmButton = {
-            Button(enabled = canSave, onClick = { onSave(name, enabled, enterTaskId, parsedCooldown ?: 0, automationMode, group.trim().ifBlank { null }) }) {
+            Button(enabled = canSave, onClick = { onSave(name, enabled, enterTaskId, exitTaskId, parsedCooldown ?: 0, automationMode, group.trim().ifBlank { null }) }) {
                 Text(stringResource(R.string.action_save))
             }
         },
@@ -431,6 +460,26 @@ internal fun automationModeDescription(mode: AutomationMode): String = when (mod
     AutomationMode.QUEUED -> stringResource(R.string.automation_mode_queued)
     AutomationMode.PARALLEL -> stringResource(R.string.automation_mode_parallel)
 }
+
+@Composable
+internal fun collisionModeTitle(mode: CollisionMode): String = stringResource(
+    when (mode) {
+        CollisionMode.ABORT_NEW -> R.string.collision_mode_abort_new_title
+        CollisionMode.ABORT_EXISTING -> R.string.collision_mode_abort_existing_title
+        CollisionMode.RUN_BOTH -> R.string.collision_mode_run_both_title
+        CollisionMode.WAIT -> R.string.collision_mode_wait_title
+    },
+)
+
+@Composable
+internal fun collisionModeDescription(mode: CollisionMode): String = stringResource(
+    when (mode) {
+        CollisionMode.ABORT_NEW -> R.string.collision_mode_abort_new_body
+        CollisionMode.ABORT_EXISTING -> R.string.collision_mode_abort_existing_body
+        CollisionMode.RUN_BOTH -> R.string.collision_mode_run_both_body
+        CollisionMode.WAIT -> R.string.collision_mode_wait_body
+    },
+)
 
 @Composable
 internal fun EmptyState(

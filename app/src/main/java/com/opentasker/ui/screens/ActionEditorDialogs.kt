@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.stateDescription
@@ -66,6 +67,8 @@ private data class LocalizedActionMetadata(
     val description: String,
     val category: String,
 )
+
+internal const val ACTION_CONTINUE_ON_ERROR_TAG = "action_continue_on_error"
 
 @Composable
 internal fun ActionPickerDialog(
@@ -217,6 +220,12 @@ internal fun ActionConfigDialog(
     var label by rememberSaveable(state.existing?.id, state.metadata.id, metadataName) {
         mutableStateOf(state.existing?.label ?: metadataName)
     }
+    var condition by rememberSaveable(state.existing?.id, state.metadata.id) {
+        mutableStateOf(state.existing?.condition.orEmpty())
+    }
+    var continueOnError by rememberSaveable(state.existing?.id, state.metadata.id) {
+        mutableStateOf(state.existing?.continueOnError ?: false)
+    }
     var values by rememberSaveable(state.existing?.id, state.metadata.id) {
         mutableStateOf(
             state.metadata.fields.associate { field ->
@@ -285,6 +294,47 @@ internal fun ActionConfigDialog(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = condition,
+                        onValueChange = { condition = it },
+                        label = { Text(stringResource(R.string.action_condition_label)) },
+                        supportingText = { Text(stringResource(R.string.action_condition_helper)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    val continueStateDescription = stringResource(
+                        if (continueOnError) R.string.label_on else R.string.label_off,
+                    )
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f),
+                        shape = RoundedCornerShape(DesignSystem.Radii.lg),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(ACTION_CONTINUE_ON_ERROR_TAG)
+                            .toggleable(
+                                value = continueOnError,
+                                role = Role.Switch,
+                                onValueChange = { continueOnError = it },
+                            )
+                            .semantics { stateDescription = continueStateDescription },
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(stringResource(R.string.action_continue_on_error_label), style = MaterialTheme.typography.labelLarge)
+                                Text(
+                                    stringResource(R.string.action_continue_on_error_helper),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Switch(checked = continueOnError, onCheckedChange = null)
+                        }
+                    }
                 }
                 items(state.metadata.fields, key = { it.key }) { field ->
                     ActionFieldInput(
@@ -326,8 +376,8 @@ internal fun ActionConfigDialog(
                                         value
                                     }
                                 },
-                            continueOnError = state.existing?.continueOnError ?: false,
-                            condition = state.existing?.condition,
+                            continueOnError = continueOnError,
+                            condition = condition.trim().ifBlank { null },
                         )
                     )
                 },
@@ -435,7 +485,7 @@ internal fun ActionFieldInput(
 }
 
 @Composable
-private fun TaskActionFieldInput(
+internal fun TaskActionFieldInput(
     label: String,
     hint: String?,
     value: String,

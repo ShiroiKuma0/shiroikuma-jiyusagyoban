@@ -18,6 +18,8 @@ import com.opentasker.core.engine.ActiveExecutionRegistry
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.model.AutomationMode
+import com.opentasker.core.model.ActionSpec
+import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.Profile
 import com.opentasker.core.validation.InputValidation
 import com.opentasker.core.model.RunLogEntry
@@ -284,8 +286,14 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun createTask(name: String, priority: Int) = launchWithMessage("Task created") {
-        db.taskDao().insert(Task(name = name.trim(), priority = priority.coerceIn(0, 10)).toEntity())
+    fun createTask(name: String, priority: Int, collisionMode: CollisionMode) = launchWithMessage("Task created") {
+        db.taskDao().insert(
+            Task(
+                name = name.trim(),
+                priority = priority.coerceIn(0, 10),
+                collisionMode = collisionMode,
+            ).toEntity(),
+        )
     }
 
     fun updateTask(task: Task, message: String = "Task updated") = launchWithMessage(message) {
@@ -324,6 +332,26 @@ class ActiveAutomationViewModel(
                 }
             }
             db.taskDao().update(task.toEntity())
+        }
+    }
+
+    fun moveTaskAction(taskId: Long, fromIndex: Int, toIndex: Int) = launchWithMessage("Action moved") {
+        db.withTransaction {
+            val entity = db.taskDao().getById(taskId) ?: error("Task no longer exists.")
+            val decoded = entity.toDomainDecodeResult()
+            decoded.issue?.let { throw CorruptRecordOverwriteException(it) }
+            val updated = decoded.value.copy(
+                actions = reorderActions(decoded.value.actions, fromIndex, toIndex),
+            )
+            db.editHistoryDao().insert(
+                EditHistoryEntity(
+                    entityType = EditHistoryDao.TYPE_TASK,
+                    entityId = taskId,
+                    previousJson = entity.actionsJson,
+                ),
+            )
+            db.editHistoryDao().pruneOld(EditHistoryDao.TYPE_TASK, taskId)
+            db.taskDao().update(updated.toEntity())
         }
     }
 
@@ -424,12 +452,13 @@ class ActiveAutomationViewModel(
         db.sceneDao().delete(scene.toEntity())
     }
 
-    fun createProfile(name: String, enabled: Boolean, enterTaskId: Long, cooldownSec: Int, automationMode: AutomationMode, group: String? = null) =
+    fun createProfile(name: String, enabled: Boolean, enterTaskId: Long, exitTaskId: Long?, cooldownSec: Int, automationMode: AutomationMode, group: String? = null) =
         launchWithMessage("Profile created") {
             val profile = Profile(
                 name = name.trim(),
                 enabled = enabled,
                 enterTaskId = enterTaskId,
+                exitTaskId = exitTaskId,
                 cooldownSec = cooldownSec.coerceAtLeast(0),
                 automationMode = automationMode,
                 group = group,
@@ -784,7 +813,11 @@ class ActiveAutomationViewModel(
                 task = task,
                 source = "Manual run",
             )
-            val status = if (result.report.success) "succeeded" else "failed"
+            val status = when {
+                result.skippedReason != null -> "skipped"
+                result.report.success -> "succeeded"
+                else -> "failed"
+            }
             events.send("${task.name} $status (${result.report.durationMs}ms)")
         }
     }
@@ -875,6 +908,15 @@ class ActiveAutomationViewModel(
                 .onSuccess { events.send(successMessage) }
                 .onFailure { events.send("Error: ${it.message ?: "Operation failed"}") }
         }
+    }
+}
+
+internal fun reorderActions(actions: List<ActionSpec>, fromIndex: Int, toIndex: Int): List<ActionSpec> {
+    require(fromIndex in actions.indices) { "Source action index is out of range." }
+    require(toIndex in actions.indices) { "Destination action index is out of range." }
+    if (fromIndex == toIndex) return actions
+    return actions.toMutableList().apply {
+        add(toIndex, removeAt(fromIndex))
     }
 }
 

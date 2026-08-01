@@ -99,6 +99,8 @@
     <string name="profile_group_helper">Optional. Groups profiles in the list for easier browsing.</string>
     <string name="profile_enable_after_save">Enable after saving</string>
     <string name="profile_enter_task">Enter task</string>
+    <string name="profile_exit_task">Exit task</string>
+    <string name="profile_exit_task_helper">Optional cleanup task to run when this profile stops matching.</string>
     <string name="profile_cooldown_label">Cooldown seconds</string>
     <string name="profile_cooldown_helper">Minimum seconds between triggers. Default is 0 (no cooldown).</string>
     <string name="profile_retrigger_label">Re-trigger behavior</string>
@@ -112,6 +114,15 @@
     <string name="task_name_helper">Use a clear verb phrase so you know what the task does from the list.</string>
     <string name="task_priority_label">Priority</string>
     <string name="task_priority_helper">Enter a value from 0 to 10. Higher priority tasks run first when multiple trigger at once.</string>
+    <string name="task_collision_label">When this task is already running</string>
+    <string name="collision_mode_abort_new_title">Abort new</string>
+    <string name="collision_mode_abort_new_body">Keep the active run and log the new request as skipped.</string>
+    <string name="collision_mode_abort_existing_title">Abort existing</string>
+    <string name="collision_mode_abort_existing_body">Cancel the active run, then start the new request.</string>
+    <string name="collision_mode_run_both_title">Run both</string>
+    <string name="collision_mode_run_both_body">Allow this task to overlap across profiles and manual or external requests.</string>
+    <string name="collision_mode_wait_title">Wait</string>
+    <string name="collision_mode_wait_body">Queue each request and run one at a time in arrival order.</string>
     <string name="task_new">New task</string>
     <string name="task_delete">Delete Task</string>
     <string name="task_add_action">Add Action</string>
@@ -119,6 +130,14 @@
     <!-- Action editor -->
     <string name="action_label_field">Action label</string>
     <string name="action_label_hint">Shown in task steps and run log entries.</string>
+    <string name="action_condition_label">Run only if</string>
+    <string name="action_condition_helper">Optional variable condition, for example %%armed == true. A false or invalid condition skips this action.</string>
+    <string name="action_continue_on_error_label">Continue after failure</string>
+    <string name="action_continue_on_error_helper">Run the next action even if this one reports a failure.</string>
+    <string name="action_condition_summary">If %1$s</string>
+    <string name="action_continue_on_error_summary">Continues after failure</string>
+    <string name="a11y_move_action_up">Move action %1$d, %2$s, up</string>
+    <string name="a11y_move_action_down">Move action %1$d, %2$s, down</string>
 
     <!-- Context editor -->
     <string name="context_invert_match">Invert match</string>

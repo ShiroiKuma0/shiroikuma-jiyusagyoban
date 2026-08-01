@@ -690,6 +690,9 @@ fun ActiveAutomationUi(
                 onDeleteAction = { task, index ->
                     if (task.actions.getOrNull(index) != null) openDeleteAction(task, index)
                 },
+                onMoveAction = { task, fromIndex, toIndex ->
+                    viewModel.moveTaskAction(task.id, fromIndex, toIndex)
+                },
                 contentPadding = innerPadding,
             )
 
@@ -849,8 +852,8 @@ fun ActiveAutomationUi(
         TaskEditorDialog(
             task = null,
             onDismiss = { showCreateTaskDialog = false },
-            onSave = { name, priority ->
-                viewModel.createTask(name, priority)
+            onSave = { name, priority, collisionMode ->
+                viewModel.createTask(name, priority, collisionMode)
                 showCreateTaskDialog = false
             },
         )
@@ -860,8 +863,14 @@ fun ActiveAutomationUi(
         TaskEditorDialog(
             task = task,
             onDismiss = { clearTaskDialog() },
-            onSave = { name, priority ->
-                viewModel.updateTask(task.copy(name = name.trim(), priority = priority.coerceIn(0, 10)))
+            onSave = { name, priority, collisionMode ->
+                viewModel.updateTask(
+                    task.copy(
+                        name = name.trim(),
+                        priority = priority.coerceIn(0, 10),
+                        collisionMode = collisionMode,
+                    ),
+                )
                 clearTaskDialog()
             },
         )
@@ -872,8 +881,8 @@ fun ActiveAutomationUi(
             profile = null,
             tasks = tasks,
             onDismiss = { showCreateProfileDialog = false },
-            onSave = { name, enabled, enterTaskId, cooldown, automationMode, group ->
-                viewModel.createProfile(name, enabled, enterTaskId, cooldown, automationMode, group)
+            onSave = { name, enabled, enterTaskId, exitTaskId, cooldown, automationMode, group ->
+                viewModel.createProfile(name, enabled, enterTaskId, exitTaskId, cooldown, automationMode, group)
                 showCreateProfileDialog = false
             },
         )
@@ -927,12 +936,13 @@ fun ActiveAutomationUi(
             profile = profile,
             tasks = tasks,
             onDismiss = { clearProfileDialog() },
-            onSave = { name, enabled, enterTaskId, cooldown, automationMode, group ->
+            onSave = { name, enabled, enterTaskId, exitTaskId, cooldown, automationMode, group ->
                 viewModel.updateProfile(
                     profile.copy(
                         name = name.trim(),
                         enabled = enabled,
                         enterTaskId = enterTaskId,
+                        exitTaskId = exitTaskId,
                         cooldownSec = cooldown.coerceAtLeast(0),
                         automationMode = automationMode,
                         group = group,

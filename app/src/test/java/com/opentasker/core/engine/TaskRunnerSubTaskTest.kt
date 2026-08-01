@@ -2,7 +2,10 @@ package com.opentasker.core.engine
 
 import android.content.ContextWrapper
 import com.opentasker.core.model.ActionSpec
+import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.Task
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -135,5 +138,46 @@ class TaskRunnerSubTaskTest {
         assertFalse(report.success)
         // The top-level action fails because somewhere below the depth limit was hit.
         assertTrue(report.results.any { it is ActionResult.Failure })
+    }
+
+    @Test
+    fun nestedTaskRunUsesTheTargetCollisionPolicy() = runBlocking {
+        registerRecorderAction("test.sub.collision.recorder")
+        val coordinator = TaskCollisionCoordinator()
+        val child = Task(
+            id = 42,
+            name = "Child",
+            collisionMode = CollisionMode.ABORT_NEW,
+            actions = listOf(ActionSpec(type = "test.sub.collision.recorder", args = mapOf("key" to "CHILD_RAN"))),
+        )
+        val activeStarted = CompletableDeferred<Unit>()
+        val releaseActive = CompletableDeferred<Unit>()
+        val active = async {
+            coordinator.execute(child) {
+                activeStarted.complete(Unit)
+                releaseActive.await()
+            }
+        }
+        activeStarted.await()
+        val variables = VariableStore()
+        val report = TaskRunner(
+            ctx = ActionContext(ContextWrapper(null), variables),
+            resolveTask = { child },
+            collisionCoordinator = coordinator,
+            executionChain = setOf(7L),
+        ).run(
+            Task(
+                id = 7,
+                name = "Parent",
+                actions = listOf(ActionSpec(type = "task.run", args = mapOf("task" to "42"))),
+            ),
+        )
+
+        assertFalse(report.success)
+        assertEquals(null, variables.get("CHILD_RAN"))
+        assertTrue((report.results.single() as ActionResult.Failure).message.contains("Abort new"))
+        releaseActive.complete(Unit)
+        active.await()
+        Unit
     }
 }

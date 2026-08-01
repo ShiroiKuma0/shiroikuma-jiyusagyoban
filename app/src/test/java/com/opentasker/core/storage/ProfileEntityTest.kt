@@ -14,10 +14,11 @@ class ProfileEntityTest {
             id = 7,
             name = "Queued profile",
             enterTaskId = 42,
+            exitTaskId = 43,
             automationMode = AutomationMode.QUEUED,
         )
 
-        assertEquals(AutomationMode.QUEUED, profile.toEntity().toDomain().automationMode)
+        assertEquals(profile, profile.toEntity().toDomain())
     }
 
     @Test

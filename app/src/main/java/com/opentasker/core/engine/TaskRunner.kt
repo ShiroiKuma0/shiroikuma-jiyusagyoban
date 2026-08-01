@@ -32,6 +32,8 @@ class TaskRunner(
      * sub-task runners inherit it, so a run stuck inside a sub-task still names the real step.
      */
     private val onStep: ((index: Int, label: String) -> Unit)? = null,
+    private val collisionCoordinator: TaskCollisionCoordinator? = null,
+    private val executionChain: Set<Long> = emptySet(),
 ) {
     /** A live `flow.foreach` iteration in progress. */
     private class LoopFrame(
@@ -337,12 +339,23 @@ class TaskRunner(
         val ref = SUB_TASK_REF_KEYS.firstNotNullOfOrNull { args[it]?.trim()?.takeIf(String::isNotBlank) }
             ?: return fail("task.run requires a 'task' (id or name)")
         val target = resolver(ref) ?: return fail("sub-task not found: $ref")
+        if (target.id > 0L && target.id in executionChain) {
+            return fail("sub-task '${target.name}' is already active in this execution chain")
+        }
 
         // Pass any extra args as input variables scoped to the sub-task invocation: a dedicated
         // scope wraps the child run so local (lowercase) inputs are visible to the child through the
         // scope chain but are popped when it returns, never leaking into the parent's later actions.
         // Global (uppercase) outputs still flow back through the shared global namespace.
-        val child = TaskRunner(ctx, templateExpressionEngine, resolveTask, depth + 1, onStep)
+        val child = TaskRunner(
+            ctx = ctx,
+            templateExpressionEngine = templateExpressionEngine,
+            resolveTask = resolveTask,
+            depth = depth + 1,
+            onStep = onStep,
+            collisionCoordinator = collisionCoordinator,
+            executionChain = executionChain + target.id,
+        )
         ctx.variables.pushScope()
         val report = try {
             args.forEach { (key, value) ->
@@ -350,7 +363,11 @@ class TaskRunner(
                     ctx.variables.set(key, value, sensitive = expansionReport.isArgumentSensitive(key))
                 }
             }
-            child.run(target)
+            when (val collision = collisionCoordinator?.execute(target) { child.run(target) }) {
+                null -> child.run(target)
+                is TaskCollisionOutcome.Executed -> collision.value
+                is TaskCollisionOutcome.Skipped -> return fail(collision.reason)
+            }
         } finally {
             ctx.variables.popScope()
         }
