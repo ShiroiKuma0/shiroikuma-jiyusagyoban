@@ -219,8 +219,11 @@ class AutomationService : Service() {
             val executionId = intent.getStringExtra(AutomationTargetContract.EXTRA_EXECUTION_ID)
             val taskId = intent.getLongExtra(AutomationTargetContract.EXTRA_TASK_ID, -1L).takeIf { it > 0 }
             val variables = externalVariables(intent)
+            val runSource = AutomationTargetContract.runSourceLabel(
+                intent.getStringExtra(AutomationTargetContract.EXTRA_RUN_SOURCE),
+            )
             if (executionId != null && taskId != null) {
-                scope.launch { runExternalTask(executionId, taskId, variables) }
+                scope.launch { runExternalTask(executionId, taskId, variables, runSource) }
             }
             return START_STICKY
         }
@@ -570,7 +573,12 @@ class AutomationService : Service() {
             .toMap()
     }
 
-    private suspend fun runExternalTask(executionId: String, taskId: Long, variables: Map<String, String>) {
+    private suspend fun runExternalTask(
+        executionId: String,
+        taskId: Long,
+        variables: Map<String, String>,
+        runSource: String,
+    ) {
         fun fail(reason: String) {
             AppLogger.warn(TAG, "External execution $executionId failed: $reason")
             ExternalExecutions.update(this, executionId, ExternalExecutionState.FAILED, error = reason)
@@ -584,7 +592,7 @@ class AutomationService : Service() {
                 logSkippedRun(
                     db = db,
                     task = decoded.value,
-                    source = EXTERNAL_RUN_SOURCE,
+                    source = runSource,
                     reason = reason,
                     metadata = listOf("execution=$executionId"),
                 )
@@ -595,7 +603,7 @@ class AutomationService : Service() {
                 appContext = this,
                 db = db,
                 task = decoded.value,
-                source = EXTERNAL_RUN_SOURCE,
+                source = runSource,
                 metadata = listOf("execution=$executionId", "Variables: ${variables.size} provided"),
                 initialVariables = variables,
                 audioForegroundService = audioForegroundServiceEligibility,
@@ -790,7 +798,6 @@ class AutomationService : Service() {
         const val ACTION_TIME_TICK_TRIGGER = "com.opentasker.action.TIME_TICK_TRIGGER"
         const val ACTION_RUN_NOTIFICATION_TASK = "com.opentasker.action.RUN_NOTIFICATION_TASK"
         const val ACTION_RUN_EXTERNAL_TASK = "com.opentasker.action.RUN_EXTERNAL_TASK"
-        const val EXTERNAL_RUN_SOURCE = "External intent"
         const val EXTRA_STARTED_FROM_VISIBLE_UI = "com.opentasker.extra.STARTED_FROM_VISIBLE_UI"
         private const val CHANNEL = "opentasker.engine"
         private const val NOTIF_ID = 1001
@@ -822,4 +829,3 @@ internal fun profileRegistrySignature(profiles: List<ProfileEntity>): List<Strin
             ).joinToString("|")
         }
         .toList()
-

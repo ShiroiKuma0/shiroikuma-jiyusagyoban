@@ -5,7 +5,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import com.opentasker.core.external.AutomationTargetReceiver
+import com.opentasker.core.external.AutomationTargetContract
+import com.opentasker.core.external.InternalTaskRunSource
 import com.opentasker.core.logging.AppLogger
 
 /**
@@ -71,11 +72,11 @@ class LocaleSettingFireReceiver : BroadcastReceiver() {
 
         AppLogger.info("LocaleSettingFireReceiver", "Locale fire: taskId=$taskId name=$taskName")
 
-        val runIntent = Intent(context, AutomationTargetReceiver::class.java).apply {
-            action = "com.opentasker.action.RUN_TASK"
-            putExtra("com.opentasker.extra.TASK_ID", taskId)
-            putExtra("com.opentasker.extra.SOURCE", "locale_plugin")
-        }
-        context.sendOrderedBroadcast(runIntent, "com.opentasker.permission.AUTOMATION")
+        val runIntent = AutomationTargetContract.internalRunTaskIntent(
+            context = context,
+            taskId = taskId,
+            source = InternalTaskRunSource.LOCALE_PLUGIN,
+        )
+        context.sendOrderedBroadcast(runIntent, AutomationTargetContract.PERMISSION)
     }
 }

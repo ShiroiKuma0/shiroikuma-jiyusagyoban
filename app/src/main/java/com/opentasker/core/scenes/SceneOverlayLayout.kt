@@ -94,7 +94,7 @@ object SceneSliderBinding {
     fun variableName(config: SceneSliderConfig): String =
         config.variable.trim().takeIf(AutomationTargetContract::isValidVariableName) ?: DEFAULT_VARIABLE
 
-    /** Broadcast variable extras carrying [progress] under the slider's variable name. */
+    /** Task variables carrying [progress] under the slider's validated variable name. */
     fun taskVariables(config: SceneSliderConfig, progress: Int): Map<String, String> =
-        mapOf(AutomationTargetContract.variableExtraName(variableName(config)) to progress.toString())
+        mapOf(variableName(config) to progress.toString())
 }

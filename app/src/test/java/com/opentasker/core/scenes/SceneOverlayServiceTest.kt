@@ -1,6 +1,5 @@
 package com.opentasker.core.scenes
 
-import com.opentasker.core.external.AutomationTargetContract
 import com.opentasker.core.model.SceneElement
 import com.opentasker.core.model.SceneElementType
 import org.junit.Assert.assertEquals
@@ -21,7 +20,7 @@ class SceneOverlayServiceTest {
             ),
         )
         val extras = SceneSliderBinding.taskVariables(config, progress = 42)
-        assertEquals(mapOf(AutomationTargetContract.variableExtraName("Brightness") to "42"), extras)
+        assertEquals(mapOf("Brightness" to "42"), extras)
     }
 
     @Test
@@ -35,7 +34,7 @@ class SceneOverlayServiceTest {
         )
         assertEquals(SceneSliderBinding.DEFAULT_VARIABLE, SceneSliderBinding.variableName(config))
         assertEquals(
-            mapOf(AutomationTargetContract.variableExtraName("value") to "7"),
+            mapOf("value" to "7"),
             SceneSliderBinding.taskVariables(config, progress = 7),
         )
     }

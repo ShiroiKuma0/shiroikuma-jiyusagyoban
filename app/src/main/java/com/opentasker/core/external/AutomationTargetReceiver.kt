@@ -15,6 +15,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
+enum class InternalTaskRunSource(
+    val wireValue: String,
+    val runLogLabel: String,
+) {
+    LOCALE_PLUGIN("locale_plugin", "Locale plugin"),
+    SCENE_OVERLAY("scene_overlay", "Scene overlay"),
+}
+
 object AutomationTargetContract {
     const val PERMISSION = "com.opentasker.permission.AUTOMATION"
 
@@ -53,8 +61,12 @@ object AutomationTargetContract {
     const val EXTRA_EXECUTION_ID = "com.opentasker.extra.EXECUTION_ID"
     const val EXTRA_EXECUTION_STATE = "com.opentasker.extra.EXECUTION_STATE"
     const val EXTRA_EXECUTION_TERMINAL = "com.opentasker.extra.EXECUTION_TERMINAL"
+    const val EXTRA_RUN_SOURCE = "com.opentasker.extra.RUN_SOURCE"
 
     const val VARIABLE_EXTRA_PREFIX = "com.opentasker.var."
+    const val DEFAULT_RUN_SOURCE = "External intent"
+    const val MAX_VARIABLE_VALUE_CHARS = 4_096
+    const val MAX_SUPPLIED_VARIABLES = 64
     private val variableNamePattern = Regex("^[A-Za-z][A-Za-z0-9_]{0,63}$")
 
     fun isValidVariableName(name: String): Boolean = variableNamePattern.matches(name)
@@ -63,6 +75,43 @@ object AutomationTargetContract {
         require(isValidVariableName(variableName)) { "Invalid variable name." }
         return VARIABLE_EXTRA_PREFIX + variableName
     }
+
+    /**
+     * The only supported constructor for trusted in-app RUN_TASK broadcasts.
+     *
+     * Keeping protocol versioning and variable encoding here prevents an internal producer from
+     * silently drifting behind the exported receiver contract again.
+     */
+    fun internalRunTaskIntent(
+        context: Context,
+        taskId: Long,
+        source: InternalTaskRunSource,
+        variables: Map<String, String> = emptyMap(),
+    ): Intent {
+        require(taskId > 0) { "Task id must be positive." }
+        variables.keys.forEach { variableName ->
+            require(isValidVariableName(variableName)) { "Invalid variable name: $variableName" }
+        }
+        return Intent(context, AutomationTargetReceiver::class.java).apply {
+            action = ACTION_RUN_TASK
+            putExtra(EXTRA_PROTOCOL_VERSION, PROTOCOL_VERSION)
+            putExtra(EXTRA_TASK_ID, taskId)
+            putExtra(EXTRA_RUN_SOURCE, source.wireValue)
+            variables.entries
+                .sortedBy { it.key }
+                .take(MAX_SUPPLIED_VARIABLES)
+                .forEach { (name, value) ->
+                    putExtra(variableExtraName(name), value.take(MAX_VARIABLE_VALUE_CHARS))
+                }
+        }
+    }
+
+    /** Maps only known in-app source tokens/labels; callers cannot inject arbitrary run-log text. */
+    fun runSourceLabel(rawSource: String?): String =
+        InternalTaskRunSource.entries
+            .firstOrNull { it.wireValue == rawSource || it.runLogLabel == rawSource }
+            ?.runLogLabel
+            ?: DEFAULT_RUN_SOURCE
 }
 
 class AutomationTargetReceiver : BroadcastReceiver() {
@@ -114,14 +163,18 @@ class AutomationTargetReceiver : BroadcastReceiver() {
             ?: return failure("Task not found. Provide ${AutomationTargetContract.EXTRA_TASK_ID} or ${AutomationTargetContract.EXTRA_TASK_NAME}.")
 
         val suppliedVariables = extractVariables(intent.extras)
+        val runSource = AutomationTargetContract.runSourceLabel(
+            intent.getStringExtra(AutomationTargetContract.EXTRA_RUN_SOURCE),
+        )
         val executionId = ExternalExecutions.accept(appContext, task.id, task.name)
 
         val serviceIntent = Intent(appContext, AutomationService::class.java).apply {
             action = AutomationService.ACTION_RUN_EXTERNAL_TASK
             putExtra(AutomationTargetContract.EXTRA_EXECUTION_ID, executionId)
             putExtra(AutomationTargetContract.EXTRA_TASK_ID, task.id)
+            putExtra(AutomationTargetContract.EXTRA_RUN_SOURCE, runSource)
             suppliedVariables.forEach { (name, value) ->
-                putExtra(AutomationTargetContract.VARIABLE_EXTRA_PREFIX + name, value)
+                putExtra(AutomationTargetContract.variableExtraName(name), value)
             }
         }
         return try {
@@ -269,9 +322,9 @@ class AutomationTargetReceiver : BroadcastReceiver() {
                 val name = key.removePrefix(AutomationTargetContract.VARIABLE_EXTRA_PREFIX)
                 if (!AutomationTargetContract.isValidVariableName(name)) return@mapNotNull null
                 val value = extras.getString(key) ?: return@mapNotNull null
-                name to value.take(MAX_VARIABLE_VALUE_CHARS)
+                name to value.take(AutomationTargetContract.MAX_VARIABLE_VALUE_CHARS)
             }
-            .take(MAX_SUPPLIED_VARIABLES)
+            .take(AutomationTargetContract.MAX_SUPPLIED_VARIABLES)
             .toMap()
     }
 
@@ -285,8 +338,6 @@ class AutomationTargetReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "AutomationTargetReceiver"
-        private const val MAX_VARIABLE_VALUE_CHARS = 4_096
-        private const val MAX_SUPPLIED_VARIABLES = 64
     }
 }
 

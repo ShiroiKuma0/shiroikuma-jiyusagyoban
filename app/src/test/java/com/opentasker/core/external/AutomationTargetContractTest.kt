@@ -35,6 +35,54 @@ class AutomationTargetContractTest {
     }
 
     @Test
+    fun internalRunSourcesMapToCanonicalLogLabels() {
+        assertEquals("Locale plugin", AutomationTargetContract.runSourceLabel("locale_plugin"))
+        assertEquals("Scene overlay", AutomationTargetContract.runSourceLabel("scene_overlay"))
+        assertEquals(
+            AutomationTargetContract.DEFAULT_RUN_SOURCE,
+            AutomationTargetContract.runSourceLabel("forged\nsource"),
+        )
+    }
+
+    @Test
+    fun everyInternalRunTaskProducerUsesTheCanonicalProtocolBuilder() {
+        val receiver = loadMainSource("com/opentasker/core/external/AutomationTargetReceiver.kt")
+        val locale = loadMainSource("com/opentasker/core/plugins/locale/LocalePluginTarget.kt")
+        val scene = loadMainSource("com/opentasker/core/scenes/SceneOverlayService.kt")
+        val service = loadMainSource("com/opentasker/core/engine/AutomationService.kt")
+
+        assertTrue(receiver.contains("fun internalRunTaskIntent("))
+        assertTrue(receiver.contains("putExtra(EXTRA_PROTOCOL_VERSION, PROTOCOL_VERSION)"))
+        assertTrue(receiver.contains("Intent(context, AutomationTargetReceiver::class.java)"))
+        assertTrue(locale.contains("AutomationTargetContract.internalRunTaskIntent("))
+        assertTrue(locale.contains("InternalTaskRunSource.LOCALE_PLUGIN"))
+        assertTrue(scene.contains("AutomationTargetContract.internalRunTaskIntent("))
+        assertTrue(scene.contains("InternalTaskRunSource.SCENE_OVERLAY"))
+        assertTrue(service.contains("AutomationTargetContract.EXTRA_RUN_SOURCE"))
+        assertTrue(service.contains("runExternalTask(executionId, taskId, variables, runSource)"))
+
+        val mainSourceRoot = listOf(
+            File("src/main/java"),
+            File("app/src/main/java"),
+        ).first { it.exists() }
+        val rawProducers = mainSourceRoot.walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .filter { sourceFile ->
+                val text = sourceFile.readText()
+                text.contains("\"com.opentasker.action.RUN_TASK\"") ||
+                    text.contains("AutomationTargetContract.ACTION_RUN_TASK")
+            }
+            .map { it.relativeTo(mainSourceRoot).invariantSeparatorsPath }
+            .toList()
+
+        assertEquals(
+            "The RUN_TASK action literal must exist only beside its canonical builder/receiver",
+            listOf("com/opentasker/core/external/AutomationTargetReceiver.kt"),
+            rawProducers,
+        )
+    }
+
+    @Test
     fun automationPermissionIsSignatureScoped() {
         val manifest = loadMainManifest()
         val permissions = manifest.getElementsByTagName("permission")
@@ -103,4 +151,10 @@ class AutomationTargetContractTest {
                 ).first { it.exists() }
             )
             .documentElement
+
+    private fun loadMainSource(relativePath: String): String =
+        listOf(
+            File("src/main/java/$relativePath"),
+            File("app/src/main/java/$relativePath"),
+        ).first { it.exists() }.readText()
 }

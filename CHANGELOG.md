@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **External task dispatch**: Locale setting-plugin fires and scene tap/long-press bindings now construct `RUN_TASK` requests through one explicit protocol-v2 builder instead of duplicating raw intent strings. Both paths had omitted `PROTOCOL_VERSION=2`, so the hardened external receiver rejected them before enqueue. The shared builder validates task IDs and variable names, bounds values/counts, preserves a canonical source label into the run log, and is protected by a source contract that rejects new raw internal `RUN_TASK` producers; unknown or legacy external protocol versions remain fail-closed.
+
 ## v0.2.79
 
 - **Backup & restore**: selecting a database to restore now opens a review instead of staging it immediately. Selection previously replaced the pending-restart journal outright, so a user could not inspect the candidate, could not tell it apart from a restore staged earlier, and had no way to back out. The review reports the source, size, schema version, compatibility, and profile/task/scene/variable/run-log counts, names the staged restore it would replace, and stages nothing until Stage is pressed. Setup gained a "Cancel staged restore" action that removes only the validated pending journal — backups, the live database, and the pre-restore snapshot are untouched — and the pending banner now describes what is actually queued (including a staged file that has since become unreadable).

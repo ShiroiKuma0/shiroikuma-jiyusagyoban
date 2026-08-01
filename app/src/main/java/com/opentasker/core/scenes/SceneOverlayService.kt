@@ -28,6 +28,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import com.opentasker.app.R
 import com.opentasker.core.external.AutomationTargetContract
+import com.opentasker.core.external.InternalTaskRunSource
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
@@ -368,11 +369,12 @@ class SceneOverlayService : Service() {
 
     private fun fireRunTask(taskId: Long, variables: Map<String, String> = emptyMap()) {
         AppLogger.info(TAG, message = "Scene element firing task $taskId")
-        val intent = Intent(AutomationTargetContract.ACTION_RUN_TASK).apply {
-            setPackage(packageName)
-            putExtra(AutomationTargetContract.EXTRA_TASK_ID, taskId)
-            variables.forEach { (extraName, value) -> putExtra(extraName, value) }
-        }
+        val intent = AutomationTargetContract.internalRunTaskIntent(
+            context = this,
+            taskId = taskId,
+            source = InternalTaskRunSource.SCENE_OVERLAY,
+            variables = variables,
+        )
         sendBroadcast(intent, AutomationTargetContract.PERMISSION)
     }
 
