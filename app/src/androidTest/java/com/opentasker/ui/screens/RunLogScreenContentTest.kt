@@ -6,12 +6,18 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.RunLogRetentionPolicy
 import com.opentasker.ui.theme.OpenTaskerTheme
 import org.junit.Rule
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class RunLogScreenContentTest {
@@ -97,5 +103,79 @@ class RunLogScreenContentTest {
         composeTestRule.onAllNodesWithText("Backup Task", substring = true).onFirst().assertIsDisplayed()
         // "Failed" shows on both the status pill and the per-task health summary.
         composeTestRule.onAllNodesWithText("Failed", substring = true).onFirst().assertIsDisplayed()
+    }
+
+    @Test
+    fun pagedRunLogExposesLoadMoreAndBothExports() {
+        var loadMoreClicks = 0
+        var jsonClicks = 0
+        var csvClicks = 0
+        val entries = listOf(
+            RunLogEntry(
+                id = 1,
+                taskId = 10,
+                taskName = "Paged Task",
+                durationMs = 10,
+                success = true,
+            ),
+        )
+        composeTestRule.setContent {
+            OpenTaskerTheme {
+                RunLogScreenContent(
+                    logs = entries,
+                    tasks = emptyList(),
+                    totalCount = 101,
+                    hasMore = true,
+                    retentionPolicy = RunLogRetentionPolicy(),
+                    onRetentionPolicyChange = {},
+                    onShareDiagnostic = {},
+                    onLoadMore = { loadMoreClicks++ },
+                    onExportJson = { jsonClicks++ },
+                    onExportCsv = { csvClicks++ },
+                    contentPadding = PaddingValues(0.dp),
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Export JSON").performScrollTo().performClick()
+        composeTestRule.onNodeWithText("Export CSV").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag(RUN_LOG_LIST_TAG).performScrollToNode(hasText("Load more"))
+        composeTestRule.onNodeWithText("Load more").performClick()
+
+        assertEquals(1, jsonClicks)
+        assertEquals(1, csvClicks)
+        assertEquals(1, loadMoreClicks)
+    }
+
+    @Test
+    fun actionTracesCanExpandBeyondTheOldFourRowLimit() {
+        val traces = (1..6).joinToString("\n") { index ->
+            "$index. success: Action $index [log] 1ms - Completed"
+        }
+        val entry = RunLogEntry(
+            id = 8,
+            taskId = 10,
+            taskName = "Trace Task",
+            durationMs = 6,
+            success = true,
+            message = "Source: manual\n$traces",
+        )
+        composeTestRule.setContent {
+            OpenTaskerTheme {
+                RunLogScreenContent(
+                    logs = listOf(entry),
+                    tasks = emptyList(),
+                    retentionPolicy = RunLogRetentionPolicy(),
+                    onRetentionPolicyChange = {},
+                    onShareDiagnostic = {},
+                    contentPadding = PaddingValues(0.dp),
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag(RUN_LOG_LIST_TAG).performScrollToNode(hasText("Show all 6 actions"))
+        composeTestRule.onNodeWithText("Show all 6 actions").performClick()
+        composeTestRule.onNodeWithTag(RUN_LOG_LIST_TAG).performScrollToNode(hasText("6. Action 6", substring = true))
+        composeTestRule.onNodeWithText("6. Action 6", substring = true).assertIsDisplayed()
     }
 }

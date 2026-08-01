@@ -67,7 +67,7 @@ Variable names follow Tasker's scope rule: an all-lowercase name is local to the
 - Alarm-backed time/day reevaluation through Doze, with a persisted engine heartbeat and periodic WorkManager watchdog that re-arms dropped ticks and foreground-service timeout recovery
 - Setup checklist covering notifications, exact alarms, battery optimization, usage access, overlays, location, Bluetooth, SMS, DND, modify system settings, Shizuku, and Termux
 - Context inspector with live source health, latest values, and per-profile match explanations
-- Step-level run logs with action traces, template diagnostics, warning counts, per-step variable writes, and configurable retention
+- Keyset-paged run logs with SQL-backed task/status/date/search filters, complete expandable action traces, redacted JSON/CSV export, per-step diagnostics and variable writes, and reviewed retention reductions
 - Live view of in-flight automations — task, origin, current step, and elapsed time — with per-run cancellation that unwinds nested sub-tasks and records a terminal `Cancelled` outcome
 - In-app diagnostics for service/foreground-type/standby/exact-alarm/matcher/watchdog health, a bounded process log, and captured crash previews; shared reports include the same evidence with credential redaction
 - Crash log capture and local diagnostic export

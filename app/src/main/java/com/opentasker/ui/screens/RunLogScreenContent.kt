@@ -36,7 +36,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -46,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -75,6 +75,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+internal const val RUN_LOG_LIST_TAG = "run_log_list"
+
 @Composable
 internal fun RunLogScreenContent(
     logs: List<RunLogEntry>,
@@ -83,21 +85,25 @@ internal fun RunLogScreenContent(
     onRetentionPolicyChange: (RunLogRetentionPolicy) -> Unit,
     onShareDiagnostic: () -> Unit,
     contentPadding: PaddingValues,
+    totalCount: Int = logs.size,
+    hasMore: Boolean = false,
+    loading: Boolean = false,
+    filters: RunLogFilterState = RunLogFilterState(),
+    taskOptions: List<Pair<Long, String>> = runLogTaskOptions(logs, tasks),
+    onFiltersChange: (RunLogFilterState) -> Unit = {},
+    onLoadMore: () -> Unit = {},
+    onRefresh: () -> Unit = {},
+    onExportJson: () -> Unit = {},
+    onExportCsv: () -> Unit = {},
     activeExecutions: List<ActiveExecution> = emptyList(),
     onCancelExecution: (Long) -> Unit = {},
 ) {
-    var statusFilterOrdinal by rememberSaveable { mutableIntStateOf(0) }
-    val statusFilter = RunLogStatusFilter.entries.getOrElse(statusFilterOrdinal) { RunLogStatusFilter.All }
-    var taskIdFilter by rememberSaveable { mutableStateOf<Long?>(null) }
-    var query by rememberSaveable { mutableStateOf("") }
-    val taskOptions = remember(logs, tasks) { runLogTaskOptions(logs, tasks) }
-    val filteredLogs = remember(logs, statusFilter, taskIdFilter, query) {
-        filterRunLogs(logs, RunLogFilterState(status = statusFilter, taskId = taskIdFilter, query = query))
-    }
+    val hasFilters = filters != RunLogFilterState()
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(contentPadding),
+            .padding(contentPadding)
+            .testTag(RUN_LOG_LIST_TAG),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
     ) {
@@ -109,17 +115,24 @@ internal fun RunLogScreenContent(
                 )
             }
         }
-        if (logs.isEmpty()) {
+        if (logs.isEmpty() && totalCount == 0 && !loading) {
             item {
                 InlineNotice(
-                    title = stringResource(R.string.empty_run_log_title),
-                    body = stringResource(R.string.empty_run_log_body),
+                    title = stringResource(if (hasFilters) R.string.empty_run_log_search_title else R.string.empty_run_log_title),
+                    body = stringResource(if (hasFilters) R.string.empty_run_log_search_body else R.string.empty_run_log_body),
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
-        } else {
+        } else if (logs.isNotEmpty()) {
             item {
-                RunLogSummaryCard(logs, onShareDiagnostic)
+                RunLogSummaryCard(
+                    logs = logs,
+                    totalCount = totalCount,
+                    onShareDiagnostic = onShareDiagnostic,
+                    onRefresh = onRefresh,
+                    onExportJson = onExportJson,
+                    onExportCsv = onExportCsv,
+                )
             }
         }
         item {
@@ -128,32 +141,34 @@ internal fun RunLogScreenContent(
                 onPolicyChange = onRetentionPolicyChange,
             )
         }
-        if (logs.isNotEmpty()) {
+        if (logs.isNotEmpty() || taskOptions.isNotEmpty() || hasFilters) {
             item {
                 RunLogFilterCard(
-                    totalCount = logs.size,
-                    visibleCount = filteredLogs.size,
-                    statusFilter = statusFilter,
-                    onStatusFilterChange = { statusFilterOrdinal = it.ordinal },
+                    totalCount = totalCount,
+                    visibleCount = logs.size,
+                    statusFilter = filters.status,
+                    onStatusFilterChange = { onFiltersChange(filters.copy(status = it)) },
                     taskOptions = taskOptions,
-                    selectedTaskId = taskIdFilter,
-                    onTaskFilterChange = { taskIdFilter = it },
-                    query = query,
-                    onQueryChange = { query = it },
+                    selectedTaskId = filters.taskId,
+                    onTaskFilterChange = { onFiltersChange(filters.copy(taskId = it)) },
+                    query = filters.query,
+                    onQueryChange = { onFiltersChange(filters.copy(query = it)) },
+                    dateFilter = filters.date,
+                    onDateFilterChange = { onFiltersChange(filters.copy(date = it)) },
                 )
             }
         }
-        if (logs.isNotEmpty() && filteredLogs.isEmpty()) {
-            item {
-                InlineNotice(
-                    title = stringResource(R.string.empty_run_log_search_title),
-                    body = stringResource(R.string.empty_run_log_search_body),
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
-        items(filteredLogs, key = { it.id }) { entry ->
+        items(logs, key = { it.id }) { entry ->
             RunLogCard(entry)
+        }
+        if (loading) {
+            item { Text(stringResource(R.string.run_log_loading), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        } else if (hasMore) {
+            item {
+                OutlinedButton(onClick = onLoadMore, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.run_log_load_more))
+                }
+            }
         }
     }
 }
@@ -259,6 +274,8 @@ private fun RunLogFilterCard(
     onTaskFilterChange: (Long?) -> Unit,
     query: String,
     onQueryChange: (String) -> Unit,
+    dateFilter: RunLogDateFilter,
+    onDateFilterChange: (RunLogDateFilter) -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -280,12 +297,16 @@ private fun RunLogFilterCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (statusFilter != RunLogStatusFilter.All || selectedTaskId != null || query.isNotBlank()) {
+                if (
+                    statusFilter != RunLogStatusFilter.All || selectedTaskId != null ||
+                    query.isNotBlank() || dateFilter != RunLogDateFilter.All
+                ) {
                     TextButton(
                         onClick = {
                             onStatusFilterChange(RunLogStatusFilter.All)
                             onTaskFilterChange(null)
                             onQueryChange("")
+                            onDateFilterChange(RunLogDateFilter.All)
                         },
                     ) {
                         Text(stringResource(R.string.action_clear))
@@ -314,6 +335,15 @@ private fun RunLogFilterCard(
                         label = filter.label,
                         selected = statusFilter == filter,
                         onClick = { onStatusFilterChange(filter) },
+                    )
+                }
+            }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                items(RunLogDateFilter.entries.toList(), key = { it.name }) { filter ->
+                    RunLogFilterChip(
+                        label = filter.label,
+                        selected = dateFilter == filter,
+                        onClick = { onDateFilterChange(filter) },
                     )
                 }
             }
@@ -368,7 +398,14 @@ private fun RunLogFilterChip(
 }
 
 @Composable
-private fun RunLogSummaryCard(logs: List<RunLogEntry>, onShareDiagnostic: () -> Unit = {}) {
+private fun RunLogSummaryCard(
+    logs: List<RunLogEntry>,
+    totalCount: Int,
+    onShareDiagnostic: () -> Unit = {},
+    onRefresh: () -> Unit = {},
+    onExportJson: () -> Unit = {},
+    onExportCsv: () -> Unit = {},
+) {
     val outcomes = remember(logs) { logs.map { it.outcome() } }
     val failures = outcomes.count { it == RunLogOutcome.Failed }
     val skipped = outcomes.count { it == RunLogOutcome.Skipped }
@@ -404,7 +441,8 @@ private fun RunLogSummaryCard(logs: List<RunLogEntry>, onShareDiagnostic: () -> 
                 )
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                item { SummaryMetric("${logs.size}", stringResource(R.string.label_entries), Modifier.width(104.dp)) }
+                item { SummaryMetric("$totalCount", stringResource(R.string.label_entries), Modifier.width(104.dp)) }
+                item { SummaryMetric("${logs.size}", stringResource(R.string.run_log_loaded), Modifier.width(104.dp)) }
                 item { SummaryMetric("${outcomes.count { it == RunLogOutcome.Succeeded }}", stringResource(R.string.status_succeeded), Modifier.width(104.dp)) }
                 item { SummaryMetric("$failures", stringResource(R.string.status_failed), Modifier.width(104.dp)) }
                 item { SummaryMetric("$skipped", stringResource(R.string.status_skipped), Modifier.width(104.dp)) }
@@ -422,6 +460,20 @@ private fun RunLogSummaryCard(logs: List<RunLogEntry>, onShareDiagnostic: () -> 
             ) {
                 Text(stringResource(R.string.run_log_share_diagnostic))
             }
+            OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.run_log_refresh))
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+            ) {
+                OutlinedButton(onClick = onExportJson, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.run_log_export_json))
+                }
+                OutlinedButton(onClick = onExportCsv, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.run_log_export_csv))
+                }
+            }
         }
     }
 }
@@ -432,6 +484,7 @@ private fun RunLogCard(entry: RunLogEntry) {
         SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(entry.timestamp))
     }
     val diagnostics = remember(entry.message) { entry.message.toRunLogDiagnostics() }
+    var tracesExpanded by rememberSaveable(entry.id) { mutableStateOf(false) }
     val hasStructuredDiagnostics = diagnostics.source != null || diagnostics.decision != null || diagnostics.traces.isNotEmpty()
     val outcome = remember(entry.success, entry.message) { entry.outcome() }
     val accent = when (outcome) {
@@ -525,15 +578,30 @@ private fun RunLogCard(entry: RunLogEntry) {
                 if (diagnostics.traces.isNotEmpty()) {
                     Spacer(Modifier.height(8.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        diagnostics.traces.take(4).forEach { trace ->
+                        val visibleTraces = if (tracesExpanded) {
+                            diagnostics.traces
+                        } else {
+                            diagnostics.traces.subList(0, minOf(COLLAPSED_TRACE_COUNT, diagnostics.traces.size))
+                        }
+                        visibleTraces.forEach { trace ->
                             RunLogTraceRow(trace)
                         }
-                        if (diagnostics.traces.size > 4) {
-                            Text(
-                                stringResource(R.string.run_log_more_actions, diagnostics.traces.size - 4),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        if (diagnostics.traces.size > COLLAPSED_TRACE_COUNT) {
+                            val stateLabel = stringResource(
+                                if (tracesExpanded) R.string.a11y_expanded else R.string.a11y_collapsed,
                             )
+                            TextButton(
+                                onClick = { tracesExpanded = !tracesExpanded },
+                                modifier = Modifier.semantics { stateDescription = stateLabel },
+                            ) {
+                                Text(
+                                    stringResource(
+                                        if (tracesExpanded) R.string.run_log_show_fewer_actions
+                                        else R.string.run_log_show_all_actions,
+                                        diagnostics.traces.size,
+                                    ),
+                                )
+                            }
                         }
                     }
                 } else if (!hasStructuredDiagnostics && diagnostics.detailLines.isNotEmpty()) {
@@ -908,3 +976,5 @@ private fun ActionTraceStatus.readableName(): String =
     name.lowercase().replaceFirstChar { it.titlecase(Locale.getDefault()) }
 
 private fun plural(count: Int): String = if (count == 1) "" else "s"
+
+private const val COLLAPSED_TRACE_COUNT = 4

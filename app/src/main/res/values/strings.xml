@@ -325,6 +325,18 @@
     <string name="run_log_search_hint">permission, WiFi, task name</string>
     <string name="run_log_share_diagnostic">Share diagnostic report</string>
     <string name="run_log_more_actions">+%1$d more action(s)</string>
+    <string name="run_log_loaded">Loaded</string>
+    <string name="run_log_loading">Loading run logs…</string>
+    <string name="run_log_load_more">Load more</string>
+    <string name="run_log_refresh">Refresh</string>
+    <string name="run_log_export_json">Export JSON</string>
+    <string name="run_log_export_csv">Export CSV</string>
+    <string name="run_log_show_all_actions">Show all %1$d actions</string>
+    <string name="run_log_show_fewer_actions">Show fewer (%1$d total)</string>
+    <string name="run_log_retention_preview_title">Review retention reduction</string>
+    <string name="run_log_retention_preview_body">%1$d entries are stored; the oldest is from %2$s. This change will permanently remove %3$d entries.</string>
+    <string name="run_log_retention_confirm">Prune entries</string>
+    <string name="run_log_export_before_pruning">Export first</string>
 
     <!-- Variables screen -->
     <string name="variables_search_label">Search variables</string>

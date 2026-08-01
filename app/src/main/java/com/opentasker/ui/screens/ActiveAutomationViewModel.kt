@@ -13,6 +13,8 @@ import com.opentasker.core.diagnostics.CrashLogHandler
 import com.opentasker.core.diagnostics.CrashLogRecord
 import com.opentasker.core.diagnostics.EngineHealthReader
 import com.opentasker.core.diagnostics.EngineHealthStatus
+import com.opentasker.core.diagnostics.RunLogExportFormat
+import com.opentasker.core.diagnostics.RunLogExporter
 import com.opentasker.core.engine.ActiveExecution
 import com.opentasker.core.engine.ActiveExecutionRegistry
 import com.opentasker.core.engine.executeAndLogTask
@@ -41,10 +43,15 @@ import com.opentasker.core.storage.EditHistoryDao
 import com.opentasker.core.storage.EditHistoryEntity
 import com.opentasker.core.storage.RunLogRetentionPolicy
 import com.opentasker.core.storage.RunLogRetentionSettings
+import com.opentasker.core.storage.RunLogQuery
+import com.opentasker.core.storage.RunLogSnapshot
+import com.opentasker.core.storage.RunLogTaskOption
 import com.opentasker.core.storage.StorageDecodeIssue
 import com.opentasker.core.storage.VariableRepository
 import com.opentasker.core.storage.minimumTimestamp
+import com.opentasker.core.storage.loadPage
 import com.opentasker.core.storage.normalized
+import com.opentasker.core.storage.openSnapshot
 import com.opentasker.core.storage.toEntity
 import com.opentasker.core.templates.ProfileTemplate
 import com.opentasker.core.transfer.BundleImportPlan
@@ -62,6 +69,7 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -95,6 +103,11 @@ internal fun databaseBackupExportName(): String =
 
 internal fun openTaskerBundleExportName(): String =
     "opentasker_bundle_${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())}.json"
+
+internal fun runLogExportName(format: RunLogExportFormat): String {
+    val extension = if (format == RunLogExportFormat.JSON) "json" else "csv"
+    return "opentasker_run_log_${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())}.$extension"
+}
 
 internal data class TaskerImportReviewState(
     val report: TaskerXmlImportReport,
@@ -133,6 +146,21 @@ data class DiagnosticsUiState(
     val crashLogs: List<CrashLogRecord> = emptyList(),
     val appLogs: List<AppLogEntry> = emptyList(),
     val loadedAtMillis: Long = 0L,
+)
+
+data class RunLogPageUiState(
+    val entries: ImmutableList<RunLogEntry> = persistentListOf(),
+    val totalCount: Int = 0,
+    val hasMore: Boolean = false,
+    val loading: Boolean = false,
+    internal val snapshot: RunLogSnapshot? = null,
+)
+
+data class RunLogRetentionPreview(
+    val policy: RunLogRetentionPolicy,
+    val storedCount: Int,
+    val prunableCount: Int,
+    val oldestTimestamp: Long?,
 )
 
 /**
@@ -210,6 +238,19 @@ class ActiveAutomationViewModel(
         .map { entities -> entities.map { it.toDomain() }.toImmutableList() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
+    private val _runLogFilters = MutableStateFlow(RunLogFilterState())
+    val runLogFilters: StateFlow<RunLogFilterState> = _runLogFilters.asStateFlow()
+
+    private val _runLogPage = MutableStateFlow(RunLogPageUiState())
+    val runLogPage: StateFlow<RunLogPageUiState> = _runLogPage.asStateFlow()
+
+    val runLogTaskOptions: StateFlow<ImmutableList<RunLogTaskOption>> = db.runLogDao()
+        .getTaskOptionsFlow()
+        .map { it.toImmutableList() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
+
+    private var runLogPageJob: Job? = null
+
     /** Runs in flight right now, so the Run Log can show and stop them. */
     val activeExecutions: StateFlow<ImmutableList<ActiveExecution>> = ActiveExecutionRegistry.active
         .map { it.toImmutableList() }
@@ -233,6 +274,9 @@ class ActiveAutomationViewModel(
     private val _runLogRetentionPolicy = MutableStateFlow(runLogRetentionSettings.load())
     val runLogRetentionPolicy: StateFlow<RunLogRetentionPolicy> = _runLogRetentionPolicy.asStateFlow()
 
+    private val _runLogRetentionPreview = MutableStateFlow<RunLogRetentionPreview?>(null)
+    val runLogRetentionPreview: StateFlow<RunLogRetentionPreview?> = _runLogRetentionPreview.asStateFlow()
+
     // Starts with a cheap placeholder; the real state (which enumerates the filesystem) is
     // loaded off the main thread in init and refreshed after each backup operation.
     private val _backupSetupState = MutableStateFlow(BackupSetupState(busy = false))
@@ -255,6 +299,7 @@ class ActiveAutomationViewModel(
     val openTaskerBundleBusy: StateFlow<Boolean> = _openTaskerBundleBusy.asStateFlow()
 
     init {
+        refreshRunLogPage()
         viewModelScope.launch {
             runCatching { pruneRunLogs(_runLogRetentionPolicy.value) }
         }
@@ -670,6 +715,117 @@ class ActiveAutomationViewModel(
         }
     }
 
+    fun updateRunLogFilters(filters: RunLogFilterState) {
+        if (_runLogFilters.value == filters) return
+        _runLogFilters.value = filters
+        refreshRunLogPage()
+    }
+
+    fun refreshRunLogPage() {
+        runLogPageJob?.cancel()
+        _runLogPage.value = RunLogPageUiState(loading = true)
+        val filters = _runLogFilters.value
+        runLogPageJob = viewModelScope.launch {
+            try {
+                val (snapshot, page) = withContext(Dispatchers.IO) {
+                    val opened = db.runLogDao().openSnapshot(filters.toStorageQuery())
+                    opened to db.runLogDao().loadPage(opened)
+                }
+                _runLogPage.value = RunLogPageUiState(
+                    entries = page.entries.map { it.toDomain() }.toImmutableList(),
+                    totalCount = snapshot.totalCount,
+                    hasMore = page.hasMore,
+                    loading = false,
+                    snapshot = snapshot,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _runLogPage.value = _runLogPage.value.copy(loading = false)
+                events.send("Error: ${error.message ?: "Run logs could not be loaded"}")
+            }
+        }
+    }
+
+    fun loadNextRunLogPage() {
+        val current = _runLogPage.value
+        val snapshot = current.snapshot ?: return
+        if (current.loading || !current.hasMore) return
+        val cursor = current.entries.lastOrNull()?.let { com.opentasker.core.storage.RunLogKey(it.timestamp, it.id) }
+            ?: return
+        _runLogPage.value = current.copy(loading = true)
+        runLogPageJob = viewModelScope.launch {
+            try {
+                val page = withContext(Dispatchers.IO) { db.runLogDao().loadPage(snapshot, cursor) }
+                val existingIds = current.entries.mapTo(mutableSetOf()) { it.id }
+                val appended = page.entries.map { it.toDomain() }.filterNot { it.id in existingIds }
+                _runLogPage.value = current.copy(
+                    entries = (current.entries + appended).toImmutableList(),
+                    hasMore = page.hasMore,
+                    loading = false,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _runLogPage.value = current.copy(loading = false)
+                events.send("Error: ${error.message ?: "More run logs could not be loaded"}")
+            }
+        }
+    }
+
+    fun exportRunLogs(uri: Uri, format: RunLogExportFormat, allRetained: Boolean = false) {
+        viewModelScope.launch {
+            try {
+                val exported = withContext(Dispatchers.IO) {
+                    val snapshot = if (allRetained) {
+                        db.runLogDao().openSnapshot(RunLogQuery())
+                    } else {
+                        _runLogPage.value.snapshot ?: db.runLogDao().openSnapshot(_runLogFilters.value.toStorageQuery())
+                    }
+                    val output = appContext.contentResolver.openOutputStream(uri, "w")
+                        ?: error("Could not open the export destination")
+                    output.use { RunLogExporter(db.runLogDao()).export(snapshot, format, it) }
+                }
+                events.send("Exported $exported run log entr${if (exported == 1) "y" else "ies"}")
+            } catch (error: Exception) {
+                events.send("Error: ${error.message ?: "Run log export failed"}")
+            }
+        }
+    }
+
+    fun requestRunLogRetention(policy: RunLogRetentionPolicy) {
+        viewModelScope.launch {
+            val normalized = policy.normalized()
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val dao = db.runLogDao()
+                    RunLogRetentionPreview(
+                        policy = normalized,
+                        storedCount = dao.count(),
+                        prunableCount = dao.countPrunable(
+                            maxEntries = normalized.maxEntries,
+                            minimumTimestamp = normalized.minimumTimestamp(System.currentTimeMillis()),
+                        ),
+                        oldestTimestamp = dao.oldestTimestamp(),
+                    )
+                }
+            }.onSuccess { preview ->
+                if (preview.prunableCount == 0) updateRunLogRetention(preview.policy)
+                else _runLogRetentionPreview.value = preview
+            }.onFailure { events.send("Error: ${it.message ?: "Retention preview failed"}") }
+        }
+    }
+
+    fun dismissRunLogRetentionPreview() {
+        _runLogRetentionPreview.value = null
+    }
+
+    fun confirmRunLogRetention() {
+        val preview = _runLogRetentionPreview.value ?: return
+        _runLogRetentionPreview.value = null
+        updateRunLogRetention(preview.policy)
+    }
+
     fun updateRunLogRetention(policy: RunLogRetentionPolicy) {
         viewModelScope.launch {
             val normalized = policy.normalized()
@@ -681,6 +837,7 @@ class ActiveAutomationViewModel(
                 .onSuccess { deleted ->
                     val suffix = if (deleted > 0) "; pruned $deleted old entry${plural(deleted)}" else ""
                     events.send("Run log retention updated$suffix")
+                    refreshRunLogPage()
                 }
                 .onFailure { events.send("Error: ${it.message ?: "Run log retention update failed"}") }
         }

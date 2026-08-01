@@ -107,6 +107,7 @@ import com.opentasker.app.BuildConfig
 import com.opentasker.app.R
 import com.opentasker.core.actions.ActionField
 import com.opentasker.core.diagnostics.DiagnosticExport
+import com.opentasker.core.diagnostics.RunLogExportFormat
 import com.opentasker.core.actions.ActionMetadata
 import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.actions.FieldType
@@ -244,9 +245,13 @@ fun ActiveAutomationUi(
     val tasks by viewModel.tasks.collectAsState()
     val scenes by viewModel.scenes.collectAsState()
     val runLogs by viewModel.runLogs.collectAsState()
+    val runLogPage by viewModel.runLogPage.collectAsState()
+    val runLogFilters by viewModel.runLogFilters.collectAsState()
+    val runLogTaskOptions by viewModel.runLogTaskOptions.collectAsState()
     val activeExecutions by viewModel.activeExecutions.collectAsState()
     val globalVariables by viewModel.globalVariables.collectAsState()
     val runLogRetentionPolicy by viewModel.runLogRetentionPolicy.collectAsState()
+    val runLogRetentionPreview by viewModel.runLogRetentionPreview.collectAsState()
     val backupSetupState by viewModel.backupSetupState.collectAsState()
     val restoreReview by viewModel.restoreReview.collectAsState()
     val diagnosticsState by viewModel.diagnosticsState.collectAsState()
@@ -303,6 +308,19 @@ fun ActiveAutomationUi(
     }
     val databaseBackupImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.importDatabaseBackup(it) }
+    }
+    var exportAllRunLogs by rememberSaveable { mutableStateOf(false) }
+    val runLogJsonExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        uri?.let { viewModel.exportRunLogs(it, RunLogExportFormat.JSON, exportAllRunLogs) }
+        exportAllRunLogs = false
+    }
+    val runLogCsvExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        uri?.let { viewModel.exportRunLogs(it, RunLogExportFormat.CSV, exportAllRunLogs) }
+        exportAllRunLogs = false
     }
     val taskDialog = taskDialogId.takeIf { it != NO_DIALOG_ENTITY_ID }
         ?.let { taskId -> tasks.firstOrNull { it.id == taskId } }
@@ -510,7 +528,7 @@ fun ActiveAutomationUi(
         OpenTaskerScreen.Scenes -> "${scenes.sumOf { it.elements.size }} elements - ${scenes.size} scenes"
         OpenTaskerScreen.Inspector -> "Live context health"
         OpenTaskerScreen.Setup -> "Permission and reliability checks"
-        OpenTaskerScreen.RunLog -> "${runLogs.size} recent entries"
+        OpenTaskerScreen.RunLog -> "${runLogPage.totalCount} matching entries"
         OpenTaskerScreen.Diagnostics -> "Engine, crashes, and app logs"
     }
 
@@ -751,11 +769,27 @@ fun ActiveAutomationUi(
             OpenTaskerScreen.Inspector -> ContextInspectorScreen(db = db, contentPadding = innerPadding)
 
             OpenTaskerScreen.RunLog -> RunLogScreenContent(
-                logs = runLogs,
+                logs = runLogPage.entries,
                 tasks = tasks,
+                totalCount = runLogPage.totalCount,
+                hasMore = runLogPage.hasMore,
+                loading = runLogPage.loading,
+                filters = runLogFilters,
+                taskOptions = runLogTaskOptions.map { it.taskId to it.taskName },
+                onFiltersChange = viewModel::updateRunLogFilters,
+                onLoadMore = viewModel::loadNextRunLogPage,
+                onRefresh = viewModel::refreshRunLogPage,
                 retentionPolicy = runLogRetentionPolicy,
-                onRetentionPolicyChange = viewModel::updateRunLogRetention,
+                onRetentionPolicyChange = viewModel::requestRunLogRetention,
                 onShareDiagnostic = viewModel::shareDiagnosticReport,
+                onExportJson = {
+                    exportAllRunLogs = false
+                    runLogJsonExportLauncher.launch(runLogExportName(RunLogExportFormat.JSON))
+                },
+                onExportCsv = {
+                    exportAllRunLogs = false
+                    runLogCsvExportLauncher.launch(runLogExportName(RunLogExportFormat.CSV))
+                },
                 contentPadding = innerPadding,
                 activeExecutions = activeExecutions,
                 onCancelExecution = viewModel::cancelExecution,
@@ -768,6 +802,18 @@ fun ActiveAutomationUi(
                 onShare = viewModel::shareDiagnosticReport,
             )
         }
+    }
+
+    runLogRetentionPreview?.let { preview ->
+        RunLogRetentionPreviewDialog(
+            preview = preview,
+            onDismiss = viewModel::dismissRunLogRetentionPreview,
+            onExportJson = {
+                exportAllRunLogs = true
+                runLogJsonExportLauncher.launch(runLogExportName(RunLogExportFormat.JSON))
+            },
+            onConfirm = viewModel::confirmRunLogRetention,
+        )
     }
 
     val blockedTaskDelete = taskDeletionPreview
@@ -1130,4 +1176,39 @@ internal fun InlineNotice(title: String, body: String, color: Color) {
             }
         }
     }
+}
+
+@Composable
+private fun RunLogRetentionPreviewDialog(
+    preview: RunLogRetentionPreview,
+    onDismiss: () -> Unit,
+    onExportJson: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val oldest = preview.oldestTimestamp?.let { timestamp ->
+        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(timestamp))
+    } ?: stringResource(R.string.label_none)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.run_log_retention_preview_title)) },
+        text = {
+            Text(
+                stringResource(
+                    R.string.run_log_retention_preview_body,
+                    preview.storedCount,
+                    oldest,
+                    preview.prunableCount,
+                ),
+            )
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) { Text(stringResource(R.string.run_log_retention_confirm)) }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = onExportJson) { Text(stringResource(R.string.run_log_export_before_pruning)) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+            }
+        },
+    )
 }

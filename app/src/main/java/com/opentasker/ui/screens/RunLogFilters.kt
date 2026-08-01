@@ -1,40 +1,40 @@
 package com.opentasker.ui.screens
 
-import com.opentasker.core.model.RunLogEntry
-import com.opentasker.core.engine.RunLogOutcome
-import com.opentasker.core.engine.outcome
+import com.opentasker.core.storage.RunLogQuery
+import com.opentasker.core.storage.RunLogStatusQuery
+import com.opentasker.core.storage.escapeRunLogLikeQuery
 
 enum class RunLogStatusFilter(val label: String) {
     All("All"),
     Succeeded("Succeeded"),
     Failed("Failed"),
     Skipped("Skipped"),
+    Cancelled("Cancelled"),
+}
+
+enum class RunLogDateFilter(val label: String, val ageMillis: Long?) {
+    All("Any date", null),
+    Day("24 hours", 24L * 60 * 60 * 1_000),
+    Week("7 days", 7L * 24 * 60 * 60 * 1_000),
+    Month("30 days", 30L * 24 * 60 * 60 * 1_000),
 }
 
 data class RunLogFilterState(
     val status: RunLogStatusFilter = RunLogStatusFilter.All,
     val taskId: Long? = null,
     val query: String = "",
+    val date: RunLogDateFilter = RunLogDateFilter.All,
 )
 
-fun filterRunLogs(
-    logs: List<RunLogEntry>,
-    state: RunLogFilterState,
-): List<RunLogEntry> {
-    val normalizedQuery = state.query.trim()
-    return logs.filter { entry ->
-        val outcome = entry.outcome()
-        val statusMatches = when (state.status) {
-            RunLogStatusFilter.All -> true
-            RunLogStatusFilter.Failed -> outcome == RunLogOutcome.Failed
-            RunLogStatusFilter.Succeeded -> outcome == RunLogOutcome.Succeeded
-            RunLogStatusFilter.Skipped -> outcome == RunLogOutcome.Skipped
-        }
-        val taskMatches = state.taskId == null || entry.taskId == state.taskId
-        val queryMatches = normalizedQuery.isBlank() ||
-            entry.taskName.contains(normalizedQuery, ignoreCase = true) ||
-            entry.message.contains(normalizedQuery, ignoreCase = true)
-
-        statusMatches && taskMatches && queryMatches
-    }
-}
+fun RunLogFilterState.toStorageQuery(nowMillis: Long = System.currentTimeMillis()): RunLogQuery = RunLogQuery(
+    status = when (status) {
+        RunLogStatusFilter.All -> RunLogStatusQuery.ALL
+        RunLogStatusFilter.Succeeded -> RunLogStatusQuery.SUCCEEDED
+        RunLogStatusFilter.Failed -> RunLogStatusQuery.FAILED
+        RunLogStatusFilter.Skipped -> RunLogStatusQuery.SKIPPED
+        RunLogStatusFilter.Cancelled -> RunLogStatusQuery.CANCELLED
+    },
+    taskId = taskId,
+    minimumTimestamp = date.ageMillis?.let { nowMillis - it },
+    escapedSearch = escapeRunLogLikeQuery(query),
+)
