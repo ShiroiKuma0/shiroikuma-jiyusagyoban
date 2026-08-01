@@ -13,6 +13,7 @@ object ApplicationContextEvents {
         replay = 1,
         extraBufferCapacity = 16,
     )
+    @Volatile private var latestForegroundPackage: String? = null
 
     val events: Flow<ContextEvent> = flow {
         emit(ContextEvent(TYPE, matched = false, metadata = mapOf("foreground" to "")))
@@ -22,6 +23,7 @@ object ApplicationContextEvents {
     fun publishForeground(packageName: String): Boolean {
         val normalized = packageName.trim()
         if (normalized.isBlank()) return false
+        latestForegroundPackage = normalized
         return foregroundEvents.tryEmit(
             ContextEvent(
                 type = TYPE,
@@ -30,4 +32,7 @@ object ApplicationContextEvents {
             ),
         )
     }
+
+    /** Latest package shown by the Context Inspector, offered as an explicit editor shortcut. */
+    fun latestObservedPackage(): String? = latestForegroundPackage
 }

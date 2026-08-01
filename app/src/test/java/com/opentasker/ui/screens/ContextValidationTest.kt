@@ -63,4 +63,12 @@ class ContextValidationTest {
         assertTrue(contextHasInvalidValues(ContextType.EVENT, mapOf("latitude" to "91")))
         assertFalse(contextHasInvalidValues(ContextType.EVENT, mapOf("latitude" to "40", "longitude" to "-74")))
     }
+
+    @Test
+    fun packageBearingContextsRejectMalformedManualEntries() {
+        assertFalse(contextHasInvalidValues(ContextType.APPLICATION, mapOf("package" to "com.example.app")))
+        assertTrue(contextHasInvalidValues(ContextType.APPLICATION, mapOf("package" to "not a package")))
+        assertTrue(contextHasInvalidValues(ContextType.PLUGIN, mapOf("package" to "plugin")))
+        assertFalse(contextHasInvalidValues(ContextType.EVENT, mapOf("package" to "")))
+    }
 }

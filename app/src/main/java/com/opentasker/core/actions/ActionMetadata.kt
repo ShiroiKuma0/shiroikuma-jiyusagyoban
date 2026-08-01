@@ -28,6 +28,7 @@ enum class FieldType {
     CHECKBOX,       // boolean toggle
     MULTILINE,      // multi-line text area
     TASK,           // stable task-ID picker
+    APP,            // validated package input with scoped installed-app picker
 }
 
 data class ActionMetadata(
@@ -359,7 +360,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_intent_launch_description,
             categoryRes = R.string.catalog_category_app,
             fields = listOf(
-                ActionField("package", R.string.catalog_action_intent_launch_field_package_label, required = true, hintRes = R.string.catalog_action_intent_launch_field_package_hint),
+                ActionField("package", R.string.catalog_action_intent_launch_field_package_label, FieldType.APP, required = true, hintRes = R.string.catalog_action_intent_launch_field_package_hint),
                 ActionField("action", R.string.catalog_action_intent_launch_field_action_label, hintRes = R.string.catalog_action_intent_launch_field_action_hint),
                 ActionField("category", R.string.catalog_action_intent_launch_field_category_label, hintRes = R.string.catalog_action_intent_launch_field_category_hint),
             )
@@ -373,7 +374,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_plugin_locale_fire_description,
             categoryRes = R.string.catalog_category_plugin,
             fields = listOf(
-                ActionField("package", R.string.catalog_action_plugin_locale_fire_field_package_label, required = true, hintRes = R.string.catalog_action_plugin_locale_fire_field_package_hint),
+                ActionField("package", R.string.catalog_action_plugin_locale_fire_field_package_label, FieldType.APP, required = true, hintRes = R.string.catalog_action_plugin_locale_fire_field_package_hint),
                 ActionField("bundleJson", R.string.catalog_action_plugin_locale_fire_field_bundlejson_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_plugin_locale_fire_field_bundlejson_hint),
                 ActionField("blurb", R.string.catalog_action_plugin_locale_fire_field_blurb_label, hintRes = R.string.catalog_action_plugin_locale_fire_field_blurb_hint),
                 ActionField("timeoutMs", R.string.catalog_action_plugin_locale_fire_field_timeoutms_label, FieldType.NUMBER, hintRes = R.string.catalog_action_plugin_locale_fire_field_timeoutms_hint),
@@ -388,7 +389,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_plugin_locale_query_description,
             categoryRes = R.string.catalog_category_plugin,
             fields = listOf(
-                ActionField("package", R.string.catalog_action_plugin_locale_query_field_package_label, required = true, hintRes = R.string.catalog_action_plugin_locale_query_field_package_hint),
+                ActionField("package", R.string.catalog_action_plugin_locale_query_field_package_label, FieldType.APP, required = true, hintRes = R.string.catalog_action_plugin_locale_query_field_package_hint),
                 ActionField("bundleJson", R.string.catalog_action_plugin_locale_query_field_bundlejson_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_plugin_locale_query_field_bundlejson_hint),
                 ActionField("blurb", R.string.catalog_action_plugin_locale_query_field_blurb_label, hintRes = R.string.catalog_action_plugin_locale_query_field_blurb_hint),
                 ActionField("timeoutMs", R.string.catalog_action_plugin_locale_query_field_timeoutms_label, FieldType.NUMBER, hintRes = R.string.catalog_action_plugin_locale_query_field_timeoutms_hint),
@@ -571,7 +572,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_app_launch_description,
             categoryRes = R.string.catalog_category_app,
             fields = listOf(
-                ActionField("package", R.string.catalog_action_app_launch_field_package_label, required = true, hintRes = R.string.catalog_action_app_launch_field_package_hint),
+                ActionField("package", R.string.catalog_action_app_launch_field_package_label, FieldType.APP, required = true, hintRes = R.string.catalog_action_app_launch_field_package_hint),
             )
         )
     )
@@ -583,7 +584,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_app_kill_description,
             categoryRes = R.string.catalog_category_app,
             fields = listOf(
-                ActionField("package", R.string.catalog_action_app_kill_field_package_label, required = true),
+                ActionField("package", R.string.catalog_action_app_kill_field_package_label, FieldType.APP, required = true),
             )
         )
     )

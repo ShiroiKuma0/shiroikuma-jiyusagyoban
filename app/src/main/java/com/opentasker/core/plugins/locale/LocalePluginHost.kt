@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import com.opentasker.core.apps.PackageNamePolicy
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -29,6 +30,7 @@ object LocalePluginContract {
     const val ACTION_EDIT_CONDITION = "com.twofortyfouram.locale.intent.action.EDIT_CONDITION"
     const val ACTION_QUERY_CONDITION = "com.twofortyfouram.locale.intent.action.QUERY_CONDITION"
     const val ACTION_REQUEST_QUERY = "com.twofortyfouram.locale.intent.action.REQUEST_QUERY"
+    val visiblePluginIntentActions = listOf(ACTION_EDIT_SETTING, ACTION_EDIT_CONDITION)
     const val EXTRA_BUNDLE = "com.twofortyfouram.locale.intent.extra.BUNDLE"
     const val EXTRA_STRING_BLURB = "com.twofortyfouram.locale.intent.extra.BLURB"
     const val EXTRA_STRING_ACTIVITY_CLASS_NAME = "com.twofortyfouram.locale.intent.extra.ACTIVITY"
@@ -89,10 +91,8 @@ data class LocalePluginDescriptor(
 )
 
 object LocalePluginBundleCodec {
-    private val packagePattern = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$")
-
     fun validatePackageName(packageName: String) {
-        require(packagePattern.matches(packageName)) { "Invalid plugin package name." }
+        require(PackageNamePolicy.isValid(packageName)) { "Invalid plugin package name." }
     }
 
     fun decodeStringBundle(bundleJson: String): Map<String, String> {

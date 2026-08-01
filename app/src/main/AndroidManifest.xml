@@ -61,6 +61,11 @@
     <queries>
         <package android:name="com.termux" />
         <package android:name="moe.shizuku.privileged.api" />
+        <!-- Scoped visibility for the shared installed-app picker; QUERY_ALL_PACKAGES is forbidden. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
         <intent>
             <action android:name="com.twofortyfouram.locale.intent.action.EDIT_SETTING" />
         </intent>

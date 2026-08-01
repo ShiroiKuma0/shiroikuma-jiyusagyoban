@@ -50,11 +50,13 @@ import com.opentasker.app.R
 import com.opentasker.core.actions.ActionField
 import com.opentasker.core.actions.FieldType
 import com.opentasker.core.contexts.CalendarSunEventPresets
+import com.opentasker.core.contexts.ApplicationContextEvents
 import com.opentasker.core.contexts.DaySchedule
 import com.opentasker.core.contexts.EventContextPreset
 import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
+import com.opentasker.core.apps.PackageNamePolicy
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.selectedContainerColor
 
@@ -174,6 +176,11 @@ internal fun ContextConfigDialog(
                             field = field,
                             value = config[field.key].orEmpty(),
                             onChange = { value -> config = config + (field.key to value) },
+                            suggestedPackage = if (state.type == ContextType.APPLICATION && field.key == "package") {
+                                ApplicationContextEvents.latestObservedPackage()
+                            } else {
+                                null
+                            },
                         )
                     }
                     if (state.type == ContextType.EVENT && config["event"].equals("nfc", ignoreCase = true)) {
@@ -237,7 +244,11 @@ internal fun contextHasInvalidValues(type: ContextType, config: Map<String, Stri
         val value = raw.toDoubleOrNull() ?: return true
         return value < min || value > max
     }
-    return when (type) {
+    val packageName = config["package"]?.trim().orEmpty()
+    val invalidPackage = packageName.isNotBlank() &&
+        type in setOf(ContextType.APPLICATION, ContextType.EVENT, ContextType.PLUGIN) &&
+        !PackageNamePolicy.isValid(packageName)
+    return invalidPackage || when (type) {
         ContextType.TIME -> invalidClock("start") || invalidClock("end")
         ContextType.LOCATION ->
             outOfRange("latitude", -90.0, 90.0) ||
@@ -250,7 +261,7 @@ internal fun contextHasInvalidValues(type: ContextType, config: Map<String, Stri
 }
 
 private fun contextFields(type: ContextType): List<ActionField> = when (type) {
-    ContextType.APPLICATION -> listOf(ActionField("package", R.string.context_field_application_package_label, required = true, hintRes = R.string.context_field_application_package_hint))
+    ContextType.APPLICATION -> listOf(ActionField("package", R.string.context_field_application_package_label, FieldType.APP, required = true, hintRes = R.string.context_field_application_package_hint))
     ContextType.TIME -> listOf(
         ActionField("start", R.string.context_field_time_start_label, required = true, hintRes = R.string.context_field_time_start_hint),
         ActionField("end", R.string.context_field_time_end_label, required = true, hintRes = R.string.context_field_time_end_hint),
@@ -274,7 +285,7 @@ private fun contextFields(type: ContextType): List<ActionField> = when (type) {
         ActionField("state", R.string.context_field_event_state_label, hintRes = R.string.context_field_event_state_hint),
         ActionField("calendar", R.string.context_field_event_calendar_label, hintRes = R.string.context_field_event_calendar_hint),
         ActionField("beforeMinutes", R.string.context_field_event_before_label, FieldType.NUMBER, hintRes = R.string.context_field_event_before_hint),
-        ActionField("package", R.string.context_field_event_package_label, hintRes = R.string.context_field_event_package_hint),
+        ActionField("package", R.string.context_field_event_package_label, FieldType.APP, hintRes = R.string.context_field_event_package_hint),
         ActionField("tagId", R.string.context_field_event_tag_label, hintRes = R.string.context_field_event_tag_hint),
         ActionField("latitude", R.string.context_field_event_latitude_label, FieldType.NUMBER, hintRes = R.string.context_field_event_latitude_hint),
         ActionField("longitude", R.string.context_field_event_longitude_label, FieldType.NUMBER, hintRes = R.string.context_field_event_longitude_hint),
@@ -286,7 +297,7 @@ private fun contextFields(type: ContextType): List<ActionField> = when (type) {
         ActionField("regex", R.string.context_field_event_regex_label, FieldType.CHECKBOX),
     )
     ContextType.PLUGIN -> listOf(
-        ActionField("package", R.string.context_field_plugin_package_label, required = true, hintRes = R.string.context_field_plugin_package_hint),
+        ActionField("package", R.string.context_field_plugin_package_label, FieldType.APP, required = true, hintRes = R.string.context_field_plugin_package_hint),
         ActionField("bundleJson", R.string.context_field_plugin_bundle_label, hintRes = R.string.context_field_plugin_bundle_hint),
         ActionField("blurb", R.string.context_field_plugin_blurb_label, hintRes = R.string.context_field_plugin_blurb_hint),
         ActionField("timeoutMs", R.string.context_field_plugin_timeout_label, FieldType.NUMBER, hintRes = R.string.context_field_plugin_timeout_hint),
@@ -294,7 +305,8 @@ private fun contextFields(type: ContextType): List<ActionField> = when (type) {
 }
 
 private fun contextConfigForSave(type: ContextType, config: Map<String, String>): Map<String, String> {
-    val nonBlank = config.filterValues { it.isNotBlank() }
+    val nonBlank = config.filterValues { it.isNotBlank() }.toMutableMap()
+    config["package"]?.trim()?.takeIf(String::isNotBlank)?.let { nonBlank["package"] = it }
     if (type == ContextType.DAY) {
         val canonicalDays = DaySchedule.canonicalize(config["days"].orEmpty()).orEmpty()
         return if (canonicalDays.isBlank()) {

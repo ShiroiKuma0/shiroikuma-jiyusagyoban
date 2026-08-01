@@ -53,6 +53,7 @@ import com.opentasker.core.actions.NotificationTaskBindings
 import com.opentasker.core.actions.NotificationTaskCandidate
 import com.opentasker.core.actions.NotificationTaskReference
 import com.opentasker.core.actions.NotificationTaskResolution
+import com.opentasker.core.apps.PackageNamePolicy
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.model.ActionSpec
@@ -241,6 +242,11 @@ internal fun ActionConfigDialog(
     val taskBindingIssues = initialTaskBindingIssues.filterKeys { it !in addressedTaskBindingKeys }
     val capability = remember(state.metadata.id) { ActionCapabilityRegistry.get(state.metadata.id) }
     val missingRequired = state.metadata.fields.any { it.required && values[it.key].isNullOrBlank() }
+    val invalidPackageValue = state.metadata.fields
+        .filter { it.fieldType == FieldType.APP }
+        .any { field ->
+            values[field.key]?.trim()?.takeIf(String::isNotBlank)?.let(PackageNamePolicy::isValid) == false
+        }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -304,14 +310,22 @@ internal fun ActionConfigDialog(
         },
         confirmButton = {
             Button(
-                enabled = !missingRequired && taskBindingIssues.isEmpty() && capability.canAdd,
+                enabled = !missingRequired && !invalidPackageValue && taskBindingIssues.isEmpty() && capability.canAdd,
                 onClick = {
                     onSave(
                         ActionSpec(
                             id = state.existing?.id ?: 0,
                             type = state.metadata.id,
                             label = label.trim().takeUnless { it.isBlank() || it == metadataName },
-                            args = values.filterValues { it.isNotBlank() },
+                            args = values
+                                .filterValues { it.isNotBlank() }
+                                .mapValues { (key, value) ->
+                                    if (state.metadata.fields.any { it.key == key && it.fieldType == FieldType.APP }) {
+                                        value.trim()
+                                    } else {
+                                        value
+                                    }
+                                },
                             continueOnError = state.existing?.continueOnError ?: false,
                             condition = state.existing?.condition,
                         )
@@ -331,6 +345,7 @@ internal fun ActionFieldInput(
     value: String,
     onChange: (String) -> Unit,
     tasks: List<Task> = emptyList(),
+    suggestedPackage: String? = null,
 ) {
     val label = stringResource(field.labelRes) + if (field.required) " *" else ""
     val hint = field.hintRes?.let { stringResource(it) }
@@ -394,6 +409,15 @@ internal fun ActionFieldInput(
             hint = hint,
             value = value,
             tasks = tasks,
+            onChange = onChange,
+        )
+
+        FieldType.APP -> InstalledAppFieldInput(
+            label = label,
+            hint = hint,
+            value = value,
+            required = field.required,
+            suggestedPackage = suggestedPackage,
             onChange = onChange,
         )
 

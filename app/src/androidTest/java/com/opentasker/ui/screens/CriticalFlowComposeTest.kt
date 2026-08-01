@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.actions.ActionField
 import com.opentasker.core.actions.ActionMetadata
+import com.opentasker.core.apps.InstalledApp
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
@@ -256,6 +257,45 @@ class CriticalFlowComposeTest {
             VariableConflictResolution(VariableConflictAction.PRESERVE_EXISTING),
             review.value.variableResolutions["API_TOKEN"],
         )
+    }
+
+    @Test
+    fun installedAppPickerSearchesLabelsAndPackages() {
+        var selected: InstalledApp? = null
+        composeTestRule.setContent {
+            TestTheme {
+                InstalledAppPickerDialog(
+                    appsOverride = listOf(
+                        InstalledApp("com.android.chrome", "Chrome"),
+                        InstalledApp("com.spotify.music", "Spotify"),
+                    ),
+                    onDismiss = {},
+                    onSelect = { selected = it },
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Search by app or package").performTextInput("spotify.music")
+        composeTestRule.onNodeWithText("Spotify").assertIsDisplayed().performClick()
+        assertEquals(InstalledApp("com.spotify.music", "Spotify"), selected)
+    }
+
+    @Test
+    fun installedAppPickerOffersLatestInspectorObservation() {
+        var selected: InstalledApp? = null
+        composeTestRule.setContent {
+            TestTheme {
+                InstalledAppPickerDialog(
+                    suggestedPackage = "com.spotify.music",
+                    appsOverride = listOf(InstalledApp("com.spotify.music", "Spotify")),
+                    onDismiss = {},
+                    onSelect = { selected = it },
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Use latest observed: Spotify (com.spotify.music)").performClick()
+        assertEquals(InstalledApp("com.spotify.music", "Spotify"), selected)
     }
 
     @Composable

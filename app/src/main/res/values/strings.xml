@@ -405,6 +405,17 @@
     <string name="import_mapped">mapped</string>
     <string name="import_unsupported">unsupported</string>
 
+    <!-- Installed app picker -->
+    <string name="app_picker_title">Choose installed app</string>
+    <string name="app_picker_browse">Browse installed apps</string>
+    <string name="app_picker_search">Search by app or package</string>
+    <string name="app_picker_invalid_package">Enter a valid Android package name, such as com.example.app.</string>
+    <string name="app_picker_visibility_notice">Only apps visible through Android’s scoped package queries are shown. You can cancel and enter a valid package manually.</string>
+    <string name="app_picker_use_observed">Use latest observed: %1$s (%2$s)</string>
+    <string name="app_picker_load_error">Installed apps could not be loaded: %1$s</string>
+    <string name="app_picker_empty">No visible app matches. Cancel to enter the package manually.</string>
+    <string name="app_picker_icon_description">%1$s app icon</string>
+
     <!-- Workspace -->
     <string name="workspace_review_readiness">Review readiness before enabling profiles. Tap Setup for permission details.</string>
     <string name="workspace_task_library_body">Build reusable action sequences for your automations.</string>
