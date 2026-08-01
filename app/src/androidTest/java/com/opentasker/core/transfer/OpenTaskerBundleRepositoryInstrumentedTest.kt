@@ -15,6 +15,7 @@ import com.opentasker.core.model.Variable
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.CorruptStoredRecordException
 import com.opentasker.core.storage.TaskEntity
+import com.opentasker.core.storage.VariableRepository
 import com.opentasker.core.storage.toEntity
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -66,16 +67,23 @@ class OpenTaskerBundleRepositoryInstrumentedTest {
             .build()
 
         try {
-            val enterTaskId = source.taskDao().insert(
-                Task(
-                    name = "Log task",
-                    actions = listOf(ActionSpec(type = "log", args = mapOf("message" to "hello"))),
-                ).toEntity()
-            )
             val exitTaskId = source.taskDao().insert(
                 Task(
                     name = "Exit task",
                     actions = listOf(ActionSpec(type = "notify.show", args = mapOf("text" to "bye"))),
+                ).toEntity()
+            )
+            val enterTaskId = source.taskDao().insert(
+                Task(
+                    name = "Log task",
+                    actions = listOf(
+                        ActionSpec(type = "log", args = mapOf("message" to "hello")),
+                        ActionSpec(type = "task.run", args = mapOf("id" to exitTaskId.toString())),
+                        ActionSpec(
+                            type = "notify.show",
+                            args = mapOf("button1_label" to "Exit", "button1_task_id" to exitTaskId.toString()),
+                        ),
+                    ),
                 ).toEntity()
             )
             source.profileDao().insert(
@@ -87,7 +95,7 @@ class OpenTaskerBundleRepositoryInstrumentedTest {
                     exitTaskId = exitTaskId,
                 ).toEntity()
             )
-            source.variableDao().insert(Variable(name = "%flag", value = "on", isGlobal = true).toEntity())
+            source.variableDao().insert(Variable(name = "FLAG", value = "on", isGlobal = true).toEntity())
             source.sceneDao().insert(
                 Scene(
                     name = "Control panel",
@@ -132,7 +140,17 @@ class OpenTaskerBundleRepositoryInstrumentedTest {
             assertEquals(importedTaskIds.getValue("Exit task"), importedProfile.exitTaskId)
             assertNotEquals(enterTaskId, importedProfile.enterTaskId)
 
-            val importedVariable = target.variableDao().get("%flag")?.toDomain()
+            val importedParent = importedTasks.single { it.name == "Log task" }
+            assertEquals(
+                importedTaskIds.getValue("Exit task").toString(),
+                importedParent.actions[1].args["id"],
+            )
+            assertEquals(
+                importedTaskIds.getValue("Exit task").toString(),
+                importedParent.actions[2].args["button1_task_id"],
+            )
+
+            val importedVariable = target.variableDao().get("FLAG")?.toDomain()
             assertEquals("on", importedVariable?.value)
 
             val importedScene = target.sceneDao().getAll().single().toDomain()
@@ -141,6 +159,140 @@ class OpenTaskerBundleRepositoryInstrumentedTest {
             assertEquals(importedTaskIds.getValue("Exit task"), importedElement.longPressTaskId)
         } finally {
             source.close()
+            target.close()
+        }
+    }
+
+    @Test
+    fun variableConflictsRequirePolicyAndReplacingSecretNeverDeclassifiesIt() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+
+        suspend fun newTarget(secret: Boolean = false): AppDatabase {
+            val target = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+                .allowMainThreadQueries()
+                .build()
+            VariableRepository(target.variableDao()).upsert(
+                Variable(name = "COUNT", value = "existing", isGlobal = true, isSecret = secret),
+            )
+            return target
+        }
+
+        val incoming = OpenTaskerBundle(
+            appVersion = "test",
+            exportedAtEpochMs = 123L,
+            variables = listOf(Variable(name = "COUNT", value = "incoming", isGlobal = true)),
+        )
+        val preserveTarget = newTarget()
+        val renameTarget = newTarget()
+        val replaceSecretTarget = newTarget(secret = true)
+        try {
+            val preserveRepository = OpenTaskerBundleRepository(preserveTarget)
+            val preservePlan = preserveRepository.planImport(incoming)
+            assertEquals("COUNT_imported", preservePlan.variableConflicts.single().suggestedRename)
+            preserveRepository.importBundle(
+                incoming,
+                mapOf("COUNT" to VariableConflictResolution(VariableConflictAction.PRESERVE_EXISTING)),
+            )
+            assertEquals("existing", preserveTarget.variableDao().get("COUNT")?.toDomain()?.value)
+
+            OpenTaskerBundleRepository(renameTarget).importBundle(
+                incoming,
+                mapOf(
+                    "COUNT" to VariableConflictResolution(
+                        VariableConflictAction.RENAME_IMPORTED,
+                        renamedTo = "COUNT_imported",
+                    ),
+                ),
+            )
+            assertEquals("existing", renameTarget.variableDao().get("COUNT")?.toDomain()?.value)
+            assertEquals("incoming", renameTarget.variableDao().get("COUNT_imported")?.toDomain()?.value)
+
+            val secretRepository = VariableRepository(replaceSecretTarget.variableDao())
+            OpenTaskerBundleRepository(replaceSecretTarget, secretRepository).importBundle(
+                incoming,
+                mapOf("COUNT" to VariableConflictResolution(VariableConflictAction.REPLACE_EXISTING)),
+            )
+            val runtime = secretRepository.runtimeGlobals()
+            assertEquals("incoming", runtime.values["COUNT"])
+            assertTrue("COUNT" in runtime.secretNames)
+            assertTrue(secretRepository.ordinaryExport().variables.none { it.name == "COUNT" })
+        } finally {
+            preserveTarget.close()
+            renameTarget.close()
+            replaceSecretTarget.close()
+        }
+    }
+
+    @Test
+    fun invalidConflictResolutionRollsBackEveryRoomWrite() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val target = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            target.variableDao().insert(Variable("COUNT", "existing", isGlobal = true).toEntity())
+            target.variableDao().insert(Variable("COUNT_imported", "occupied", isGlobal = true).toEntity())
+            val beforeTasks = target.taskDao().getAll()
+            val bundle = OpenTaskerBundle(
+                appVersion = "test",
+                exportedAtEpochMs = 123L,
+                tasks = listOf(Task(id = 7, name = "Must roll back", actions = listOf(ActionSpec(type = "log")))),
+                variables = listOf(Variable("COUNT", "incoming", isGlobal = true)),
+            )
+
+            val failure = runCatching {
+                OpenTaskerBundleRepository(target).importBundle(
+                    bundle,
+                    mapOf(
+                        "COUNT" to VariableConflictResolution(
+                            VariableConflictAction.RENAME_IMPORTED,
+                            renamedTo = "COUNT_imported",
+                        ),
+                    ),
+                )
+            }.exceptionOrNull()
+
+            assertTrue(failure is IllegalArgumentException)
+            assertEquals(beforeTasks, target.taskDao().getAll())
+            assertEquals("existing", target.variableDao().get("COUNT")?.toDomain()?.value)
+            assertEquals("occupied", target.variableDao().get("COUNT_imported")?.toDomain()?.value)
+        } finally {
+            target.close()
+        }
+    }
+
+    @Test
+    fun unsupportedFutureAndInvalidMigratedBundlesPerformZeroRoomWrites() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val target = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            target.taskDao().insert(Task(name = "Existing", actions = listOf(ActionSpec(type = "log"))).toEntity())
+            val before = target.taskDao().getAll()
+            val repository = OpenTaskerBundleRepository(target)
+
+            val futureFailure = runCatching {
+                repository.importBundle(
+                    OpenTaskerBundle(
+                        schemaVersion = 999,
+                        appVersion = "future",
+                        exportedAtEpochMs = 0,
+                        tasks = listOf(Task(id = 7, name = "Future", actions = listOf(ActionSpec(type = "log")))),
+                    ),
+                )
+            }.exceptionOrNull()
+            val invalidMigrated = OpenTaskerBundleCodec.decode(
+                """{"schemaVersion":1,"appVersion":"old","exportedAtEpochMs":0,"tasks":[{"id":1,"name":"Invalid","actions":[]}]}""",
+            )
+            val migrationValidationFailure = runCatching {
+                repository.importBundle(invalidMigrated)
+            }.exceptionOrNull()
+
+            assertTrue(futureFailure is IllegalArgumentException)
+            assertTrue(migrationValidationFailure is IllegalArgumentException)
+            assertEquals(before, target.taskDao().getAll())
+        } finally {
             target.close()
         }
     }

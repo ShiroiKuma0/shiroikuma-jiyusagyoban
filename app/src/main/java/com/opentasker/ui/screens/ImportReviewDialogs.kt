@@ -1,6 +1,7 @@
 package com.opentasker.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -19,6 +20,9 @@ import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.capabilities.AutomationPower
 import com.opentasker.core.transfer.RecipePowerRequest
+import com.opentasker.core.transfer.VariableConflictAction
+import com.opentasker.core.transfer.VariableConflictResolution
+import com.opentasker.core.transfer.VariableImportConflict
 import com.opentasker.ui.theme.DesignSystem
 
 @Composable
@@ -26,6 +30,7 @@ internal fun OpenTaskerBundleReviewDialog(
     state: OpenTaskerBundleReviewState,
     busy: Boolean,
     onDismiss: () -> Unit,
+    onVariableConflictResolution: (String, VariableConflictResolution) -> Unit = { _, _ -> },
     onConfirm: () -> Unit,
 ) {
     val bundle = state.bundle
@@ -33,6 +38,7 @@ internal fun OpenTaskerBundleReviewDialog(
     val reviewWarnings = (bundle.metadata.warnings + plan.warnings + plan.lossyWarnings).distinct()
     val capabilityRequirements = plan.capabilityRequirements
     val powerRequests = plan.powerRequests
+    val allConflictsResolved = plan.variableConflicts.all { it.name in state.variableResolutions }
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
         title = { Text(stringResource(R.string.dialog_review_bundle)) },
@@ -53,7 +59,7 @@ internal fun OpenTaskerBundleReviewDialog(
                 item {
                     InlineNotice(
                         title = bundle.metadata.name.ifBlank { stringResource(R.string.import_opentasker_bundle) },
-                        body = "Schema ${bundle.schemaVersion} - exported by app ${bundle.appVersion}",
+                        body = stringResource(R.string.import_schema_app, bundle.schemaVersion, bundle.appVersion),
                         color = if (plan.canImport) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
                     )
                 }
@@ -78,6 +84,26 @@ internal fun OpenTaskerBundleReviewDialog(
                             values = plan.warnings.ifEmpty { listOf(stringResource(R.string.import_incompatible_body)) },
                             color = MaterialTheme.colorScheme.error,
                         )
+                    }
+                }
+                if (plan.variableConflicts.isNotEmpty()) {
+                    item {
+                        Text(
+                            stringResource(R.string.import_variable_conflicts),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
+                    plan.variableConflicts.forEach { conflict ->
+                        item(key = conflict.name) {
+                            VariableConflictReview(
+                                conflict = conflict,
+                                resolution = state.variableResolutions[conflict.name],
+                                enabled = !busy,
+                                onResolution = { resolution ->
+                                    onVariableConflictResolution(conflict.name, resolution)
+                                },
+                            )
+                        }
                     }
                 }
                 if (capabilityRequirements.isNotEmpty()) {
@@ -113,10 +139,16 @@ internal fun OpenTaskerBundleReviewDialog(
         },
         confirmButton = {
             Button(
-                enabled = plan.canImport && !busy,
+                enabled = plan.canImport && allConflictsResolved && !busy,
                 onClick = onConfirm,
             ) {
-                Text(if (busy) stringResource(R.string.status_importing) else stringResource(R.string.import_disabled))
+                Text(
+                    when {
+                        busy -> stringResource(R.string.status_importing)
+                        plan.canImport && allConflictsResolved -> stringResource(R.string.import_for_review)
+                        else -> stringResource(R.string.import_disabled)
+                    },
+                )
             }
         },
         dismissButton = {
@@ -125,6 +157,70 @@ internal fun OpenTaskerBundleReviewDialog(
             }
         },
     )
+}
+
+@Composable
+private fun VariableConflictReview(
+    conflict: VariableImportConflict,
+    resolution: VariableConflictResolution?,
+    enabled: Boolean,
+    onResolution: (VariableConflictResolution) -> Unit,
+) {
+    val detail = if (conflict.existingIsSecret) {
+        stringResource(R.string.import_variable_conflict_secret, conflict.name)
+    } else {
+        stringResource(R.string.import_variable_conflict, conflict.name)
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs)) {
+        Text(detail, style = MaterialTheme.typography.bodyMedium)
+        Column(modifier = Modifier.fillMaxWidth()) {
+            VariableConflictChoice(
+                label = stringResource(R.string.import_variable_preserve),
+                selected = resolution?.action == VariableConflictAction.PRESERVE_EXISTING,
+                enabled = enabled,
+                onClick = {
+                    onResolution(VariableConflictResolution(VariableConflictAction.PRESERVE_EXISTING))
+                },
+            )
+            VariableConflictChoice(
+                label = stringResource(R.string.import_variable_rename, conflict.suggestedRename),
+                selected = resolution?.action == VariableConflictAction.RENAME_IMPORTED,
+                enabled = enabled,
+                onClick = {
+                    onResolution(
+                        VariableConflictResolution(
+                            action = VariableConflictAction.RENAME_IMPORTED,
+                            renamedTo = conflict.suggestedRename,
+                        ),
+                    )
+                },
+            )
+            VariableConflictChoice(
+                label = if (conflict.existingIsSecret) {
+                    stringResource(R.string.import_variable_replace_secret)
+                } else {
+                    stringResource(R.string.import_variable_replace)
+                },
+                selected = resolution?.action == VariableConflictAction.REPLACE_EXISTING,
+                enabled = enabled,
+                onClick = {
+                    onResolution(VariableConflictResolution(VariableConflictAction.REPLACE_EXISTING))
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun VariableConflictChoice(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    TextButton(enabled = enabled, onClick = onClick) {
+        Text(if (selected) stringResource(R.string.import_variable_selected, label) else label)
+    }
 }
 
 @Composable

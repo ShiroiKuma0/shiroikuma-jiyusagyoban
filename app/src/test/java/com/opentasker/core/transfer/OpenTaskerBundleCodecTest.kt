@@ -16,6 +16,32 @@ import org.junit.Test
 
 class OpenTaskerBundleCodecTest {
     @Test
+    fun schema1GoldenFixtureMigratesDeterministicallyAndRoundTripsAsSchema2() {
+        val fixture = checkNotNull(javaClass.classLoader?.getResource("bundles/schema1-golden.json"))
+            .readText()
+
+        val migrated = OpenTaskerBundleCodec.decode(fixture)
+        val roundTripped = OpenTaskerBundleCodec.decode(OpenTaskerBundleCodec.encode(migrated))
+
+        assertEquals(OPEN_TASKER_BUNDLE_SCHEMA_VERSION, migrated.schemaVersion)
+        assertEquals(listOf("Parent", "Child"), migrated.tasks.map(Task::name))
+        assertEquals("Golden profile", migrated.profiles.single().name)
+        assertEquals("COUNT", migrated.variables.single().name)
+        assertEquals("Golden scene", migrated.scenes.single().name)
+        assertTrue(migrated.metadata.warnings.any { it.startsWith("Migrated bundle schema 1 to 2") })
+        assertFalse(migrated.metadata.warnings.any { it.contains("manifest did not match") })
+        assertTrue(OpenTaskerBundleCodec.validate(migrated).canImport)
+        assertEquals(migrated, roundTripped)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun decodeRejectsUnsupportedFutureSchemaBeforeDomainDeserialization() {
+        OpenTaskerBundleCodec.decode(
+            """{"schemaVersion":999,"appVersion":"future","exportedAtEpochMs":0}""",
+        )
+    }
+
+    @Test
     fun buildSortsTopLevelCollectionsForStableDiffs() {
         val firstTask = Task(id = 2, name = "B Task", actions = listOf(ActionSpec(type = "log", args = mapOf("message" to "b"))))
         val secondTask = Task(id = 1, name = "A Task", actions = listOf(ActionSpec(type = "notify.show")))
@@ -242,6 +268,25 @@ class OpenTaskerBundleCodecTest {
         assertFalse(plan.canImport)
         assertTrue(plan.warnings.any { it.contains("duplicate task ids: 7") })
         assertTrue(plan.warnings.any { it.contains("duplicate variable names: %TOKEN") })
+    }
+
+    @Test
+    fun validateBlocksNormalizedVariableCollisionsAndSecretPayloads() {
+        val plan = OpenTaskerBundleCodec.validate(
+            OpenTaskerBundle(
+                appVersion = "0.2.79",
+                exportedAtEpochMs = 123L,
+                variables = listOf(
+                    Variable(name = "%TOKEN", value = "first", isGlobal = true),
+                    Variable(name = "TOKEN", value = "second", isGlobal = true),
+                    Variable(name = "API_KEY", value = "must-not-import", isGlobal = true, isSecret = true),
+                ),
+            ),
+        )
+
+        assertFalse(plan.canImport)
+        assertTrue(plan.warnings.any { it.contains("duplicate normalized variable names: TOKEN") })
+        assertTrue(plan.warnings.any { it.contains("must omit secrets") })
     }
 
     @Test

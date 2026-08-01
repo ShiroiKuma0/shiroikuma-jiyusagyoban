@@ -2,6 +2,7 @@ package com.opentasker.ui.screens
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -21,6 +22,9 @@ import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 import com.opentasker.core.transfer.BundleImportPlan
 import com.opentasker.core.transfer.OpenTaskerBundle
+import com.opentasker.core.transfer.VariableConflictAction
+import com.opentasker.core.transfer.VariableConflictResolution
+import com.opentasker.core.transfer.VariableImportConflict
 import com.opentasker.ui.theme.OpenTaskerTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -206,6 +210,52 @@ class CriticalFlowComposeTest {
         composeTestRule.onNodeWithText("Review OpenTasker bundle").assertIsDisplayed()
         composeTestRule.onNodeWithText("Cannot import").assertIsDisplayed()
         composeTestRule.onNodeWithText("Import Disabled").assertIsNotEnabled()
+    }
+
+    @Test
+    fun bundleVariableConflictRequiresAnExplicitChoice() {
+        val review = mutableStateOf(
+            OpenTaskerBundleReviewState(
+                bundle = OpenTaskerBundle(
+                    appVersion = "0.2.79",
+                    exportedAtEpochMs = 0,
+                ),
+                plan = BundleImportPlan(
+                    canImport = true,
+                    variableConflicts = listOf(
+                        VariableImportConflict(
+                            name = "API_TOKEN",
+                            existingIsSecret = true,
+                            suggestedRename = "API_TOKEN_imported",
+                        ),
+                    ),
+                ),
+            ),
+        )
+        composeTestRule.setContent {
+            TestTheme {
+                OpenTaskerBundleReviewDialog(
+                    state = review.value,
+                    busy = false,
+                    onDismiss = {},
+                    onVariableConflictResolution = { name, resolution ->
+                        review.value = review.value.copy(
+                            variableResolutions = review.value.variableResolutions + (name to resolution),
+                        )
+                    },
+                    onConfirm = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Import Disabled").assertIsNotEnabled()
+        composeTestRule.onNodeWithText("Keep existing").performClick()
+        composeTestRule.onNodeWithText("Selected: Keep existing").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Import for Review").assertIsEnabled()
+        assertEquals(
+            VariableConflictResolution(VariableConflictAction.PRESERVE_EXISTING),
+            review.value.variableResolutions["API_TOKEN"],
+        )
     }
 
     @Composable

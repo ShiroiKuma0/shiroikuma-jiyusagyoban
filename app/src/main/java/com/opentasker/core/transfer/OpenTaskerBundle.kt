@@ -14,6 +14,7 @@ import com.opentasker.core.model.Variable
 import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.VariableRepository
+import com.opentasker.core.storage.isEffectivelySecret
 import com.opentasker.core.storage.toEntity
 import com.opentasker.core.validation.InputValidation
 import kotlinx.serialization.Serializable
@@ -76,6 +77,24 @@ data class BundleImportPlan(
     val lossyWarnings: List<String> = emptyList(),
     val capabilityRequirements: List<CapabilityRequirement> = emptyList(),
     val powerRequests: List<RecipePowerRequest> = emptyList(),
+    val variableConflicts: List<VariableImportConflict> = emptyList(),
+)
+
+enum class VariableConflictAction {
+    PRESERVE_EXISTING,
+    RENAME_IMPORTED,
+    REPLACE_EXISTING,
+}
+
+data class VariableImportConflict(
+    val name: String,
+    val existingIsSecret: Boolean,
+    val suggestedRename: String,
+)
+
+data class VariableConflictResolution(
+    val action: VariableConflictAction,
+    val renamedTo: String? = null,
 )
 
 data class BundleImportReport(
@@ -100,6 +119,9 @@ object OpenTaskerBundleCodec {
         allowComments = true
         allowTrailingComma = true
         decodeEnumsCaseInsensitive = true
+    }
+    private val schemaProbeJson = Json(json) {
+        ignoreUnknownKeys = true
     }
 
     fun build(
@@ -163,9 +185,49 @@ object OpenTaskerBundleCodec {
 
     internal fun decode(rawJson: String, budget: ImportResourceBudget): OpenTaskerBundle {
         ImportResourceGuard.requireJsonPreflight(rawJson, budget)
-        return json.decodeFromString<OpenTaskerBundle>(rawJson).also { bundle ->
+        // Probe only the envelope before choosing a version DTO. This keeps future schemas away
+        // from current domain serializers without allocating an untrusted JsonElement tree.
+        val schemaVersion = schemaProbeJson.decodeFromString<BundleSchemaEnvelope>(rawJson).schemaVersion
+        require(schemaVersion in SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMAS) {
+            "Unsupported schema version $schemaVersion; supported versions are " +
+                "${SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMAS.first}..${SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMAS.last}."
+        }
+        val bundle = when (schemaVersion) {
+            1 -> migrateV1(json.decodeFromString<OpenTaskerBundleV1>(rawJson))
+            OPEN_TASKER_BUNDLE_SCHEMA_VERSION -> json.decodeFromString<OpenTaskerBundle>(rawJson)
+            else -> error("Schema preflight and migration chain are out of sync")
+        }
+        return bundle.also {
             ImportResourceGuard.requireBundle(bundle, budget)
         }
+    }
+
+    private fun migrateV1(source: OpenTaskerBundleV1): OpenTaskerBundle {
+        val migrationWarning =
+            "Migrated bundle schema 1 to 2; action capability and power manifests were recomputed."
+        val legacy = OpenTaskerBundle(
+            schemaVersion = 1,
+            appVersion = source.appVersion,
+            exportedAtEpochMs = source.exportedAtEpochMs,
+            metadata = BundleMetadata(
+                name = source.metadata.name,
+                description = source.metadata.description,
+                warnings = source.metadata.warnings + migrationWarning,
+            ),
+            tasks = source.tasks,
+            profiles = source.profiles,
+            variables = source.variables,
+            scenes = source.scenes,
+        )
+        val plan = validate(legacy)
+        return legacy.copy(
+            schemaVersion = OPEN_TASKER_BUNDLE_SCHEMA_VERSION,
+            metadata = legacy.metadata.copy(
+                capabilityRequirements = plan.capabilityRequirements,
+                powerRequests = plan.powerRequests,
+                warnings = (legacy.metadata.warnings + plan.warnings + plan.lossyWarnings).distinct(),
+            ),
+        )
     }
 
     fun validate(bundle: OpenTaskerBundle): BundleImportPlan = validate(bundle, ImportResourceBudget.Default)
@@ -191,6 +253,20 @@ object OpenTaskerBundleCodec {
         }
         duplicateStrings(bundle.variables.map { it.name }).takeIf { it.isNotEmpty() }?.let { duplicates ->
             warnings += "Bundle has duplicate variable names: ${duplicates.joinToString()}."
+        }
+        val normalizedVariableNames = bundle.variables.mapNotNull { variable ->
+            VariableNamePolicy.normalizeForScope(variable.name, variable.isGlobal)
+        }
+        duplicateStrings(normalizedVariableNames).takeIf { it.isNotEmpty() }?.let { duplicates ->
+            warnings += "Bundle has duplicate normalized variable names: ${duplicates.joinToString()}."
+        }
+        bundle.variables.forEach { variable ->
+            if (VariableNamePolicy.normalizeForScope(variable.name, variable.isGlobal) == null) {
+                warnings += "Invalid variable name '${variable.name}'."
+            }
+        }
+        if (bundle.variables.any(Variable::isSecret)) {
+            warnings += "Bundle contains secret variable values; ordinary JSON bundles must omit secrets."
         }
 
         val taskIds = bundle.tasks.map { it.id }.toSet()
@@ -293,11 +369,14 @@ object OpenTaskerBundleCodec {
         startsWith("Unsupported schema version") ||
             startsWith("Bundle has duplicate task ids") ||
             startsWith("Bundle has duplicate variable names") ||
+            startsWith("Bundle has duplicate normalized variable names") ||
+            startsWith("Bundle contains secret variable values") ||
             startsWith("Bundle contains unknown unclassified actions") ||
             startsWith("Import budget exceeded") ||
             startsWith("Invalid task ") ||
             startsWith("Invalid action ") ||
-            startsWith("Invalid profile ")
+            startsWith("Invalid profile ") ||
+            startsWith("Invalid variable name ")
 
     private fun duplicateLongs(values: List<Long>): List<Long> =
         values.groupingBy { it }
@@ -358,6 +437,30 @@ class OpenTaskerBundleRepository(
     private val db: AppDatabase,
     private val variableRepository: VariableRepository = VariableRepository(db.variableDao()),
 ) {
+    suspend fun planImport(bundle: OpenTaskerBundle): BundleImportPlan {
+        val base = OpenTaskerBundleCodec.validate(bundle)
+        if (!base.canImport) return base
+
+        val occupiedNames = db.variableDao().getAll().associateBy { it.name }.toMutableMap()
+        val reservedNames = occupiedNames.keys.toMutableSet()
+        bundle.variables.mapNotNullTo(reservedNames) { variable ->
+            VariableNamePolicy.normalizeForScope(variable.name, variable.isGlobal)
+        }
+        val conflicts = bundle.variables
+            .sortedWith(compareBy<Variable> { it.name.lowercase() }.thenBy { it.name })
+            .mapNotNull { variable ->
+                val storageName = VariableNamePolicy.normalizeForScope(variable.name, variable.isGlobal)
+                    ?: return@mapNotNull null
+                val existing = occupiedNames[storageName] ?: return@mapNotNull null
+                VariableImportConflict(
+                    name = storageName,
+                    existingIsSecret = existing.isEffectivelySecret(),
+                    suggestedRename = nextImportedVariableName(storageName, variable.isGlobal, reservedNames),
+                ).also { reservedNames += it.suggestedRename }
+            }
+        return base.copy(variableConflicts = conflicts)
+    }
+
     suspend fun exportBundle(
         appVersion: String,
         exportedAtEpochMs: Long = System.currentTimeMillis(),
@@ -382,15 +485,18 @@ class OpenTaskerBundleRepository(
         )
     }
 
-    suspend fun importBundle(bundle: OpenTaskerBundle): BundleImportReport {
-        val plan = OpenTaskerBundleCodec.validate(bundle)
+    suspend fun importBundle(
+        bundle: OpenTaskerBundle,
+        variableResolutions: Map<String, VariableConflictResolution> = emptyMap(),
+    ): BundleImportReport {
+        val plan = planImport(bundle)
         require(plan.canImport) { plan.warnings.joinToString() }
 
         var insertedTasks = 0
         var insertedProfiles = 0
         var insertedVariables = 0
         var insertedScenes = 0
-        val importWarnings = plan.warnings.toMutableList()
+        val importWarnings = (bundle.metadata.warnings + plan.warnings).distinct().toMutableList()
         val lossyWarnings = plan.lossyWarnings.toMutableList()
 
         db.withTransaction {
@@ -416,8 +522,42 @@ class OpenTaskerBundleRepository(
                 val storageName = VariableNamePolicy.normalizeForScope(variable.name, variable.isGlobal)
                     ?: throw IllegalArgumentException("Invalid variable name '${variable.name}'")
                 val existing = db.variableDao().get(storageName)
-                variableRepository.importVariable(variable)
-                if (existing == null) insertedVariables++
+                if (existing == null) {
+                    variableRepository.importVariable(variable.copy(name = storageName))
+                    insertedVariables++
+                    return@forEach
+                }
+
+                val resolution = variableResolutions[storageName]
+                    ?: VariableConflictResolution(VariableConflictAction.PRESERVE_EXISTING)
+                when (resolution.action) {
+                    VariableConflictAction.PRESERVE_EXISTING -> {
+                        importWarnings += "Preserved existing variable '$storageName'."
+                    }
+                    VariableConflictAction.RENAME_IMPORTED -> {
+                        val rename = resolution.renamedTo
+                            ?: plan.variableConflicts.first { it.name == storageName }.suggestedRename
+                        val normalizedRename = VariableNamePolicy.normalizeForScope(rename, variable.isGlobal)
+                            ?: throw IllegalArgumentException("Invalid renamed variable '$rename'")
+                        require(normalizedRename != storageName) {
+                            "Renamed variable '$storageName' must use a different name."
+                        }
+                        require(db.variableDao().get(normalizedRename) == null) {
+                            "Renamed variable '$normalizedRename' already exists."
+                        }
+                        variableRepository.importVariable(variable.copy(name = normalizedRename))
+                        insertedVariables++
+                        importWarnings += "Renamed imported variable '$storageName' to '$normalizedRename'."
+                    }
+                    VariableConflictAction.REPLACE_EXISTING -> {
+                        val keepSecret = existing.isEffectivelySecret()
+                        variableRepository.importVariable(
+                            variable.copy(name = storageName, isSecret = keepSecret || variable.isSecret),
+                        )
+                        val suffix = if (keepSecret) " and kept it secret" else ""
+                        importWarnings += "Replaced existing variable '$storageName'$suffix."
+                    }
+                }
             }
 
             bundle.profiles.sortedWith(compareBy<Profile> { it.name.lowercase() }.thenBy { it.id }).forEach { profile ->
@@ -461,4 +601,50 @@ class OpenTaskerBundleRepository(
             tapTaskId = element.tapTaskId?.let { taskIdMap[it] },
             longPressTaskId = element.longPressTaskId?.let { taskIdMap[it] },
         )
+
+    private fun nextImportedVariableName(
+        original: String,
+        isGlobal: Boolean,
+        reservedNames: Set<String>,
+    ): String {
+        val baseLength = (VariableNamePolicy.MAX_LENGTH - "_imported9999".length).coerceAtLeast(1)
+        val base = original.take(baseLength)
+        var suffix = "_imported"
+        var candidate = VariableNamePolicy.normalizeForScope(base + suffix, isGlobal)
+        var index = 2
+        while (candidate == null || candidate in reservedNames) {
+            suffix = "_imported$index"
+            candidate = VariableNamePolicy.normalizeForScope(
+                original.take((VariableNamePolicy.MAX_LENGTH - suffix.length).coerceAtLeast(1)) + suffix,
+                isGlobal,
+            )
+            index++
+        }
+        return candidate
+    }
 }
+
+@Serializable
+private data class OpenTaskerBundleV1(
+    val schemaVersion: Int = 1,
+    val appVersion: String,
+    val exportedAtEpochMs: Long,
+    val metadata: BundleMetadataV1 = BundleMetadataV1(),
+    val tasks: List<Task> = emptyList(),
+    val profiles: List<Profile> = emptyList(),
+    val variables: List<Variable> = emptyList(),
+    val scenes: List<Scene> = emptyList(),
+)
+
+@Serializable
+private data class BundleMetadataV1(
+    val name: String = "OpenTasker Export",
+    val description: String = "",
+    val capabilityRequirements: List<CapabilityRequirement> = emptyList(),
+    val warnings: List<String> = emptyList(),
+)
+
+@Serializable
+private data class BundleSchemaEnvelope(
+    val schemaVersion: Int = 1,
+)

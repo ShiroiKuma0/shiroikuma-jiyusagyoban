@@ -840,7 +840,8 @@ fun ActiveAutomationUi(
             state = state,
             busy = openTaskerBundleBusy,
             onDismiss = viewModel::clearOpenTaskerBundleReview,
-            onConfirm = { viewModel.confirmOpenTaskerBundleImport(state.bundle) },
+            onVariableConflictResolution = viewModel::resolveOpenTaskerVariableConflict,
+            onConfirm = viewModel::confirmOpenTaskerBundleImport,
         )
     }
 

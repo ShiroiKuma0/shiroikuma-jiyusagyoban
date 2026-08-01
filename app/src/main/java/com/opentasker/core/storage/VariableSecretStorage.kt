@@ -40,9 +40,12 @@ class AesGcmVariableSecretCodec(
         require(plaintextBytes.size <= MAX_SECRET_PLAINTEXT_BYTES) {
             "Secret value exceeds $MAX_SECRET_PLAINTEXT_BYTES UTF-8 bytes."
         }
-        val iv = ByteArray(GCM_IV_BYTES).also(secureRandom::nextBytes)
         val cipher = Cipher.getInstance(ALGORITHM)
-        cipher.init(Cipher.ENCRYPT_MODE, keyProvider(), GCMParameterSpec(GCM_TAG_BITS, iv))
+        // Android Keystore keys created with randomized encryption reject a caller-supplied IV.
+        // Let the provider generate it, then persist that authenticated nonce in the envelope.
+        cipher.init(Cipher.ENCRYPT_MODE, keyProvider(), secureRandom)
+        val iv = cipher.iv
+        require(iv.size == GCM_IV_BYTES) { "Secret cipher generated an invalid IV." }
         cipher.updateAAD(variableName.toByteArray(StandardCharsets.UTF_8))
         val encrypted = cipher.doFinal(plaintextBytes)
         return listOf(

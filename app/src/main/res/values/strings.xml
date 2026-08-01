@@ -370,6 +370,7 @@
     <!-- Import -->
     <string name="import_disabled_notice">Imported profiles will be created disabled for review.</string>
     <string name="import_schema_info">Schema %1$d</string>
+    <string name="import_schema_app">Schema %1$d — exported by app %2$s</string>
     <string name="import_incompatible">Cannot import</string>
     <string name="import_incompatible_body">Bundle schema is not compatible with this version of OpenTasker.</string>
     <string name="import_capability_review">Capability review</string>
@@ -391,6 +392,14 @@
     <string name="import_count_scenes">Scenes</string>
     <string name="import_count_setup_notes">Setup notes</string>
     <string name="import_count_warnings">Warnings</string>
+    <string name="import_variable_conflicts">Resolve variable name conflicts</string>
+    <string name="import_variable_conflict">An existing variable is named %1$s. Choose what to keep.</string>
+    <string name="import_variable_conflict_secret">An existing secret variable is named %1$s. Replacing its value will keep it secret.</string>
+    <string name="import_variable_preserve">Keep existing</string>
+    <string name="import_variable_rename">Rename to %1$s</string>
+    <string name="import_variable_replace">Replace existing</string>
+    <string name="import_variable_replace_secret">Replace value; keep secret</string>
+    <string name="import_variable_selected">Selected: %1$s</string>
     <string name="import_count_src_tasks">Src tasks</string>
     <string name="import_count_src_profiles">Src profiles</string>
     <string name="import_mapped">mapped</string>

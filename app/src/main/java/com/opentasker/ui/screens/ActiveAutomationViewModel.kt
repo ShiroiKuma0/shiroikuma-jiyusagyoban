@@ -53,6 +53,7 @@ import com.opentasker.core.transfer.TaskerImportPlanner
 import com.opentasker.core.transfer.TaskerImportPreview
 import com.opentasker.core.transfer.TaskerXmlImportReport
 import com.opentasker.core.transfer.TaskerXmlImporter
+import com.opentasker.core.transfer.VariableConflictResolution
 import com.opentasker.widget.TaskShortcutHelper
 import androidx.room.withTransaction
 import kotlinx.collections.immutable.ImmutableList
@@ -101,6 +102,7 @@ internal data class TaskerImportReviewState(
 internal data class OpenTaskerBundleReviewState(
     val bundle: OpenTaskerBundle,
     val plan: BundleImportPlan,
+    val variableResolutions: Map<String, VariableConflictResolution> = emptyMap(),
 )
 
 /**
@@ -588,7 +590,7 @@ class ActiveAutomationViewModel(
                 withContext(Dispatchers.IO) {
                     val rawJson = readBoundedOpenTaskerBundle(appContext, uri)
                     val bundle = OpenTaskerBundleCodec.decode(rawJson)
-                    OpenTaskerBundleReviewState(bundle = bundle, plan = OpenTaskerBundleCodec.validate(bundle))
+                    OpenTaskerBundleReviewState(bundle = bundle, plan = bundleRepository.planImport(bundle))
                 }
             }
                 .onSuccess {
@@ -606,13 +608,24 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun confirmOpenTaskerBundleImport(bundle: OpenTaskerBundle) {
+    fun resolveOpenTaskerVariableConflict(name: String, resolution: VariableConflictResolution) {
+        if (_openTaskerBundleBusy.value) return
+        val review = _openTaskerBundleReview.value ?: return
+        if (review.plan.variableConflicts.none { it.name == name }) return
+        _openTaskerBundleReview.value = review.copy(
+            variableResolutions = review.variableResolutions + (name to resolution),
+        )
+    }
+
+    fun confirmOpenTaskerBundleImport() {
+        val review = _openTaskerBundleReview.value ?: return
+        if (review.plan.variableConflicts.any { it.name !in review.variableResolutions }) return
         viewModelScope.launch {
             if (_openTaskerBundleBusy.value) return@launch
             _openTaskerBundleBusy.value = true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    bundleRepository.importBundle(bundle)
+                    bundleRepository.importBundle(review.bundle, review.variableResolutions)
                 }
             }
                 .onSuccess { importReport ->

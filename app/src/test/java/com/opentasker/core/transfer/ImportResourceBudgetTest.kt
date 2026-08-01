@@ -177,7 +177,7 @@ class ImportResourceBudgetTest {
             File("src/main/java/com/opentasker/core/transfer/OpenTaskerBundle.kt"),
             File("app/src/main/java/com/opentasker/core/transfer/OpenTaskerBundle.kt"),
         ).first { it.exists() }.readText()
-        val validation = source.indexOf("val plan = OpenTaskerBundleCodec.validate(bundle)")
+        val validation = source.indexOf("val plan = planImport(bundle)")
         val transaction = source.indexOf("db.withTransaction", startIndex = validation)
 
         assertTrue("Bundle validation must exist", validation >= 0)
