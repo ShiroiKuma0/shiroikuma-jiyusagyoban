@@ -38,6 +38,11 @@
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Speed test: pins its own cellular/WiFi network with requestNetwork so a mobile leg can run
+         while WiFi stays connected. It never changes the system default route. -->
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <!-- Reading the SIM slots (carrier name + subscription id) for the 接続 speed tests. -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
@@ -107,6 +112,9 @@
         <!-- Sister apps: token-gated automation intents driven by the Send Intent action. -->
         <package android:name="shiroikuma.jami" />
         <package android:name="shiroikuma.renrakusaki" />
+        <!-- 白い熊 地図 (OsmAnd fork): a speed-test history row opens its fix with
+             VIEW geo:<lat>,<lon>, handled by net.osmand.plus.activities.search.GeoIntentActivity. -->
+        <package android:name="shiroikuma.chizu" />
         <!--
           Broad visibility for the generic Send Intent action. Package visibility is
           all-or-nothing per package, so matching any launchable app's MAIN/LAUNCHER
