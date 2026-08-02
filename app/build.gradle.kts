@@ -1,4 +1,5 @@
 import java.net.URLEncoder
+import java.util.zip.ZipFile
 
 plugins {
     alias(libs.plugins.android.application)
@@ -130,6 +131,7 @@ dependencies {
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
+    implementation(libs.sqlcipher.android)
     ksp(libs.androidx.room.compiler)
 
     implementation(libs.work.runtime.ktx)
@@ -332,6 +334,96 @@ abstract class VerifyQualityGateSeedTask : org.gradle.api.DefaultTask() {
     @org.gradle.api.tasks.TaskAction
     fun verify() {
         check(!seedFailure.get()) { "Seeded local quality-gate failure." }
+    }
+}
+
+abstract class VerifyNativePageAlignmentTask : org.gradle.api.DefaultTask() {
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    abstract val apk: org.gradle.api.file.RegularFileProperty
+
+    @org.gradle.api.tasks.TaskAction
+    fun verify() {
+        val apkFile = apk.get().asFile
+        check(apkFile.isFile) { "APK for native page-alignment audit is missing: ${apkFile.absolutePath}" }
+
+        ZipFile(apkFile).use { archive ->
+            val nativeEntries = archive.entries().asSequence()
+                .filter { it.name.startsWith("lib/") && it.name.endsWith(".so") }
+                .toList()
+            if (nativeEntries.isEmpty()) {
+                println("Native page-alignment audit passed: APK contains no native libraries.")
+                return
+            }
+
+            val violations = nativeEntries.mapNotNull { entry ->
+                check(entry.size <= MAX_NATIVE_LIBRARY_BYTES) {
+                    "Native library ${entry.name} exceeds the audit size limit"
+                }
+                val bytes = archive.getInputStream(entry).use { it.readBytes() }
+                val alignment = elfLoadAlignment(bytes)
+                if (alignment < REQUIRED_PAGE_ALIGNMENT) {
+                    "${entry.name}: PT_LOAD p_align=$alignment, required >= $REQUIRED_PAGE_ALIGNMENT"
+                } else {
+                    null
+                }
+            }
+            check(violations.isEmpty()) {
+                "16 KB native page-alignment audit failed:\n${violations.joinToString("\n")}"
+            }
+            println(
+                "Native page-alignment audit passed: ${nativeEntries.size} libraries, " +
+                    "minimum PT_LOAD alignment >= $REQUIRED_PAGE_ALIGNMENT bytes.",
+            )
+        }
+    }
+
+    private fun elfLoadAlignment(bytes: ByteArray): Long {
+        check(bytes.size >= 64 && bytes[0] == 0x7f.toByte() && bytes[1] == 'E'.code.toByte() &&
+            bytes[2] == 'L'.code.toByte() && bytes[3] == 'F'.code.toByte()) {
+            "Native library is not a valid ELF object"
+        }
+        val elfClass = bytes[4].toInt()
+        val littleEndian = bytes[5].toInt() == 1
+        check(elfClass == 1 || elfClass == 2) { "Unsupported ELF class: $elfClass" }
+        check(littleEndian || bytes[5].toInt() == 2) { "Unsupported ELF byte order" }
+
+        fun number(offset: Int, width: Int): Long {
+            var value = 0L
+            if (littleEndian) {
+                repeat(width) { index -> value = value or ((bytes[offset + index].toLong() and 0xff) shl (index * 8)) }
+            } else {
+                repeat(width) { index -> value = (value shl 8) or (bytes[offset + index].toLong() and 0xff) }
+            }
+            return value
+        }
+
+        val programHeaderOffset = number(if (elfClass == 1) 28 else 32, if (elfClass == 1) 4 else 8)
+        val entrySize = number(if (elfClass == 1) 42 else 54, 2).toInt()
+        val entryCount = number(if (elfClass == 1) 44 else 56, 2).toInt()
+        val alignmentOffset = if (elfClass == 1) 28 else 48
+        val typeOffset = 0
+        var minimumAlignment = Long.MAX_VALUE
+        var loadSegments = 0
+        repeat(entryCount) { index ->
+            val header = programHeaderOffset + index.toLong() * entrySize
+            check(header + entrySize <= bytes.size) { "ELF program header table is truncated" }
+            if (number(header.toInt() + typeOffset, 4) == PT_LOAD) {
+                loadSegments += 1
+                minimumAlignment = minOf(
+                    minimumAlignment,
+                    number(header.toInt() + alignmentOffset, if (elfClass == 1) 4 else 8),
+                )
+            }
+        }
+        check(loadSegments > 0) { "ELF object has no PT_LOAD segments" }
+        return minimumAlignment
+    }
+
+    private companion object {
+        const val REQUIRED_PAGE_ALIGNMENT = 16 * 1024L
+        const val MAX_NATIVE_LIBRARY_BYTES = 100L * 1024 * 1024
+        const val PT_LOAD = 1L
     }
 }
 
@@ -652,5 +744,13 @@ tasks.register("localQualityGate") {
         generateCycloneDxSbom,
         verifyJvmTestCount,
         verifyQualityGateSeed,
+        "verifyNativePageAlignment",
     )
+}
+
+tasks.register<VerifyNativePageAlignmentTask>("verifyNativePageAlignment") {
+    group = "verification"
+    description = "Checks that every packaged native ELF has 16 KB PT_LOAD alignment."
+    dependsOn("packageDebug")
+    apk.set(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk"))
 }

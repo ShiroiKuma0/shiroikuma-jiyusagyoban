@@ -9,8 +9,10 @@ import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.DatabaseMigrations
+import com.opentasker.core.storage.DatabaseSecurity
 import com.opentasker.core.storage.PendingRestoreApplyResult
 import com.opentasker.core.storage.VariableRepository
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import com.opentasker.core.diagnostics.CrashLogHandler
 import com.opentasker.core.engine.RunLogPruneWorker
 import com.opentasker.core.engine.EngineWatchdogWorker
@@ -57,12 +59,14 @@ class OpenTaskerApp_NoHilt : Application() {
                 PendingRestoreApplyResult.NoPending -> Unit
             }
 
+            val databaseKey = DatabaseSecurity.prepareEncryptedDatabase(this, DatabaseBackupManager.DATABASE_NAME)
             _db = Room.databaseBuilder(
                 this,
                 AppDatabase::class.java,
-                "opentasker.db"
+                DatabaseBackupManager.DATABASE_NAME,
             )
                 .addMigrations(*DatabaseMigrations.getAllMigrations())
+                .openHelperFactory(SupportOpenHelperFactory(databaseKey.copyOf()))
                 .build()
         }
 

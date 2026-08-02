@@ -1,7 +1,6 @@
 package com.opentasker.core.storage
 
 import android.content.Context
-import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import com.opentasker.core.logging.AppLogger
 import java.io.File
@@ -55,7 +54,7 @@ class DatabaseBackupManager(
                     }
                 }
                 validateDatabaseFile(tempFile)
-                publishValidatedBackup(tempFile, backupFile)
+                publishValidatedBackup(context, tempFile, backupFile)
             } catch (error: Exception) {
                 tempFile.delete()
                 throw error
@@ -273,7 +272,7 @@ class DatabaseBackupManager(
     }
 
     private fun summarize(file: File, sourceLabel: String): RestoreCandidate =
-        SQLiteDatabase.openDatabase(file.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { sqlite ->
+        DatabaseSecurity.openReadOnly(file, context).use { sqlite ->
             RestoreCandidate(
                 sourceLabel = sourceLabel,
                 sizeBytes = file.length(),
@@ -286,7 +285,7 @@ class DatabaseBackupManager(
             )
         }
 
-    private fun countOrZero(sqlite: SQLiteDatabase, table: String): Int =
+    private fun countOrZero(sqlite: ReadOnlyDatabase, table: String): Int =
         runCatching { readLong(sqlite, "SELECT COUNT(*) FROM $table").toInt() }.getOrDefault(0)
 
     suspend fun stageRestore(uri: Uri): Result<File> = withContext(Dispatchers.IO) {
@@ -377,6 +376,10 @@ class DatabaseBackupManager(
         return canonicalBackup
     }
 
+    private fun validateDatabaseFile(file: File) {
+        validateDatabaseFile(context, file)
+    }
+
     companion object {
         const val DATABASE_NAME = "opentasker.db"
 
@@ -392,7 +395,7 @@ class DatabaseBackupManager(
             var replacementPublished = false
             var temp: File? = null
             return try {
-                validateDatabaseFile(pending)
+                validateDatabaseFile(context, pending)
                 dbFile.parentFile?.mkdirs()
                 rollback = if (dbFile.exists()) {
                     File(backupDir(context), "${databaseName.removeSuffix(".db")}_pre_restore_${timestamp()}.db")
@@ -411,7 +414,7 @@ class DatabaseBackupManager(
                         output.fd.sync()
                     }
                 }
-                validateDatabaseFile(temp)
+                validateDatabaseFile(context, temp)
 
                 // The pending file is the durable restore journal. Keep it until the same-directory
                 // atomic replacement and stale-sidecar cleanup both finish, so a process death can
@@ -463,7 +466,7 @@ class DatabaseBackupManager(
         private fun timestamp(): String =
             SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
 
-        private fun publishValidatedBackup(tempFile: File, backupFile: File) {
+        private fun publishValidatedBackup(context: Context, tempFile: File, backupFile: File) {
             try {
                 if (backupFile.exists() && !backupFile.delete()) {
                     throw IOException("Could not replace existing backup file: ${backupFile.absolutePath}")
@@ -472,17 +475,17 @@ class DatabaseBackupManager(
                     tempFile.copyTo(backupFile, overwrite = true)
                     tempFile.delete()
                 }
-                validateDatabaseFile(backupFile)
+                validateDatabaseFile(context, backupFile)
             } catch (error: Exception) {
                 backupFile.delete()
                 throw error
             }
         }
 
-        private fun validateDatabaseFile(file: File) {
+        private fun validateDatabaseFile(context: Context, file: File) {
             if (!file.exists()) throw IOException("Backup file does not exist")
-            SQLiteDatabase.openDatabase(file.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { sqlite ->
-                sqlite.rawQuery("PRAGMA integrity_check", null).use { cursor ->
+            DatabaseSecurity.openReadOnly(file, context).use { sqlite ->
+                sqlite.rawQuery("PRAGMA integrity_check").use { cursor ->
                     if (!cursor.moveToFirst() || cursor.getString(0) != "ok") {
                         throw IOException("Backup failed SQLite integrity check")
                     }
@@ -496,10 +499,7 @@ class DatabaseBackupManager(
                 }
                 val requiredSchema = requiredSchemaColumns(schemaVersion)
                 val requiredTables = requiredSchema.keys
-                sqlite.rawQuery(
-                    "SELECT name FROM sqlite_master WHERE type='table'",
-                    null,
-                ).use { cursor ->
+                sqlite.rawQuery("SELECT name FROM sqlite_master WHERE type='table'").use { cursor ->
                     val found = mutableSetOf<String>()
                     while (cursor.moveToNext()) {
                         found += cursor.getString(0)
@@ -569,8 +569,8 @@ class DatabaseBackupManager(
             }
         }
 
-        private fun tableColumns(sqlite: SQLiteDatabase, table: String): Set<String> =
-            sqlite.rawQuery("PRAGMA table_info($table)", null).use { cursor ->
+        private fun tableColumns(sqlite: ReadOnlyDatabase, table: String): Set<String> =
+            sqlite.rawQuery("PRAGMA table_info($table)").use { cursor ->
                 val columns = mutableSetOf<String>()
                 val nameIndex = cursor.getColumnIndex("name")
                 if (nameIndex < 0) {
@@ -582,8 +582,8 @@ class DatabaseBackupManager(
                 columns
             }
 
-        private fun readLong(sqlite: SQLiteDatabase, sql: String): Long =
-            sqlite.rawQuery(sql, null).use { cursor ->
+        private fun readLong(sqlite: ReadOnlyDatabase, sql: String): Long =
+            sqlite.rawQuery(sql).use { cursor ->
                 if (!cursor.moveToFirst()) {
                     throw IOException("Backup query returned no rows: $sql")
                 }

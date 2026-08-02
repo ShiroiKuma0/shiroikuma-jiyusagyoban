@@ -13,6 +13,8 @@
 
 ### Automation engine
 
+- **Encrypted automation database** — SQLCipher encrypts the complete Room file at rest with a random key wrapped by Android Keystore; existing plaintext databases migrate once before Room opens, and wrong-key opens fail closed
+
 - **Profiles, contexts, tasks, actions** — a complete Room-backed automation pipeline with a Compose UI
 - **7 context families** — Application, Time, Day, Location, State, Event, and Plugin (Locale/Tasker condition)
 - **68 built-in actions** plus engine-handled flow control (`task.run`, `if`/`else`/`end if`, `for each`/`end for`, `stop`)
@@ -131,6 +133,7 @@ Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON 
 - Environment-driven release signing
 - SQLite database backup/restore with WAL-safe validation and atomic staged restore, reviewed before staging (source, schema version, compatibility, entity counts) and cancellable afterwards; encrypted `.otbackup` v2 exports use bounded-memory, independently authenticated 64 KiB frames while legacy v1 files remain restorable. Secret rows stay ciphertext and the device-bound Keystore key is never copied, so a restore on another device requires secret re-entry
 - APK payload comparison harness for reproducibility checks
+- SQLCipher native libraries are included in both standard and F-Droid source builds; the release gate audits their 16 KB page alignment and keeps the dependency checksum-pinned
 
 ### Power-user backends
 
