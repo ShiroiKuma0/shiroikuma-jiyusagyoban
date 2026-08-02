@@ -7,6 +7,7 @@ import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Upsert
 import androidx.room.Update
 import com.opentasker.core.model.Variable
 import com.opentasker.core.model.DEFAULT_PROJECT_ID
@@ -37,6 +38,8 @@ fun Variable.toEntity(): VariableEntity {
 interface VariableDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insert(v: VariableEntity)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertAll(values: List<VariableEntity>)
+    @Upsert suspend fun upsert(v: VariableEntity)
+    @Upsert suspend fun upsertAll(values: List<VariableEntity>)
     @Update suspend fun update(v: VariableEntity)
     @Delete suspend fun delete(v: VariableEntity)
     @Query("DELETE FROM variables WHERE name = :name AND projectId = 1") suspend fun deleteByName(name: String)

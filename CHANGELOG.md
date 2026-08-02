@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Room migrations and writes**: additive schema transitions now use Room 2.8 auto-migrations backed by the exported schema history, while semantic rewrites remain explicit; profile and variable writes use `@Upsert` to remove insert/update races.
+
 - **Performance evidence**: added a validated baseline-profile artifact and a separate Macrobenchmark module covering cold start and first navigation, with explicit API 35+ device-run commands and no hosted-CI requirement.
 
 - **Documentation truth**: the local quality gate now checks current README release claims and reports stale version, schema, and capability claims in historical research snapshots without treating those snapshots as current product documentation.

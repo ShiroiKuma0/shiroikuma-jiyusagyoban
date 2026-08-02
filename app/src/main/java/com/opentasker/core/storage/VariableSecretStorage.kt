@@ -193,7 +193,7 @@ class VariableRepository(
 
     suspend fun upsert(variable: Variable) {
         storageMutationMutex.withLock {
-            dao.insert(variable.normalizedForStorage().toStoredEntity(secretCodec))
+            dao.upsert(variable.normalizedForStorage().toStoredEntity(secretCodec))
         }
     }
 
@@ -213,7 +213,7 @@ class VariableRepository(
             } else {
                 dao.getInProject(normalized.name, normalized.projectId)
             }
-            if (existing == null) dao.insert(entity) else dao.update(entity)
+            if (existing == null) dao.upsert(entity) else dao.upsert(entity)
         }
     }
 
@@ -255,7 +255,7 @@ class VariableRepository(
     suspend fun persistRuntime(values: List<RuntimeVariableValue>) {
         val entities = values.map(::runtimeValueToEntity)
         storageMutationMutex.withLock {
-            dao.insertAll(entities)
+            dao.upsertAll(entities)
         }
     }
 
@@ -287,7 +287,7 @@ class VariableRepository(
                     else -> conflictedNames += value.name
                 }
             }
-            if (accepted.isNotEmpty()) dao.insertAll(accepted.map(::runtimeValueToEntity))
+            if (accepted.isNotEmpty()) dao.upsertAll(accepted.map(::runtimeValueToEntity))
             RuntimeVariableCommitResult(appliedNames, conflictedNames)
         }
     }
@@ -301,7 +301,7 @@ class VariableRepository(
                     .filter { it.isSecret && !AesGcmVariableSecretCodec.isEnvelope(it.value) }
                     .forEach { entity ->
                         runCatching {
-                            dao.update(
+                            dao.upsert(
                                 entity.copy(
                                     value = secretCodec.encrypt(entity.name, entity.value),
                                     isSecret = true,

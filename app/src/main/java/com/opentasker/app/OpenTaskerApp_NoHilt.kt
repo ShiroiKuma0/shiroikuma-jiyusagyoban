@@ -65,7 +65,7 @@ class OpenTaskerApp_NoHilt : Application() {
                 AppDatabase::class.java,
                 DatabaseBackupManager.DATABASE_NAME,
             )
-                .addMigrations(*DatabaseMigrations.getAllMigrations())
+                .addMigrations(*DatabaseMigrations.getManualMigrations())
                 .openHelperFactory(SupportOpenHelperFactory(databaseKey.copyOf()))
                 .build()
         }

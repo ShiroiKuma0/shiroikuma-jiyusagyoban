@@ -658,7 +658,7 @@ class OpenTaskerBundleRepository(
                     exitTaskId = profile.exitTaskId?.let { taskIdMap[it] },
                     projectId = projectIdMap[profile.projectId] ?: DEFAULT_PROJECT_ID,
                 )
-                db.profileDao().insert(remappedProfile.toEntity())
+                db.profileDao().upsert(remappedProfile.toEntity())
                 insertedProfiles++
             }
 

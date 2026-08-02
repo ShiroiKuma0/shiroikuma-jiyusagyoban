@@ -7,6 +7,7 @@ import androidx.room.Insert
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.Query
+import androidx.room.Upsert
 import androidx.room.Update
 import kotlinx.serialization.encodeToString
 import com.opentasker.core.model.AutomationMode
@@ -113,6 +114,7 @@ private data class StoredProfileContexts(
 @Dao
 interface ProfileDao {
     @Insert suspend fun insert(p: ProfileEntity): Long
+    @Upsert suspend fun upsert(p: ProfileEntity)
     @Update suspend fun update(p: ProfileEntity)
     @Delete suspend fun delete(p: ProfileEntity)
     @Query("SELECT * FROM profiles WHERE id = :id") suspend fun getById(id: Long): ProfileEntity?

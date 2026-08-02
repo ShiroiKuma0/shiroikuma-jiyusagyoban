@@ -1,6 +1,7 @@
 package com.opentasker.core.storage
 
 import androidx.room.Database
+import androidx.room.AutoMigration
 import androidx.room.RoomDatabase
 
 const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 10
@@ -9,6 +10,13 @@ const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 10
     entities = [ProjectEntity::class, ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class, EditHistoryEntity::class],
     version = OPEN_TASKER_DATABASE_SCHEMA_VERSION,
     exportSchema = true,
+    autoMigrations = [
+        AutoMigration(from = 2, to = 3),
+        AutoMigration(from = 3, to = 4),
+        AutoMigration(from = 4, to = 5),
+        AutoMigration(from = 7, to = 8),
+        AutoMigration(from = 9, to = 10),
+    ],
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun projectDao(): ProjectDao

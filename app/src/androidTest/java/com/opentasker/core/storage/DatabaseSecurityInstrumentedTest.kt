@@ -36,7 +36,7 @@ class DatabaseSecurityInstrumentedTest {
         assertFalse(DatabaseSecurity.isPlaintext(databaseFile))
 
         val encrypted = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DATABASE)
-            .addMigrations(*DatabaseMigrations.getAllMigrations())
+            .addMigrations(*DatabaseMigrations.getManualMigrations())
             .openHelperFactory(SupportOpenHelperFactory(key.copyOf()))
             .allowMainThreadQueries()
             .build()

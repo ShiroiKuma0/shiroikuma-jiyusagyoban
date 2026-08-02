@@ -481,7 +481,7 @@ class ActiveAutomationViewModel(
                         tasks = db.taskDao().getAll().map { it.toDomain() },
                         scenes = db.sceneDao().getAll().map { it.toDomain() },
                     )
-                    rewrite.profiles.forEach { db.profileDao().update(it.toEntity()) }
+                    rewrite.profiles.forEach { db.profileDao().upsert(it.toEntity()) }
                     rewrite.tasks.filterNot { it.id == task.id }.forEach { db.taskDao().update(it.toEntity()) }
                     rewrite.scenes.forEach { db.sceneDao().update(it.toEntity()) }
                 }
@@ -552,7 +552,7 @@ class ActiveAutomationViewModel(
                         blockedCount = rewrite.blocked.size
                         return@withTransaction
                     }
-                    rewrite.profiles.forEach { db.profileDao().update(it.toEntity()) }
+                    rewrite.profiles.forEach { db.profileDao().upsert(it.toEntity()) }
                     rewrite.tasks.forEach { db.taskDao().update(it.toEntity()) }
                     rewrite.scenes.forEach { db.sceneDao().update(it.toEntity()) }
                     db.taskDao().delete(task.toEntity())
@@ -617,7 +617,7 @@ class ActiveAutomationViewModel(
                 projectId = projectId,
             )
             requireValidProfileFieldLimits(profile)
-            db.profileDao().insert(reviewFeedbackRisk(profile).toEntity())
+            db.profileDao().upsert(reviewFeedbackRisk(profile).toEntity())
         }
 
     fun updateProfile(profile: Profile, message: String = "Profile updated") =
@@ -650,7 +650,7 @@ class ActiveAutomationViewModel(
                 if (previous != null && previous.contexts != profile.contexts) {
                     locationDwellStateStore.clearProfile(profile.id)
                 }
-                db.profileDao().update(reviewedProfile.toEntity())
+                    db.profileDao().upsert(reviewedProfile.toEntity())
             }
         }
 
@@ -728,7 +728,7 @@ class ActiveAutomationViewModel(
             check(review.canAcknowledge) {
                 "Remove unsupported or unknown actions before enabling this imported profile."
             }
-            db.profileDao().update(
+            db.profileDao().upsert(
                 current.copy(
                     enabled = true,
                     requiresRiskAcknowledgement = false,
@@ -746,7 +746,7 @@ class ActiveAutomationViewModel(
             val applied = template.instantiate(slotValues)
             db.withTransaction {
                 val taskId = db.taskDao().insert(applied.task.toEntity())
-                db.profileDao().insert(applied.profile.copy(enterTaskId = taskId).toEntity())
+                db.profileDao().upsert(applied.profile.copy(enterTaskId = taskId).toEntity())
             }
         }
 
@@ -1348,7 +1348,7 @@ class ActiveAutomationViewModel(
                         .takeIf { it.id == entityId }
                         ?.toEntity()
                 }.getOrNull() ?: current.copy(contextsJson = targetJson)
-                db.profileDao().update(restored)
+                db.profileDao().upsert(restored)
                 locationDwellStateStore.clearProfile(entityId)
                 if (redo) history.markRedone(snapshot.id) else history.markUndone(snapshot.id, currentJson)
             }

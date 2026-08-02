@@ -284,7 +284,7 @@ class AutomationTargetReceiver : BroadcastReceiver() {
         if (enabled && profile.requiresRiskAcknowledgement) {
             return failure("Imported profile requires in-app power review before its first enable.")
         }
-        db.profileDao().update(profile.copy(enabled = enabled).toEntity())
+        db.profileDao().upsert(profile.copy(enabled = enabled).toEntity())
         return TargetResponse(
             Activity.RESULT_OK,
             Bundle().apply {

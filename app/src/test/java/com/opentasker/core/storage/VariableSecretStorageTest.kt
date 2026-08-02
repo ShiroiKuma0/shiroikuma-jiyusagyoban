@@ -214,6 +214,14 @@ class VariableSecretStorageTest {
             values.forEach { insert(it) }
         }
 
+        override suspend fun upsert(v: VariableEntity) {
+            insert(v)
+        }
+
+        override suspend fun upsertAll(values: List<VariableEntity>) {
+            values.forEach { upsert(it) }
+        }
+
         override suspend fun update(v: VariableEntity) {
             insert(v)
         }

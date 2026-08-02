@@ -152,6 +152,21 @@ object DatabaseMigrations {
             MIGRATION_9_10,
         )
     }
+
+    /**
+     * Migrations that are not represented by AppDatabase.autoMigrations.
+     *
+     * Keep the explicit migrations available above for schema-history tests; runtime builders
+     * must not register both a manual and generated migration for the same version pair.
+     */
+    fun getManualMigrations(): Array<Migration> {
+        return arrayOf(
+            MIGRATION_1_2,
+            MIGRATION_5_6,
+            MIGRATION_6_7,
+            MIGRATION_8_9,
+        )
+    }
 }
 
 /**
