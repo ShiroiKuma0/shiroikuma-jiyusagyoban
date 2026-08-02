@@ -838,6 +838,36 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "zen.rule.set",
+            nameRes = R.string.catalog_action_zen_rule_set_name,
+            descriptionRes = R.string.catalog_action_zen_rule_set_description,
+            categoryRes = R.string.catalog_category_settings,
+            fields = listOf(
+                ActionField("id", R.string.catalog_action_zen_rule_set_field_id_label, required = true, hintRes = R.string.catalog_action_zen_rule_set_field_id_hint),
+                ActionField("name", R.string.catalog_action_zen_rule_set_field_name_label, required = true, hintRes = R.string.catalog_action_zen_rule_set_field_name_hint),
+                ActionField("mode", R.string.catalog_action_zen_rule_set_field_mode_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_zen_rule_set_field_mode_hint, options = listOf(option("off", R.string.label_off), option("priority", R.string.action_option_dnd_priority), option("alarms", R.string.action_option_dnd_alarms), option("total_silence", R.string.action_option_dnd_total_silence))),
+                ActionField("enabled", R.string.catalog_action_zen_rule_set_field_enabled_label, FieldType.CHECKBOX, hintRes = R.string.catalog_action_zen_rule_set_field_enabled_hint),
+                ActionField("grayscale", R.string.catalog_action_zen_rule_set_field_grayscale_label, FieldType.CHECKBOX),
+                ActionField("dim_wallpaper", R.string.catalog_action_zen_rule_set_field_dim_wallpaper_label, FieldType.CHECKBOX),
+                ActionField("night_mode", R.string.catalog_action_zen_rule_set_field_night_mode_label, FieldType.CHECKBOX),
+            ),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "zen.rule.clear",
+            nameRes = R.string.catalog_action_zen_rule_clear_name,
+            descriptionRes = R.string.catalog_action_zen_rule_clear_description,
+            categoryRes = R.string.catalog_category_settings,
+            fields = listOf(
+                ActionField("id", R.string.catalog_action_zen_rule_clear_field_id_label, required = true, hintRes = R.string.catalog_action_zen_rule_clear_field_id_hint),
+            ),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "app.archive",
             nameRes = R.string.catalog_action_app_archive_name,
             descriptionRes = R.string.catalog_action_app_archive_description,

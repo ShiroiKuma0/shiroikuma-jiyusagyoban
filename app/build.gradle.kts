@@ -742,7 +742,7 @@ val verifyDocumentationTruth = tasks.register<VerifyDocumentationTruthTask>("ver
     currentDocumentation.from(currentDocumentationPaths)
     historicalDocumentation.from(historicalDocumentationPaths)
     versionName.set(appVersionName)
-    actionCount.set(72)
+    actionCount.set(74)
     contextFamilyCount.set(7)
     schemaVersion.set(10)
     repositoryRoot.set(repositoryRootPath)

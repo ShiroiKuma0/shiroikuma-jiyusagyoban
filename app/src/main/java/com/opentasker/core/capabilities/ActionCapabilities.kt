@@ -110,6 +110,8 @@ object ActionCapabilityRegistry {
         "wol" to wakeOnLanCapability(),
         "volume.set" to volumeCapability("May be blocked by Do Not Disturb policy access."),
         "dnd.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Do Not Disturb access.", R.string.capability_dnd_access),
+        "zen.rule.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Do Not Disturb access; uses Android 15+ owned Zen rules and falls back to transient DND below Android 15.", R.string.capability_zen_rule_access),
+        "zen.rule.clear" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Do Not Disturb access; removes an OpenTasker-owned Zen rule or clears transient DND below Android 15.", R.string.capability_zen_rule_access),
         "ringer.set" to volumeCapability("May require Do Not Disturb access on some devices when switching to silent mode."),
         "torch.set" to ActionCapability(CapabilityLevel.Supported, "Uses camera flashlight.", R.string.capability_torch_ready),
         "airplane.toggle" to elevatedUnsupported("airplane.toggle", "Airplane mode changes require system or device-owner privileges.", R.string.capability_airplane_unsupported),

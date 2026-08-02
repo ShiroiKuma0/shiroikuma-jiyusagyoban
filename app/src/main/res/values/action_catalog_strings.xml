@@ -306,6 +306,23 @@
     <string name="catalog_action_dnd_set_description" formatted="false">Set DND interruption filter mode</string>
     <string name="catalog_action_dnd_set_field_mode_label" formatted="false">Mode</string>
     <string name="catalog_action_dnd_set_field_mode_hint" formatted="false">off/priority/alarms/total_silence</string>
+    <string name="catalog_action_zen_rule_set_name" formatted="false">Set Zen rule</string>
+    <string name="catalog_action_zen_rule_set_description" formatted="false">Create or update an owned DND rule with Android 15 device effects</string>
+    <string name="catalog_action_zen_rule_set_field_id_label" formatted="false">Rule ID</string>
+    <string name="catalog_action_zen_rule_set_field_id_hint" formatted="false">stable key, for example focus_evening</string>
+    <string name="catalog_action_zen_rule_set_field_name_label" formatted="false">Rule name</string>
+    <string name="catalog_action_zen_rule_set_field_name_hint" formatted="false">name shown in Android DND settings</string>
+    <string name="catalog_action_zen_rule_set_field_mode_label" formatted="false">Mode</string>
+    <string name="catalog_action_zen_rule_set_field_mode_hint" formatted="false">off/priority/alarms/total_silence</string>
+    <string name="catalog_action_zen_rule_set_field_enabled_label" formatted="false">Enabled</string>
+    <string name="catalog_action_zen_rule_set_field_enabled_hint" formatted="false">whether Android may activate this rule</string>
+    <string name="catalog_action_zen_rule_set_field_grayscale_label" formatted="false">Grayscale display</string>
+    <string name="catalog_action_zen_rule_set_field_dim_wallpaper_label" formatted="false">Dim wallpaper</string>
+    <string name="catalog_action_zen_rule_set_field_night_mode_label" formatted="false">Night mode</string>
+    <string name="catalog_action_zen_rule_clear_name" formatted="false">Clear Zen rule</string>
+    <string name="catalog_action_zen_rule_clear_description" formatted="false">Remove an OpenTasker-owned DND rule</string>
+    <string name="catalog_action_zen_rule_clear_field_id_label" formatted="false">Rule ID</string>
+    <string name="catalog_action_zen_rule_clear_field_id_hint" formatted="false">the stable key used by Set Zen rule</string>
     <string name="catalog_action_ringer_set_name" formatted="false">Set Ringer Mode</string>
     <string name="catalog_action_ringer_set_description" formatted="false">Set device ringer mode</string>
     <string name="catalog_action_ringer_set_field_mode_label" formatted="false">Mode</string>

@@ -151,6 +151,7 @@
     <string name="capability_app_archive_unsupported" formatted="false">Package archive requests require Android 15 (API 35) or newer.</string>
     <string name="capability_local_network_setup" formatted="false">Android 17+ requires local network access for the LAN broadcast; grant it in Setup.</string>
     <string name="capability_dnd_access" formatted="false">Requires Do Not Disturb access.</string>
+    <string name="capability_zen_rule_access" formatted="false">Requires Do Not Disturb access; Android 15+ uses owned Zen rules with device effects.</string>
     <string name="capability_torch_ready" formatted="false">Uses the camera flashlight.</string>
     <string name="capability_airplane_unsupported" formatted="false">Airplane mode changes require system or device-owner privileges. No privileged transport is available in this build.</string>
     <string name="capability_mobile_data_unsupported" formatted="false">Mobile data changes require carrier, system, or device-owner privileges. No privileged transport is available in this build.</string>

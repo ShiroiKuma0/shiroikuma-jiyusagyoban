@@ -110,6 +110,8 @@ object AutomationSensitivityRegistry {
         "mobile.toggle",
         "screen.timeout",
         "dnd.set",
+        "zen.rule.set",
+        "zen.rule.clear",
         "ringer.set",
         "torch.set",
         "tile.set",

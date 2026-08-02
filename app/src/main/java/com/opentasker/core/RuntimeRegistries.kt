@@ -72,6 +72,8 @@ import com.opentasker.core.actions.WakeAction
 import com.opentasker.core.actions.WakeOnLanAction
 import com.opentasker.core.actions.WiFiToggleAction
 import com.opentasker.core.actions.WriteFileAction
+import com.opentasker.core.actions.ZenRuleClearAction
+import com.opentasker.core.actions.ZenRuleSetAction
 import com.opentasker.core.contexts.ApplicationContextSourceImpl
 import com.opentasker.core.contexts.ContextSourceRegistry
 import com.opentasker.core.contexts.EventContextSourceImpl
@@ -116,6 +118,8 @@ private fun registerBuiltInActions() {
         MobileDataAction(),
         ScreenTimeoutAction(),
         DoNotDisturbAction(),
+        ZenRuleSetAction(),
+        ZenRuleClearAction(),
         RingerModeAction(),
         TorchAction(),
         TileStateAction(),

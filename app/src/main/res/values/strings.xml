@@ -307,8 +307,8 @@
     <string name="setup_sms_body">Needed before SMS actions can send messages. Keep SMS automations explicit and user-authored.</string>
     <string name="setup_sms_required_for">SMS actions</string>
     <string name="setup_dnd_title">Do Not Disturb access</string>
-    <string name="setup_dnd_body">Needed before OpenTasker can change interruption filters or DND-related settings.</string>
-    <string name="setup_dnd_required_for">DND actions</string>
+    <string name="setup_dnd_body">Needed before OpenTasker can change interruption filters or create, update, and remove owned Zen rules.</string>
+    <string name="setup_dnd_required_for">DND and Zen rule actions</string>
     <string name="setup_shizuku_title">Shizuku power mode</string>
     <string name="setup_shizuku_required_for">Elevated actions</string>
     <string name="setup_shizuku_status_not_installed">Shizuku manager is not installed.</string>
