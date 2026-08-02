@@ -6,6 +6,8 @@
 
 - **Native release safety**: the local release gate now inspects every packaged ELF library and fails if any PT_LOAD segment is below 16 KB alignment. The current SQLCipher, DataStore, and Compose native payloads pass the audit.
 
+- **Predictive back**: audited the target-37 activity and Compose surfaces. The manifest is opted into `OnBackInvokedCallback`, `MainActivity` has no legacy `onBackPressed()` override, and dialogs consistently use Compose `onDismissRequest`, preserving both gesture and 3-button dismissal paths through AndroidX.
+
 - **Media context**: added a level-triggered `media_active` state with optional active-package matching. It observes local audio playback and accessible media sessions, emits stop transitions, and fails closed when notification-listener access is unavailable.
 
 - **Keyboard actions**: added `ime.info` for current/enabled input-method variables and `ime.set` for enabled-target validation plus the system picker. Android does not allow a normal app to silently choose another keyboard, so that limitation is reported explicitly.
