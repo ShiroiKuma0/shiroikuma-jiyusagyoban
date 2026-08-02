@@ -193,6 +193,8 @@ Full local release gate (pinned Gradle bootstrap verification, blocking lint, JV
 
 Release-facing version, SDK, capability-count, schema, and required artifact-commit claims are generated and checked from [`tools/release-truth.json`](tools/release-truth.json) by the same gate.
 
+Performance evidence is local and explicit. The quality gate validates the committed baseline-profile artifact and compiles the API 35+ Macrobenchmark harness; collect device evidence with `./gradlew :app:generateBaselineProfile` and run the release-like benchmark APK with `./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest`. The harness records cold-start (`StartupTimingMetric`) and first-navigation (`FrameTimingMetric`) results. Review repeated clean runs before changing a regression budget; hosted CI is intentionally not required.
+
 ```powershell
 .\tools\verify-local-release.ps1
 ```
@@ -212,6 +214,7 @@ Treat a wrapper upgrade as one atomic change: run `gradlew wrapper --gradle-vers
 | AGP | 9.2.1 |
 | KSP | 2.3.10 |
 | Build Tools | 36.0.0 |
+| Macrobenchmark | 1.5.0-alpha07 |
 | JDK | 17 or 21 |
 | Min SDK | 26 (Android 8.0) |
 | Compile SDK | 37 |
@@ -232,7 +235,7 @@ See [ROADMAP.md](ROADMAP.md) for the full backlog. Key remaining work:
 
 - Broad device-verified background geofence reliability evidence
 - API 37 platform readiness pass (FGS, predictive back, large-screen QA)
-- Macrobenchmark and Baseline Profile for cold-start performance
+- Device-run performance evidence is collected locally through the checked-in Macrobenchmark and Baseline Profile harness
 
 ---
 

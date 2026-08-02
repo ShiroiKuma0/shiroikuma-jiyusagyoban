@@ -1,0 +1,2 @@
+Lcom/opentasker/app/MainActivity;
+Lcom/opentasker/app/OpenTaskerApp_NoHilt;

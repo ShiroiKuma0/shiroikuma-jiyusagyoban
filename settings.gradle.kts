@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "OpenTasker"
 include(":app")
+include(":baselineprofile")

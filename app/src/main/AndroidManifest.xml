@@ -98,6 +98,10 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         tools:targetApi="s">
 
+        <profileable
+            android:shell="true"
+            tools:targetApi="29" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

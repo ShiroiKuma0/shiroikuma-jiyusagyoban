@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlin.parcelize)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.androidx.baselineprofile)
 }
 
 val releaseKeystorePath = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE")
@@ -70,11 +71,16 @@ android {
         getByName("debug") {
             isPseudoLocalesEnabled = true
         }
-        release {
+    release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfigs.findByName("release")?.let { signingConfig = it }
+        }
+        create("benchmark") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
         }
     }
 
@@ -136,6 +142,7 @@ dependencies {
 
     implementation(libs.work.runtime.ktx)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.profileinstaller)
 
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.collections.immutable)
@@ -146,6 +153,7 @@ dependencies {
     implementation(libs.jsoup)
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
+    baselineProfile(project(":baselineprofile"))
 
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)
@@ -588,6 +596,49 @@ tasks.register("verifyRoomSchema") {
     }
 }
 
+val verifyPerformanceEvidence = tasks.register("verifyPerformanceEvidence") {
+    group = "verification"
+    description = "Checks the baseline-profile artifact and macrobenchmark evidence harness."
+    dependsOn("compileReleaseArtProfile", ":baselineprofile:compileBenchmarkReleaseKotlin")
+
+    val profileFile = layout.projectDirectory.file("src/main/baseline-prof.txt")
+    val baselineSource = rootProject.layout.projectDirectory.file(
+        "baselineprofile/src/main/java/com/opentasker/baselineprofile/OpenTaskerBaselineProfile.kt",
+    )
+    val macrobenchmarkSource = rootProject.layout.projectDirectory.file(
+        "baselineprofile/src/main/java/com/opentasker/baselineprofile/OpenTaskerMacrobenchmark.kt",
+    )
+    inputs.files(profileFile, baselineSource, macrobenchmarkSource)
+
+    if (providers.gradleProperty("openTaskerRequirePerformanceRun").orNull?.toBoolean() == true) {
+        dependsOn("generateBaselineProfile")
+    }
+
+    doLast {
+        val profile = profileFile.asFile.readLines().map(String::trim).filter(String::isNotEmpty)
+        check(profile.any { it == "Lcom/opentasker/app/MainActivity;" }) {
+            "Baseline profile must include the launcher activity class rule."
+        }
+        check(profile.any { it == "Lcom/opentasker/app/OpenTaskerApp_NoHilt;" }) {
+            "Baseline profile must include the application class rule."
+        }
+
+        val baselineSourceText = baselineSource.asFile.readText()
+        check("BaselineProfileRule" in baselineSourceText && "startActivityAndWait" in baselineSourceText) {
+            "Baseline profile generator must exercise cold start."
+        }
+        val macrobenchmarkSourceText = macrobenchmarkSource.asFile.readText()
+        check("StartupTimingMetric" in macrobenchmarkSourceText && "FrameTimingMetric" in macrobenchmarkSourceText) {
+            "Macrobenchmark suite must cover startup and first-navigation timing."
+        }
+        println(
+            "Performance evidence harness passed: ${profile.size} profile rules; " +
+                "API 35+ device evidence is collected explicitly with :app:generateBaselineProfile " +
+                "and :baselineprofile:connectedBenchmarkReleaseAndroidTest.",
+        )
+    }
+}
+
 tasks.register<VerifyReleaseTruthTask>("verifyReleaseTruth") {
     truthFile.set(rootProject.layout.projectDirectory.file("tools/release-truth.json"))
     readmeFile.set(rootProject.layout.projectDirectory.file("README.md"))
@@ -745,6 +796,7 @@ tasks.register("localQualityGate") {
         verifyJvmTestCount,
         verifyQualityGateSeed,
         "verifyNativePageAlignment",
+        verifyPerformanceEvidence,
     )
 }
 
