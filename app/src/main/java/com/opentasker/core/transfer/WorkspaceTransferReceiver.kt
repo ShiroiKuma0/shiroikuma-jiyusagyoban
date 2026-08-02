@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.os.Environment
 import com.opentasker.app.BuildConfig
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.engine.EngineShutdown
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.storage.AutoStartSettings
@@ -155,8 +156,15 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
                             logTag = "WorkspaceTransfer",
                         )
                         pending.setResultCode(if (result.report.success) Activity.RESULT_OK else Activity.RESULT_FIRST_USER)
+                        // Carry the first failure back to the caller. Without it an adb-driven run
+                        // reports only "success=false" and the reason is stranded in the on-device run
+                        // log, which is exactly the wrong place when the caller is a script.
+                        val reason = result.skippedReason
+                            ?: result.report.results
+                                .firstNotNullOfOrNull { (it as? ActionResult.Failure)?.message }
                         pending.setResultData(
-                            "ran '$taskName': success=${result.report.success} in ${result.report.durationMs}ms"
+                            "ran '$taskName': success=${result.report.success} in ${result.report.durationMs}ms" +
+                                if (reason.isNullOrBlank()) "" else " — $reason"
                         )
                     }
                     ACTION_SET_STARTUP_TASKS -> {
