@@ -337,6 +337,10 @@
     <string name="catalog_action_app_kill_name" formatted="false">Kill App</string>
     <string name="catalog_action_app_kill_description" formatted="false">Force close an app</string>
     <string name="catalog_action_app_kill_field_package_label" formatted="false">Package name</string>
+    <string name="catalog_action_app_archive_name" formatted="false">Archive App</string>
+    <string name="catalog_action_app_archive_description" formatted="false">Archive an installed application while retaining its user data</string>
+    <string name="catalog_action_app_unarchive_name" formatted="false">Unarchive App</string>
+    <string name="catalog_action_app_unarchive_description" formatted="false">Request restoration of an archived application</string>
     <string name="catalog_action_home_go_name" formatted="false">Go Home</string>
     <string name="catalog_action_home_go_description" formatted="false">Return to launcher home screen</string>
     <string name="catalog_action_url_open_name" formatted="false">Open URL</string>

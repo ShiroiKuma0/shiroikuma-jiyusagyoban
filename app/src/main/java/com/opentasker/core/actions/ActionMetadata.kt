@@ -838,6 +838,30 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "app.archive",
+            nameRes = R.string.catalog_action_app_archive_name,
+            descriptionRes = R.string.catalog_action_app_archive_description,
+            categoryRes = R.string.catalog_category_app,
+            fields = listOf(
+                ActionField("package", R.string.catalog_action_app_launch_field_package_label, FieldType.APP, required = true, hintRes = R.string.catalog_action_app_launch_field_package_hint),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "app.unarchive",
+            nameRes = R.string.catalog_action_app_unarchive_name,
+            descriptionRes = R.string.catalog_action_app_unarchive_description,
+            categoryRes = R.string.catalog_category_app,
+            fields = listOf(
+                ActionField("package", R.string.catalog_action_app_launch_field_package_label, FieldType.APP, required = true, hintRes = R.string.catalog_action_app_launch_field_package_hint),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "shortcut.publish",
             nameRes = R.string.catalog_action_shortcut_publish_name,
             descriptionRes = R.string.catalog_action_shortcut_publish_description,

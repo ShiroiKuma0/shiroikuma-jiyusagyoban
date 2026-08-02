@@ -119,6 +119,8 @@ object AutomationSensitivityRegistry {
         "app.launch",
         "shortcut.publish",
         "app.kill",
+        "app.archive",
+        "app.unarchive",
         "home.go",
         "url.open",
         "sms.send",
@@ -144,6 +146,7 @@ object AutomationSensitivityRegistry {
     private val destructiveActionIds = setOf(
         "script.termux.run",
         "app.kill",
+        "app.archive",
         "file.write",
         "file.delete",
         "download",

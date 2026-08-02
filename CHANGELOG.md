@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **App archive actions**: added SDK-gated `app.archive` and `app.unarchive` actions with bounded PackageInstaller status handling, package validation, explicit self-archive refusal, and fail-closed permission/installer errors.
+
 - **Screen-recording trigger**: added Android 15/API 35-gated visibility callbacks, visible/not-visible editor presets, and setup guidance for `event=screen_recording` without capturing screen contents.
 
 - **Bluetooth aggregate trigger**: added a tracked final-disconnect transition as `event=bluetooth_all_disconnected`, an editor preset, and multi-device sequence tests.

@@ -11,8 +11,9 @@ import kotlin.streams.toList
 /**
  * Static guard for the PendingIntent surface: every constructed PendingIntent must be immutable,
  * with the single documented exception of the Termux plugin callback (which the plugin protocol
- * requires to be mutable so the receiver can fill in result extras). Also verifies the notification
- * button request-code allocator hands out collision-free codes.
+ * requires to be mutable so the receiver can fill in result extras, and the PackageInstaller
+ * archive status callback). Also verifies the notification button request-code allocator hands
+ * out collision-free codes.
  */
 class PendingIntentSourceGuardTest {
     private val mainSourceRoot: Path = listOf(
@@ -21,7 +22,7 @@ class PendingIntentSourceGuardTest {
     ).first(Files::exists)
 
     /** Files permitted to build a mutable PendingIntent, with the reason each is allowed. */
-    private val mutableAllowlist = setOf("TermuxCommandBroker.kt")
+    private val mutableAllowlist = setOf("TermuxCommandBroker.kt", "PackageArchiveActions.kt")
 
     private fun kotlinFiles(): List<Path> =
         Files.walk(mainSourceRoot).use { stream ->

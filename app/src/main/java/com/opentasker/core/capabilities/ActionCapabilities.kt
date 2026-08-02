@@ -105,6 +105,8 @@ object ActionCapabilityRegistry {
         "brightness.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access.", R.string.capability_write_settings),
         "screen.timeout" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access.", R.string.capability_write_settings),
         "app.kill" to ActionCapability(CapabilityLevel.Unsupported, "Force-stopping another app requires privileged app-management access that no normal app can hold.", R.string.capability_app_kill_unsupported),
+        "app.archive" to packageArchiveCapability("Archive installed packages while retaining their user data."),
+        "app.unarchive" to packageArchiveCapability("Request restoration of an archived package through its responsible installer."),
         "wol" to wakeOnLanCapability(),
         "volume.set" to volumeCapability("May be blocked by Do Not Disturb policy access."),
         "dnd.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Do Not Disturb access.", R.string.capability_dnd_access),
@@ -149,6 +151,13 @@ object ActionCapabilityRegistry {
             ActionCapability(CapabilityLevel.Unsupported, "Android 13+ blocks direct Bluetooth enable/disable for normal apps.", R.string.capability_bluetooth_unsupported)
         } else {
             ActionCapability(CapabilityLevel.RequiresSetup, "Requires Bluetooth permission.", R.string.capability_bluetooth_permission)
+        }
+
+    private fun packageArchiveCapability(reason: String): ActionCapability =
+        if (android.os.Build.VERSION.SDK_INT >= 35) {
+            ActionCapability(CapabilityLevel.Supported, reason, R.string.capability_app_archive_ready)
+        } else {
+            ActionCapability(CapabilityLevel.Unsupported, "Package archive APIs require Android 15 (API 35) or newer.", R.string.capability_app_archive_unsupported)
         }
 
     /**

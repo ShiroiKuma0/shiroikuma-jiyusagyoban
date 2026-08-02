@@ -37,6 +37,8 @@ import com.opentasker.core.actions.NotifyAction
 import com.opentasker.core.actions.NotifyCancelAction
 import com.opentasker.core.actions.ProgressNotificationAction
 import com.opentasker.core.actions.OpenUrlAction
+import com.opentasker.core.actions.AppArchiveAction
+import com.opentasker.core.actions.AppUnarchiveAction
 import com.opentasker.core.actions.PauseSoundAction
 import com.opentasker.core.actions.PersistVariableAction
 import com.opentasker.core.actions.PingAction
@@ -119,6 +121,8 @@ private fun registerBuiltInActions() {
         TileStateAction(),
         TemporaryStateAction(),
         LaunchAppAction(),
+        AppArchiveAction(),
+        AppUnarchiveAction(),
         ShortcutPublishAction(),
         LocalePluginSettingAction(),
         LocalePluginConditionQueryAction(),
