@@ -842,9 +842,14 @@ internal fun SceneElementView(
         }
 
         SceneElementType.RECTANGLE, SceneElementType.OVAL -> {
-            val fill = sceneColor(cfg["bgColor"])
+            // v(), NOT the raw map: every other element expands its config through v() so a %variable
+            // re-renders live on each change. Shapes read cfg[] directly, so a colour like
+            // %Setsuzoku_CurColor resolved to the literal string, sceneColor() returned null and the
+            // shape drew nothing — a per-SIM coloured icon was invisible while a literal-colour
+            // sibling rendered fine.
+            val fill = sceneColor(v("bgColor"))
             val shape = if (element.type == SceneElementType.OVAL) ovalShape
-            else RoundedCornerShape((cfg["cornerRadius"]?.toIntOrNull() ?: 0).dp)
+            else RoundedCornerShape((v("cornerRadius").toIntOrNull() ?: 0).dp)
             Box(
                 Modifier
                     .fillMaxSize()

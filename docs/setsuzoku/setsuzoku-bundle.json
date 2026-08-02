@@ -907,125 +907,93 @@
       "elements": [
         {
           "type": "RECTANGLE",
-          "xDp": 28,
+          "xDp": 18,
           "yDp": 30,
-          "widthDp": 92,
-          "heightDp": 116,
+          "widthDp": 118,
+          "heightDp": 156,
           "config": {
             "bgColor": "%Setsuzoku_CurColor",
-            "borderColor": "#FFFF00",
-            "borderWidth": "2",
-            "cornerRadius": "12"
+            "cornerRadius": "16"
           }
         },
         {
           "type": "RECTANGLE",
-          "xDp": 46,
-          "yDp": 52,
-          "widthDp": 56,
-          "heightDp": 44,
+          "xDp": 44,
+          "yDp": 64,
+          "widthDp": 66,
+          "heightDp": 58,
           "config": {
-            "bgColor": "#000000",
-            "borderColor": "%Setsuzoku_CurColor",
-            "borderWidth": "2",
-            "cornerRadius": "6"
+            "bgColor": "#FFFF00",
+            "cornerRadius": "8"
           }
         },
         {
           "type": "RECTANGLE",
-          "xDp": 54,
-          "yDp": 62,
-          "widthDp": 40,
-          "heightDp": 4,
+          "xDp": 44,
+          "yDp": 86,
+          "widthDp": 66,
+          "heightDp": 3,
           "config": {
             "bgColor": "%Setsuzoku_CurColor",
-            "borderWidth": "0",
-            "cornerRadius": "2"
+            "cornerRadius": "1"
           }
         },
         {
           "type": "RECTANGLE",
-          "xDp": 54,
-          "yDp": 72,
-          "widthDp": 40,
-          "heightDp": 4,
+          "xDp": 73,
+          "yDp": 64,
+          "widthDp": 3,
+          "heightDp": 58,
           "config": {
             "bgColor": "%Setsuzoku_CurColor",
-            "borderWidth": "0",
-            "cornerRadius": "2"
-          }
-        },
-        {
-          "type": "RECTANGLE",
-          "xDp": 54,
-          "yDp": 82,
-          "widthDp": 40,
-          "heightDp": 4,
-          "config": {
-            "bgColor": "%Setsuzoku_CurColor",
-            "borderWidth": "0",
-            "cornerRadius": "2"
+            "cornerRadius": "1"
           }
         },
         {
           "type": "TEXT",
-          "xDp": 28,
-          "yDp": 112,
-          "widthDp": 92,
-          "heightDp": 26,
+          "xDp": 146,
+          "yDp": 46,
+          "widthDp": 220,
+          "heightDp": 56,
           "config": {
-            "text": "SIM%Setsuzoku_CurSlot",
-            "textSize": "17",
+            "text": "%Setsuzoku_CurName",
+            "textSize": "42",
             "bold": "true",
-            "textColor": "#FFFFFF",
+            "textColor": "#FFFF00",
             "align": "center"
           }
         },
         {
           "type": "TEXT",
-          "xDp": 136,
-          "yDp": 56,
-          "widthDp": 232,
-          "heightDp": 56,
+          "xDp": 146,
+          "yDp": 110,
+          "widthDp": 220,
+          "heightDp": 36,
           "config": {
-            "text": "%Setsuzoku_CurName",
-            "textSize": "40",
+            "text": "SIM%Setsuzoku_CurSlot",
+            "textSize": "26",
             "bold": "true",
-            "textColor": "#FFFFFF",
-            "align": "left"
+            "textColor": "#FFFF00",
+            "align": "center"
           }
         },
         {
           "type": "TEXT",
-          "xDp": 134,
-          "yDp": 54,
-          "widthDp": 232,
-          "heightDp": 56,
-          "config": {
-            "text": "%Setsuzoku_CurName",
-            "textSize": "40",
-            "bold": "true",
-            "textColor": "%Setsuzoku_CurColor",
-            "align": "left"
-          }
-        },
-        {
-          "type": "TEXT",
-          "xDp": 136,
-          "yDp": 112,
-          "widthDp": 232,
-          "heightDp": 30,
+          "xDp": 146,
+          "yDp": 150,
+          "widthDp": 220,
+          "heightDp": 26,
           "config": {
             "text": "%SPD_Phase",
-            "textSize": "20",
+            "textSize": "18",
             "textColor": "#999999",
-            "align": "left"
+            "align": "center"
           }
         },
         {
           "type": "TEXT",
           "xDp": 10,
-          "yDp": 176,
+          "yDp": 190,
           "widthDp": 360,
           "heightDp": 106,
           "config": {
@@ -1039,7 +1007,7 @@
         {
           "type": "TEXT",
           "xDp": 10,
-          "yDp": 286,
+          "yDp": 300,
           "widthDp": 360,
           "heightDp": 36,
           "config": {
@@ -1053,7 +1021,7 @@
         {
           "type": "TEXT",
           "xDp": 10,
-          "yDp": 324,
+          "yDp": 338,
           "widthDp": 360,
           "heightDp": 26,
           "config": {
@@ -1066,7 +1034,7 @@
         {
           "type": "PROGRESS",
           "xDp": 30,
-          "yDp": 366,
+          "yDp": 376,
           "widthDp": 320,
           "heightDp": 26,
           "config": {
@@ -1079,7 +1047,7 @@
         {
           "type": "TEXT",
           "xDp": 10,
-          "yDp": 398,
+          "yDp": 408,
           "widthDp": 360,
           "heightDp": 26,
           "config": {
@@ -1092,12 +1060,12 @@
         {
           "type": "TEXT",
           "xDp": 20,
-          "yDp": 438,
+          "yDp": 446,
           "widthDp": 160,
-          "heightDp": 22,
+          "heightDp": 24,
           "config": {
-            "text": "平均",
-            "textSize": "16",
+            "text": "平均  MB/s",
+            "textSize": "17",
             "textColor": "#999999",
             "align": "center"
           }
@@ -1105,12 +1073,12 @@
         {
           "type": "TEXT",
           "xDp": 20,
-          "yDp": 462,
+          "yDp": 472,
           "widthDp": 160,
-          "heightDp": 40,
+          "heightDp": 42,
           "config": {
             "text": "%SPD_AvgMB",
-            "textSize": "30",
+            "textSize": "32",
             "bold": "true",
             "textColor": "#FFFF00",
             "align": "center"
@@ -1119,7 +1087,7 @@
         {
           "type": "TEXT",
           "xDp": 20,
-          "yDp": 504,
+          "yDp": 516,
           "widthDp": 160,
           "heightDp": 22,
           "config": {
@@ -1132,12 +1100,12 @@
         {
           "type": "TEXT",
           "xDp": 200,
-          "yDp": 438,
+          "yDp": 446,
           "widthDp": 160,
-          "heightDp": 22,
+          "heightDp": 24,
           "config": {
-            "text": "最高",
-            "textSize": "16",
+            "text": "最高  MB/s",
+            "textSize": "17",
             "textColor": "#999999",
             "align": "center"
           }
@@ -1145,12 +1113,12 @@
         {
           "type": "TEXT",
           "xDp": 200,
-          "yDp": 462,
+          "yDp": 472,
           "widthDp": 160,
-          "heightDp": 40,
+          "heightDp": 42,
           "config": {
             "text": "%SPD_PeakMB",
-            "textSize": "30",
+            "textSize": "32",
             "bold": "true",
             "textColor": "#FFFF00",
             "align": "center"
@@ -1159,7 +1127,7 @@
         {
           "type": "TEXT",
           "xDp": 200,
-          "yDp": 504,
+          "yDp": 516,
           "widthDp": 160,
           "heightDp": 22,
           "config": {
@@ -1172,7 +1140,7 @@
         {
           "type": "TEXT",
           "xDp": 10,
-          "yDp": 542,
+          "yDp": 550,
           "widthDp": 360,
           "heightDp": 24,
           "config": {
@@ -1185,7 +1153,7 @@
         {
           "type": "TEXT",
           "xDp": 10,
-          "yDp": 570,
+          "yDp": 578,
           "widthDp": 360,
           "heightDp": 22,
           "config": {
