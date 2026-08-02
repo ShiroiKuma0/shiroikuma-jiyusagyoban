@@ -21,4 +21,10 @@ class AdvancedProtectionReaderTest {
         assertFalse(AdvancedProtectionReader.shouldWarn(sdkInt = 35, apmEnabled = true))
         assertFalse(AdvancedProtectionReader.shouldWarn(sdkInt = 33, apmEnabled = true))
     }
+
+    @Test
+    fun liveCallbackIsOnlyAvailableOnApi36Plus() {
+        assertFalse(AdvancedProtectionReader.supportsLiveCallback(35))
+        assertTrue(AdvancedProtectionReader.supportsLiveCallback(36))
+    }
 }

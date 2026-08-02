@@ -80,6 +80,7 @@ import com.opentasker.core.storage.RestoreCandidate
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import com.opentasker.core.permissions.OemBatteryGuidance
+import com.opentasker.core.diagnostics.AdvancedProtectionReader
 import com.opentasker.core.permissions.RuntimePermissionOutcome
 import com.opentasker.core.permissions.RuntimePermissionRequestHistory
 import com.opentasker.ui.theme.ThemeMode
@@ -161,6 +162,7 @@ fun PermissionOnboardingScreen(
     tasks: List<Task> = emptyList(),
 ) {
     val context = LocalContext.current
+    val advancedProtectionEnabled by AdvancedProtectionReader.enabled.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     val permissionHistory = remember(context) { RuntimePermissionRequestHistory(context) }
     val permissionGrantedMessage = stringResource(R.string.permission_granted)
@@ -281,6 +283,26 @@ fun PermissionOnboardingScreen(
         }
 
         item { ThemeSetupCard() }
+
+        if (advancedProtectionEnabled) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.72f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.42f)),
+                    shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.lg),
+                ) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(stringResource(R.string.setup_advanced_protection_title), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(R.string.setup_advanced_protection_body),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                        )
+                    }
+                }
+            }
+        }
 
         item {
             BackupSetupCard(

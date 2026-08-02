@@ -12,6 +12,7 @@ import com.opentasker.core.capabilities.AutomationFeedbackRiskAnalyzer
 import com.opentasker.core.capabilities.ImportedProfileEnablePolicy
 import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.diagnostics.DiagnosticExport
+import com.opentasker.core.diagnostics.AdvancedProtectionReader
 import com.opentasker.core.diagnostics.CrashLogHandler
 import com.opentasker.core.diagnostics.CrashLogRecord
 import com.opentasker.core.diagnostics.EngineHealthReader
@@ -92,6 +93,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -419,6 +421,11 @@ class ActiveAutomationViewModel(
             runCatching { refreshBackupSetupState(busy = false) }
         }
         refreshDiagnostics()
+        viewModelScope.launch {
+            AdvancedProtectionReader.changes.collect {
+                refreshDiagnostics()
+            }
+        }
     }
 
     fun refreshDiagnostics() {

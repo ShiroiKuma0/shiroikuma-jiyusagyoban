@@ -14,6 +14,7 @@ import com.opentasker.core.storage.PendingRestoreApplyResult
 import com.opentasker.core.storage.VariableRepository
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import com.opentasker.core.diagnostics.CrashLogHandler
+import com.opentasker.core.diagnostics.AdvancedProtectionReader
 import com.opentasker.core.engine.RunLogPruneWorker
 import com.opentasker.core.engine.EngineWatchdogWorker
 import com.opentasker.core.platform.AppVisibilityTracker
@@ -43,6 +44,7 @@ class OpenTaskerApp_NoHilt : Application() {
         super.onCreate()
         installStrictModeInDebug()
         CrashLogHandler.install(this)
+        AdvancedProtectionReader.start(this)
         AppVisibilityTracker.register(this)
         ShizukuPowerBackend.initialize(this)
         registerActionMetadata()
