@@ -14,28 +14,28 @@ object DesignSystem {
         val sm = 8.dp      // Small spacing (list item padding, button internal)
         val md = 12.dp     // Medium spacing (card padding, section separation)
         val lg = 16.dp     // Large spacing (page padding, major sections)
-        val xl = 24.dp     // Extra large spacing (screen sections, major gaps)
-        val xxl = 32.dp    // Double extra large (top-level section gaps)
+        val xl = 20.dp     // Extra large spacing (screen sections, major gaps)
+        val xxl = 28.dp    // Double extra large (top-level section gaps)
     }
 
     object Screen {
-        val horizontalPadding = 14.dp
-        val verticalPadding = 12.dp
-        val cardPadding = 14.dp
-        val heroCardPadding = 16.dp
-        val sectionGap = 10.dp
-        val cardGap = 10.dp
+        val horizontalPadding = 20.dp
+        val verticalPadding = 10.dp
+        val cardPadding = 16.dp
+        val heroCardPadding = 18.dp
+        val sectionGap = 12.dp
+        val cardGap = 8.dp
     }
 
     // ========== Border Radius Scale ==========
     // Consistent radius scale for modern, slightly rounded aesthetic
     object Radii {
-        val xs = 4.dp      // Tight radius (badge, small buttons)
-        val sm = 6.dp      // Small radius (input fields, small components)
-        val md = 8.dp      // Medium radius (cards, standard buttons)
-        val lg = 10.dp     // Large radius (dialogs, large cards)
-        val xl = 12.dp     // Extra large radius (bottom sheets, premium cards)
-        val xxl = 14.dp    // Card radius (premium summary cards)
+        val xs = 2.dp      // Tight radius (small controls)
+        val sm = 4.dp      // Small radius (inputs, compact controls)
+        val md = 6.dp      // Medium radius (cards, standard buttons)
+        val lg = 8.dp      // Large radius (dialogs, large cards)
+        val xl = 10.dp     // Extra large radius (bottom sheets, premium cards)
+        val xxl = 12.dp    // Card radius (summary cards)
     }
 
     // ========== Elevation/Shadow Scale ==========
@@ -66,7 +66,7 @@ object DesignSystem {
         val touchTargetMin = 48.dp
         
         // List item height
-        val listItemHeight = 64.dp
+        val listItemHeight = 56.dp
         
         // Checkbox size
         val checkboxSize = 24.dp
@@ -74,8 +74,8 @@ object DesignSystem {
         // Status indicator size
         val statusIndicator = 12.dp
 
-        val compactControlHeight = 40.dp
-        val cardActionHeight = 44.dp
+        val compactControlHeight = 36.dp
+        val cardActionHeight = 40.dp
     }
 
     // ========== Semantic Colors ==========
@@ -93,6 +93,6 @@ object DesignSystem {
         val elevatedSurface = 0.92f
         val restingSurface = 0.78f
         val selectedSurface = 0.50f
-        val subtleBorder = 0.72f
+        val subtleBorder = 0.42f
     }
 }

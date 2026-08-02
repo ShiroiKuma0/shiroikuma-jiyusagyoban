@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.opentasker.core.capabilities.AutomationFeedbackRiskAnalyzer
 import com.opentasker.core.capabilities.ImportedProfileEnablePolicy
 import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.diagnostics.DiagnosticExport
@@ -509,12 +510,13 @@ class ActiveAutomationViewModel(
                 group = group,
             )
             requireValidProfileFieldLimits(profile)
-            db.profileDao().insert(profile.toEntity())
+            db.profileDao().insert(reviewFeedbackRisk(profile).toEntity())
         }
 
     fun updateProfile(profile: Profile, message: String = "Profile updated") =
         launchWithMessage(message) {
-            requireValidProfileFieldLimits(profile)
+            val reviewedProfile = reviewFeedbackRisk(profile)
+            requireValidProfileFieldLimits(reviewedProfile)
             // Atomic read-check-snapshot-update, matching updateScene, so racing writers
             // (dialog save vs. notification/external-intent path) can't lose a revision.
             db.withTransaction {
@@ -526,7 +528,7 @@ class ActiveAutomationViewModel(
                 val previous = previousEntity?.toDomain()
                 if (
                     previous?.requiresRiskAcknowledgement == true &&
-                    (profile.enabled || !profile.requiresRiskAcknowledgement)
+                    (reviewedProfile.enabled || !reviewedProfile.requiresRiskAcknowledgement)
                 ) {
                     throw IllegalStateException("Review imported automation powers before enabling this profile.")
                 }
@@ -543,9 +545,19 @@ class ActiveAutomationViewModel(
                 if (previous != null && previous.contexts != profile.contexts) {
                     locationDwellStateStore.clearProfile(profile.id)
                 }
-                db.profileDao().update(profile.toEntity())
+                db.profileDao().update(reviewedProfile.toEntity())
             }
         }
+
+    private suspend fun reviewFeedbackRisk(profile: Profile): Profile {
+        if (!profile.enabled || profile.requiresRiskAcknowledgement) return profile
+        val tasks = db.taskDao().getAll().map { it.toDomain() }
+        return if (AutomationFeedbackRiskAnalyzer.analyze(profile, tasks).isEmpty()) {
+            profile
+        } else {
+            profile.copy(enabled = false, requiresRiskAcknowledgement = true)
+        }
+    }
 
     fun acknowledgeAndEnableImportedProfile(profileId: Long) =
         launchWithMessage("Imported profile reviewed and enabled") {

@@ -18,32 +18,32 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 
-// Command-center palette derived from the nine-screen product mockup. Graphite surfaces keep
-// dense automation data calm, while iris, mint, blue, and coral communicate action and state.
-private val Iris = Color(0xFF8B5CF6)
-private val SignalBlue = Color(0xFF63B8FF)
-private val SignalMint = Color(0xFF63E6A6)
-private val SignalRed = Color(0xFFFF6B7A)
-private val Text = Color(0xFFF1F4FA)
-private val TextSecondary = Color(0xFFA9B3C5)
-private val GraphiteBackground = Color(0xFF090C12)
-private val GraphiteSurface = Color(0xFF10151E)
-private val GraphiteElevated = Color(0xFF171E29)
-private val GraphiteOutline = Color(0xFF344052)
+// Premium command-center palette: warm text, quiet graphite surfaces, and one restrained
+// sage accent. The UI should read like a workbench, not a collection of outlined cards.
+private val Sage = Color(0xFFB7C7B0)
+private val Sand = Color(0xFFD8C8AF)
+private val CoolBlue = Color(0xFF9CB7B0)
+private val SignalRed = Color(0xFFE38B84)
+private val Text = Color(0xFFF4F1EA)
+private val TextSecondary = Color(0xFFA9AEA8)
+private val GraphiteBackground = Color(0xFF101211)
+private val GraphiteSurface = Color(0xFF151817)
+private val GraphiteElevated = Color(0xFF1C211F)
+private val GraphiteOutline = Color(0xFF39413D)
 
 private val Amoled = darkColorScheme(
-    primary = Iris,
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFF2A1745),
-    onPrimaryContainer = Color(0xFFE5D2FF),
-    secondary = SignalBlue,
+    primary = Sage,
+    onPrimary = Color(0xFF182019),
+    primaryContainer = Color(0xFF2A352B),
+    onPrimaryContainer = Color(0xFFD9E7D3),
+    secondary = Sand,
     onSecondary = Color.Black,
-    secondaryContainer = Color(0xFF102B40),
-    onSecondaryContainer = Color(0xFFCBE9FF),
-    tertiary = SignalMint,
+    secondaryContainer = Color(0xFF383328),
+    onSecondaryContainer = Color(0xFFF0E2C8),
+    tertiary = CoolBlue,
     onTertiary = Color.Black,
-    tertiaryContainer = Color(0xFF103727),
-    onTertiaryContainer = Color(0xFFC8F8DF),
+    tertiaryContainer = Color(0xFF263532),
+    onTertiaryContainer = Color(0xFFD6E7E2),
     error = SignalRed,
     onError = Color(0xFF35000A),
     errorContainer = Color(0xFF47131D),
@@ -55,36 +55,36 @@ private val Amoled = darkColorScheme(
     surfaceVariant = GraphiteElevated,
     onSurfaceVariant = TextSecondary,
     outline = GraphiteOutline,
-    outlineVariant = Color(0xFF273142),
+    outlineVariant = Color(0xFF252B28),
 )
 
 // Catppuccin Latte palette for the light theme. Mirrors the dark scheme's structure so every
 // semantic token (including the *Container and outlineVariant slots the UI relies on) is defined
 // and coherent in both modes, rather than falling back to mismatched Material defaults.
-private val LightIris = Color(0xFF6D35C8)
-private val LightBlue = Color(0xFF176B9C)
-private val LightMint = Color(0xFF147A4B)
-private val LightRed = Color(0xFFB3263B)
-private val LightText = Color(0xFF171A21)
-private val LightSubtext = Color(0xFF566173)
-private val LightBase = Color(0xFFF3F5F9)
-private val LightSurface = Color(0xFFFFFFFF)
-private val LightElevated = Color(0xFFE9EDF4)
-private val LightOutline = Color(0xFF8C98AA)
+private val LightSage = Color(0xFF4D6653)
+private val LightSand = Color(0xFF765E3D)
+private val LightBlue = Color(0xFF4D6864)
+private val LightRed = Color(0xFF9D4F4B)
+private val LightText = Color(0xFF20241F)
+private val LightSubtext = Color(0xFF606960)
+private val LightBase = Color(0xFFF4F2EC)
+private val LightSurface = Color(0xFFFBFAF6)
+private val LightElevated = Color(0xFFE9ECE4)
+private val LightOutline = Color(0xFF89928A)
 
 private val Light = lightColorScheme(
-    primary = LightIris,
+    primary = LightSage,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFECDDFF),
-    onPrimaryContainer = Color(0xFF32125F),
-    secondary = LightBlue,
+    primaryContainer = Color(0xFFDCE8D8),
+    onPrimaryContainer = Color(0xFF1F3524),
+    secondary = LightSand,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFD8EEFF),
-    onSecondaryContainer = Color(0xFF07334E),
-    tertiary = LightMint,
+    secondaryContainer = Color(0xFFF0E5D2),
+    onSecondaryContainer = Color(0xFF43321C),
+    tertiary = LightBlue,
     onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFD1F3DF),
-    onTertiaryContainer = Color(0xFF083D25),
+    tertiaryContainer = Color(0xFFDDEAE6),
+    onTertiaryContainer = Color(0xFF1E3934),
     error = LightRed,
     onError = Color.White,
     errorContainer = Color(0xFFFFDADD),
@@ -96,7 +96,7 @@ private val Light = lightColorScheme(
     surfaceVariant = LightElevated,
     onSurfaceVariant = LightSubtext,
     outline = LightOutline,
-    outlineVariant = Color(0xFFC8D0DC),
+    outlineVariant = Color(0xFFD7DDD5),
 )
 
 private val HighContrast = darkColorScheme(
@@ -129,32 +129,32 @@ private val HighContrast = darkColorScheme(
 private val OpenTaskerTypography = Typography(
     headlineSmall = TextStyle(
         fontWeight = FontWeight.SemiBold,
-        fontSize = 24.sp,
-        lineHeight = 30.sp,
+        fontSize = 26.sp,
+        lineHeight = 31.sp,
     ),
     titleLarge = TextStyle(
         fontWeight = FontWeight.SemiBold,
-        fontSize = 20.sp,
-        lineHeight = 26.sp,
+        fontSize = 22.sp,
+        lineHeight = 27.sp,
     ),
     titleMedium = TextStyle(
         fontWeight = FontWeight.SemiBold,
-        fontSize = 16.sp,
+        fontSize = 17.sp,
         lineHeight = 22.sp,
     ),
     titleSmall = TextStyle(
         fontWeight = FontWeight.SemiBold,
-        fontSize = 14.sp,
+        fontSize = 15.sp,
         lineHeight = 20.sp,
     ),
     bodyMedium = TextStyle(
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
-        lineHeight = 21.sp,
+        lineHeight = 20.sp,
     ),
     bodySmall = TextStyle(
         fontWeight = FontWeight.Normal,
-        fontSize = 12.sp,
+        fontSize = 13.sp,
         lineHeight = 18.sp,
     ),
     labelLarge = TextStyle(
@@ -164,13 +164,13 @@ private val OpenTaskerTypography = Typography(
     ),
     labelMedium = TextStyle(
         fontWeight = FontWeight.Medium,
-        fontSize = 12.sp,
-        lineHeight = 16.sp,
+        fontSize = 13.sp,
+        lineHeight = 17.sp,
     ),
     labelSmall = TextStyle(
         fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
-        lineHeight = 14.sp,
+        fontSize = 12.sp,
+        lineHeight = 15.sp,
     ),
 )
 
@@ -219,5 +219,5 @@ fun OpenTaskerTheme(
 @Composable
 fun selectedContainerColor(): Color =
     MaterialTheme.colorScheme.primary
-        .copy(alpha = 0.42f)
+        .copy(alpha = 0.22f)
         .compositeOver(MaterialTheme.colorScheme.surface)

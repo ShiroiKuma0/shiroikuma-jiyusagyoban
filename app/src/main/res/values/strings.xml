@@ -376,6 +376,8 @@
     <string name="imported_profile_tasks_title">Tasks that can run</string>
     <string name="imported_profile_no_sensitive_powers">No sensitive powers are currently classified for these tasks.</string>
     <string name="imported_profile_data_chain_title">Potential data transfer</string>
+    <string name="imported_profile_feedback_title">Feedback loop risk</string>
+    <string name="imported_profile_feedback_body">This static task cycle can retrigger itself: %1$s</string>
     <string name="imported_profile_blocked_title">Cannot enable this profile</string>
     <string name="imported_profile_blocked_body">Resolve missing task references and remove unsupported or unknown actions first: %1$s</string>
     <string name="imported_profile_acknowledgement">I reviewed these tasks and understand the requested powers.</string>

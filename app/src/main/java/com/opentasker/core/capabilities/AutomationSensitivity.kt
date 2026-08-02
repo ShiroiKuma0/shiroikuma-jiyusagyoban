@@ -240,6 +240,7 @@ object AutomationSensitivityRegistry {
 
 data class ImportedProfileEnableReview(
     val risk: AutomationRiskSummary,
+    val feedbackLoopRisks: List<FeedbackLoopRisk>,
     val unsupportedActionIds: Set<String>,
     val missingTaskIds: Set<Long>,
     val requiresAcknowledgement: Boolean,
@@ -262,6 +263,7 @@ object ImportedProfileEnablePolicy {
             .toSortedSet()
         return ImportedProfileEnableReview(
             risk = AutomationSensitivityRegistry.summarize(profile, tasks),
+            feedbackLoopRisks = AutomationFeedbackRiskAnalyzer.analyze(profile, tasks),
             unsupportedActionIds = unsupported,
             missingTaskIds = missingTaskIds,
             requiresAcknowledgement = profile.requiresRiskAcknowledgement,

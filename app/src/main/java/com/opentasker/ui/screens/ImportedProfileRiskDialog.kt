@@ -44,6 +44,12 @@ internal fun ImportedProfileRiskDialog(
     val missingTaskLabels = review.missingTaskIds.map { taskId ->
         stringResource(R.string.imported_profile_missing_task_reference, taskId)
     }
+    val feedbackLabels = review.feedbackLoopRisks.map { risk ->
+        stringResource(
+            R.string.imported_profile_feedback_body,
+            risk.taskPath.joinToString(" → "),
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -87,6 +93,15 @@ internal fun ImportedProfileRiskDialog(
                         InlineNotice(
                             title = stringResource(R.string.imported_profile_data_chain_title),
                             body = chainLabels.joinToString("\n"),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+                if (review.feedbackLoopRisks.isNotEmpty()) {
+                    item {
+                        InlineNotice(
+                            title = stringResource(R.string.imported_profile_feedback_title),
+                            body = feedbackLabels.joinToString("\n"),
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
