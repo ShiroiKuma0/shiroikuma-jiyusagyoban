@@ -96,6 +96,7 @@
     <string name="dialog_delete_variable">Delete %%%1$s?</string>
     <string name="dialog_review_bundle">Review OpenTasker bundle</string>
     <string name="dialog_review_tasker">Review Tasker import</string>
+    <string name="dialog_profile_share_review">Review community share</string>
 
     <!-- Profile editor -->
     <string name="profile_name_label">Profile name</string>
@@ -430,6 +431,7 @@
     <string name="import_count_profiles">Profiles</string>
     <string name="import_count_variables">Variables</string>
     <string name="import_count_scenes">Scenes</string>
+    <string name="import_count_contexts">Contexts</string>
     <string name="import_count_setup_notes">Setup notes</string>
     <string name="import_count_warnings">Warnings</string>
     <string name="import_variable_conflicts">Resolve variable name conflicts</string>
@@ -444,6 +446,28 @@
     <string name="import_count_src_profiles">Src profiles</string>
     <string name="import_mapped">mapped</string>
     <string name="import_unsupported">unsupported</string>
+    <string name="profile_share_unverified_notice">This is an unverified local draft. Review the manifest and import plan before anything is written to OpenTasker.</string>
+    <string name="profile_share_slug">Share slug</string>
+    <string name="profile_share_slug_hint">3-64 lowercase letters, numbers, and hyphens</string>
+    <string name="profile_share_title">Title</string>
+    <string name="profile_share_summary">Summary</string>
+    <string name="profile_share_author">Author (optional)</string>
+    <string name="profile_share_source_url">Source URL (optional)</string>
+    <string name="profile_share_invalid_details">Share details need attention</string>
+    <string name="profile_share_trust_title">Trust and submission</string>
+    <string name="profile_share_trust_body">Trust: %1$s. Submission channel: %2$s. OpenTasker does not treat this draft as verified.</string>
+    <string name="profile_share_screenshots">Screenshots</string>
+    <string name="profile_share_screenshot_count">%1$d of %2$d attached</string>
+    <string name="profile_share_attach_screenshots">Attach screenshots</string>
+    <string name="profile_share_screenshot_description">Attached share screenshot</string>
+    <string name="profile_share_screenshot_unavailable">Preview unavailable</string>
+    <string name="profile_share_blockers">Blocking findings</string>
+    <string name="profile_share_warnings">Warnings and reviewer notes</string>
+    <string name="profile_share_import_plan">Bundle import plan</string>
+    <string name="profile_share_review_import">Review import plan</string>
+    <string name="profile_share_preview_action">Preview community share</string>
+    <string name="profile_share_preparing">Preparing share...</string>
+    <string name="action_remove_share_screenshot">Remove screenshot</string>
 
     <!-- Installed app picker -->
     <string name="app_picker_title">Choose installed app</string>
@@ -833,6 +857,7 @@
     <string name="ui_error_tasker_xml_import">Tasker XML import failed</string>
     <string name="ui_error_bundle_export">OpenTasker bundle export failed</string>
     <string name="ui_error_bundle_preview">OpenTasker bundle preview failed</string>
+    <string name="ui_error_share_preview">Unable to prepare share preview</string>
     <string name="ui_error_bundle_import">OpenTasker bundle import failed</string>
     <string name="ui_error_run_logs_load">Run logs could not be loaded</string>
     <string name="ui_error_run_logs_more">More run logs could not be loaded</string>

@@ -40,6 +40,9 @@ import com.opentasker.core.references.AutomationReferenceIndex
 import com.opentasker.core.references.AutomationReferenceRewriter
 import com.opentasker.core.references.ReferenceResolution
 import com.opentasker.core.references.TaskReference
+import com.opentasker.core.sharing.ProfileShareDraft
+import com.opentasker.core.sharing.ProfileShareLibrary
+import com.opentasker.core.sharing.ProfileShareManifest
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.RestoreCandidate
@@ -130,6 +133,13 @@ internal data class OpenTaskerBundleReviewState(
     val bundle: OpenTaskerBundle,
     val plan: BundleImportPlan,
     val variableResolutions: Map<String, VariableConflictResolution> = emptyMap(),
+)
+
+internal data class ProfileShareReviewState(
+    val draft: ProfileShareDraft,
+    val manifest: ProfileShareManifest,
+    val plan: BundleImportPlan,
+    val draftError: String? = null,
 )
 
 /**
@@ -342,6 +352,9 @@ class ActiveAutomationViewModel(
 
     private val _openTaskerBundleBusy = MutableStateFlow(false)
     val openTaskerBundleBusy: StateFlow<Boolean> = _openTaskerBundleBusy.asStateFlow()
+
+    private val _profileShareReview = MutableStateFlow<ProfileShareReviewState?>(null)
+    internal val profileShareReview: StateFlow<ProfileShareReviewState?> = _profileShareReview.asStateFlow()
 
     init {
         refreshRunLogPage()
@@ -635,6 +648,26 @@ class ActiveAutomationViewModel(
             }
         }
 
+    fun previewLocalProfileShare(appVersion: String) {
+        viewModelScope.launch {
+            if (_openTaskerBundleBusy.value) return@launch
+            _openTaskerBundleBusy.value = true
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val bundle = bundleRepository.exportBundle(
+                        appVersion = appVersion,
+                        name = "OpenTasker Community Share",
+                        description = "A local OpenTasker profile share draft.",
+                    )
+                    buildProfileShareReview(bundle)
+                }
+            }
+                .onSuccess { _profileShareReview.value = it }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_share_preview)) }
+            _openTaskerBundleBusy.value = false
+        }
+    }
+
     fun previewTaskerXml(uri: Uri, appVersion: String) {
         viewModelScope.launch {
             if (_taskerImportBusy.value) return@launch
@@ -726,16 +759,79 @@ class ActiveAutomationViewModel(
                 withContext(Dispatchers.IO) {
                     val rawJson = readBoundedOpenTaskerBundle(appContext, uri)
                     val bundle = OpenTaskerBundleCodec.decode(rawJson)
-                    OpenTaskerBundleReviewState(bundle = bundle, plan = bundleRepository.planImport(bundle))
+                    buildProfileShareReview(bundle)
                 }
             }
                 .onSuccess {
-                    _openTaskerBundleReview.value = it
+                    _profileShareReview.value = it
                     events.send(message(R.string.ui_message_bundle_ready))
                 }
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_bundle_preview)) }
             _openTaskerBundleBusy.value = false
         }
+    }
+
+    fun updateProfileShareDraft(draft: ProfileShareDraft) {
+        val current = _profileShareReview.value ?: return
+        runCatching { ProfileShareLibrary.buildManifest(draft) }
+            .onSuccess { manifest ->
+                _profileShareReview.value = current.copy(
+                    draft = draft,
+                    manifest = manifest,
+                    draftError = null,
+                )
+            }
+            .onFailure { error ->
+                _profileShareReview.value = current.copy(
+                    draft = draft,
+                    draftError = error.message ?: "Invalid share details.",
+                )
+            }
+    }
+
+    fun addProfileShareScreenshots(uris: List<Uri>) {
+        val current = _profileShareReview.value ?: return
+        val screenshots = (current.draft.screenshots + uris.map(Uri::toString))
+            .distinct()
+            .take(PROFILE_SHARE_MAX_SCREENSHOTS)
+        updateProfileShareDraft(current.draft.copy(screenshots = screenshots))
+    }
+
+    fun removeProfileShareScreenshot(uri: String) {
+        val current = _profileShareReview.value ?: return
+        updateProfileShareDraft(current.draft.copy(screenshots = current.draft.screenshots - uri))
+    }
+
+    fun clearProfileShareReview() {
+        if (!_openTaskerBundleBusy.value) {
+            _profileShareReview.value = null
+        }
+    }
+
+    fun continueProfileShareImportReview() {
+        val share = _profileShareReview.value ?: return
+        if (share.draftError != null || share.manifest.hasBlockingFindings || !share.plan.canImport) return
+        _openTaskerBundleReview.value = OpenTaskerBundleReviewState(
+            bundle = share.draft.bundle,
+            plan = share.plan,
+        )
+        _profileShareReview.value = null
+    }
+
+    private suspend fun buildProfileShareReview(bundle: OpenTaskerBundle): ProfileShareReviewState {
+        val draft = ProfileShareDraft(
+            slug = defaultProfileShareSlug(bundle.metadata.name),
+            title = bundle.metadata.name.ifBlank { "OpenTasker Share" },
+            summary = bundle.metadata.description.ifBlank {
+                "A local OpenTasker profile share draft."
+            },
+            bundle = bundle,
+        )
+        return ProfileShareReviewState(
+            draft = draft,
+            manifest = ProfileShareLibrary.buildManifest(draft),
+            plan = bundleRepository.planImport(bundle),
+        )
     }
 
     fun clearOpenTaskerBundleReview() {
@@ -1134,6 +1230,17 @@ class ActiveAutomationViewModel(
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
         }
     }
+}
+
+internal const val PROFILE_SHARE_MAX_SCREENSHOTS = 6
+
+internal fun defaultProfileShareSlug(name: String): String {
+    val slug = name
+        .lowercase(Locale.US)
+        .replace(Regex("[^a-z0-9]+"), "-")
+        .trim('-')
+        .take(64)
+    return slug.takeIf { it.length >= 3 } ?: "opentasker-share"
 }
 
 internal fun reorderActions(actions: List<ActionSpec>, fromIndex: Int, toIndex: Int): List<ActionSpec> {

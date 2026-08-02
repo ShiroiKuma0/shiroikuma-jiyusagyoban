@@ -299,6 +299,7 @@ fun ActiveAutomationUi(
     val taskerImportBusy by viewModel.taskerImportBusy.collectAsState()
     val openTaskerBundleReview by viewModel.openTaskerBundleReview.collectAsState()
     val openTaskerBundleBusy by viewModel.openTaskerBundleBusy.collectAsState()
+    val profileShareReview by viewModel.profileShareReview.collectAsState()
     val taskerXmlLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.previewTaskerXml(it, BuildConfig.VERSION_NAME) }
     }
@@ -309,6 +310,11 @@ fun ActiveAutomationUi(
     }
     val openTaskerBundleImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.previewOpenTaskerBundle(it) }
+    }
+    val profileShareScreenshotLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris ->
+        viewModel.addProfileShareScreenshots(uris)
     }
     val databaseBackupExportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
@@ -656,6 +662,7 @@ fun ActiveAutomationUi(
                     showTemplateDialog = true
                     if (!onboardingCompleted) onboardingTemplateFlow = true
                 },
+                onPreviewProfileShare = { viewModel.previewLocalProfileShare(BuildConfig.VERSION_NAME) },
                 onExportOpenTaskerBundle = { openTaskerBundleExportLauncher.launch(openTaskerBundleExportName()) },
                 onImportOpenTaskerBundle = { openTaskerBundleImportLauncher.launch(OPEN_TASKER_BUNDLE_MIME_TYPES) },
                 openTaskerBundleBusy = openTaskerBundleBusy,
@@ -894,6 +901,18 @@ fun ActiveAutomationUi(
             onDismiss = viewModel::clearOpenTaskerBundleReview,
             onVariableConflictResolution = viewModel::resolveOpenTaskerVariableConflict,
             onConfirm = viewModel::confirmOpenTaskerBundleImport,
+        )
+    }
+
+    profileShareReview?.let { state ->
+        ProfileShareReviewDialog(
+            state = state,
+            busy = openTaskerBundleBusy,
+            onDismiss = viewModel::clearProfileShareReview,
+            onDraftChanged = viewModel::updateProfileShareDraft,
+            onAttachScreenshots = { profileShareScreenshotLauncher.launch(arrayOf("image/*")) },
+            onRemoveScreenshot = viewModel::removeProfileShareScreenshot,
+            onContinueImportReview = viewModel::continueProfileShareImportReview,
         )
     }
 

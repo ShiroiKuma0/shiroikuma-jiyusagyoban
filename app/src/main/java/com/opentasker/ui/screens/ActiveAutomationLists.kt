@@ -78,6 +78,7 @@ internal fun ProfilesScreen(
     onCreateTaskFirst: () -> Unit,
     onCreateProfile: () -> Unit,
     onBrowseTemplates: () -> Unit,
+    onPreviewProfileShare: () -> Unit,
     onExportOpenTaskerBundle: () -> Unit,
     onImportOpenTaskerBundle: () -> Unit,
     openTaskerBundleBusy: Boolean,
@@ -150,6 +151,7 @@ internal fun ProfilesScreen(
                 tasks = tasks,
                 runLogs = runLogs,
                 onBrowseTemplates = onBrowseTemplates,
+                onPreviewProfileShare = onPreviewProfileShare,
                 onExportOpenTaskerBundle = onExportOpenTaskerBundle,
                 onImportOpenTaskerBundle = onImportOpenTaskerBundle,
                 openTaskerBundleBusy = openTaskerBundleBusy,
@@ -230,6 +232,7 @@ private fun WorkspaceSummaryCard(
     tasks: List<Task>,
     runLogs: List<RunLogEntry>,
     onBrowseTemplates: () -> Unit,
+    onPreviewProfileShare: () -> Unit,
     onExportOpenTaskerBundle: () -> Unit,
     onImportOpenTaskerBundle: () -> Unit,
     openTaskerBundleBusy: Boolean,
@@ -308,6 +311,19 @@ private fun WorkspaceSummaryCard(
                 ) {
                     Text(if (openTaskerBundleBusy) stringResource(R.string.import_reading_json) else stringResource(R.string.import_import_json))
                 }
+            }
+            OutlinedButton(
+                onClick = onPreviewProfileShare,
+                enabled = !openTaskerBundleBusy,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    if (openTaskerBundleBusy) {
+                        stringResource(R.string.profile_share_preparing)
+                    } else {
+                        stringResource(R.string.profile_share_preview_action)
+                    },
+                )
             }
         }
     }
