@@ -1,3 +1,4 @@
+import java.io.File
 import java.net.URLEncoder
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
@@ -84,6 +85,7 @@ abstract class VerifyDocumentationTruthTask : DefaultTask() {
         )
     }
 }
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -100,6 +102,21 @@ val releaseKeyAlias = System.getenv("OPEN_TASKER_RELEASE_KEY_ALIAS")
 val releaseKeyPassword = System.getenv("OPEN_TASKER_RELEASE_KEY_PASSWORD")
 val appVersionCode = 84
 val appVersionName = "0.2.82"
+// --- shiroikuma fork: per-build version tail ---
+// forkVersionName = "<upstreamBase>+N", forkVersionCode = <upstreamCode>*10000 + N,
+// where N = BUILD_NUMBER from gradle.properties (bumped every build, reset to 1 on upstream sync).
+val forkBuildNumber = (project.findProperty("BUILD_NUMBER") as String?)?.trim()?.toIntOrNull() ?: 1
+val forkVersionName = "$appVersionName+$forkBuildNumber"
+val forkVersionCode = appVersionCode * 10000 + forkBuildNumber
+
+// --- shiroikuma fork: release signing from a gitignored keystore.properties ---
+// (falls back to the upstream OPEN_TASKER_* env vars when the file is absent).
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) keystorePropertiesFile.inputStream().use { load(it) }
+}
+val useKeystoreProperties = keystorePropertiesFile.exists()
+
 val allowedDistributions = setOf("standard", "fdroid", "play")
 val selectedDistribution = providers.gradleProperty("openTaskerDistribution")
     .orElse("standard")
@@ -111,6 +128,7 @@ require(selectedDistribution in allowedDistributions) {
 val smsActionAvailable = selectedDistribution != "play"
 val smsReceiveAvailable = selectedDistribution != "play"
 val hasReleaseSigning = listOf(
+val hasReleaseSigning = useKeystoreProperties || listOf(
     releaseKeystorePath,
     releaseKeystorePassword,
     releaseKeyAlias,
@@ -121,13 +139,14 @@ android {
     namespace = "com.opentasker.app"
     compileSdk = 37
     buildToolsVersion = "36.0.0"
+    ndkVersion = "28.2.13676358"
 
     defaultConfig {
-        applicationId = "com.opentasker.app"
+        applicationId = "shiroikuma.jiyusagyoban"
         minSdk = 26
         targetSdk = 37
-        versionCode = appVersionCode
-        versionName = appVersionName
+        versionCode = forkVersionCode
+        versionName = forkVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "DISTRIBUTION", "\"$selectedDistribution\"")
         buildConfigField("Boolean", "SMS_ACTION_AVAILABLE", smsActionAvailable.toString())
@@ -138,6 +157,16 @@ android {
         manifestPlaceholders["smsWapPushPermissionName"] = if (smsReceiveAvailable) "android.permission.RECEIVE_WAP_PUSH" else "android.permission.INTERNET"
         manifestPlaceholders["smsTriggerEnabled"] = smsReceiveAvailable.toString()
         manifestPlaceholders["phoneStatePermissionName"] = if (smsActionAvailable) "android.permission.READ_PHONE_STATE" else "android.permission.ACCESS_NETWORK_STATE"
+        ndk {
+            // The native key-grabber (libevgrab.so) ships arm64 only, matching our single-ABI APK.
+            abiFilters += "arm64-v8a"
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
     }
 
     signingConfigs {
@@ -149,10 +178,17 @@ android {
         }
         if (hasReleaseSigning) {
             create("release") {
-                storeFile = file(releaseKeystorePath!!)
-                storePassword = releaseKeystorePassword
-                keyAlias = releaseKeyAlias
-                keyPassword = releaseKeyPassword
+                if (useKeystoreProperties) {
+                    storeFile = file(keystoreProperties.getProperty("storeFile"))
+                    storePassword = keystoreProperties.getProperty("storePassword")
+                    keyAlias = keystoreProperties.getProperty("keyAlias")
+                    keyPassword = keystoreProperties.getProperty("keyPassword")
+                } else {
+                    storeFile = file(releaseKeystorePath!!)
+                    storePassword = releaseKeystorePassword
+                    keyAlias = releaseKeyAlias
+                    keyPassword = releaseKeyPassword
+                }
             }
         } else {
             // Self-host signing identity, checked in deliberately. Distributed builds are
@@ -200,10 +236,14 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        aidl = true
     }
 
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        // Extract libevgrab.so to nativeLibraryDir so the Shizuku UserService (KeyGrabberService) can
+        // System.load() it by absolute path from the privileged process.
+        jniLibs.useLegacyPackaging = true
     }
 
     sourceSets {
@@ -228,6 +268,7 @@ dependencies {
     androidTestImplementation(composeBom)
 
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.documentfile)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -241,7 +282,6 @@ dependencies {
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
-    implementation(libs.sqlcipher.android)
     ksp(libs.androidx.room.compiler)
 
     implementation(libs.work.runtime.ktx)
@@ -258,6 +298,8 @@ dependencies {
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
     baselineProfile(project(":baselineprofile"))
+    // On-device APK signing for the generated per-target share-relay APKs (core/share/relay).
+    implementation(libs.apksig)
 
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)
@@ -947,4 +989,39 @@ tasks.register<VerifyNativePageAlignmentTask>("verifyNativePageAlignment") {
     description = "Checks that packaged native ELFs are read-only and have 16 KB PT_LOAD alignment."
     dependsOn("packageDebug")
     apk.set(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk"))
+// --- shiroikuma fork: archive naming + one-shot build task ---
+base {
+    archivesName = "shiroikuma-jiyusagyoban_${forkVersionName}_arm64-v8a"
+}
+
+tasks.register("buildFork") {
+    group = "build"
+    description = "Build the signed release APK, copy it to ~/tmp, and bump BUILD_NUMBER for next time."
+    dependsOn("assembleRelease")
+    // Configuration-cache-safe: capture every project-derived value HERE (configuration time) —
+    // the doLast lambda must not touch `layout` / `rootProject` / other project services.
+    val apkName = "shiroikuma-jiyusagyoban_${forkVersionName}_arm64-v8a.apk"
+    val outputDirProvider = layout.buildDirectory.dir("outputs/apk/release")
+    val propsFile = rootProject.file("gradle.properties")
+    val versionCode = forkVersionCode
+    val nextBuildNumber = forkBuildNumber + 1
+    doLast {
+        val outputDir = outputDirProvider.get().asFile
+        val targetDir = File(System.getProperty("user.home"), "tmp").apply { mkdirs() }
+        val apk = outputDir.listFiles { _, name -> name.endsWith(".apk") }?.firstOrNull()
+            ?: throw GradleException("No APK found in $outputDir")
+        val target = File(targetDir, apkName)
+        apk.copyTo(target, overwrite = true)
+        println("\u001b[1;36m>>> ${target.absolutePath}\u001b[0m")
+        println("\u001b[1;36m>>> versionCode $versionCode\u001b[0m")
+
+        // Auto-increment BUILD_NUMBER for the next build.
+        val text = propsFile.readText()
+        propsFile.writeText(
+            if (Regex("(?m)^BUILD_NUMBER=").containsMatchIn(text))
+                text.replace(Regex("(?m)^BUILD_NUMBER=.*$"), "BUILD_NUMBER=$nextBuildNumber")
+            else text.trimEnd() + "\n\n# shiroikuma fork: per-build version tail\nBUILD_NUMBER=$nextBuildNumber\n"
+        )
+        println("\u001b[1;36m>>> BUILD_NUMBER bumped to $nextBuildNumber\u001b[0m")
+    }
 }

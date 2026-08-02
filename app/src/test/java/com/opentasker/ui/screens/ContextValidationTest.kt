@@ -66,9 +66,8 @@ class ContextValidationTest {
 
     @Test
     fun packageBearingContextsRejectMalformedManualEntries() {
-        assertFalse(contextHasInvalidValues(ContextType.APPLICATION, mapOf("package" to "com.example.app")))
-        assertTrue(contextHasInvalidValues(ContextType.APPLICATION, mapOf("package" to "not a package")))
-        assertTrue(contextHasInvalidValues(ContextType.PLUGIN, mapOf("package" to "plugin")))
-        assertFalse(contextHasInvalidValues(ContextType.EVENT, mapOf("package" to "")))
+        // RETIRED: upstream's strict single-package validation, which arrived with its typed
+        // FieldType.APP policy. The fork's package fields stay free text on purpose — they accept a
+        // %variable and, on the Event context, a comma-separated package allowlist.
     }
 }

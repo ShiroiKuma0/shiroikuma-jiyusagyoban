@@ -5,7 +5,6 @@ import android.security.keystore.KeyProperties
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.Variable
 import com.opentasker.core.model.VariableNamePolicy
-import com.opentasker.core.model.DEFAULT_PROJECT_ID
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
 import java.security.SecureRandom
@@ -153,7 +152,6 @@ data class RuntimeVariableValue(
     val value: String,
     val isSecret: Boolean,
     val isGlobal: Boolean = true,
-    val projectId: Long = DEFAULT_PROJECT_ID,
 )
 
 data class RuntimeVariableCommitResult(
@@ -177,15 +175,10 @@ class VariableRepository(
     private val migrationMutex = Mutex()
     @Volatile private var legacyMigrationAttempted = false
 
-    fun observeGlobals(projectId: Long? = DEFAULT_PROJECT_ID): Flow<List<Variable>> = flow {
+    fun observeGlobals(): Flow<List<Variable>> = flow {
         migrateLegacySensitiveVariables()
-        val source = when (projectId) {
-            null -> dao.getAllGlobalAsFlowAll()
-            DEFAULT_PROJECT_ID -> dao.getAllGlobalAsFlow()
-            else -> dao.getAllGlobalAsFlowInProject(projectId)
-        }
         emitAll(
-            source.map { entities ->
+            dao.getAllAsFlow().map { entities ->
                 entities.map(::decodeForDomain)
             },
         )
@@ -193,33 +186,25 @@ class VariableRepository(
 
     suspend fun upsert(variable: Variable) {
         storageMutationMutex.withLock {
-            dao.upsert(variable.normalizedForStorage().toStoredEntity(secretCodec))
+            dao.insert(variable.normalizedForStorage().toStoredEntity(secretCodec))
         }
     }
 
-    suspend fun delete(name: String, projectId: Long = DEFAULT_PROJECT_ID) {
-        storageMutationMutex.withLock {
-            if (projectId == DEFAULT_PROJECT_ID) dao.deleteByName(name)
-            else dao.deleteByNameInProject(name, projectId)
-        }
+    suspend fun delete(projectId: Long, name: String) {
+        storageMutationMutex.withLock { dao.delete(projectId, name) }
     }
 
     suspend fun importVariable(variable: Variable) {
         val normalized = variable.normalizedForStorage()
         val entity = normalized.toStoredEntity(secretCodec)
         storageMutationMutex.withLock {
-            val existing = if (normalized.projectId == DEFAULT_PROJECT_ID) {
-                dao.get(normalized.name)
-            } else {
-                dao.getInProject(normalized.name, normalized.projectId)
-            }
-            if (existing == null) dao.upsert(entity) else dao.upsert(entity)
+            if (dao.get(normalized.projectId, normalized.name) == null) dao.insert(entity) else dao.update(entity)
         }
     }
 
-    suspend fun ordinaryExport(projectId: Long? = null): OrdinaryVariableExport {
+    suspend fun ordinaryExport(): OrdinaryVariableExport {
         migrateLegacySensitiveVariables()
-        val entities = projectId?.let { dao.getAllInProject(it) } ?: dao.getAll()
+        val entities = dao.getAll()
         return OrdinaryVariableExport(
             variables = entities
                 .filterNot(VariableEntity::isEffectivelySecret)
@@ -228,17 +213,16 @@ class VariableRepository(
         )
     }
 
-    suspend fun runtimeGlobals(projectId: Long = DEFAULT_PROJECT_ID): RuntimeVariableSeed {
+    suspend fun runtimeGlobals(): RuntimeVariableSeed {
         migrateLegacySensitiveVariables()
-        return readRuntimeGlobals(projectId)
+        return readRuntimeGlobals()
     }
 
-    private suspend fun readRuntimeGlobals(projectId: Long = DEFAULT_PROJECT_ID): RuntimeVariableSeed {
+    private suspend fun readRuntimeGlobals(): RuntimeVariableSeed {
         val values = linkedMapOf<String, String>()
         val secretNames = linkedSetOf<String>()
         val unavailable = linkedSetOf<String>()
-        val entities = if (projectId == DEFAULT_PROJECT_ID) dao.getAllGlobal() else dao.getAllGlobalInProject(projectId)
-        entities.sortedBy { it.name }.forEach { entity ->
+        dao.getAll().sortedBy { it.name }.forEach { entity ->
             if (!entity.isEffectivelySecret()) {
                 values[entity.name] = entity.value
                 return@forEach
@@ -255,7 +239,7 @@ class VariableRepository(
     suspend fun persistRuntime(values: List<RuntimeVariableValue>) {
         val entities = values.map(::runtimeValueToEntity)
         storageMutationMutex.withLock {
-            dao.upsertAll(entities)
+            dao.insertAll(entities)
         }
     }
 
@@ -270,7 +254,7 @@ class VariableRepository(
         if (values.isEmpty()) return RuntimeVariableCommitResult(emptyList(), emptyList())
         migrateLegacySensitiveVariables()
         return storageMutationMutex.withLock {
-            val current = readRuntimeGlobals(values.firstOrNull()?.projectId ?: DEFAULT_PROJECT_ID)
+            val current = readRuntimeGlobals()
             val accepted = mutableListOf<RuntimeVariableValue>()
             val appliedNames = mutableListOf<String>()
             val conflictedNames = mutableListOf<String>()
@@ -287,7 +271,7 @@ class VariableRepository(
                     else -> conflictedNames += value.name
                 }
             }
-            if (accepted.isNotEmpty()) dao.upsertAll(accepted.map(::runtimeValueToEntity))
+            if (accepted.isNotEmpty()) dao.insertAll(accepted.map(::runtimeValueToEntity))
             RuntimeVariableCommitResult(appliedNames, conflictedNames)
         }
     }
@@ -301,7 +285,7 @@ class VariableRepository(
                     .filter { it.isSecret && !AesGcmVariableSecretCodec.isEnvelope(it.value) }
                     .forEach { entity ->
                         runCatching {
-                            dao.upsert(
+                            dao.update(
                                 entity.copy(
                                     value = secretCodec.encrypt(entity.name, entity.value),
                                     isSecret = true,
@@ -330,16 +314,15 @@ class VariableRepository(
 
     private fun decodeForDomain(entity: VariableEntity): Variable {
         if (!entity.isSecret) {
-            return Variable(entity.name, entity.value, entity.isGlobal)
+            return Variable(entity.name, entity.value, entity.projectId)
         }
         val decoded = secretCodec.decrypt(entity.name, entity.value)
         return Variable(
             name = entity.name,
             value = decoded.getOrDefault(""),
-            isGlobal = entity.isGlobal,
+            projectId = entity.projectId,
             isSecret = true,
             secretAvailable = decoded.isSuccess,
-            projectId = entity.projectId,
         )
     }
 
@@ -347,9 +330,8 @@ class VariableRepository(
         Variable(
             name = value.name,
             value = value.value,
-        isGlobal = true,
-        isSecret = value.isSecret,
-        projectId = value.projectId,
+            projectId = 0,
+            isSecret = value.isSecret,
         ).normalizedForStorage().toStoredEntity(secretCodec)
 
     companion object {
@@ -373,20 +355,16 @@ private fun RuntimeVariableSeed.stateOf(name: String): RuntimeVariableState = Ru
 internal fun VariableEntity.isEffectivelySecret(): Boolean = isSecret
 
 internal fun Variable.normalizedForStorage(): Variable {
-    val normalizedName = VariableNamePolicy.normalizeForScope(name, isGlobal)
-        ?: throw IllegalArgumentException(
-            if (isGlobal) {
-                "Invalid global variable name '$name'"
-            } else {
-                "Invalid local variable name '$name': local names must be all lowercase"
-            },
-        )
+    // Fork: names may be non-ASCII (Japanese), so only strip an optional `%` sigil and trim —
+    // VariableNamePolicy's ASCII-only pattern must not reject them here.
+    val normalizedName = name.trim().removePrefix("%")
+    require(normalizedName.isNotEmpty()) { "Empty variable name" }
     return if (normalizedName == name) this else copy(name = normalizedName)
 }
 
 internal fun Variable.toStoredEntity(codec: VariableSecretCodec): VariableEntity = VariableEntity(
+    projectId = projectId,
     name = name,
     value = if (isSecret) codec.encrypt(name, value) else value,
-    isGlobal = isGlobal,
     isSecret = isSecret,
 )

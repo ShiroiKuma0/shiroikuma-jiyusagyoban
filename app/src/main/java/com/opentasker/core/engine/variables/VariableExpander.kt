@@ -458,8 +458,8 @@ class ArrayStore {
         synchronized(lock) { arrays.clear() }
     }
 
-    companion object {
-        private const val MAX_ARRAYS = 500
+    fun remove(name: String) {
+        synchronized(lock) { arrays.remove(name) }
     }
 
     fun get(name: String, index: Int): String {
@@ -480,4 +480,8 @@ class ArrayStore {
 
     fun snapshot(): Map<String, List<String>> =
         synchronized(lock) { LinkedHashMap(arrays).mapValues { (_, values) -> values.toList() } }
+
+    companion object {
+        private const val MAX_ARRAYS = 500
+    }
 }
