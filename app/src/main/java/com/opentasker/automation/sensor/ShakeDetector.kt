@@ -5,16 +5,16 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import com.opentasker.automation.MonitorLifecycle
 import com.opentasker.core.contexts.ShakeContextEvents
 import com.opentasker.core.logging.AppLogger
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.sqrt
 
 class ShakeDetector(context: Context) {
 
     private val sensorManager = context.applicationContext.getSystemService(SensorManager::class.java)
     private val accelerometer = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-    private val started = AtomicBoolean(false)
+    private val lifecycle = MonitorLifecycle()
 
     private var lastShakeTime = 0L
 
@@ -28,10 +28,8 @@ class ShakeDetector(context: Context) {
             val gz = z / SensorManager.GRAVITY_EARTH
             val magnitude = sqrt((gx * gx + gy * gy + gz * gz).toDouble()).toFloat()
 
-            if (magnitude < SHAKE_THRESHOLD_G) return
-
             val now = System.currentTimeMillis()
-            if (now - lastShakeTime < DEBOUNCE_MS) return
+            if (!shouldPublishShake(magnitude, lastShakeTime, now)) return
             lastShakeTime = now
 
             AppLogger.info(TAG, "Shake detected: magnitude=${magnitude}g")
@@ -42,35 +40,38 @@ class ShakeDetector(context: Context) {
     }
 
     fun start(): Boolean {
-        if (!started.compareAndSet(false, true)) return true
-        if (accelerometer == null) {
-            started.set(false)
-            AppLogger.warn(TAG, "No accelerometer sensor available")
-            return false
+        return lifecycle.start {
+            if (accelerometer == null) {
+                AppLogger.warn(TAG, "No accelerometer sensor available")
+                return@start false
+            }
+            val registered = sensorManager?.registerListener(
+                listener,
+                accelerometer,
+                SensorManager.SENSOR_DELAY_UI,
+            ) == true
+            if (registered) {
+                AppLogger.info(TAG, "Shake detector started")
+            } else {
+                AppLogger.warn(TAG, "Accelerometer listener could not be registered")
+            }
+            registered
         }
-        val registered = sensorManager?.registerListener(
-            listener,
-            accelerometer,
-            SensorManager.SENSOR_DELAY_UI,
-        ) == true
-        if (registered) {
-            AppLogger.info(TAG, "Shake detector started")
-        } else {
-            started.set(false)
-            AppLogger.warn(TAG, "Accelerometer listener could not be registered")
-        }
-        return registered
     }
 
     fun stop() {
-        if (!started.compareAndSet(true, false)) return
-        sensorManager?.unregisterListener(listener)
-        AppLogger.info(TAG, "Shake detector stopped")
+        lifecycle.stop {
+            sensorManager?.unregisterListener(listener)
+            AppLogger.info(TAG, "Shake detector stopped")
+        }
     }
 
     companion object {
         private const val TAG = "OpenTasker"
         private const val SHAKE_THRESHOLD_G = 2.5f
         private const val DEBOUNCE_MS = 1000L
+
+        internal fun shouldPublishShake(magnitudeG: Float, lastShakeAtMs: Long, nowMs: Long): Boolean =
+            magnitudeG >= SHAKE_THRESHOLD_G && nowMs - lastShakeAtMs >= DEBOUNCE_MS
     }
 }

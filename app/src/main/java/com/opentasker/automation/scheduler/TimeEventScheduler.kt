@@ -25,7 +25,7 @@ class TimeEventScheduler(context: Context) {
         val pendingIntent = tickPendingIntent()
 
         alarmManager.cancel(pendingIntent)
-        when (ExactAlarmSupport.schedulePrecision(appContext)) {
+        when (scheduleMode(ExactAlarmSupport.schedulePrecision(appContext))) {
             AlarmSchedulePrecision.Exact -> {
                 try {
                     alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
@@ -69,5 +69,7 @@ class TimeEventScheduler(context: Context) {
             ((nowMillis / MINUTE_MS) + 1L) * MINUTE_MS
 
         internal fun recoveryTriggerAtMillis(nowMillis: Long): Long = nowMillis + RECOVERY_DELAY_MS
+
+        internal fun scheduleMode(precision: AlarmSchedulePrecision): AlarmSchedulePrecision = precision
     }
 }

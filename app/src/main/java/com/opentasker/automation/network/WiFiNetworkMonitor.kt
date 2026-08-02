@@ -8,16 +8,16 @@ import android.net.NetworkRequest
 import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.os.Build
+import com.opentasker.automation.MonitorLifecycle
 import com.opentasker.core.contexts.DeviceStateEvents
 import com.opentasker.core.logging.AppLogger
-import java.util.concurrent.atomic.AtomicBoolean
 
 class WiFiNetworkMonitor(
     context: Context,
 ) {
     private val appContext = context.applicationContext
     private val connectivityManager: ConnectivityManager? = appContext.getSystemService(ConnectivityManager::class.java)
-    private val started = AtomicBoolean(false)
+    private val lifecycle = MonitorLifecycle()
     @Volatile private var lastState: WiFiState? = null
 
     private val callback = object : ConnectivityManager.NetworkCallback() {
@@ -35,39 +35,35 @@ class WiFiNetworkMonitor(
     }
 
     fun start(): Boolean {
-        if (!started.compareAndSet(false, true)) return true
-        val cm = connectivityManager
-        if (cm == null) {
-            started.set(false)
-            AppLogger.warn(TAG, "ConnectivityManager unavailable; WiFi monitoring disabled")
-            emitState(WiFiState(connected = false, ssid = UNKNOWN_SSID))
-            return false
-        }
+        return lifecycle.start {
+            val cm = connectivityManager
+            if (cm == null) {
+                AppLogger.warn(TAG, "ConnectivityManager unavailable; WiFi monitoring disabled")
+                emitState(WiFiState(connected = false, ssid = UNKNOWN_SSID))
+                return@start false
+            }
 
-        val request = NetworkRequest.Builder()
-            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-            .build()
+            val request = NetworkRequest.Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .build()
 
-        try {
-            cm.registerNetworkCallback(request, callback)
-            emitCurrentState()
-            AppLogger.debug(TAG, "WiFi NetworkCallback registered")
-            return true
-        } catch (ex: RuntimeException) {
-            started.set(false)
-            AppLogger.error(TAG, "Failed to register WiFi NetworkCallback", ex)
-            emitState(WiFiState(connected = false, ssid = UNKNOWN_SSID))
-            return false
+            try {
+                cm.registerNetworkCallback(request, callback)
+                emitCurrentState()
+                AppLogger.debug(TAG, "WiFi NetworkCallback registered")
+                true
+            } catch (ex: RuntimeException) {
+                AppLogger.error(TAG, "Failed to register WiFi NetworkCallback", ex)
+                emitState(WiFiState(connected = false, ssid = UNKNOWN_SSID))
+                false
+            }
         }
     }
 
     fun stop() {
-        if (!started.compareAndSet(true, false)) return
-        try {
+        lifecycle.stop {
             connectivityManager?.unregisterNetworkCallback(callback)
             AppLogger.debug(TAG, "WiFi NetworkCallback unregistered")
-        } catch (ex: RuntimeException) {
-            AppLogger.warn(TAG, "WiFi NetworkCallback was already unregistered", ex)
         }
     }
 

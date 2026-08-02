@@ -28,7 +28,7 @@ class AppUsageMonitor(
         if (monitorJob?.isActive == true) return true
         monitorJob = scope.launch(Dispatchers.Default) {
             while (isActive) {
-                if (!UsageAccess.hasUsageStatsAccess(appContext)) {
+                if (appUsagePollAction(UsageAccess.hasUsageStatsAccess(appContext)) == AppUsagePollAction.PAUSE_FOR_MISSING_ACCESS) {
                     if (!warnedMissingAccess) {
                         AppLogger.warn(TAG, "Usage access is not granted; app-open triggers are paused")
                         warnedMissingAccess = true

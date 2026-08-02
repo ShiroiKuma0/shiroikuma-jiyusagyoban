@@ -213,7 +213,7 @@ internal fun TaskEditorDialog(
         mutableStateOf(task?.collisionMode ?: CollisionMode.ABORT_NEW)
     }
     val parsedPriority = priority.toIntOrNull()
-    val canSave = name.isNotBlank() && parsedPriority != null && parsedPriority in 0..10
+    val canSave = taskEditorCanSave(name, parsedPriority)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -290,8 +290,14 @@ internal fun ProfileEditorDialog(
     val parsedCooldown = cooldown.toIntOrNull()
     val selectedTaskExists = tasks.any { it.id == enterTaskId }
     val selectedExitTaskExists = exitTaskId == null || tasks.any { it.id == exitTaskId }
-    val canSave = name.isNotBlank() && enterTaskId > 0 && selectedTaskExists &&
-        selectedExitTaskExists && (cooldown.isBlank() || parsedCooldown != null)
+    val canSave = profileEditorCanSave(
+        name = name,
+        enterTaskId = enterTaskId,
+        selectedTaskExists = selectedTaskExists,
+        selectedExitTaskExists = selectedExitTaskExists,
+        cooldown = cooldown,
+        parsedCooldown = parsedCooldown,
+    )
     val importedReviewRequired = profile?.requiresRiskAcknowledgement == true
     val onLabel = stringResource(R.string.label_on)
     val offLabel = stringResource(R.string.label_off)
@@ -480,6 +486,20 @@ internal fun collisionModeDescription(mode: CollisionMode): String = stringResou
         CollisionMode.WAIT -> R.string.collision_mode_wait_body
     },
 )
+
+internal fun taskEditorCanSave(name: String, parsedPriority: Int?): Boolean =
+    name.isNotBlank() && parsedPriority != null && parsedPriority in 0..10
+
+internal fun profileEditorCanSave(
+    name: String,
+    enterTaskId: Long,
+    selectedTaskExists: Boolean,
+    selectedExitTaskExists: Boolean,
+    cooldown: String,
+    parsedCooldown: Int?,
+): Boolean =
+    name.isNotBlank() && enterTaskId > 0 && selectedTaskExists &&
+        selectedExitTaskExists && (cooldown.isBlank() || parsedCooldown != null)
 
 @Composable
 internal fun EmptyState(

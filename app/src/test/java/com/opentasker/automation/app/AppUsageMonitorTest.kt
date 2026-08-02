@@ -2,6 +2,7 @@ package com.opentasker.automation.app
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 class AppUsageMonitorTest {
@@ -37,5 +38,11 @@ class AppUsageMonitorTest {
         )
 
         assertEquals("com.example.NewActivity", selected?.className)
+    }
+
+    @Test
+    fun missingUsageAccessPausesPollingAndRestoresItWhenPermissionReturns() {
+        assertSame(AppUsagePollAction.PAUSE_FOR_MISSING_ACCESS, appUsagePollAction(hasUsageAccess = false))
+        assertSame(AppUsagePollAction.QUERY_FOREGROUND, appUsagePollAction(hasUsageAccess = true))
     }
 }

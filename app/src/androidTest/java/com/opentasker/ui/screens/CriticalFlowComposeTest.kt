@@ -10,6 +10,7 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
@@ -94,6 +95,25 @@ class CriticalFlowComposeTest {
         composeTestRule.onNodeWithText("Save").assertIsEnabled().performClick()
 
         assertEquals("Morning focus:${CollisionMode.ABORT_NEW}", savedName)
+    }
+
+    @Test
+    fun taskEditorRestoresDraftAcrossSavedInstanceState() {
+        val restorationTester = StateRestorationTester(composeTestRule)
+        restorationTester.setContent {
+            TestTheme {
+                TaskEditorDialog(
+                    task = null,
+                    onDismiss = {},
+                    onSave = { _, _, _ -> },
+                )
+            }
+        }
+
+        composeTestRule.onAllNodes(hasSetTextAction())[0].performTextInput("Remembered task")
+        restorationTester.emulateSavedInstanceStateRestore()
+
+        composeTestRule.onNodeWithText("Remembered task").assertIsDisplayed()
     }
 
     @Test
