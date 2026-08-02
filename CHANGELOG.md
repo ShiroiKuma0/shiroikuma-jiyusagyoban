@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Add an explicit Android predictive-back callback bridge with a legacy-compatible root-screen fallback and lifecycle-safe teardown.
+- Add adaptive navigation regression coverage for compact/medium/expanded widths, large-font scaling, resize/fold state restoration, and accessible navigation semantics.
 
 ## v0.2.80
 

@@ -220,8 +220,6 @@ private val primaryNavigationScreens = listOf(
 private val secondaryNavigationScreens = OpenTaskerScreen.entries.filterNot { it in primaryNavigationScreens }
 private val adaptiveNavigationScreens = OpenTaskerScreen.entries
 
-internal fun usesNavigationRail(widthDp: Int): Boolean = widthDp >= 600
-
 private fun OpenTaskerScreen.icon(): ImageVector = when (this) {
     OpenTaskerScreen.Profiles -> Icons.Outlined.Tune
     OpenTaskerScreen.Tasks -> Icons.AutoMirrored.Outlined.PlaylistPlay
@@ -257,7 +255,7 @@ fun ActiveAutomationUi(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current.applicationContext
-    val useNavigationRail = usesNavigationRail(LocalConfiguration.current.screenWidthDp)
+    val useNavigationRail = usesNavigationRail(LocalConfiguration.current.screenWidthDp, LocalConfiguration.current.fontScale)
     val viewModel: ActiveAutomationViewModel = viewModel(factory = ActiveAutomationViewModelFactory(db, context))
     val profiles by viewModel.profiles.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
