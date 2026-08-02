@@ -432,7 +432,7 @@ fun registerActionMetadata() {
             categoryRes = R.string.catalog_category_plugin,
             fields = listOf(
                 ActionField("package", R.string.catalog_action_plugin_locale_fire_field_package_label, FieldType.APP, required = true, hintRes = R.string.catalog_action_plugin_locale_fire_field_package_hint),
-                ActionField("bundleJson", R.string.catalog_action_plugin_locale_fire_field_bundlejson_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_plugin_locale_fire_field_bundlejson_hint),
+                ActionField("bundleJson", R.string.catalog_action_plugin_locale_fire_field_bundlejson_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_plugin_locale_fire_field_bundlejson_hint, sensitive = true),
                 ActionField("blurb", R.string.catalog_action_plugin_locale_fire_field_blurb_label, hintRes = R.string.catalog_action_plugin_locale_fire_field_blurb_hint),
                 ActionField("timeoutMs", R.string.catalog_action_plugin_locale_fire_field_timeoutms_label, FieldType.NUMBER, hintRes = R.string.catalog_action_plugin_locale_fire_field_timeoutms_hint, numberRule = integerRule(1_000, 30_000)),
             )
@@ -447,7 +447,7 @@ fun registerActionMetadata() {
             categoryRes = R.string.catalog_category_plugin,
             fields = listOf(
                 ActionField("package", R.string.catalog_action_plugin_locale_query_field_package_label, FieldType.APP, required = true, hintRes = R.string.catalog_action_plugin_locale_query_field_package_hint),
-                ActionField("bundleJson", R.string.catalog_action_plugin_locale_query_field_bundlejson_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_plugin_locale_query_field_bundlejson_hint),
+                ActionField("bundleJson", R.string.catalog_action_plugin_locale_query_field_bundlejson_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_plugin_locale_query_field_bundlejson_hint, sensitive = true),
                 ActionField("blurb", R.string.catalog_action_plugin_locale_query_field_blurb_label, hintRes = R.string.catalog_action_plugin_locale_query_field_blurb_hint),
                 ActionField("timeoutMs", R.string.catalog_action_plugin_locale_query_field_timeoutms_label, FieldType.NUMBER, hintRes = R.string.catalog_action_plugin_locale_query_field_timeoutms_hint, numberRule = integerRule(1_000, 30_000)),
                 ActionField("resultVariable", R.string.catalog_action_plugin_locale_query_field_resultvariable_label, hintRes = R.string.catalog_action_plugin_locale_query_field_resultvariable_hint),

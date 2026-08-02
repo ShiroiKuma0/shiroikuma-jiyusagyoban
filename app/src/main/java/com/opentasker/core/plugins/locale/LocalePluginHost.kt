@@ -90,6 +90,63 @@ data class LocalePluginDescriptor(
     val conditionReceiverPermissions: List<String> = emptyList(),
 )
 
+/** Package/component queries used by the host and discovery surfaces. */
+interface LocalePluginComponentResolver {
+    fun editActivities(packageName: String, action: String): List<ComponentName>
+    fun broadcastReceivers(packageName: String, action: String): List<ComponentName>
+    fun activityPackages(action: String): Set<String>
+    fun broadcastReceiverPermissions(action: String): Map<String, List<String>>
+}
+
+/** Broadcast boundary used by the host; production uses Android and tests can supply a fixture. */
+interface LocalePluginTransport {
+    suspend fun sendSetting(intent: Intent)
+    suspend fun queryCondition(intent: Intent): Int
+}
+
+private class AndroidLocalePluginComponentResolver(
+    private val packageManager: PackageManager,
+) : LocalePluginComponentResolver {
+    override fun editActivities(packageName: String, action: String): List<ComponentName> =
+        queryEditActivities(packageManager, packageName, action)
+
+    override fun broadcastReceivers(packageName: String, action: String): List<ComponentName> =
+        queryBroadcastReceivers(packageManager, packageName, action).map { it.component }
+
+    override fun activityPackages(action: String): Set<String> = queryPackages(packageManager, action)
+
+    override fun broadcastReceiverPermissions(action: String): Map<String, List<String>> =
+        queryBroadcastReceiversByPackage(packageManager, action)
+}
+
+private class AndroidLocalePluginTransport(
+    private val appContext: Context,
+    private val dispatcher: CoroutineDispatcher,
+) : LocalePluginTransport {
+    override suspend fun sendSetting(intent: Intent) {
+        withContext(dispatcher) { appContext.sendBroadcast(intent) }
+    }
+
+    override suspend fun queryCondition(intent: Intent): Int = withContext(dispatcher) {
+        suspendCancellableCoroutine { continuation ->
+            val resultReceiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context, intent: Intent?) {
+                    if (continuation.isActive) continuation.resume(resultCode)
+                }
+            }
+            appContext.sendOrderedBroadcast(
+                intent,
+                null,
+                resultReceiver,
+                null,
+                Activity.RESULT_CANCELED,
+                null,
+                null,
+            )
+        }
+    }
+}
+
 object LocalePluginBundleCodec {
     fun validatePackageName(packageName: String) {
         require(PackageNamePolicy.isValid(packageName)) { "Invalid plugin package name." }
@@ -243,11 +300,31 @@ class LocalePluginConditionStateCache(
     }
 }
 
-class LocalePluginHost(
-    private val appContext: Context,
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val conditionStateCache: LocalePluginConditionStateCache = LocalePluginConditionStateCache.Shared,
+class LocalePluginHost private constructor(
+    private val conditionStateCache: LocalePluginConditionStateCache,
+    private val componentResolver: LocalePluginComponentResolver,
+    private val transport: LocalePluginTransport,
 ) {
+    constructor(
+        appContext: Context,
+        dispatcher: CoroutineDispatcher = Dispatchers.IO,
+        conditionStateCache: LocalePluginConditionStateCache = LocalePluginConditionStateCache.Shared,
+    ) : this(
+        conditionStateCache,
+        AndroidLocalePluginComponentResolver(appContext.packageManager),
+        AndroidLocalePluginTransport(appContext, dispatcher),
+    )
+
+    constructor(
+        componentResolver: LocalePluginComponentResolver,
+        transport: LocalePluginTransport,
+        conditionStateCache: LocalePluginConditionStateCache = LocalePluginConditionStateCache(),
+    ) : this(
+        conditionStateCache,
+        componentResolver,
+        transport,
+    )
+
     fun buildEditSettingIntent(packageName: String): LocalePluginEditIntentResult =
         buildEditIntent(packageName, LocalePluginContract.ACTION_EDIT_SETTING, "setting")
 
@@ -270,10 +347,8 @@ class LocalePluginHost(
         )
 
         return withTimeout(request.timeoutMs) {
-            withContext(dispatcher) {
-                appContext.sendBroadcast(intent)
-                LocalePluginResult(true, "Locale plugin setting dispatched to ${component.flattenToShortString()}.")
-            }
+            transport.sendSetting(intent)
+            LocalePluginResult(true, "Locale plugin setting dispatched to ${component.flattenToShortString()}.")
         }
     }
 
@@ -300,39 +375,16 @@ class LocalePluginHost(
         )
 
         return withTimeout(request.timeoutMs) {
-            withContext(dispatcher) {
-                suspendCancellableCoroutine { continuation ->
-                    val resultReceiver = object : BroadcastReceiver() {
-                        override fun onReceive(context: Context, intent: Intent?) {
-                            val result = conditionStateCache.resolve(
-                                cacheKey,
-                                LocalePluginConditionResultParser.parse(resultCode, request.packageName),
-                            )
-                            if (continuation.isActive) continuation.resume(result)
-                        }
-                    }
-                    runCatching {
-                        appContext.sendOrderedBroadcast(
-                            intent,
-                            null,
-                            resultReceiver,
-                            null,
-                            Activity.RESULT_CANCELED,
-                            null,
-                            null,
-                        )
-                    }.onFailure { throwable ->
-                        if (continuation.isActive) {
-                            continuation.resume(
-                                LocalePluginConditionResult(
-                                    state = LocalePluginConditionState.Unknown,
-                                    message = "Locale plugin condition query failed for ${request.packageName}: ${throwable.message}",
-                                )
-                            )
-                        }
-                    }
-                }
+            val resultCode = runCatching { transport.queryCondition(intent) }.getOrElse { throwable ->
+                return@withTimeout LocalePluginConditionResult(
+                    state = LocalePluginConditionState.Unknown,
+                    message = "Locale plugin condition query failed for ${request.packageName}: ${throwable.message}",
+                )
             }
+            conditionStateCache.resolve(
+                cacheKey,
+                LocalePluginConditionResultParser.parse(resultCode, request.packageName),
+            )
         }
     }
 
@@ -347,7 +399,7 @@ class LocalePluginHost(
         .putExtra(LocalePluginContract.EXTRA_BLURB, request.blurb.take(120))
 
     private fun resolveBroadcastTarget(packageName: String, action: String): LocaleBroadcastTargetResolution {
-        val receivers = queryBroadcastReceivers(appContext.packageManager, packageName, action)
+        val receivers = componentResolver.broadcastReceivers(packageName, action).map { LocaleBroadcastReceiverTarget(it) }
         return when (receivers.size) {
             0 -> LocaleBroadcastTargetResolution(
                 component = null,
@@ -370,7 +422,7 @@ class LocalePluginHost(
         label: String,
     ): LocalePluginEditIntentResult {
         LocalePluginBundleCodec.validatePackageName(packageName)
-        val activities = queryEditActivities(appContext.packageManager, packageName, action)
+        val activities = componentResolver.editActivities(packageName, action)
         return when (activities.size) {
             0 -> LocalePluginEditIntentResult(
                 success = false,
@@ -392,50 +444,57 @@ class LocalePluginHost(
     }
 }
 
-class LocalePluginDiscovery(private val appContext: Context) {
+interface LocalePluginPackageMetadata {
+    fun label(packageName: String): String
+    fun requestedPermissions(packageName: String): List<String>
+}
+
+private class AndroidLocalePluginPackageMetadata(
+    private val packageManager: PackageManager,
+) : LocalePluginPackageMetadata {
+    override fun label(packageName: String): String =
+        runCatching { packageManager.getApplicationInfo(packageName, 0) }
+            .map { packageManager.getApplicationLabel(it).toString() }
+            .getOrDefault(packageName)
+
+    override fun requestedPermissions(packageName: String): List<String> = runCatching {
+        packageManager.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS)
+            .requestedPermissions
+            ?.toList()
+            .orEmpty()
+    }.getOrDefault(emptyList())
+}
+
+class LocalePluginDiscovery(
+    private val componentResolver: LocalePluginComponentResolver,
+    private val packageMetadata: LocalePluginPackageMetadata,
+) {
+    constructor(appContext: Context) : this(
+        componentResolver = AndroidLocalePluginComponentResolver(appContext.packageManager),
+        packageMetadata = AndroidLocalePluginPackageMetadata(appContext.packageManager),
+    )
+
     fun discover(): List<LocalePluginDescriptor> {
-        val pm = appContext.packageManager
-        val settings = queryPackages(pm, LocalePluginContract.ACTION_EDIT_SETTING)
-        val conditions = queryPackages(pm, LocalePluginContract.ACTION_EDIT_CONDITION)
-        val settingReceivers = queryBroadcastReceiversByPackage(pm, LocalePluginContract.ACTION_FIRE_SETTING)
-        val conditionReceivers = queryBroadcastReceiversByPackage(pm, LocalePluginContract.ACTION_QUERY_CONDITION)
+        val settings = componentResolver.activityPackages(LocalePluginContract.ACTION_EDIT_SETTING)
+        val conditions = componentResolver.activityPackages(LocalePluginContract.ACTION_EDIT_CONDITION)
+        val settingReceivers = componentResolver.broadcastReceiverPermissions(LocalePluginContract.ACTION_FIRE_SETTING)
+        val conditionReceivers = componentResolver.broadcastReceiverPermissions(LocalePluginContract.ACTION_QUERY_CONDITION)
         return (settings + conditions)
             .distinct()
             .sorted()
             .map { packageName ->
-                val appInfo = runCatching { pm.getApplicationInfo(packageName, 0) }.getOrNull()
-                val label = appInfo?.let { pm.getApplicationLabel(it).toString() } ?: packageName
-                val permissions = runCatching {
-                    pm.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS)
-                        .requestedPermissions
-                        ?.toList()
-                        .orEmpty()
-                }.getOrDefault(emptyList())
                 LocalePluginDescriptor(
                     packageName = packageName,
-                    label = label,
+                    label = packageMetadata.label(packageName),
                     supportsSettings = packageName in settings,
                     supportsConditions = packageName in conditions,
-                    requestedPermissions = permissions.sorted(),
+                    requestedPermissions = packageMetadata.requestedPermissions(packageName).sorted(),
                     settingReceiverPermissions = settingReceivers[packageName].orEmpty(),
                     conditionReceiverPermissions = conditionReceivers[packageName].orEmpty(),
                 )
             }
     }
 
-    private fun queryPackages(pm: PackageManager, action: String): Set<String> =
-        pm.queryIntentActivities(Intent(action), PackageManager.MATCH_DEFAULT_ONLY)
-            .mapNotNull { it.activityInfo?.packageName }
-            .toSet()
-
-    private fun queryBroadcastReceiversByPackage(pm: PackageManager, action: String): Map<String, List<String>> =
-        pm.queryBroadcastReceivers(Intent(action), 0)
-            .mapNotNull { resolveInfo ->
-                val receiverInfo = resolveInfo.activityInfo ?: return@mapNotNull null
-                receiverInfo.packageName to receiverInfo.permission.orEmpty()
-            }
-            .groupBy({ it.first }, { it.second })
-            .mapValues { (_, permissions) -> permissions.filter { it.isNotBlank() }.distinct().sorted() }
 }
 
 private data class LocaleBroadcastReceiverTarget(
@@ -474,6 +533,20 @@ private fun queryEditActivities(
             ComponentName(packageName, activityInfo.name.toClassName(packageName))
         }
         .sortedBy { it.className }
+
+private fun queryPackages(pm: PackageManager, action: String): Set<String> =
+    pm.queryIntentActivities(Intent(action), PackageManager.MATCH_DEFAULT_ONLY)
+        .mapNotNull { it.activityInfo?.packageName }
+        .toSet()
+
+private fun queryBroadcastReceiversByPackage(pm: PackageManager, action: String): Map<String, List<String>> =
+    pm.queryBroadcastReceivers(Intent(action), 0)
+        .mapNotNull { resolveInfo ->
+            val receiverInfo = resolveInfo.activityInfo ?: return@mapNotNull null
+            receiverInfo.packageName to receiverInfo.permission.orEmpty()
+        }
+        .groupBy({ it.first }, { it.second })
+        .mapValues { (_, permissions) -> permissions.filter { it.isNotBlank() }.distinct().sorted() }
 
 private fun String.toClassName(packageName: String): String = when {
     startsWith(".") -> packageName + this
