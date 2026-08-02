@@ -137,6 +137,8 @@ import com.opentasker.ui.theme.isNarrowScreen
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import com.opentasker.core.engine.RunLogOutcome
+import com.opentasker.core.engine.outcome
 /**
  * Increments every time the activity resumes — remember() permission/Shizuku checks against this so
  * they re-evaluate after the user returns from a settings screen or the Shizuku grant dialog.
@@ -527,7 +529,9 @@ private fun WorkspaceSummaryCard(
     val enabledProfiles = profiles.count { it.enabled }
     val configuredContexts = profiles.sumOf { it.contexts.size }
     val totalActions = tasks.sumOf { it.actions.size }
-    val recentFailure = runLogs.firstOrNull { !it.success }
+    // outcome(), not the raw success flag — a Skipped or Cancelled run is stored with success = false
+    // but neither is a failure, and the workspace card must not cry wolf over a skipped slider fire.
+    val recentFailure = runLogs.firstOrNull { it.outcome() == RunLogOutcome.Failed }
     val reviewDetails = stringResource(R.string.workspace_review_run_log_details)
 
     Card(

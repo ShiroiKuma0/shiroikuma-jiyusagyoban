@@ -72,6 +72,8 @@ import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.opentasker.core.engine.RunLogOutcome
+import com.opentasker.core.engine.outcome
 
 private val GREEN = Color(0xFF00E676)
 private val RED = Color(0xFFFF5252)
@@ -377,7 +379,10 @@ fun MonitorScreen(
         val taskAgg = runWindow
             .groupBy { it.taskName.ifBlank { "task #${it.taskId}" } }
             .map { (name, runs) ->
-                TaskActivity(name, runs.size, runs.maxOf { it.timestamp }, runs.count { !it.success })
+                // Count real failures only. A Skipped run (collision / admission gate) and a Cancelled
+                // one both store success = false, so the raw flag reddened a task row for runs that
+                // never started — exactly what a mid-drag slider skip produces.
+                TaskActivity(name, runs.size, runs.maxOf { it.timestamp }, runs.count { it.outcome() == RunLogOutcome.Failed })
             }
             .sortedByDescending { it.lastAt }
         item { FoldHeader("Task activity (${taskAgg.size} task${if (taskAgg.size == 1) "" else "s"})", openRuns) { toggle("runs") } }
