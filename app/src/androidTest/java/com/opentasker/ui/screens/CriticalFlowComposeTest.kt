@@ -70,6 +70,8 @@ class CriticalFlowComposeTest {
         composeTestRule.onNodeWithText("Setup checklist").assertIsDisplayed()
         composeTestRule.onNodeWithText("Theme").assertIsDisplayed()
         composeTestRule.onNodeWithText("Backup and restore").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Locale execution grants").assertIsDisplayed()
+        composeTestRule.onNodeWithText("No Locale execution grants are issued.").assertIsDisplayed()
         composeTestRule.onNodeWithText("System").assertIsDisplayed()
     }
 

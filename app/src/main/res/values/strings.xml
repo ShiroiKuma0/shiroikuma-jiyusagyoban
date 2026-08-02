@@ -989,4 +989,10 @@
     <string name="setup_push_token">Distributor token: %1$s</string>
     <string name="setup_push_copy">Copy distributor token</string>
     <string name="setup_push_copied">Distributor token copied.</string>
+    <string name="setup_locale_grants_title">Locale execution grants</string>
+    <string name="setup_locale_grants_body">These grants let Locale-compatible hosts fire one selected task. Revoke a grant to block future fires without deleting the task.</string>
+    <string name="setup_locale_grants_empty">No Locale execution grants are issued.</string>
+    <string name="setup_locale_grant_unknown_task">Deleted or unavailable task (ID %1$d)</string>
+    <string name="setup_locale_grant_task_id">Task ID %1$d</string>
+    <string name="setup_locale_grant_revoke">Revoke</string>
 </resources>

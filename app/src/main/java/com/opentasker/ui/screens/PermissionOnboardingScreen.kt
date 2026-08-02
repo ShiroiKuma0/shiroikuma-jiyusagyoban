@@ -93,6 +93,7 @@ import com.opentasker.core.scripting.TermuxScriptState
 import com.opentasker.core.capabilities.SetupRequirement
 import com.opentasker.core.capabilities.SetupRequirementResolver
 import com.opentasker.core.contexts.PushTriggerTokenStore
+import com.opentasker.core.plugins.locale.LocaleGrantStore
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 
@@ -290,6 +291,7 @@ fun PermissionOnboardingScreen(
 
         item { TermuxScriptAllowlistCard(onMessage) }
         item { PushTriggerSetupCard(onMessage) }
+        item { LocaleGrantManagementCard(tasks = tasks, refreshKey = refreshTick) }
 
         SetupSection.entries.forEach { section ->
             val itemsForSection = sectionItems.getValue(section)
@@ -375,6 +377,71 @@ private fun PushTriggerSetupCard(onMessage: (String) -> Unit) {
                 shape = RoundedCornerShape(12.dp),
             ) {
                 Text(stringResource(R.string.setup_push_copy))
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocaleGrantManagementCard(
+    tasks: List<Task>,
+    refreshKey: Int,
+) {
+    val context = LocalContext.current
+    val store = remember(context) { LocaleGrantStore(context) }
+    var grants by remember(context, refreshKey) { mutableStateOf(store.grants()) }
+    val taskNames = remember(tasks) { tasks.associateBy(Task::id) }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(stringResource(R.string.setup_locale_grants_title), style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(R.string.setup_locale_grants_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (grants.isEmpty()) {
+                Text(
+                    stringResource(R.string.setup_locale_grants_empty),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                grants.forEach { grant ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                taskNames[grant.taskId]?.name
+                                    ?: stringResource(R.string.setup_locale_grant_unknown_task, grant.taskId),
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                stringResource(R.string.setup_locale_grant_task_id, grant.taskId),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                store.revoke(grant.token)
+                                grants = grants.filterNot { it.token == grant.token }
+                            },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        ) {
+                            Text(stringResource(R.string.setup_locale_grant_revoke))
+                        }
+                    }
+                }
             }
         }
     }
