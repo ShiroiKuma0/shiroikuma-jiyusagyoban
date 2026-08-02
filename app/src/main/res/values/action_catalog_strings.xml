@@ -258,6 +258,15 @@
     <string name="catalog_action_brightness_set_name" formatted="false">Set Brightness</string>
     <string name="catalog_action_brightness_set_description" formatted="false">Set screen brightness level</string>
     <string name="catalog_action_brightness_set_field_brightness_label" formatted="false">Brightness (0-255)</string>
+    <string name="catalog_action_state_temporary_name" formatted="false">Temporary State</string>
+    <string name="catalog_action_state_temporary_description" formatted="false">Apply a reversible setting and restore it later</string>
+    <string name="catalog_action_state_temporary_field_target_action_label" formatted="false">Setting</string>
+    <string name="catalog_action_state_temporary_field_target_args_label" formatted="false">Setting arguments (JSON)</string>
+    <string name="catalog_action_state_temporary_field_target_args_hint" formatted="false">Example: {&quot;brightness&quot;:&quot;80&quot;}</string>
+    <string name="catalog_action_state_temporary_field_key_label" formatted="false">Revert key</string>
+    <string name="catalog_action_state_temporary_field_key_hint" formatted="false">Unique channel, e.g. quiet-hours</string>
+    <string name="catalog_action_state_temporary_field_duration_label" formatted="false">Duration (seconds)</string>
+    <string name="catalog_action_state_temporary_field_duration_hint" formatted="false">1 to 604800 seconds</string>
     <string name="catalog_action_volume_set_name" formatted="false">Set Volume</string>
     <string name="catalog_action_volume_set_description" formatted="false">Adjust volume for a stream</string>
     <string name="catalog_action_volume_set_field_stream_label" formatted="false">Stream</string>

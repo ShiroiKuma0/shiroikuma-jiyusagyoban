@@ -99,6 +99,13 @@ private val audioStreamOptions = listOf(
     option("voice", R.string.action_option_stream_voice),
 )
 
+private val temporaryStateTargetOptions = listOf(
+    option("brightness.set", R.string.catalog_action_brightness_set_name),
+    option("volume.set", R.string.catalog_action_volume_set_name),
+    option("ringer.set", R.string.catalog_action_ringer_set_name),
+    option("dnd.set", R.string.catalog_action_dnd_set_name),
+)
+
 private fun integerRule(
     minimum: Long? = null,
     maximum: Long? = null,
@@ -807,6 +814,21 @@ fun registerActionMetadata() {
                 ActionField("read_timeout_sec", R.string.catalog_action_http_request_field_read_timeout_label, FieldType.NUMBER, numberRule = integerRule(1, 120)),
                 ActionField("write_timeout_sec", R.string.catalog_action_http_request_field_write_timeout_label, FieldType.NUMBER, numberRule = integerRule(1, 120)),
                 ActionField("call_timeout_sec", R.string.catalog_action_http_request_field_call_timeout_label, FieldType.NUMBER, numberRule = integerRule(1, 120)),
+            ),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "state.temporary",
+            nameRes = R.string.catalog_action_state_temporary_name,
+            descriptionRes = R.string.catalog_action_state_temporary_description,
+            categoryRes = R.string.catalog_category_settings,
+            fields = listOf(
+                ActionField("target_action", R.string.catalog_action_state_temporary_field_target_action_label, FieldType.DROPDOWN, required = true, options = temporaryStateTargetOptions),
+                ActionField("target_args", R.string.catalog_action_state_temporary_field_target_args_label, FieldType.MULTILINE, required = true, hintRes = R.string.catalog_action_state_temporary_field_target_args_hint, sensitive = true),
+                ActionField("key", R.string.catalog_action_state_temporary_field_key_label, required = true, hintRes = R.string.catalog_action_state_temporary_field_key_hint, sensitive = false),
+                ActionField("duration_sec", R.string.catalog_action_state_temporary_field_duration_label, FieldType.NUMBER, required = true, hintRes = R.string.catalog_action_state_temporary_field_duration_hint, numberRule = integerRule(1, 604_800)),
             ),
         )
     )

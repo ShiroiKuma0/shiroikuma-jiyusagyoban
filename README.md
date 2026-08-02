@@ -15,7 +15,7 @@
 
 - **Profiles, contexts, tasks, actions** — a complete Room-backed automation pipeline with a Compose UI
 - **7 context families** — Application, Time, Day, Location, State, Event, and Plugin (Locale/Tasker condition)
-- **65 built-in actions** plus engine-handled flow control (`task.run`, `if`/`else`/`end if`, `for each`/`end for`, `stop`)
+- **66 built-in actions** plus engine-handled flow control (`task.run`, `if`/`else`/`end if`, `for each`/`end for`, `stop`)
 - **Template expressions** — bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math/date functions, traces, and strict regex policy
 - **Side-effect-free preflight reviews** — preview a task or profile with synthetic event variables, expanded inputs, branch decisions, setup gaps, intended effects, and explicit blockers before any action runs
 - **First-class secret variables** — AES-256-GCM Android Keystore storage, deliberate reveal/re-entry UX, and provenance-based redaction for derived action arguments, logs, traces, and failures
@@ -45,11 +45,11 @@
 - Locale/Tasker condition plugins — polled as first-class context predicates with last-known-state caching
 - Home Assistant bridge proof of concept — bounded outbound JSON webhooks with HTTPS-by-default policy, redacted webhook secrets, and transient retry/backoff
 
-### Actions (65 registered + 7 engine-handled)
+### Actions (66 registered + 7 engine-handled)
 
 | Category | Count | Examples |
 |----------|------:|---------|
-| Settings | 11 | Wi-Fi, Bluetooth, brightness, volume, airplane, mobile data, screen timeout, DND, ringer mode, torch, tile state |
+| Settings | 12 | Wi-Fi, Bluetooth, brightness, volume, airplane, mobile data, screen timeout, DND, ringer mode, torch, tile state, temporary state |
 | App | 7 | launch intent, launch app, kill, go home, open URL, SMS, screenshot |
 | File | 5 | read, write, append, delete, list |
 | Network | 8 | HTTP Request, Home Assistant webhook, MQTT publish, legacy GET/POST aliases, ping, download, Wake-on-LAN |
@@ -73,6 +73,8 @@ The **MQTT Publish** action uses a small in-app MQTT 3.1.1 QoS 0/1 client over p
 The **Clipboard** actions read and write text without an extra permission, cap transfers at 64 KiB, and mark clipboard-derived values sensitive. **Contact lookup** supports bounded name/phone/email matching into sensitive variables. Android 17+ defaults to a field-scoped system picker with a timeout and no broad address-book grant; explicit `READ_CONTACTS` permission mode remains available for unattended runs through Setup.
 
 **Quick Settings tiles** provide four app-owned slots. Long-press a tile to bind a task and configure its label, subtitle, icon, and state; `tile.set` can update a configured slot at runtime, and tile-triggered task runs use the same foreground execution and run-log identity as other external entry points.
+
+The **Temporary State** action applies a bounded reversible setting (brightness, volume, ringer mode, or DND) and restores the captured prior value through a unique persisted WorkManager job. Reusing the same revert key replaces the earlier timer, and pending work remains inspectable through WorkManager after process death.
 
 The **push trigger spike** chooses a distributor-neutral UnifiedPush boundary instead of adding a polling client or a Google service. Setup creates a per-install token; a distributor adapter forwards an explicit `com.opentasker.action.PUSH_EVENT` broadcast with that token, topic, event ID, title, and message. The receiver authenticates the token, caps the message at 8 KiB, keeps only topic/title/event ID/size in event metadata, and suppresses duplicate topic/event-ID deliveries for 30 seconds. Delivery is at-least-once, so retry belongs to the distributor; no network retry is attempted inside the receiver. ntfy can be adapted to this same envelope later without changing profiles.
 

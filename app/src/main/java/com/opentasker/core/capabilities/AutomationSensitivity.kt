@@ -109,6 +109,7 @@ object AutomationSensitivityRegistry {
         "ringer.set",
         "torch.set",
         "tile.set",
+        "state.temporary",
         "app.launch",
         "app.kill",
         "home.go",
