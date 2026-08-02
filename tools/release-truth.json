@@ -1,6 +1,6 @@
 {
     "schemaVersion":  1,
-    "requiredArtifactCommit":  "a0db380e639fd1e65affa256759bc59bdf7c2603",
+    "requiredArtifactCommit":  "cd8f68c38d12a00370e624dacb91b85687793ecf",
     "application":  {
                         "versionName":  "0.2.81",
                         "versionCode":  83

@@ -23,7 +23,7 @@ Repo: https://github.com/SysAdminDoc/OpenTasker.git
 Builds:
   - versionName: 0.2.81
     versionCode: 83
-    commit: a0db380e639fd1e65affa256759bc59bdf7c2603
+    commit: cd8f68c38d12a00370e624dacb91b85687793ecf
     subdir: .
     gradle:
       - yes
