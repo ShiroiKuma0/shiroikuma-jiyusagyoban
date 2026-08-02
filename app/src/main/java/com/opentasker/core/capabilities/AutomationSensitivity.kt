@@ -81,6 +81,7 @@ object AutomationSensitivityRegistry {
         "http.get",
         "http.post",
         "integration.home_assistant.webhook",
+        "mqtt.publish",
         "ping",
         "download",
         "wol",

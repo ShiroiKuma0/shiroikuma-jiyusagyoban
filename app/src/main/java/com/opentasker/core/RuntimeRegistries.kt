@@ -25,6 +25,7 @@ import com.opentasker.core.actions.ListFilesAction
 import com.opentasker.core.actions.LockDeviceAction
 import com.opentasker.core.actions.LogAction
 import com.opentasker.core.actions.MobileDataAction
+import com.opentasker.core.actions.MqttPublishAction
 import com.opentasker.core.actions.MuteAction
 import com.opentasker.core.actions.NextTrackAction
 import com.opentasker.core.actions.NotifyAction
@@ -121,6 +122,7 @@ private fun registerBuiltInActions() {
         HttpGetAction(),
         HttpPostAction(),
         HomeAssistantWebhookAction(),
+        MqttPublishAction(),
         PingAction(),
         DownloadAction(),
         WakeOnLanAction(),

@@ -810,6 +810,27 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "mqtt.publish",
+            nameRes = R.string.catalog_action_mqtt_publish_name,
+            descriptionRes = R.string.catalog_action_mqtt_publish_description,
+            categoryRes = R.string.catalog_category_network,
+            fields = listOf(
+                ActionField("host", R.string.catalog_action_mqtt_publish_field_host_label, required = true, hintRes = R.string.catalog_action_mqtt_publish_field_host_hint),
+                ActionField("port", R.string.catalog_action_mqtt_publish_field_port_label, FieldType.NUMBER, hintRes = R.string.catalog_action_mqtt_publish_field_port_hint, numberRule = integerRule(1, 65_535)),
+                ActionField("tls", R.string.catalog_action_mqtt_publish_field_tls_label, FieldType.CHECKBOX, hintRes = R.string.catalog_action_mqtt_publish_field_tls_hint),
+                ActionField("topic", R.string.catalog_action_mqtt_publish_field_topic_label, required = true, hintRes = R.string.catalog_action_mqtt_publish_field_topic_hint),
+                ActionField("payload", R.string.catalog_action_mqtt_publish_field_payload_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_mqtt_publish_field_payload_hint, sensitive = true),
+                ActionField("qos", R.string.catalog_action_mqtt_publish_field_qos_label, FieldType.NUMBER, hintRes = R.string.catalog_action_mqtt_publish_field_qos_hint, numberRule = integerRule(0, 1)),
+                ActionField("retain", R.string.catalog_action_mqtt_publish_field_retain_label, FieldType.CHECKBOX, hintRes = R.string.catalog_action_mqtt_publish_field_retain_hint),
+                ActionField("username", R.string.catalog_action_mqtt_publish_field_username_label, hintRes = R.string.catalog_action_mqtt_publish_field_username_hint),
+                ActionField("password", R.string.catalog_action_mqtt_publish_field_password_label, hintRes = R.string.catalog_action_mqtt_publish_field_password_hint, sensitive = true),
+                ActionField("timeout_sec", R.string.catalog_action_mqtt_publish_field_timeout_label, FieldType.NUMBER, hintRes = R.string.catalog_action_mqtt_publish_field_timeout_hint, numberRule = integerRule(1, 30)),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "http.get",
             nameRes = R.string.catalog_action_http_get_name,
             descriptionRes = R.string.catalog_action_http_get_description,

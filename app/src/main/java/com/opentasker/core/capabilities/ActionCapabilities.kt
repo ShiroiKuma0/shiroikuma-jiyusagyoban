@@ -79,6 +79,7 @@ object ActionCapabilityRegistry {
         "http.get",
         "http.post",
         "integration.home_assistant.webhook",
+        "mqtt.publish",
         "ping",
         "download",
         // Device feedback covered by normal manifest permissions.

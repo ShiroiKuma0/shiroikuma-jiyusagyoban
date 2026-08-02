@@ -369,6 +369,28 @@
     <string name="catalog_action_home_assistant_webhook_field_backoff_hint" formatted="false">Initial delay; exponential and capped at 10 seconds (100-5000)</string>
     <string name="catalog_action_home_assistant_webhook_field_allow_http_label" formatted="false">Allow HTTP</string>
     <string name="catalog_action_home_assistant_webhook_field_allow_http_hint" formatted="false">Only for private-LAN endpoints; ACCESS_LOCAL_NETWORK and host policy still apply</string>
+    <string name="catalog_action_mqtt_publish_name" formatted="false">MQTT Publish</string>
+    <string name="catalog_action_mqtt_publish_description" formatted="false">Publish a bounded message to an MQTT 3.1.1 broker using the platform socket/TLS stack</string>
+    <string name="catalog_action_mqtt_publish_field_host_label" formatted="false">Broker host</string>
+    <string name="catalog_action_mqtt_publish_field_host_hint" formatted="false">Hostname or IP address</string>
+    <string name="catalog_action_mqtt_publish_field_port_label" formatted="false">Broker port</string>
+    <string name="catalog_action_mqtt_publish_field_port_hint" formatted="false">Default: 8883 with TLS, 1883 without TLS</string>
+    <string name="catalog_action_mqtt_publish_field_tls_label" formatted="false">Use TLS</string>
+    <string name="catalog_action_mqtt_publish_field_tls_hint" formatted="false">Enabled by default; cleartext is limited to private/local hosts</string>
+    <string name="catalog_action_mqtt_publish_field_topic_label" formatted="false">Topic</string>
+    <string name="catalog_action_mqtt_publish_field_topic_hint" formatted="false">Publish topic, without + or # wildcards</string>
+    <string name="catalog_action_mqtt_publish_field_payload_label" formatted="false">Payload</string>
+    <string name="catalog_action_mqtt_publish_field_payload_hint" formatted="false">UTF-8 payload, maximum 64 KB; redacted from display</string>
+    <string name="catalog_action_mqtt_publish_field_qos_label" formatted="false">QoS</string>
+    <string name="catalog_action_mqtt_publish_field_qos_hint" formatted="false">0 or 1; QoS 1 waits for PUBACK</string>
+    <string name="catalog_action_mqtt_publish_field_retain_label" formatted="false">Retain</string>
+    <string name="catalog_action_mqtt_publish_field_retain_hint" formatted="false">Ask the broker to retain the last message</string>
+    <string name="catalog_action_mqtt_publish_field_username_label" formatted="false">Username</string>
+    <string name="catalog_action_mqtt_publish_field_username_hint" formatted="false">Optional broker username</string>
+    <string name="catalog_action_mqtt_publish_field_password_label" formatted="false">Password</string>
+    <string name="catalog_action_mqtt_publish_field_password_hint" formatted="false">Optional broker password; always redacted</string>
+    <string name="catalog_action_mqtt_publish_field_timeout_label" formatted="false">Timeout (seconds)</string>
+    <string name="catalog_action_mqtt_publish_field_timeout_hint" formatted="false">Connect, handshake, and acknowledgement timeout (1-30)</string>
     <string name="catalog_action_ping_name" formatted="false">Ping Host</string>
     <string name="catalog_action_ping_description" formatted="false">Ping a network host</string>
     <string name="catalog_action_ping_field_host_label" formatted="false">Host address</string>
