@@ -32,6 +32,8 @@ class CancelSpeedTestAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         SpeedTestCancel.request()
         ctx.variables.set("SPD_Phase", "cancelled")
+        // Nothing is being measured any more, so the live overlay must stop claiming a direction.
+        ctx.variables.set("SPD_Arrow", "")
         ctx.logger("Speed test cancel requested")
         return ActionResult.Success
     }
