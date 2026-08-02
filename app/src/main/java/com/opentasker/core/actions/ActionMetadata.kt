@@ -911,6 +911,63 @@ fun registerActionMetadata() {
         )
     )
 
+    // --- 接続: measuring each SIM's real throughput ------------------------------------------------
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "net.speedtest",
+            name = "Speed Test",
+            description = "Measure download/upload throughput over a chosen transport. Pins its own network, so a mobile test runs with WiFi still connected — WiFi never has to be switched off",
+            category = "Network",
+            fields = listOf(
+                ActionField("transport", "Transport", FieldType.DROPDOWN, required = true, options = listOf("cellular", "wifi", "auto"), hint = "cellular = the SIM carrying data; auto = current default route"),
+                ActionField("direction", "Direction", FieldType.DROPDOWN, options = listOf("both", "down", "up"), hint = "default: both"),
+                ActionField("seconds", "Seconds per leg", FieldType.NUMBER, hint = "default 10 — the CLOCK is the limiter, as in Ookla; the size cap is only a runaway guard"),
+                ActionField("max_mb", "Max MB per leg", FieldType.NUMBER, hint = "default 4000 — a runaway guard, not a target. Set it low only if you want to cap data; a cap that binds first ends the leg mid-ramp and under-reports"),
+                ActionField("streams", "Parallel streams", FieldType.NUMBER, hint = "default 8 — one TCP stream is capped by window/RTT and under-reports a fast link; several fill the pipe the way real use does"),
+                ActionField("prefix", "Variable prefix", hint = "default SPD_ — live progress lands in %SPD_Cur, %SPD_Avg, %SPD_Peak, %SPD_Pct, %SPD_Phase; results in %SPD_DownAvg, %SPD_UpAvg, %SPD_DownPeak, %SPD_UpPeak, %SPD_DownMs"),
+                ActionField("ramp_ms", "Ignore first (ms)", FieldType.NUMBER, hint = "default 2000 — TCP slow-start is excluded from the reported average; the un-excluded figure is kept in %SPD_DownRaw"),
+                ActionField("down_url", "Download URL", hint = "default: speed.cloudflare.com (anycast — routing already picks the nearest PoP), with reachability fallbacks"),
+                ActionField("up_url", "Upload URL", hint = "default: speed.cloudflare.com"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "net.speedtest.cancel",
+            name = "Cancel Speed Test",
+            description = "Abort a running speed test immediately. The calling task still restores WiFi and the data SIM — this only stops the transfer",
+            category = "Network",
+            fields = listOf()
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "sim.data.set",
+            name = "Set Data SIM",
+            description = "Point mobile data at a SIM slot (0 = SIM1, 1 = SIM2). Needs Shizuku — the switch goes through a privileged telephony call",
+            category = "System",
+            fields = listOf(
+                ActionField("slot", "SIM slot", FieldType.DROPDOWN, required = true, options = listOf("0", "1"), hint = "0 = SIM1, 1 = SIM2 — addressed by slot because subscription ids change on every re-insertion"),
+                ActionField("settle_ms", "Settle (ms)", FieldType.NUMBER, hint = "default 3000 — wait for the modem to attach before measuring, or the first samples time the handover"),
+                ActionField("store_previous", "Store previous slot in", hint = "variable (default: SIM_Previous) — use it to restore the original SIM afterwards"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "sim.list",
+            name = "Read SIMs",
+            description = "Publish the active SIM slots — carrier name, subscription id, and which slot currently carries data",
+            category = "System",
+            fields = listOf(
+                ActionField("prefix", "Variable prefix", hint = "default SIM_ — writes %SIM_Count, %SIM_0Name, %SIM_0Sub, %SIM_1Name, %SIM_1Sub, %SIM_DataSlot"),
+            )
+        )
+    )
+
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "location.mode",

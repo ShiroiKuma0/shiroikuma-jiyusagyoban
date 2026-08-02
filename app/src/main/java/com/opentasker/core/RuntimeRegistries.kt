@@ -142,7 +142,11 @@ import com.opentasker.core.actions.PickAppDialogAction
 import com.opentasker.core.actions.PickAppsToVariableAction
 import com.opentasker.core.actions.PickListToVariableAction
 import com.opentasker.core.actions.TextDialogAction
+import com.opentasker.core.actions.ReadSimsAction
+import com.opentasker.core.actions.SetDataSimAction
 import com.opentasker.core.actions.ShellRunAction
+import com.opentasker.core.actions.CancelSpeedTestAction
+import com.opentasker.core.actions.SpeedTestAction
 import com.opentasker.core.actions.LocationModeAction
 import com.opentasker.core.actions.SetImeAction
 import com.opentasker.core.actions.HideSceneAction
@@ -306,6 +310,10 @@ private fun registerBuiltInActions() {
         PickListToVariableAction(),
         TextDialogAction(),
         ShellRunAction(),
+        SpeedTestAction(),
+        CancelSpeedTestAction(),
+        SetDataSimAction(),
+        ReadSimsAction(),
         LocationModeAction(),
         SetImeAction(),
         SetWidgetAction(),
