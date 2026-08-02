@@ -43,7 +43,7 @@
 - NFC tag scans with normalized ID matching and a one-time NDEF write helper
 - Calendar windows with redacted event metadata
 - Sunrise/sunset filters with coordinate, offset, and window support
-- Shake, Bluetooth connect/disconnect, package install/remove/replace
+- Shake, Bluetooth connect/disconnect and Android 16 bond-loss/encryption security events, package install/remove/replace
 - Bluetooth all-devices-disconnected transition with an editor preset and multi-device tracking
 - Android 15+ screen-recording visibility trigger - `event=screen_recording` reacts to whether this app is visible in a recording without capturing screen contents
 - Quick Settings tile tap, home-screen widget/shortcut, boot

@@ -85,5 +85,46 @@ class BluetoothContextEventsTest {
         assertEquals("bluetooth_some_connected", BluetoothContextEvents.buildSomeConnectedEvent().metadata["event"])
     }
 
+    @Test
+    fun keyMissingEventCarriesBondLossReason() {
+        val event = BluetoothContextEvents.buildKeyMissingEvent(
+            deviceName = "Headset",
+            deviceAddress = "AA:BB:CC:DD:EE:FF",
+            bondLossReason = 2,
+        )
+
+        assertEquals(BluetoothContextEvents.EVENT_KEY_MISSING, event.metadata["event"])
+        assertEquals(BluetoothContextEvents.STATE_KEY_MISSING, event.metadata["state"])
+        assertEquals("Headset", event.metadata["device"])
+        assertEquals("AA:BB:CC:DD:EE:FF", event.metadata["address"])
+        assertEquals("2", event.metadata["bondLossReason"])
+    }
+
+    @Test
+    fun encryptionEventCarriesSanitizedLinkAttributes() {
+        val event = BluetoothContextEvents.buildEncryptionChangeEvent(
+            deviceName = "Keyboard",
+            enabled = true,
+            status = 0,
+            algorithm = 2,
+            keySize = 16,
+            transport = 1,
+        )
+
+        assertEquals(BluetoothContextEvents.EVENT_ENCRYPTION_CHANGE, event.metadata["event"])
+        assertEquals(BluetoothContextEvents.STATE_ENCRYPTED, event.metadata["state"])
+        assertEquals("true", event.metadata["enabled"])
+        assertEquals("0", event.metadata["status"])
+        assertEquals("2", event.metadata["algorithm"])
+        assertEquals("16", event.metadata["keySize"])
+        assertEquals("1", event.metadata["transport"])
+    }
+
+    @Test
+    fun securityBroadcastsAreGatedToAndroid16() {
+        assertFalse(BluetoothContextEvents.supportsSecurityTriggers(35))
+        assertTrue(BluetoothContextEvents.supportsSecurityTriggers(36))
+    }
+
     private fun STATE() = BluetoothContextEvents.STATE_CONNECTED
 }

@@ -12,7 +12,7 @@
     <string name="context_type_state_title" formatted="false">State</string>
     <string name="context_type_state_description" formatted="false">Matches a device state such as battery level, charging, headphones, screen, or active media playback.</string>
     <string name="context_type_event_title" formatted="false">Event</string>
-    <string name="context_type_event_description" formatted="false">Matches a one-shot event such as boot, notification, NFC, Bluetooth connect/disconnect, calendar, sun, shake, or Locale plugin queries.</string>
+    <string name="context_type_event_description" formatted="false">Matches a one-shot event such as boot, notification, NFC, Bluetooth connect/disconnect/security, calendar, sun, shake, or Locale plugin queries.</string>
     <string name="context_type_plugin_title" formatted="false">Plugin</string>
     <string name="context_type_plugin_description" formatted="false">Matches when a Locale/Tasker condition plugin reports satisfied. The plugin is polled periodically and its last known state is cached.</string>
 
@@ -43,7 +43,7 @@
     <string name="context_field_state_value_label" formatted="false">Expected value</string>
     <string name="context_field_state_value_hint" formatted="false">true/false, connected/disconnected, on/off, package name, 80</string>
     <string name="context_field_event_type_label" formatted="false">Event type</string>
-    <string name="context_field_event_type_hint" formatted="false">boot_completed, notification, nfc, bluetooth, calendar, sunrise, sunset, shake, camera, mic, package_added, package_removed, package_replaced</string>
+    <string name="context_field_event_type_hint" formatted="false">boot_completed, notification, nfc, bluetooth, bluetooth_key_missing, bluetooth_encryption_change, calendar, sunrise, sunset, shake, camera, mic, package_added, package_removed, package_replaced</string>
     <string name="context_field_event_state_label" formatted="false">Event state</string>
     <string name="context_field_event_state_hint" formatted="false">during, upcoming, connected, disconnected</string>
     <string name="context_field_event_calendar_label" formatted="false">Calendar name</string>
@@ -98,6 +98,9 @@
     <string name="context_preset_at_sunset" formatted="false">At sunset</string>
     <string name="context_preset_30_after" formatted="false">30 min after</string>
     <string name="context_preset_all_bluetooth_disconnected" formatted="false">All Bluetooth devices disconnected</string>
+    <string name="context_preset_bluetooth_key_missing" formatted="false">Bluetooth key missing</string>
+    <string name="context_preset_bluetooth_encrypted" formatted="false">Bluetooth link encrypted</string>
+    <string name="context_preset_bluetooth_unencrypted" formatted="false">Bluetooth link unencrypted</string>
     <string name="context_preset_screen_recording_visible" formatted="false">Screen recording visible</string>
     <string name="context_preset_screen_recording_not_visible" formatted="false">Screen recording not visible</string>
 
