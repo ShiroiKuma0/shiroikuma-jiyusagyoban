@@ -25,6 +25,8 @@
 
 - **Push trigger spike**: added an authenticated `event=push` bridge for a de-googled UnifiedPush distributor, with a per-install Setup token, bounded payloads, duplicate suppression, and redacted event metadata.
 
+- **Tasker migration**: expanded XML import/export mappings for safe notification, variable, speech/vibration, volume/brightness/timeout, torch/media, app/URL, screenshot, and structured flow actions. Unsupported actions remain explicit, and lossy notification/volume fields are listed in the migration report.
+
 - **Release trust**: a generated `tools/release-truth.json` manifest now owns version/code, Android SDK, dependency, capability-count, bundle/Room schema, and immutable artifact-commit claims. The local quality gate validates the manifest against shipped source, README, and F-Droid metadata with configuration-cache-safe verification.
 
 - **Execution authoring**: profile editing can now select or clear an exit task; task editing exposes the previously stored collision policy; action editing exposes conditions and continue-after-failure; and task cards provide accessible move-up/down controls backed by a transactional history snapshot. Task collision admission now runs at the shared execution boundary for profile, manual, nested, widget/shortcut, notification, and external requests: Abort new logs a skipped run, Abort existing cancels the active coroutine tree, Wait serializes requests, and Run both permits overlap. Profile re-trigger mode remains the earlier profile-specific decision, while the referenced task's collision policy is the global last-mile rule.

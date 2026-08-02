@@ -20,15 +20,15 @@ class TaskerXmlExportTest {
             actions = listOf(
                 ActionSpec(type = "notify.show", args = mapOf("title" to "Hello", "text" to "World")),
                 ActionSpec(type = "var.set", args = mapOf("name" to "%MODE", "value" to "on")),
-                ActionSpec(type = "torch.set", args = mapOf("state" to "on")),
+                ActionSpec(type = "wifi.toggle", args = mapOf("state" to "on")),
             ),
         )
         val report = TaskerXmlExporter.export(emptyList(), listOf(task))
 
         assertEquals(1, report.exportedTaskCount)
         assertEquals(1, report.skippedActions.size)
-        assertEquals("torch.set", report.skippedActions[0].actionType)
-        assertTrue(report.xml.contains("<code>548</code>"))
+        assertEquals("wifi.toggle", report.skippedActions[0].actionType)
+        assertTrue(report.xml.contains("<code>523</code>"))
         assertTrue(report.xml.contains("<code>547</code>"))
         assertTrue(report.xml.contains("Hello"))
         assertTrue(report.xml.contains("%MODE"))
@@ -149,5 +149,37 @@ class TaskerXmlExportTest {
         val report = TaskerXmlExporter.export(emptyList(), listOf(task))
 
         assertTrue(report.xml.contains("<code>30</code>"))
+        assertTrue(report.xml.contains("<Int sr=\"arg0\" val=\"500\"/>"))
+        assertTrue(report.xml.contains("<Int sr=\"arg1\" val=\"2\"/>"))
+    }
+
+    @Test
+    fun exportsSafeSettingsMediaNotificationVariableAndFlowBatch() {
+        val task = Task(
+            id = 1,
+            name = "Safe batch",
+            actions = listOf(
+                ActionSpec(type = "notify.show", args = mapOf("title" to "Title", "text" to "Body")),
+                ActionSpec(type = "var.set", args = mapOf("name" to "%MODE", "value" to "quiet")),
+                ActionSpec(type = "tts.speak", args = mapOf("text" to "Hello")),
+                ActionSpec(type = "vibrate", args = mapOf("millis" to "250")),
+                ActionSpec(type = "volume.set", args = mapOf("stream" to "music", "level" to "4")),
+                ActionSpec(type = "torch.set", args = mapOf("state" to "on")),
+                ActionSpec(type = "sound.play", args = mapOf("path" to "content://media/song")),
+                ActionSpec(type = "flow.if", args = mapOf("condition" to "%MODE = quiet")),
+                ActionSpec(type = "flow.else"),
+                ActionSpec(type = "flow.endif"),
+                ActionSpec(type = "flow.foreach", args = mapOf("list" to "%ITEMS", "var" to "item")),
+                ActionSpec(type = "flow.endfor"),
+                ActionSpec(type = "flow.stop"),
+            ),
+        )
+
+        val report = TaskerXmlExporter.export(emptyList(), listOf(task))
+
+        assertTrue(report.skippedActions.isEmpty())
+        listOf("523", "547", "559", "61", "307", "511", "192", "37", "43", "38", "39", "40", "137")
+            .forEach { code -> assertTrue("missing Tasker code $code", report.xml.contains("<code>$code</code>")) }
+        assertTrue(report.xml.contains("content://media/song"))
     }
 }

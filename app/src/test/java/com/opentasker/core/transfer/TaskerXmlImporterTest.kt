@@ -34,7 +34,7 @@ class TaskerXmlImporterTest {
                         <id>10</id>
                         <nme>Alert task</nme>
                         <Action sr="act0">
-                            <code>548</code>
+                            <code>523</code>
                             <Str sr="arg0">Build done</Str>
                             <Str sr="arg1">APK is ready</Str>
                         </Action>
@@ -173,6 +173,46 @@ class TaskerXmlImporterTest {
             "61500",
             waitMillisFor("""<Int sr="arg0" val="500"/><Int sr="arg1" val="1"/><Int sr="arg2" val="1"/>"""),
         )
+    }
+
+    @Test
+    fun mapsSafeSettingsMediaNotificationVariableAndFlowBatch() {
+        val report = TaskerXmlImporter.parse(
+            rawXml = """
+                <TaskerData>
+                    <Task sr="task1">
+                        <id>1</id><nme>Safe batch</nme>
+                        <Action><code>523</code><Str sr="arg0">Title</Str><Str sr="arg1">Body</Str></Action>
+                        <Action><code>547</code><Str sr="arg0">%MODE</Str><Str sr="arg1">quiet</Str></Action>
+                        <Action><code>559</code><Str sr="arg0">Hello</Str></Action>
+                        <Action><code>61</code><Int sr="arg0" val="250"/></Action>
+                        <Action><code>307</code><Int sr="arg0" val="4"/></Action>
+                        <Action><code>511</code><Str sr="arg0">on</Str></Action>
+                        <Action><code>192</code><Str sr="arg0">content://media/song</Str></Action>
+                        <Action><code>449</code></Action>
+                        <Action><code>451</code></Action>
+                        <Action><code>453</code></Action>
+                        <Action><code>37</code><Str sr="arg0">%MODE = quiet</Str></Action>
+                        <Action><code>43</code></Action><Action><code>38</code></Action>
+                        <Action><code>39</code><Str sr="arg0">%ITEMS</Str><Str sr="arg1">item</Str></Action>
+                        <Action><code>40</code></Action><Action><code>137</code></Action>
+                    </Task>
+                </TaskerData>
+            """.trimIndent(),
+            appVersion = "test",
+            importedAtEpochMs = 123L,
+        )
+
+        val actions = report.bundle.tasks.single().actions
+        assertEquals(16, actions.size)
+        assertEquals(listOf("notify.show", "var.set", "tts.speak", "vibrate", "volume.set", "torch.set"), actions.take(6).map { it.type })
+        assertEquals("4", actions[4].args["level"])
+        assertEquals("music", actions[4].args["stream"])
+        assertEquals("content://media/song", actions[6].args["path"])
+        assertEquals("%MODE = quiet", actions[10].args["condition"])
+        assertEquals(16, report.mappedActions.size)
+        assertTrue(report.unsupportedActions.isEmpty())
+        assertTrue(report.lossyWarnings.any { it.contains("volume") })
     }
 
     @Test

@@ -25,10 +25,31 @@ data class SkippedExportAction(
 object TaskerXmlExporter {
 
     private val REVERSE_ACTION_MAP: Map<String, String> = mapOf(
-        "notify.show" to "548",
+        "notify.show" to "523",
+        "notify.cancel" to "779",
         "flow.wait" to "30",
         "log" to "905",
         "var.set" to "547",
+        "tts.speak" to "559",
+        "vibrate" to "61",
+        "torch.set" to "511",
+        "sound.play" to "192",
+        "sound.stop" to "449",
+        "track.next" to "451",
+        "track.previous" to "453",
+        "home.go" to "25",
+        "app.launch" to "20",
+        "url.open" to "104",
+        "screenshot.take" to "176",
+        "flow.if" to "37",
+        "flow.else" to "43",
+        "flow.endif" to "38",
+        "flow.foreach" to "39",
+        "flow.endfor" to "40",
+        "flow.stop" to "137",
+        "task.run" to "130",
+        "brightness.set" to "810",
+        "screen.timeout" to "812",
     )
 
     fun export(
@@ -84,7 +105,7 @@ object TaskerXmlExporter {
         sb.appendLine("    <pri>${task.priority}</pri>")
 
         task.actions.forEachIndexed { index, action ->
-            val taskerCode = REVERSE_ACTION_MAP[action.type]
+            val taskerCode = taskerCodeFor(action)
             if (taskerCode != null) {
                 appendAction(sb, index, taskerCode, action)
             } else {
@@ -104,16 +125,21 @@ object TaskerXmlExporter {
         sb.appendLine("      <code>$code</code>")
 
         when (action.type) {
-            "notify.show" -> {
-                appendStr(sb, 0, action.args["title"] ?: "Notification")
-                appendStr(sb, 1, action.args["text"] ?: "")
+            "notify.show", "notify.cancel" -> {
+                if (action.type == "notify.show") {
+                    appendStr(sb, 0, action.args["title"] ?: "Notification")
+                    appendStr(sb, 1, action.args["text"] ?: "")
+                } else {
+                    appendStr(sb, 0, action.args["tag"] ?: "")
+                    action.args["id"]?.let { appendStr(sb, 1, it) }
+                }
             }
             "flow.wait" -> {
                 val millis = action.args["millis"]?.toLongOrNull() ?: 1000
                 val seconds = millis / 1000
                 val remainMs = millis % 1000
-                appendStr(sb, 0, seconds.toString())
-                appendStr(sb, 1, remainMs.toString())
+                appendInt(sb, 0, remainMs.toString())
+                appendInt(sb, 1, seconds.toString())
             }
             "log" -> {
                 appendStr(sb, 0, action.args["message"] ?: "")
@@ -122,6 +148,24 @@ object TaskerXmlExporter {
                 appendStr(sb, 0, action.args["name"] ?: "%VAR")
                 appendStr(sb, 1, action.args["value"] ?: "")
             }
+            "tts.speak" -> appendStr(sb, 0, action.args["text"] ?: "")
+            "vibrate" -> appendInt(sb, 0, action.args["millis"] ?: "100")
+            "volume.set" -> {
+                val level = action.args["level"] ?: "0"
+                if (level == "mute" || level == "unmute") appendStr(sb, 0, level) else appendInt(sb, 0, level)
+            }
+            "torch.set" -> appendStr(sb, 0, action.args["state"] ?: "toggle")
+            "sound.play" -> appendStr(sb, 0, action.args["path"] ?: "")
+            "app.launch" -> appendStr(sb, 0, action.args["package"] ?: "")
+            "url.open" -> appendStr(sb, 0, action.args["url"] ?: "")
+            "flow.if" -> appendStr(sb, 0, action.args["condition"] ?: "true")
+            "flow.foreach" -> {
+                appendStr(sb, 0, action.args["list"] ?: "")
+                appendStr(sb, 1, action.args["var"] ?: "item")
+            }
+            "task.run" -> appendStr(sb, 0, action.args["task"] ?: action.args["name"] ?: action.args["id"] ?: "")
+            "brightness.set" -> appendStr(sb, 0, action.args["brightness"] ?: "auto")
+            "screen.timeout" -> appendInt(sb, 0, action.args["millis"] ?: "60000")
         }
 
         sb.appendLine("    </Action>")
@@ -217,6 +261,17 @@ object TaskerXmlExporter {
 
     private fun appendStr(sb: StringBuilder, index: Int, value: String) {
         sb.appendLine("""      <Str sr="arg$index" ve="3">${escapeXml(value)}</Str>""")
+    }
+
+    private fun appendInt(sb: StringBuilder, index: Int, value: String) {
+        sb.appendLine("""      <Int sr="arg$index" val="${escapeXml(value)}"/>""")
+    }
+
+    private fun taskerCodeFor(action: ActionSpec): String? {
+        if (action.type == "volume.set") {
+            return if (action.args["stream"].orEmpty().lowercase() in setOf("music", "media")) "307" else null
+        }
+        return REVERSE_ACTION_MAP[action.type]
     }
 
     private fun parseClockParts(clock: String): Pair<Int, Int>? {

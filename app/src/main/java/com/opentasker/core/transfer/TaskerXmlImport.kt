@@ -58,7 +58,7 @@ object TaskerXmlImporter {
         val mappedActions = mutableListOf<TaskerMappedAction>()
         val unsupportedActions = mutableListOf<TaskerUnsupportedAction>()
 
-        val tasks = parseTasks(doc, mappedActions, unsupportedActions)
+        val tasks = parseTasks(doc, mappedActions, unsupportedActions, lossyWarnings)
         val variables = parseVariables(doc, lossyWarnings)
         val profiles = parseProfiles(doc, tasks.map { it.id }.toSet(), lossyWarnings)
         val sceneCount = doc.elementsByTagName("Scene").size
@@ -98,6 +98,7 @@ object TaskerXmlImporter {
         doc: Document,
         mappedActions: MutableList<TaskerMappedAction>,
         unsupportedActions: MutableList<TaskerUnsupportedAction>,
+        lossyWarnings: MutableList<String>,
     ): List<Task> {
         val usedIds = mutableSetOf<Long>()
         return doc.elementsByTagName("Task").mapIndexed { index, element ->
@@ -107,6 +108,7 @@ object TaskerXmlImporter {
                 val parsed = parseAction(name, actionElement, actionIndex)
                 parsed.mapped?.let(mappedActions::add)
                 parsed.unsupported?.let(unsupportedActions::add)
+                parsed.lossyWarning?.let { lossyWarnings += "Task '$name' action ${actionIndex + 1}: $it" }
                 parsed.action
             }
             Task(id = id, name = name, actions = actions)
@@ -215,46 +217,158 @@ object TaskerXmlImporter {
     private fun parseAction(taskName: String, element: Element, actionIndex: Int): ParsedTaskerAction {
         val code = element.childText("code").ifBlank { element.getAttribute("code") }.ifBlank { "unknown" }
         val strings = element.actionStrings()
-        val ints = element.actionInts()
         val intsByIndex = element.actionIntsByIndex()
         val normalized = code.lowercase()
-        val action = when (normalized) {
-            "548", "notify", "notify.show" -> ActionSpec(
+        val actionWithLoss = when (normalized) {
+            "523", "notify", "notify.show" -> ActionWithLoss(
+                action = ActionSpec(
                 type = "notify.show",
                 label = "Tasker notification",
                 args = mapOf(
                     "title" to strings.getOrElse(0) { "Tasker notification" },
                     "text" to strings.getOrElse(1) { strings.getOrElse(0) { "Imported from Tasker" } },
                 ),
+                ),
+                lossyWarning = "notification icon, priority, and channel settings were not imported",
             )
-            "547", "flash", "toast" -> ActionSpec(
+            "779", "notify.cancel" -> ActionWithLoss(
+                ActionSpec(
+                    type = "notify.cancel",
+                    label = "Tasker cancel notification",
+                    args = buildMap {
+                        strings.getOrNull(0)?.takeIf(String::isNotBlank)?.let { put("tag", it) }
+                        strings.getOrNull(1)?.takeIf(String::isNotBlank)?.let { put("id", it) }
+                    },
+                ),
+            )
+            "548", "flash", "toast" -> ActionWithLoss(
+                action = ActionSpec(
                 type = "notify.show",
                 label = "Tasker flash",
                 args = mapOf(
                     "title" to "Tasker",
                     "text" to strings.getOrElse(0) { "Imported Tasker flash action" },
                 ),
+                ),
+                lossyWarning = "flash styling was represented as a standard notification",
             )
-            "30", "wait", "flow.wait" -> ActionSpec(
+            "547", "var.set", "variable.set" -> ActionWithLoss(
+                ActionSpec(
+                    type = "var.set",
+                    label = "Tasker variable set",
+                    args = mapOf(
+                        "name" to strings.getOrElse(0) { "%IMPORTED" },
+                        "value" to strings.getOrElse(1) { "" },
+                    ),
+                ),
+                lossyWarning = null,
+            )
+            "30", "wait", "flow.wait" -> ActionWithLoss(
+                action = ActionSpec(
                 type = "flow.wait",
                 label = "Tasker wait",
                 args = mapOf("millis" to waitMillis(strings, intsByIndex).toString()),
-            )
-            "log" -> ActionSpec(
-                type = "log",
-                label = "Tasker log",
-                args = mapOf("message" to strings.getOrElse(0) { "Imported Tasker log action" }),
-            )
-            "var.set", "variable.set" -> ActionSpec(
-                type = "var.set",
-                label = "Tasker variable set",
-                args = mapOf(
-                    "name" to strings.getOrElse(0) { "%IMPORTED" },
-                    "value" to strings.getOrElse(1) { "" },
                 ),
             )
-            else -> unsupportedAction(code)
+            "559", "say", "tts.speak" -> ActionWithLoss(
+                action = ActionSpec(
+                    type = "tts.speak",
+                    label = "Tasker speech",
+                    args = mapOf("text" to strings.getOrElse(0) { "" }),
+                ),
+            )
+            "61", "vibrate" -> ActionWithLoss(
+                action = ActionSpec(
+                    type = "vibrate",
+                    label = "Tasker vibrate",
+                    args = mapOf("millis" to waitMillis(strings, intsByIndex).coerceIn(1L, 10_000L).toString()),
+                ),
+            )
+            "303", "304", "305", "307", "308", "volume.set" -> ActionWithLoss(
+                action = ActionSpec(
+                    type = "volume.set",
+                    label = "Tasker volume",
+                    args = mapOf(
+                        "stream" to taskerVolumeStream(normalized),
+                        "level" to taskerLevel(strings, intsByIndex),
+                    ),
+                ),
+                lossyWarning = "Tasker volume display/sound flags were not imported",
+            )
+            "810", "brightness", "brightness.set" -> ActionWithLoss(
+                ActionSpec(
+                    type = "brightness.set",
+                    label = "Tasker brightness",
+                    args = mapOf("brightness" to taskerScalar(strings, intsByIndex, "auto")),
+                ),
+            )
+            "812", "screen.timeout" -> ActionWithLoss(
+                ActionSpec(
+                    type = "screen.timeout",
+                    label = "Tasker screen timeout",
+                    args = mapOf("millis" to waitMillis(strings, intsByIndex).coerceIn(1_000L, 1_800_000L).toString()),
+                ),
+            )
+            "511", "torch", "torch.set" -> ActionWithLoss(
+                action = ActionSpec(
+                    type = "torch.set",
+                    label = "Tasker torch",
+                    args = mapOf("state" to taskerOnOff(strings, intsByIndex)),
+                ),
+            )
+            "192", "play", "sound.play" -> ActionWithLoss(
+                action = ActionSpec(
+                    type = "sound.play",
+                    label = "Tasker sound",
+                    args = mapOf("path" to strings.getOrElse(0) { "" }),
+                ),
+            )
+            "449", "sound.stop" -> ActionWithLoss(ActionSpec(type = "sound.stop", label = "Tasker stop sound"))
+            "451", "track.next" -> ActionWithLoss(ActionSpec(type = "track.next", label = "Tasker next track"))
+            "453", "track.previous" -> ActionWithLoss(ActionSpec(type = "track.previous", label = "Tasker previous track"))
+            "15", "lock" -> ActionWithLoss(ActionSpec(type = "lock", label = "Tasker lock device"))
+            "20", "launch", "app.launch" -> ActionWithLoss(
+                ActionSpec(type = "app.launch", label = "Tasker launch app", args = mapOf("package" to strings.getOrElse(0) { "" })),
+            )
+            "25", "home", "home.go" -> ActionWithLoss(ActionSpec(type = "home.go", label = "Tasker go home"))
+            "104", "browse", "url.open" -> ActionWithLoss(
+                ActionSpec(type = "url.open", label = "Tasker open URL", args = mapOf("url" to strings.getOrElse(0) { "" })),
+            )
+            "176", "screenshot", "screenshot.take" -> ActionWithLoss(ActionSpec(type = "screenshot.take", label = "Tasker screenshot"))
+            "37", "if", "flow.if" -> ActionWithLoss(
+                ActionSpec(type = "flow.if", label = "Tasker if", args = mapOf("condition" to strings.joinToString(" ").ifBlank { "true" })),
+            )
+            "43", "else", "flow.else" -> ActionWithLoss(ActionSpec(type = "flow.else", label = "Tasker else"))
+            "38", "endif", "flow.endif" -> ActionWithLoss(ActionSpec(type = "flow.endif", label = "Tasker end if"))
+            "39", "for", "flow.foreach" -> ActionWithLoss(
+                ActionSpec(
+                    type = "flow.foreach",
+                    label = "Tasker for",
+                    args = mapOf(
+                        "list" to strings.getOrElse(0) { "" },
+                        "var" to strings.getOrElse(1) { "item" },
+                    ),
+                ),
+            )
+            "40", "endfor", "flow.endfor" -> ActionWithLoss(ActionSpec(type = "flow.endfor", label = "Tasker end for"))
+            "137", "stop", "flow.stop" -> ActionWithLoss(ActionSpec(type = "flow.stop", label = "Tasker stop"))
+            "130", "perform.task", "task.run" -> ActionWithLoss(
+                ActionSpec(
+                    type = "task.run",
+                    label = "Tasker perform task",
+                    args = mapOf("task" to strings.firstOrNull().orEmpty().ifBlank { intsByIndex[0]?.toString().orEmpty() }),
+                ),
+            )
+            "log" -> ActionWithLoss(
+                action = ActionSpec(
+                    type = "log",
+                    label = "Tasker log",
+                    args = mapOf("message" to strings.getOrElse(0) { "Imported Tasker log action" }),
+                ),
+            )
+            else -> ActionWithLoss(unsupportedAction(code))
         }
+        val action = actionWithLoss.action
         val unsupported = if (action.type == TASKER_UNSUPPORTED_ACTION_ID) {
             TaskerUnsupportedAction(taskName = taskName, taskerCode = code, actionIndex = actionIndex)
         } else {
@@ -265,7 +379,12 @@ object TaskerXmlImporter {
         } else {
             null
         }
-        return ParsedTaskerAction(action = action, mapped = mapped, unsupported = unsupported)
+        return ParsedTaskerAction(
+            action = action,
+            mapped = mapped,
+            unsupported = unsupported,
+            lossyWarning = actionWithLoss.lossyWarning,
+        )
     }
 
     private fun unsupportedAction(code: String): ActionSpec =
@@ -277,6 +396,28 @@ object TaskerXmlImporter {
                 "summary" to "This Tasker action was preserved as an unsupported placeholder during import.",
             ),
         )
+
+    private fun taskerVolumeStream(code: String): String = when (code) {
+        "303" -> "alarm"
+        "304" -> "ring"
+        "305" -> "notification"
+        "308" -> "system"
+        else -> "music"
+    }
+
+    private fun taskerLevel(strings: List<String>, intsByIndex: Map<Int, Int>): String =
+        taskerScalar(strings, intsByIndex, "0")
+
+    private fun taskerScalar(strings: List<String>, intsByIndex: Map<Int, Int>, fallback: String): String =
+        strings.firstOrNull()?.trim()?.takeIf { it.isNotBlank() }
+            ?: intsByIndex[0]?.toString()
+            ?: fallback
+
+    private fun taskerOnOff(strings: List<String>, intsByIndex: Map<Int, Int>): String {
+        val text = strings.firstOrNull()?.trim()?.lowercase()
+        if (text == "on" || text == "off" || text == "toggle") return text
+        return if ((intsByIndex[0] ?: 0) == 0) "off" else "on"
+    }
 
     private fun parseDocument(rawXml: String): Document {
         val factory = DocumentBuilderFactory.newInstance().apply {
@@ -379,6 +520,12 @@ object TaskerXmlImporter {
         val action: ActionSpec,
         val mapped: TaskerMappedAction?,
         val unsupported: TaskerUnsupportedAction?,
+        val lossyWarning: String? = null,
+    )
+
+    private data class ActionWithLoss(
+        val action: ActionSpec,
+        val lossyWarning: String? = null,
     )
 
     private val PROFILE_SCALAR_TAGS = setOf(
