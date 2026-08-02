@@ -639,6 +639,63 @@ val verifyPerformanceEvidence = tasks.register("verifyPerformanceEvidence") {
     }
 }
 
+val verifyDocumentationTruth = tasks.register("verifyDocumentationTruth") {
+    group = "verification"
+    description = "Checks current release claims and reports stale local historical documentation claims."
+
+    val currentDocumentation = listOf(
+        rootProject.layout.projectDirectory.file("README.md"),
+        rootProject.layout.projectDirectory.file("CHANGELOG.md"),
+        rootProject.layout.projectDirectory.file("tools/release-truth.json"),
+    )
+    val historicalDocumentation = listOf(
+        rootProject.file("CLAUDE.md"),
+        rootProject.file("docs/research/raw-research-output.txt"),
+        rootProject.file("docs/research/iter-1-roadmap-recommendations.md"),
+    ).filter(File::isFile)
+    inputs.files(currentDocumentation + historicalDocumentation)
+
+    doLast {
+        val readme = rootProject.file("README.md").readText()
+        check("version-$appVersionName-blue.svg" in readme) {
+            "README version badge does not match the current application version."
+        }
+        check("**68 built-in actions**" in readme && "**7 context families**" in readme) {
+            "README capability counts do not match the current release contract."
+        }
+
+        val staleClaims = historicalDocumentation.flatMap { file ->
+            val text = file.readText()
+            val claims = buildList {
+                Regex("\\bv\\d+\\.\\d+\\.\\d+\\b").findAll(text).mapTo(this) { it.value }
+                Regex("\\b(?:Room schema:|schema v)(\\d+)\\b", RegexOption.IGNORE_CASE)
+                    .findAll(text)
+                    .mapTo(this) { "schema ${it.groupValues[1]}" }
+                Regex("\\b(\\d+) built-in actions\\b").findAll(text)
+                    .mapTo(this) { "${it.groupValues[1]} built-in actions" }
+            }.distinct()
+            claims.filterNot { claim ->
+                claim == "v$appVersionName" ||
+                    claim == "schema 10" ||
+                    claim == "68 built-in actions"
+            }.map { claim -> "${file.relativeTo(rootProject.projectDir)}: $claim" }
+        }
+        staleClaims.forEach { claim -> logger.warn("Documentation freshness: historical claim detected: $claim") }
+
+        historicalDocumentation
+            .filter { it.name.contains("iter-1") }
+            .forEach { file ->
+                check("Historical research snapshot" in file.readText()) {
+                    "Historical research file is missing its scope label: ${file.relativeTo(rootProject.projectDir)}"
+                }
+            }
+        println(
+            "Documentation truth passed: current release claims are checked; " +
+                "${staleClaims.size} historical claims reported without blocking labeled snapshots.",
+        )
+    }
+}
+
 tasks.register<VerifyReleaseTruthTask>("verifyReleaseTruth") {
     truthFile.set(rootProject.layout.projectDirectory.file("tools/release-truth.json"))
     readmeFile.set(rootProject.layout.projectDirectory.file("README.md"))
@@ -797,6 +854,7 @@ tasks.register("localQualityGate") {
         verifyQualityGateSeed,
         "verifyNativePageAlignment",
         verifyPerformanceEvidence,
+        verifyDocumentationTruth,
     )
 }
 

@@ -195,6 +195,8 @@ Release-facing version, SDK, capability-count, schema, and required artifact-com
 
 Performance evidence is local and explicit. The quality gate validates the committed baseline-profile artifact and compiles the API 35+ Macrobenchmark harness; collect device evidence with `./gradlew :app:generateBaselineProfile` and run the release-like benchmark APK with `./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest`. The harness records cold-start (`StartupTimingMetric`) and first-navigation (`FrameTimingMetric`) results. Review repeated clean runs before changing a regression budget; hosted CI is intentionally not required.
 
+Current release claims come from `tools/release-truth.json` and the versioned README/CHANGELOG. The local quality gate reports stale version, schema, and capability claims found in ignored historical research files as warnings; labeled historical snapshots remain non-blocking.
+
 ```powershell
 .\tools\verify-local-release.ps1
 ```
