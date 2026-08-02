@@ -82,6 +82,7 @@ internal fun ProfilesScreen(
     onPreflightProfile: (Profile) -> Unit,
     onExportOpenTaskerBundle: () -> Unit,
     onImportOpenTaskerBundle: () -> Unit,
+    onImportOpenTaskerBundleText: () -> Unit,
     openTaskerBundleBusy: Boolean,
     onImportTaskerXml: () -> Unit,
     taskerImportBusy: Boolean,
@@ -105,6 +106,9 @@ internal fun ProfilesScreen(
             secondaryActionLabel = if (openTaskerBundleBusy) stringResource(R.string.import_reading_bundle) else stringResource(R.string.import_import_json),
             onSecondaryAction = onImportOpenTaskerBundle,
             secondaryActionEnabled = !openTaskerBundleBusy,
+            quinaryActionLabel = stringResource(R.string.import_paste_json_action),
+            onQuinaryAction = onImportOpenTaskerBundleText,
+            quinaryActionEnabled = !openTaskerBundleBusy,
             tertiaryActionLabel = if (taskerImportBusy) stringResource(R.string.import_reading_xml) else stringResource(R.string.action_import_tasker_xml),
             onTertiaryAction = onImportTaskerXml,
             tertiaryActionEnabled = !taskerImportBusy,
@@ -123,6 +127,9 @@ internal fun ProfilesScreen(
             secondaryActionLabel = if (openTaskerBundleBusy) stringResource(R.string.import_reading_bundle) else stringResource(R.string.import_import_json),
             onSecondaryAction = onImportOpenTaskerBundle,
             secondaryActionEnabled = !openTaskerBundleBusy,
+            quinaryActionLabel = stringResource(R.string.import_paste_json_action),
+            onQuinaryAction = onImportOpenTaskerBundleText,
+            quinaryActionEnabled = !openTaskerBundleBusy,
             tertiaryActionLabel = if (taskerImportBusy) stringResource(R.string.import_reading_xml) else stringResource(R.string.action_import_tasker_xml),
             onTertiaryAction = onImportTaskerXml,
             tertiaryActionEnabled = !taskerImportBusy,
@@ -158,6 +165,7 @@ internal fun ProfilesScreen(
                 onPreviewProfileShare = onPreviewProfileShare,
                 onExportOpenTaskerBundle = onExportOpenTaskerBundle,
                 onImportOpenTaskerBundle = onImportOpenTaskerBundle,
+                onImportOpenTaskerBundleText = onImportOpenTaskerBundleText,
                 openTaskerBundleBusy = openTaskerBundleBusy,
                 onImportTaskerXml = onImportTaskerXml,
                 taskerImportBusy = taskerImportBusy,
@@ -243,6 +251,7 @@ private fun WorkspaceSummaryCard(
     onPreviewProfileShare: () -> Unit,
     onExportOpenTaskerBundle: () -> Unit,
     onImportOpenTaskerBundle: () -> Unit,
+    onImportOpenTaskerBundleText: () -> Unit,
     openTaskerBundleBusy: Boolean,
     onImportTaskerXml: () -> Unit,
     taskerImportBusy: Boolean,
@@ -319,6 +328,13 @@ private fun WorkspaceSummaryCard(
                 ) {
                     Text(if (openTaskerBundleBusy) stringResource(R.string.import_reading_json) else stringResource(R.string.import_import_json))
                 }
+            }
+            OutlinedButton(
+                onClick = onImportOpenTaskerBundleText,
+                enabled = !openTaskerBundleBusy,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.import_paste_json_action))
             }
             OutlinedButton(
                 onClick = onPreviewProfileShare,

@@ -33,6 +33,8 @@
 
 ### Triggers (contexts)
 
+- **Offline bundle import** - paste exported JSON or decoded QR text into the existing disabled-by-default review flow with bounded input validation
+
 - Time/day schedules with presets, aliases, and ranges
 - Device state (battery, charging, headphones, screen, media playback, airplane, power save, Wi-Fi SSID)
 - App foreground detection via UsageStats, with optional exact/glob Activity component matching and explicit unavailable-component reporting

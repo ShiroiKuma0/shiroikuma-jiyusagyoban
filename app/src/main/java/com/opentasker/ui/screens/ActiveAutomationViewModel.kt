@@ -72,6 +72,7 @@ import com.opentasker.core.transfer.BundleImportPlan
 import com.opentasker.core.transfer.OpenTaskerBundle
 import com.opentasker.core.transfer.OpenTaskerBundleCodec
 import com.opentasker.core.transfer.OpenTaskerBundleRepository
+import com.opentasker.core.transfer.OpenTaskerBundleTextImport
 import com.opentasker.core.transfer.TaskerImportPlanner
 import com.opentasker.core.transfer.TaskerImportPreview
 import com.opentasker.core.transfer.TaskerXmlImportReport
@@ -854,14 +855,24 @@ class ActiveAutomationViewModel(
     }
 
     fun previewOpenTaskerBundle(uri: Uri) {
+        previewOpenTaskerBundleSource {
+            OpenTaskerBundleCodec.decode(readBoundedOpenTaskerBundle(appContext, uri))
+        }
+    }
+
+    fun previewOpenTaskerBundleText(rawText: String) {
+        previewOpenTaskerBundleSource {
+            OpenTaskerBundleTextImport.decode(rawText)
+        }
+    }
+
+    private fun previewOpenTaskerBundleSource(load: suspend () -> OpenTaskerBundle) {
         viewModelScope.launch {
             if (_openTaskerBundleBusy.value) return@launch
             _openTaskerBundleBusy.value = true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val rawJson = readBoundedOpenTaskerBundle(appContext, uri)
-                    val bundle = OpenTaskerBundleCodec.decode(rawJson)
-                    buildProfileShareReview(bundle)
+                    buildProfileShareReview(load())
                 }
             }
                 .onSuccess {

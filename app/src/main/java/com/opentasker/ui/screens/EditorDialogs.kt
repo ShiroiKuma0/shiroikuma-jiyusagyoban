@@ -518,6 +518,9 @@ internal fun EmptyState(
     quaternaryActionLabel: String? = null,
     onQuaternaryAction: (() -> Unit)? = null,
     quaternaryActionEnabled: Boolean = true,
+    quinaryActionLabel: String? = null,
+    onQuinaryAction: (() -> Unit)? = null,
+    quinaryActionEnabled: Boolean = true,
 ) {
     val actionWidth = Modifier
         .widthIn(max = 420.dp)
@@ -632,6 +635,17 @@ internal fun EmptyState(
                     .heightIn(min = 48.dp),
             ) {
                 Text(quaternaryActionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+            }
+        }
+        if (quinaryActionLabel != null && onQuinaryAction != null) {
+            Spacer(Modifier.height(6.dp))
+            TextButton(
+                onClick = onQuinaryAction,
+                enabled = quinaryActionEnabled,
+                modifier = actionWidth
+                    .heightIn(min = 48.dp),
+            ) {
+                Text(quinaryActionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
             }
         }
     }

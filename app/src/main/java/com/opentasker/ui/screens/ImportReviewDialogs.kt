@@ -1,5 +1,7 @@
 package com.opentasker.ui.screens
 
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,6 +27,65 @@ import com.opentasker.core.transfer.VariableConflictAction
 import com.opentasker.core.transfer.VariableConflictResolution
 import com.opentasker.core.transfer.VariableImportConflict
 import com.opentasker.ui.theme.DesignSystem
+
+internal fun readClipboardText(context: Context): String {
+    val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return ""
+    return clipboard.primaryClip
+        ?.takeIf { it.itemCount > 0 }
+        ?.getItemAt(0)
+        ?.coerceToText(context)
+        ?.toString()
+        .orEmpty()
+}
+
+@Composable
+internal fun OpenTaskerBundleTextImportDialog(
+    text: String,
+    busy: Boolean,
+    onTextChanged: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.import_paste_json_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
+                Text(
+                    stringResource(R.string.import_paste_json_body),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = onTextChanged,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 180.dp, max = 360.dp),
+                    placeholder = { Text(stringResource(R.string.import_paste_json_hint)) },
+                    minLines = 8,
+                    maxLines = 16,
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = text.isNotBlank() && !busy,
+                onClick = onConfirm,
+            ) {
+                Text(
+                    if (busy) stringResource(R.string.import_reading_bundle)
+                    else stringResource(R.string.import_paste_json_review),
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(enabled = !busy, onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        },
+    )
+}
 
 @Composable
 internal fun OpenTaskerBundleReviewDialog(

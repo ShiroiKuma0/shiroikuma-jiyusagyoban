@@ -1,6 +1,5 @@
 package com.opentasker.ui.screens
 
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -297,6 +296,8 @@ fun ActiveAutomationUi(
     var profileDialogId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var showCreateProfileDialog by rememberSaveable { mutableStateOf(false) }
     var showTemplateDialog by rememberSaveable { mutableStateOf(false) }
+    var showBundleTextImportDialog by rememberSaveable { mutableStateOf(false) }
+    var bundleTextImportDraft by rememberSaveable { mutableStateOf("") }
     var onboardingTemplateFlow by rememberSaveable { mutableStateOf(false) }
     var selectedTemplateId by rememberSaveable { mutableStateOf<String?>(null) }
     val onboardingCompleted by OnboardingPreference.hasCompleted(context).collectAsState(initial = true)
@@ -746,6 +747,10 @@ fun ActiveAutomationUi(
                 onPreflightProfile = viewModel::previewProfilePreflight,
                 onExportOpenTaskerBundle = { openTaskerBundleExportLauncher.launch(openTaskerBundleExportName()) },
                 onImportOpenTaskerBundle = { openTaskerBundleImportLauncher.launch(OPEN_TASKER_BUNDLE_MIME_TYPES) },
+                onImportOpenTaskerBundleText = {
+                    bundleTextImportDraft = readClipboardText(context)
+                    showBundleTextImportDialog = true
+                },
                 openTaskerBundleBusy = openTaskerBundleBusy,
                 onImportTaskerXml = { taskerXmlLauncher.launch(TASKER_XML_MIME_TYPES) },
                 taskerImportBusy = taskerImportBusy,
@@ -1017,6 +1022,19 @@ fun ActiveAutomationUi(
             onAttachScreenshots = { profileShareScreenshotLauncher.launch(arrayOf("image/*")) },
             onRemoveScreenshot = viewModel::removeProfileShareScreenshot,
             onContinueImportReview = viewModel::continueProfileShareImportReview,
+        )
+    }
+
+    if (showBundleTextImportDialog) {
+        OpenTaskerBundleTextImportDialog(
+            text = bundleTextImportDraft,
+            busy = openTaskerBundleBusy,
+            onTextChanged = { bundleTextImportDraft = it },
+            onDismiss = { if (!openTaskerBundleBusy) showBundleTextImportDialog = false },
+            onConfirm = {
+                showBundleTextImportDialog = false
+                viewModel.previewOpenTaskerBundleText(bundleTextImportDraft)
+            },
         )
     }
 
@@ -1369,9 +1387,6 @@ private fun OpenTaskerNavigationItem(
         )
     }
 }
-
-
-
 
 @Composable
 internal fun SummaryMetric(value: String, label: String, modifier: Modifier = Modifier) {
