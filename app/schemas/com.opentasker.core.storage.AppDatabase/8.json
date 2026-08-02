@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 8,
-    "identityHash": "0643495beba4032edf549a5047340206",
+    "identityHash": "a702ef46f8aeaa8d3434f5af23b4a0ca",
     "entities": [
       {
         "tableName": "profiles",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `enabled` INTEGER NOT NULL, `enterTaskId` INTEGER NOT NULL, `exitTaskId` INTEGER, `cooldownSec` INTEGER NOT NULL, `contextsJson` TEXT NOT NULL, `automationMode` TEXT NOT NULL, `profileGroup` TEXT, `requiresRiskAcknowledgement` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `enabled` INTEGER NOT NULL, `enterTaskId` INTEGER NOT NULL, `exitTaskId` INTEGER, `cooldownSec` INTEGER NOT NULL, `contextsJson` TEXT NOT NULL, `automationMode` TEXT NOT NULL, `projectId` INTEGER, `position` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -56,13 +56,13 @@
             "notNull": true
           },
           {
-            "fieldPath": "profileGroup",
-            "columnName": "profileGroup",
-            "affinity": "TEXT"
+            "fieldPath": "projectId",
+            "columnName": "projectId",
+            "affinity": "INTEGER"
           },
           {
-            "fieldPath": "requiresRiskAcknowledgement",
-            "columnName": "requiresRiskAcknowledgement",
+            "fieldPath": "position",
+            "columnName": "position",
             "affinity": "INTEGER",
             "notNull": true
           }
@@ -76,7 +76,7 @@
       },
       {
         "tableName": "tasks",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `priority` INTEGER NOT NULL, `collisionMode` TEXT NOT NULL, `actionsJson` TEXT NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `priority` INTEGER NOT NULL, `collisionMode` TEXT NOT NULL, `actionsJson` TEXT NOT NULL, `projectId` INTEGER, `position` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -107,6 +107,17 @@
             "columnName": "actionsJson",
             "affinity": "TEXT",
             "notNull": true
+          },
+          {
+            "fieldPath": "projectId",
+            "columnName": "projectId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
           }
         ],
         "primaryKey": {
@@ -118,7 +129,7 @@
       },
       {
         "tableName": "scenes",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `widthDp` INTEGER NOT NULL, `heightDp` INTEGER NOT NULL, `elementsJson` TEXT NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `widthDp` INTEGER NOT NULL, `heightDp` INTEGER NOT NULL, `elementsJson` TEXT NOT NULL, `projectId` INTEGER, `position` INTEGER NOT NULL, `bgColor` TEXT, `cornerRadiusDp` INTEGER NOT NULL, `scrimAlpha` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -149,6 +160,34 @@
             "columnName": "elementsJson",
             "affinity": "TEXT",
             "notNull": true
+          },
+          {
+            "fieldPath": "projectId",
+            "columnName": "projectId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bgColor",
+            "columnName": "bgColor",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "cornerRadiusDp",
+            "columnName": "cornerRadiusDp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scrimAlpha",
+            "columnName": "scrimAlpha",
+            "affinity": "INTEGER",
+            "notNull": true
           }
         ],
         "primaryKey": {
@@ -160,8 +199,14 @@
       },
       {
         "tableName": "variables",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`name` TEXT NOT NULL, `value` TEXT NOT NULL, `isGlobal` INTEGER NOT NULL, `isSecret` INTEGER NOT NULL, PRIMARY KEY(`name`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`projectId` INTEGER NOT NULL, `name` TEXT NOT NULL, `value` TEXT NOT NULL, PRIMARY KEY(`projectId`, `name`))",
         "fields": [
+          {
+            "fieldPath": "projectId",
+            "columnName": "projectId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
           {
             "fieldPath": "name",
             "columnName": "name",
@@ -173,23 +218,12 @@
             "columnName": "value",
             "affinity": "TEXT",
             "notNull": true
-          },
-          {
-            "fieldPath": "isGlobal",
-            "columnName": "isGlobal",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "isSecret",
-            "columnName": "isSecret",
-            "affinity": "INTEGER",
-            "notNull": true
           }
         ],
         "primaryKey": {
           "autoGenerate": false,
           "columnNames": [
+            "projectId",
             "name"
           ]
         }
@@ -256,18 +290,7 @@
           "columnNames": [
             "id"
           ]
-        },
-        "indices": [
-          {
-            "name": "index_run_logs_timestamp",
-            "unique": false,
-            "columnNames": [
-              "timestamp"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_run_logs_timestamp` ON `${TABLE_NAME}` (`timestamp`)"
-          }
-        ]
+        }
       },
       {
         "tableName": "edit_history",
@@ -309,24 +332,53 @@
           "columnNames": [
             "id"
           ]
-        },
-        "indices": [
+        }
+      },
+      {
+        "tableName": "projects",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `color` INTEGER, `sortOrder` INTEGER NOT NULL, `description` TEXT NOT NULL)",
+        "fields": [
           {
-            "name": "index_edit_history_entityType_entityId",
-            "unique": false,
-            "columnNames": [
-              "entityType",
-              "entityId"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_edit_history_entityType_entityId` ON `${TABLE_NAME}` (`entityType`, `entityId`)"
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "color",
+            "columnName": "color",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
           }
-        ]
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '0643495beba4032edf549a5047340206')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a702ef46f8aeaa8d3434f5af23b4a0ca')"
     ]
   }
 }

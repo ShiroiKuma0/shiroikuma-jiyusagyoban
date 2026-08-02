@@ -9,6 +9,12 @@ import kotlinx.coroutines.flow.flow
 object ApplicationContextEvents {
     private const val TYPE = "app"
 
+    /** Latest foreground package (last value published by the usage monitor). "" until first seen.
+     *  Exposed so a task can read it via `state.get` (key "app") to branch on the foreground app. */
+    @Volatile
+    var current: String = ""
+        private set
+
     private val foregroundEvents = MutableSharedFlow<ContextEvent>(
         replay = 1,
         extraBufferCapacity = 16,
@@ -24,6 +30,7 @@ object ApplicationContextEvents {
         val normalized = packageName.trim()
         if (normalized.isBlank()) return false
         latestForegroundPackage = normalized
+        current = normalized
         return foregroundEvents.tryEmit(
             ContextEvent(
                 type = TYPE,

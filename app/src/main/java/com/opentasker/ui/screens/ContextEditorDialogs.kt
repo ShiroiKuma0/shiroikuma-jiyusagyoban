@@ -1,6 +1,5 @@
 package com.opentasker.ui.screens
 
-import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -50,13 +49,11 @@ import com.opentasker.app.R
 import com.opentasker.core.actions.ActionField
 import com.opentasker.core.actions.FieldType
 import com.opentasker.core.contexts.CalendarSunEventPresets
-import com.opentasker.core.contexts.ApplicationContextEvents
 import com.opentasker.core.contexts.DaySchedule
 import com.opentasker.core.contexts.EventContextPreset
 import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
-import com.opentasker.core.apps.PackageNamePolicy
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.selectedContainerColor
 
@@ -76,8 +73,8 @@ internal fun ContextTypePickerDialog(onDismiss: () -> Unit, onSelect: (ContextTy
                         shape = RoundedCornerShape(14.dp),
                     ) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs)) {
-                            Text(stringResource(contextTitleRes(type)), style = MaterialTheme.typography.titleSmall)
-                            Text(stringResource(contextDescriptionRes(type)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(type.name.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleSmall)
+                            Text(contextDescription(type), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -122,14 +119,14 @@ internal fun ContextConfigDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(contextTitleRes(state.type))) },
+        title = { Text(state.type.name.lowercase().replaceFirstChar { it.uppercase() }) },
         text = {
             LazyColumn(
                 modifier = Modifier.heightIn(max = 420.dp),
                 verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
             ) {
                 item {
-                    Text(stringResource(contextDescriptionRes(state.type)), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(contextDescription(state.type), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(12.dp))
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
@@ -176,11 +173,6 @@ internal fun ContextConfigDialog(
                             field = field,
                             value = config[field.key].orEmpty(),
                             onChange = { value -> config = config + (field.key to value) },
-                            suggestedPackage = if (state.type == ContextType.APPLICATION && field.key == "package") {
-                                ApplicationContextEvents.latestObservedPackage()
-                            } else {
-                                null
-                            },
                         )
                     }
                     if (state.type == ContextType.EVENT && config["event"].equals("nfc", ignoreCase = true)) {
@@ -244,11 +236,7 @@ internal fun contextHasInvalidValues(type: ContextType, config: Map<String, Stri
         val value = raw.toDoubleOrNull() ?: return true
         return value < min || value > max
     }
-    val packageName = config["package"]?.trim().orEmpty()
-    val invalidPackage = packageName.isNotBlank() &&
-        type in setOf(ContextType.APPLICATION, ContextType.EVENT, ContextType.PLUGIN) &&
-        !PackageNamePolicy.isValid(packageName)
-    return invalidPackage || when (type) {
+    return when (type) {
         ContextType.TIME -> invalidClock("start") || invalidClock("end")
         ContextType.LOCATION ->
             outOfRange("latitude", -90.0, 90.0) ||
@@ -261,52 +249,54 @@ internal fun contextHasInvalidValues(type: ContextType, config: Map<String, Stri
 }
 
 private fun contextFields(type: ContextType): List<ActionField> = when (type) {
-    ContextType.APPLICATION -> listOf(ActionField("package", R.string.context_field_application_package_label, FieldType.APP, required = true, hintRes = R.string.context_field_application_package_hint))
+    ContextType.APPLICATION -> listOf(ActionField("package", "Package name", required = true, hint = "com.example.app (personal profile only)"))
     ContextType.TIME -> listOf(
-        ActionField("start", R.string.context_field_time_start_label, required = true, hintRes = R.string.context_field_time_start_hint),
-        ActionField("end", R.string.context_field_time_end_label, required = true, hintRes = R.string.context_field_time_end_hint),
+        ActionField("start", "Start HH:mm", required = true, hint = "09:00"),
+        ActionField("end", "End HH:mm", required = true, hint = "17:00"),
     )
-    ContextType.DAY -> listOf(ActionField("days", R.string.context_field_day_days_label, required = true, hintRes = R.string.context_field_day_days_hint))
+    ContextType.DAY -> listOf(ActionField("days", "Days", required = true, hint = "weekdays, weekends, MON-FRI"))
     ContextType.LOCATION -> listOf(
-        ActionField("latitude", R.string.context_field_location_latitude_label, FieldType.NUMBER, required = true),
-        ActionField("longitude", R.string.context_field_location_longitude_label, FieldType.NUMBER, required = true),
-        ActionField("radiusMeters", R.string.context_field_location_radius_label, FieldType.NUMBER, required = true, hintRes = R.string.context_field_location_radius_hint),
-        ActionField("maxAccuracyMeters", R.string.context_field_location_accuracy_label, FieldType.NUMBER, hintRes = R.string.context_field_location_accuracy_hint),
-        ActionField("dwellSeconds", R.string.context_field_location_dwell_label, FieldType.NUMBER, hintRes = R.string.context_field_location_dwell_hint),
-        ActionField("outside", R.string.context_field_location_outside_label, FieldType.CHECKBOX, hintRes = R.string.context_field_location_outside_hint),
+        ActionField("latitude", "Latitude", FieldType.NUMBER, required = true),
+        ActionField("longitude", "Longitude", FieldType.NUMBER, required = true),
+        ActionField("radiusMeters", "Radius meters", FieldType.NUMBER, required = true, hint = "100"),
+        ActionField("maxAccuracyMeters", "Max accuracy meters", FieldType.NUMBER, hint = "50"),
+        ActionField("dwellSeconds", "Dwell seconds", FieldType.NUMBER, hint = "300"),
+        ActionField("outside", "Match when outside", FieldType.CHECKBOX, hint = "Fire when away from this place instead of at it (with dwell)"),
     )
     ContextType.STATE -> listOf(
-        ActionField("key", R.string.context_field_state_key_label, required = true, hintRes = R.string.context_field_state_key_hint),
-        ActionField("operator", R.string.context_field_state_operator_label, hintRes = R.string.context_field_state_operator_hint),
-        ActionField("value", R.string.context_field_state_value_label, required = true, hintRes = R.string.context_field_state_value_hint),
+        ActionField("key", "State key", required = true, hint = "battery_level, charging, headphones, screen"),
+        ActionField("operator", "Operator", hint = "=, >=, <=, >, <"),
+        ActionField("value", "Expected value", required = true, hint = "true/false, connected/disconnected, on/off, 80"),
     )
     ContextType.EVENT -> listOf(
-        ActionField("event", R.string.context_field_event_type_label, required = true, hintRes = R.string.context_field_event_type_hint),
-        ActionField("state", R.string.context_field_event_state_label, hintRes = R.string.context_field_event_state_hint),
-        ActionField("calendar", R.string.context_field_event_calendar_label, hintRes = R.string.context_field_event_calendar_hint),
-        ActionField("beforeMinutes", R.string.context_field_event_before_label, FieldType.NUMBER, hintRes = R.string.context_field_event_before_hint),
-        ActionField("package", R.string.context_field_event_package_label, FieldType.APP, hintRes = R.string.context_field_event_package_hint),
-        ActionField("tagId", R.string.context_field_event_tag_label, hintRes = R.string.context_field_event_tag_hint),
-        ActionField("latitude", R.string.context_field_event_latitude_label, FieldType.NUMBER, hintRes = R.string.context_field_event_latitude_hint),
-        ActionField("longitude", R.string.context_field_event_longitude_label, FieldType.NUMBER, hintRes = R.string.context_field_event_longitude_hint),
-        ActionField("offsetMinutes", R.string.context_field_event_offset_label, FieldType.NUMBER, hintRes = R.string.context_field_event_offset_hint),
-        ActionField("windowMinutes", R.string.context_field_event_window_label, FieldType.NUMBER, hintRes = R.string.context_field_event_window_hint),
-        ActionField("title", R.string.context_field_event_title_label, hintRes = R.string.context_field_event_title_hint),
-        ActionField("body", R.string.context_field_event_body_label, hintRes = R.string.context_field_event_body_hint),
-        ActionField("filter", R.string.context_field_event_filter_label, hintRes = R.string.context_field_event_filter_hint),
-        ActionField("regex", R.string.context_field_event_regex_label, FieldType.CHECKBOX),
+        ActionField("event", "Event type", required = true, hint = "boot_completed, notification, nfc, bluetooth, calendar, sunrise, sunset, shake, package_added, package_removed, package_replaced, orientation, fold, app_foreground, hardware_key"),
+        ActionField("state", "Event state", hint = "during, upcoming, connected, disconnected"),
+        ActionField("fold", "Fold posture", hint = "for event=fold: folded, semi, unfolded"),
+        ActionField("key", "Hardware key", hint = "for event=hardware_key: volume_up, volume_down, power"),
+        ActionField("press", "Press type", hint = "for event=hardware_key: short, long"),
+        ActionField("calendar", "Calendar name", hint = "Work"),
+        ActionField("beforeMinutes", "Before minutes", FieldType.NUMBER, hint = "15"),
+        ActionField("package", "Package allowlist", hint = "com.example.app, com.chat.app"),
+        ActionField("tagId", "NFC tag ID", hint = "04AABBCC"),
+        ActionField("latitude", "Latitude", FieldType.NUMBER, hint = "40.7128"),
+        ActionField("longitude", "Longitude", FieldType.NUMBER, hint = "-74.0060"),
+        ActionField("offsetMinutes", "Sun offset minutes", FieldType.NUMBER, hint = "-30"),
+        ActionField("windowMinutes", "Sun window minutes", FieldType.NUMBER, hint = "5"),
+        ActionField("title", "Title contains", hint = "Optional notification title text"),
+        ActionField("body", "Body contains", hint = "Optional notification body text"),
+        ActionField("filter", "Any metadata filter", hint = "Optional text/package/action filter"),
+        ActionField("regex", "Use regex matching", FieldType.CHECKBOX),
     )
     ContextType.PLUGIN -> listOf(
-        ActionField("package", R.string.context_field_plugin_package_label, FieldType.APP, required = true, hintRes = R.string.context_field_plugin_package_hint),
-        ActionField("bundleJson", R.string.context_field_plugin_bundle_label, hintRes = R.string.context_field_plugin_bundle_hint),
-        ActionField("blurb", R.string.context_field_plugin_blurb_label, hintRes = R.string.context_field_plugin_blurb_hint),
-        ActionField("timeoutMs", R.string.context_field_plugin_timeout_label, FieldType.NUMBER, hintRes = R.string.context_field_plugin_timeout_hint),
+        ActionField("package", "Plugin package", required = true, hint = "com.example.plugin"),
+        ActionField("bundleJson", "Plugin config JSON", hint = "{\"key\":\"value\"}"),
+        ActionField("blurb", "Description", hint = "Optional label from plugin config"),
+        ActionField("timeoutMs", "Query timeout ms", FieldType.NUMBER, hint = "5000"),
     )
 }
 
 private fun contextConfigForSave(type: ContextType, config: Map<String, String>): Map<String, String> {
-    val nonBlank = config.filterValues { it.isNotBlank() }.toMutableMap()
-    config["package"]?.trim()?.takeIf(String::isNotBlank)?.let { nonBlank["package"] = it }
+    val nonBlank = config.filterValues { it.isNotBlank() }
     if (type == ContextType.DAY) {
         val canonicalDays = DaySchedule.canonicalize(config["days"].orEmpty()).orEmpty()
         return if (canonicalDays.isBlank()) {
@@ -369,13 +359,13 @@ internal fun DayScheduleInput(value: String, onChange: (String) -> Unit) {
             )
         }
         listOf(
-            listOf("MON" to R.string.context_day_mon, "TUE" to R.string.context_day_tue, "WED" to R.string.context_day_wed),
-            listOf("THU" to R.string.context_day_thu, "FRI" to R.string.context_day_fri, "SAT" to R.string.context_day_sat, "SUN" to R.string.context_day_sun),
+            listOf("MON", "TUE", "WED"),
+            listOf("THU", "FRI", "SAT", "SUN"),
         ).forEach { rowDays ->
             Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                rowDays.forEach { (day, dayLabelRes) ->
+                rowDays.forEach { day ->
                     DayPresetButton(
-                        label = stringResource(dayLabelRes),
+                        label = day,
                         selected = day in selected,
                         onClick = {
                             val next = if (day in selected) selected - day else selected + day
@@ -491,24 +481,12 @@ internal fun EventPresetRow(
     }
 }
 
-@StringRes
-internal fun contextTitleRes(type: ContextType): Int = when (type) {
-    ContextType.APPLICATION -> R.string.context_type_application_title
-    ContextType.TIME -> R.string.context_type_time_title
-    ContextType.DAY -> R.string.context_type_day_title
-    ContextType.LOCATION -> R.string.context_type_location_title
-    ContextType.STATE -> R.string.context_type_state_title
-    ContextType.EVENT -> R.string.context_type_event_title
-    ContextType.PLUGIN -> R.string.context_type_plugin_title
-}
-
-@StringRes
-internal fun contextDescriptionRes(type: ContextType): Int = when (type) {
-    ContextType.APPLICATION -> R.string.context_type_application_description
-    ContextType.TIME -> R.string.context_type_time_description
-    ContextType.DAY -> R.string.context_type_day_description
-    ContextType.LOCATION -> R.string.context_type_location_description
-    ContextType.STATE -> R.string.context_type_state_description
-    ContextType.EVENT -> R.string.context_type_event_description
-    ContextType.PLUGIN -> R.string.context_type_plugin_description
+internal fun contextDescription(type: ContextType): String = when (type) {
+    ContextType.APPLICATION -> "Matches when an app is detected in the foreground."
+    ContextType.TIME -> "Matches during a clock time window."
+    ContextType.DAY -> "Matches on selected days, presets, or weekday/weekend ranges."
+    ContextType.LOCATION -> "Matches near a latitude/longitude radius with optional accuracy and dwell checks."
+    ContextType.STATE -> "Matches a device state such as battery level, charging, headphones, or screen."
+    ContextType.EVENT -> "Matches a one-shot event such as boot, notification, NFC, Bluetooth connect/disconnect, calendar, sun, shake, or Locale plugin queries."
+    ContextType.PLUGIN -> "Matches when a Locale/Tasker condition plugin reports satisfied. The plugin is polled periodically and its last known state is cached."
 }

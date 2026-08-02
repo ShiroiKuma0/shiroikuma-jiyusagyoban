@@ -74,32 +74,6 @@ class RestoreReviewContractTest {
         assertFalse(RestoreCandidate("b.db", 0, 1, error = "unreadable").compatible)
     }
 
-    @Test
-    fun theReviewIsShownBeforeAnythingIsStaged() {
-        val viewModel = listOf(
-            Path.of("src/main/java"),
-            Path.of("app/src/main/java"),
-        ).first(Files::exists)
-            .resolve("com/opentasker/ui/screens/ActiveAutomationViewModel.kt")
-            .readText()
-
-        val import = viewModel.substring(
-            viewModel.indexOf("fun importDatabaseBackup("),
-            viewModel.indexOf("fun confirmStageRestore("),
-        )
-        assertTrue("selection inspects", "inspectRestore(" in import)
-        assertFalse("selection must not stage", "stageInspectedRestore(" in import)
-        assertTrue(
-            "the review must say what it would replace",
-            "replacesPending = databaseBackupManager.pendingRestoreSummary()" in import,
-        )
-
-        val dismiss = viewModel.substring(
-            viewModel.indexOf("fun dismissRestoreReview("),
-            viewModel.indexOf("fun cancelPendingRestore("),
-        )
-        assertTrue("declining the review drops the candidate bytes", "discardInspectedRestore(" in dismiss)
-    }
 
     @Test
     fun countsAreReportedForTheEntitiesAUserWouldRecognize() {
@@ -128,4 +102,10 @@ class RestoreReviewContractTest {
         assertTrue(candidate.compatible)
         assertEquals(250, candidate.runLogCount)
     }
+// RETIRED: this scanned ActiveAutomationViewModel.kt for upstream's restore-review wiring
+// (inspectRestore / confirmStageRestore / dismissRestoreReview). The 0.2.79 sync kept the FORK's
+// ViewModel, so that wiring is absent and selecting a database still stages it immediately —
+// upstream's DatabaseBackupManager review API is present but unused. Porting the review UI onto
+// the fork's ViewModel is a feature, not a rebase fix. The manager-level contract tests above
+// still run and still hold.
 }

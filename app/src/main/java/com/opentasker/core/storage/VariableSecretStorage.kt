@@ -178,7 +178,7 @@ class VariableRepository(
     fun observeGlobals(): Flow<List<Variable>> = flow {
         migrateLegacySensitiveVariables()
         emitAll(
-            dao.getAllGlobalAsFlow().map { entities ->
+            dao.getAllAsFlow().map { entities ->
                 entities.map(::decodeForDomain)
             },
         )
@@ -190,15 +190,15 @@ class VariableRepository(
         }
     }
 
-    suspend fun delete(name: String) {
-        storageMutationMutex.withLock { dao.deleteByName(name) }
+    suspend fun delete(projectId: Long, name: String) {
+        storageMutationMutex.withLock { dao.delete(projectId, name) }
     }
 
     suspend fun importVariable(variable: Variable) {
         val normalized = variable.normalizedForStorage()
         val entity = normalized.toStoredEntity(secretCodec)
         storageMutationMutex.withLock {
-            if (dao.get(normalized.name) == null) dao.insert(entity) else dao.update(entity)
+            if (dao.get(normalized.projectId, normalized.name) == null) dao.insert(entity) else dao.update(entity)
         }
     }
 
@@ -222,7 +222,7 @@ class VariableRepository(
         val values = linkedMapOf<String, String>()
         val secretNames = linkedSetOf<String>()
         val unavailable = linkedSetOf<String>()
-        dao.getAllGlobal().sortedBy { it.name }.forEach { entity ->
+        dao.getAll().sortedBy { it.name }.forEach { entity ->
             if (!entity.isEffectivelySecret()) {
                 values[entity.name] = entity.value
                 return@forEach
@@ -314,13 +314,13 @@ class VariableRepository(
 
     private fun decodeForDomain(entity: VariableEntity): Variable {
         if (!entity.isSecret) {
-            return Variable(entity.name, entity.value, entity.isGlobal)
+            return Variable(entity.name, entity.value, entity.projectId)
         }
         val decoded = secretCodec.decrypt(entity.name, entity.value)
         return Variable(
             name = entity.name,
             value = decoded.getOrDefault(""),
-            isGlobal = entity.isGlobal,
+            projectId = entity.projectId,
             isSecret = true,
             secretAvailable = decoded.isSuccess,
         )
@@ -330,7 +330,7 @@ class VariableRepository(
         Variable(
             name = value.name,
             value = value.value,
-            isGlobal = true,
+            projectId = 0,
             isSecret = value.isSecret,
         ).normalizedForStorage().toStoredEntity(secretCodec)
 
@@ -355,20 +355,16 @@ private fun RuntimeVariableSeed.stateOf(name: String): RuntimeVariableState = Ru
 internal fun VariableEntity.isEffectivelySecret(): Boolean = isSecret
 
 internal fun Variable.normalizedForStorage(): Variable {
-    val normalizedName = VariableNamePolicy.normalizeForScope(name, isGlobal)
-        ?: throw IllegalArgumentException(
-            if (isGlobal) {
-                "Invalid global variable name '$name'"
-            } else {
-                "Invalid local variable name '$name': local names must be all lowercase"
-            },
-        )
+    // Fork: names may be non-ASCII (Japanese), so only strip an optional `%` sigil and trim —
+    // VariableNamePolicy's ASCII-only pattern must not reject them here.
+    val normalizedName = name.trim().removePrefix("%")
+    require(normalizedName.isNotEmpty()) { "Empty variable name" }
     return if (normalizedName == name) this else copy(name = normalizedName)
 }
 
 internal fun Variable.toStoredEntity(codec: VariableSecretCodec): VariableEntity = VariableEntity(
+    projectId = projectId,
     name = name,
     value = if (isSecret) codec.encrypt(name, value) else value,
-    isGlobal = isGlobal,
     isSecret = isSecret,
 )
