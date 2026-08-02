@@ -1,4 +1,5 @@
 import java.net.URLEncoder
+import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.ConfigurableFileCollection
@@ -449,8 +450,18 @@ abstract class VerifyNativePageAlignmentTask : org.gradle.api.DefaultTask() {
                 .filter { it.name.startsWith("lib/") && it.name.endsWith(".so") }
                 .toList()
             if (nativeEntries.isEmpty()) {
-                println("Native page-alignment audit passed: APK contains no native libraries.")
+                println("Native page-alignment/read-only audit passed: APK contains no native libraries.")
                 return
+            }
+
+            // APK-backed native libraries are loaded from immutable package storage. A compressed
+            // entry would be extracted to a mutable file before loading and cannot satisfy Android
+            // 17's System.load read-only requirement without an explicit setReadOnly() step.
+            val readOnlyViolations = nativeEntries
+                .filter { entry -> entry.method != ZipEntry.STORED }
+                .map { entry -> "${entry.name}: compressed native entry is not guaranteed read-only" }
+            check(readOnlyViolations.isEmpty()) {
+                "Android 17 read-only native-library audit failed:\n${readOnlyViolations.joinToString("\n")}"
             }
 
             val violations = nativeEntries.mapNotNull { entry ->
@@ -469,8 +480,9 @@ abstract class VerifyNativePageAlignmentTask : org.gradle.api.DefaultTask() {
                 "16 KB native page-alignment audit failed:\n${violations.joinToString("\n")}"
             }
             println(
-                "Native page-alignment audit passed: ${nativeEntries.size} libraries, " +
-                    "minimum PT_LOAD alignment >= $REQUIRED_PAGE_ALIGNMENT bytes.",
+                "Native page-alignment/read-only audit passed: ${nativeEntries.size} libraries, " +
+                    "all APK entries stored read-only, minimum PT_LOAD alignment >= " +
+                    "$REQUIRED_PAGE_ALIGNMENT bytes.",
             )
         }
     }
@@ -918,7 +930,7 @@ tasks.register("localQualityGate") {
 
 tasks.register<VerifyNativePageAlignmentTask>("verifyNativePageAlignment") {
     group = "verification"
-    description = "Checks that every packaged native ELF has 16 KB PT_LOAD alignment."
+    description = "Checks that packaged native ELFs are read-only and have 16 KB PT_LOAD alignment."
     dependsOn("packageDebug")
     apk.set(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk"))
 }
