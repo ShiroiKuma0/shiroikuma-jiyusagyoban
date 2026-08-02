@@ -29,6 +29,7 @@ import kotlinx.coroutines.launch
  *   - "tile_clicked": Quick Settings tile toggled
  *   - "push": authenticated UnifiedPush distributor delivery
  *   - "share": sanitized Android Sharesheet text, URI, or file delivery
+ *   - "fold": foldable posture changed (folded / semi / unfolded), also exposed as %FOLD
  */
 class EventContextSourceImpl : EventDemandContextSource {
     override val type = "event"
@@ -64,10 +65,15 @@ class EventContextSourceImpl : EventDemandContextSource {
         NotificationContextEvents.events,
         NfcContextEvents.events,
         BootContextEvents.events,
-        CalendarSunContextEvents.events(app, requestedEvent = requestedEvent),
+        CalendarSunContextEvents.events(app),
         LocalePluginRequestQueryEvents.events(app),
         QuickSettingsTileContextEvents.events,
         PushContextEvents.events,
         ShareContextEvents.events,
+        BroadcastContextEvents.events,
+        OrientationContextEvents.events,
+        FoldContextEvents.events,
+        AppForegroundChangedContextEvents.events,
+        HardwareKeyContextEvents.events,
     )
 }

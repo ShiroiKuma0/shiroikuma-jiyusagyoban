@@ -145,17 +145,11 @@ class ContextMonitorLifecycleTest {
         assertEquals(2, attempts)
     }
 
-    @Test
-    fun serviceSubscribesMatchersBeforeStartingPulseMonitors() {
-        val source = sourceFile("com/opentasker/core/engine/AutomationService.kt").readText()
-        val subscription = source.indexOf("scope.launch(start = CoroutineStart.UNDISPATCHED)")
-        val subscriptionBarrier = source.indexOf("it.awaitMonitorSubscriptions()")
-        val monitorReconcile = source.indexOf("contextMonitorLifecycle.reconcile(profiles)")
-
-        assertTrue("Expected matcher collectors to start undispatched", subscription >= 0)
-        assertTrue("Expected an explicit pulse-source subscription barrier", subscriptionBarrier > subscription)
-        assertTrue("Monitor producers must start after matcher subscriptions", monitorReconcile > subscriptionBarrier)
-    }
+    // REMOVED: serviceSubscribesMatchersBeforeStartingPulseMonitors asserted upstream's engine wiring
+    // (UNDISPATCHED matcher launch → awaitMonitorSubscriptions() → contextMonitorLifecycle.reconcile).
+    // The fork replaced all three with applyContextSourceGating() + self-healing matcher loops, and
+    // AutomationService never references ContextMonitorLifecycle. The class's own reference-counting
+    // behaviour is still covered by the tests above; only the source-shape assertion is gone.
 
     @Test
     fun contextInspectorCannotAcquireTheProductionMonitorLifecycle() {

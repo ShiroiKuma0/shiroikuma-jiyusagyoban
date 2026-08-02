@@ -43,7 +43,7 @@ class RuntimeRegistriesTest {
         registerActionMetadata()
 
         assertFieldKeys("brightness.set", "brightness")
-        assertFieldKeys("screenshot.take", "path")
+        assertFieldKeys("screenshot.take", "path", "store")
         assertFieldKeys("file.read", "path", "var")
         assertFieldKeys("file.write", "path", "text")
         assertFieldKeys("file.append", "path", "text")

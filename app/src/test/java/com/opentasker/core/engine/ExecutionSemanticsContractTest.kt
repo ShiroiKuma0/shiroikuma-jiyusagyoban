@@ -32,14 +32,7 @@ class ExecutionSemanticsContractTest {
         assertEquals("Production run paths must use executeAndLogTask", emptyList<String>(), directRunnerConstruction)
     }
 
-    @Test
-    fun actionReorderUsesOneTransactionAndSnapshotsThePreviousOrder() {
-        val source = sourceRoot.resolve("com/opentasker/ui/screens/ActiveAutomationViewModel.kt").readText()
-        val method = source.substringAfter("fun moveTaskAction(").substringBefore("fun createScene(")
-
-        assertTrue(method.contains("db.withTransaction"))
-        assertTrue(method.contains("previousJson = StorageJson.encodeToString(decoded.value)"))
-        assertTrue(method.contains("nextJson = StorageJson.encodeToString(updated)"))
-        assertTrue(method.contains("db.taskDao().update(updated.toEntity())"))
-    }
+    // RETIRED: upstream's transactional `moveTaskAction` snapshot contract. The fork reorders actions
+    // through its own multi-select / clone / cut / paste editor path, not upstream's move-up/down card
+    // controls, so this source-text assertion no longer describes our ViewModel.
 }

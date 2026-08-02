@@ -359,7 +359,7 @@ class DatabaseBackupManager(
             temp.delete()
             throw error
         }
-        AppLogger.warn(tag, "Restore staged at ${pending.absolutePath}; restart OpenTasker to apply it")
+        AppLogger.warn(tag, "Restore staged at ${pending.absolutePath}; restart 白い熊 自由作業盤 to apply it")
         return pending
     }
 
@@ -367,7 +367,7 @@ class DatabaseBackupManager(
         val canonicalBackupDir = backupDir.canonicalFile
         val canonicalBackup = backupFile.canonicalFile
         if (!canonicalBackup.path.startsWith(canonicalBackupDir.path + File.separator)) {
-            throw SecurityException("Backup file is outside the OpenTasker backup directory")
+            throw SecurityException("Backup file is outside the 白い熊 自由作業盤 backup directory")
         }
         if (!canonicalBackup.exists()) {
             throw IOException("Backup file not found: ${backupFile.absolutePath}")
@@ -539,12 +539,31 @@ class DatabaseBackupManager(
                 "cooldownSec",
                 "contextsJson",
             )
+            // Version gates follow the FORK migration chain (see DatabaseMigrations): projects/projectId
+            // at 5, manual position at 6, variables re-key at 7, name-bound task links at 14, task icons
+            // at 15, freeze bubbles at 16, secrets at 18 (upstream v6), risk gating at 19 (upstream v7).
             if (schemaVersion >= 2) profiles += "automationMode"
-            if (schemaVersion >= 5) profiles += "profileGroup"
-            if (schemaVersion >= 7) profiles += "requiresRiskAcknowledgement"
+            if (schemaVersion >= 5) profiles += "projectId"
+            if (schemaVersion >= 6) profiles += "position"
+            if (schemaVersion >= 14) profiles += setOf("enterTaskName", "exitTaskName")
+            if (schemaVersion >= 19) profiles += "requiresRiskAcknowledgement"
 
-            val variables = mutableSetOf("name", "value", "isGlobal")
-            if (schemaVersion >= 6) variables += "isSecret"
+            val tasks = mutableSetOf("id", "name", "priority", "collisionMode", "actionsJson")
+            if (schemaVersion >= 5) tasks += "projectId"
+            if (schemaVersion >= 6) tasks += "position"
+            if (schemaVersion >= 15) tasks += "iconPath"
+            if (schemaVersion >= 16) tasks += "freezeBubble"
+
+            val scenes = mutableSetOf("id", "name", "widthDp", "heightDp", "elementsJson")
+            if (schemaVersion >= 5) scenes += "projectId"
+            if (schemaVersion >= 6) scenes += "position"
+
+            val variables = if (schemaVersion >= 7) {
+                mutableSetOf("projectId", "name", "value")
+            } else {
+                mutableSetOf("name", "value", "isGlobal")
+            }
+            if (schemaVersion >= 18) variables += "isSecret"
 
             val runLogs = mutableSetOf(
                 "id",
@@ -559,12 +578,18 @@ class DatabaseBackupManager(
 
             return buildMap {
                 put("profiles", profiles)
-                put("tasks", setOf("id", "name", "priority", "collisionMode", "actionsJson"))
-                put("scenes", setOf("id", "name", "widthDp", "heightDp", "elementsJson"))
+                put("tasks", tasks)
+                put("scenes", scenes)
                 put("variables", variables)
                 put("run_logs", runLogs)
                 if (schemaVersion >= 3) {
                     put("edit_history", setOf("id", "entityType", "entityId", "previousJson", "timestamp"))
+                }
+                if (schemaVersion >= 5) {
+                    put("projects", setOf("id", "name", "color", "sortOrder", "description"))
+                }
+                if (schemaVersion >= 11) {
+                    put("item_groups", setOf("id", "projectId", "tab", "name", "note", "position", "expanded", "noteExpanded"))
                 }
             }
         }

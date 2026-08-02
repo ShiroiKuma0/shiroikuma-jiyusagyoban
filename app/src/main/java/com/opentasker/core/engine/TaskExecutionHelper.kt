@@ -24,7 +24,6 @@ data class TaskExecutionResult(
     val report: TaskRunReport,
     val logInserted: Boolean,
     val skippedReason: String? = null,
-    val execution: ExecutionEnvelope,
 )
 
 suspend fun executeAndLogTask(
@@ -36,81 +35,40 @@ suspend fun executeAndLogTask(
     initialVariables: Map<String, String> = emptyMap(),
     visibleActivity: Boolean = false,
     audioForegroundService: AudioForegroundServiceEligibility = AudioForegroundServiceEligibility.NONE,
+    eventLocals: Map<String, String> = emptyMap(),
     logTag: String = TAG,
     admissionController: ExecutionAdmissionController = ExecutionAdmissionController.Default,
     profileId: Long? = null,
-    execution: ExecutionEnvelope = ExecutionEnvelope.create(task, source, profileId = profileId),
 ): TaskExecutionResult = withContext(Dispatchers.IO) {
-    val accepted = ExecutionCommandLedger.accept(execution)
-    if (!accepted.isNew) {
-        val reason = ExecutionTerminalReason(
-            ExecutionTerminalReasonCode.DUPLICATE_DELIVERY,
-            "Duplicate execution delivery ignored.",
-        ).render()
-        return@withContext TaskExecutionResult(
-            report = collisionSkippedReport(task, reason),
-            logInserted = false,
-            skippedReason = reason,
-            execution = execution,
-        )
-    }
     val admission = admissionController.tryAcquire(profileId)
     if (!admission.accepted) {
         val reason = admission.reason ?: "Execution admission rejected this run."
-        val terminalReason = ExecutionTerminalReason(ExecutionTerminalReasonCode.ADMISSION_REJECTED, reason)
-        ExecutionCommandLedger.transition(
-            execution.executionId,
-            ExecutionLedgerState.SKIPPED,
-            terminalReason,
-        )
         val inserted = logSkippedRun(
             db = db,
             task = task,
-            source = execution.source,
+            source = source,
             reason = reason,
             metadata = metadata,
-            execution = execution,
-            terminalReason = terminalReason,
         )
         return@withContext TaskExecutionResult(
             report = collisionSkippedReport(task, reason),
             logInserted = inserted,
             skippedReason = reason,
-            execution = execution,
         )
     }
     val admissionLease = requireNotNull(admission.lease)
     try {
-    ExecutionCommandLedger.transition(execution.executionId, ExecutionLedgerState.RUNNING)
     // Run the whole task off the caller's thread. Manual runs (ViewModel), widget/shortcut, and
     // notification-action paths call this from the main thread; without this hop, blocking actions
     // (HTTP, file, ping) would throw NetworkOnMainThreadException and fail silently.
-    val variables = VariableStore()
-    val variableRepository = VariableRepository(db.variableDao())
-    val persistedGlobals = runCatching {
-        variableRepository.runtimeGlobals(task.projectId)
-    }.getOrElse { error ->
-        AppLogger.error(logTag, "Failed to hydrate global variables", error)
-        RuntimeVariableSeed(emptyMap(), emptySet(), emptySet())
-    }
-    variables.seedGlobals(persistedGlobals.values, persistedGlobals.secretNames)
-    val persistedBaselineValues = variables.globalSnapshot()
-    val persistedBaselineSecretNames = variables.globalSensitiveSnapshot()
-    val persistedBaseline = RuntimeVariableSeed(
-        values = persistedBaselineValues,
-        secretNames = persistedBaselineSecretNames,
-        unavailableSecretNames = persistedBaselineSecretNames - persistedBaselineValues.keys,
-    )
-    if (persistedGlobals.unavailableSecretNames.isNotEmpty()) {
-        AppLogger.warn(
-            logTag,
-            "Secret variables require re-entry: ${persistedGlobals.unavailableSecretNames.sorted().joinToString()}",
-        )
-    }
+    //
+    // Fork: globals are durable through the DB-backed PersistentGlobalScope (every global set commits
+    // live, per project bucket), so upstream's hydrate/seed + post-run snapshot-commit machinery is
+    // not used — a whole-namespace snapshot commit would collapse the per-project buckets.
+    val variables = VariableStore(com.opentasker.core.engine.variables.PersistentGlobalScope, task.projectId)
     initialVariables.forEach { (name, value) -> variables.set(name, value) }
-    // Baseline after seeding + event vars, so only globals actually changed during the run persist.
-    val baselineGlobals = variables.globalSnapshot()
-    val baselineSensitiveGlobals = variables.globalSensitiveSnapshot()
+    // Force-local so this invocation's event snapshot shadows the (possibly since-overwritten) super-global.
+    eventLocals.forEach { (name, value) -> variables.setLocal(name, value) }
     val audioEligibility = AudioRuntimeEligibility(
         appVisible = visibleActivity,
         foregroundService = audioForegroundService,
@@ -129,22 +87,23 @@ suspend fun executeAndLogTask(
             val admittedExecutionId = ActiveExecutionRegistry.register(
                 taskId = task.id,
                 taskName = task.name,
-                source = execution.source,
+                source = source,
                 job = currentCoroutineContext()[Job],
                 startedAtMs = System.currentTimeMillis(),
-                executionId = execution.executionId,
-                parentExecutionId = execution.parentExecutionId,
-                producer = execution.producer.wireValue,
             )
             executionId = admittedExecutionId
             try {
-                TaskRunner(
+                val runner = TaskRunner(
                     ctx,
                     resolveTask = dbSubTaskResolver(db),
                     onStep = { index, label -> ActiveExecutionRegistry.reportStep(admittedExecutionId, index, label) },
                     collisionCoordinator = collisionCoordinator,
                     executionChain = setOf(task.id).filterTo(linkedSetOf()) { it > 0L },
-                ).run(task)
+                    projectNameResolver = { pid -> pid?.let { db.projectDao().getById(it)?.name } },
+                )
+                // Fork: RunningTasks is the funnel the Monitor's "Live now" list and the shutdown
+                // report read, so every admitted run registers in both inventories.
+                RunningTasks.track(task.id, task.name, source) { runner.run(task) }
             } finally {
                 ActiveExecutionRegistry.unregister(admittedExecutionId)
             }
@@ -154,15 +113,6 @@ suspend fun executeAndLogTask(
         // suspending write here would be dropped and the run would vanish without a trace.
         withContext(NonCancellable) {
             executionId?.let(ActiveExecutionRegistry::unregister)
-            val terminalReason = ExecutionTerminalReason(
-                ExecutionTerminalReasonCode.CANCELLED,
-                cancellation.message ?: ActiveExecutionRegistry.CANCELLED_BY_USER,
-            )
-            ExecutionCommandLedger.transition(
-                execution.executionId,
-                ExecutionLedgerState.CANCELLED,
-                terminalReason,
-            )
             insertRunLog(
                 db,
                 RunLogEntry(
@@ -172,14 +122,12 @@ suspend fun executeAndLogTask(
                     durationMs = 0,
                     success = false,
                     message = cancelledRunLogMessage(
-                        source = execution.source,
+                        source = source,
                         reason = cancellation.message ?: ActiveExecutionRegistry.CANCELLED_BY_USER,
-                        execution = execution,
-                        terminalReason = terminalReason,
                         metadata = metadata,
                     ),
-                    source = RunLogSource.classify(execution.source).key,
-                    sourceLabel = RunLogSource.classify(execution.source).label,
+                    source = RunLogSource.classify(source).key,
+                    sourceLabel = RunLogSource.classify(source).label,
                 ),
             )
         }
@@ -188,52 +136,23 @@ suspend fun executeAndLogTask(
     val report = when (collisionOutcome) {
         is TaskCollisionOutcome.Executed -> collisionOutcome.value
         is TaskCollisionOutcome.Skipped -> {
-            val terminalReason = ExecutionTerminalReason(
-                ExecutionTerminalReasonCode.COLLISION_SKIPPED,
-                collisionOutcome.reason,
-            )
-            ExecutionCommandLedger.transition(
-                execution.executionId,
-                ExecutionLedgerState.SKIPPED,
-                terminalReason,
-            )
             val inserted = logSkippedRun(
                 db = db,
                 task = task,
-                source = execution.source,
+                source = source,
                 reason = collisionOutcome.reason,
                 metadata = metadata,
-                execution = execution,
-                terminalReason = terminalReason,
             )
             return@withContext TaskExecutionResult(
                 report = collisionSkippedReport(task, collisionOutcome.reason),
                 logInserted = inserted,
                 skippedReason = collisionOutcome.reason,
-                execution = execution,
             )
         }
     }
-    val globalCommitMetadata = persistChangedGlobals(
-        variableRepository,
-        persistedBaseline,
-        baselineGlobals,
-        variables.globalSnapshot(),
-        baselineSensitiveGlobals,
-        variables.globalSensitiveSnapshot(),
-        logTag,
-        projectId = task.projectId,
-    )
     AppLogger.info(logTag, "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)")
-    val terminalReason = ExecutionTerminalReason(
-        if (report.success) ExecutionTerminalReasonCode.COMPLETED else ExecutionTerminalReasonCode.TASK_FAILED,
-    )
-    ExecutionCommandLedger.transition(
-        execution.executionId,
-        if (report.success) ExecutionLedgerState.SUCCEEDED else ExecutionLedgerState.FAILED,
-        terminalReason,
-    )
-    val classified = RunLogSource.classify(execution.source)
+    maybeQueueFreezeBubble(appContext, task, variables)
+    val classified = RunLogSource.classify(source)
     val riskMetadata = taskPowerRunLogMetadata(task)
     val logEntry = RunLogEntry(
         taskId = task.id,
@@ -242,17 +161,15 @@ suspend fun executeAndLogTask(
         durationMs = report.durationMs,
         success = report.success,
         message = runLogMessage(
-            source = execution.source,
-            execution = execution,
-            terminalReason = terminalReason,
-            metadata = riskMetadata + metadata + globalCommitMetadata,
+            source = source,
+            metadata = riskMetadata + metadata,
             traces = report.traces,
         ),
         source = classified.key,
         sourceLabel = classified.label,
     )
     val inserted = insertRunLog(db, logEntry)
-    TaskExecutionResult(report, inserted, execution = execution)
+    TaskExecutionResult(report, inserted)
     } finally {
         admissionLease.release()
     }
@@ -296,45 +213,30 @@ fun changedGlobals(
     after: Map<String, String>,
     beforeSensitive: Set<String> = emptySet(),
     afterSensitive: Set<String> = emptySet(),
-    projectId: Long = com.opentasker.core.model.DEFAULT_PROJECT_ID,
 ): List<RuntimeVariableValue> =
     after.asSequence()
         .filter { (name, value) -> before[name] != value || (name in beforeSensitive) != (name in afterSensitive) }
         .sortedBy { it.key }
-        .map { (name, value) -> RuntimeVariableValue(name, value, isSecret = name in afterSensitive, projectId = projectId) }
+        .map { (name, value) -> RuntimeVariableValue(name, value, isSecret = name in afterSensitive) }
         .toList()
 
 /**
- * Commits globals changed during the run to [com.opentasker.core.storage.VariableDao] before the
- * task's success is reported, so names containing uppercase letters and explicit `var.persist`
- * values survive across separate runs and process restarts. All-lowercase locals never reach this path.
+ * If [task] is freeze-enabled, queue a re-freeze bubble for the app it launches/unfreezes. The package is
+ * read from the task's `app.launch` (preferred) or `app.unfreeze` action, expanded against the run's
+ * variables; an unresolved (`%var`-still-present) or blank package is skipped.
  */
-private suspend fun persistChangedGlobals(
-    variableRepository: VariableRepository,
-    persistedBaseline: RuntimeVariableSeed,
-    before: Map<String, String>,
-    after: Map<String, String>,
-    beforeSensitive: Set<String>,
-    afterSensitive: Set<String>,
-    logTag: String,
-    projectId: Long = com.opentasker.core.model.DEFAULT_PROJECT_ID,
-): List<String> {
-    val changed = changedGlobals(before, after, beforeSensitive, afterSensitive, projectId)
-    if (changed.isEmpty()) return emptyList()
-    val commit = runCatching {
-        variableRepository.persistRuntimeAtomically(persistedBaseline, changed)
-    }.getOrElse { error ->
-        AppLogger.error(
-            logTag,
-            "Failed to persist ${changed.size} global variable change(s) atomically",
-            error,
-        )
-        return listOf("Global commit failed: ${changed.map(RuntimeVariableValue::name).joinToString()}")
-    }
-    if (commit.conflictedNames.isEmpty()) return emptyList()
-    val names = commit.conflictedNames.joinToString()
-    AppLogger.warn(logTag, "Global commit preserved newer concurrent value(s): $names")
-    return listOf("Global write conflict (newer value kept): $names")
+private fun maybeQueueFreezeBubble(appContext: Context, task: Task, variables: VariableStore) {
+    if (!task.freezeBubble) return
+    val pkgRaw = task.actions.firstOrNull { it.type == "app.launch" }?.args?.get("package")
+        ?: task.actions.firstOrNull { it.type == "app.unfreeze" }?.args?.get("package")
+        ?: return
+    val pkg = variables.expand(pkgRaw).trim()
+    if (pkg.isEmpty() || pkg.contains('%')) return
+    val label = runCatching {
+        val pm = appContext.packageManager
+        pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+    }.getOrNull()?.takeIf { it.isNotBlank() } ?: task.name
+    com.opentasker.core.bubbles.FreezeBubbleStore.enqueue(pkg, label, task.iconPath)
 }
 
 suspend fun logSkippedRun(
@@ -343,17 +245,8 @@ suspend fun logSkippedRun(
     source: String,
     reason: String,
     metadata: List<String> = emptyList(),
-    execution: ExecutionEnvelope? = null,
-    terminalReason: ExecutionTerminalReason? = null,
 ): Boolean {
-    val envelope = execution ?: ExecutionEnvelope.create(task, source)
-    ExecutionCommandLedger.accept(envelope)
-    val resolvedReason = terminalReason ?: ExecutionTerminalReason(
-        ExecutionTerminalReasonCode.UNKNOWN,
-        reason,
-    )
-    ExecutionCommandLedger.transition(envelope.executionId, ExecutionLedgerState.SKIPPED, resolvedReason)
-    val classified = RunLogSource.classify(envelope.source)
+    val classified = RunLogSource.classify(source)
     return insertRunLog(
         db,
         RunLogEntry(
@@ -362,10 +255,8 @@ suspend fun logSkippedRun(
             durationMs = 0,
             success = false,
             message = skippedRunLogMessage(
-                source = envelope.source,
+                source = source,
                 reason = reason,
-                execution = envelope,
-                terminalReason = resolvedReason,
                 metadata = metadata,
             ),
             source = classified.key,
@@ -374,25 +265,46 @@ suspend fun logSkippedRun(
     )
 }
 
+/** Fail-closed decode: a corrupt stored task resolves to `null` instead of an empty action list. */
+private fun TaskEntity.decodedOrNull(ref: String): Task? {
+    val result = toDomainDecodeResult()
+    if (result.issue != null) {
+        AppLogger.error(TAG, "Task '$ref' (id=$id) is corrupt: ${result.issue.message}")
+        return null
+    }
+    return result.value
+}
+
 /**
- * Resolves a sub-task by numeric id first, then by exact name (case-insensitive), for `task.run`.
- * Corrupt tasks (whose stored payload fails to decode) resolve to `null` so `task.run` fails
- * closed instead of silently running an empty action list.
+ * Resolve a task reference NAME-first (the id is only a legacy fallback), scoped to [projectId] when
+ * given — a `(project, name)` match wins, then any-project name match (deterministic: lowest position
+ * then id), then the numeric id. Used by scene elements (tap / long-press / gesture) so a link survives
+ * re-imports that re-id the task and disambiguates same-name tasks across projects. Mirrors the scene
+ * resolver in SceneActions.
+ */
+suspend fun resolveTaskByName(db: AppDatabase, ref: String, projectId: Long?): Task? {
+    if (ref.isBlank()) return null
+    val all = db.taskDao().getAll()
+    if (projectId != null) {
+        all.firstOrNull { (it.projectId ?: 0L) == projectId && it.name.equals(ref, ignoreCase = true) }
+            ?.let { return it.decodedOrNull(ref) }
+    }
+    all.filter { it.name.equals(ref, ignoreCase = true) }
+        .minByOrNull { it.position.toLong() * 10_000_000L + it.id }
+        ?.let { return it.decodedOrNull(ref) }
+    return ref.toLongOrNull()?.let { id -> all.firstOrNull { it.id == id }?.decodedOrNull(ref) }
+}
+
+/**
+ * Resolves a sub-task by NAME first (exact, then case-insensitive); the numeric id is only a legacy
+ * fallback. Used by `task.run` — matches the name-first resolution scenes use, so re-imports that re-id
+ * a task don't strand callers that reference it. Corrupt tasks (whose stored payload fails to decode)
+ * resolve to `null` so `task.run` fails closed instead of silently running an empty action list.
  */
 fun dbSubTaskResolver(db: AppDatabase): SubTaskResolver = resolver@{ ref ->
-    fun TaskEntity.decodedOrNull(): Task? {
-        val result = toDomainDecodeResult()
-        if (result.issue != null) {
-            AppLogger.error(TAG, "Sub-task '$ref' (id=$id) is corrupt: ${result.issue.message}")
-            return null
-        }
-        return result.value
-    }
-    val byId = ref.toLongOrNull()?.let { db.taskDao().getById(it) }
-    if (byId != null) return@resolver byId.decodedOrNull()
-    val exact = db.taskDao().getByName(ref)
-    if (exact != null) return@resolver exact.decodedOrNull()
-    db.taskDao().getAll().firstOrNull { it.name.equals(ref, ignoreCase = true) }?.decodedOrNull()
+    db.taskDao().getByName(ref)?.let { return@resolver it.decodedOrNull(ref) }
+    db.taskDao().getAll().firstOrNull { it.name.equals(ref, ignoreCase = true) }?.let { return@resolver it.decodedOrNull(ref) }
+    ref.toLongOrNull()?.let { db.taskDao().getById(it) }?.decodedOrNull(ref)
 }
 
 suspend fun insertRunLog(db: AppDatabase, entry: RunLogEntry): Boolean =

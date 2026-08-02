@@ -1,10 +1,13 @@
 package com.opentasker.core.engine
 
-import com.opentasker.core.actions.ActionArgumentSensitivity
 import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
+import com.opentasker.core.actions.ActionArgumentSensitivity
+import com.opentasker.core.capabilities.CapabilityPrompt
+import com.opentasker.core.capabilities.CapabilityState
+import com.opentasker.core.dialog.DialogActivity
+import com.opentasker.core.dialog.DialogBridge
 import com.opentasker.core.expressions.TemplateExpansionTrace
-import com.opentasker.core.expressions.TemplateScope
 import com.opentasker.core.expressions.TemplateExpressionEngine
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
@@ -12,6 +15,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Resolves a sub-task by id or name for the `task.run` action. */
 typealias SubTaskResolver = suspend (ref: String) -> Task?
@@ -35,6 +39,8 @@ class TaskRunner(
     private val onStep: ((index: Int, label: String) -> Unit)? = null,
     private val collisionCoordinator: TaskCollisionCoordinator? = null,
     private val executionChain: Set<Long> = emptySet(),
+    /** Resolves a projectId → project name, for the permission-block dialog. Null → "Unfiled". */
+    private val projectNameResolver: (suspend (Long?) -> String?)? = null,
 ) {
     /** A live `flow.foreach` iteration in progress. */
     private class LoopFrame(
@@ -58,6 +64,39 @@ class TaskRunner(
     )
 
     suspend fun run(task: Task): TaskRunReport {
+        // Pre-flight permission gate: if the task uses an action whose special access isn't granted,
+        // DON'T run any action — show a modal OK dialog naming the task, project, and missing permission(s).
+        val missing = CapabilityState.missingForTask(task, ctx.app)
+        if (missing.isNotEmpty()) {
+            val preStart = System.currentTimeMillis()
+            val project = runCatching { projectNameResolver?.invoke(task.projectId) }.getOrNull() ?: "Unfiled"
+            // Still blocked, still logged — but don't stack another modal on top of the settings page
+            // the user was just sent to. A per-minute profile would otherwise re-raise it immediately.
+            if (!CapabilityPrompt.allQuiet(missing.map { it.requirement })) {
+                showPermissionBlockDialog(project, task.name, missing)
+            }
+            val summary = missing.joinToString(", ") { CapabilityState.shortLabel(it.requirement) }
+            val failure = ActionResult.Failure("Not run — missing permission(s): $summary")
+            return TaskRunReport(
+                taskId = task.id,
+                taskName = task.name,
+                startedAt = preStart,
+                durationMs = System.currentTimeMillis() - preStart,
+                results = listOf(failure),
+                traces = listOf(
+                    ActionExecutionTrace(
+                        index = 0,
+                        actionType = "permission",
+                        label = "permission check",
+                        durationMs = 0,
+                        status = ActionTraceStatus.FAILURE,
+                        message = failure.message,
+                    ),
+                ),
+                success = false,
+            )
+        }
+
         ctx.variables.pushScope()
         val started = System.currentTimeMillis()
         val results = mutableListOf<ActionResult>()
@@ -427,9 +466,8 @@ class TaskRunner(
             ?: ActionResult.Failure("unknown action: ${spec.type}").let { result ->
                 return result to traceFor(index, spec, started, result, ActionArgumentExpansionReport.Empty)
             }
-        val expansionReport = expandArgs(spec.type, spec.args)
+        val expansionReport = expandArgs(spec.args)
         val timeoutMs = actionTimeoutMs(spec.type)
-        val before = ctx.variables.toTemplateScope()
         val rawResult = try {
             withTimeout(timeoutMs) {
                 ctx.variables.withSensitiveWrites(expansionReport.hasSecretDerivedValues()) {
@@ -454,8 +492,7 @@ class TaskRunner(
         } else {
             rawResult
         }
-        val changes = variableChangesBetween(before, ctx.variables.toTemplateScope())
-        return result to traceFor(index, spec, started, result, expansionReport, changes)
+        return result to traceFor(index, spec, started, result, expansionReport)
     }
 
     private suspend fun runSubTask(
@@ -463,7 +500,7 @@ class TaskRunner(
         spec: ActionSpec,
         started: Long,
     ): Pair<ActionResult, ActionExecutionTrace> {
-        val expansionReport = expandArgs(spec.type, spec.args)
+        val expansionReport = expandArgs(spec.args)
         val args = expansionReport.args
 
         fun fail(message: String): Pair<ActionResult, ActionExecutionTrace> {
@@ -483,40 +520,84 @@ class TaskRunner(
             return fail("sub-task '${target.name}' is already active in this execution chain")
         }
 
-        // Pass any extra args as input variables scoped to the sub-task invocation: a dedicated
-        // scope wraps the child run so local (lowercase) inputs are visible to the child through the
-        // scope chain but are popped when it returns, never leaking into the parent's later actions.
-        // Global (uppercase) outputs still flow back through the shared global namespace.
+        // Named parameters (param:<name>); values are already expanded in the caller's scope.
+        val parameters = buildMap {
+            args.forEach { (key, value) ->
+                if (key.startsWith(SUB_TASK_PARAM_PREFIX)) put(key.removePrefix(SUB_TASK_PARAM_PREFIX), value)
+            }
+        }
+        val resultsPrefix = args[SUB_TASK_RESULTS_PREFIX_KEY]?.trim().orEmpty()
+
+        // Isolated child: shares globals + arrays, fresh locals, read-only params, its own returns.
+        // The child resolves its %MixedCase project-globals against ITS OWN project.
+        val childCtx = ActionContext(
+            app = ctx.app,
+            variables = ctx.variables.childScope(target.projectId),
+            eventVariables = emptyMap(),
+            parameters = parameters,
+            returns = mutableMapOf(),
+            logger = ctx.logger,
+        )
         val child = TaskRunner(
-            ctx = ctx,
+            ctx = childCtx,
             templateExpressionEngine = templateExpressionEngine,
             resolveTask = resolveTask,
             depth = depth + 1,
             onStep = onStep,
             collisionCoordinator = collisionCoordinator,
             executionChain = executionChain + target.id,
+            projectNameResolver = projectNameResolver,
         )
-        ctx.variables.pushScope()
-        val report = try {
-            args.forEach { (key, value) ->
-                if (key !in SUB_TASK_REF_KEYS) {
-                    ctx.variables.set(key, value, sensitive = expansionReport.isArgumentSensitive(key))
-                }
-            }
-            when (val collision = collisionCoordinator?.execute(target) { child.run(target) }) {
-                null -> child.run(target)
-                is TaskCollisionOutcome.Executed -> collision.value
-                is TaskCollisionOutcome.Skipped -> return fail(collision.reason)
-            }
-        } finally {
-            ctx.variables.popScope()
+        // Upstream's global last-mile rule: the target task's own collision policy decides whether a
+        // nested run starts, waits behind the active one, or is skipped outright.
+        val report = when (val collision = collisionCoordinator?.execute(target) { child.run(target) }) {
+            null -> child.run(target)
+            is TaskCollisionOutcome.Executed -> collision.value
+            is TaskCollisionOutcome.Skipped -> return fail(collision.reason)
         }
+
+        // Surface the sub-task's named results and status back to the caller as variables.
+        childCtx.returns.forEach { (name, value) -> ctx.variables.set("$resultsPrefix$name", value) }
+        ctx.variables.set("${resultsPrefix}ok", report.success.toString())
+        val errorMessage = report.results.firstNotNullOfOrNull { (it as? ActionResult.Failure)?.message } ?: ""
+        ctx.variables.set("${resultsPrefix}error", errorMessage)
+
         val result = if (report.success) {
             ActionResult.Success
         } else {
-            ActionResult.Failure("sub-task '${target.name}' failed")
+            ActionResult.Failure(errorMessage.ifBlank { "sub-task '${target.name}' failed" })
         }
         return result to traceFor(index, spec, started, result, expansionReport)
+    }
+
+    /** Modal OK dialog (via DialogActivity) naming the task, project, and each missing permission. */
+    private suspend fun showPermissionBlockDialog(
+        project: String,
+        taskName: String,
+        missing: List<CapabilityState.MissingCapability>,
+    ) {
+        val lines = missing.joinToString("\n") { m ->
+            "• ${CapabilityState.shortLabel(m.requirement)} — needed by: ${m.actionTypes.joinToString(", ")}"
+        }
+        val text = "Can't run “$taskName” (project “$project”).\n\nMissing permission(s):\n$lines\n\n" +
+            "Grant it below, then run again."
+        // Only offer a deep-link pill for a permission that actually has a System settings page to open.
+        val grantable = missing.distinctBy { it.requirement }
+            .filter { CapabilityState.settingsIntent(it.requirement, ctx.app) != null }
+        val id = java.util.UUID.randomUUID().toString()
+        val deferred = DialogBridge.register(id)
+        val intent = android.content.Intent(ctx.app, DialogActivity::class.java).apply {
+            putExtra(DialogActivity.EXTRA_ID, id)
+            putExtra(DialogActivity.EXTRA_TYPE, DialogActivity.TYPE_TEXT)
+            putExtra(DialogActivity.EXTRA_TITLE, "Permission required")
+            putExtra(DialogActivity.EXTRA_TEXT, text)
+            putExtra(DialogActivity.EXTRA_OK, "OK")
+            putExtra(DialogActivity.EXTRA_SETTINGS_REQS, grantable.map { it.requirement.name }.toTypedArray())
+            putExtra(DialogActivity.EXTRA_SETTINGS_LABELS, grantable.map { CapabilityState.shortLabel(it.requirement) }.toTypedArray())
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val shown = runCatching { ctx.app.startActivity(intent); true }.getOrDefault(false)
+        if (shown) runCatching { withTimeoutOrNull(120_000L) { deferred.await() } } else DialogBridge.cancel(id)
     }
 
     private fun shouldRun(spec: ActionSpec): Boolean {
@@ -526,10 +607,10 @@ class TaskRunner(
 
     /** Evaluates a condition string with legacy `%var` then bounded `{{ ... }}` expansion. */
     private fun evaluateConditionString(condition: String): Boolean {
-        val legacyExpanded = ctx.variables.expand(condition)
+        val legacyExpanded = ctx.variables.expand(rewriteParamSugar(condition))
         if (!legacyExpanded.contains("{{")) return ctx.variables.evaluateCondition(legacyExpanded)
 
-        val expanded = templateExpressionEngine.expand(legacyExpanded, ctx.variables.toTemplateScope(ctx.eventVariables))
+        val expanded = templateExpressionEngine.expand(legacyExpanded, ctx.variables.toTemplateScope(ctx.eventVariables, ctx.parameters))
         if (expanded.warnings.isNotEmpty()) return false
         return ctx.variables.evaluateCondition(expanded.value)
     }
@@ -540,7 +621,6 @@ class TaskRunner(
         started: Long,
         result: ActionResult,
         expansionReport: ActionArgumentExpansionReport,
-        variableChanges: List<ActionVariableChange> = emptyList(),
     ): ActionExecutionTrace = ActionExecutionTrace(
         index = index,
         actionType = spec.type,
@@ -559,22 +639,21 @@ class TaskRunner(
         expandedArgSummary = expansionReport.summary(),
         templateWarnings = expansionReport.templateWarnings(),
         argumentExpansions = expansionReport.expansions,
-        variableChanges = variableChanges,
     )
 
-    private fun expandArgs(actionType: String, args: Map<String, String>): ActionArgumentExpansionReport {
+    private fun expandArgs(args: Map<String, String>): ActionArgumentExpansionReport {
         if (args.isEmpty()) return ActionArgumentExpansionReport.Empty
 
-        val templateScope = ctx.variables.toTemplateScope(ctx.eventVariables)
+        val templateScope = ctx.variables.toTemplateScope(ctx.eventVariables, ctx.parameters)
         val expansions = mutableListOf<ActionArgumentExpansionTrace>()
         val expandedArgs = args.mapValues { (name, rawValue) ->
-            val legacy = ctx.variables.expandTracked(rawValue)
+            val legacy = ctx.variables.expandTracked(rewriteParamSugar(rawValue))
             if (!legacy.value.contains("{{")) {
                 if (legacy.isSecretDerived) {
                     expansions += ActionArgumentExpansionTrace(
                         argName = name,
                         rawValue = rawValue,
-                        expandedValue = REDACTED_VALUE,
+                        expandedValue = ActionArgumentSensitivity.REDACTED,
                         expressions = emptyList(),
                         warnings = emptyList(),
                         isSecretDerived = true,
@@ -589,9 +668,9 @@ class TaskRunner(
                 expansions += ActionArgumentExpansionTrace(
                     argName = name,
                     rawValue = rawValue,
-                    expandedValue = if (isSecretDerived) REDACTED_VALUE else result.value,
+                    expandedValue = if (isSecretDerived) ActionArgumentSensitivity.REDACTED else result.value,
                     expressions = result.traces.map { trace ->
-                        if (trace.isSecretDerived) trace.copy(value = REDACTED_VALUE) else trace
+                        if (trace.isSecretDerived) trace.copy(value = ActionArgumentSensitivity.REDACTED) else trace
                     },
                     warnings = result.warnings,
                     isSecretDerived = isSecretDerived,
@@ -600,7 +679,7 @@ class TaskRunner(
             result.value
         }
 
-        return ActionArgumentExpansionReport(expandedArgs, expansions, actionType)
+        return ActionArgumentExpansionReport(expandedArgs, expansions)
     }
 }
 
@@ -627,11 +706,18 @@ private fun actionTimeoutMs(actionType: String): Long = when {
     // Playback and speech suspend until completion; a long sound file or near-limit TTS
     // text legitimately outlives the default 60 s budget.
     actionType == "sound.play" || actionType == "tts.speak" -> MEDIA_ACTION_TIMEOUT_MS
+    // intent.send receiver-mode replies wait on real work in the target app (sister-app
+    // state exports run for minutes); its result_timeout caps at 600 s, budget adds slack.
+    actionType == "intent.send" -> INTENT_SEND_TIMEOUT_MS
+    // Interactive dialogs suspend on the user; a picker pondered for over a minute must not
+    // be killed under them (their own `timeout` arg still applies when set).
+    actionType.startsWith("dialog.") || actionType == "app.pickmulti" -> MEDIA_ACTION_TIMEOUT_MS
     else -> DEFAULT_ACTION_TIMEOUT_MS
 }
 
 private const val DEFAULT_ACTION_TIMEOUT_MS = 60_000L
 private const val MEDIA_ACTION_TIMEOUT_MS = 600_000L // 10 minutes
+private const val INTENT_SEND_TIMEOUT_MS = 660_000L // result_timeout max (600 s) + 60 s margin
 
 // The engine budget must exceed WaitAction.MAX_WAIT_MS (30 min): the timeout clock starts
 // before the action parses its arguments, so an equal budget deterministically failed a
@@ -640,8 +726,17 @@ private const val MAX_WAIT_TIMEOUT_MS = 1_860_000L // 30 minutes + 60 s margin
 
 const val SUB_TASK_ACTION_ID = "task.run"
 const val MAX_SUBTASK_DEPTH = 8
-/** Argument keys `task.run` accepts as its target, in precedence order. */
-val SUB_TASK_REF_KEYS = listOf("task", "name", "id")
+internal val SUB_TASK_REF_KEYS = listOf("task", "name", "id")
+
+/** Run Task arg keys: each `param:<name>` is a named parameter; results land under this prefix. */
+const val SUB_TASK_PARAM_PREFIX = "param:"
+const val SUB_TASK_RESULTS_PREFIX_KEY = "results_prefix"
+
+private val PARAM_SUGAR_REGEX = Regex("%@([A-Za-z_][A-Za-z0-9_]*)")
+
+/** Rewrites the terse `%@name` parameter reference into the canonical `{{ param.name }}`. */
+private fun rewriteParamSugar(text: String): String =
+    if (text.contains("%@")) text.replace(PARAM_SUGAR_REGEX) { "{{ param.${it.groupValues[1]} }}" } else text
 
 /** Safety cap on total interpreted steps to bound pathological flow.foreach loops. */
 private const val MAX_FLOW_STEPS = 100_000
@@ -668,61 +763,7 @@ data class ActionExecutionTrace(
     val expandedArgSummary: String? = null,
     val templateWarnings: List<String> = emptyList(),
     val argumentExpansions: List<ActionArgumentExpansionTrace> = emptyList(),
-    val variableChanges: List<ActionVariableChange> = emptyList(),
 )
-
-/**
- * One variable an action added or modified. Captured per step so a finished run answers "what did
- * this task actually set?" — the run log previously showed only what went *into* each action.
- */
-data class ActionVariableChange(
-    val scope: VariableChangeScope,
-    val name: String,
-    val value: String,
-    val added: Boolean,
-    val sensitive: Boolean = false,
-)
-
-enum class VariableChangeScope { TASK, GLOBAL, ARRAY }
-
-/**
- * Variables an action added or modified, derived by diffing the store around the call.
- *
- * Deltas are used rather than a full snapshot because a run's interesting output is what changed,
- * and a snapshot per step would grow the run log with the same untouched globals over and over.
- * Sensitive names carry the flag so the value is redacted at the serialization boundary — the
- * value itself is never written to the log.
- */
-internal fun variableChangesBetween(
-    before: TemplateScope,
-    after: TemplateScope,
-): List<ActionVariableChange> = buildList {
-    fun diff(
-        scope: VariableChangeScope,
-        beforeValues: Map<String, String>,
-        afterValues: Map<String, String>,
-        sensitiveNames: Set<String>,
-    ) {
-        afterValues.entries
-            .sortedBy { it.key }
-            .forEach { (name, value) ->
-                if (!beforeValues.containsKey(name)) {
-                    add(ActionVariableChange(scope, name, value, added = true, sensitive = name in sensitiveNames))
-                } else if (beforeValues[name] != value) {
-                    add(ActionVariableChange(scope, name, value, added = false, sensitive = name in sensitiveNames))
-                }
-            }
-    }
-
-    diff(VariableChangeScope.TASK, before.task, after.task, after.sensitiveTask)
-    diff(VariableChangeScope.GLOBAL, before.global, after.global, after.sensitiveGlobal)
-    diff(
-        VariableChangeScope.ARRAY,
-        before.arrays.mapValues { (_, items) -> items.joinToString(", ") },
-        after.arrays.mapValues { (_, items) -> items.joinToString(", ") },
-        after.sensitiveArrays,
-    )
-}
 
 data class ActionArgumentExpansionTrace(
     val argName: String,
@@ -746,7 +787,6 @@ fun List<ActionExecutionTrace>.toRunLogMessage(maxLines: Int = 8): String {
 private data class ActionArgumentExpansionReport(
     val args: Map<String, String>,
     val expansions: List<ActionArgumentExpansionTrace>,
-    val actionType: String? = null,
 ) {
     fun templateWarnings(): List<String> =
         expansions.flatMap { expansion -> expansion.warnings.map { "${expansion.argName}: $it" } }.distinct()
@@ -756,7 +796,7 @@ private data class ActionArgumentExpansionReport(
         return expansions
             .take(MAX_SUMMARY_ARGS)
             .joinToString(", ") { expansion ->
-                "${expansion.argName}=${summarizeArgValue(actionType, expansion.argName, expansion.expandedValue, expansion.isSecretDerived)}"
+                "${expansion.argName}=${summarizeArgValue(expansion.argName, expansion.expandedValue, expansion.isSecretDerived)}"
             }
             .let { summary ->
                 val remaining = expansions.size - MAX_SUMMARY_ARGS
@@ -780,7 +820,7 @@ private data class ActionArgumentExpansionReport(
             .sortedByDescending { it.length }
         var redacted = message
         for (value in secretValues) {
-            redacted = redacted.replace(value, REDACTED_VALUE)
+            redacted = redacted.replace(value, ActionArgumentSensitivity.REDACTED)
         }
         return redacted
     }
@@ -809,46 +849,27 @@ private fun ActionExecutionTrace.traceDetailSuffix(): String {
 private fun ActionExecutionTrace.toRunLogLines(): List<String> = buildList {
     add(toSummaryLine())
     argumentExpansions
-        .flatMap { it.toTemplateDiagnosticLines(actionType) }
+        .flatMap { it.toTemplateDiagnosticLines() }
         .take(MAX_TEMPLATE_TRACE_LINES_PER_ACTION)
-        .forEach(::add)
-    variableChanges
-        .take(MAX_VARIABLE_CHANGE_LINES_PER_ACTION)
-        .map { it.toRunLogLine() }
         .forEach(::add)
 }
 
-private fun ActionVariableChange.toRunLogLine(): String = listOf(
-    VARIABLE_CHANGE_PREFIX,
-    scope.name.lowercase(),
-    name.toLogField(),
-    if (added) VARIABLE_CHANGE_ADDED else VARIABLE_CHANGE_UPDATED,
-    if (sensitive) REDACTED_VALUE else value.toLogField(),
-).joinToString("	")
-
-private fun ActionArgumentExpansionTrace.toTemplateDiagnosticLines(actionType: String?): List<String> =
+private fun ActionArgumentExpansionTrace.toTemplateDiagnosticLines(): List<String> =
     expressions.map { expressionTrace ->
-        val sensitive = isSecretDerived ||
-            ActionArgumentSensitivity.isSensitive(actionType, argName) ||
-            expressionTrace.isSecretDerived
+        val sensitive = isSecretDerived || isSensitiveArgName(argName) || expressionTrace.isSecretDerived
         listOf(
             TEMPLATE_TRACE_PREFIX,
             argName.toLogField(),
             expressionTrace.source.name.lowercase().toLogField(),
-            if (sensitive) REDACTED_VALUE else expressionTrace.expression.toLogField(),
-            if (sensitive) REDACTED_VALUE else expressionTrace.value.toLogField(),
+            if (sensitive) ActionArgumentSensitivity.REDACTED else expressionTrace.expression.toLogField(),
+            if (sensitive) ActionArgumentSensitivity.REDACTED else expressionTrace.value.toLogField(),
             expressionTrace.warning.orEmpty().toLogField(),
         ).joinToString("\t")
     }
 
-private fun summarizeArgValue(
-    actionType: String?,
-    argName: String,
-    value: String,
-    forceRedact: Boolean = false,
-): String {
-    if (forceRedact || ActionArgumentSensitivity.isSensitive(actionType, argName)) {
-        return REDACTED_VALUE
+private fun summarizeArgValue(argName: String, value: String, forceRedact: Boolean = false): String {
+    if (forceRedact || isSensitiveArgName(argName)) {
+        return ActionArgumentSensitivity.REDACTED
     }
     val singleLine = value.replace(Regex("""\s+"""), " ").trim()
     return if (singleLine.length <= MAX_SUMMARY_VALUE_LENGTH) {
@@ -868,13 +889,22 @@ private fun String.toLogField(): String =
             if (value.length <= MAX_TEMPLATE_TRACE_FIELD_LENGTH) value else value.take(MAX_TEMPLATE_TRACE_FIELD_LENGTH) + "..."
         }
 
+private fun isSensitiveArgName(argName: String): Boolean =
+    SENSITIVE_ARG_TOKENS.any { token -> argName.contains(token, ignoreCase = true) }
+
+private val SENSITIVE_ARG_TOKENS = listOf(
+    "authorization",
+    "cookie",
+    "body",
+    "headers",
+    "key",
+    "password",
+    "query",
+    "secret",
+    "token",
+)
 private const val TEMPLATE_TRACE_PREFIX = "Template:"
-private const val REDACTED_VALUE = ActionArgumentSensitivity.REDACTED
 private const val MAX_SUMMARY_ARGS = 4
 private const val MAX_SUMMARY_VALUE_LENGTH = 80
 private const val MAX_TEMPLATE_TRACE_LINES_PER_ACTION = 8
-private const val MAX_VARIABLE_CHANGE_LINES_PER_ACTION = 8
-private const val VARIABLE_CHANGE_PREFIX = "Var:"
-private const val VARIABLE_CHANGE_ADDED = "added"
-private const val VARIABLE_CHANGE_UPDATED = "updated"
 private const val MAX_TEMPLATE_TRACE_FIELD_LENGTH = 120
