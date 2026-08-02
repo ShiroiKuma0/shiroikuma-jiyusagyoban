@@ -154,6 +154,7 @@ class AutomationService : Service() {
     private val cooldownStore by lazy { CooldownStore(this) }
     private val executionAdmission by lazy { ExecutionAdmissionController.persisted(this) }
     private val matchers = Collections.synchronizedMap(mutableMapOf<Long, ProfileMatcher>())
+    private val pulseContinuities = Collections.synchronizedMap(mutableMapOf<Long, PulseEventContinuity>())
     private val cooldowns = CooldownReservations(persist = { profileId, deadline -> cooldownStore.set(profileId, deadline) })
     private val matcherJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>()) // Track jobs for cleanup
     private val profileTaskJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>())
@@ -300,6 +301,7 @@ class AutomationService : Service() {
         cooldowns.clear()
         profileTaskJobs.clear()
         queuedProfileTasks.clear()
+        pulseContinuities.clear()
         engineHeartbeatStore.recordStopped()
         PluginConditionSubscriptions.clear()
         job.cancel()
@@ -327,6 +329,9 @@ class AutomationService : Service() {
             decoded.value
         }
         val activeIds = profiles.map { it.id }.toSet()
+        synchronized(pulseContinuities) {
+            pulseContinuities.keys.removeAll { it !in activeIds }
+        }
         cooldownStore.pruneDeleted(activeIds)
         synchronized(queuedProfileTasks) {
             // Slots are keyed +id for enter tasks and -id for exit tasks; prune both.
@@ -334,7 +339,8 @@ class AutomationService : Service() {
         }
         registerPluginSubscriptions(profiles)
         for (domain in profiles) {
-            val matcher = ProfileMatcher(this, domain)
+            val pulseContinuity = pulseContinuities.getOrPut(domain.id) { PulseEventContinuity() }
+            val matcher = ProfileMatcher(this, domain, pulseContinuity)
 
             val matcherJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 try {

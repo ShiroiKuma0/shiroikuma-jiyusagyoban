@@ -32,6 +32,21 @@ class ProfileMatcherTest {
     }
 
     @Test
+    fun inheritedPulseBaselineDoesNotRefireThePulseThatStartedDuringReconcile() = runBlocking {
+        val changes = profileStateChangesFromSnapshots(
+            snapshots = flowOf(
+                ProfileMatchSnapshot(allMatched = true, pulseSequence = 7),
+                ProfileMatchSnapshot(allMatched = true, pulseSequence = 8),
+            ),
+            hasPulseContexts = true,
+            initialPulseSequence = 7,
+        ).toList()
+
+        assertEquals(1, changes.size)
+        assertTrue(changes.single() is ProfileStateChange.Activated)
+    }
+
+    @Test
     fun eventPulseDoesNotActivateRetroactivelyWhenLevelContextMatchesLater() = runBlocking {
         val changes = profileStateChangesFromSnapshots(
             snapshots = flowOf(

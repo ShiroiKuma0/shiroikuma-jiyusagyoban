@@ -30,9 +30,10 @@ import kotlinx.coroutines.flow.scan
  * 
  * Includes performance monitoring to detect slow matchers.
  */
-class ProfileMatcher(
+internal class ProfileMatcher(
     private val app: Context,
     private val profile: Profile,
+    private val pulseContinuity: PulseEventContinuity = PulseEventContinuity(),
 ) {
     private val tag = "ProfileMatcher[${profile.name}]"
     private val performanceThresholdMs = 1000L // Warn if evaluation takes > 1 second
@@ -68,7 +69,12 @@ class ProfileMatcher(
                     if (isPulseContext) markPulseContextSubscribed(index, pulseContextCount)
                     source.events(app)
                 }
-                sourceEvents.scan(ContextMatchUpdate.initial(isPulseContext)) { previous, event ->
+                sourceEvents.scan(
+                    ContextMatchUpdate.initial(
+                        pulseContext = isPulseContext,
+                        pulseSequence = if (isPulseContext) pulseContinuity.currentSequence() else 0L,
+                    ),
+                ) { previous, event ->
                     if (spec.type == ContextType.PLUGIN &&
                         !ContextMatchEvaluator.pluginEventAddressesSpec(spec, event)
                     ) {
@@ -81,12 +87,18 @@ class ProfileMatcher(
                     } else {
                         event
                     }
+                    val pulseObservation = if (isPulseContext) {
+                        pulseContinuity.observe(index, preparedEvent)
+                    } else {
+                        null
+                    }
+                    if (pulseObservation?.duplicate == true) return@scan previous
                     val matched = ContextMatchEvaluator.matches(spec, preparedEvent)
                     val effectiveMatched = if (spec.invert) !matched else matched
                     ContextMatchUpdate(
                         matched = effectiveMatched,
                         pulseContext = isPulseContext,
-                        pulseSequence = if (isPulseContext) previous.pulseSequence + 1 else 0,
+                        pulseSequence = pulseObservation?.sequence ?: 0L,
                         event = if (isPulseContext && effectiveMatched) preparedEvent else null,
                     )
                 }
@@ -103,7 +115,11 @@ class ProfileMatcher(
             combine(flows) { allMatches ->
                 evaluateSnapshot(allMatches)
             }.let { snapshots ->
-                profileStateChangesFromSnapshots(snapshots, hasPulseContexts) { change ->
+                profileStateChangesFromSnapshots(
+                    snapshots = snapshots,
+                    hasPulseContexts = hasPulseContexts,
+                    initialPulseSequence = pulseContinuity.currentSequence(),
+                ) { change ->
                     val startTime = System.currentTimeMillis()
                     when (change) {
                         is ProfileStateChange.Activated -> {
@@ -126,7 +142,8 @@ class ProfileMatcher(
         val allMatched = evaluateContextExpression(contextMatches, profile.contexts, profile.contextExpression)
         val pulseSequence = contextMatches
             .filter { it.pulseContext }
-            .sumOf { it.pulseSequence }
+            .maxOfOrNull { it.pulseSequence }
+            ?: 0L
         val duration = System.currentTimeMillis() - startTime
 
         if (duration > performanceThresholdMs) {
@@ -157,8 +174,8 @@ internal data class ContextMatchUpdate(
     val event: ContextEvent? = null,
 ) {
     companion object {
-        fun initial(pulseContext: Boolean): ContextMatchUpdate =
-            ContextMatchUpdate(matched = false, pulseContext = pulseContext, pulseSequence = 0)
+        fun initial(pulseContext: Boolean, pulseSequence: Long = 0L): ContextMatchUpdate =
+            ContextMatchUpdate(matched = false, pulseContext = pulseContext, pulseSequence = pulseSequence)
     }
 }
 
@@ -176,10 +193,11 @@ private data class PulseAccumulator(
 internal fun profileStateChangesFromSnapshots(
     snapshots: Flow<ProfileMatchSnapshot>,
     hasPulseContexts: Boolean,
+    initialPulseSequence: Long = 0L,
     onChange: (ProfileStateChange) -> Unit = {},
 ): Flow<ProfileStateChange> =
     if (hasPulseContexts) {
-        snapshots.scan(PulseAccumulator(lastPulseSequence = 0, change = null)) { previous, snapshot ->
+        snapshots.scan(PulseAccumulator(lastPulseSequence = initialPulseSequence, change = null)) { previous, snapshot ->
             val pulseChanged = snapshot.pulseSequence != previous.lastPulseSequence
             val change = if (pulseChanged && snapshot.pulseSequence > 0 && snapshot.allMatched) {
                 ProfileStateChange.Activated(snapshot.event)
