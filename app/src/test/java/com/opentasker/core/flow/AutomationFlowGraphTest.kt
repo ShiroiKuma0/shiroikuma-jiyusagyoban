@@ -168,4 +168,57 @@ class AutomationFlowGraphTest {
             actionNode.accessibilityLabel(),
         )
     }
+
+    @Test
+    fun complexRealWorldFixtureValidatesBranchesSubflowsAndRepairTarget() {
+        val enterTask = Task(
+            id = 100,
+            name = "Prepare evening mode",
+            actions = listOf(
+                ActionSpec(
+                    type = "dnd.set",
+                    condition = "%calendar = meeting",
+                    args = mapOf("state" to "enabled"),
+                ),
+                ActionSpec(type = "task.run", args = mapOf("task" to "Restore evening defaults")),
+                ActionSpec(
+                    type = "notify.show",
+                    args = mapOf("title" to "Evening mode"),
+                    continueOnError = true,
+                ),
+            ),
+        )
+        val childTask = Task(
+            id = 101,
+            name = "Restore evening defaults",
+            actions = listOf(ActionSpec(type = "brightness.set", args = mapOf("value" to "20"))),
+        )
+        val profile = Profile(
+            id = 42,
+            name = "Evening meeting mode",
+            enabled = true,
+            contexts = listOf(
+                ContextSpec(ContextType.EVENT, mapOf("event" to "calendar")),
+                ContextSpec(ContextType.STATE, mapOf("key" to "battery"), invert = true),
+            ),
+            enterTaskId = enterTask.id,
+            exitTaskId = 999,
+        )
+
+        val graph = AutomationFlowGraphBuilder.build(profile, listOf(enterTask, childTask))
+        val actions = graph.actionNodesFor("enter-task:100")
+
+        assertEquals(2, graph.contextNodes.size)
+        assertEquals(
+            listOf("if %calendar = meeting", "then", "then"),
+            actions.map { graph.incomingEdgeLabel(it.id) },
+        )
+        assertTrue(actions[1].isSubTask)
+        assertTrue(actions[2].detail.orEmpty().contains("continues after error"))
+        assertEquals(AutomationFlowTarget.Profile(42), graph.nodes.single { it.kind == AutomationFlowNodeKind.MISSING }.target)
+        assertTrue(graph.warnings.any { it.contains("Exit task 999") })
+        assertTrue(graph.accessibilitySummary().contains("2 context"))
+        assertTrue(graph.accessibilitySummary().contains("3 action"))
+        assertTrue(actions[0].accessibilityLabel().contains("condition if %calendar = meeting"))
+    }
 }
