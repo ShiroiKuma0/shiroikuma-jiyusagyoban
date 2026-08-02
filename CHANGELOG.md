@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Adaptive shell**: medium and expanded windows now use a scrollable navigation rail with every destination visible, while compact windows keep bottom navigation; the layout switches from live window width so rotation and resize preserve the selected screen.
+
 - **Scene authoring safety**: image drafts no longer save placeholder sources; picker-selected images must decode before save, invalid imports are rejected, accessibility descriptions/decorative state flow into overlays, and shared slider/image config validation is enforced by editor, import, diagnostics, and runtime.
 
 - **Failure recovery**: added structured Try/Catch/End Try flow blocks with bounded exponential retry for explicitly idempotent actions, redacted `FLOW_ERROR_*` handler variables, and honest validation of retry bounds and block nesting.

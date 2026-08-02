@@ -10,6 +10,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
@@ -27,6 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -67,6 +70,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -92,6 +96,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -214,6 +219,9 @@ private val primaryNavigationScreens = listOf(
 )
 
 private val secondaryNavigationScreens = OpenTaskerScreen.entries.filterNot { it in primaryNavigationScreens }
+private val adaptiveNavigationScreens = OpenTaskerScreen.entries
+
+internal fun usesNavigationRail(widthDp: Int): Boolean = widthDp >= 600
 
 private fun OpenTaskerScreen.icon(): ImageVector = when (this) {
     OpenTaskerScreen.Profiles -> Icons.Outlined.Tune
@@ -250,6 +258,7 @@ fun ActiveAutomationUi(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current.applicationContext
+    val useNavigationRail = usesNavigationRail(LocalConfiguration.current.screenWidthDp)
     val viewModel: ActiveAutomationViewModel = viewModel(factory = ActiveAutomationViewModelFactory(db, context))
     val profiles by viewModel.profiles.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
@@ -639,46 +648,48 @@ fun ActiveAutomationUi(
             }
         },
         bottomBar = {
-            Column {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.78f))
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 0.dp,
-                ) {
-                    primaryNavigationScreens.forEach { destination ->
-                        OpenTaskerNavigationItem(
-                            selected = screen == destination,
-                            onClick = {
-                                screenOrdinal = destination.ordinal
-                                showMoreDestinations = false
-                            },
-                            icon = destination.icon(),
-                            label = stringResource(destination.labelRes),
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    Box(Modifier.weight(1f)) {
-                        OpenTaskerNavigationItem(
-                            selected = screen in secondaryNavigationScreens || showMoreDestinations,
-                            onClick = { showMoreDestinations = true },
-                            icon = Icons.Outlined.MoreHoriz,
-                            label = stringResource(R.string.nav_more),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        DropdownMenu(
-                            expanded = showMoreDestinations,
-                            onDismissRequest = { showMoreDestinations = false },
-                            modifier = Modifier.align(Alignment.TopEnd),
-                        ) {
-                            secondaryNavigationScreens.forEach { destination ->
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(destination.labelRes)) },
-                                    leadingIcon = { Icon(destination.icon(), contentDescription = stringResource(destination.labelRes)) },
-                                    onClick = {
-                                        screenOrdinal = destination.ordinal
-                                        showMoreDestinations = false
-                                    },
-                                )
+            if (!useNavigationRail) {
+                Column {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.78f))
+                    NavigationBar(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 0.dp,
+                    ) {
+                        primaryNavigationScreens.forEach { destination ->
+                            OpenTaskerNavigationItem(
+                                selected = screen == destination,
+                                onClick = {
+                                    screenOrdinal = destination.ordinal
+                                    showMoreDestinations = false
+                                },
+                                icon = destination.icon(),
+                                label = stringResource(destination.labelRes),
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        Box(Modifier.weight(1f)) {
+                            OpenTaskerNavigationItem(
+                                selected = screen in secondaryNavigationScreens || showMoreDestinations,
+                                onClick = { showMoreDestinations = true },
+                                icon = Icons.Outlined.MoreHoriz,
+                                label = stringResource(R.string.nav_more),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            DropdownMenu(
+                                expanded = showMoreDestinations,
+                                onDismissRequest = { showMoreDestinations = false },
+                                modifier = Modifier.align(Alignment.TopEnd),
+                            ) {
+                                secondaryNavigationScreens.forEach { destination ->
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(destination.labelRes)) },
+                                        leadingIcon = { Icon(destination.icon(), contentDescription = stringResource(destination.labelRes)) },
+                                        onClick = {
+                                            screenOrdinal = destination.ordinal
+                                            showMoreDestinations = false
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
@@ -686,6 +697,36 @@ fun ActiveAutomationUi(
             }
         },
     ) { innerPadding ->
+        Row(Modifier.fillMaxSize()) {
+            if (useNavigationRail) {
+                NavigationRail(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .widthIn(min = 88.dp, max = 128.dp),
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        adaptiveNavigationScreens.forEach { destination ->
+                            OpenTaskerNavigationItem(
+                                selected = screen == destination,
+                                onClick = {
+                                    screenOrdinal = destination.ordinal
+                                    showMoreDestinations = false
+                                },
+                                icon = destination.icon(),
+                                label = stringResource(destination.labelRes),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
+            }
+            Box(Modifier.weight(1f).fillMaxHeight()) {
         when (screen) {
             OpenTaskerScreen.Profiles -> ProfilesScreen(
                 profiles = projectProfiles,
@@ -869,6 +910,8 @@ fun ActiveAutomationUi(
                 onRefresh = viewModel::refreshDiagnostics,
                 onShare = viewModel::shareDiagnosticReport,
             )
+        }
+            }
         }
     }
 

@@ -124,6 +124,7 @@ Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON 
 - Profile and task search bars
 - One global search across profiles, tasks, actions, variables, and scenes, including named references, with live results and deep links into the matching editor or library surface
 - Saveable editor/dialog state across rotation and resize
+- Adaptive navigation rail at medium/expanded widths keeps every destination discoverable while compact windows retain the bottom navigation layout
 
 ### Distribution
 
