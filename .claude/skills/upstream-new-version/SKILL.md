@@ -42,7 +42,17 @@ upstream (fast-forward only); `custom` carries our patches and is rebased onto e
      those two literals; our fork-version block multiplies them, so we never edit them by hand.
 
 4. **Reset the build tail:**
-   - In `gradle.properties`, set **`BUILD_NUMBER=1`** (new upstream line starts its `+N` at 1).
+   - In `gradle.properties`, set **`BUILD_NUMBER=1`**.
+   - This happens on **every** sync, not only when upstream bumped its own version — the rebase moves
+     the `.g<sha>` pin, and `+N` must always read as "our Nth build on this upstream base".
+     (白い熊, 2026-08-02: *"The counter should reset to 001 on every version change, thus also on a
+     new `g...` part."*)
+   - The pin itself needs no edit: it is derived from `git merge-base HEAD master`, which the rebase
+     moves by itself. See the global **`git-versioning`** skill.
+   - **Deliver the first build of a new base with `adb install -r -d`.** If upstream shipped commits
+     without bumping `appVersionCode`, the reset makes this build's `versionCode` *lower* than the
+     installed one and plain `-r` fails with `INSTALL_FAILED_VERSION_DOWNGRADE`. `-d` installs it as
+     a normal update, so the workspace database survives. `adb uninstall` stays forbidden.
 
 5. **Verify our customizations are intact after the rebase:**
 
@@ -55,6 +65,7 @@ upstream (fast-forward only); `custom` carries our patches and is rebased onto e
    | Signing | `keystore.properties` block + `useKeystoreProperties` | `app/build.gradle.kts` |
    | Archive name + task | `archivesName = "shiroikuma-jiyusagyoban_…"` + `buildFork` task | `app/build.gradle.kts` |
    | Build tail | `BUILD_NUMBER=1` | `gradle.properties` |
+   | Upstream-base pin | `upstreamBaseSha` / `upstreamBaseDate` / `upstreamPin` block (uses `providers.exec`, **not** `ProcessBuilder` — config cache) | `app/build.gradle.kts` |
    | Committed agent files | `CLAUDE.md`, `.claude/` un-ignored; only `.claude/settings.local.json` out | `.gitignore` |
    | Black-yellow icon | yellow foreground + black `ic_launcher_background` | `app/src/main/res/mipmap/…` + `values/colors.xml` |
    | Send-intent action | our `SendIntentAction` registered + manifest queries | `app/src/main/java/com/opentasker/core/actions/…`, `AndroidManifest.xml` |

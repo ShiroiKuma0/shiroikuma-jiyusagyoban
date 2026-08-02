@@ -103,10 +103,51 @@ val releaseKeyPassword = System.getenv("OPEN_TASKER_RELEASE_KEY_PASSWORD")
 val appVersionCode = 84
 val appVersionName = "0.2.82"
 // --- shiroikuma fork: per-build version tail ---
-// forkVersionName = "<upstreamBase>+N", forkVersionCode = <upstreamCode>*10000 + N,
+// forkVersionName = "<upstreamBase>.<base date>.g<base sha>+NNN", forkVersionCode = <upstreamCode>*10000 + N,
 // where N = BUILD_NUMBER from gradle.properties (bumped every build, reset to 1 on upstream sync).
 val forkBuildNumber = (project.findProperty("BUILD_NUMBER") as String?)?.trim()?.toIntOrNull() ?: 1
-val forkVersionName = "$appVersionName+$forkBuildNumber"
+
+// `providers.exec`, NOT a raw ProcessBuilder: this build has Gradle's configuration cache on, which
+// refuses an external process started at configuration time. The provider API is the supported form —
+// it also registers the git output as a cache input, so the pin re-resolves when the base moves.
+// isIgnoreExitValue: a repo with no local `master` (shallow clone, tarball) must degrade to an empty
+// pin, never fail the build.
+val repoRootDir = project.rootDir
+fun gitOutput(vararg command: String): String = try {
+    providers.exec {
+        commandLine(*command)
+        workingDir = repoRootDir
+        isIgnoreExitValue = true
+    }.standardOutput.asText.get().trim()
+} catch (e: Exception) {
+    println("Git command [${command.joinToString(" ")}] failed [$e]")
+    ""
+}
+
+// shiroikuma fork: upstream-base pin. `custom` is rebased onto every upstream commit, so upstream's
+// versionName stands still for months — the 0.2.79 line alone took 10 upstream commits without a
+// bump. The sha is what says whether we are behind upstream. It is the merge-base of HEAD and master
+// (the upstream mirror), i.e. the upstream commit our patches sit on, NOT our own HEAD, and NOT
+// master's tip (which overstates it when custom is not yet rebased).
+val upstreamBaseSha = gitOutput("git", "merge-base", "HEAD", "master").take(8)
+
+// That same commit's date, so versions sort chronologically — a bare sha orders them at random.
+// The commit's committer date, never build time: every build on one upstream base must share a pin.
+val upstreamBaseDate = if (upstreamBaseSha.length == 8) {
+    gitOutput("git", "show", "-s", "--format=%cd", "--date=format:%Y-%m-%d", upstreamBaseSha)
+} else {
+    ""
+}
+
+val upstreamPin = when {
+    upstreamBaseSha.length != 8 -> ""
+    upstreamBaseDate.length == 10 -> ".$upstreamBaseDate.g$upstreamBaseSha"
+    else -> ".g$upstreamBaseSha"          // git present but the date lookup failed
+}
+
+// Zero-padded in the NAME only, so +002 sorts before +010. versionCode keeps the plain integer.
+val paddedBuild = forkBuildNumber.toString().padStart(3, '0')
+val forkVersionName = "$appVersionName$upstreamPin+$paddedBuild"
 val forkVersionCode = appVersionCode * 10000 + forkBuildNumber
 
 // --- shiroikuma fork: release signing from a gitignored keystore.properties ---
