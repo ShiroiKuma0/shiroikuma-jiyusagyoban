@@ -308,6 +308,9 @@
     <string name="setup_sms_title">SMS send</string>
     <string name="setup_sms_body">Needed before SMS actions can send messages. Keep SMS automations explicit and user-authored.</string>
     <string name="setup_sms_required_for">SMS actions</string>
+    <string name="setup_sms_receive_title">SMS and MMS receive</string>
+    <string name="setup_sms_receive_body">Allows event=sms_received automations to receive sanitized sender and body values. Android 17 may delay standard OTP SMS delivery for up to three hours unless the app is exempt.</string>
+    <string name="setup_sms_receive_required_for">SMS/MMS-received event contexts</string>
     <string name="setup_dnd_title">Do Not Disturb access</string>
     <string name="setup_dnd_body">Needed before OpenTasker can change interruption filters or create, update, and remove owned Zen rules.</string>
     <string name="setup_dnd_required_for">DND and Zen rule actions</string>
@@ -650,6 +653,10 @@
     <string name="context_weekend">Weekend</string>
     <string name="context_nfc_write_helper">NFC write helper</string>
     <string name="context_presets">Presets</string>
+    <string name="context_field_event_sender_label">Sender</string>
+    <string name="context_field_event_sender_hint">Optional sender or originating address filter</string>
+    <string name="context_sms_received_android_17_note">On Android 17+, standard SMS messages containing OTPs may be withheld for up to three hours for non-default-SMS apps. Connected-device and other exempt apps can receive them sooner; use SMS Retriever or User Consent when OTP timing matters.</string>
+    <string name="context_sms_received_unavailable_note">The SMS/MMS trigger is omitted from Play builds. Use a standard or F-Droid build for this event.</string>
 
     <string name="empty_first_automation_title">Build your first automation</string>
     <string name="empty_first_automation_body">Start from a guided template for the fastest path, import existing work, or create a blank task when you know the exact steps.</string>

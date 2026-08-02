@@ -1133,6 +1133,16 @@ private fun buildPermissionItems(
             section = SetupSection.NEEDED,
             requirements = setOf(SetupRequirement.SMS),
         ) else null,
+        if (BuildConfig.SMS_RECEIVE_AVAILABLE) PermissionSetupItem(
+            title = context.getString(R.string.setup_sms_receive_title),
+            body = context.getString(R.string.setup_sms_receive_body),
+            granted = hasPermission(context, Manifest.permission.RECEIVE_SMS),
+            actionLabel = request,
+            action = PermissionAction.RuntimePermission(Manifest.permission.RECEIVE_SMS),
+            requiredFor = context.getString(R.string.setup_sms_receive_required_for),
+            section = SetupSection.NEEDED,
+            requirements = setOf(SetupRequirement.SMS),
+        ) else null,
         PermissionSetupItem(
             title = context.getString(R.string.setup_dnd_title),
             body = context.getString(R.string.setup_dnd_body),

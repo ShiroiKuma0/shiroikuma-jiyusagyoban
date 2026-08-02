@@ -202,6 +202,11 @@ object ContextMatchEvaluator {
             return false
         }
 
+        val senderFilter = firstConfig(spec, "sender", "from", "originatingAddress")
+        if (senderFilter.isNotBlank() && !textMatches(event.metadata["sender"].orEmpty(), senderFilter, regex)) {
+            return false
+        }
+
         val filter = spec.config["filter"]?.trim().orEmpty()
         // A spec with neither an event name nor a filter would match every pulse from any
         // event bridge; fail closed instead (only imports can produce such a spec).

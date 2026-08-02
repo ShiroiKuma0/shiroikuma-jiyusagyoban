@@ -43,9 +43,10 @@
 - NFC tag scans with normalized ID matching and a one-time NDEF write helper
 - Calendar windows with redacted event metadata
 - Sunrise/sunset filters with coordinate, offset, and window support
-- Shake, Bluetooth connect/disconnect and Android 16 bond-loss/encryption security events, Android 16 Advanced Protection transitions, package install/remove/replace
+- Shake, Bluetooth connect/disconnect and Android 16 bond-loss/encryption security events, Android 16 Advanced Protection transitions, sanitized SMS/MMS receipt on standard/F-Droid builds, package install/remove/replace
 - Bluetooth all-devices-disconnected transition with an editor preset and multi-device tracking
 - Android 15+ screen-recording visibility trigger - `event=screen_recording` reacts to whether this app is visible in a recording without capturing screen contents
+- SMS/MMS-received trigger - `event=sms_received` exposes sanitized sender/body metadata on standard/F-Droid builds; Android 17 may delay standard OTP SMS delivery for up to three hours outside exempt apps
 - Quick Settings tile tap, home-screen widget/shortcut, boot
 - Authenticated `event=push` bridge for a de-googled UnifiedPush distributor; delivery IDs are deduplicated, payloads are bounded, and message content is redacted before matching/logging
 - Received Share (`ACTION_SEND`/`SEND_MULTIPLE`) trigger for bounded text, URLs, single files, and multiple files, with MIME/text/URI filters and `share_*` task variables

@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
  *   - "camera" / "mic": active AppOps watcher pulse
  *   - "screen_recording": Android 15 screen-recording visibility callback pulse
  *   - "advanced_protection": Android 16 Advanced Protection state callback pulse
+ *   - "sms_received": sanitized SMS/MMS delivery (standard/F-Droid builds only)
  *   - "package_added" / "package_removed" / "package_replaced": package changes
  *   - "locale_request_query": Locale condition plugin requested a host query
  *   - "boot_completed": manifest boot receiver restarted the engine
@@ -59,6 +60,7 @@ class EventContextSourceImpl : EventDemandContextSource {
         CompanionContextEvents.events,
         ScreenRecordingContextEvents.events,
         AdvancedProtectionContextEvents.events,
+        SmsContextEvents.events,
         NotificationContextEvents.events,
         NfcContextEvents.events,
         BootContextEvents.events,

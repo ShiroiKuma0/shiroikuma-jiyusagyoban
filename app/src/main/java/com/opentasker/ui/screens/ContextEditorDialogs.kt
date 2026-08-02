@@ -46,6 +46,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.opentasker.app.BuildConfig
 import com.opentasker.app.R
 import com.opentasker.core.actions.ActionField
 import com.opentasker.core.actions.FieldType
@@ -197,6 +198,21 @@ internal fun ContextConfigDialog(
                             )
                         }
                     }
+                    if (state.type == ContextType.EVENT && config["event"].equals("sms_received", ignoreCase = true)) {
+                        item("sms-api-37-note") {
+                            Text(
+                                text = stringResource(
+                                    if (BuildConfig.SMS_RECEIVE_AVAILABLE) {
+                                        R.string.context_sms_received_android_17_note
+                                    } else {
+                                        R.string.context_sms_received_unavailable_note
+                                    },
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                     val eventPresets = if (state.type == ContextType.EVENT) {
                         CalendarSunEventPresets.presetsFor(config["event"].orEmpty()) +
                             BluetoothEventPresets.allPresets() +
@@ -297,6 +313,7 @@ private fun contextFields(type: ContextType): List<ActionField> = when (type) {
         ActionField("calendar", R.string.context_field_event_calendar_label, hintRes = R.string.context_field_event_calendar_hint),
         ActionField("beforeMinutes", R.string.context_field_event_before_label, FieldType.NUMBER, hintRes = R.string.context_field_event_before_hint),
         ActionField("package", R.string.context_field_event_package_label, FieldType.APP, hintRes = R.string.context_field_event_package_hint),
+        ActionField("sender", R.string.context_field_event_sender_label, hintRes = R.string.context_field_event_sender_hint),
         ActionField("tagId", R.string.context_field_event_tag_label, hintRes = R.string.context_field_event_tag_hint),
         ActionField("latitude", R.string.context_field_event_latitude_label, FieldType.NUMBER, hintRes = R.string.context_field_event_latitude_hint),
         ActionField("longitude", R.string.context_field_event_longitude_label, FieldType.NUMBER, hintRes = R.string.context_field_event_longitude_hint),

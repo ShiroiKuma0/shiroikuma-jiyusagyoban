@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add a build-gated `event=sms_received` SMS/MMS trigger with sanitized sender/body metadata, sender/body filters, Android 17 OTP-delay disclosure, and Play-artifact exclusion.
 - Add Android 16 Advanced Protection live detection, diagnostics/setup banners, and `event=advanced_protection` enabled/disabled transitions with reflection-safe callback teardown.
 
 - Add Android 16 Bluetooth `bluetooth_key_missing` and `bluetooth_encryption_change` event contexts with device/security metadata, editor presets, permission setup copy, and low-SDK no-op gating.

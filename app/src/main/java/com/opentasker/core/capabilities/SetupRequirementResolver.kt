@@ -80,6 +80,7 @@ object SetupRequirementResolver {
                 }
                 ContextType.EVENT -> when {
                     tokens.contains("screen_recording") -> add(SetupRequirement.SCREEN_RECORDING)
+                    tokens.contains("sms_received") -> add(SetupRequirement.SMS)
                     tokens.containsAny("notification", "notify") -> add(SetupRequirement.NOTIFICATION_ACCESS)
                     tokens.contains("calendar") -> add(SetupRequirement.CALENDAR)
                 }

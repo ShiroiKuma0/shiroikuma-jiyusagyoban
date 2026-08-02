@@ -108,6 +108,7 @@ require(selectedDistribution in allowedDistributions) {
     "Unsupported OpenTasker distribution '$selectedDistribution'. Expected one of: ${allowedDistributions.joinToString()}."
 }
 val smsActionAvailable = selectedDistribution != "play"
+val smsReceiveAvailable = selectedDistribution != "play"
 val hasReleaseSigning = listOf(
     releaseKeystorePath,
     releaseKeystorePassword,
@@ -129,7 +130,12 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "DISTRIBUTION", "\"$selectedDistribution\"")
         buildConfigField("Boolean", "SMS_ACTION_AVAILABLE", smsActionAvailable.toString())
+        buildConfigField("Boolean", "SMS_RECEIVE_AVAILABLE", smsReceiveAvailable.toString())
         manifestPlaceholders["smsPermissionName"] = if (smsActionAvailable) "android.permission.SEND_SMS" else "android.permission.INTERNET"
+        manifestPlaceholders["smsReceivePermissionName"] = if (smsReceiveAvailable) "android.permission.RECEIVE_SMS" else "android.permission.INTERNET"
+        manifestPlaceholders["smsMmsPermissionName"] = if (smsReceiveAvailable) "android.permission.RECEIVE_MMS" else "android.permission.INTERNET"
+        manifestPlaceholders["smsWapPushPermissionName"] = if (smsReceiveAvailable) "android.permission.RECEIVE_WAP_PUSH" else "android.permission.INTERNET"
+        manifestPlaceholders["smsTriggerEnabled"] = smsReceiveAvailable.toString()
         manifestPlaceholders["phoneStatePermissionName"] = if (smsActionAvailable) "android.permission.READ_PHONE_STATE" else "android.permission.ACCESS_NETWORK_STATE"
     }
 

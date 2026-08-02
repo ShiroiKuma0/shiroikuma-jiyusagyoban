@@ -38,6 +38,14 @@
     <uses-permission
         android:name="${smsPermissionName}" />
     <uses-permission
+        android:name="${smsReceivePermissionName}" />
+    <uses-permission
+        android:name="${smsMmsPermissionName}"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission
+        android:name="${smsWapPushPermissionName}"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission
         android:name="${phoneStatePermissionName}" />
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
@@ -189,6 +197,19 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.opentasker.core.contexts.SmsReceivedReceiver"
+            android:enabled="${smsTriggerEnabled}"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.provider.Telephony.WAP_PUSH_RECEIVED" />
+                <data android:mimeType="application/vnd.wap.mms-message" />
             </intent-filter>
         </receiver>
 
