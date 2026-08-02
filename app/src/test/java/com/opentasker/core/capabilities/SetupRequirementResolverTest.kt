@@ -72,4 +72,19 @@ class SetupRequirementResolverTest {
             SetupRequirementResolver.resolve(listOf(profile), listOf(task)),
         )
     }
+
+    @Test
+    fun screenRecordingEventAddsScreenRecordingRequirement() {
+        val profile = Profile(
+            id = 1,
+            name = "Recording",
+            contexts = listOf(ContextSpec(ContextType.EVENT, mapOf("event" to "screen_recording"))),
+            enterTaskId = 1,
+        )
+
+        assertEquals(
+            setOf(SetupRequirement.SCREEN_RECORDING),
+            SetupRequirementResolver.resolve(listOf(profile), emptyList()),
+        )
+    }
 }

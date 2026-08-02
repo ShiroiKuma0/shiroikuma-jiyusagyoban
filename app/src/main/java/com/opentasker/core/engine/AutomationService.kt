@@ -38,6 +38,7 @@ import com.opentasker.core.contexts.ContextEvent
 import com.opentasker.core.contexts.PackageContextEvents
 import com.opentasker.core.contexts.PluginConditionSubscription
 import com.opentasker.core.contexts.PluginConditionSubscriptions
+import com.opentasker.core.contexts.ScreenRecordingContextEvents
 import com.opentasker.core.contexts.TimeContextEvents
 import com.opentasker.core.contexts.UsbDeviceContextEvents
 import com.opentasker.core.model.AutomationMode
@@ -150,6 +151,10 @@ class AutomationService : Service() {
                 ContextMonitor.COMPANION_EVENTS to ContextMonitorHandle(
                     start = { true },
                     stop = {},
+                ),
+                ContextMonitor.SCREEN_RECORDING to ContextMonitorHandle(
+                    start = { ScreenRecordingContextEvents.start(this) },
+                    stop = { ScreenRecordingContextEvents.stop(this) },
                 ),
             ),
         )

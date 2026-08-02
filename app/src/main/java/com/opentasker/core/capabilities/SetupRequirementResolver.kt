@@ -26,6 +26,7 @@ enum class SetupRequirement {
     SMS,
     DND,
     CONTACTS,
+    SCREEN_RECORDING,
 }
 
 object SetupRequirementResolver {
@@ -78,6 +79,7 @@ object SetupRequirementResolver {
                     if (tokens.containsAny("bluetooth", "bt")) add(SetupRequirement.BLUETOOTH)
                 }
                 ContextType.EVENT -> when {
+                    tokens.contains("screen_recording") -> add(SetupRequirement.SCREEN_RECORDING)
                     tokens.containsAny("notification", "notify") -> add(SetupRequirement.NOTIFICATION_ACCESS)
                     tokens.contains("calendar") -> add(SetupRequirement.CALENDAR)
                 }

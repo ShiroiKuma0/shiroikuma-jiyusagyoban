@@ -299,6 +299,9 @@
     <string name="setup_bluetooth_title">Bluetooth connect</string>
     <string name="setup_bluetooth_body">Needed on Android 12 and newer for Bluetooth device actions and context checks.</string>
     <string name="setup_bluetooth_required_for">Bluetooth actions</string>
+    <string name="setup_screen_recording_title">Screen recording detection</string>
+    <string name="setup_screen_recording_body">On Android 15 and newer, OpenTasker can react when this app becomes visible or invisible in a screen recording. No screen contents are captured by this trigger.</string>
+    <string name="setup_screen_recording_required_for">Screen recording event contexts</string>
     <string name="setup_local_network_required_for">LAN network actions</string>
     <string name="setup_sms_title">SMS send</string>
     <string name="setup_sms_body">Needed before SMS actions can send messages. Keep SMS automations explicit and user-authored.</string>

@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
  *   - "usb": USB/input device attached/detached
  *   - "shake": accelerometer shake pulse
  *   - "camera" / "mic": active AppOps watcher pulse
+ *   - "screen_recording": Android 15 screen-recording visibility callback pulse
  *   - "package_added" / "package_removed" / "package_replaced": package changes
  *   - "locale_request_query": Locale condition plugin requested a host query
  *   - "boot_completed": manifest boot receiver restarted the engine
@@ -55,6 +56,7 @@ class EventContextSourceImpl : EventDemandContextSource {
         BluetoothContextEvents.events,
         UsbDeviceContextEvents.events,
         CompanionContextEvents.events,
+        ScreenRecordingContextEvents.events,
         NotificationContextEvents.events,
         NfcContextEvents.events,
         BootContextEvents.events,

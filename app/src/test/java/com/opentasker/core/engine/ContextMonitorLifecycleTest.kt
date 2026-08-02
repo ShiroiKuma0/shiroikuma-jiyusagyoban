@@ -88,6 +88,7 @@ class ContextMonitorLifecycleTest {
             ContextSpec(ContextType.EVENT, mapOf("event" to "package_replaced")),
             ContextSpec(ContextType.EVENT, mapOf("event" to "bluetooth")),
             ContextSpec(ContextType.EVENT, mapOf("event" to "bluetooth_all_disconnected")),
+            ContextSpec(ContextType.EVENT, mapOf("event" to "screen_recording")),
         )
 
         assertEquals(
@@ -97,6 +98,7 @@ class ContextMonitorLifecycleTest {
                 ContextMonitor.CAMERA_MIC,
                 ContextMonitor.PACKAGE_EVENTS,
                 ContextMonitor.BLUETOOTH_EVENTS,
+                ContextMonitor.SCREEN_RECORDING,
             ),
             requiredContextMonitors(profile),
         )
@@ -114,6 +116,7 @@ class ContextMonitorLifecycleTest {
                 ContextMonitor.BLUETOOTH_EVENTS,
                 ContextMonitor.USB_EVENTS,
                 ContextMonitor.COMPANION_EVENTS,
+                ContextMonitor.SCREEN_RECORDING,
             ),
             requiredContextMonitors(broad),
         )

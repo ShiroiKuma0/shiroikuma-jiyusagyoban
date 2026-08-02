@@ -55,4 +55,20 @@ class AutomationServiceCompatibilitySourceTest {
             source.contains("EventDemandContextSource") && source.contains("onSubscribed()"),
         )
     }
+
+    @Test
+    fun screenRecordingEventsReachMatchersThroughTheSubscriptionReadyEventSource() {
+        val source = sourceRoot.resolve("com/opentasker/core/contexts/EventContextSourceImpl.kt").readText()
+
+        assertTrue(
+            "Screen-recording events must reach event-context matchers",
+            source.contains("ScreenRecordingContextEvents.events"),
+        )
+        assertTrue(
+            "Screen-recording monitor startup must be SDK-gated and lifecycle-owned",
+            sourceRoot.resolve("com/opentasker/core/contexts/ScreenRecordingContextEvents.kt")
+                .readText()
+                .contains("Build.VERSION.SDK_INT < ANDROID_15_API"),
+        )
+    }
 }
