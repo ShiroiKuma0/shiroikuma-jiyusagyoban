@@ -91,7 +91,13 @@ internal fun RunLogScreenContent(
     }
     // The latest failure (logs are timestamp-DESC) gets a banner atop the Log tab — this is where
     // run failures surface now that the Profiles workspace card is gone.
-    val latestFailure = logs.firstOrNull { !it.success }
+    //
+    // Classify with outcome(), NOT the raw success flag: a Skipped run never started (the collision
+    // or admission gate turned it away) and a Cancelled one was stopped on purpose, yet both are
+    // stored with success = false. Since the collision policy became live at the shared execution
+    // boundary, an ordinary slider drag skips a few mid-drag fires — on the raw flag that painted a
+    // red "failure" banner over a workspace in which nothing had actually failed.
+    val latestFailure = logs.firstOrNull { it.outcome() == RunLogOutcome.Failed }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
