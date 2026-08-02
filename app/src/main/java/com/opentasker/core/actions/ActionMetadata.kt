@@ -820,6 +820,31 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "shortcut.publish",
+            nameRes = R.string.catalog_action_shortcut_publish_name,
+            descriptionRes = R.string.catalog_action_shortcut_publish_description,
+            categoryRes = R.string.catalog_category_app,
+            fields = listOf(
+                ActionField("id", R.string.catalog_action_shortcut_publish_field_id_label, required = true, hintRes = R.string.catalog_action_shortcut_publish_field_id_hint),
+                ActionField("task_id", R.string.catalog_action_shortcut_publish_field_task_id_label, FieldType.TASK, required = true, hintRes = R.string.catalog_action_shortcut_publish_field_task_id_hint, numberRule = integerRule(1)),
+                ActionField("label", R.string.catalog_action_shortcut_publish_field_label_label, required = true, hintRes = R.string.catalog_action_shortcut_publish_field_label_hint),
+                ActionField(
+                    "mode",
+                    R.string.catalog_action_shortcut_publish_field_mode_label,
+                    FieldType.DROPDOWN,
+                    required = true,
+                    hintRes = R.string.catalog_action_shortcut_publish_field_mode_hint,
+                    options = listOf(
+                        option("dynamic", R.string.action_option_shortcut_dynamic),
+                        option("pinned", R.string.action_option_shortcut_pinned),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "flow.try",
             nameRes = R.string.catalog_action_flow_try_name,
             descriptionRes = R.string.catalog_action_flow_try_description,

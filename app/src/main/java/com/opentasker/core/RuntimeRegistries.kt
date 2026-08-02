@@ -45,6 +45,7 @@ import com.opentasker.core.actions.ReadFileAction
 import com.opentasker.core.actions.RingerModeAction
 import com.opentasker.core.actions.RebootAction
 import com.opentasker.core.actions.SayAction
+import com.opentasker.core.actions.ShortcutPublishAction
 import com.opentasker.core.actions.ScreenOffAction
 import com.opentasker.core.actions.ScreenTimeoutAction
 import com.opentasker.core.actions.ScreenshotAction
@@ -116,6 +117,7 @@ private fun registerBuiltInActions() {
         TileStateAction(),
         TemporaryStateAction(),
         LaunchAppAction(),
+        ShortcutPublishAction(),
         LocalePluginSettingAction(),
         LocalePluginConditionQueryAction(),
         KillAppAction(),

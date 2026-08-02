@@ -116,6 +116,7 @@ object AutomationSensitivityRegistry {
         "ime.info",
         "ime.set",
         "app.launch",
+        "shortcut.publish",
         "app.kill",
         "home.go",
         "url.open",

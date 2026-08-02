@@ -70,6 +70,7 @@ object ActionCapabilityRegistry {
         // App and intent dispatch: uses ordinary intent resolution.
         "intent.launch",
         "app.launch",
+        "shortcut.publish",
         "home.go",
         "url.open",
         // Scoped file access inside the app's own sandbox.

@@ -521,4 +521,16 @@
     <string name="catalog_action_log_name" formatted="false">Log Message</string>
     <string name="catalog_action_log_description" formatted="false">Write message to task log</string>
     <string name="catalog_action_log_field_message_label" formatted="false">Message</string>
+    <string name="catalog_action_shortcut_publish_name" formatted="false">Publish Shortcut</string>
+    <string name="catalog_action_shortcut_publish_description" formatted="false">Create a dynamic or pinned launcher shortcut for a task</string>
+    <string name="catalog_action_shortcut_publish_field_id_label" formatted="false">Shortcut ID</string>
+    <string name="catalog_action_shortcut_publish_field_id_hint" formatted="false">Stable ID used to update this shortcut</string>
+    <string name="catalog_action_shortcut_publish_field_task_id_label" formatted="false">Task</string>
+    <string name="catalog_action_shortcut_publish_field_task_id_hint" formatted="false">Task to run when the shortcut is tapped</string>
+    <string name="catalog_action_shortcut_publish_field_label_label" formatted="false">Label</string>
+    <string name="catalog_action_shortcut_publish_field_label_hint" formatted="false">Label shown by the launcher</string>
+    <string name="catalog_action_shortcut_publish_field_mode_label" formatted="false">Mode</string>
+    <string name="catalog_action_shortcut_publish_field_mode_hint" formatted="false">Dynamic updates immediately; pinned asks the launcher</string>
+    <string name="action_option_shortcut_dynamic" formatted="false">Dynamic</string>
+    <string name="action_option_shortcut_pinned" formatted="false">Pinned</string>
 </resources>

@@ -11,6 +11,7 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.widget.TaskShortcutHelper
 
 /**
  * Launch an application.
@@ -33,6 +34,28 @@ class LaunchAppAction : Action {
             ActionResult.Success
         } catch (e: Exception) {
             ActionResult.Failure("launch failed: ${e.message}")
+        }
+    }
+}
+
+/** Publish a dynamic launcher shortcut or request a pinned shortcut for an existing task. */
+class ShortcutPublishAction : Action {
+    override val id = "shortcut.publish"
+    override val category = ActionCategory.APP
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val shortcutId = args["id"]?.trim().orEmpty()
+        val taskId = args["task_id"]?.trim()?.toLongOrNull() ?: return ActionResult.Failure("task_id must be a positive number")
+        val label = args["label"]?.trim().orEmpty()
+        val mode = args["mode"]?.trim()?.lowercase().orEmpty().ifBlank { "dynamic" }
+        val validation = TaskShortcutHelper.validatePublish(shortcutId, taskId, label, mode)
+        if (!validation.isValid) return ActionResult.Failure(validation.error ?: "invalid shortcut")
+        val publishMode = TaskShortcutHelper.PublishMode.valueOf(mode.uppercase())
+        return if (TaskShortcutHelper.publishShortcut(ctx.app, shortcutId, taskId, label, publishMode)) {
+            ctx.logger("Shortcut published: $shortcutId ($mode)")
+            ActionResult.Success
+        } else {
+            ActionResult.Failure("shortcut request was declined or unsupported")
         }
     }
 }
