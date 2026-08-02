@@ -60,6 +60,10 @@
     <string name="context_field_event_offset_hint" formatted="false">-30</string>
     <string name="context_field_event_window_label" formatted="false">Sun window minutes</string>
     <string name="context_field_event_window_hint" formatted="false">5</string>
+    <string name="context_field_event_topic_label" formatted="false">Push topic</string>
+    <string name="context_field_event_topic_hint" formatted="false">topic-name</string>
+    <string name="context_field_event_id_label" formatted="false">Push event ID</string>
+    <string name="context_field_event_id_hint" formatted="false">optional exact delivery ID</string>
     <string name="context_field_event_title_label" formatted="false">Title contains</string>
     <string name="context_field_event_title_hint" formatted="false">Optional notification title text</string>
     <string name="context_field_event_body_label" formatted="false">Body contains</string>

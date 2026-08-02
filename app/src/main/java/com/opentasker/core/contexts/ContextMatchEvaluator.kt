@@ -136,6 +136,18 @@ object ContextMatchEvaluator {
             if (actualPackage !in packageAllowlist) return false
         }
 
+        val topicAllowlist = firstConfig(spec, "topic", "topics")
+            .splitCsv()
+            .map { it.lowercase(Locale.US) }
+            .toSet()
+        if (topicAllowlist.isNotEmpty()) {
+            val actualTopic = event.metadata["topic"].orEmpty().lowercase(Locale.US)
+            if (actualTopic !in topicAllowlist) return false
+        }
+
+        val eventId = spec.config["eventId"]?.trim().orEmpty()
+        if (eventId.isNotBlank() && event.metadata["eventId"].orEmpty() != eventId) return false
+
         val configuredTagIds = firstConfig(spec, "tagId", "tagIds", "tag")
             .splitCsv()
             .map(NfcContextEvents::normalizeTagId)

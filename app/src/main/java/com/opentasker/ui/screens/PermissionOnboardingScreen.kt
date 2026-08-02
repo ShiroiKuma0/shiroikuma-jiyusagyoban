@@ -4,6 +4,8 @@ import android.Manifest
 import android.app.Activity
 import android.app.NotificationManager
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
@@ -90,6 +92,7 @@ import com.opentasker.core.scripting.TermuxScriptBackend
 import com.opentasker.core.scripting.TermuxScriptState
 import com.opentasker.core.capabilities.SetupRequirement
 import com.opentasker.core.capabilities.SetupRequirementResolver
+import com.opentasker.core.contexts.PushTriggerTokenStore
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 
@@ -286,6 +289,7 @@ fun PermissionOnboardingScreen(
         }
 
         item { TermuxScriptAllowlistCard(onMessage) }
+        item { PushTriggerSetupCard(onMessage) }
 
         SetupSection.entries.forEach { section ->
             val itemsForSection = sectionItems.getValue(section)
@@ -332,6 +336,45 @@ fun PermissionOnboardingScreen(
                         },
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PushTriggerSetupCard(onMessage: (String) -> Unit) {
+    val context = LocalContext.current
+    val token = remember(context) { PushTriggerTokenStore(context).token() }
+    val tokenLabel = stringResource(R.string.setup_push_title)
+    val copiedMessage = stringResource(R.string.setup_push_copied)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(stringResource(R.string.setup_push_title), style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(R.string.setup_push_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                stringResource(R.string.setup_push_token, token),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(
+                onClick = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                    clipboard?.setPrimaryClip(ClipData.newPlainText(tokenLabel, token))
+                    onMessage(copiedMessage)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+            ) {
+                Text(stringResource(R.string.setup_push_copy))
             }
         }
     }

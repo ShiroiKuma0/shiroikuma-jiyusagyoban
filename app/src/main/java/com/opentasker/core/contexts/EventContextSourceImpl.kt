@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
  *   - "locale_request_query": Locale condition plugin requested a host query
  *   - "boot_completed": manifest boot receiver restarted the engine
  *   - "tile_clicked": Quick Settings tile toggled
+ *   - "push": authenticated UnifiedPush distributor delivery
  */
 class EventContextSourceImpl : EventDemandContextSource {
     override val type = "event"
@@ -56,5 +57,6 @@ class EventContextSourceImpl : EventDemandContextSource {
         CalendarSunContextEvents.events(app, requestedEvent = requestedEvent),
         LocalePluginRequestQueryEvents.events(app),
         QuickSettingsTileContextEvents.events,
+        PushContextEvents.events,
     )
 }

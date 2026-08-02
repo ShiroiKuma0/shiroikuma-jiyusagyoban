@@ -984,4 +984,9 @@
     <string name="diagnostics_health_state_loading">Loading</string>
     <string name="diagnostics_health_state_stale">Stale</string>
     <string name="diagnostics_health_state_error">Error</string>
+    <string name="setup_push_title">UnifiedPush trigger bridge</string>
+    <string name="setup_push_body">A future UnifiedPush distributor can forward authenticated event=push deliveries here. Keep this per-install token private. Payloads are capped and message content is redacted before event matching and logs.</string>
+    <string name="setup_push_token">Distributor token: %1$s</string>
+    <string name="setup_push_copy">Copy distributor token</string>
+    <string name="setup_push_copied">Distributor token copied.</string>
 </resources>

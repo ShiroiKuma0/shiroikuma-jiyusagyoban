@@ -1,0 +1,78 @@
+package com.opentasker.core.contexts
+
+import com.opentasker.core.model.ContextSpec
+import com.opentasker.core.model.ContextType
+import java.nio.charset.StandardCharsets
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class PushContextEventsTest {
+    @After
+    fun tearDown() {
+        PushContextEvents.resetForTests()
+    }
+
+    @Test
+    fun authenticatedDeliveryEmitsMatchableRedactedEvent() = runBlocking {
+        val token = "install-token"
+        val received = async {
+            withTimeout(1_000L) {
+                PushContextEvents.events.first { it.metadata["event"] == PushContextEvents.EVENT_PUSH }
+            }
+        }
+        yield()
+        val message = "hello from a private channel"
+        val accepted = PushContextEvents.publishDelivery(
+            PushDelivery(
+                token = token,
+                topic = "tasks",
+                eventId = "evt-1",
+                title = "Run task",
+                message = message,
+            ),
+            expectedToken = token,
+            nowMs = 10_000L,
+        )
+
+        val event = received.await()
+        assertTrue(accepted)
+        assertTrue(
+            ContextMatchEvaluator.matches(
+                ContextSpec(ContextType.EVENT, config = mapOf("event" to "push", "topic" to "tasks")),
+                event,
+            ),
+        )
+        assertEquals("tasks", event.metadata["topic"])
+        assertEquals("evt-1", event.metadata["eventId"])
+        assertEquals(message.toByteArray(StandardCharsets.UTF_8).size.toString(), event.metadata["payloadBytes"])
+        assertFalse(event.metadata.containsKey("message"))
+    }
+
+    @Test
+    fun wrongTokenAndOversizedMessageFailClosed() {
+        val base = PushDelivery(token = "wrong", topic = "tasks", eventId = "evt-1")
+        assertNull(PushContextEvents.parseDelivery(base, expectedToken = "right"))
+
+        val oversized = base.copy(
+            token = "right",
+            message = "x".repeat(PushContextEvents.MAX_MESSAGE_BYTES + 1),
+        )
+        assertNull(PushContextEvents.parseDelivery(oversized, expectedToken = "right"))
+    }
+
+    @Test
+    fun duplicateDeliveryIsSuppressedForAtLeastOnceRetry() {
+        val delivery = PushDelivery(token = "token", topic = "tasks", eventId = "evt-1")
+        assertTrue(PushContextEvents.publishDelivery(delivery, "token", nowMs = 1_000L))
+        assertFalse(PushContextEvents.publishDelivery(delivery, "token", nowMs = 1_001L))
+    }
+}

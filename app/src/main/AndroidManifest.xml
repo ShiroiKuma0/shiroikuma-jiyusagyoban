@@ -203,6 +203,20 @@
             </intent-filter>
         </receiver>
 
+        <!--
+            UnifiedPush distributors may forward a delivery here. The receiver is exported because
+            the distributor is a separate application; every payload still requires the per-install
+            token shown in Setup and is bounded/redacted by PushContextEvents.
+        -->
+        <receiver
+            android:name="com.opentasker.core.contexts.PushEventReceiver"
+            android:exported="true"
+            android:intentMatchingFlags="enforceIntentFilter">
+            <intent-filter>
+                <action android:name="com.opentasker.action.PUSH_EVENT" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name="com.opentasker.core.scripting.TermuxResultReceiver"
             android:exported="false" />
