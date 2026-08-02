@@ -4,6 +4,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.net.TrafficStats
 import androidx.core.content.ContextCompat
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
@@ -121,13 +122,24 @@ class SpeedTestAction : Action {
                 pinned == null || processBound -> { url -> url.openConnection() as HttpURLConnection }
                 else -> { url -> pinned.network.openConnection(url) as HttpURLConnection }
             }
+            // Latency BEFORE the legs, while the transport is pinned and the link is idle — measuring
+            // it under load would report bufferbloat, not the round trip.
+            val socketFor: () -> java.net.Socket = when {
+                pinned == null || processBound -> ({ java.net.Socket() })
+                else -> ({ pinned.network.socketFactory.createSocket() })
+            }
+            publishLatency(ctx, prefix, measureLatency(socketFor, downUrls.first()))
+
             try {
                 var down: Leg? = null
                 var up: Leg? = null
                 if (direction != "up") {
                     down = transfer(ctx, prefix, "down", open, downUrls, seconds, maxBytes, streams, rampMs)
                 }
-                if (direction != "down") {
+                // A cancel during the download leg must end the run, not roll on into the upload leg.
+                // The upload's own loops would exit at once, but resolving the upload URL and opening
+                // the connections happens BEFORE them and is not cheap.
+                if (direction != "down" && !SpeedTestCancel.isRequested) {
                     up = transfer(ctx, prefix, "up", open, upUrls, seconds, maxBytes, streams, rampMs)
                 }
                 publishSummary(ctx, prefix, down, up)
@@ -198,12 +210,25 @@ class SpeedTestAction : Action {
         val started = System.nanoTime()
         val total = java.util.concurrent.atomic.AtomicLong(0)
         val firstByte = java.util.concurrent.atomic.AtomicLong(0)
+        // When a byte was last actually counted. This, not "when the workers returned", is where the
+        // measurement window ends — see the comment at endedAt below.
+        val lastByteAt = java.util.concurrent.atomic.AtomicLong(0)
+        // Payload counting says a byte moved the moment write() returns — i.e. when it reached the
+        // kernel's socket buffer, not the network. Over a whole leg that overstates upload by whatever
+        // is still buffered when the clock stops. The kernel's own per-UID counters only advance when
+        // bytes actually hit the interface, so the headline figures come from these.
+        val uid = android.os.Process.myUid()
+        fun wireBytes(): Long =
+            if (phase == "up") TrafficStats.getUidTxBytes(uid) else TrafficStats.getUidRxBytes(uid)
+        val wireStart = wireBytes()
+        var wireAtRamp = -1L
         val failures = mutableListOf<String>()
         // Which endpoint actually carried the leg. Without this a fallback is invisible and a slow
         // mirror reads as a slow link — exactly the wrong conclusion.
         val usedHost = java.util.concurrent.atomic.AtomicReference("")
 
         ctx.variables.set("${prefix}Phase", phase)
+        ctx.variables.set("${prefix}Arrow", arrowFor(phase))
         ctx.variables.set("${prefix}Pct", "0")
 
         // Sampler: one publisher for all streams, so the UI sees aggregate throughput and the store is
@@ -216,15 +241,21 @@ class SpeedTestAction : Action {
         var rampAt = 0L
         val sampler = launch {
             var lastBytes = 0L
+            var lastWire = wireStart
             var lastAt = System.nanoTime()
             while (isActive) {
                 kotlinx.coroutines.delay(SAMPLE_MS)
                 val now = System.nanoTime()
                 val seen = total.get()
-                peak = max(peak, instantMbps(seen - lastBytes, now - lastAt))
-                if (rampBytes < 0 && (now - started) / 1_000_000 >= rampMs) { rampBytes = seen; rampAt = now }
+                val seenWire = wireBytes()
+                val inst = instantMbps(seenWire - lastWire, now - lastAt)
+                peak = max(peak, inst)
+                lastWire = seenWire
+                if (rampBytes < 0 && (now - started) / 1_000_000 >= rampMs) {
+                    rampBytes = seen; rampAt = now; wireAtRamp = wireBytes()
+                }
                 samples++
-                publish(ctx, prefix, phase, seen, started, now, peak, maxBytes, seconds)
+                publish(ctx, prefix, phase, seen, started, now, peak, maxBytes, seconds, inst)
                 lastBytes = seen; lastAt = now
             }
         }
@@ -236,10 +267,17 @@ class SpeedTestAction : Action {
                         // Re-request until the deadline: one response is finite, the leg is not.
                         var served = false
                         while (isActive && !SpeedTestCancel.isRequested && total.get() < maxBytes && System.nanoTime() < deadline) {
-                            runStream(open, candidate, phase, deadline, maxBytes, total, firstByte)
+                            runStream(open, candidate, phase, deadline, maxBytes, total, firstByte, lastByteAt)
                             served = true
                         }
-                        if (!served) runStream(open, candidate, phase, deadline, maxBytes, total, firstByte)
+                        // …but NOT after a cancel. This guarantees one stream when the deadline has
+                        // already passed; it used to fire on a cancel too, so every worker still opened
+                        // a connection and ran a full stream after 白い熊 tapped 中止. With 8 workers
+                        // that is 8 connection setups — measured as ~12 s between the tap and the run
+                        // actually ending.
+                        if (!served && !SpeedTestCancel.isRequested) {
+                            runStream(open, candidate, phase, deadline, maxBytes, total, firstByte, lastByteAt)
+                        }
                         usedHost.compareAndSet("", hostOf(candidate))
                         return@async true
                     } catch (e: Exception) {
@@ -261,14 +299,28 @@ class SpeedTestAction : Action {
         )
         if (!anyOk) throw java.io.IOException(failures.joinToString("; ").ifEmpty { "no endpoint reachable" })
 
-        val elapsedMs = (System.nanoTime() - started) / 1_000_000
+        // The window ends at the LAST COUNTED BYTE, not when the workers returned. Past the deadline
+        // an upload worker still flushes its socket buffer, closes the stream and waits for the
+        // server's response — seconds in which `total` stands still while the clock ran on, dragging
+        // the average down. 白い熊 watched exactly that: the figure kept falling for ~5 s after the bar
+        // reached 100 %. On a 10 s leg a 5 s tail understates the result by a third, which is the
+        // upload's long-standing gap against Ookla. Download has the same shape, with a far smaller
+        // tail (a final read and close, no response to wait for) — which is why only upload looked
+        // wrong.
+        val endedAt = lastByteAt.get().takeIf { it > 0L } ?: System.nanoTime()
+        val elapsedMs = (endedAt - started) / 1_000_000
         val latency = firstByte.get().takeIf { it > 0 }?.let { (it - started) / 1_000_000 } ?: 0L
-        val endedAt = System.nanoTime()
         // Settled = after the ramp. Falls back to the whole leg when the run was too short to have one.
-        val settledBytes = if (rampBytes >= 0) total.get() - rampBytes else total.get()
+        // Settled = after the ramp, and measured on the wire. Falls back to the payload counter if the
+        // kernel counters are unavailable (they return -1 when unsupported).
+        val wireEnd = wireBytes()
+        val wireSettled = if (wireAtRamp >= 0) wireEnd - wireAtRamp else wireEnd - wireStart
+        val settledBytes = if (wireSettled > 0) wireSettled
+        else if (rampBytes >= 0) total.get() - rampBytes else total.get()
         val settledMs = if (rampBytes >= 0) (endedAt - rampAt) / 1_000_000 else elapsedMs
         val leg = Leg(total.get(), elapsedMs, peak, samples, latency, settledBytes, settledMs)
-        publish(ctx, prefix, phase, total.get(), started, System.nanoTime(), peak, maxBytes, seconds)
+        // endedAt, not "now": the summary must not re-introduce the tail this fix just removed.
+        publish(ctx, prefix, phase, total.get(), started, endedAt, peak, maxBytes, seconds, 0.0)
         val cap = phase.replaceFirstChar(Char::uppercase)
         ctx.variables.set("$prefix${cap}Avg", fmt(leg.averageMbps))
         ctx.variables.set("$prefix${cap}Peak", fmt(leg.peakMbps))
@@ -282,6 +334,52 @@ class SpeedTestAction : Action {
         leg
     }
 
+    private class Latency(val avgMs: Double, val minMs: Double, val jitterMs: Double, val lossPct: Int)
+
+    /**
+     * Round-trip time to the server we are about to measure against, as the TCP handshake: the time
+     * from SYN to SYN-ACK is one round trip, which is the quantity Ookla reports as "ping".
+     *
+     * NOT /system/bin/ping. A subprocess does not inherit bindProcessToNetwork, so it would time
+     * whatever the system default route is — on a cellular leg with WiFi still up, the wrong link
+     * entirely. This connects through the same pinned socket the transfer will use.
+     *
+     * Also NOT the same thing as %SPD_*Ms, which is time-to-first-byte: DNS + TCP + TLS + the server
+     * building a response. That figure is 250-320 ms here against Ookla's ~27 ms, and the two were
+     * never comparable — hence the 初byte label.
+     *
+     * DNS is resolved once, outside the timed loop, so a slow resolver cannot inflate the RTT.
+     */
+    private fun measureLatency(socketFor: () -> java.net.Socket, urlText: String, samples: Int = 5): Latency? {
+        val url = runCatching { URL(urlText) }.getOrNull() ?: return null
+        val port = if (url.port > 0) url.port else if (url.protocol == "https") 443 else 80
+        val address = runCatching { java.net.InetAddress.getByName(url.host) }.getOrNull() ?: return null
+        val rtts = mutableListOf<Double>()
+        var lost = 0
+        repeat(samples) {
+            val socket = runCatching { socketFor() }.getOrNull() ?: return@repeat
+            val startedAt = System.nanoTime()
+            val ok = runCatching {
+                socket.connect(java.net.InetSocketAddress(address, port), 2_000)
+                true
+            }.getOrDefault(false)
+            if (ok) rtts += (System.nanoTime() - startedAt) / 1_000_000.0 else lost++
+            runCatching { socket.close() }
+        }
+        if (rtts.isEmpty()) return Latency(0.0, 0.0, 0.0, 100)
+        val avg = rtts.average()
+        // Jitter as mean deviation from the mean, which is what ping's mdev reports.
+        val jitter = rtts.sumOf { kotlin.math.abs(it - avg) } / rtts.size
+        return Latency(avg, rtts.min(), jitter, lost * 100 / samples)
+    }
+
+    private fun publishLatency(ctx: ActionContext, prefix: String, latency: Latency?) {
+        ctx.variables.set("${prefix}Ping", latency?.let { fmt(it.avgMs) } ?: "")
+        ctx.variables.set("${prefix}PingMin", latency?.let { fmt(it.minMs) } ?: "")
+        ctx.variables.set("${prefix}PingJitter", latency?.let { fmt(it.jitterMs) } ?: "")
+        ctx.variables.set("${prefix}PingLoss", latency?.lossPct?.toString() ?: "")
+    }
+
     /** One connection's share of a leg. Throws if this endpoint cannot be used at all. */
     private suspend fun runStream(
         open: (URL) -> HttpURLConnection,
@@ -291,6 +389,7 @@ class SpeedTestAction : Action {
         maxBytes: Long,
         total: java.util.concurrent.atomic.AtomicLong,
         firstByte: java.util.concurrent.atomic.AtomicLong,
+        lastByteAt: java.util.concurrent.atomic.AtomicLong,
     ) {
         val target = if (phase == "up") resolveRedirects(open, urlText) else urlText
         val conn = open(URL(target))
@@ -312,10 +411,22 @@ class SpeedTestAction : Action {
                     out.write(buffer)
                     firstByte.compareAndSet(0L, System.nanoTime())
                     total.addAndGet(buffer.size.toLong())
+                    lastByteAt.set(System.nanoTime())
                 }
-                out.flush()
-                runCatching { out.close() }
-                runCatching { conn.responseCode }
+                // Only finish the request politely if the loop ended on its own terms. Past the
+                // deadline the socket buffer still has to drain, out.close() blocks until it has and
+                // responseCode then waits for the server on top: 白い熊 measured 12 s of that after a
+                // 10 s leg, the overlay sitting at 0 while the average fell. Nothing measurable happens
+                // in it, so the connection is dropped instead — finally { conn.disconnect() } tears it
+                // down. The bytes still in the buffer were never on the wire and must not be counted
+                // either; that is what the TrafficStats measurement below is for.
+                if (currentCoroutineContext().isActive && !SpeedTestCancel.isRequested &&
+                    System.nanoTime() < deadline
+                ) {
+                    out.flush()
+                    runCatching { out.close() }
+                    runCatching { conn.responseCode }
+                }
             } else {
                 var code = conn.responseCode
                 var hops = 0
@@ -342,6 +453,7 @@ class SpeedTestAction : Action {
                     val read = input.read(buffer)
                     if (read < 0) break
                     total.addAndGet(read.toLong())
+                    lastByteAt.set(System.nanoTime())
                 }
                 runCatching { input.close() }
             }
@@ -432,6 +544,7 @@ class SpeedTestAction : Action {
         peak: Double,
         maxBytes: Long,
         seconds: Double,
+        instant: Double,
     ) {
         val elapsedMs = (nowNs - startedNs) / 1_000_000
         val avg = if (elapsedMs <= 0) 0.0 else total * 8.0 / elapsedMs / 1000.0
@@ -440,10 +553,14 @@ class SpeedTestAction : Action {
         val byPct = total.toDouble() / maxBytes
         val byTime = (nowNs - startedNs) / (seconds * 1_000_000_000L)
         ctx.variables.set("${prefix}Phase", phase)
-        ctx.variables.set("${prefix}Cur", fmt(avg))
+        ctx.variables.set("${prefix}Arrow", arrowFor(phase))
+        // Cur is the speedometer: throughput over the last sample window only. It used to be set to
+        // the SAME cumulative mean as Avg, so the headline could only ever decay — which is why an
+        // upload appeared to start near the download's closing figure and fall from there.
+        ctx.variables.set("${prefix}Cur", fmt(instant))
         ctx.variables.set("${prefix}Avg", fmt(avg))
         ctx.variables.set("${prefix}Peak", fmt(peak))
-        ctx.variables.set("${prefix}CurMB", mb(avg))
+        ctx.variables.set("${prefix}CurMB", mb(instant))
         ctx.variables.set("${prefix}AvgMB", mb(avg))
         ctx.variables.set("${prefix}PeakMB", mb(peak))
         ctx.variables.set("${prefix}Mb", fmt(total / 1_000_000.0))
@@ -453,6 +570,7 @@ class SpeedTestAction : Action {
 
     private fun publishSummary(ctx: ActionContext, prefix: String, down: Leg?, up: Leg?) {
         ctx.variables.set("${prefix}Phase", "done")
+        ctx.variables.set("${prefix}Arrow", "")
         ctx.variables.set("${prefix}Pct", "100")
         ctx.variables.set("${prefix}Samples", ((down?.samples ?: 0) + (up?.samples ?: 0)).toString())
         ctx.variables.set("${prefix}Ms", (down?.latencyMs ?: up?.latencyMs ?: 0L).toString())
@@ -508,6 +626,17 @@ class SpeedTestAction : Action {
         if (nanos <= 0) 0.0 else bytes * 8.0 * 1000.0 / nanos
 
     private fun fmt(value: Double): String = String.format(java.util.Locale.US, "%.2f", value)
+
+    /**
+     * The direction glyph the live overlay shows next to the speed, so which way is being
+     * measured reads at a glance instead of from a small "down"/"up" word. Empty between
+     * legs and once the run ends — an arrow with no transfer behind it would be a lie.
+     */
+    private fun arrowFor(phase: String): String = when (phase) {
+        "down" -> "↓"
+        "up" -> "↑"
+        else -> ""
+    }
 
     /** Megabits/s → 1024-based megabytes/s (MiB/s), the unit 白い熊 reads speeds in. */
     private fun mb(mbps: Double): String = fmt(mbps * 1_000_000.0 / 8.0 / 1_048_576.0)

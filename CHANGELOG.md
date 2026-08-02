@@ -89,6 +89,123 @@ This lists what the fork adds; upstream's own history lives in the OpenTasker re
 - **Quick Settings tiles**: added four active per-task tile slots with long-press configuration, persistent task/label/subtitle/icon/state settings, direct task dispatch, slot-aware tile events, and a functional `tile.set` action.
 
 - **Visual system**: the command-center shell now uses a calmer sage/graphite palette, larger readable type, tighter spacing tokens, compact headers, border-light navigation, and text-led status indicators. Profile/task summaries and action/context rows rely on grouping and hairline rhythm instead of nested outlined boxes. The nine-page redesign reference is preserved at `design/mockups/opentasker-command-center-v2.png`.
+## 0.2.79.2026-08-02.g915979d9+025 — 2026-08-02
+
+**接続 — measuring real throughput on each SIM.** 白い熊's speed varies by location, and the phone
+carries two SIMs (slot 0 T-Mobile, slot 1 O₂). This release is the engine behind a workspace project
+that measures download, upload and latency per SIM and over WiFi, shows it live, and reports it. It
+spans builds `+005`–`+025`; the measurement was wrong for most of them, and the corrections are the
+most interesting part of the story.
+
+### Speed testing, shaped like Ookla's
+
+`net.speedtest` pins one transport with `ConnectivityManager.requestNetwork` and runs the transfer on
+that network. Each leg is bounded by the **clock**, not by bytes: `seconds` (default 10) decides, and
+`max_mb` is only a runaway guard. A byte cap that binds first ends the leg inside TCP slow-start —
+a 5 MB cap finished in 0.28 s and produced a single sample. Eight parallel streams by default, because
+one TCP stream is bounded by `window / RTT` and under-reports a fast link. The first `ramp_ms` (2 s) is
+excluded from the headline average and kept separately in `%SPD_*Raw`.
+
+Endpoints are discovered at run time from Ookla's server list, ordered by distance from the client IP,
+so "pick a nearby server" is answered by the source of truth rather than guessed. Those servers
+307-redirect `http`→`https` and `HttpURLConnection` silently refuses cross-protocol redirects, so the
+download follows hops by hand and the upload pre-resolves its final URL with a zero-length probe — a
+body already streaming cannot be replayed at a new location. `%SPD_*Fallback` is non-empty whenever a
+figure came from a fallback endpoint and is therefore not comparable with the others; a throttled
+mirror silently carried three early runs and made them look like 白い熊's link.
+
+Cloudflare's `/__down` is deliberately absent: it answers 403 to non-browser clients. It backs their
+web speed test and was never a public API, and sending browser headers to get past that would be
+impersonating one against an endpoint free to start refusing again.
+
+### Switching the data SIM without root
+
+`sim.data.set` and `sim.list` address SIMs **by slot, never by subscription id** — this phone carries
+five subIds for two physical SIMs, stale entries from earlier insertions, so a hardcoded subId breaks
+on re-insertion. The switch goes through a Shizuku UserService calling `ISub.setDefaultDataSubId`;
+shell holds `MODIFY_PHONE_STATE`, and Shizuku runs as shell. `cmd phone` has no data-sub subcommand,
+and `settings put global multi_sim_data_call` only mirrors the choice rather than driving it.
+
+Shizuku UserServices are instantiated **by name**, so they need R8 keep rules. Without one,
+`bindUserService` returns a null binder and the only symptom is a message about the privileged
+telephony bridge failing to start.
+
+### Cancelling a run now actually stops it
+
+The cancel button was reached through a scene tap, and it did nothing useful. Two faults, either of
+which was enough on its own:
+
+- The transfer's stream loop checks the cancel flag on every buffer — but the fallback beneath it,
+  `if (!served) runStream(…)`, exists to guarantee one stream when the deadline has already passed and
+  it fired on **cancel** too. All eight workers therefore opened a connection and ran a full stream
+  *after* the tap. A cancel during download also rolled straight on into the upload leg's URL
+  resolution and connection setup. Measured tap-to-stop fell from ~12 s to **194 ms**.
+- `接続 -- 中止` restored the SIM before WiFi, unguarded. Cancelling with no run in flight handed
+  `sim.data.set` an empty slot; the action failed, the task aborted on it, and the WiFi restore —
+  sitting after it — never ran. The cancel button could leave the phone with WiFi off, which is the
+  one state that costs a chat its route back to the device. WiFi is restored first now, and every
+  step between "WiFi off" and that restore is non-fatal.
+
+### What the upload was really measuring
+
+白い熊 noticed uploads starting near the download's closing figure and falling away, then continuing to
+fall for several seconds after the progress bar reached 100 %. That instinct was right, and it turned
+out to be three separate faults:
+
+- **The measured window ran until the workers returned.** Past the deadline an upload worker still
+  flushes its socket buffer, closes the stream and waits for the server's HTTP response — seconds in
+  which no bytes are counted while the clock advances. On a 10 s leg a 5 s tail understates the result
+  by a third, which was the whole of the upload's long-standing gap against Ookla. The window now ends
+  at the last counted byte.
+- **The leg did not stop at the deadline either** — 12 s of draining after a 10 s leg, sitting at zero.
+  Nothing measurable happens there, so the connection is dropped instead.
+- **Bytes counted as sent when `write()` returned**, i.e. on entering the kernel's socket buffer rather
+  than on reaching the wire, so whatever was still buffered counted as delivered. Throughput now comes
+  from the kernel's own per-UID counters, which advance only when bytes leave the interface.
+
+`%SPD_Cur` was also being set to the same cumulative mean as `%SPD_Avg`, so the live headline could only
+ever decay — exactly the behaviour that looked like bleed from the previous leg. It is a true
+instantaneous rate now.
+
+Against a same-hour Ookla reference on T-Mobile (192 / 58.4 Mb/s) the fork reads 163.82 / 66.39: −15 %
+and +14 %, in opposite directions, which is variance between two runs rather than bias. Upload had been
+−64 %. Part of the residual is honest accounting — the kernel counters include TCP/IP headers, which
+Ookla's payload figure does not.
+
+### Latency is a round trip again
+
+`%SPD_*Ms` is time-to-first-byte: DNS, TCP, TLS and the server composing a response. It read 250–320 ms
+against Ookla's ~27 ms, and the two were never comparable — hence its 初byte label. `net.speedtest` now
+also measures the **TCP handshake** to the server the leg is about to use, five samples, before the
+transfer while the link is idle; measuring under load would report bufferbloat instead. SYN to SYN-ACK
+is one round trip, which is the quantity Ookla reports. Published as `%SPD_Ping` with min, jitter and
+loss beside it. Measured: Wi-Fi 5.92 ms, T-Mobile 22.72 ms, O₂ 30.89 ms — against 83 / 284 / 273 of
+初byte on the same run.
+
+It is deliberately **not** `/system/bin/ping`: a subprocess does not inherit `bindProcessToNetwork`, so
+on a cellular leg it would time whatever the system default route is rather than the SIM under test.
+
+### Scenes: shape colours, and a direction that reads at a glance
+
+`RECTANGLE` and `OVAL` read their fill straight from the raw config map while every other element type
+goes through the expander, so a colour given as a `%variable` stayed a literal string, `sceneColor()`
+returned null, and the shape drew **nothing** — while a literal-coloured sibling in the same icon
+rendered fine, which made it read as a layout bug. Fixed, and it repairs variable-coloured shapes
+across the whole workspace, not only in 接続.
+
+`net.speedtest` also publishes `%SPD_Arrow` — `↓` while downloading, `↑` while uploading, and empty the
+moment a run ends or is cancelled, so an overlay can never show a direction with no transfer behind it.
+A scene cannot branch on a variable and the phase only exists while the action runs, so this had to come
+from the engine.
+
+### Per-network binding, and why WiFi has to be switched off
+
+`requestNetwork(TRANSPORT_CELLULAR)` succeeds on this device and a cellular network does come up while
+WiFi stays connected — but using it fails with `EPERM` when binding the socket, confirmed both
+per-connection and process-wide. Both code paths are kept, process-binding preferred, so this works
+unchanged on a device that permits either; but on 白い熊's phone a SIM can only be measured while it is
+the default route. The workspace therefore saves WiFi state, switches it off, and restores it.
+
 ## 0.2.79.2026-08-02.g915979d9+004 — 2026-08-02
 
 **Rebased onto upstream `915979d9`** — ten upstream commits that never bumped upstream's own version,
