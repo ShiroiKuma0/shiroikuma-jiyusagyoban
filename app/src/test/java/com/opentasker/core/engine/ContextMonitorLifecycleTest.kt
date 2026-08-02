@@ -160,6 +160,15 @@ class ContextMonitorLifecycleTest {
         assertFalse("Inspector must not start the shake sensor", "ShakeDetector" in source)
     }
 
+    @Test
+    fun contextInspectorCollectorsFollowVisibleScreenLifecycle() {
+        val source = sourceFile("com/opentasker/ui/screens/ContextInspectorScreen.kt").readText()
+
+        assertTrue("Inspector must expose an explicit visible-state start", "fun startObserving()" in source)
+        assertTrue("Inspector must stop collectors when the screen leaves composition", "onDispose { viewModel.stopObserving() }" in source)
+        assertTrue("Inspector must surface age-aware observation state", "observationStatus(nowMs)" in source)
+    }
+
     private fun profile(id: Long, vararg contexts: ContextSpec): Profile = Profile(
         id = id,
         name = "P$id",

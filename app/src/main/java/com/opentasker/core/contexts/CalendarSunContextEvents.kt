@@ -7,33 +7,49 @@ import android.content.pm.PackageManager
 import android.provider.CalendarContract
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
+import java.util.concurrent.ConcurrentHashMap
+import java.util.Locale
+
+private const val MILLIS_PER_MINUTE = 60_000L
 
 object CalendarSunContextEvents {
-    fun events(app: Context): Flow<ContextEvent> = callbackFlow {
-        var lastMinute = -1L
-        val tickJob = launch(Dispatchers.IO) {
-            while (isActive) {
-                val now = System.currentTimeMillis()
-                val minute = now / MILLIS_PER_MINUTE
-                if (minute != lastMinute) {
-                    lastMinute = minute
-                    buildCalendarEvent(app, now).forEach { trySend(it) }
-                    trySend(buildSunTick(now))
-                }
-                delay(1_000)
-            }
-        }
+    private val buses = ConcurrentHashMap<String, CalendarSunEventBus>()
 
-        awaitClose { tickJob.cancel() }
+    /**
+     * Returns one shared, demand-counted stream per application process. The default is used by
+     * the Context Inspector and intentionally observes both families; matchers pass their exact
+     * event name so unrelated profiles do not start calendar reads or sun wakeups.
+     */
+    fun events(app: Context, requestedEvent: String? = null): Flow<ContextEvent> =
+        busFor(app).events(demandFor(requestedEvent))
+
+    internal fun demandFor(requestedEvent: String?): CalendarSunDemand = when {
+        requestedEvent == null || requestedEvent.isBlank() -> CalendarSunDemand.ALL
+        requestedEvent.trim().equals("calendar", ignoreCase = true) -> CalendarSunDemand.CALENDAR
+        requestedEvent.trim().lowercase(Locale.US) in SUN_EVENTS -> CalendarSunDemand.SUN
+        else -> CalendarSunDemand.NONE
     }
+
+    private fun busFor(app: Context): CalendarSunEventBus {
+        val application = app.applicationContext ?: app
+        return buses.computeIfAbsent(application.packageName) { CalendarSunEventBus(application) }
+    }
+
+    private val SUN_EVENTS = setOf("sun_tick", "sunrise", "sunset")
 
     internal fun buildCalendarEvent(app: Context, nowMs: Long): List<ContextEvent> {
         if (!hasCalendarPermission(app)) {
@@ -198,10 +214,94 @@ object CalendarSunContextEvents {
         CalendarContract.Instances.AVAILABILITY,
     )
 
-    private const val MILLIS_PER_MINUTE = 60_000L
     private const val DEFAULT_LOOKAHEAD_MILLIS = 24L * 60L * MILLIS_PER_MINUTE
     private const val DEFAULT_BEFORE_WINDOW_MINUTES = 30
     private const val MAX_CALENDAR_NAME_CHARS = 80
+}
+
+internal enum class CalendarSunDemand {
+    NONE,
+    CALENDAR,
+    SUN,
+    ALL;
+
+    val includesCalendar: Boolean
+        get() = this == CALENDAR || this == ALL
+
+    val includesSun: Boolean
+        get() = this == SUN || this == ALL
+}
+
+/** One producer loop shared by all engine matchers and the visible Context Inspector. */
+private class CalendarSunEventBus(
+    private val app: Context,
+) {
+    private val events = MutableSharedFlow<ContextEvent>(extraBufferCapacity = 32)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val demandCounts = mutableMapOf<CalendarSunDemand, Int>()
+    private var producerJob: Job? = null
+
+    fun events(demand: CalendarSunDemand): Flow<ContextEvent> = callbackFlow {
+        val forwardJob = launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            events.collect { event -> send(event) }
+        }
+        addDemand(demand)
+
+        awaitClose {
+            forwardJob.cancel()
+            removeDemand(demand)
+        }
+    }
+
+    @Synchronized
+    private fun addDemand(demand: CalendarSunDemand) {
+        demandCounts[demand] = demandCounts.getOrDefault(demand, 0) + 1
+        if (demand != CalendarSunDemand.NONE && producerJob == null) {
+            producerJob = scope.launch { produce() }
+        }
+    }
+
+    @Synchronized
+    private fun removeDemand(demand: CalendarSunDemand) {
+        val remaining = (demandCounts[demand] ?: 0) - 1
+        if (remaining > 0) demandCounts[demand] = remaining else demandCounts.remove(demand)
+        if (activeDemand() == CalendarSunDemand.NONE) {
+            producerJob?.cancel()
+            producerJob = null
+        }
+    }
+
+    @Synchronized
+    private fun activeDemand(): CalendarSunDemand {
+        val hasCalendar = demandCounts.any { it.key.includesCalendar && it.value > 0 }
+        val hasSun = demandCounts.any { it.key.includesSun && it.value > 0 }
+        return when {
+            hasCalendar && hasSun -> CalendarSunDemand.ALL
+            hasCalendar -> CalendarSunDemand.CALENDAR
+            hasSun -> CalendarSunDemand.SUN
+            else -> CalendarSunDemand.NONE
+        }
+    }
+
+    private suspend fun produce() {
+        var lastMinute = -1L
+        var lastDemand = CalendarSunDemand.NONE
+        while (currentCoroutineContext().isActive) {
+            val now = System.currentTimeMillis()
+            val demand = activeDemand()
+            if (demand == CalendarSunDemand.NONE) return
+            val minute = now / MILLIS_PER_MINUTE
+            if (minute != lastMinute || demand != lastDemand) {
+                if (demand.includesCalendar) {
+                    CalendarSunContextEvents.buildCalendarEvent(app, now).forEach(events::tryEmit)
+                }
+                if (demand.includesSun) events.tryEmit(CalendarSunContextEvents.buildSunTick(now))
+                lastMinute = minute
+                lastDemand = demand
+            }
+            delay(1_000)
+        }
+    }
 }
 
 data class CalendarInstance(

@@ -3,6 +3,7 @@ package com.opentasker.core.engine
 import android.content.Context
 import com.opentasker.core.contexts.ContextMatchEvaluator
 import com.opentasker.core.contexts.ContextSourceRegistry
+import com.opentasker.core.contexts.EventDemandContextSource
 import com.opentasker.core.contexts.SubscriptionReadyContextSource
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.logging.AppLogger
@@ -54,7 +55,11 @@ class ProfileMatcher(
             val source = sourceType?.let(ContextSourceRegistry::get)
             if (source != null) {
                 val isPulseContext = spec.type == ContextType.EVENT
-                val sourceEvents = if (isPulseContext && source is SubscriptionReadyContextSource) {
+                val sourceEvents = if (isPulseContext && source is EventDemandContextSource) {
+                    source.events(app, spec.config["event"]) {
+                        markPulseContextSubscribed(index, pulseContextCount)
+                    }
+                } else if (isPulseContext && source is SubscriptionReadyContextSource) {
                     source.events(app) { markPulseContextSubscribed(index, pulseContextCount) }
                 } else {
                     if (isPulseContext) markPulseContextSubscribed(index, pulseContextCount)

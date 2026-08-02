@@ -26,6 +26,26 @@ interface SubscriptionReadyContextSource : ContextSource {
     override fun events(app: Context): Flow<ContextEvent> = events(app) {}
 }
 
+/**
+ * A pulse source whose upstream work can be narrowed to the event requested by one matcher.
+ *
+ * This keeps shared producers demand-gated: a calendar-only profile must not make a sun ticker
+ * wake up, and an NFC-only profile must not make CalendarProvider queries.
+ */
+interface EventDemandContextSource : SubscriptionReadyContextSource {
+    fun events(
+        app: Context,
+        requestedEvent: String?,
+        onSubscribed: () -> Unit,
+    ): Flow<ContextEvent>
+
+    override fun events(app: Context): Flow<ContextEvent> =
+        events(app, requestedEvent = null, onSubscribed = {})
+
+    override fun events(app: Context, onSubscribed: () -> Unit): Flow<ContextEvent> =
+        events(app, requestedEvent = null, onSubscribed = onSubscribed)
+}
+
 object ContextSourceRegistry {
     private val byType = Collections.synchronizedMap(mutableMapOf<String, ContextSource>())
 

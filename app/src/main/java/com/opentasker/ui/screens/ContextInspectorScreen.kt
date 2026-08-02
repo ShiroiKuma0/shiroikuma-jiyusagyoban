@@ -32,6 +32,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -51,11 +52,13 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.opentasker.core.contexts.ContextEventObservation
 import com.opentasker.core.contexts.ContextInspectionSnapshot
+import com.opentasker.core.contexts.ContextObservationStatus
 import com.opentasker.core.contexts.ContextSourceRegistry
 import com.opentasker.core.contexts.ContextSourceSnapshot
 import com.opentasker.core.contexts.ContextSourceStatus
 import com.opentasker.core.contexts.ProfileInspection
 import com.opentasker.core.contexts.inspectProfiles
+import com.opentasker.core.contexts.observationStatus
 import com.opentasker.core.contexts.toContextSourceLabel
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.location.LocationPolicyDisclosures
@@ -67,6 +70,7 @@ import com.opentasker.core.scheduling.ExactAlarmSupport
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.StorageDecodeIssue
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -89,6 +93,8 @@ class ContextInspectorViewModel(
     private val latestEvents = MutableStateFlow<Map<String, ContextEventObservation>>(emptyMap())
     private val sourceErrors = MutableStateFlow<Map<String, String>>(emptyMap())
     private val refreshTick = MutableStateFlow(clock())
+    private val sourceCollectorJobs = mutableMapOf<String, Job>()
+    private var refreshJob: Job? = null
     private val locationDwellStateStore = LocationDwellStateStore(appContext, clock)
 
     private val profileDecodeResults = db.profileDao()
@@ -130,24 +136,16 @@ class ContextInspectorViewModel(
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyContextInspectionSnapshot(clock()))
 
-    init {
-        startSourceCollectors()
-        viewModelScope.launch {
-            while (isActive) {
-                delay(5_000)
-                refresh()
-            }
-        }
-    }
-
     fun refresh() {
         refreshTick.value = clock()
     }
 
-    private fun startSourceCollectors() {
+    /** Start only while the inspector is visible; the shared event bus then has real demand. */
+    fun startObserving() {
+        if (sourceCollectorJobs.values.any(Job::isActive)) return
         requiredContextSourceKeys().forEach { key ->
             val source = ContextSourceRegistry.get(key) ?: return@forEach
-            viewModelScope.launch {
+            sourceCollectorJobs[key] = viewModelScope.launch {
                 source.events(appContext)
                     .catch { error ->
                         sourceErrors.update { current ->
@@ -163,7 +161,30 @@ class ContextInspectorViewModel(
                     }
             }
         }
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
+            while (isActive) {
+                delay(5_000)
+                refresh()
+            }
+        }
     }
+
+    fun stopObserving() {
+        sourceCollectorJobs.values.forEach(Job::cancel)
+        sourceCollectorJobs.clear()
+        refreshJob?.cancel()
+        refreshJob = null
+        latestEvents.value = emptyMap()
+        sourceErrors.value = emptyMap()
+        refresh()
+    }
+
+    override fun onCleared() {
+        stopObserving()
+        super.onCleared()
+    }
+
 }
 
 class ContextInspectorViewModelFactory(
@@ -190,6 +211,11 @@ fun ContextInspectorScreen(
     val viewModel: ContextInspectorViewModel = viewModel(factory = factory)
     val snapshot by viewModel.snapshot.collectAsState()
     val storageDecodeIssues by viewModel.storageDecodeIssues.collectAsState()
+
+    DisposableEffect(viewModel) {
+        viewModel.startObserving()
+        onDispose { viewModel.stopObserving() }
+    }
 
     if (snapshot.sources.isEmpty() && snapshot.profiles.isEmpty() && storageDecodeIssues.isEmpty()) {
         InspectorEmptyState(contentPadding)
@@ -304,6 +330,7 @@ private fun ContextInspectorSummaryCard(
 @Composable
 private fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
     val color = sourceStatusColor(source.status)
+    val observationStatus = source.observationStatus(nowMs)
     val observation = source.lastObservation
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -332,6 +359,10 @@ private fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
                     )
                 }
                 InspectorStatusPill(source.status.label, color)
+                InspectorStatusPill(
+                    observationStatus.label,
+                    observationStatusColor(observationStatus),
+                )
             }
             source.setupDetail?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -597,6 +628,14 @@ private fun sourceStatusColor(status: ContextSourceStatus): Color = when (status
     ContextSourceStatus.NeedsSetup,
     ContextSourceStatus.Missing,
     ContextSourceStatus.Error -> MaterialTheme.colorScheme.error
+}
+
+@Composable
+private fun observationStatusColor(status: ContextObservationStatus): Color = when (status) {
+    ContextObservationStatus.Ready -> MaterialTheme.colorScheme.tertiary
+    ContextObservationStatus.Loading -> MaterialTheme.colorScheme.secondary
+    ContextObservationStatus.Stale -> MaterialTheme.colorScheme.onSurfaceVariant
+    ContextObservationStatus.Error -> MaterialTheme.colorScheme.error
 }
 
 private fun sourceStatusIcon(status: ContextSourceStatus) = when (status) {

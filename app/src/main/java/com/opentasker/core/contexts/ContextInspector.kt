@@ -20,6 +20,14 @@ enum class ContextSourceStatus(val label: String) {
     Error("Error"),
 }
 
+/** Health of the latest observation, independent of whether the source itself needs setup. */
+enum class ContextObservationStatus(val label: String) {
+    Loading("Loading"),
+    Ready("Ready"),
+    Stale("Stale"),
+    Error("Error"),
+}
+
 data class ContextEventObservation(
     val event: ContextEvent,
     val observedAtMs: Long,
@@ -234,3 +242,18 @@ private fun contextReason(
         else -> "Latest value does not satisfy the configuration."
     }
 }
+
+fun ContextSourceSnapshot.observationStatus(
+    nowMs: Long,
+    staleAfterMs: Long = CONTEXT_OBSERVATION_STALE_AFTER_MS,
+): ContextObservationStatus = when {
+    error != null -> ContextObservationStatus.Error
+    lastObservation == null -> ContextObservationStatus.Loading
+    observationAgeMs(nowMs)?.let { it > staleAfterMs } == true -> ContextObservationStatus.Stale
+    else -> ContextObservationStatus.Ready
+}
+
+fun ContextSourceSnapshot.observationAgeMs(nowMs: Long): Long? =
+    lastObservation?.let { (nowMs - it.observedAtMs).coerceAtLeast(0L) }
+
+internal const val CONTEXT_OBSERVATION_STALE_AFTER_MS = 5 * 60_000L

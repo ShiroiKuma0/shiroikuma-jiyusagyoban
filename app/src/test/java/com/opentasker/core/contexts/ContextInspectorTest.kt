@@ -10,6 +10,24 @@ import org.junit.Test
 
 class ContextInspectorTest {
     @Test
+    fun observationHealthExposesLoadingReadyStaleAndErrorWithAge() {
+        val loading = ContextSourceSnapshot(key = "event", label = "System event", registered = true)
+        val ready = loading.copy(
+            lastObservation = ContextEventObservation(
+                ContextEvent("event", true, mapOf("event" to "calendar")),
+                observedAtMs = 100_000L,
+            ),
+        )
+        val error = loading.copy(error = "source stopped")
+
+        assertEquals(ContextObservationStatus.Loading, loading.observationStatus(100_000L))
+        assertEquals(ContextObservationStatus.Ready, ready.observationStatus(110_000L))
+        assertEquals(10_000L, ready.observationAgeMs(110_000L))
+        assertEquals(ContextObservationStatus.Stale, ready.observationStatus(100_000L + CONTEXT_OBSERVATION_STALE_AFTER_MS + 1))
+        assertEquals(ContextObservationStatus.Error, error.observationStatus(100_000L))
+    }
+
+    @Test
     fun profileInspectionMatchesWhenAllContextsMatchLatestValues() {
         val profile = Profile(
             id = 1,

@@ -24,11 +24,15 @@ import kotlinx.coroutines.launch
  *   - "boot_completed": manifest boot receiver restarted the engine
  *   - "tile_clicked": Quick Settings tile toggled
  */
-class EventContextSourceImpl : SubscriptionReadyContextSource {
+class EventContextSourceImpl : EventDemandContextSource {
     override val type = "event"
 
-    override fun events(app: Context, onSubscribed: () -> Unit): Flow<ContextEvent> = channelFlow {
-        val collectors = eventFlows(app).map { upstream ->
+    override fun events(
+        app: Context,
+        requestedEvent: String?,
+        onSubscribed: () -> Unit,
+    ): Flow<ContextEvent> = channelFlow {
+        val collectors = eventFlows(app, requestedEvent).map { upstream ->
             launch(start = CoroutineStart.UNDISPATCHED) {
                 upstream.collect { event -> send(event) }
             }
@@ -40,7 +44,7 @@ class EventContextSourceImpl : SubscriptionReadyContextSource {
         awaitClose { collectors.forEach { it.cancel() } }
     }
 
-    private fun eventFlows(app: Context): List<Flow<ContextEvent>> = listOf(
+    private fun eventFlows(app: Context, requestedEvent: String?): List<Flow<ContextEvent>> = listOf(
         // Keep service-owned pulse bridges first so onSubscribed is a strict producer barrier.
         ShakeContextEvents.events,
         CameraMicContextEvents.flow,
@@ -49,7 +53,7 @@ class EventContextSourceImpl : SubscriptionReadyContextSource {
         NotificationContextEvents.events,
         NfcContextEvents.events,
         BootContextEvents.events,
-        CalendarSunContextEvents.events(app),
+        CalendarSunContextEvents.events(app, requestedEvent = requestedEvent),
         LocalePluginRequestQueryEvents.events(app),
         QuickSettingsTileContextEvents.events,
     )

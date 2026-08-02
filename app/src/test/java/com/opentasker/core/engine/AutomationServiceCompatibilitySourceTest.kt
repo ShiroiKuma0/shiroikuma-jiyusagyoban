@@ -52,7 +52,7 @@ class AutomationServiceCompatibilitySourceTest {
         assertTrue("Camera/mic AppOps events must reach event-context matchers", source.contains("CameraMicContextEvents.flow"))
         assertTrue(
             "Event monitor startup must wait until the event source is subscribed",
-            source.contains("SubscriptionReadyContextSource") && source.contains("onSubscribed()"),
+            source.contains("EventDemandContextSource") && source.contains("onSubscribed()"),
         )
     }
 }

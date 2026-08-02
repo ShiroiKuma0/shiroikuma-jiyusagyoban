@@ -9,6 +9,16 @@ import java.time.ZoneOffset
 
 class CalendarSunContextEventsTest {
     @Test
+    fun eventDemandOnlyWakesTheRequiredCalendarOrSunProducer() {
+        assertEquals(CalendarSunDemand.ALL, CalendarSunContextEvents.demandFor(null))
+        assertEquals(CalendarSunDemand.ALL, CalendarSunContextEvents.demandFor(""))
+        assertEquals(CalendarSunDemand.CALENDAR, CalendarSunContextEvents.demandFor("calendar"))
+        assertEquals(CalendarSunDemand.SUN, CalendarSunContextEvents.demandFor("sunrise"))
+        assertEquals(CalendarSunDemand.SUN, CalendarSunContextEvents.demandFor("sun_tick"))
+        assertEquals(CalendarSunDemand.NONE, CalendarSunContextEvents.demandFor("nfc"))
+    }
+
+    @Test
     fun selectCalendarEventPrefersActiveBusyEventAndRedactsTitle() {
         val now = epochMillis(2026, 5, 5, 14, 0)
         val event = CalendarSunContextEvents.selectCalendarEvent(
