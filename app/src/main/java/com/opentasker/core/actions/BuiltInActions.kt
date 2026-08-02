@@ -1,10 +1,14 @@
 package com.opentasker.core.actions
 
 import android.Manifest
+import android.app.Activity
+import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -328,36 +332,155 @@ class WaitAction : Action {
 }
 
 /**
- * Intent launch action.
+ * Bounded activity, broadcast, and service intent dispatch.
  *
  * Args:
  *   - "package": target package
- *   - "action": intent action (optional, defaults to MAIN)
+ *   - "mode": activity, broadcast, or service (defaults to activity)
+ *   - "component": explicit class for a broadcast/service and approved external target
+ *   - "action": intent action (optional for activity/component dispatch)
  *   - "category": intent category (optional)
+ *   - "uri", "mime_type": bounded data URI and MIME type
+ *   - "flags": comma-separated allowlisted flag names
+ *   - "extras": key=string:value, key=int:value, or key=bool:value lines
+ *   - "result_variable": ordered-broadcast result code destination
  */
 class LaunchIntentAction : Action {
     override val id = "intent.launch"
     override val category = ActionCategory.APP
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val pkg = args["package"] ?: return ActionResult.Failure("missing package")
-        val action = args["action"]?.ifBlank { null }
-        val category = args["category"]?.ifBlank { null }
+        val plan = when (val parsed = IntentDispatchPolicy.parse(args)) {
+            is IntentDispatchParseResult.Valid -> parsed.plan
+            is IntentDispatchParseResult.Invalid -> return ActionResult.Failure(parsed.message)
+        }
         return try {
-            val intent = if (action == null) {
-                ctx.app.packageManager.getLaunchIntentForPackage(pkg)
-                    ?: return ActionResult.Failure("app not found: $pkg")
-            } else {
-                Intent(action).setPackage(pkg)
-            }.apply {
-                category?.let(::addCategory)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val intent = buildIntent(ctx, plan)
+                ?: return ActionResult.Failure("target component was not found or is not exported")
+            applyIntentPayload(intent, plan)
+            val dispatchResult = when (plan.mode) {
+                IntentDispatchMode.ACTIVITY -> ctx.app.startActivity(intent)
+                IntentDispatchMode.BROADCAST -> if (plan.resultVariable == null) {
+                    ctx.app.sendBroadcast(intent)
+                } else {
+                    sendOrderedBroadcast(ctx, intent, plan.resultVariable)
+                }
+                IntentDispatchMode.SERVICE -> ctx.app.startService(intent)
             }
-            ctx.app.startActivity(intent)
-            ctx.logger("Intent launch: $pkg")
-            ActionResult.Success
+            ctx.logger("Intent ${plan.mode.name.lowercase()} dispatch: ${plan.packageName}")
+            if (dispatchResult is ActionResult.Failure) dispatchResult else ActionResult.Success
         } catch (ex: Exception) {
-            ActionResult.Failure("intent launch failed: ${ex.message}", ex)
+            ActionResult.Failure("intent ${plan.mode.name.lowercase()} dispatch failed: ${ex.message}", ex)
+        }
+    }
+
+    private fun buildIntent(ctx: ActionContext, plan: IntentDispatchPlan): Intent? {
+        val packageManager = ctx.app.packageManager
+        val explicitComponent = plan.componentClassName?.let { ComponentName(plan.packageName, it) }
+        val intent = if (plan.mode == IntentDispatchMode.ACTIVITY && plan.action == null && explicitComponent == null) {
+            packageManager.getLaunchIntentForPackage(plan.packageName)
+                ?: return null
+        } else {
+            Intent().apply {
+                plan.action?.let(::setAction)
+                setPackage(plan.packageName)
+            }
+        }.apply {
+            explicitComponent?.let(::setComponent)
+        }
+
+        val component = intent.component ?: when (plan.mode) {
+            IntentDispatchMode.ACTIVITY -> intent.resolveActivity(packageManager)
+            IntentDispatchMode.BROADCAST, IntentDispatchMode.SERVICE -> null
+        }
+        if (plan.mode != IntentDispatchMode.ACTIVITY && component == null) return null
+        if (component != null) {
+            if (component.packageName != plan.packageName) return null
+            if (component.packageName != ctx.app.packageName && !isExported(packageManager, plan.mode, component)) {
+                return null
+            }
+            intent.component = component
+        }
+        if (plan.mode != IntentDispatchMode.ACTIVITY && plan.packageName != ctx.app.packageName) {
+            // Broadcasts and services never use an external package-scoped implicit dispatch.
+            if (explicitComponent == null) return null
+        }
+        if (plan.mode == IntentDispatchMode.ACTIVITY && plan.action != null &&
+            plan.packageName != ctx.app.packageName && explicitComponent == null
+        ) {
+            // A package plus arbitrary action is not an approval of a particular exported
+            // component; require the user to choose the class explicitly.
+            return null
+        }
+        return intent
+    }
+
+    private fun isExported(
+        packageManager: PackageManager,
+        mode: IntentDispatchMode,
+        component: ComponentName,
+    ): Boolean = runCatching {
+        when (mode) {
+            IntentDispatchMode.ACTIVITY -> packageManager.getActivityInfo(component, 0).exported
+            IntentDispatchMode.BROADCAST -> packageManager.getReceiverInfo(component, 0).exported
+            IntentDispatchMode.SERVICE -> packageManager.getServiceInfo(component, 0).exported
+        }
+    }.getOrDefault(false)
+
+    private fun applyIntentPayload(intent: Intent, plan: IntentDispatchPlan) {
+        plan.category?.let(intent::addCategory)
+        when {
+            plan.uri != null && plan.mimeType != null -> intent.setDataAndType(Uri.parse(plan.uri), plan.mimeType)
+            plan.uri != null -> intent.data = Uri.parse(plan.uri)
+            plan.mimeType != null -> intent.type = plan.mimeType
+        }
+        if (plan.mode == IntentDispatchMode.ACTIVITY) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        plan.flags.forEach { flag ->
+            intent.addFlags(
+                when (flag) {
+                    IntentDispatchFlag.ACTIVITY_NEW_TASK -> Intent.FLAG_ACTIVITY_NEW_TASK
+                    IntentDispatchFlag.ACTIVITY_CLEAR_TOP -> Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    IntentDispatchFlag.ACTIVITY_SINGLE_TOP -> Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    IntentDispatchFlag.ACTIVITY_CLEAR_TASK -> Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    IntentDispatchFlag.GRANT_READ_URI -> Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    IntentDispatchFlag.GRANT_WRITE_URI -> Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                },
+            )
+        }
+        plan.extras.forEach { extra ->
+            when (extra.type) {
+                IntentExtraType.STRING -> intent.putExtra(extra.key, extra.value)
+                IntentExtraType.INT -> intent.putExtra(extra.key, extra.value.toInt())
+                IntentExtraType.BOOL -> intent.putExtra(extra.key, extra.value.equals("true", ignoreCase = true))
+            }
+        }
+    }
+
+    private suspend fun sendOrderedBroadcast(
+        ctx: ActionContext,
+        intent: Intent,
+        resultVariable: String,
+    ): ActionResult = suspendCancellableCoroutine { continuation ->
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: android.content.Context, resultIntent: Intent?) {
+                if (continuation.isActive) {
+                    ctx.variables.set(resultVariable, resultCode.toString())
+                    continuation.resumeWith(Result.success(ActionResult.Success))
+                }
+            }
+        }
+        try {
+            ctx.app.sendOrderedBroadcast(
+                intent,
+                null,
+                receiver,
+                null,
+                Activity.RESULT_CANCELED,
+                null,
+                null,
+            )
+        } catch (ex: Exception) {
+            if (continuation.isActive) continuation.resumeWith(Result.success(ActionResult.Failure(ex.message ?: "ordered broadcast failed", ex)))
         }
     }
 }

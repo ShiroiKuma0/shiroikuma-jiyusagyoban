@@ -418,8 +418,25 @@ fun registerActionMetadata() {
             categoryRes = R.string.catalog_category_app,
             fields = listOf(
                 ActionField("package", R.string.catalog_action_intent_launch_field_package_label, FieldType.APP, required = true, hintRes = R.string.catalog_action_intent_launch_field_package_hint),
+                ActionField(
+                    "mode",
+                    R.string.catalog_action_intent_launch_field_mode_label,
+                    FieldType.DROPDOWN,
+                    hintRes = R.string.catalog_action_intent_launch_field_mode_hint,
+                    options = listOf(
+                        option("activity", R.string.action_option_intent_activity),
+                        option("broadcast", R.string.action_option_intent_broadcast),
+                        option("service", R.string.action_option_intent_service),
+                    ),
+                ),
+                ActionField("component", R.string.catalog_action_intent_launch_field_component_label, hintRes = R.string.catalog_action_intent_launch_field_component_hint),
                 ActionField("action", R.string.catalog_action_intent_launch_field_action_label, hintRes = R.string.catalog_action_intent_launch_field_action_hint),
                 ActionField("category", R.string.catalog_action_intent_launch_field_category_label, hintRes = R.string.catalog_action_intent_launch_field_category_hint),
+                ActionField("uri", R.string.catalog_action_intent_launch_field_uri_label, hintRes = R.string.catalog_action_intent_launch_field_uri_hint),
+                ActionField("mime_type", R.string.catalog_action_intent_launch_field_mime_label, hintRes = R.string.catalog_action_intent_launch_field_mime_hint),
+                ActionField("flags", R.string.catalog_action_intent_launch_field_flags_label, hintRes = R.string.catalog_action_intent_launch_field_flags_hint),
+                ActionField("extras", R.string.catalog_action_intent_launch_field_extras_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_intent_launch_field_extras_hint, sensitive = true),
+                ActionField("result_variable", R.string.catalog_action_intent_launch_field_result_variable_label, hintRes = R.string.catalog_action_intent_launch_field_result_variable_hint),
             )
         )
     )

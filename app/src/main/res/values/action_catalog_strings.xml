@@ -159,7 +159,7 @@
     <string name="catalog_action_flow_stop_name" formatted="false">Stop</string>
     <string name="catalog_action_flow_stop_description" formatted="false">Halt the rest of the task immediately</string>
     <string name="catalog_action_intent_launch_name" formatted="false">Launch Intent</string>
-    <string name="catalog_action_intent_launch_description" formatted="false">Launch an activity or service via intent</string>
+    <string name="catalog_action_intent_launch_description" formatted="false">Dispatch a bounded activity, broadcast, or service intent</string>
     <string name="catalog_category_app" formatted="false">App</string>
     <string name="catalog_action_intent_launch_field_package_label" formatted="false">Package name</string>
     <string name="catalog_action_intent_launch_field_package_hint" formatted="false">com.example.app</string>
@@ -167,6 +167,23 @@
     <string name="catalog_action_intent_launch_field_action_hint" formatted="false">MAIN, VIEW, etc.</string>
     <string name="catalog_action_intent_launch_field_category_label" formatted="false">Intent category</string>
     <string name="catalog_action_intent_launch_field_category_hint" formatted="false">Optional</string>
+    <string name="catalog_action_intent_launch_field_mode_label" formatted="false">Dispatch mode</string>
+    <string name="catalog_action_intent_launch_field_mode_hint" formatted="false">Choose the explicit Android component kind</string>
+    <string name="catalog_action_intent_launch_field_component_label" formatted="false">Component class</string>
+    <string name="catalog_action_intent_launch_field_component_hint" formatted="false">com.example.app.MainActivity</string>
+    <string name="catalog_action_intent_launch_field_uri_label" formatted="false">Data URI</string>
+    <string name="catalog_action_intent_launch_field_uri_hint" formatted="false">https://example.com or content://…</string>
+    <string name="catalog_action_intent_launch_field_mime_label" formatted="false">MIME type</string>
+    <string name="catalog_action_intent_launch_field_mime_hint" formatted="false">text/plain or */*</string>
+    <string name="catalog_action_intent_launch_field_flags_label" formatted="false">Intent flags</string>
+    <string name="catalog_action_intent_launch_field_flags_hint" formatted="false">activity_clear_top, grant_read_uri</string>
+    <string name="catalog_action_intent_launch_field_extras_label" formatted="false">Primitive extras</string>
+    <string name="catalog_action_intent_launch_field_extras_hint" formatted="false">key=string:value, key=int:1, or key=bool:true</string>
+    <string name="catalog_action_intent_launch_field_result_variable_label" formatted="false">Ordered result variable</string>
+    <string name="catalog_action_intent_launch_field_result_variable_hint" formatted="false">Optional variable for a broadcast result code</string>
+    <string name="action_option_intent_activity" formatted="false">Activity</string>
+    <string name="action_option_intent_broadcast" formatted="false">Broadcast</string>
+    <string name="action_option_intent_service" formatted="false">Service</string>
     <string name="catalog_action_plugin_locale_fire_name" formatted="false">Locale Plugin Setting</string>
     <string name="catalog_action_plugin_locale_fire_description" formatted="false">Dispatch an explicit Locale/Tasker-compatible setting plugin request</string>
     <string name="catalog_category_plugin" formatted="false">Plugin</string>
