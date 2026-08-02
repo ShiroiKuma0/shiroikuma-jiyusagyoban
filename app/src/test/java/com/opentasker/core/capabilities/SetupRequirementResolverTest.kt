@@ -61,4 +61,15 @@ class SetupRequirementResolverTest {
 
         assertTrue(SetupRequirementResolver.resolve(listOf(disabled, unacknowledged), listOf(task)).isEmpty())
     }
+
+    @Test
+    fun contactsLookupAddsContactsPermissionRequirement() {
+        val task = Task(id = 1, name = "Find", actions = listOf(ActionSpec(type = "contacts.lookup")))
+        val profile = Profile(id = 1, name = "Find contact", enterTaskId = task.id)
+
+        assertEquals(
+            setOf(SetupRequirement.CONTACTS),
+            SetupRequirementResolver.resolve(listOf(profile), listOf(task)),
+        )
+    }
 }

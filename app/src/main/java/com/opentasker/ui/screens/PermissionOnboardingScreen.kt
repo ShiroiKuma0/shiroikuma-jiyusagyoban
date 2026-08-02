@@ -907,6 +907,16 @@ private fun buildPermissionItems(
             requirements = setOf(SetupRequirement.CALENDAR),
         ),
         PermissionSetupItem(
+            title = context.getString(R.string.setup_contacts_access_title),
+            body = context.getString(R.string.setup_contacts_access_body),
+            granted = hasPermission(context, Manifest.permission.READ_CONTACTS),
+            actionLabel = request,
+            action = PermissionAction.RuntimePermission(Manifest.permission.READ_CONTACTS),
+            requiredFor = context.getString(R.string.setup_contacts_access_required_for),
+            section = SetupSection.NEEDED,
+            requirements = setOf(SetupRequirement.CONTACTS),
+        ),
+        PermissionSetupItem(
             title = context.getString(R.string.setup_overlay_access_title),
             body = context.getString(R.string.setup_overlay_access_body),
             granted = Settings.canDrawOverlays(context),

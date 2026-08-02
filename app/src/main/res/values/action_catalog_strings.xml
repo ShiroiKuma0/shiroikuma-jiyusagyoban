@@ -47,6 +47,24 @@
     <string name="catalog_action_var_persist_field_name_hint" formatted="false">local variable name</string>
     <string name="catalog_action_var_persist_field_global_name_label" formatted="false">Global name</string>
     <string name="catalog_action_var_persist_field_global_name_hint" formatted="false">Auto-uppercased from source if omitted</string>
+    <string name="catalog_action_clipboard_get_name" formatted="false">Get Clipboard</string>
+    <string name="catalog_action_clipboard_get_description" formatted="false">Read text from the system clipboard into a sensitive variable</string>
+    <string name="catalog_action_clipboard_get_field_var_label" formatted="false">Output variable</string>
+    <string name="catalog_action_clipboard_get_field_var_hint" formatted="false">default: Clipboard (also sets %Clipboard_has_text)</string>
+    <string name="catalog_action_clipboard_set_name" formatted="false">Set Clipboard</string>
+    <string name="catalog_action_clipboard_set_description" formatted="false">Write bounded text to the system clipboard</string>
+    <string name="catalog_action_clipboard_set_field_text_label" formatted="false">Text</string>
+    <string name="catalog_action_clipboard_set_field_text_hint" formatted="false">Maximum 64 KiB; clipboard contents are not logged</string>
+    <string name="catalog_action_contacts_lookup_name" formatted="false">Lookup Contact</string>
+    <string name="catalog_action_contacts_lookup_description" formatted="false">Resolve a contact name, phone number, or email into sensitive variables</string>
+    <string name="catalog_action_contacts_lookup_field_query_label" formatted="false">Name, phone, or email</string>
+    <string name="catalog_action_contacts_lookup_field_query_hint" formatted="false">Search text; maximum 128 characters</string>
+    <string name="catalog_action_contacts_lookup_field_mode_label" formatted="false">Lookup mode</string>
+    <string name="catalog_action_contacts_lookup_field_mode_hint" formatted="false">Picker is the default on Android 17+; permission is for unattended runs</string>
+    <string name="catalog_action_contacts_lookup_field_var_label" formatted="false">Output variable</string>
+    <string name="catalog_action_contacts_lookup_field_var_hint" formatted="false">default: Contact; also sets name, phone, email, arrays, and count</string>
+    <string name="action_option_contacts_permission" formatted="false">Permission (unattended)</string>
+    <string name="action_option_contacts_picker" formatted="false">System picker (Android 17+)</string>
     <string name="catalog_action_data_read_name" formatted="false">Read Data</string>
     <string name="catalog_action_data_read_description" formatted="false">Parse JSON, CSV, XML, or HTML into variables — great for HTTP responses and files</string>
     <string name="catalog_action_data_read_field_source_label" formatted="false">Source data</string>

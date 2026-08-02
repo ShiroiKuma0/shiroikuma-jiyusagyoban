@@ -25,6 +25,7 @@ enum class SetupRequirement {
     LOCAL_NETWORK,
     SMS,
     DND,
+    CONTACTS,
 }
 
 object SetupRequirementResolver {
@@ -92,6 +93,7 @@ object SetupRequirementResolver {
         when (type) {
             "brightness.set", "screen.timeout" -> add(SetupRequirement.WRITE_SETTINGS)
             "sms.send" -> add(SetupRequirement.SMS)
+            "contacts.lookup" -> add(SetupRequirement.CONTACTS)
             "dnd.set", "ringer.set", "volume.set", "media.mute" -> add(SetupRequirement.DND)
             "http.request", "http.get", "http.post", "integration.home_assistant.webhook", "mqtt.publish", "ping", "download", "wol" -> add(SetupRequirement.LOCAL_NETWORK)
             "script.termux.run" -> Unit // Termux is an optional integration, not a permission blocker.

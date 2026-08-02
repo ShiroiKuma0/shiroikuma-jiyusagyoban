@@ -62,6 +62,8 @@ object AutomationSensitivityRegistry {
     )
 
     private val dataAccessActionIds = setOf(
+        "clipboard.get",
+        "contacts.lookup",
         "plugin.locale.query",
         "script.termux.run",
         "screenshot.take",
@@ -88,6 +90,7 @@ object AutomationSensitivityRegistry {
     )
 
     private val deviceControlActionIds = setOf(
+        "clipboard.set",
         "notify.show",
         "notify.cancel",
         "tts.speak",

@@ -810,6 +810,42 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "clipboard.get",
+            nameRes = R.string.catalog_action_clipboard_get_name,
+            descriptionRes = R.string.catalog_action_clipboard_get_description,
+            categoryRes = R.string.catalog_category_variable,
+            fields = listOf(
+                ActionField("var", R.string.catalog_action_clipboard_get_field_var_label, hintRes = R.string.catalog_action_clipboard_get_field_var_hint),
+            ),
+        )
+    )
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "clipboard.set",
+            nameRes = R.string.catalog_action_clipboard_set_name,
+            descriptionRes = R.string.catalog_action_clipboard_set_description,
+            categoryRes = R.string.catalog_category_system,
+            fields = listOf(
+                ActionField("text", R.string.catalog_action_clipboard_set_field_text_label, FieldType.MULTILINE, required = true, hintRes = R.string.catalog_action_clipboard_set_field_text_hint, sensitive = true),
+            ),
+        )
+    )
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "contacts.lookup",
+            nameRes = R.string.catalog_action_contacts_lookup_name,
+            descriptionRes = R.string.catalog_action_contacts_lookup_description,
+            categoryRes = R.string.catalog_category_variable,
+            fields = listOf(
+                ActionField("query", R.string.catalog_action_contacts_lookup_field_query_label, required = true, hintRes = R.string.catalog_action_contacts_lookup_field_query_hint, sensitive = true),
+                ActionField("mode", R.string.catalog_action_contacts_lookup_field_mode_label, FieldType.DROPDOWN, hintRes = R.string.catalog_action_contacts_lookup_field_mode_hint, options = listOf(option("picker", R.string.action_option_contacts_picker), option("permission", R.string.action_option_contacts_permission))),
+                ActionField("var", R.string.catalog_action_contacts_lookup_field_var_label, hintRes = R.string.catalog_action_contacts_lookup_field_var_hint),
+            ),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "integration.home_assistant.webhook",
             nameRes = R.string.catalog_action_home_assistant_webhook_name,
             descriptionRes = R.string.catalog_action_home_assistant_webhook_description,

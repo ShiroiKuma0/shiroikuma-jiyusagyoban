@@ -261,6 +261,9 @@
     <string name="setup_calendar_access_title">Calendar access</string>
     <string name="setup_calendar_access_body">Needed for local calendar-window triggers. OpenTasker only emits redacted calendar metadata to matching.</string>
     <string name="setup_calendar_access_required_for">Calendar triggers</string>
+    <string name="setup_contacts_access_title">Contacts access</string>
+    <string name="setup_contacts_access_body">Needed for unattended contact lookup actions. Contact values are written as sensitive variables and never copied into run-log messages. On Android 17+, picker mode can grant only the selected fields instead.</string>
+    <string name="setup_contacts_access_required_for">Unattended contact lookup</string>
     <string name="setup_overlay_access_title">Overlay access</string>
     <string name="setup_overlay_access_body">Needed for scene overlays and controls displayed over other apps.</string>
     <string name="setup_overlay_access_required_for">Scenes, overlay UI</string>

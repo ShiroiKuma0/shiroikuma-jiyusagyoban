@@ -4,6 +4,9 @@ import com.opentasker.core.actions.AirplaneModeAction
 import com.opentasker.core.actions.AppendFileAction
 import com.opentasker.core.actions.BluetoothToggleAction
 import com.opentasker.core.actions.BrightnessAction
+import com.opentasker.core.actions.ClipboardGetAction
+import com.opentasker.core.actions.ClipboardSetAction
+import com.opentasker.core.actions.ContactsLookupAction
 import com.opentasker.core.actions.DataReadAction
 import com.opentasker.core.actions.DateTimeAddAction
 import com.opentasker.core.actions.DateTimeFormatAction
@@ -82,6 +85,9 @@ private fun registerBuiltInActions() {
         NotifyCancelAction(),
         SetVariableAction(),
         PersistVariableAction(),
+        ClipboardGetAction(),
+        ClipboardSetAction(),
+        ContactsLookupAction(),
         DataReadAction(),
         DateTimeFormatAction(),
         DateTimeParseAction(),

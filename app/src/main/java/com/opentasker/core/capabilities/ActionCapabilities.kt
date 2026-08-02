@@ -44,6 +44,8 @@ object ActionCapabilityRegistry {
         // Variables, text, and date-time: pure in-process transforms.
         "var.set",
         "var.persist",
+        "clipboard.get",
+        "clipboard.set",
         "data.read",
         "datetime.format",
         "datetime.parse",
@@ -90,6 +92,7 @@ object ActionCapabilityRegistry {
     private val capabilities = mapOf(
         "notify.show" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires notification permission on Android 13+.", R.string.capability_notification_permission),
         "notify.cancel" to ActionCapability(CapabilityLevel.RequiresSetup, "Cancels a posted notification by tag and/or ID. Requires notification permission on Android 13+.", R.string.capability_notification_cancel_permission),
+        "contacts.lookup" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires an explicit Contacts permission for unattended lookup, or Android 17 field-scoped picker mode.", R.string.capability_contacts_permission),
         "plugin.locale.fire" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires an installed Locale-compatible plugin; requests are dispatched only to an explicit package.", R.string.capability_locale_fire_setup),
         "plugin.locale.query" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires an installed Locale-compatible condition plugin; queries are explicit ordered broadcasts with timeout handling.", R.string.capability_locale_query_setup),
         "wifi.toggle" to ActionCapability(CapabilityLevel.Unsupported, "Android 10+ blocks direct WiFi toggles for normal apps.", R.string.capability_wifi_unsupported),

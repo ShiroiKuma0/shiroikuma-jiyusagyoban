@@ -15,7 +15,7 @@
 
 - **Profiles, contexts, tasks, actions** — a complete Room-backed automation pipeline with a Compose UI
 - **7 context families** — Application, Time, Day, Location, State, Event, and Plugin (Locale/Tasker condition)
-- **62 built-in actions** plus engine-handled flow control (`task.run`, `if`/`else`/`end if`, `for each`/`end for`, `stop`)
+- **65 built-in actions** plus engine-handled flow control (`task.run`, `if`/`else`/`end if`, `for each`/`end for`, `stop`)
 - **Template expressions** — bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math/date functions, traces, and strict regex policy
 - **Side-effect-free preflight reviews** — preview a task or profile with synthetic event variables, expanded inputs, branch decisions, setup gaps, intended effects, and explicit blockers before any action runs
 - **First-class secret variables** — AES-256-GCM Android Keystore storage, deliberate reveal/re-entry UX, and provenance-based redaction for derived action arguments, logs, traces, and failures
@@ -44,7 +44,7 @@
 - Locale/Tasker condition plugins — polled as first-class context predicates with last-known-state caching
 - Home Assistant bridge proof of concept — bounded outbound JSON webhooks with HTTPS-by-default policy, redacted webhook secrets, and transient retry/backoff
 
-### Actions (62 registered + 7 engine-handled)
+### Actions (65 registered + 7 engine-handled)
 
 | Category | Count | Examples |
 |----------|------:|---------|
@@ -53,9 +53,9 @@
 | File | 5 | read, write, append, delete, list |
 | Network | 8 | HTTP Request, Home Assistant webhook, MQTT publish, legacy GET/POST aliases, ping, download, Wake-on-LAN |
 | Media | 6 | play, stop, pause, next, previous, mute |
-| System | 6 | vibrate, reboot, lock, screen off, wake, log |
+| System | 7 | vibrate, clipboard set, reboot, lock, screen off, wake, log |
 | Notification | 3 | notify/toast, cancel, TTS speak |
-| Variable | 11 | set variable, read data (JSON/CSV/XML/HTML), date-time (format/parse/add), text (match/replace/split/join/substring) |
+| Variable | 13 | set variable, clipboard get, contacts lookup, read data (JSON/CSV/XML/HTML), date-time (format/parse/add), text (match/replace/split/join/substring) |
 | Flow | 1+7 | wait; engine: task.run, if/else/end if, for each/end for, stop |
 | Plugin | 2 | Locale setting dispatch, Locale condition query |
 | Script | 1 | SHA-256-pinned Termux `RUN_COMMAND` with bounded result capture |
@@ -68,6 +68,8 @@ New automations use **HTTP Request** for GET, HEAD, POST, PUT, PATCH, DELETE, an
 The **Intent Dispatch** action supports bounded activity, explicit broadcast, and explicit service delivery. It accepts allowlisted URI/MIME data, six activity/URI flags, capped string/int/bool extras, and optional ordered-broadcast result-code capture. External activity actions with arbitrary actions require a chosen component; broadcasts and services always require one. `file://` URIs, parcelable/serialization-style extras, unknown flags, ambiguous targets, and non-exported external components fail closed.
 
 The **MQTT Publish** action uses a small in-app MQTT 3.1.1 QoS 0/1 client over platform sockets and TLS, so the F-Droid build adds no MQTT dependency. TLS is enabled by default; cleartext is restricted to private/local hosts and the Android 17 local-network grant. Payloads are capped at 64 KB, QoS 2 and wildcard publish topics are rejected, and username/password fields are redacted.
+
+The **Clipboard** actions read and write text without an extra permission, cap transfers at 64 KiB, and mark clipboard-derived values sensitive. **Contact lookup** supports bounded name/phone/email matching into sensitive variables. Android 17+ defaults to a field-scoped system picker with a timeout and no broad address-book grant; explicit `READ_CONTACTS` permission mode remains available for unattended runs through Setup.
 
 The **push trigger spike** chooses a distributor-neutral UnifiedPush boundary instead of adding a polling client or a Google service. Setup creates a per-install token; a distributor adapter forwards an explicit `com.opentasker.action.PUSH_EVENT` broadcast with that token, topic, event ID, title, and message. The receiver authenticates the token, caps the message at 8 KiB, keeps only topic/title/event ID/size in event metadata, and suppresses duplicate topic/event-ID deliveries for 30 seconds. Delivery is at-least-once, so retry belongs to the distributor; no network retry is attempted inside the receiver. ntfy can be adapted to this same envelope later without changing profiles.
 
