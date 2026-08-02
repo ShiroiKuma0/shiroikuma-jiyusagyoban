@@ -188,7 +188,7 @@ fun registerActionMetadata() {
             categoryRes = R.string.catalog_category_variable,
             fields = listOf(
                 ActionField("source", R.string.catalog_action_data_read_field_source_label, required = true, hintRes = R.string.catalog_action_data_read_field_source_hint),
-                ActionField("format", R.string.catalog_action_data_read_field_format_label, FieldType.DROPDOWN, hintRes = R.string.catalog_action_data_read_field_format_hint, options = listOf(option("json", R.string.action_option_json), option("csv", R.string.action_option_csv), option("xml", R.string.action_option_xml))),
+                ActionField("format", R.string.catalog_action_data_read_field_format_label, FieldType.DROPDOWN, hintRes = R.string.catalog_action_data_read_field_format_hint, options = listOf(option("json", R.string.action_option_json), option("csv", R.string.action_option_csv), option("xml", R.string.action_option_xml), option("html", R.string.action_option_html))),
                 ActionField("path", R.string.catalog_action_data_read_field_path_label, hintRes = R.string.catalog_action_data_read_field_path_hint),
                 ActionField("var", R.string.catalog_action_data_read_field_var_label, hintRes = R.string.catalog_action_data_read_field_var_hint),
             )

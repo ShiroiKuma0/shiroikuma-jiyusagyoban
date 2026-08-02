@@ -5,12 +5,13 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import org.jsoup.Jsoup
 import javax.xml.parsers.DocumentBuilderFactory
 import org.w3c.dom.Element
 import org.xml.sax.InputSource
 
 /**
- * Deterministic, on-device parser that turns a JSON / CSV / XML string into one or more variable
+ * Deterministic, on-device parser that turns a JSON / CSV / XML / HTML string into one or more variable
  * values, without any network or cloud dependency. Used by the `data.read` action to make raw HTTP
  * responses and file contents usable in automations.
  *
@@ -30,6 +31,7 @@ object StructuredDataReader {
             "json" -> readJson(source, path)
             "csv" -> readCsv(source, path)
             "xml" -> readXml(source, path)
+            "html" -> readHtml(source, path)
             else -> null
         } ?: return null
         return ReadResult(values.take(MAX_RESULT_VALUES))
@@ -181,6 +183,17 @@ object StructuredDataReader {
         return out
     }
 
+    // ---- HTML ----
+    //
+    // path is a bounded CSS selector. Matching elements yield their normalized text content.
+    // Jsoup parses only the supplied string; this action never follows links or performs I/O.
+    private fun readHtml(source: String, path: String): List<String>? {
+        val selector = path.trim()
+        if (selector.isEmpty() || selector.length > MAX_SELECTOR_CHARS) return null
+        val document = runCatching { Jsoup.parse(source) }.getOrNull() ?: return null
+        return runCatching { document.select(selector).map { it.text() } }.getOrNull()
+    }
+
     // ---- selectors ----
 
     private sealed interface Selector {
@@ -224,4 +237,6 @@ object StructuredDataReader {
         out += Selector.Property(path.substring(start, cursor))
         return cursor
     }
+
+    private const val MAX_SELECTOR_CHARS = 512
 }

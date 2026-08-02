@@ -53,7 +53,7 @@
 | Media | 6 | play, stop, pause, next, previous, mute |
 | System | 6 | vibrate, reboot, lock, screen off, wake, log |
 | Notification | 3 | notify/toast, cancel, TTS speak |
-| Variable | 11 | set variable, read data (JSON/CSV/XML), date-time (format/parse/add), text (match/replace/split/join/substring) |
+| Variable | 11 | set variable, read data (JSON/CSV/XML/HTML), date-time (format/parse/add), text (match/replace/split/join/substring) |
 | Flow | 1+7 | wait; engine: task.run, if/else/end if, for each/end for, stop |
 | Plugin | 2 | Locale setting dispatch, Locale condition query |
 | Script | 1 | SHA-256-pinned Termux `RUN_COMMAND` with bounded result capture |
@@ -207,6 +207,8 @@ All dependency versions are centralized in `gradle/libs.versions.toml`.
 ---
 
 ## Planned
+
+`data.read` supports bounded HTML extraction with CSS selectors and normalized element text. Parsing is local-only and never fetches linked resources; the pinned jsoup parser is MIT-licensed and included in the F-Droid-compatible dependency set.
 
 See [ROADMAP.md](ROADMAP.md) for the full backlog. Key remaining work:
 

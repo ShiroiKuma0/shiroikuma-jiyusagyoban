@@ -48,13 +48,13 @@
     <string name="catalog_action_var_persist_field_global_name_label" formatted="false">Global name</string>
     <string name="catalog_action_var_persist_field_global_name_hint" formatted="false">Auto-uppercased from source if omitted</string>
     <string name="catalog_action_data_read_name" formatted="false">Read Data</string>
-    <string name="catalog_action_data_read_description" formatted="false">Parse JSON, CSV, or XML into variables — great for HTTP responses and files</string>
+    <string name="catalog_action_data_read_description" formatted="false">Parse JSON, CSV, XML, or HTML into variables — great for HTTP responses and files</string>
     <string name="catalog_action_data_read_field_source_label" formatted="false">Source data</string>
     <string name="catalog_action_data_read_field_source_hint" formatted="false">%response or file contents</string>
     <string name="catalog_action_data_read_field_format_label" formatted="false">Format</string>
-    <string name="catalog_action_data_read_field_format_hint" formatted="false">json (default), csv, or xml</string>
+    <string name="catalog_action_data_read_field_format_hint" formatted="false">json (default), csv, xml, or html</string>
     <string name="catalog_action_data_read_field_path_label" formatted="false">Selector</string>
-    <string name="catalog_action_data_read_field_path_hint" formatted="false">JSON items[0].name · CSV column c or cell r,c · XML root/item/name</string>
+    <string name="catalog_action_data_read_field_path_hint" formatted="false">JSON items[0].name · CSV column c or cell r,c · XML root/item/name · HTML CSS selector</string>
     <string name="catalog_action_data_read_field_var_label" formatted="false">Output variable</string>
     <string name="catalog_action_data_read_field_var_hint" formatted="false">default: data (also sets %var array + %var_count)</string>
     <string name="catalog_action_datetime_format_name" formatted="false">Format Date/Time</string>

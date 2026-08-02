@@ -105,6 +105,27 @@ class StructuredDataReaderTest {
         assertNull(read("xml", withDoctype, "root/item"))
     }
 
+    // ---- HTML ----
+
+    @Test
+    fun htmlCssSelectorExtractsNormalizedText() {
+        val html = "<html><body><article><h1>One</h1><p class='value'> A </p><p class='value'>B</p></article></body></html>"
+
+        assertEquals(listOf("A", "B"), read("html", html, "p.value"))
+    }
+
+    @Test
+    fun htmlMalformedMarkupIsRecoveredAndMissingSelectorIsEmpty() {
+        assertEquals(listOf("First", "Second"), read("html", "<main><p>First<p>Second", "main p"))
+        assertEquals(emptyList<String>(), read("html", "<main><p>First</p></main>", ".missing"))
+    }
+
+    @Test
+    fun htmlRejectsBlankOrOversizedSelectors() {
+        assertNull(read("html", "<p>value</p>", ""))
+        assertNull(read("html", "<p>value</p>", "p".repeat(513)))
+    }
+
     // ---- guards ----
 
     @Test

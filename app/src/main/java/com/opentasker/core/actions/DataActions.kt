@@ -7,12 +7,12 @@ import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 
 /**
- * Parse a JSON / CSV / XML string into variables, fully on-device.
+ * Parse a JSON / CSV / XML / HTML string into variables, fully on-device.
  *
  * Args:
  *   - "source": the data to parse (typically a `%var` holding an HTTP response or file contents)
- *   - "format": "json" (default), "csv", or "xml"
- *   - "path": selector — JSON `items[0].name`, CSV column `c` or cell `r,c`, XML `root/item/name`
+ *   - "format": "json" (default), "csv", "xml", or "html"
+ *   - "path": selector — JSON `items[0].name`, CSV column `c` or cell `r,c`, XML `root/item/name`, or HTML CSS selector
  *   - "var": output variable base name (default "data")
  *
  * Sets `%var` to the first extracted value, stores all values as the `var` array (`%var(#)` /

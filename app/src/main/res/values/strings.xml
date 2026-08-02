@@ -809,6 +809,7 @@
     <string name="action_option_json">JSON</string>
     <string name="action_option_csv">CSV</string>
     <string name="action_option_xml">XML</string>
+    <string name="action_option_html">HTML</string>
     <string name="action_option_seconds">Seconds</string>
     <string name="action_option_minutes">Minutes</string>
     <string name="action_option_hours">Hours</string>
