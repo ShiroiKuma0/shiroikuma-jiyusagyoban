@@ -138,6 +138,7 @@ class AutomationService : Service() {
     }
     
     private val cooldownStore by lazy { CooldownStore(this) }
+    private val executionAdmission by lazy { ExecutionAdmissionController.persisted(this) }
     private val matchers = Collections.synchronizedMap(mutableMapOf<Long, ProfileMatcher>())
     private val cooldowns = CooldownReservations(persist = { profileId, deadline -> cooldownStore.set(profileId, deadline) })
     private val matcherJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>()) // Track jobs for cleanup
@@ -553,6 +554,8 @@ class AutomationService : Service() {
             source = "Profile: ${profile.name}",
             metadata = profileRunMetadata(profile),
             audioForegroundService = audioForegroundServiceEligibility,
+            admissionController = executionAdmission,
+            profileId = profile.id,
         )
         if (result.logInserted) {
             pruneRunLogs(force = false)
@@ -608,6 +611,7 @@ class AutomationService : Service() {
                 initialVariables = variables,
                 audioForegroundService = audioForegroundServiceEligibility,
                 logTag = TAG,
+                admissionController = executionAdmission,
             )
             ExternalExecutions.update(
                 context = this,
@@ -669,6 +673,7 @@ class AutomationService : Service() {
                 source = NotificationActionReceiver.SOURCE,
                 metadata = listOf("button=$buttonLabel"),
                 audioForegroundService = audioForegroundServiceEligibility,
+                admissionController = executionAdmission,
             )
             if (result.logInserted) pruneRunLogs(force = false)
             val status = when {

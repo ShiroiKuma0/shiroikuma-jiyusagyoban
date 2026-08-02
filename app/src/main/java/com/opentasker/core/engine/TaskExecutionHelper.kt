@@ -36,7 +36,27 @@ suspend fun executeAndLogTask(
     visibleActivity: Boolean = false,
     audioForegroundService: AudioForegroundServiceEligibility = AudioForegroundServiceEligibility.NONE,
     logTag: String = TAG,
+    admissionController: ExecutionAdmissionController = ExecutionAdmissionController.Default,
+    profileId: Long? = null,
 ): TaskExecutionResult = withContext(Dispatchers.IO) {
+    val admission = admissionController.tryAcquire(profileId)
+    if (!admission.accepted) {
+        val reason = admission.reason ?: "Execution admission rejected this run."
+        val inserted = logSkippedRun(
+            db = db,
+            task = task,
+            source = source,
+            reason = reason,
+            metadata = metadata,
+        )
+        return@withContext TaskExecutionResult(
+            report = collisionSkippedReport(task, reason),
+            logInserted = inserted,
+            skippedReason = reason,
+        )
+    }
+    val admissionLease = requireNotNull(admission.lease)
+    try {
     // Run the whole task off the caller's thread. Manual runs (ViewModel), widget/shortcut, and
     // notification-action paths call this from the main thread; without this hop, blocking actions
     // (HTTP, file, ping) would throw NetworkOnMainThreadException and fail silently.
@@ -171,6 +191,9 @@ suspend fun executeAndLogTask(
     )
     val inserted = insertRunLog(db, logEntry)
     TaskExecutionResult(report, inserted)
+    } finally {
+        admissionLease.release()
+    }
 }
 
 private fun collisionSkippedReport(task: Task, reason: String): TaskRunReport {
