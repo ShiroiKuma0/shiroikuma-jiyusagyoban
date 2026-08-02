@@ -18,85 +18,85 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 
-// AMOLED-black palette with Catppuccin Mocha accents.
-// Optimized for premium dark theme with excellent contrast and visual hierarchy.
-private val Mauve = Color(0xFFCBA6F7)          // Primary - vibrant purple
-private val Sapphire = Color(0xFF74C7EC)       // Secondary - cool blue
-private val Green = Color(0xFFA6E3A1)          // Tertiary - fresh green
-private val Red = Color(0xFFF38BA8)            // Error - warm red
-private val Peach = Color(0xFFFFB4A2)          // Warning accent
-private val Text = Color(0xFFCDD6F4)           // Primary text - light lavender
-private val TextSecondary = Color(0xFFA6ADC8)  // Secondary text - muted lavender
-private val Surface0 = Color(0xFF11111B)       // Primary surface
-private val Surface1 = Color(0xFF1E1E2E)       // Elevated surface
-private val Overlay0 = Color(0xFF45475A)       // Subtle overlay
+// Command-center palette derived from the nine-screen product mockup. Graphite surfaces keep
+// dense automation data calm, while iris, mint, blue, and coral communicate action and state.
+private val Iris = Color(0xFF8B5CF6)
+private val SignalBlue = Color(0xFF63B8FF)
+private val SignalMint = Color(0xFF63E6A6)
+private val SignalRed = Color(0xFFFF6B7A)
+private val Text = Color(0xFFF1F4FA)
+private val TextSecondary = Color(0xFFA9B3C5)
+private val GraphiteBackground = Color(0xFF090C12)
+private val GraphiteSurface = Color(0xFF10151E)
+private val GraphiteElevated = Color(0xFF171E29)
+private val GraphiteOutline = Color(0xFF344052)
 
 private val Amoled = darkColorScheme(
-    primary = Mauve,                           // Primary actions, active states
-    onPrimary = Color.Black,                   // Text on primary
-    primaryContainer = Mauve.copy(alpha = 0.12f), // Subtle primary background
-    onPrimaryContainer = Mauve,
-    secondary = Sapphire,                      // Secondary actions
+    primary = Iris,
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFF2A1745),
+    onPrimaryContainer = Color(0xFFE5D2FF),
+    secondary = SignalBlue,
     onSecondary = Color.Black,
-    secondaryContainer = Sapphire.copy(alpha = 0.12f),
-    onSecondaryContainer = Sapphire,
-    tertiary = Green,                          // Tertiary actions, success states
+    secondaryContainer = Color(0xFF102B40),
+    onSecondaryContainer = Color(0xFFCBE9FF),
+    tertiary = SignalMint,
     onTertiary = Color.Black,
-    tertiaryContainer = Green.copy(alpha = 0.12f),
-    onTertiaryContainer = Green,
-    error = Red,                               // Error states
-    onError = Color.Black,
-    errorContainer = Red.copy(alpha = 0.12f),
-    onErrorContainer = Red,
-    background = Color.Black,                  // True AMOLED black for status bar
+    tertiaryContainer = Color(0xFF103727),
+    onTertiaryContainer = Color(0xFFC8F8DF),
+    error = SignalRed,
+    onError = Color(0xFF35000A),
+    errorContainer = Color(0xFF47131D),
+    onErrorContainer = Color(0xFFFFD9DE),
+    background = GraphiteBackground,
     onBackground = Text,
-    surface = Surface0,                        // Main surface color
+    surface = GraphiteSurface,
     onSurface = Text,
-    surfaceVariant = Surface1,                 // Elevated surfaces
+    surfaceVariant = GraphiteElevated,
     onSurfaceVariant = TextSecondary,
-    outline = Overlay0,                        // Borders and dividers
-    outlineVariant = Overlay0.copy(alpha = 0.5f),
+    outline = GraphiteOutline,
+    outlineVariant = Color(0xFF273142),
 )
 
 // Catppuccin Latte palette for the light theme. Mirrors the dark scheme's structure so every
 // semantic token (including the *Container and outlineVariant slots the UI relies on) is defined
 // and coherent in both modes, rather than falling back to mismatched Material defaults.
-private val LatteMauve = Color(0xFF8839EF)        // Primary
-private val LatteSapphire = Color(0xFF209FB5)     // Secondary
-private val LatteGreen = Color(0xFF40A02B)        // Tertiary / success
-private val LatteRed = Color(0xFFD20F39)          // Error
-private val LatteText = Color(0xFF4C4F69)         // Primary text
-private val LatteSubtext = Color(0xFF6C6F85)      // Secondary text
-private val LatteBase = Color(0xFFEFF1F5)         // App background
-private val LatteSurface = Color(0xFFFFFFFF)      // Card/sheet surface
-private val LatteElevated = Color(0xFFE6E9EF)     // Elevated surface (mantle)
-private val LatteOverlay = Color(0xFF9CA0B0)      // Borders and dividers
+private val LightIris = Color(0xFF6D35C8)
+private val LightBlue = Color(0xFF176B9C)
+private val LightMint = Color(0xFF147A4B)
+private val LightRed = Color(0xFFB3263B)
+private val LightText = Color(0xFF171A21)
+private val LightSubtext = Color(0xFF566173)
+private val LightBase = Color(0xFFF3F5F9)
+private val LightSurface = Color(0xFFFFFFFF)
+private val LightElevated = Color(0xFFE9EDF4)
+private val LightOutline = Color(0xFF8C98AA)
 
 private val Light = lightColorScheme(
-    primary = LatteMauve,
+    primary = LightIris,
     onPrimary = Color.White,
-    primaryContainer = LatteMauve.copy(alpha = 0.12f),
-    onPrimaryContainer = LatteMauve,
-    secondary = LatteSapphire,
+    primaryContainer = Color(0xFFECDDFF),
+    onPrimaryContainer = Color(0xFF32125F),
+    secondary = LightBlue,
     onSecondary = Color.White,
-    secondaryContainer = LatteSapphire.copy(alpha = 0.12f),
-    onSecondaryContainer = LatteSapphire,
-    tertiary = LatteGreen,
+    secondaryContainer = Color(0xFFD8EEFF),
+    onSecondaryContainer = Color(0xFF07334E),
+    tertiary = LightMint,
     onTertiary = Color.White,
-    tertiaryContainer = LatteGreen.copy(alpha = 0.12f),
-    onTertiaryContainer = LatteGreen,
-    error = LatteRed,
+    tertiaryContainer = Color(0xFFD1F3DF),
+    onTertiaryContainer = Color(0xFF083D25),
+    error = LightRed,
     onError = Color.White,
-    errorContainer = LatteRed.copy(alpha = 0.12f),
-    onErrorContainer = LatteRed,
-    background = LatteBase,
-    onBackground = LatteText,
-    surface = LatteSurface,
-    onSurface = LatteText,
-    surfaceVariant = LatteElevated,
-    onSurfaceVariant = LatteSubtext,
-    outline = LatteOverlay,
-    outlineVariant = LatteOverlay.copy(alpha = 0.5f),
+    errorContainer = Color(0xFFFFDADD),
+    onErrorContainer = Color(0xFF6D001A),
+    background = LightBase,
+    onBackground = LightText,
+    surface = LightSurface,
+    onSurface = LightText,
+    surfaceVariant = LightElevated,
+    onSurfaceVariant = LightSubtext,
+    outline = LightOutline,
+    outlineVariant = Color(0xFFC8D0DC),
 )
 
 private val HighContrast = darkColorScheme(
@@ -175,9 +175,9 @@ private val OpenTaskerTypography = Typography(
 )
 
 private val OpenTaskerShapes = Shapes(
-    small = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-    medium = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-    large = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+    small = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
+    medium = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+    large = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
 )
 
 @Composable

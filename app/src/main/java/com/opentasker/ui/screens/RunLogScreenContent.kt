@@ -454,14 +454,16 @@ private fun RunLogSummaryCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            OutlinedButton(
-                onClick = onShareDiagnostic,
+            Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
             ) {
-                Text(stringResource(R.string.run_log_share_diagnostic))
-            }
-            OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.run_log_refresh))
+                OutlinedButton(onClick = onShareDiagnostic, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.run_log_share_diagnostic), maxLines = 1)
+                }
+                OutlinedButton(onClick = onRefresh, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.run_log_refresh), maxLines = 1)
+                }
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),

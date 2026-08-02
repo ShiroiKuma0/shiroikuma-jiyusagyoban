@@ -112,8 +112,14 @@ private fun DiagnosticSummaryCard(
     )
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.66f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+        colors = CardDefaults.cardColors(
+            containerColor = if (healthy) {
+                MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.72f)
+            } else {
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.72f)
+            },
+        ),
+        border = BorderStroke(1.dp, statusColor.copy(alpha = 0.40f)),
         shape = RoundedCornerShape(DesignSystem.Radii.xxl),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {

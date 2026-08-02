@@ -19,12 +19,12 @@ object DesignSystem {
     }
 
     object Screen {
-        val horizontalPadding = 16.dp
-        val verticalPadding = 16.dp
-        val cardPadding = 16.dp
-        val heroCardPadding = 18.dp
-        val sectionGap = 12.dp
-        val cardGap = 12.dp
+        val horizontalPadding = 14.dp
+        val verticalPadding = 12.dp
+        val cardPadding = 14.dp
+        val heroCardPadding = 16.dp
+        val sectionGap = 10.dp
+        val cardGap = 10.dp
     }
 
     // ========== Border Radius Scale ==========
@@ -33,9 +33,9 @@ object DesignSystem {
         val xs = 4.dp      // Tight radius (badge, small buttons)
         val sm = 6.dp      // Small radius (input fields, small components)
         val md = 8.dp      // Medium radius (cards, standard buttons)
-        val lg = 12.dp     // Large radius (dialogs, large cards)
-        val xl = 16.dp     // Extra large radius (bottom sheets, premium cards)
-        val xxl = 18.dp    // Card radius (premium summary cards)
+        val lg = 10.dp     // Large radius (dialogs, large cards)
+        val xl = 12.dp     // Extra large radius (bottom sheets, premium cards)
+        val xxl = 14.dp    // Card radius (premium summary cards)
     }
 
     // ========== Elevation/Shadow Scale ==========
@@ -90,9 +90,9 @@ object DesignSystem {
         val secondary = 0.60f
         val tertiary = 0.38f
         val hintText = 0.60f
-        val elevatedSurface = 0.64f
-        val restingSurface = 0.56f
-        val selectedSurface = 0.42f
-        val subtleBorder = 0.46f
+        val elevatedSurface = 0.92f
+        val restingSurface = 0.78f
+        val selectedSurface = 0.50f
+        val subtleBorder = 0.72f
     }
 }

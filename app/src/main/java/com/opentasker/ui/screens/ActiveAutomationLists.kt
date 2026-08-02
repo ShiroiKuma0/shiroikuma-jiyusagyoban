@@ -628,7 +628,25 @@ private fun TaskCard(
         shape = RoundedCornerShape(16.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(DesignSystem.Radii.md),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.30f)),
+                ) {
+                    Icon(
+                        Icons.Filled.PlayArrow,
+                        contentDescription = runDescription,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .padding(10.dp)
+                            .size(22.dp)
+                            .clearAndSetSemantics { },
+                    )
+                }
                 Column(Modifier.weight(1f)) {
                     Text(task.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
@@ -636,6 +654,18 @@ private fun TaskCard(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                Button(
+                    onClick = onRun,
+                    modifier = Modifier.semantics { contentDescription = runDescription },
+                ) {
+                    Icon(
+                        Icons.Filled.PlayArrow,
+                        contentDescription = runDescription,
+                        modifier = Modifier.clearAndSetSemantics { },
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(stringResource(R.string.action_run))
                 }
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
@@ -694,20 +724,6 @@ private fun TaskCard(
                 }
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                item {
-                    OutlinedButton(
-                        onClick = onRun,
-                        modifier = Modifier.semantics { contentDescription = runDescription },
-                    ) {
-                        Icon(
-                            Icons.Filled.PlayArrow,
-                            contentDescription = runDescription,
-                            modifier = Modifier.clearAndSetSemantics { },
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.action_run))
-                    }
-                }
                 item {
                     OutlinedButton(
                         onClick = onPin,

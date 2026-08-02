@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,18 +31,25 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.AccountTree
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.MonitorHeart
+import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.Sensors
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -66,8 +74,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -84,6 +90,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -206,15 +213,15 @@ private val primaryNavigationScreens = listOf(
 private val secondaryNavigationScreens = OpenTaskerScreen.entries.filterNot { it in primaryNavigationScreens }
 
 private fun OpenTaskerScreen.icon(): ImageVector = when (this) {
-    OpenTaskerScreen.Profiles -> Icons.Filled.CheckCircle
-    OpenTaskerScreen.Tasks -> Icons.Filled.Edit
-    OpenTaskerScreen.Vars -> Icons.Filled.Menu
-    OpenTaskerScreen.Flow -> Icons.Filled.Info
-    OpenTaskerScreen.Scenes -> Icons.Filled.Edit
-    OpenTaskerScreen.Inspector -> Icons.Filled.Info
-    OpenTaskerScreen.Setup -> Icons.Filled.Settings
-    OpenTaskerScreen.RunLog -> Icons.Filled.Info
-    OpenTaskerScreen.Diagnostics -> Icons.Filled.Error
+    OpenTaskerScreen.Profiles -> Icons.Outlined.Tune
+    OpenTaskerScreen.Tasks -> Icons.AutoMirrored.Outlined.PlaylistPlay
+    OpenTaskerScreen.Vars -> Icons.Outlined.Key
+    OpenTaskerScreen.Flow -> Icons.Outlined.AccountTree
+    OpenTaskerScreen.Scenes -> Icons.Outlined.Widgets
+    OpenTaskerScreen.Inspector -> Icons.Outlined.Sensors
+    OpenTaskerScreen.Setup -> Icons.Outlined.Settings
+    OpenTaskerScreen.RunLog -> Icons.Outlined.History
+    OpenTaskerScreen.Diagnostics -> Icons.Outlined.MonitorHeart
 }
 
 internal data class ActionEditState(
@@ -521,11 +528,11 @@ fun ActiveAutomationUi(
 
     var showMoreDestinations by rememberSaveable { mutableStateOf(false) }
     val headerDetail = when (screen) {
-        OpenTaskerScreen.Profiles -> "${profiles.count { it.enabled }} enabled - ${profiles.size} total"
-        OpenTaskerScreen.Tasks -> "${tasks.sumOf { it.actions.size }} actions - ${tasks.size} tasks"
+        OpenTaskerScreen.Profiles -> "${profiles.count { it.enabled }} enabled • ${profiles.size} total"
+        OpenTaskerScreen.Tasks -> "${tasks.sumOf { it.actions.size }} actions • ${tasks.size} tasks"
         OpenTaskerScreen.Vars -> "${globalVariables.size} global variables"
-        OpenTaskerScreen.Flow -> "${profiles.size} profiles - ${tasks.size} tasks"
-        OpenTaskerScreen.Scenes -> "${scenes.sumOf { it.elements.size }} elements - ${scenes.size} scenes"
+        OpenTaskerScreen.Flow -> "${profiles.size} profiles • ${tasks.size} tasks"
+        OpenTaskerScreen.Scenes -> "${scenes.sumOf { it.elements.size }} elements • ${scenes.size} scenes"
         OpenTaskerScreen.Inspector -> "Live context health"
         OpenTaskerScreen.Setup -> "Permission and reliability checks"
         OpenTaskerScreen.RunLog -> "${runLogPage.totalCount} matching entries"
@@ -536,25 +543,10 @@ fun ActiveAutomationUi(
         modifier = modifier
             .fillMaxSize()
             .imePadding(),
+        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("OpenTasker", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(
-                            "${screen.label} - $headerDetail",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                ),
-            )
+            OpenTaskerHeader(screen = screen, detail = headerDetail)
         },
         floatingActionButton = {
             when (screen) {
@@ -569,6 +561,8 @@ fun ActiveAutomationUi(
                             }
                         },
                         shape = RoundedCornerShape(DesignSystem.Radii.lg),
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
                         icon = {
                             Icon(
                                 Icons.Filled.Add,
@@ -582,6 +576,8 @@ fun ActiveAutomationUi(
                 OpenTaskerScreen.Tasks -> ExtendedFloatingActionButton(
                     onClick = { showCreateTaskDialog = true },
                     shape = RoundedCornerShape(DesignSystem.Radii.lg),
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                     icon = { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.task_new)) },
                     text = { Text(stringResource(R.string.task_new)) },
                 )
@@ -596,44 +592,47 @@ fun ActiveAutomationUi(
             }
         },
         bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-                tonalElevation = 0.dp,
-            ) {
-                primaryNavigationScreens.forEach { destination ->
-                    OpenTaskerNavigationItem(
-                        selected = screen == destination,
-                        onClick = {
-                            screenOrdinal = destination.ordinal
-                            showMoreDestinations = false
-                        },
-                        icon = destination.icon(),
-                        label = destination.label,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                Box(Modifier.weight(1f)) {
-                    OpenTaskerNavigationItem(
-                        selected = screen in secondaryNavigationScreens,
-                        onClick = { showMoreDestinations = true },
-                        icon = Icons.Filled.Menu,
-                        label = "More",
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    DropdownMenu(
-                        expanded = showMoreDestinations,
-                        onDismissRequest = { showMoreDestinations = false },
-                        modifier = Modifier.align(Alignment.TopEnd),
-                    ) {
-                        secondaryNavigationScreens.forEach { destination ->
-                            DropdownMenuItem(
-                                text = { Text(destination.label) },
-                                leadingIcon = { Icon(destination.icon(), contentDescription = destination.label) },
-                                onClick = {
-                                    screenOrdinal = destination.ordinal
-                                    showMoreDestinations = false
-                                },
-                            )
+            Column {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.78f))
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 0.dp,
+                ) {
+                    primaryNavigationScreens.forEach { destination ->
+                        OpenTaskerNavigationItem(
+                            selected = screen == destination,
+                            onClick = {
+                                screenOrdinal = destination.ordinal
+                                showMoreDestinations = false
+                            },
+                            icon = destination.icon(),
+                            label = destination.label,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Box(Modifier.weight(1f)) {
+                        OpenTaskerNavigationItem(
+                            selected = screen in secondaryNavigationScreens || showMoreDestinations,
+                            onClick = { showMoreDestinations = true },
+                            icon = Icons.Outlined.MoreHoriz,
+                            label = "More",
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        DropdownMenu(
+                            expanded = showMoreDestinations,
+                            onDismissRequest = { showMoreDestinations = false },
+                            modifier = Modifier.align(Alignment.TopEnd),
+                        ) {
+                            secondaryNavigationScreens.forEach { destination ->
+                                DropdownMenuItem(
+                                    text = { Text(destination.label) },
+                                    leadingIcon = { Icon(destination.icon(), contentDescription = destination.label) },
+                                    onClick = {
+                                        screenOrdinal = destination.ordinal
+                                        showMoreDestinations = false
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -1055,6 +1054,83 @@ fun ActiveAutomationUi(
 private const val DIAGNOSTICS_REFRESH_INTERVAL_MS = 5_000L
 
 @Composable
+private fun OpenTaskerHeader(screen: OpenTaskerScreen, detail: String) {
+    val appName = stringResource(R.string.app_name)
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding(),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(DesignSystem.Radii.md),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.38f)),
+                ) {
+                    Box(
+                        modifier = Modifier.size(40.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_opentasker_mark),
+                            contentDescription = appName,
+                            tint = Color.Unspecified,
+                            modifier = Modifier.size(28.dp),
+                        )
+                    }
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        appName,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                    )
+                    Text(
+                        screen.label,
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        detail,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(DesignSystem.Radii.md),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                ) {
+                    Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = screen.icon(),
+                            contentDescription = screen.label,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.78f))
+        }
+    }
+}
+
+@Composable
 private fun OpenTaskerNavigationItem(
     selected: Boolean,
     onClick: () -> Unit,
@@ -1067,7 +1143,7 @@ private fun OpenTaskerNavigationItem(
     val notSelectedDescription = stringResource(R.string.a11y_not_selected)
     Column(
         modifier = modifier
-            .heightIn(min = 68.dp)
+            .heightIn(min = 64.dp)
             .clickable(role = Role.Tab, onClick = onClick)
             .semantics(mergeDescendants = true) {
                 this.selected = selected
@@ -1079,7 +1155,7 @@ private fun OpenTaskerNavigationItem(
     ) {
         Surface(
             color = if (selected) selectedContainerColor() else Color.Transparent,
-            shape = RoundedCornerShape(6.dp),
+            shape = RoundedCornerShape(DesignSystem.Radii.md),
             border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)) else null,
         ) {
             Box(
@@ -1113,15 +1189,15 @@ private fun OpenTaskerNavigationItem(
 internal fun SummaryMetric(value: String, label: String, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
-        shape = RoundedCornerShape(DesignSystem.Radii.lg),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.84f)),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Text(value, style = MaterialTheme.typography.titleMedium)
+            Text(value, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
