@@ -96,6 +96,7 @@ object AutomationSensitivityRegistry {
         "clipboard.set",
         "notify.show",
         "notify.cancel",
+        "notify.progress",
         "tts.speak",
         "intent.launch",
         "plugin.locale.fire",

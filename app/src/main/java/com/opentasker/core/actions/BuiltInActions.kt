@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.ComponentName
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -122,6 +123,76 @@ class NotifyAction : Action {
         private val nextNotificationId = AtomicInteger(10_000)
     }
 }
+
+/** Posts an ordered progress notification on Android 16+ and a normal progress bar below it. */
+class ProgressNotificationAction : Action {
+    override val id = "notify.progress"
+    override val category = ActionCategory.NOTIFICATION
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(ctx.app, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return ActionResult.Failure("Notification permission is not granted")
+        }
+        val progress = parseProgress(args["progress"])
+            ?: return ActionResult.Failure("progress must be an integer from 0 to 100")
+        if (progress !in 0..100) return ActionResult.Failure("progress must be an integer from 0 to 100")
+        val channelDef = NotificationChannels.resolve(args["channel"] ?: "default")
+        val manager = ctx.app.getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(NotificationChannel(channelDef.id, channelDef.name, channelDef.importance))
+        val title = args["title"]?.takeIf { it.isNotBlank() } ?: "Progress"
+        val text = args["text"].orEmpty()
+        val id = args["id"]?.toIntOrNull() ?: nextNotificationId.getAndIncrement()
+        val tag = args["tag"]?.takeIf { it.isNotBlank() }
+        val segments = parseSegmentLengths(args["segments"])
+
+        val notification = if (Build.VERSION.SDK_INT >= 36) {
+            val style = Notification.ProgressStyle()
+                .setProgress(progress)
+                .setStyledByProgress(true)
+            if (segments.isNotEmpty()) {
+                style.setProgressSegments(segments.map { Notification.ProgressStyle.Segment(it) })
+            }
+            Notification.Builder(ctx.app, channelDef.id)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setCategory(Notification.CATEGORY_PROGRESS)
+                .setOnlyAlertOnce(true)
+                .setOngoing(progress < 100)
+                .setStyle(style)
+                .build()
+        } else {
+            NotificationCompat.Builder(ctx.app, channelDef.id)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setProgress(100, progress, false)
+                .setOnlyAlertOnce(true)
+                .setOngoing(progress < 100)
+                .build()
+        }
+        return try {
+            NotificationManagerCompat.from(ctx.app).notify(tag, id, notification)
+            ctx.logger("Progress notification: $progress% (id=$id)")
+            ActionResult.Success
+        } catch (ex: SecurityException) {
+            ActionResult.Failure("progress notification failed: ${ex.message}", ex)
+        }
+    }
+
+    private companion object {
+        val nextNotificationId = AtomicInteger(20_000)
+    }
+}
+
+internal fun parseProgress(value: String?): Int? = value?.trim()?.toIntOrNull()?.takeIf { it in 0..100 }
+
+internal fun parseSegmentLengths(value: String?): List<Int> = value.orEmpty()
+    .split(',', ';')
+    .mapNotNull { it.trim().toIntOrNull() }
+    .filter { it > 0 }
 
 class NotifyCancelAction : Action {
     override val id = "notify.cancel"

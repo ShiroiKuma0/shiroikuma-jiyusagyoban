@@ -150,6 +150,24 @@ fun registerActionMetadata() {
     )
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "notify.progress",
+            nameRes = R.string.catalog_action_notify_progress_name,
+            descriptionRes = R.string.catalog_action_notify_progress_description,
+            categoryRes = R.string.catalog_category_notification,
+            fields = listOf(
+                ActionField("title", R.string.catalog_action_notify_progress_field_title_label, required = true, hintRes = R.string.catalog_action_notify_progress_field_title_hint),
+                ActionField("text", R.string.catalog_action_notify_progress_field_text_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_notify_progress_field_text_hint),
+                ActionField("progress", R.string.catalog_action_notify_progress_field_progress_label, FieldType.NUMBER, required = true, hintRes = R.string.catalog_action_notify_progress_field_progress_hint, numberRule = integerRule(0, 100)),
+                ActionField("segments", R.string.catalog_action_notify_progress_field_segments_label, hintRes = R.string.catalog_action_notify_progress_field_segments_hint),
+                ActionField("channel", R.string.catalog_action_notify_progress_field_channel_label, hintRes = R.string.catalog_action_notify_progress_field_channel_hint),
+                ActionField("tag", R.string.catalog_action_notify_progress_field_tag_label, hintRes = R.string.catalog_action_notify_progress_field_tag_hint),
+                ActionField("id", R.string.catalog_action_notify_progress_field_id_label, FieldType.NUMBER, hintRes = R.string.catalog_action_notify_progress_field_id_hint, numberRule = integerRule(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong())),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "notify.cancel",
             nameRes = R.string.catalog_action_notify_cancel_name,
             descriptionRes = R.string.catalog_action_notify_cancel_description,

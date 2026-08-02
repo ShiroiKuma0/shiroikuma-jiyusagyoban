@@ -10,6 +10,8 @@
 
 - **Shortcut publishing**: tasks can publish dynamic launcher shortcuts or request pinned shortcuts with bounded labels, stable IDs, and explicit task bindings.
 
+- **Progress notifications**: added an Android 16 `Notification.ProgressStyle` action with ordered segments and a standard progress-bar fallback on older releases.
+
 - **Adaptive shell**: medium and expanded windows now use a scrollable navigation rail with every destination visible, while compact windows keep bottom navigation; the layout switches from live window width so rotation and resize preserve the selected screen.
 
 - **Scene authoring safety**: image drafts no longer save placeholder sources; picker-selected images must decode before save, invalid imports are rejected, accessibility descriptions/decorative state flow into overlays, and shared slider/image config validation is enforced by editor, import, diagnostics, and runtime.

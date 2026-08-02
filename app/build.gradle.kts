@@ -660,7 +660,7 @@ val verifyDocumentationTruth = tasks.register("verifyDocumentationTruth") {
         check("version-$appVersionName-blue.svg" in readme) {
             "README version badge does not match the current application version."
         }
-        check("**68 built-in actions**" in readme && "**7 context families**" in readme) {
+        check("**70 built-in actions**" in readme && "**7 context families**" in readme) {
             "README capability counts do not match the current release contract."
         }
 
@@ -677,7 +677,7 @@ val verifyDocumentationTruth = tasks.register("verifyDocumentationTruth") {
             claims.filterNot { claim ->
                 claim == "v$appVersionName" ||
                     claim == "schema 10" ||
-                    claim == "68 built-in actions"
+                claim == "70 built-in actions"
             }.map { claim -> "${file.relativeTo(rootProject.projectDir)}: $claim" }
         }
         staleClaims.forEach { claim -> logger.warn("Documentation freshness: historical claim detected: $claim") }

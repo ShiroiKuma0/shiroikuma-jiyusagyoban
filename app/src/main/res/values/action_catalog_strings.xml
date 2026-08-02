@@ -521,6 +521,22 @@
     <string name="catalog_action_log_name" formatted="false">Log Message</string>
     <string name="catalog_action_log_description" formatted="false">Write message to task log</string>
     <string name="catalog_action_log_field_message_label" formatted="false">Message</string>
+    <string name="catalog_action_notify_progress_name" formatted="false">Progress Notification</string>
+    <string name="catalog_action_notify_progress_description" formatted="false">Post ordered progress feedback with an Android 16 fallback</string>
+    <string name="catalog_action_notify_progress_field_title_label" formatted="false">Title</string>
+    <string name="catalog_action_notify_progress_field_title_hint" formatted="false">Notification title</string>
+    <string name="catalog_action_notify_progress_field_text_label" formatted="false">Text</string>
+    <string name="catalog_action_notify_progress_field_text_hint" formatted="false">Optional status text</string>
+    <string name="catalog_action_notify_progress_field_progress_label" formatted="false">Progress</string>
+    <string name="catalog_action_notify_progress_field_progress_hint" formatted="false">0 to 100</string>
+    <string name="catalog_action_notify_progress_field_segments_label" formatted="false">Segments</string>
+    <string name="catalog_action_notify_progress_field_segments_hint" formatted="false">Optional comma-separated positive lengths</string>
+    <string name="catalog_action_notify_progress_field_channel_label" formatted="false">Channel</string>
+    <string name="catalog_action_notify_progress_field_channel_hint" formatted="false">quiet, default, or urgent</string>
+    <string name="catalog_action_notify_progress_field_tag_label" formatted="false">Tag</string>
+    <string name="catalog_action_notify_progress_field_tag_hint" formatted="false">Optional replacement tag</string>
+    <string name="catalog_action_notify_progress_field_id_label" formatted="false">ID</string>
+    <string name="catalog_action_notify_progress_field_id_hint" formatted="false">Optional notification ID</string>
     <string name="catalog_action_shortcut_publish_name" formatted="false">Publish Shortcut</string>
     <string name="catalog_action_shortcut_publish_description" formatted="false">Create a dynamic or pinned launcher shortcut for a task</string>
     <string name="catalog_action_shortcut_publish_field_id_label" formatted="false">Shortcut ID</string>
