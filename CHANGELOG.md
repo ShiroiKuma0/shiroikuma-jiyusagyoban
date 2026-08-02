@@ -2,14 +2,14 @@
 
 ## Unreleased
 
+## v0.2.80
+
 - Add a build-gated `event=sms_received` SMS/MMS trigger with sanitized sender/body metadata, sender/body filters, Android 17 OTP-delay disclosure, and Play-artifact exclusion.
 - Add Android 16 Advanced Protection live detection, diagnostics/setup banners, and `event=advanced_protection` enabled/disabled transitions with reflection-safe callback teardown.
 
 - Add Android 16 Bluetooth `bluetooth_key_missing` and `bluetooth_encryption_change` event contexts with device/security metadata, editor presets, permission setup copy, and low-SDK no-op gating.
 
 - Add owned Android 15+ Zen rule set/clear actions with grayscale, dim-wallpaper, and night-mode effects, plus transient DND fallback on older Android versions.
-
-## Unreleased
 
 - **App archive actions**: added SDK-gated `app.archive` and `app.unarchive` actions with bounded PackageInstaller status handling, package validation, explicit self-archive refusal, and fail-closed permission/installer errors.
 

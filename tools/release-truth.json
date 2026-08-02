@@ -2,8 +2,8 @@
     "schemaVersion":  1,
     "requiredArtifactCommit":  "a30bee6dff2a3b631a137048b2d4178b079da9e5",
     "application":  {
-                        "versionName":  "0.2.79",
-                        "versionCode":  81
+                        "versionName":  "0.2.80",
+                        "versionCode":  82
                     },
     "android":  {
                     "minSdk":  26,
