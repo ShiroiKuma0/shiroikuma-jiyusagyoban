@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Companion presence trigger**: added user-confirmed CompanionDeviceManager association and revocation setup, OS-managed presence callbacks, and `event=companion_presence` present/absent matching without a scan loop.
+
 - **Matcher pulse continuity**: profile matcher rebuilds now carry event-pulse sequence state across edits and suppress replayed push/share/boot deliveries per context slot, preventing reconcile-time drops and duplicate runs.
 
 - **Room migrations and writes**: additive schema transitions now use Room 2.8 auto-migrations backed by the exported schema history, while semantic rewrites remain explicit; profile and variable writes use `@Upsert` to remove insert/update races.

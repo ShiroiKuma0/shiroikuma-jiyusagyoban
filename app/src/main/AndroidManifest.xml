@@ -169,6 +169,15 @@
             </intent-filter>
         </service>
 
+        <service
+            android:name="com.opentasker.core.contexts.CompanionPresenceService"
+            android:exported="true"
+            android:permission="android.permission.BIND_COMPANION_DEVICE_SERVICE">
+            <intent-filter>
+                <action android:name="android.companion.CompanionDeviceService" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name="com.opentasker.core.engine.BootReceiver"
             android:exported="false">

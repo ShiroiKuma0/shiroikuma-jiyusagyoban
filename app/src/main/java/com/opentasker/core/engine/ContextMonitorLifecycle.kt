@@ -19,6 +19,7 @@ internal enum class ContextMonitor {
     PACKAGE_EVENTS,
     BLUETOOTH_EVENTS,
     USB_EVENTS,
+    COMPANION_EVENTS,
 }
 
 internal data class ContextMonitorHandle(
@@ -142,6 +143,7 @@ private fun MutableSet<ContextMonitor>.addEventMonitor(spec: ContextSpec) {
         "package_added", "package_removed", "package_replaced" -> add(ContextMonitor.PACKAGE_EVENTS)
         "bluetooth" -> add(ContextMonitor.BLUETOOTH_EVENTS)
         "usb" -> add(ContextMonitor.USB_EVENTS)
+        "companion_presence" -> add(ContextMonitor.COMPANION_EVENTS)
         "" -> addAll(EVENT_MONITORS)
         else -> Unit
     }
@@ -162,4 +164,5 @@ private val EVENT_MONITORS = setOf(
     ContextMonitor.PACKAGE_EVENTS,
     ContextMonitor.BLUETOOTH_EVENTS,
     ContextMonitor.USB_EVENTS,
+    ContextMonitor.COMPANION_EVENTS,
 )

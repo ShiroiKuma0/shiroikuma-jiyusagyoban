@@ -54,6 +54,7 @@ class EventContextSourceImpl : EventDemandContextSource {
         PackageContextEvents.events,
         BluetoothContextEvents.events,
         UsbDeviceContextEvents.events,
+        CompanionContextEvents.events,
         NotificationContextEvents.events,
         NfcContextEvents.events,
         BootContextEvents.events,

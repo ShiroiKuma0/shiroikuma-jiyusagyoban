@@ -147,6 +147,10 @@ class AutomationService : Service() {
                     },
                     stop = { unregisterReceiver(UsbDeviceContextEvents.receiver) },
                 ),
+                ContextMonitor.COMPANION_EVENTS to ContextMonitorHandle(
+                    start = { true },
+                    stop = {},
+                ),
             ),
         )
     }

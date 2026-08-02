@@ -112,6 +112,7 @@ class ContextMonitorLifecycleTest {
                 ContextMonitor.PACKAGE_EVENTS,
                 ContextMonitor.BLUETOOTH_EVENTS,
                 ContextMonitor.USB_EVENTS,
+                ContextMonitor.COMPANION_EVENTS,
             ),
             requiredContextMonitors(broad),
         )

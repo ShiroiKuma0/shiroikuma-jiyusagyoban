@@ -15,6 +15,7 @@ import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -93,6 +94,8 @@ import com.opentasker.core.scripting.TermuxScriptState
 import com.opentasker.core.capabilities.SetupRequirement
 import com.opentasker.core.capabilities.SetupRequirementResolver
 import com.opentasker.core.contexts.PushTriggerTokenStore
+import com.opentasker.core.contexts.CompanionAssociationResult
+import com.opentasker.core.contexts.CompanionDeviceAssociation
 import com.opentasker.core.plugins.locale.LocaleGrantStore
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
@@ -291,6 +294,7 @@ fun PermissionOnboardingScreen(
 
         item { TermuxScriptAllowlistCard(onMessage) }
         item { PushTriggerSetupCard(onMessage) }
+        item { CompanionSetupCard(onMessage) }
         item { LocaleGrantManagementCard(tasks = tasks, refreshKey = refreshTick) }
 
         SetupSection.entries.forEach { section ->
@@ -338,6 +342,93 @@ fun PermissionOnboardingScreen(
                         },
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompanionSetupCard(onMessage: (String) -> Unit) {
+    val context = LocalContext.current
+    val activity = context.findActivity()
+    var refreshTick by remember { mutableIntStateOf(0) }
+    var associations by remember(context, refreshTick) {
+        mutableStateOf(CompanionDeviceAssociation.list(context))
+    }
+    val associatedMessage = stringResource(R.string.setup_companion_associated)
+    val failureMessage = stringResource(R.string.setup_companion_failed)
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) {
+        associations = CompanionDeviceAssociation.list(context)
+        refreshTick++
+        onMessage(associatedMessage)
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(stringResource(R.string.setup_companion_title), style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(R.string.setup_companion_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (associations.isEmpty()) {
+                Text(
+                    stringResource(R.string.setup_companion_empty),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                associations.forEach { association ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(association.label, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        OutlinedButton(
+                            onClick = {
+                                CompanionDeviceAssociation.disassociate(context, association)
+                                associations = CompanionDeviceAssociation.list(context)
+                                refreshTick++
+                            },
+                        ) {
+                            Text(stringResource(R.string.setup_companion_revoke))
+                        }
+                    }
+                }
+            }
+            Button(
+                enabled = activity != null,
+                onClick = {
+                    val started = activity?.let {
+                        CompanionDeviceAssociation.associate(it) { result ->
+                            when (result) {
+                                is CompanionAssociationResult.Found -> launcher.launch(
+                                    IntentSenderRequest.Builder(result.intentSender).build(),
+                                )
+                                is CompanionAssociationResult.Created -> {
+                                    associations = CompanionDeviceAssociation.list(context)
+                                    refreshTick++
+                                    onMessage(associatedMessage)
+                                }
+                                is CompanionAssociationResult.Failed -> onMessage(
+                                    result.message.ifBlank { failureMessage },
+                                )
+                            }
+                        }
+                    } ?: false
+                    if (!started) onMessage(failureMessage)
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.setup_companion_associate))
             }
         }
     }

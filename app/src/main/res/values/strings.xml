@@ -1065,6 +1065,13 @@
     <string name="setup_push_token">Distributor token: %1$s</string>
     <string name="setup_push_copy">Copy distributor token</string>
     <string name="setup_push_copied">Distributor token copied.</string>
+    <string name="setup_companion_title">Companion device presence</string>
+    <string name="setup_companion_body">Associate a nearby Bluetooth device with Android’s low-power companion service. Profiles can match event=companion_presence with state=present or absent.</string>
+    <string name="setup_companion_empty">No companion devices are associated.</string>
+    <string name="setup_companion_associate">Associate a device</string>
+    <string name="setup_companion_revoke">Revoke</string>
+    <string name="setup_companion_associated">Companion device association updated.</string>
+    <string name="setup_companion_failed">Unable to start companion device association.</string>
     <string name="setup_locale_grants_title">Locale execution grants</string>
     <string name="setup_locale_grants_body">These grants let Locale-compatible hosts fire one selected task. Revoke a grant to block future fires without deleting the task.</string>
     <string name="setup_locale_grants_empty">No Locale execution grants are issued.</string>
