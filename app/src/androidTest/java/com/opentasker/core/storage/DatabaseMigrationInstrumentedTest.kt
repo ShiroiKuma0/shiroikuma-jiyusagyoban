@@ -266,6 +266,33 @@ class DatabaseMigrationInstrumentedTest {
     }
 
     @Test
+    fun appDatabaseMigratesFrom9To10WithRedoColumns() {
+        appDatabaseHelper.createDatabase(APP_DATABASE_NAME, 9).apply {
+            execSQL(
+                """
+                INSERT INTO edit_history (id, entityType, entityId, previousJson, timestamp)
+                VALUES (1, 'scene', 7, 'scene-a', 1000)
+                """.trimIndent(),
+            )
+            close()
+        }
+
+        val migrated = appDatabaseHelper.runMigrationsAndValidate(
+            APP_DATABASE_NAME,
+            10,
+            true,
+            DatabaseMigrations.MIGRATION_9_10,
+        )
+
+        migrated.query("SELECT previousJson, nextJson, isUndone FROM edit_history WHERE id = 1").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("scene-a", cursor.getString(0))
+            assertEquals("", cursor.getString(1))
+            assertEquals(0, cursor.getInt(2))
+        }
+    }
+
+    @Test
     fun appDatabaseMigratesFullPathFrom1ToCurrent() {
         appDatabaseHelper.createDatabase(APP_DATABASE_NAME, 1).apply {
             execSQL(
@@ -282,7 +309,7 @@ class DatabaseMigrationInstrumentedTest {
 
         val migrated = appDatabaseHelper.runMigrationsAndValidate(
             APP_DATABASE_NAME,
-            8,
+            10,
             true,
             *DatabaseMigrations.getAllMigrations(),
         )

@@ -29,6 +29,8 @@ fun SceneLibraryScreen(
     focusSceneId: Long? = null,
     onCreateScene: (String, Int, Int) -> Unit,
     onUpdateScene: (Scene, String) -> Unit,
+    onUndoSceneEdit: (Scene) -> Unit = {},
+    onRedoSceneEdit: (Scene) -> Unit = {},
     onDeleteScene: (Scene) -> Unit,
     contentPadding: PaddingValues,
 ) {
@@ -161,6 +163,8 @@ fun SceneLibraryScreen(
                     pendingElementDeleteIndex = index
                 },
                 onUpdateScene = onUpdateScene,
+                onUndo = { onUndoSceneEdit(scene) },
+                onRedo = { onRedoSceneEdit(scene) },
                 onDelete = { onDeleteScene(scene) },
                 onShowOverlay = { SceneOverlayService.show(sceneContext, scene) },
             )

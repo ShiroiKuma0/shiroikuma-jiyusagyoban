@@ -38,7 +38,8 @@ class ExecutionSemanticsContractTest {
         val method = source.substringAfter("fun moveTaskAction(").substringBefore("fun createScene(")
 
         assertTrue(method.contains("db.withTransaction"))
-        assertTrue(method.contains("previousJson = entity.actionsJson"))
+        assertTrue(method.contains("previousJson = StorageJson.encodeToString(decoded.value)"))
+        assertTrue(method.contains("nextJson = StorageJson.encodeToString(updated)"))
         assertTrue(method.contains("db.taskDao().update(updated.toEntity())"))
     }
 }

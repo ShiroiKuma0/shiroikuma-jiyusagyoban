@@ -81,4 +81,76 @@ class EditHistoryDaoInstrumentedTest {
             db.close()
         }
     }
+
+    @Test
+    fun multiStepUndoRedoKeepsCursorAndClearsRedoBranch() = runBlocking {
+        val db = buildDb()
+        try {
+            val dao = db.editHistoryDao()
+            val firstId = dao.insert(
+                EditHistoryEntity(
+                    entityType = EditHistoryDao.TYPE_TASK,
+                    entityId = 10,
+                    previousJson = "A",
+                    nextJson = "B",
+                    timestamp = 1,
+                ),
+            )
+            val secondId = dao.insert(
+                EditHistoryEntity(
+                    entityType = EditHistoryDao.TYPE_TASK,
+                    entityId = 10,
+                    previousJson = "B",
+                    nextJson = "C",
+                    timestamp = 2,
+                ),
+            )
+            val thirdId = dao.insert(
+                EditHistoryEntity(
+                    entityType = EditHistoryDao.TYPE_TASK,
+                    entityId = 10,
+                    previousJson = "C",
+                    nextJson = "D",
+                    timestamp = 3,
+                ),
+            )
+            dao.insert(
+                EditHistoryEntity(
+                    entityType = EditHistoryDao.TYPE_SCENE,
+                    entityId = 10,
+                    previousJson = "scene-a",
+                    nextJson = "scene-b",
+                    timestamp = 4,
+                ),
+            )
+
+            assertEquals(thirdId, dao.getUndoCandidate(EditHistoryDao.TYPE_TASK, 10)?.id)
+            dao.markUndone(thirdId, "D")
+            assertEquals(secondId, dao.getUndoCandidate(EditHistoryDao.TYPE_TASK, 10)?.id)
+            dao.markUndone(secondId, "C")
+            assertEquals(firstId, dao.getUndoCandidate(EditHistoryDao.TYPE_TASK, 10)?.id)
+            assertEquals(secondId, dao.getRedoCandidate(EditHistoryDao.TYPE_TASK, 10)?.id)
+            dao.markRedone(secondId)
+            assertEquals(thirdId, dao.getRedoCandidate(EditHistoryDao.TYPE_TASK, 10)?.id)
+            dao.markRedone(thirdId)
+            assertEquals(null, dao.getRedoCandidate(EditHistoryDao.TYPE_TASK, 10))
+            assertEquals(null, dao.getRedoCandidate(EditHistoryDao.TYPE_SCENE, 10))
+
+            dao.markUndone(thirdId, "D")
+            dao.deleteRedoBranch(EditHistoryDao.TYPE_TASK, 10)
+            val branchedId = dao.insert(
+                EditHistoryEntity(
+                    entityType = EditHistoryDao.TYPE_TASK,
+                    entityId = 10,
+                    previousJson = "C",
+                    nextJson = "X",
+                    timestamp = 5,
+                ),
+            )
+            assertEquals(branchedId, dao.getUndoCandidate(EditHistoryDao.TYPE_TASK, 10)?.id)
+            assertEquals(null, dao.getRedoCandidate(EditHistoryDao.TYPE_TASK, 10))
+        } finally {
+            db.close()
+        }
+    }
 }

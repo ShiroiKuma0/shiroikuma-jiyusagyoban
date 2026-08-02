@@ -59,6 +59,7 @@ import com.opentasker.core.storage.RunLogQuery
 import com.opentasker.core.storage.RunLogSnapshot
 import com.opentasker.core.storage.RunLogTaskOption
 import com.opentasker.core.storage.StorageDecodeIssue
+import com.opentasker.core.storage.StorageJson
 import com.opentasker.core.storage.VariableRepository
 import com.opentasker.core.storage.ProjectEntity
 import com.opentasker.core.storage.minimumTimestamp
@@ -259,6 +260,24 @@ class ActiveAutomationViewModel(
         else -> message(R.string.ui_error_message, value)
     }
 
+    private suspend fun recordEdit(
+        entityType: String,
+        entityId: Long,
+        previousJson: String,
+        nextJson: String,
+    ) {
+        db.editHistoryDao().deleteRedoBranch(entityType, entityId)
+        db.editHistoryDao().insert(
+            EditHistoryEntity(
+                entityType = entityType,
+                entityId = entityId,
+                previousJson = previousJson,
+                nextJson = nextJson,
+            ),
+        )
+        db.editHistoryDao().pruneOld(entityType, entityId)
+    }
+
     private val profileDecodeResults = db.profileDao()
         .getAllAsFlow()
         .map { entities -> entities.map { it.toDomainDecodeResult() } }
@@ -443,20 +462,18 @@ class ActiveAutomationViewModel(
                 previous.toDomainDecodeResult().issue?.let { issue ->
                     throw CorruptRecordOverwriteException(issue)
                 }
-                db.editHistoryDao().insert(
-                    EditHistoryEntity(
-                        entityType = EditHistoryDao.TYPE_TASK,
-                        entityId = task.id,
-                        previousJson = previous.actionsJson,
-                    ),
+                val previousTask = previous.toDomain()
+                recordEdit(
+                    entityType = EditHistoryDao.TYPE_TASK,
+                    entityId = task.id,
+                    previousJson = StorageJson.encodeToString(previousTask),
+                    nextJson = StorageJson.encodeToString(task),
                 )
-                db.editHistoryDao().pruneOld(EditHistoryDao.TYPE_TASK, task.id)
 
                 // A rename breaks every reference that still names this task ("task.run" targets,
                 // legacy notification bindings). Pin those to the stable id in the same
                 // transaction so they cannot dangle or be captured by a future task that takes the
                 // old name.
-                val previousTask = previous.toDomain()
                 if (!previousTask.name.equals(task.name, ignoreCase = true)) {
                     val rewrite = AutomationReferenceRewriter.stabilizeNameReferences(
                         target = previousTask,
@@ -481,14 +498,12 @@ class ActiveAutomationViewModel(
             val updated = decoded.value.copy(
                 actions = reorderActions(decoded.value.actions, fromIndex, toIndex),
             )
-            db.editHistoryDao().insert(
-                EditHistoryEntity(
-                    entityType = EditHistoryDao.TYPE_TASK,
-                    entityId = taskId,
-                    previousJson = entity.actionsJson,
-                ),
+            recordEdit(
+                entityType = EditHistoryDao.TYPE_TASK,
+                entityId = taskId,
+                previousJson = StorageJson.encodeToString(decoded.value),
+                nextJson = StorageJson.encodeToString(updated),
             )
-            db.editHistoryDao().pruneOld(EditHistoryDao.TYPE_TASK, taskId)
             db.taskDao().update(updated.toEntity())
         }
     }
@@ -574,14 +589,12 @@ class ActiveAutomationViewModel(
                 previous.toDomainDecodeResult().issue?.let { issue ->
                     throw CorruptRecordOverwriteException(issue)
                 }
-                db.editHistoryDao().insert(
-                    EditHistoryEntity(
-                        entityType = EditHistoryDao.TYPE_SCENE,
-                        entityId = scene.id,
-                        previousJson = previous.elementsJson,
-                    ),
+                recordEdit(
+                    entityType = EditHistoryDao.TYPE_SCENE,
+                    entityId = scene.id,
+                    previousJson = StorageJson.encodeToString(previous.toDomain()),
+                    nextJson = StorageJson.encodeToString(scene),
                 )
-                db.editHistoryDao().pruneOld(EditHistoryDao.TYPE_SCENE, scene.id)
             }
             db.sceneDao().update(scene.toEntity())
         }
@@ -627,14 +640,12 @@ class ActiveAutomationViewModel(
                     throw IllegalStateException("Review imported automation powers before enabling this profile.")
                 }
                 if (previousEntity != null) {
-                    db.editHistoryDao().insert(
-                        EditHistoryEntity(
-                            entityType = EditHistoryDao.TYPE_PROFILE,
-                            entityId = profile.id,
-                            previousJson = previousEntity.contextsJson,
-                        ),
+                    recordEdit(
+                        entityType = EditHistoryDao.TYPE_PROFILE,
+                        entityId = profile.id,
+                        previousJson = StorageJson.encodeToString(previous),
+                        nextJson = StorageJson.encodeToString(reviewedProfile),
                     )
-                    db.editHistoryDao().pruneOld(EditHistoryDao.TYPE_PROFILE, profile.id)
                 }
                 if (previous != null && previous.contexts != profile.contexts) {
                     locationDwellStateStore.clearProfile(profile.id)
@@ -1296,35 +1307,96 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun undoLastTaskEdit(taskId: Long) {
+    private suspend fun transitionEdit(entityType: String, entityId: Long, redo: Boolean): Boolean = db.withTransaction {
+        val history = db.editHistoryDao()
+        val snapshot = if (redo) {
+            history.getRedoCandidate(entityType, entityId)
+        } else {
+            history.getUndoCandidate(entityType, entityId)
+        } ?: return@withTransaction false
+        val targetJson = if (redo) snapshot.nextJson else snapshot.previousJson
+        if (targetJson.isBlank()) return@withTransaction false
+
+        when (entityType) {
+            EditHistoryDao.TYPE_TASK -> {
+                val current = db.taskDao().getById(entityId) ?: return@withTransaction false
+                val currentDecoded = current.toDomainDecodeResult()
+                val currentJson = if (currentDecoded.issue == null) {
+                    StorageJson.encodeToString(currentDecoded.value)
+                } else {
+                    current.actionsJson
+                }
+                val restored = runCatching {
+                    StorageJson.decodeFromString<Task>(targetJson)
+                        .takeIf { it.id == entityId }
+                        ?.toEntity()
+                }.getOrNull() ?: current.copy(actionsJson = targetJson)
+                db.taskDao().update(restored)
+                if (redo) history.markRedone(snapshot.id) else history.markUndone(snapshot.id, currentJson)
+            }
+
+            EditHistoryDao.TYPE_PROFILE -> {
+                val current = db.profileDao().getById(entityId) ?: return@withTransaction false
+                val currentDecoded = current.toDomainDecodeResult()
+                val currentJson = if (currentDecoded.issue == null) {
+                    StorageJson.encodeToString(currentDecoded.value)
+                } else {
+                    current.contextsJson
+                }
+                val restored = runCatching {
+                    StorageJson.decodeFromString<Profile>(targetJson)
+                        .takeIf { it.id == entityId }
+                        ?.toEntity()
+                }.getOrNull() ?: current.copy(contextsJson = targetJson)
+                db.profileDao().update(restored)
+                locationDwellStateStore.clearProfile(entityId)
+                if (redo) history.markRedone(snapshot.id) else history.markUndone(snapshot.id, currentJson)
+            }
+
+            EditHistoryDao.TYPE_SCENE -> {
+                val current = db.sceneDao().getById(entityId) ?: return@withTransaction false
+                val currentDecoded = current.toDomainDecodeResult()
+                val currentJson = if (currentDecoded.issue == null) {
+                    StorageJson.encodeToString(currentDecoded.value)
+                } else {
+                    current.elementsJson
+                }
+                val restored = runCatching {
+                    StorageJson.decodeFromString<Scene>(targetJson)
+                        .takeIf { it.id == entityId }
+                        ?.toEntity()
+                }.getOrNull() ?: current.copy(elementsJson = targetJson)
+                db.sceneDao().update(restored)
+                if (redo) history.markRedone(snapshot.id) else history.markUndone(snapshot.id, currentJson)
+            }
+
+            else -> return@withTransaction false
+        }
+        true
+    }
+
+    private fun transitionEditAsync(entityType: String, entityId: Long, redo: Boolean) {
         viewModelScope.launch {
-            runCatching {
-                val snapshot = db.editHistoryDao().getLatest(EditHistoryDao.TYPE_TASK, taskId)
-                    ?: return@runCatching false
-                val current = db.taskDao().getById(taskId) ?: return@runCatching false
-                db.taskDao().update(current.copy(actionsJson = snapshot.previousJson))
-                db.editHistoryDao().deleteFor(EditHistoryDao.TYPE_TASK, taskId)
-                true
-            }.onSuccess { undone ->
-                events.send(message(if (undone) R.string.ui_message_edit_undone else R.string.ui_message_no_edit_history))
-            }.onFailure { events.send(errorMessage(it, R.string.ui_error_undo)) }
+            runCatching { transitionEdit(entityType, entityId, redo) }
+                .onSuccess { changed ->
+                    val messageRes = when {
+                        changed && redo -> R.string.ui_message_edit_redone
+                        changed -> R.string.ui_message_edit_undone
+                        redo -> R.string.ui_message_no_redo_history
+                        else -> R.string.ui_message_no_edit_history
+                    }
+                    events.send(message(messageRes))
+                }
+                .onFailure { events.send(errorMessage(it, if (redo) R.string.ui_error_redo else R.string.ui_error_undo)) }
         }
     }
 
-    fun undoLastProfileEdit(profileId: Long) {
-        viewModelScope.launch {
-            runCatching {
-                val snapshot = db.editHistoryDao().getLatest(EditHistoryDao.TYPE_PROFILE, profileId)
-                    ?: return@runCatching false
-                val current = db.profileDao().getById(profileId) ?: return@runCatching false
-                db.profileDao().update(current.copy(contextsJson = snapshot.previousJson))
-                db.editHistoryDao().deleteFor(EditHistoryDao.TYPE_PROFILE, profileId)
-                true
-            }.onSuccess { undone ->
-                events.send(message(if (undone) R.string.ui_message_edit_undone else R.string.ui_message_no_edit_history))
-            }.onFailure { events.send(errorMessage(it, R.string.ui_error_undo)) }
-        }
-    }
+    fun undoLastTaskEdit(taskId: Long) = transitionEditAsync(EditHistoryDao.TYPE_TASK, taskId, redo = false)
+    fun redoLastTaskEdit(taskId: Long) = transitionEditAsync(EditHistoryDao.TYPE_TASK, taskId, redo = true)
+    fun undoLastProfileEdit(profileId: Long) = transitionEditAsync(EditHistoryDao.TYPE_PROFILE, profileId, redo = false)
+    fun redoLastProfileEdit(profileId: Long) = transitionEditAsync(EditHistoryDao.TYPE_PROFILE, profileId, redo = true)
+    fun undoLastSceneEdit(sceneId: Long) = transitionEditAsync(EditHistoryDao.TYPE_SCENE, sceneId, redo = false)
+    fun redoLastSceneEdit(sceneId: Long) = transitionEditAsync(EditHistoryDao.TYPE_SCENE, sceneId, redo = true)
 
     fun updateVariable(name: String, value: String, isSecret: Boolean, successMessage: String, projectId: Long = DEFAULT_PROJECT_ID) {
         viewModelScope.launch {

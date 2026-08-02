@@ -86,6 +86,8 @@ internal fun ProfilesScreen(
     onImportTaskerXml: () -> Unit,
     taskerImportBusy: Boolean,
     onEditProfile: (Profile) -> Unit,
+    onUndoProfileEdit: (Profile) -> Unit = {},
+    onRedoProfileEdit: (Profile) -> Unit = {},
     onDeleteProfile: (Profile) -> Unit,
     onToggleProfile: (Profile, Boolean) -> Unit,
     onAddContext: (Profile) -> Unit,
@@ -218,6 +220,8 @@ internal fun ProfilesScreen(
                 profile = profile,
                 enterTaskName = enterTaskName,
                 onEdit = { onEditProfile(profile) },
+                onUndo = { onUndoProfileEdit(profile) },
+                onRedo = { onRedoProfileEdit(profile) },
                 onDelete = { onDeleteProfile(profile) },
                 onToggle = { onToggleProfile(profile, it) },
                 onAddContext = { onAddContext(profile) },
@@ -414,6 +418,8 @@ private fun ProfileCard(
     profile: Profile,
     enterTaskName: String,
     onEdit: () -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
     onDelete: () -> Unit,
     onToggle: (Boolean) -> Unit,
     onPreflight: () -> Unit,
@@ -546,6 +552,7 @@ private fun ProfileCard(
                     Text(stringResource(R.string.profile_delete))
                 }
             }
+            HistoryButtons(onUndo = onUndo, onRedo = onRedo)
         }
     }
 }
@@ -556,6 +563,8 @@ internal fun TasksScreen(
     storageDecodeIssues: List<StorageDecodeIssue>,
     onCreateTask: () -> Unit,
     onEditTask: (Task) -> Unit,
+    onUndoTaskEdit: (Task) -> Unit = {},
+    onRedoTaskEdit: (Task) -> Unit = {},
     onDeleteTask: (Task) -> Unit,
     onRunTask: (Task) -> Unit,
     onPreflightTask: (Task) -> Unit,
@@ -622,6 +631,8 @@ internal fun TasksScreen(
             TaskCard(
                 task = task,
                 onEdit = { onEditTask(task) },
+                onUndo = { onUndoTaskEdit(task) },
+                onRedo = { onRedoTaskEdit(task) },
                 onDelete = { onDeleteTask(task) },
                 onRun = { onRunTask(task) },
                 onPreflight = { onPreflightTask(task) },
@@ -639,6 +650,8 @@ internal fun TasksScreen(
 private fun TaskCard(
     task: Task,
     onEdit: () -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
     onDelete: () -> Unit,
     onRun: () -> Unit,
     onPreflight: () -> Unit,
@@ -790,6 +803,25 @@ private fun TaskCard(
                     }
                 }
             }
+            HistoryButtons(onUndo = onUndo, onRedo = onRedo)
+        }
+    }
+}
+
+@Composable
+private fun HistoryButtons(
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+    ) {
+        OutlinedButton(onClick = onUndo, modifier = Modifier.weight(1f)) {
+            Text(stringResource(R.string.action_undo))
+        }
+        OutlinedButton(onClick = onRedo, modifier = Modifier.weight(1f)) {
+            Text(stringResource(R.string.action_redo))
         }
     }
 }

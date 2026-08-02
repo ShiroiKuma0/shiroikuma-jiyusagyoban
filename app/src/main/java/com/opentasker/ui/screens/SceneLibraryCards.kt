@@ -160,6 +160,8 @@ internal fun SceneCard(
     onEditElement: (Int, SceneElement) -> Unit,
     onDeleteElement: (Int, SceneElement) -> Unit,
     onUpdateScene: (Scene, String) -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
     onDelete: () -> Unit,
     onShowOverlay: () -> Unit = {},
 ) {
@@ -235,6 +237,18 @@ internal fun SceneCard(
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.scenes_add_element_content_description))
                 Spacer(Modifier.width(6.dp))
                 Text(stringResource(R.string.action_add_element))
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+            ) {
+                OutlinedButton(onClick = onUndo, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.action_undo))
+                }
+                OutlinedButton(onClick = onRedo, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.action_redo))
+                }
             }
 
             if (scene.elements.isNotEmpty()) {

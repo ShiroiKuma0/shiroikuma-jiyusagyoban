@@ -132,6 +132,13 @@ object DatabaseMigrations {
         }
     }
 
+    val MIGRATION_9_10 = object : Migration(9, 10) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE edit_history ADD COLUMN nextJson TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE edit_history ADD COLUMN isUndone INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -142,6 +149,7 @@ object DatabaseMigrations {
             MIGRATION_6_7,
             MIGRATION_7_8,
             MIGRATION_8_9,
+            MIGRATION_9_10,
         )
     }
 }
@@ -182,6 +190,9 @@ object DatabaseMigrations {
  *   - projects: adds the default workspace project and ordering
  *   - profiles, tasks, scenes: adds projectId (legacy rows backfill to Default)
  *   - variables: migrates to a composite (projectId, name) key for project-scoped values
+ *
+ * Version 10:
+ *   - edit_history: adds nextJson and isUndone so five-entry per-entity stacks support redo
  *
  * To add a migration:
  * 1. Increment database version in @Database annotation

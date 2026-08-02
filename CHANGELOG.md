@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Edit history**: task, profile, and scene edits now keep a bounded five-step undo/redo stack. Undo moves one revision at a time without discarding newer history, redo restores newer revisions, and saving after an undo starts a new branch. Scene edits are snapshotted with the full scene so dimensions and names recover as well as elements.
+
 - **Global search**: added a live cross-project search for profiles, tasks, actions, variables, and scenes. Results include task/profile/scene references and deep-link into the matching editor or library surface without indexing secret variable values.
 
 - **Personal-data actions**: added bounded clipboard get/set actions and a contacts lookup action. Clipboard and contact outputs are marked sensitive and never written to run-log messages; unattended contact lookup requires an explicit Setup grant, while Android 17+ picker mode uses a field-scoped selection with a timeout.

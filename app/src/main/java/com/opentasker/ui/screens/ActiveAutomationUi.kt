@@ -709,6 +709,8 @@ fun ActiveAutomationUi(
                 onImportTaskerXml = { taskerXmlLauncher.launch(TASKER_XML_MIME_TYPES) },
                 taskerImportBusy = taskerImportBusy,
                 onEditProfile = { openProfileDialog(it) },
+                onUndoProfileEdit = { viewModel.undoLastProfileEdit(it.id) },
+                onRedoProfileEdit = { viewModel.redoLastProfileEdit(it.id) },
                 onDeleteProfile = { openDeleteProfile(it) },
                 onToggleProfile = { profile, enabled ->
                     if (enabled && profile.requiresRiskAcknowledgement) {
@@ -736,6 +738,8 @@ fun ActiveAutomationUi(
                 storageDecodeIssues = storageDecodeIssues,
                 onCreateTask = { showCreateTaskDialog = true },
                 onEditTask = { openTaskDialog(it) },
+                onUndoTaskEdit = { viewModel.undoLastTaskEdit(it.id) },
+                onRedoTaskEdit = { viewModel.redoLastTaskEdit(it.id) },
                 onDeleteTask = { openDeleteTask(it) },
                 onRunTask = { viewModel.runTaskNow(it) },
                 onPreflightTask = viewModel::previewTaskPreflight,
@@ -812,6 +816,8 @@ fun ActiveAutomationUi(
                     viewModel.createScene(name, width, height, selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID)
                 },
                 onUpdateScene = viewModel::updateScene,
+                onUndoSceneEdit = { viewModel.undoLastSceneEdit(it.id) },
+                onRedoSceneEdit = { viewModel.redoLastSceneEdit(it.id) },
                 onDeleteScene = { openDeleteScene(it) },
                 contentPadding = innerPadding,
             )
