@@ -141,7 +141,7 @@ private fun MutableSet<ContextMonitor>.addEventMonitor(spec: ContextSpec) {
         "shake" -> add(ContextMonitor.SHAKE)
         "camera", "mic", "microphone" -> add(ContextMonitor.CAMERA_MIC)
         "package_added", "package_removed", "package_replaced" -> add(ContextMonitor.PACKAGE_EVENTS)
-        "bluetooth" -> add(ContextMonitor.BLUETOOTH_EVENTS)
+        "bluetooth", "bluetooth_all_disconnected", "bluetooth_some_connected" -> add(ContextMonitor.BLUETOOTH_EVENTS)
         "usb" -> add(ContextMonitor.USB_EVENTS)
         "companion_presence" -> add(ContextMonitor.COMPANION_EVENTS)
         "" -> addAll(EVENT_MONITORS)

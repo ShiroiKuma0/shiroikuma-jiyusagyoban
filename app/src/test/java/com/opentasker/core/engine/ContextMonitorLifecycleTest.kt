@@ -87,6 +87,7 @@ class ContextMonitorLifecycleTest {
             ContextSpec(ContextType.EVENT, mapOf("event" to "microphone")),
             ContextSpec(ContextType.EVENT, mapOf("event" to "package_replaced")),
             ContextSpec(ContextType.EVENT, mapOf("event" to "bluetooth")),
+            ContextSpec(ContextType.EVENT, mapOf("event" to "bluetooth_all_disconnected")),
         )
 
         assertEquals(

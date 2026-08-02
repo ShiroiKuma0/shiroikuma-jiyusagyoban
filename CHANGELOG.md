@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Bluetooth aggregate trigger**: added a tracked final-disconnect transition as `event=bluetooth_all_disconnected`, an editor preset, and multi-device sequence tests.
+
 - **Offline bundle import**: added bounded clipboard/QR-text JSON import that reuses the existing disabled-by-default review before any database write, with malformed and oversized input rejection.
 
 - **Companion presence trigger**: added user-confirmed CompanionDeviceManager association and revocation setup, OS-managed presence callbacks, and `event=companion_presence` present/absent matching without a scan loop.

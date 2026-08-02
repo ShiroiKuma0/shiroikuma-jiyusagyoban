@@ -52,6 +52,7 @@ import com.opentasker.core.actions.FieldType
 import com.opentasker.core.contexts.CalendarSunEventPresets
 import com.opentasker.core.contexts.ApplicationContextEvents
 import com.opentasker.core.contexts.ApplicationComponentMatcher
+import com.opentasker.core.contexts.BluetoothEventPresets
 import com.opentasker.core.contexts.DaySchedule
 import com.opentasker.core.contexts.EventContextPreset
 import com.opentasker.core.contexts.NfcTagWriteSession
@@ -196,7 +197,8 @@ internal fun ContextConfigDialog(
                         }
                     }
                     val eventPresets = if (state.type == ContextType.EVENT) {
-                        CalendarSunEventPresets.presetsFor(config["event"].orEmpty())
+                        CalendarSunEventPresets.presetsFor(config["event"].orEmpty()) +
+                            BluetoothEventPresets.allPresets()
                     } else {
                         emptyList()
                     }

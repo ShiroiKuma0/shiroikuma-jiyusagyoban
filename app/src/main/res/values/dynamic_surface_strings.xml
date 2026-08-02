@@ -97,6 +97,7 @@
     <string name="context_preset_at_sunrise" formatted="false">At sunrise</string>
     <string name="context_preset_at_sunset" formatted="false">At sunset</string>
     <string name="context_preset_30_after" formatted="false">30 min after</string>
+    <string name="context_preset_all_bluetooth_disconnected" formatted="false">All Bluetooth devices disconnected</string>
 
     <!-- Home-screen widget and configuration activity. -->
     <string name="widget_choose_task_title" formatted="false">Choose widget task</string>

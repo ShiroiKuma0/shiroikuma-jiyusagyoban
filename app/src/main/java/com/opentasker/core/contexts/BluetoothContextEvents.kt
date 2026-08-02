@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 
 /**
  * Bridges Bluetooth ACL connect/disconnect broadcasts into `event=bluetooth` context events.
+ * The final disconnect also emits `event=bluetooth_all_disconnected`.
  *
  * Emits metadata:
  *   - "event": "bluetooth"
@@ -35,7 +36,13 @@ object BluetoothContextEvents {
 
     const val STATE_CONNECTED = "connected"
     const val STATE_DISCONNECTED = "disconnected"
+    const val EVENT_ALL_DISCONNECTED = "bluetooth_all_disconnected"
+    const val EVENT_SOME_CONNECTED = "bluetooth_some_connected"
+    const val STATE_ALL_DISCONNECTED = "all_disconnected"
+    const val STATE_SOME_CONNECTED = "some_connected"
     const val UNKNOWN_DEVICE = "Unknown"
+
+    private val connectionTracker = BluetoothConnectionTracker()
 
     val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -47,9 +54,17 @@ object BluetoothContextEvents {
             val device = intent.bluetoothDevice()
             val name = device.safeName()
             val address = device?.address.orEmpty()
+            val identity = address.ifBlank { "name:$name" }
             // Log device name + state only; the address is intentionally omitted from logs.
             AppLogger.debug(TAG, "Bluetooth event: state=$state, device=$name")
             events_.tryEmit(buildEvent(state, name, address))
+            if (state == STATE_CONNECTED) {
+                if (connectionTracker.onConnected(identity)) {
+                    events_.tryEmit(buildSomeConnectedEvent())
+                }
+            } else if (connectionTracker.onDisconnected(identity)) {
+                events_.tryEmit(buildAllDisconnectedEvent())
+            }
         }
     }
 
@@ -69,6 +84,26 @@ object BluetoothContextEvents {
                 put("address", deviceAddress)
             }
         },
+    )
+
+    fun buildAllDisconnectedEvent(): ContextEvent = ContextEvent(
+        type = "event",
+        matched = true,
+        metadata = mapOf(
+            "event" to EVENT_ALL_DISCONNECTED,
+            "state" to STATE_ALL_DISCONNECTED,
+            "connectedCount" to "0",
+        ),
+    )
+
+    fun buildSomeConnectedEvent(): ContextEvent = ContextEvent(
+        type = "event",
+        matched = true,
+        metadata = mapOf(
+            "event" to EVENT_SOME_CONNECTED,
+            "state" to STATE_SOME_CONNECTED,
+            "connectedCount" to "1+",
+        ),
     )
 
     fun intentFilter(): IntentFilter = IntentFilter().apply {

@@ -44,6 +44,7 @@
 - Calendar windows with redacted event metadata
 - Sunrise/sunset filters with coordinate, offset, and window support
 - Shake, Bluetooth connect/disconnect, package install/remove/replace
+- Bluetooth all-devices-disconnected transition with an editor preset and multi-device tracking
 - Quick Settings tile tap, home-screen widget/shortcut, boot
 - Authenticated `event=push` bridge for a de-googled UnifiedPush distributor; delivery IDs are deduplicated, payloads are bounded, and message content is redacted before matching/logging
 - Received Share (`ACTION_SEND`/`SEND_MULTIPLE`) trigger for bounded text, URLs, single files, and multiple files, with MIME/text/URI filters and `share_*` task variables

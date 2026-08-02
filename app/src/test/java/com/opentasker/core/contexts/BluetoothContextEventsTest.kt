@@ -57,5 +57,33 @@ class BluetoothContextEventsTest {
         assertFalse(ContextMatchEvaluator.matches(spec(mapOf("event" to "bluetooth", "filter" to "Kitchen")), event))
     }
 
+    @Test
+    fun allDisconnectedEventMatchesItsExplicitPreset() {
+        val event = BluetoothContextEvents.buildAllDisconnectedEvent()
+        val allDisconnected = spec(
+            mapOf(
+                "event" to BluetoothContextEvents.EVENT_ALL_DISCONNECTED,
+                "state" to BluetoothContextEvents.STATE_ALL_DISCONNECTED,
+            ),
+        )
+
+        assertEquals("0", event.metadata["connectedCount"])
+        assertTrue(ContextMatchEvaluator.matches(allDisconnected, event))
+    }
+
+    @Test
+    fun trackerEmitsOnlyWhenTheFinalConnectedDeviceLeaves() {
+        val tracker = BluetoothConnectionTracker()
+        assertTrue(tracker.onConnected("headset"))
+        assertFalse(tracker.onConnected("watch"))
+
+        assertFalse(tracker.onDisconnected("headset"))
+        assertTrue(tracker.onDisconnected("watch"))
+        assertFalse(tracker.onDisconnected("watch"))
+        assertEquals(0, tracker.connectedCount())
+        assertTrue(tracker.onConnected("watch"))
+        assertEquals("bluetooth_some_connected", BluetoothContextEvents.buildSomeConnectedEvent().metadata["event"])
+    }
+
     private fun STATE() = BluetoothContextEvents.STATE_CONNECTED
 }
