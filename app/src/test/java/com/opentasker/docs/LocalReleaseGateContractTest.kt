@@ -20,6 +20,7 @@ class LocalReleaseGateContractTest {
         val script = repoRoot.resolve("tools/verify-local-release.ps1").readText()
 
         assertTrue(readme.contains(".\\tools\\verify-local-release.ps1"))
+        assertTrue(readme.contains("tools/release-truth.json"))
         assertTrue(build.contains("abortOnError = true"))
         assertFalse(build.contains("disable += listOf(\"MissingPermission\""))
         assertFalse(build.contains("baseline = file(\"lint-baseline.xml\")"))
@@ -27,6 +28,7 @@ class LocalReleaseGateContractTest {
             "lintDebug",
             "compileDebugAndroidTestKotlin",
             "verifyRoomSchema",
+            "verifyReleaseTruth",
             "verifyResolvedDependencyPolicy",
             "generateCycloneDxSbom",
             "verifyJvmTestCount",

@@ -379,6 +379,103 @@ val verifyQualityGateSeed = tasks.register<VerifyQualityGateSeedTask>("verifyQua
     seedFailure.set(qualityGateSeedFailure)
 }
 
+abstract class VerifyReleaseTruthTask : org.gradle.api.DefaultTask() {
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    abstract val truthFile: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    abstract val readmeFile: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    abstract val metadataFile: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    abstract val moduleBuildFile: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    abstract val runtimeRegistriesFile: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    abstract val contextSpecFile: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    abstract val bundleFile: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.Internal
+    abstract val repositoryDirectory: org.gradle.api.file.DirectoryProperty
+
+    @org.gradle.api.tasks.TaskAction
+    fun verify() {
+        val truth = truthFile.get().asFile.readText()
+        fun truthValue(key: String): String = Regex("\\\"$key\\\"\\s*:\\s*(?:\\\"([^\\\"]+)\\\"|(\\d+))")
+            .find(truth)
+            ?.let { it.groupValues[1].ifBlank { it.groupValues[2] } }
+            ?: error("Release truth manifest is missing '$key'.")
+        fun requireTruth(key: String, expected: String) {
+            check(truthValue(key) == expected) {
+                "Release truth '$key' expected '$expected' but found '${truthValue(key)}'."
+            }
+        }
+        fun sourceValue(text: String, pattern: String, name: String): String = Regex(pattern)
+            .find(text)?.groupValues?.get(1)
+            ?: error("Could not derive $name from shipped source.")
+
+        val moduleSource = moduleBuildFile.get().asFile.readText()
+        requireTruth("schemaVersion", "1")
+        requireTruth("versionName", sourceValue(moduleSource, "val\\s+appVersionName\\s*=\\s*\"([^\"]+)\"", "version name"))
+        requireTruth("versionCode", sourceValue(moduleSource, "val\\s+appVersionCode\\s*=\\s*(\\d+)", "version code"))
+        requireTruth("minSdk", sourceValue(moduleSource, "(?m)^\\s*minSdk\\s*=\\s*(\\d+)", "minimum SDK"))
+        requireTruth("compileSdk", sourceValue(moduleSource, "(?m)^\\s*compileSdk\\s*=\\s*(\\d+)", "compile SDK"))
+        requireTruth("targetSdk", sourceValue(moduleSource, "(?m)^\\s*targetSdk\\s*=\\s*(\\d+)", "target SDK"))
+        requireTruth("buildTools", sourceValue(moduleSource, "(?m)^\\s*buildToolsVersion\\s*=\\s*\"([^\"]+)\"", "build tools"))
+        requireTruth("bundleSchemaVersion", sourceValue(bundleFile.get().asFile.readText(), "const val OPEN_TASKER_BUNDLE_SCHEMA_VERSION\\s*=\\s*(\\d+)", "bundle schema version"))
+        requireTruth("roomSchemaVersion", sourceValue(moduleSource, "(?m)^\\s*val currentVersion\\s*=\\s*(\\d+)", "Room schema version"))
+
+        val runtime = runtimeRegistriesFile.get().asFile.readText()
+        requireTruth("registeredActions", Regex("(?m)^\\s+[A-Za-z0-9]+Action\\(\\),").findAll(runtime).count().toString())
+        val contextBody = sourceValue(contextSpecFile.get().asFile.readText(), "(?s)enum class ContextType\\s*\\{(.*?)\\}", "context type enum")
+        requireTruth("contextFamilies", Regex("(?m)^\\s+[A-Z][A-Z_]+\\s*(,|//)").findAll(contextBody).count().toString())
+
+        val readme = readmeFile.get().asFile.readText()
+        check("version-${truthValue("versionName")}-blue.svg" in readme) { "README version badge is stale." }
+        check("### Actions (${truthValue("registeredActions")} registered + ${truthValue("engineHandledActions")} engine-handled)" in readme) { "README action count is stale." }
+        check("**${truthValue("registeredActions")} built-in actions**" in readme) { "README built-in action count is stale." }
+        check("- **${truthValue("contextFamilies")} context families**" in readme) { "README context-family count is stale." }
+
+        val artifactCommit = truthValue("requiredArtifactCommit")
+        check(Regex("[0-9a-f]{40}").matches(artifactCommit)) { "Release truth requiredArtifactCommit must be a full lowercase SHA-1." }
+        val artifactGradle = git("show", "$artifactCommit:app/build.gradle.kts")
+        check("val appVersionName = \"${truthValue("versionName")}\"" in artifactGradle) { "Required artifact commit has a different version." }
+        check("val appVersionCode = ${truthValue("versionCode")}" in artifactGradle) { "Required artifact commit has a different version code." }
+
+        val metadata = metadataFile.get().asFile.readText()
+        fun metadataValue(key: String): String = Regex("(?m)^\\s*(?:-\\s*)?$key:\\s*(.+?)\\s*$")
+            .find(metadata)?.groupValues?.get(1)?.trim()?.trim('"', '\'')
+            ?: error("F-Droid metadata is missing '$key'.")
+        check(metadataValue("versionName") == truthValue("versionName")) { "F-Droid versionName is stale." }
+        check(metadataValue("versionCode") == truthValue("versionCode")) { "F-Droid versionCode is stale." }
+        check(metadataValue("commit") == artifactCommit) { "F-Droid commit does not match release truth." }
+        println("Release truth passed for v${truthValue("versionName")} (${truthValue("versionCode")}); artifact $artifactCommit")
+    }
+
+    private fun git(vararg args: String): String {
+        val process = ProcessBuilder("git", *args)
+            .directory(repositoryDirectory.get().asFile)
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader().readText().trim()
+        check(process.waitFor() == 0) { "Git ${args.joinToString(" ")} failed: $output" }
+        return output
+    }
+}
+
 tasks.register("verifyRoomSchema") {
     group = "verification"
     description = "Checks that all Room schema versions up to the current are exported and tracked."
@@ -396,6 +493,17 @@ tasks.register("verifyRoomSchema") {
         }
         println("Room schema drift gate passed: versions 1..$currentVersion present.")
     }
+}
+
+tasks.register<VerifyReleaseTruthTask>("verifyReleaseTruth") {
+    truthFile.set(rootProject.layout.projectDirectory.file("tools/release-truth.json"))
+    readmeFile.set(rootProject.layout.projectDirectory.file("README.md"))
+    metadataFile.set(rootProject.layout.projectDirectory.file("fdroid/metadata/com.opentasker.app.yml"))
+    moduleBuildFile.set(layout.projectDirectory.file("build.gradle.kts"))
+    runtimeRegistriesFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/RuntimeRegistries.kt"))
+    contextSpecFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/model/ContextSpec.kt"))
+    bundleFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/transfer/OpenTaskerBundle.kt"))
+    repositoryDirectory.set(rootProject.layout.projectDirectory)
 }
 
 tasks.register("verifyFdroidReadiness") {
@@ -440,6 +548,7 @@ tasks.register("verifyFdroidReadiness") {
 tasks.register("verifyFdroidMetadata") {
     group = "verification"
     description = "Checks that draft fdroiddata metadata matches the current release contract."
+    dependsOn("verifyReleaseTruth")
 
     val metadataFile = rootProject.file("fdroid/metadata/com.opentasker.app.yml")
     inputs.file(metadataFile)
@@ -537,6 +646,7 @@ tasks.register("localQualityGate") {
         "lintDebug",
         "compileDebugAndroidTestKotlin",
         "verifyRoomSchema",
+        "verifyReleaseTruth",
         verifyResolvedDependencyPolicy,
         generateCycloneDxSbom,
         verifyJvmTestCount,

@@ -98,6 +98,22 @@ class ReleaseTruthContractTest {
     }
 
     @Test
+    fun generatedReleaseTruthManifestOwnsArtifactAndCapabilityClaims() {
+        val truth = read("tools/release-truth.json")
+        val gradle = read("app/build.gradle.kts")
+        val fdroid = read("fdroid/metadata/com.opentasker.app.yml")
+        val artifactCommit = jsonValue(truth, "requiredArtifactCommit")
+
+        assertEquals("1", jsonValue(truth, "schemaVersion"))
+        assertEquals(gradleValue(gradle, """val\s+appVersionName\s*=\s*"([^"]+)"""), jsonValue(truth, "versionName"))
+        assertEquals(gradleValue(gradle, """val\s+appVersionCode\s*=\s*(\d+)"""), jsonValue(truth, "versionCode"))
+        assertTrue("verifyReleaseTruth" in gradle)
+        assertEquals(artifactCommit, metadataValue(fdroid, "commit"))
+        assertTrue(Regex("[0-9a-f]{40}").matches(artifactCommit))
+        assertTrue(Files.exists(repoRoot.resolve("tools/generate-release-truth.ps1")))
+    }
+
+    @Test
     fun capabilityDocumentsMatchStatesDerivedFromShippedSource() {
         requireSourceEvidence(
             "app/src/main/java/com/opentasker/ui/screens/SceneEditorCanvas.kt",
@@ -284,6 +300,12 @@ class ReleaseTruthContractTest {
             ?.trim()
             ?.trim('"')
             ?: error("Missing F-Droid metadata value for $key")
+
+    private fun jsonValue(text: String, key: String): String =
+        Regex("\\\"$key\\\"\\s*:\\s*(?:\\\"([^\\\"]+)\\\"|(\\d+))")
+            .find(text)
+            ?.let { match -> match.groupValues[1].ifBlank { match.groupValues[2] } }
+            ?: error("Missing release truth value for $key")
 
     private fun assertMetadataValue(text: String, key: String, expected: String) {
         assertEquals("F-Droid $key", expected, metadataValue(text, key))

@@ -1,0 +1,30 @@
+{
+    "schemaVersion":  1,
+    "requiredArtifactCommit":  "a30bee6dff2a3b631a137048b2d4178b079da9e5",
+    "application":  {
+                        "versionName":  "0.2.79",
+                        "versionCode":  81
+                    },
+    "android":  {
+                    "minSdk":  26,
+                    "compileSdk":  37,
+                    "targetSdk":  37,
+                    "buildTools":  "36.0.0"
+                },
+    "dependencies":  {
+                         "kotlin":  "2.3.21",
+                         "gradle":  "9.4.1",
+                         "agp":  "9.2.1",
+                         "ksp":  "2.3.7",
+                         "room":  "2.8.4",
+                         "composeBom":  "2026.05.00",
+                         "work":  "2.11.2"
+                     },
+    "capabilities":  {
+                         "registeredActions":  60,
+                         "engineHandledActions":  7,
+                         "contextFamilies":  7,
+                         "bundleSchemaVersion":  2,
+                         "roomSchemaVersion":  8
+                     }
+}
