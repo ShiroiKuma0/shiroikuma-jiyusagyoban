@@ -26,6 +26,15 @@
 }
 -keep class com.opentasker.core.input.IKeyGrabber* { *; }
 
+# Telephony bridge (Shizuku UserService) — same reason: Shizuku instantiates it BY NAME inside the
+# privileged process, so R8 renaming or stripping it makes bindUserService fail with nothing but a
+# null binder. The AIDL stub must survive intact too.
+-keep class com.opentasker.core.telephony.TelephonyBridgeService {
+    <init>(...);
+    *;
+}
+-keep class com.opentasker.core.telephony.ITelephonyBridge* { *; }
+
 # RE2J internals (uses sun.misc.Unsafe fallback)
 -dontwarn com.google.re2j.**
 -keep class com.google.re2j.** { *; }
