@@ -15,6 +15,7 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
@@ -86,6 +88,24 @@ import com.opentasker.core.power.ShizukuPowerState
 import com.opentasker.core.scheduling.ExactAlarmSupport
 import com.opentasker.core.scripting.TermuxScriptBackend
 import com.opentasker.core.scripting.TermuxScriptState
+import com.opentasker.core.capabilities.SetupRequirement
+import com.opentasker.core.capabilities.SetupRequirementResolver
+import com.opentasker.core.model.Profile
+import com.opentasker.core.model.Task
+
+private enum class SetupSection {
+    ENGINE,
+    NEEDED,
+    OPTIONAL,
+    RELIABILITY,
+}
+
+private fun SetupSection.titleRes(): Int = when (this) {
+    SetupSection.ENGINE -> R.string.setup_section_engine
+    SetupSection.NEEDED -> R.string.setup_section_needed
+    SetupSection.OPTIONAL -> R.string.setup_section_optional
+    SetupSection.RELIABILITY -> R.string.setup_section_reliability
+}
 
 private data class PermissionSetupItem(
     val title: String,
@@ -96,6 +116,8 @@ private data class PermissionSetupItem(
     val requiredFor: String,
     val optional: Boolean = false,
     val allowActionWhenGranted: Boolean = false,
+    val section: SetupSection = SetupSection.ENGINE,
+    val requirements: Set<SetupRequirement> = emptySet(),
 )
 
 data class BackupSetupState(
@@ -128,6 +150,8 @@ fun PermissionOnboardingScreen(
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
     onCancelPendingRestore: () -> Unit = {},
+    profiles: List<Profile> = emptyList(),
+    tasks: List<Task> = emptyList(),
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -166,11 +190,25 @@ fun PermissionOnboardingScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val items = remember(context, refreshTick) { buildPermissionItems(context, permissionHistory) }
-    val orderedItems = remember(items) {
-        items.sortedWith(compareBy<PermissionSetupItem> { it.optional }.thenBy { it.granted }.thenBy { it.title })
+    val automationRequirements = remember(profiles, tasks) {
+        SetupRequirementResolver.resolve(profiles, tasks)
     }
-    val requiredItems = remember(items) { items.filterNot { it.optional } }
+    val items = remember(context, refreshTick) { buildPermissionItems(context, permissionHistory) }
+    val visibleItems = remember(items, automationRequirements) {
+        items.filter { item ->
+            item.section != SetupSection.NEEDED || item.requirements.any(automationRequirements::contains)
+        }
+    }
+    val sectionItems = remember(visibleItems) {
+        SetupSection.entries.associateWith { section ->
+            visibleItems
+                .filter { it.section == section }
+                .sortedWith(compareBy<PermissionSetupItem> { it.granted }.thenBy { it.title })
+        }
+    }
+    val requiredItems = remember(visibleItems) {
+        visibleItems.filter { it.section == SetupSection.ENGINE || it.section == SetupSection.NEEDED }
+    }
     val grantedCount = requiredItems.count { it.granted }
     val pendingCount = requiredItems.size - grantedCount
     val progress = if (requiredItems.isEmpty()) 0f else grantedCount.toFloat() / requiredItems.size.toFloat()
@@ -249,12 +287,23 @@ fun PermissionOnboardingScreen(
 
         item { TermuxScriptAllowlistCard(onMessage) }
 
-        items(orderedItems, key = { it.title }) { item ->
-            val alreadyReadyMessage = stringResource(R.string.setup_item_already_ready, item.title)
-            PermissionSetupCard(
-                item = item,
-                onRunAction = {
-                    when (val action = item.action) {
+        SetupSection.entries.forEach { section ->
+            val itemsForSection = sectionItems.getValue(section)
+            if (itemsForSection.isNotEmpty()) {
+                item {
+                    Text(
+                        text = stringResource(section.titleRes()),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
+                    )
+                }
+                items(itemsForSection, key = { it.title }) { item ->
+                    val alreadyReadyMessage = stringResource(R.string.setup_item_already_ready, item.title)
+                    PermissionSetupCard(
+                        item = item,
+                        onRunAction = {
+                            when (val action = item.action) {
                         PermissionAction.None -> onMessage(alreadyReadyMessage)
                         is PermissionAction.RuntimePermission -> {
                             pendingPermission = action.permission
@@ -279,9 +328,11 @@ fun PermissionOnboardingScreen(
                             )
                             refreshTick++
                         }
-                    }
-                },
-            )
+                            }
+                        },
+                    )
+                }
+            }
         }
     }
 }
@@ -578,10 +629,6 @@ private fun PermissionSetupCard(
                         color = stateColor,
                     )
                 }
-                PermissionStatusPill(
-                    stateLabel,
-                    stateColor,
-                )
             }
             Text(item.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             PermissionRequirement(label = if (item.optional) stringResource(R.string.setup_optional_requirement, item.requiredFor) else item.requiredFor)
@@ -605,34 +652,23 @@ private fun PermissionMetric(value: String, label: String, modifier: Modifier = 
 
 @Composable
 private fun PermissionStatusPill(label: String, color: Color) {
-    Surface(
-        color = color.copy(alpha = 0.14f),
-        shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.32f)),
-    ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelMedium,
-            color = color,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(
+            modifier = Modifier
+                .size(7.dp)
+                .background(color, CircleShape),
         )
+        Text(label, style = MaterialTheme.typography.labelMedium, color = color)
     }
 }
 
 @Composable
 private fun PermissionRequirement(label: String) {
-    Surface(
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
-    ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-        )
-    }
+    Text(
+        label,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 private fun buildPermissionItems(
@@ -708,6 +744,7 @@ private fun buildPermissionItems(
             actionLabel = openSettings,
             action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)),
             requiredFor = context.getString(R.string.setup_battery_required_for),
+            section = SetupSection.RELIABILITY,
         ),
         if (oem.needsExtraSteps) PermissionSetupItem(
             title = context.getString(R.string.setup_oem_guidance_title, oem.oemName),
@@ -727,6 +764,7 @@ private fun buildPermissionItems(
             action = PermissionAction.OemSettings(oem.settingsTargets, oem.dontKillMyAppUrl),
             requiredFor = context.getString(R.string.setup_oem_required_for, oem.oemName),
             optional = true,
+            section = SetupSection.RELIABILITY,
         ) else null,
         PermissionSetupItem(
             title = context.getString(R.string.setup_usage_card_title),
@@ -735,6 +773,8 @@ private fun buildPermissionItems(
             actionLabel = openSettings,
             action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)),
             requiredFor = context.getString(R.string.setup_usage_required_for),
+            section = SetupSection.NEEDED,
+            requirements = setOf(SetupRequirement.USAGE_ACCESS),
         ),
         PermissionSetupItem(
             title = context.getString(R.string.setup_notification_access_title),
@@ -743,6 +783,8 @@ private fun buildPermissionItems(
             actionLabel = openSettings,
             action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)),
             requiredFor = context.getString(R.string.setup_notification_access_required_for),
+            section = SetupSection.NEEDED,
+            requirements = setOf(SetupRequirement.NOTIFICATION_ACCESS),
         ),
         PermissionSetupItem(
             title = context.getString(R.string.setup_calendar_access_title),
@@ -751,6 +793,8 @@ private fun buildPermissionItems(
             actionLabel = request,
             action = PermissionAction.RuntimePermission(Manifest.permission.READ_CALENDAR),
             requiredFor = context.getString(R.string.setup_calendar_access_required_for),
+            section = SetupSection.NEEDED,
+            requirements = setOf(SetupRequirement.CALENDAR),
         ),
         PermissionSetupItem(
             title = context.getString(R.string.setup_overlay_access_title),
@@ -761,6 +805,8 @@ private fun buildPermissionItems(
                 Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}")),
             ),
             requiredFor = context.getString(R.string.setup_overlay_access_required_for),
+            section = SetupSection.NEEDED,
+            requirements = setOf(SetupRequirement.OVERLAY),
         ),
         PermissionSetupItem(
             title = context.getString(R.string.setup_write_settings_title),
@@ -772,6 +818,8 @@ private fun buildPermissionItems(
             ),
             requiredFor = context.getString(R.string.setup_write_settings_required_for),
             optional = true,
+            section = SetupSection.NEEDED,
+            requirements = setOf(SetupRequirement.WRITE_SETTINGS),
         ),
         PermissionSetupItem(
             title = context.getString(R.string.setup_foreground_location_title),
@@ -780,6 +828,8 @@ private fun buildPermissionItems(
             actionLabel = request,
             action = PermissionAction.RuntimePermission(Manifest.permission.ACCESS_FINE_LOCATION),
             requiredFor = context.getString(R.string.setup_foreground_location_required_for),
+            section = SetupSection.NEEDED,
+            requirements = setOf(SetupRequirement.FOREGROUND_LOCATION),
         ),
         PermissionSetupItem(
             title = context.getString(R.string.setup_nearby_wifi_title),
@@ -792,6 +842,8 @@ private fun buildPermissionItems(
                 PermissionAction.None
             },
             requiredFor = context.getString(R.string.setup_nearby_wifi_required_for),
+            section = SetupSection.NEEDED,
+            requirements = setOf(SetupRequirement.NEARBY_WIFI),
         ),
         PermissionSetupItem(
             title = context.getString(R.string.setup_background_location_title),
@@ -800,6 +852,8 @@ private fun buildPermissionItems(
             actionLabel = context.getString(R.string.action_open_app_settings),
             action = PermissionAction.SettingsIntent(appDetailsIntent(context)),
             requiredFor = context.getString(R.string.setup_background_location_required_for),
+            section = SetupSection.NEEDED,
+            requirements = setOf(SetupRequirement.BACKGROUND_LOCATION),
         ),
         PermissionSetupItem(
             title = context.getString(R.string.setup_bluetooth_title),
@@ -812,6 +866,8 @@ private fun buildPermissionItems(
                 PermissionAction.None
             },
             requiredFor = context.getString(R.string.setup_bluetooth_required_for),
+            section = SetupSection.NEEDED,
+            requirements = setOf(SetupRequirement.BLUETOOTH),
         ),
         if (Build.VERSION.SDK_INT >= ANDROID_17_API) PermissionSetupItem(
             title = context.getString(R.string.setup_local_network_title),
@@ -820,6 +876,8 @@ private fun buildPermissionItems(
             actionLabel = request,
             action = PermissionAction.RuntimePermission("android.permission.ACCESS_LOCAL_NETWORK"),
             requiredFor = context.getString(R.string.setup_local_network_required_for),
+            section = SetupSection.NEEDED,
+            requirements = setOf(SetupRequirement.LOCAL_NETWORK),
         ) else null,
         if (BuildConfig.SMS_ACTION_AVAILABLE) PermissionSetupItem(
             title = context.getString(R.string.setup_sms_title),
@@ -828,6 +886,8 @@ private fun buildPermissionItems(
             actionLabel = request,
             action = PermissionAction.RuntimePermission(Manifest.permission.SEND_SMS),
             requiredFor = context.getString(R.string.setup_sms_required_for),
+            section = SetupSection.NEEDED,
+            requirements = setOf(SetupRequirement.SMS),
         ) else null,
         PermissionSetupItem(
             title = context.getString(R.string.setup_dnd_title),
@@ -836,6 +896,8 @@ private fun buildPermissionItems(
             actionLabel = openSettings,
             action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)),
             requiredFor = context.getString(R.string.setup_dnd_required_for),
+            section = SetupSection.NEEDED,
+            requirements = setOf(SetupRequirement.DND),
         ),
         PermissionSetupItem(
             title = context.getString(R.string.setup_shizuku_title),
@@ -846,6 +908,7 @@ private fun buildPermissionItems(
             requiredFor = context.getString(R.string.setup_shizuku_required_for),
             optional = true,
             allowActionWhenGranted = true,
+            section = SetupSection.OPTIONAL,
         ),
         PermissionSetupItem(
             title = context.getString(R.string.setup_termux_title),
@@ -867,6 +930,7 @@ private fun buildPermissionItems(
             },
             requiredFor = context.getString(R.string.setup_termux_required_for),
             optional = true,
+            section = SetupSection.OPTIONAL,
         ),
         PermissionSetupItem(
             title = context.getString(R.string.setup_app_visibility_title),

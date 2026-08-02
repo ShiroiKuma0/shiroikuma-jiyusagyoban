@@ -764,6 +764,8 @@ fun ActiveAutomationUi(
                 onExportBackup = { databaseBackupExportLauncher.launch(databaseBackupExportName()) },
                 onImportBackup = { databaseBackupImportLauncher.launch(DATABASE_BACKUP_MIME_TYPES) },
                 onCancelPendingRestore = viewModel::cancelPendingRestore,
+                profiles = profiles,
+                tasks = tasks,
             )
 
             OpenTaskerScreen.Inspector -> ContextInspectorScreen(db = db, contentPadding = innerPadding)
