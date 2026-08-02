@@ -1,0 +1,565 @@
+package com.opentasker.core.engine
+
+import com.opentasker.core.actions.ActionArgumentSensitivity
+import com.opentasker.core.capabilities.ActionCapabilityRegistry
+import com.opentasker.core.capabilities.CapabilityLevel
+import com.opentasker.core.capabilities.SetupRequirement
+import com.opentasker.core.capabilities.SetupRequirementResolver
+import com.opentasker.core.expressions.TemplateExpansionResult
+import com.opentasker.core.expressions.TemplateExpressionEngine
+import com.opentasker.core.expressions.TemplateExpansionTrace
+import com.opentasker.core.expressions.TemplateValueSource
+import com.opentasker.core.model.ActionSpec
+import com.opentasker.core.model.ContextSpec
+import com.opentasker.core.model.Profile
+import com.opentasker.core.model.Task
+
+/** Synthetic inputs for a side-effect-free task/profile preflight. */
+data class PreflightInputs(
+    val eventVariables: Map<String, String> = emptyMap(),
+    val globalVariables: Map<String, String> = emptyMap(),
+    val secretGlobalNames: Set<String> = emptySet(),
+    val grantedSetupRequirements: Set<SetupRequirement> = emptySet(),
+)
+
+enum class PreflightStepStatus {
+    SIMULATED,
+    SKIPPED,
+    BLOCKED,
+}
+
+data class PreflightStep(
+    val taskPath: String,
+    val actionIndex: Int,
+    val actionType: String,
+    val label: String,
+    val status: PreflightStepStatus,
+    val expandedArguments: Map<String, String> = emptyMap(),
+    val condition: String? = null,
+    val branchDecision: String? = null,
+    val capability: CapabilityLevel = CapabilityLevel.Supported,
+    val intendedEffect: String,
+    val warnings: List<String> = emptyList(),
+    val executionCount: Int = 1,
+)
+
+data class PreflightTaskReport(
+    val taskId: Long,
+    val taskName: String,
+    val taskPath: String,
+    val steps: List<PreflightStep>,
+)
+
+data class PreflightContextReport(
+    val index: Int,
+    val type: String,
+    val configuration: Map<String, String>,
+    val intendedEffect: String = "Context matching is described only; no context source is started.",
+)
+
+data class PreflightReport(
+    val title: String,
+    val profileId: Long? = null,
+    val profileName: String? = null,
+    val contexts: List<PreflightContextReport> = emptyList(),
+    val tasks: List<PreflightTaskReport> = emptyList(),
+    val setupRequirements: Set<SetupRequirement> = emptySet(),
+    val missingSetupRequirements: Set<SetupRequirement> = emptySet(),
+    val warnings: List<String> = emptyList(),
+    val sideEffectsSuppressed: Boolean = true,
+) {
+    val blockedSteps: List<PreflightStep>
+        get() = tasks.flatMap { it.steps }.filter { it.status == PreflightStepStatus.BLOCKED }
+
+    val canPreflight: Boolean
+        get() = sideEffectsSuppressed && blockedSteps.isEmpty()
+}
+
+/**
+ * Static action descriptions used by the preflight runner. No Action.run implementation is ever
+ * called here. Registered actions receive an explicit category-based simulation contract; an
+ * unknown action has no preview implementation and is blocked instead of being guessed.
+ */
+object PreflightActionRegistry {
+    fun hasImplementation(actionId: String): Boolean =
+        actionId in FlowControl.ALL || actionId == SUB_TASK_ACTION_ID || ActionRegistry.get(actionId) != null
+
+    fun intendedEffect(actionId: String): String = when (actionId) {
+        FlowControl.IF, FlowControl.ELSE, FlowControl.ENDIF, FlowControl.FOREACH, FlowControl.ENDFOR,
+        FlowControl.STOP -> "Evaluates flow control in memory; no external effect."
+        SUB_TASK_ACTION_ID -> "Would invoke a referenced sub-task; nested action execution is suppressed."
+        "var.set" -> "Updates the preflight variable snapshot only; durable variable writes are suppressed."
+        "var.persist" -> "Would promote a variable to global scope; persistence is suppressed."
+        else -> {
+            val category = ActionRegistry.get(actionId)?.category?.name?.lowercase() ?: "unknown"
+            "Would simulate $category action $actionId; the runtime action is not invoked."
+        }
+    }
+
+    /** Registry completeness is a testable contract for every action registered at runtime. */
+    internal fun missingRegisteredImplementations(): Set<String> =
+        ActionRegistry.allIds().filterNot(::hasImplementation).toSet()
+}
+
+object PreflightRunner {
+    private const val MAX_STEPS = 512
+    private const val MAX_SUBTASK_DEPTH = 8
+    private const val MAX_DISPLAY_VALUE_LENGTH = 256
+
+    fun preflightTask(
+        task: Task,
+        tasks: List<Task> = listOf(task),
+        inputs: PreflightInputs = PreflightInputs(),
+    ): PreflightReport {
+        val variables = VariableStore()
+        seedVariables(variables, inputs)
+        val required = setupRequirements(task, tasks)
+        val taskReports = mutableListOf<PreflightTaskReport>()
+        val warnings = mutableListOf<String>()
+        taskReports += simulateTask(
+            task = task,
+            tasks = tasks,
+            variables = variables,
+            input = inputs,
+            taskPath = task.name,
+            depth = 0,
+            activeTaskIds = setOf(task.id),
+            reports = taskReports,
+            warnings = warnings,
+        )
+        return PreflightReport(
+            title = task.name,
+            tasks = taskReports,
+            setupRequirements = required,
+            missingSetupRequirements = required - inputs.grantedSetupRequirements,
+            warnings = warnings.distinct(),
+        )
+    }
+
+    fun preflightProfile(
+        profile: Profile,
+        tasks: List<Task>,
+        inputs: PreflightInputs = PreflightInputs(),
+    ): PreflightReport {
+        val byId = tasks.associateBy(Task::id)
+        val required = setupRequirements(profile, tasks)
+        val warnings = mutableListOf<String>()
+        val taskReports = mutableListOf<PreflightTaskReport>()
+        val variables = VariableStore()
+        seedVariables(variables, inputs)
+        val contexts = profile.contexts.mapIndexed { index, context ->
+            PreflightContextReport(index, context.type.name, context.config)
+        }
+        val rootTaskIds = listOfNotNull(profile.enterTaskId, profile.exitTaskId).distinct()
+        rootTaskIds.forEach { taskId ->
+            val task = byId[taskId]
+            if (task == null) {
+                warnings += "Profile references missing task $taskId. Repair the profile before relying on this preflight."
+            } else {
+                taskReports += simulateTask(
+                    task = task,
+                    tasks = tasks,
+                    variables = variables,
+                    input = inputs,
+                    taskPath = "${profile.name} / ${task.name}",
+                    depth = 0,
+                    activeTaskIds = setOf(task.id),
+                    reports = taskReports,
+                    warnings = warnings,
+                )
+            }
+        }
+        return PreflightReport(
+            title = profile.name,
+            profileId = profile.id,
+            profileName = profile.name,
+            contexts = contexts,
+            tasks = taskReports,
+            setupRequirements = required,
+            missingSetupRequirements = required - inputs.grantedSetupRequirements,
+            warnings = warnings.distinct(),
+        )
+    }
+
+    private fun simulateTask(
+        task: Task,
+        tasks: List<Task>,
+        variables: VariableStore,
+        input: PreflightInputs,
+        taskPath: String,
+        depth: Int,
+        activeTaskIds: Set<Long>,
+        reports: MutableList<PreflightTaskReport>,
+        warnings: MutableList<String>,
+    ): PreflightTaskReport {
+        variables.pushScope()
+        return try {
+            simulateTaskInScope(
+                task = task,
+                tasks = tasks,
+                variables = variables,
+                input = input,
+                taskPath = taskPath,
+                depth = depth,
+                activeTaskIds = activeTaskIds,
+                reports = reports,
+                warnings = warnings,
+            )
+        } finally {
+            variables.popScope()
+        }
+    }
+
+    private fun simulateTaskInScope(
+        task: Task,
+        tasks: List<Task>,
+        variables: VariableStore,
+        input: PreflightInputs,
+        taskPath: String,
+        depth: Int,
+        activeTaskIds: Set<Long>,
+        reports: MutableList<PreflightTaskReport>,
+        warnings: MutableList<String>,
+    ): PreflightTaskReport {
+        if (depth > MAX_SUBTASK_DEPTH) {
+            val blocked = PreflightStep(
+                taskPath = taskPath,
+                actionIndex = 0,
+                actionType = SUB_TASK_ACTION_ID,
+                label = task.name,
+                status = PreflightStepStatus.BLOCKED,
+                intendedEffect = "Nested preflight depth is bounded; no sub-task is traversed.",
+                warnings = listOf("Sub-task depth limit $MAX_SUBTASK_DEPTH exceeded."),
+            )
+            warnings += blocked.warnings
+            return PreflightTaskReport(task.id, task.name, taskPath, listOf(blocked))
+        }
+
+        val structure = FlowStructure.analyze(task.actions)
+        if (structure.error != null) {
+            val blocked = PreflightStep(
+                taskPath = taskPath,
+                actionIndex = 0,
+                actionType = "flow",
+                label = "flow control",
+                status = PreflightStepStatus.BLOCKED,
+                intendedEffect = "Flow control is invalid; no action would be attempted.",
+                warnings = listOf(structure.error),
+            )
+            warnings += blocked.warnings
+            return PreflightTaskReport(task.id, task.name, taskPath, listOf(blocked))
+        }
+
+        val steps = linkedMapOf<Int, PreflightStep>()
+        val loopStack = ArrayDeque<PreflightLoopFrame>()
+        var pc = 0
+        var interpretedSteps = 0
+        var halted = false
+        while (!halted && pc in task.actions.indices && interpretedSteps++ < MAX_STEPS) {
+            val spec = task.actions[pc]
+            if (FlowControl.isControl(spec.type)) {
+                val control = simulateControl(pc, spec, structure, loopStack, variables, input)
+                recordStep(steps, control.step.copy(taskPath = taskPath))
+                pc = control.nextPc
+                halted = control.halt
+                continue
+            }
+
+            val expansion = expandArguments(spec, variables, input)
+            val condition = spec.condition?.trim()?.takeIf(String::isNotBlank)
+            val conditionResult = condition?.let { evaluate(it, variables, input) }
+            if (conditionResult != null && !conditionResult.value) {
+                recordStep(
+                    steps,
+                    PreflightStep(
+                        taskPath = taskPath,
+                        actionIndex = pc,
+                        actionType = spec.type,
+                        label = spec.label ?: spec.type,
+                        status = PreflightStepStatus.SKIPPED,
+                        expandedArguments = expansion.values,
+                        condition = conditionResult.display,
+                        branchDecision = "condition -> false",
+                        capability = ActionCapabilityRegistry.get(spec.type).level,
+                        intendedEffect = PreflightActionRegistry.intendedEffect(spec.type),
+                        warnings = expansion.warnings + conditionResult.warnings,
+                    ),
+                )
+                pc++
+                continue
+            }
+
+            val capability = ActionCapabilityRegistry.get(spec.type)
+            val actionKnown = PreflightActionRegistry.hasImplementation(spec.type)
+            val stepWarnings = (expansion.warnings + conditionResult?.warnings.orEmpty()).toMutableList()
+            val status = when {
+                !actionKnown -> {
+                    stepWarnings += "No preflight implementation exists for unknown action '${spec.type}'."
+                    PreflightStepStatus.BLOCKED
+                }
+                capability.level == CapabilityLevel.Unsupported -> {
+                    stepWarnings += capability.reason
+                    PreflightStepStatus.BLOCKED
+                }
+                else -> PreflightStepStatus.SIMULATED
+            }
+            if (capability.level == CapabilityLevel.RequiresSetup) stepWarnings += capability.reason
+            val step = PreflightStep(
+                taskPath = taskPath,
+                actionIndex = pc,
+                actionType = spec.type,
+                label = spec.label ?: spec.type,
+                status = status,
+                expandedArguments = expansion.values,
+                condition = conditionResult?.display,
+                branchDecision = conditionResult?.let { "condition -> true" },
+                capability = capability.level,
+                intendedEffect = PreflightActionRegistry.intendedEffect(spec.type),
+                warnings = stepWarnings.distinct(),
+            )
+            recordStep(steps, step)
+            warnings += step.warnings
+
+            if (status != PreflightStepStatus.BLOCKED) {
+                simulateVariableWrite(spec, expansion.rawValues, variables)
+                if (spec.type == SUB_TASK_ACTION_ID) {
+                    val reference = SUB_TASK_REF_KEYS.firstNotNullOfOrNull { expansion.rawValues[it]?.trim()?.takeIf(String::isNotBlank) }
+                    val target = reference?.let { resolveTask(it, tasks) }
+                    when {
+                        reference == null -> addWarning(steps, pc, "task.run requires a task id or name.")
+                        target == null -> addWarning(steps, pc, "Sub-task not found: $reference")
+                        target.id in activeTaskIds -> addWarning(steps, pc, "Sub-task recursion detected for ${target.name}.")
+                        else -> {
+                            val child = simulateTask(
+                                task = target,
+                                tasks = tasks,
+                                variables = variables,
+                                input = input,
+                                taskPath = "$taskPath / ${target.name}",
+                                depth = depth + 1,
+                                activeTaskIds = activeTaskIds + target.id,
+                                reports = reports,
+                                warnings = warnings,
+                            )
+                            reports += child
+                        }
+                    }
+                }
+            }
+            pc++
+        }
+
+        if (interpretedSteps >= MAX_STEPS) {
+            warnings += "Preflight step budget $MAX_STEPS exceeded; remaining flow was not traversed."
+        }
+        task.actions.indices
+            .filterNot(steps::containsKey)
+            .forEach { index ->
+                val spec = task.actions[index]
+                steps[index] = PreflightStep(
+                    taskPath = taskPath,
+                    actionIndex = index,
+                    actionType = spec.type,
+                    label = spec.label ?: spec.type,
+                    status = PreflightStepStatus.SKIPPED,
+                    expandedArguments = emptyMap(),
+                    branchDecision = "not reached by selected branch",
+                    capability = ActionCapabilityRegistry.get(spec.type).level,
+                    intendedEffect = PreflightActionRegistry.intendedEffect(spec.type),
+                )
+            }
+        return PreflightTaskReport(task.id, task.name, taskPath, steps.values.sortedBy { it.actionIndex })
+    }
+
+    private data class PreflightLoopFrame(
+        val foreachIndex: Int,
+        val items: List<String>,
+        val itemVar: String,
+        var index: Int,
+    )
+
+    private data class ControlSimulation(
+        val step: PreflightStep,
+        val nextPc: Int,
+        val halt: Boolean = false,
+    )
+
+    private fun simulateControl(
+        index: Int,
+        spec: ActionSpec,
+        structure: FlowStructure,
+        loops: ArrayDeque<PreflightLoopFrame>,
+        variables: VariableStore,
+        input: PreflightInputs,
+    ): ControlSimulation {
+        fun step(decision: String, nextPc: Int, halt: Boolean = false) = ControlSimulation(
+            step = PreflightStep(
+                taskPath = "",
+                actionIndex = index,
+                actionType = spec.type,
+                label = spec.label ?: spec.type,
+                status = PreflightStepStatus.SIMULATED,
+                condition = spec.args["condition"] ?: spec.condition,
+                branchDecision = decision,
+                intendedEffect = PreflightActionRegistry.intendedEffect(spec.type),
+            ),
+            nextPc = nextPc,
+            halt = halt,
+        )
+        return when (spec.type) {
+            FlowControl.IF -> {
+                val condition = spec.args["condition"]?.trim()?.takeIf(String::isNotBlank)
+                    ?: spec.condition?.trim()?.takeIf(String::isNotBlank)
+                    ?: "true"
+                val evaluated = evaluate(condition, variables, input)
+                val next = if (evaluated.value) {
+                    index + 1
+                } else {
+                    structure.ifToElse[index]?.plus(1) ?: structure.ifToEndif.getValue(index) + 1
+                }
+                step("$condition -> ${evaluated.value}", next)
+            }
+            FlowControl.ELSE -> step("else branch selected", structure.elseToEndif.getValue(index) + 1)
+            FlowControl.ENDIF -> step("endif", index + 1)
+            FlowControl.FOREACH -> {
+                val listName = listOf("list", "in", "array", "items")
+                    .firstNotNullOfOrNull { spec.args[it]?.trim()?.takeIf(String::isNotBlank) }
+                val itemVar = spec.args["var"]?.trim()?.takeIf(String::isNotBlank) ?: "item"
+                val items = listName?.let(variables::getArrayItems).orEmpty()
+                if (items.isEmpty()) {
+                    step("foreach ${listName ?: "<missing list>"} -> 0 items", structure.foreachToEndfor.getValue(index) + 1)
+                } else {
+                    loops.addLast(PreflightLoopFrame(index, items, itemVar, 0))
+                    variables.set(itemVar, items.first())
+                    step("foreach $listName -> ${items.size} items (1/${items.size})", index + 1)
+                }
+            }
+            FlowControl.ENDFOR -> {
+                val frame = loops.lastOrNull()
+                if (frame == null) step("endfor without loop", index + 1, halt = true)
+                else {
+                    frame.index++
+                    if (frame.index < frame.items.size) {
+                        variables.set(frame.itemVar, frame.items[frame.index])
+                        step("loop ${frame.index + 1}/${frame.items.size}", frame.foreachIndex + 1)
+                    } else {
+                        loops.removeLast()
+                        step("endfor", index + 1)
+                    }
+                }
+            }
+            FlowControl.STOP -> step("stop", index + 1, halt = true)
+            else -> step(spec.type, index + 1)
+        }
+    }
+
+    private fun recordStep(steps: MutableMap<Int, PreflightStep>, incoming: PreflightStep) {
+        val existing = steps[incoming.actionIndex]
+        steps[incoming.actionIndex] = if (existing == null) incoming else existing.copy(
+            executionCount = existing.executionCount + 1,
+            status = if (existing.status == PreflightStepStatus.BLOCKED) existing.status else incoming.status,
+            branchDecision = incoming.branchDecision ?: existing.branchDecision,
+            warnings = (existing.warnings + incoming.warnings).distinct(),
+        )
+    }
+
+    private fun addWarning(steps: MutableMap<Int, PreflightStep>, index: Int, warning: String) {
+        steps[index]?.let { step ->
+            steps[index] = step.copy(
+                status = PreflightStepStatus.BLOCKED,
+                warnings = (step.warnings + warning).distinct(),
+            )
+        }
+    }
+
+    private data class Expansion(
+        val values: Map<String, String>,
+        val rawValues: Map<String, String>,
+        val warnings: List<String>,
+    )
+
+    private fun expandArguments(spec: ActionSpec, variables: VariableStore, input: PreflightInputs): Expansion {
+        val rawValues = spec.args.mapValues { (_, raw) -> expand(raw, variables, input) }
+        val warnings = rawValues.values.flatMap { it.warnings }
+        val display = rawValues.mapValues { (key, expansion) ->
+            val secret = expansion.traces.any { it.isSecretDerived }
+            if (secret) ActionArgumentSensitivity.REDACTED
+            else ActionArgumentSensitivity.maskValue(spec.type, key, expansion.value, rawValues.mapValues { it.value.value })
+        }
+        return Expansion(display, rawValues.mapValues { it.value.value }, warnings.distinct())
+    }
+
+    private fun expand(raw: String, variables: VariableStore, input: PreflightInputs): TemplateExpansionResult {
+        val legacy = variables.expandTracked(raw)
+        val result = TemplateExpressionEngine().expand(
+            legacy.value,
+            variables.toTemplateScope(input.eventVariables),
+        )
+        return if (legacy.isSecretDerived && result.traces.none { it.isSecretDerived }) {
+            result.copy(
+                traces = result.traces + TemplateExpansionTrace(
+                    rawExpression = raw,
+                    expression = raw,
+                    value = ActionArgumentSensitivity.REDACTED,
+                    source = TemplateValueSource.GLOBAL,
+                    path = raw,
+                    isSecretDerived = true,
+                ),
+            )
+        } else {
+            result
+        }
+    }
+
+    private fun evaluate(raw: String, variables: VariableStore, input: PreflightInputs): ConditionResult {
+        val expanded = expand(raw, variables, input)
+        return ConditionResult(
+            value = variables.evaluateCondition(expanded.value),
+            display = if (expanded.traces.any { it.isSecretDerived }) ActionArgumentSensitivity.REDACTED else expanded.value,
+            warnings = expanded.warnings,
+        )
+    }
+
+    private data class ConditionResult(
+        val value: Boolean,
+        val display: String,
+        val warnings: List<String>,
+    )
+
+    private fun simulateVariableWrite(spec: ActionSpec, values: Map<String, String>, variables: VariableStore) {
+        when (spec.type) {
+            "var.set" -> {
+                val name = values["name"]?.trim().orEmpty()
+                if (name.isNotBlank()) variables.set(name, values["value"].orEmpty())
+            }
+            "var.persist" -> {
+                val source = values["name"]?.trim().orEmpty()
+                val target = values["global_name"]?.trim().orEmpty().ifBlank { source }
+                val value = variables.get(source)
+                if (value != null && target.isNotBlank()) variables.set(target.uppercase(), value, sensitive = variables.isSensitive(source))
+            }
+        }
+    }
+
+    private fun resolveTask(reference: String, tasks: List<Task>): Task? =
+        reference.toLongOrNull()?.let { id -> tasks.firstOrNull { it.id == id } }
+            ?: tasks.firstOrNull { it.name.equals(reference, ignoreCase = true) }
+
+    private fun seedVariables(variables: VariableStore, input: PreflightInputs) {
+        variables.seedGlobals(input.globalVariables, input.secretGlobalNames)
+        variables.pushScope()
+        input.eventVariables.forEach { (name, value) -> variables.set(name, value) }
+    }
+
+    private fun setupRequirements(task: Task, tasks: List<Task>): Set<SetupRequirement> =
+        SetupRequirementResolver.resolve(
+            profiles = listOf(Profile(id = -1, name = "Preflight", enabled = true, enterTaskId = task.id)),
+            tasks = tasks,
+        )
+
+    private fun setupRequirements(profile: Profile, tasks: List<Task>): Set<SetupRequirement> =
+        SetupRequirementResolver.resolve(
+            profiles = listOf(profile.copy(enabled = true, requiresRiskAcknowledgement = false)),
+            tasks = tasks,
+        )
+}

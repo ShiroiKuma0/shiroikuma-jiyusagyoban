@@ -29,6 +29,8 @@
 
 - **Profile sharing**: added an editable local community-share preview for workspace and imported bundles. The preview accepts bounded screenshot attachments with local thumbnails, renders trust and safety findings, exposes the computed bundle import plan, and hands off to the existing variable-conflict review before any Room write.
 
+- **Preflight runner**: added side-effect-free task/profile previews with bounded synthetic event variables, flow branch decisions, expanded arguments, setup gaps, intended effects, and explicit blockers for unsupported actions. The review surface never invokes runtime actions or persists variables.
+
 - **Flow validation**: added a complex graph fixture covering multiple contexts, conditional branch labels, subflow markers, missing-task repair targets, continuation semantics, and screen-reader summaries. The Flow surface keeps zoom/pan and picker-backed add commands, while direct drag/drop persistence remains deferred until those editor paths have broader UI coverage.
 
 - **Release trust**: a generated `tools/release-truth.json` manifest now owns version/code, Android SDK, dependency, capability-count, bundle/Room schema, and immutable artifact-commit claims. The local quality gate validates the manifest against shipped source, README, and F-Droid metadata with configuration-cache-safe verification.

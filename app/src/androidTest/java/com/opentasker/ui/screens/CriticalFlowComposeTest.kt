@@ -170,6 +170,7 @@ class CriticalFlowComposeTest {
                     onEditTask = {},
                     onDeleteTask = {},
                     onRunTask = {},
+                    onPreflightTask = {},
                     onPinTask = {},
                     onAddAction = {},
                     onEditAction = { _, _, _ -> },

@@ -300,6 +300,8 @@ fun ActiveAutomationUi(
     val openTaskerBundleReview by viewModel.openTaskerBundleReview.collectAsState()
     val openTaskerBundleBusy by viewModel.openTaskerBundleBusy.collectAsState()
     val profileShareReview by viewModel.profileShareReview.collectAsState()
+    val preflightReview by viewModel.preflightReview.collectAsState()
+    val preflightBusy by viewModel.preflightBusy.collectAsState()
     val taskerXmlLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.previewTaskerXml(it, BuildConfig.VERSION_NAME) }
     }
@@ -663,6 +665,7 @@ fun ActiveAutomationUi(
                     if (!onboardingCompleted) onboardingTemplateFlow = true
                 },
                 onPreviewProfileShare = { viewModel.previewLocalProfileShare(BuildConfig.VERSION_NAME) },
+                onPreflightProfile = viewModel::previewProfilePreflight,
                 onExportOpenTaskerBundle = { openTaskerBundleExportLauncher.launch(openTaskerBundleExportName()) },
                 onImportOpenTaskerBundle = { openTaskerBundleImportLauncher.launch(OPEN_TASKER_BUNDLE_MIME_TYPES) },
                 openTaskerBundleBusy = openTaskerBundleBusy,
@@ -697,6 +700,7 @@ fun ActiveAutomationUi(
                 onEditTask = { openTaskDialog(it) },
                 onDeleteTask = { openDeleteTask(it) },
                 onRunTask = { viewModel.runTaskNow(it) },
+                onPreflightTask = viewModel::previewTaskPreflight,
                 onPinTask = { viewModel.pinTaskShortcut(it) },
                 onAddAction = { openActionPicker(it) },
                 onEditAction = { task, index, action ->
@@ -913,6 +917,15 @@ fun ActiveAutomationUi(
             onAttachScreenshots = { profileShareScreenshotLauncher.launch(arrayOf("image/*")) },
             onRemoveScreenshot = viewModel::removeProfileShareScreenshot,
             onContinueImportReview = viewModel::continueProfileShareImportReview,
+        )
+    }
+
+    preflightReview?.let { state ->
+        PreflightReviewDialog(
+            state = state,
+            busy = preflightBusy,
+            onDismiss = viewModel::clearPreflightReview,
+            onRerun = viewModel::rerunPreflight,
         )
     }
 

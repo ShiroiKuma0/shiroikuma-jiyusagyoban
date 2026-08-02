@@ -21,6 +21,9 @@ import com.opentasker.core.diagnostics.RunLogExporter
 import com.opentasker.core.engine.ActiveExecution
 import com.opentasker.core.engine.ActiveExecutionRegistry
 import com.opentasker.core.engine.ExecutionEnvelope
+import com.opentasker.core.engine.PreflightInputs
+import com.opentasker.core.engine.PreflightReport
+import com.opentasker.core.engine.PreflightRunner
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.model.AutomationMode
@@ -140,6 +143,17 @@ internal data class ProfileShareReviewState(
     val manifest: ProfileShareManifest,
     val plan: BundleImportPlan,
     val draftError: String? = null,
+)
+
+internal sealed interface PreflightTarget {
+    data class TaskTarget(val task: Task) : PreflightTarget
+    data class ProfileTarget(val profile: Profile) : PreflightTarget
+}
+
+internal data class PreflightReviewState(
+    val target: PreflightTarget,
+    val inputs: PreflightInputs,
+    val report: PreflightReport,
 )
 
 /**
@@ -355,6 +369,12 @@ class ActiveAutomationViewModel(
 
     private val _profileShareReview = MutableStateFlow<ProfileShareReviewState?>(null)
     internal val profileShareReview: StateFlow<ProfileShareReviewState?> = _profileShareReview.asStateFlow()
+
+    private val _preflightReview = MutableStateFlow<PreflightReviewState?>(null)
+    internal val preflightReview: StateFlow<PreflightReviewState?> = _preflightReview.asStateFlow()
+
+    private val _preflightBusy = MutableStateFlow(false)
+    val preflightBusy: StateFlow<Boolean> = _preflightBusy.asStateFlow()
 
     init {
         refreshRunLogPage()
@@ -1140,6 +1160,53 @@ class ActiveAutomationViewModel(
                 else -> "failed"
             }
             events.send(message(R.string.ui_message_run_status, task.name, status, result.report.durationMs))
+        }
+    }
+
+    fun previewTaskPreflight(task: Task) {
+        startPreflight(PreflightTarget.TaskTarget(task), PreflightInputs())
+    }
+
+    fun previewProfilePreflight(profile: Profile) {
+        startPreflight(PreflightTarget.ProfileTarget(profile), PreflightInputs())
+    }
+
+    fun rerunPreflight(eventVariables: Map<String, String>) {
+        val current = _preflightReview.value ?: return
+        startPreflight(
+            target = current.target,
+            inputs = current.inputs.copy(eventVariables = eventVariables),
+        )
+    }
+
+    fun clearPreflightReview() {
+        if (!_preflightBusy.value) _preflightReview.value = null
+    }
+
+    private fun startPreflight(target: PreflightTarget, inputs: PreflightInputs) {
+        viewModelScope.launch {
+            if (_preflightBusy.value) return@launch
+            _preflightBusy.value = true
+            runCatching {
+                withContext(Dispatchers.Default) {
+                    val availableTasks = tasks.value.toList()
+                    val report = when (target) {
+                        is PreflightTarget.TaskTarget -> PreflightRunner.preflightTask(
+                            task = target.task,
+                            tasks = availableTasks,
+                            inputs = inputs,
+                        )
+                        is PreflightTarget.ProfileTarget -> PreflightRunner.preflightProfile(
+                            profile = target.profile,
+                            tasks = availableTasks,
+                            inputs = inputs,
+                        )
+                    }
+                    PreflightReviewState(target, inputs, report)
+                }
+            }.onSuccess { _preflightReview.value = it }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_preflight)) }
+            _preflightBusy.value = false
         }
     }
 

@@ -1020,4 +1020,31 @@
     <string name="setup_locale_grant_unknown_task">Deleted or unavailable task (ID %1$d)</string>
     <string name="setup_locale_grant_task_id">Task ID %1$d</string>
     <string name="setup_locale_grant_revoke">Revoke</string>
+    <string name="action_preflight">Preflight</string>
+    <string name="dialog_preflight_review">Preflight review</string>
+    <string name="preflight_notice">Preview only: no network, file, setting, shell, notification, scene, or durable variable action will run.</string>
+    <string name="preflight_synthetic_variables">Synthetic event variables</string>
+    <string name="preflight_synthetic_variables_hint">One key=value per line, for example mode=on</string>
+    <string name="preflight_run">Run preflight</string>
+    <string name="preflight_running">Running preflight…</string>
+    <string name="preflight_side_effects_suppressed">Side effects suppressed</string>
+    <string name="preflight_can_run">Preflight complete: every reached step has a preview.</string>
+    <string name="preflight_has_blockers">Preflight has blockers: review the blocked steps before running.</string>
+    <string name="preflight_contexts">Contexts (%1$d)</string>
+    <string name="preflight_tasks">Tasks (%1$d)</string>
+    <string name="preflight_setup_required">Setup required: %1$s</string>
+    <string name="preflight_setup_missing">Missing setup: %1$s</string>
+    <string name="preflight_warnings">Warnings</string>
+    <string name="preflight_context_detail">%1$d. %2$s — %3$s</string>
+    <string name="preflight_task_detail">%1$s (%2$d steps)</string>
+    <string name="preflight_step_detail">%1$d. %2$s — %3$s (%4$s)</string>
+    <string name="preflight_status_simulated">simulated</string>
+    <string name="preflight_status_skipped">skipped</string>
+    <string name="preflight_status_blocked">blocked</string>
+    <string name="preflight_effect">Intended effect: %1$s</string>
+    <string name="preflight_arguments">Expanded inputs: %1$s</string>
+    <string name="preflight_branch">Branch: %1$s</string>
+    <string name="preflight_warning_item">Warning: %1$s</string>
+    <string name="preflight_no_values">none</string>
+    <string name="ui_error_preflight">Unable to create the preflight report.</string>
 </resources>

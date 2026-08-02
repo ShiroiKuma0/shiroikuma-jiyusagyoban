@@ -79,6 +79,7 @@ internal fun ProfilesScreen(
     onCreateProfile: () -> Unit,
     onBrowseTemplates: () -> Unit,
     onPreviewProfileShare: () -> Unit,
+    onPreflightProfile: (Profile) -> Unit,
     onExportOpenTaskerBundle: () -> Unit,
     onImportOpenTaskerBundle: () -> Unit,
     openTaskerBundleBusy: Boolean,
@@ -221,6 +222,7 @@ internal fun ProfilesScreen(
                 onAddContext = { onAddContext(profile) },
                 onEditContext = { index, context -> onEditContext(profile, index, context) },
                 onDeleteContext = { index -> onDeleteContext(profile, index) },
+                onPreflight = { onPreflightProfile(profile) },
             )
         }
     }
@@ -412,6 +414,7 @@ private fun ProfileCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onToggle: (Boolean) -> Unit,
+    onPreflight: () -> Unit,
     onAddContext: () -> Unit,
     onEditContext: (Int, ContextSpec) -> Unit,
     onDeleteContext: (Int) -> Unit,
@@ -514,6 +517,9 @@ private fun ProfileCard(
                 }
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                OutlinedButton(onClick = onPreflight) {
+                    Text(stringResource(R.string.action_preflight))
+                }
                 TextButton(
                     onClick = onDelete,
                     modifier = Modifier.semantics { contentDescription = deleteDescription },
@@ -539,6 +545,7 @@ internal fun TasksScreen(
     onEditTask: (Task) -> Unit,
     onDeleteTask: (Task) -> Unit,
     onRunTask: (Task) -> Unit,
+    onPreflightTask: (Task) -> Unit,
     onPinTask: (Task) -> Unit,
     onAddAction: (Task) -> Unit,
     onEditAction: (Task, Int, ActionSpec) -> Unit,
@@ -604,6 +611,7 @@ internal fun TasksScreen(
                 onEdit = { onEditTask(task) },
                 onDelete = { onDeleteTask(task) },
                 onRun = { onRunTask(task) },
+                onPreflight = { onPreflightTask(task) },
                 onPin = { onPinTask(task) },
                 onAddAction = { onAddAction(task) },
                 onEditAction = { index, action -> onEditAction(task, index, action) },
@@ -620,6 +628,7 @@ private fun TaskCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onRun: () -> Unit,
+    onPreflight: () -> Unit,
     onPin: () -> Unit,
     onAddAction: () -> Unit,
     onEditAction: (Int, ActionSpec) -> Unit,
@@ -734,6 +743,11 @@ private fun TaskCard(
                 }
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                item {
+                    OutlinedButton(onClick = onPreflight) {
+                        Text(stringResource(R.string.action_preflight))
+                    }
+                }
                 item {
                     OutlinedButton(
                         onClick = onPin,
