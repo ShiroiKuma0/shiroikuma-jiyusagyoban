@@ -112,6 +112,14 @@ object ActionCapabilityRegistry {
         "dialog.list" to dialogCapability(),
         "dialog.text" to dialogCapability(),
         "shell.run" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Shizuku installed, started, and access granted to this app.", CapabilityRequirement.Shizuku, blocking = true),
+        // Switching which SIM carries data goes through ISub.setDefaultDataSubId, which needs
+        // MODIFY_PHONE_STATE — held by shell, so Shizuku is the whole requirement.
+        "sim.data.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Switches the SIM that carries mobile data — requires Shizuku installed, started, and access granted to this app.", CapabilityRequirement.Shizuku, blocking = true),
+        "sim.list" to ActionCapability(CapabilityLevel.Supported, "Reads the active SIM slots and which one carries data."),
+        // Pins its own network and transfers over it; no special access beyond the declared
+        // CHANGE_NETWORK_STATE, and it never changes the system's default route.
+        "net.speedtest.cancel" to ActionCapability(CapabilityLevel.Supported, "Aborts a running speed test immediately."),
+        "net.speedtest" to ActionCapability(CapabilityLevel.Supported, "Measures download/upload throughput over a chosen transport (mobile or WiFi), time-boxed and byte-capped."),
         "audio.record.start" to ActionCapability(CapabilityLevel.RequiresSetup, "Records the microphone — needs the Microphone (RECORD_AUDIO) permission.", CapabilityRequirement.Microphone, blocking = true),
         "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported 白い熊 自由作業盤 action."),
     )
