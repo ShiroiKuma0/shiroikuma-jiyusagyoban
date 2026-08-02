@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
  *   - "sun_tick": local minute tick used by sunrise/sunset event filters
  *   - "nfc": NFC tag scan
  *   - "bluetooth": Bluetooth device connected/disconnected
+ *   - "usb": USB/input device attached/detached
  *   - "shake": accelerometer shake pulse
  *   - "camera" / "mic": active AppOps watcher pulse
  *   - "package_added" / "package_removed" / "package_replaced": package changes
@@ -52,6 +53,7 @@ class EventContextSourceImpl : EventDemandContextSource {
         CameraMicContextEvents.flow,
         PackageContextEvents.events,
         BluetoothContextEvents.events,
+        UsbDeviceContextEvents.events,
         NotificationContextEvents.events,
         NfcContextEvents.events,
         BootContextEvents.events,

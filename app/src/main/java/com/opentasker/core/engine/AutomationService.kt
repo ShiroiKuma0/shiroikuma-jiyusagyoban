@@ -39,6 +39,7 @@ import com.opentasker.core.contexts.PackageContextEvents
 import com.opentasker.core.contexts.PluginConditionSubscription
 import com.opentasker.core.contexts.PluginConditionSubscriptions
 import com.opentasker.core.contexts.TimeContextEvents
+import com.opentasker.core.contexts.UsbDeviceContextEvents
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
@@ -133,6 +134,18 @@ class AutomationService : Service() {
                         true
                     },
                     stop = { unregisterReceiver(BluetoothContextEvents.receiver) },
+                ),
+                ContextMonitor.USB_EVENTS to ContextMonitorHandle(
+                    start = {
+                        ContextCompat.registerReceiver(
+                            this,
+                            UsbDeviceContextEvents.receiver,
+                            UsbDeviceContextEvents.intentFilter(),
+                            ContextCompat.RECEIVER_NOT_EXPORTED,
+                        )
+                        true
+                    },
+                    stop = { unregisterReceiver(UsbDeviceContextEvents.receiver) },
                 ),
             ),
         )

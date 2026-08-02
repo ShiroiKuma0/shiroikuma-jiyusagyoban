@@ -111,6 +111,7 @@ class ContextMonitorLifecycleTest {
                 ContextMonitor.CAMERA_MIC,
                 ContextMonitor.PACKAGE_EVENTS,
                 ContextMonitor.BLUETOOTH_EVENTS,
+                ContextMonitor.USB_EVENTS,
             ),
             requiredContextMonitors(broad),
         )
