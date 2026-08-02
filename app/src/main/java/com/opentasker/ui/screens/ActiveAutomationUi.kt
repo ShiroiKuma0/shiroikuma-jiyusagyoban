@@ -200,6 +200,21 @@ import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.isSpecified
+
+/**
+ * Size of the version label in the top bar, as a fraction of the app-name label it sits beside.
+ * ~66%: visually subordinate, so the build string annotates the name instead of blending into it,
+ * while staying big enough to read without leaning in.
+ */
+private const val VERSION_LABEL_SCALE = 0.66f
+
+/** Scales a [TextUnit], passing Unspecified straight through — `lineHeight` is often unspecified and
+ *  multiplying that throws. */
+private fun TextUnit.scaleBy(factor: Float): TextUnit = if (isSpecified) this * factor else this
+
 
 
 private const val NO_DIALOG_ENTITY_ID = 0L
@@ -803,7 +818,36 @@ fun ActiveAutomationUi(
             TopAppBar(
                 title = {
                     Column {
-                        Text("白い熊 自由作業盤", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        // The app name, with the FULL installed version pinned to its right — the whole
+                        // string (upstream base + base date + upstream sha + our build counter), never a
+                        // shortened form, so a glance at the bar says exactly which build is running.
+                        // Bottom-aligned and at VERSION_LABEL_SCALE of the name's size so it reads as an
+                        // annotation on the name rather than a second word inside it. Sitting the smaller
+                        // text on the name's bottom edge also drops it clear of the 相撲字時計 overlay,
+                        // which draws across the top band of the screen.
+                        val nameStyle = LocalTextStyle.current
+                        Row(
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(
+                                "白い熊 自由作業盤",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                // fill = false: the name yields width first, so the version is never the
+                                // part that gets ellipsized away.
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                            Text(
+                                BuildConfig.VERSION_NAME,
+                                style = nameStyle.copy(
+                                    fontSize = nameStyle.fontSize.scaleBy(VERSION_LABEL_SCALE),
+                                    lineHeight = nameStyle.lineHeight.scaleBy(VERSION_LABEL_SCALE),
+                                ),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                            )
+                        }
                         Text(
                             "${screen.label} - $headerDetail",
                             style = MaterialTheme.typography.labelMedium,
