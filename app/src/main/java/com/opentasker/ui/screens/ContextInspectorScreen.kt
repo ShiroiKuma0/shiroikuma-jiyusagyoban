@@ -59,7 +59,6 @@ import com.opentasker.core.contexts.ContextSourceStatus
 import com.opentasker.core.contexts.ProfileInspection
 import com.opentasker.core.contexts.inspectProfiles
 import com.opentasker.core.contexts.observationStatus
-import com.opentasker.core.contexts.toContextSourceLabel
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.location.LocationPolicyDisclosures
 import com.opentasker.core.model.ContextType
@@ -265,7 +264,7 @@ fun ContextInspectorScreen(
             item {
                 InspectorNotice(
                     title = stringResource(R.string.empty_profiles_inspector),
-                    body = "Create a profile before reviewing match explanations.",
+                    body = stringResource(R.string.inspector_no_profiles_body),
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
@@ -309,17 +308,21 @@ private fun ContextInspectorSummaryCard(
                     )
                 }
                 InspectorStatusPill(
-                    label = if (attentionSources == 0) "Ready" else "$attentionSources attention",
+                    label = if (attentionSources == 0) {
+                        stringResource(R.string.inspector_ready)
+                    } else {
+                        stringResource(R.string.inspector_attention, attentionSources)
+                    },
                     color = healthColor,
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                InspectorMetric("$activeSources", "Active sources", Modifier.weight(1f))
-                InspectorMetric("$matchingProfiles", "Matching", Modifier.weight(1f))
-                InspectorMetric("$enabledProfiles", "Enabled", Modifier.weight(1f))
+                InspectorMetric("$activeSources", stringResource(R.string.inspector_active_sources), Modifier.weight(1f))
+                InspectorMetric("$matchingProfiles", stringResource(R.string.inspector_matching), Modifier.weight(1f))
+                InspectorMetric("$enabledProfiles", stringResource(R.string.inspector_enabled), Modifier.weight(1f))
             }
             OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Refresh, contentDescription = "Refresh", modifier = Modifier.size(18.dp))
+                Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.inspector_refresh), modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(stringResource(R.string.inspector_refresh))
             }
@@ -347,20 +350,26 @@ private fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-                Icon(sourceStatusIcon(source.status), contentDescription = source.status.label, tint = color, modifier = Modifier.size(22.dp))
+                Icon(sourceStatusIcon(source.status), contentDescription = stringResource(source.status.resourceId), tint = color, modifier = Modifier.size(22.dp))
                 Column(Modifier.weight(1f)) {
                     Text(source.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     val lastUpdateLabel = stringResource(R.string.inspector_last_update)
                     val noValueLabel = stringResource(R.string.inspector_no_value)
                     Text(
-                        observation?.let { "$lastUpdateLabel ${formatRelativeTime(it.observedAtMs, nowMs)}" } ?: noValueLabel,
+                        observation?.let {
+                            stringResource(
+                                R.string.inspector_last_update_value,
+                                lastUpdateLabel,
+                                formatRelativeTime(LocalContext.current, it.observedAtMs, nowMs),
+                            )
+                        } ?: noValueLabel,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                InspectorStatusPill(source.status.label, color)
+                InspectorStatusPill(stringResource(source.status.resourceId), color)
                 InspectorStatusPill(
-                    observationStatus.label,
+                    stringResource(observationStatus.resourceId),
                     observationStatusColor(observationStatus),
                 )
             }
@@ -368,7 +377,7 @@ private fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             source.error?.let {
-                InspectorNotice("Source error", it, MaterialTheme.colorScheme.error)
+                InspectorNotice(stringResource(R.string.inspector_source_error), it, MaterialTheme.colorScheme.error)
             }
             observation?.let {
                 ContextMetadataBlock(event = it, nowMs = nowMs)
@@ -400,7 +409,7 @@ private fun ProfileInspectorCard(profile: ProfileInspection, nowMs: Long) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
                 Icon(
                     if (profile.matching) Icons.Filled.CheckCircle else Icons.Filled.Info,
-                    contentDescription = if (profile.matching) stringResource(R.string.status_matching) else "Not matching",
+                    contentDescription = if (profile.matching) stringResource(R.string.status_matching) else stringResource(R.string.inspector_not_matching),
                     tint = color,
                     modifier = Modifier.size(22.dp),
                 )
@@ -437,6 +446,7 @@ private fun ContextCheckRow(
     check: com.opentasker.core.contexts.ContextCheck,
     nowMs: Long,
 ) {
+    val context = LocalContext.current
     val color = if (check.effectiveMatched) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -446,10 +456,17 @@ private fun ContextCheckRow(
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
-                InspectorStatusPill("#${check.index + 1}", MaterialTheme.colorScheme.secondary)
+                InspectorStatusPill(
+                    stringResource(R.string.inspector_context_number, check.index + 1),
+                    MaterialTheme.colorScheme.secondary,
+                )
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "${check.spec.type.name.lowercase(Locale.US).replaceFirstChar { it.titlecase(Locale.US) }} via ${check.sourceLabel}",
+                        stringResource(
+                            R.string.inspector_context_source,
+                            stringResource(contextTitleRes(check.spec.type)),
+                            check.sourceLabel,
+                        ),
                         style = MaterialTheme.typography.titleSmall,
                     )
                     Text(
@@ -460,15 +477,18 @@ private fun ContextCheckRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                InspectorStatusPill(if (check.effectiveMatched) "Match" else "No match", color)
+                InspectorStatusPill(
+                    if (check.effectiveMatched) stringResource(R.string.inspector_match) else stringResource(R.string.inspector_no_match),
+                    color,
+                )
             }
             Text(check.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            locationDwellDetail(check, nowMs)?.let {
+            locationDwellDetail(context, check, nowMs)?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             check.lastObservation?.let {
                 Text(
-                    "Observed ${formatRelativeTime(it.observedAtMs, nowMs)}",
+                    stringResource(R.string.inspector_observed, formatRelativeTime(context, it.observedAtMs, nowMs)),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -486,15 +506,15 @@ private fun ContextMetadataBlock(event: ContextEventObservation, nowMs: Long) {
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Latest value", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.inspector_latest_value), style = MaterialTheme.typography.labelLarge)
             Text(
-                "matched=${event.event.matched}",
+                stringResource(R.string.inspector_matched, event.event.matched),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             event.event.metadata.entries.sortedBy { it.key }.forEach { (key, value) ->
                 Text(
-                    "$key=$value",
+                    stringResource(R.string.inspector_metadata, key, value),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -502,7 +522,7 @@ private fun ContextMetadataBlock(event: ContextEventObservation, nowMs: Long) {
                 )
             }
             Text(
-                formatAbsoluteTime(event.observedAtMs, nowMs),
+                formatAbsoluteTime(LocalContext.current, event.observedAtMs, nowMs),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -546,15 +566,19 @@ private fun OemRiskNotice(oem: OemBatteryGuidance.Guidance) {
         border = BorderStroke(1.dp, color.copy(alpha = 0.26f)),
     ) {
         Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Icon(Icons.Filled.Error, contentDescription = "Warning", tint = color, modifier = Modifier.size(20.dp))
+            Icon(Icons.Filled.Error, contentDescription = stringResource(R.string.inspector_warning), tint = color, modifier = Modifier.size(20.dp))
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    "${oem.oemName} background risk: ${oem.riskLevel.name.lowercase(Locale.US)}",
+                    stringResource(
+                        R.string.inspector_oem_risk,
+                        oem.oemName,
+                        oem.riskLevel.name.lowercase(Locale.US),
+                    ),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    "${oem.summary} Open the Setup tab for OEM-specific steps.",
+                    stringResource(R.string.inspector_oem_summary, oem.summary),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -601,13 +625,13 @@ private fun InspectorEmptyState(contentPadding: PaddingValues) {
             ) {
                 Icon(
                     Icons.Filled.Info,
-                    contentDescription = "Context inspector unavailable",
+                    contentDescription = stringResource(R.string.inspector_unavailable_content_description),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp),
                 )
-                Text("Context inspector unavailable", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.inspector_unavailable_title), style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "Runtime context sources have not registered yet. Open Setup to confirm permissions, then refresh after sources begin reporting.",
+                    stringResource(R.string.inspector_unavailable_body),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -657,7 +681,7 @@ private fun buildContextSourceSnapshots(
         val setup = contextSourceSetup(context, key)
         ContextSourceSnapshot(
             key = key,
-            label = key.toContextSourceLabel(),
+            label = context.getString(sourceLabelResource(key)),
             registered = key in registeredKeys,
             setupReady = setup.ready,
             setupDetail = setup.detail,
@@ -665,6 +689,16 @@ private fun buildContextSourceSnapshots(
             lastObservation = observations[key],
         )
     }
+}
+
+private fun sourceLabelResource(key: String): Int = when (key) {
+    "app" -> R.string.context_source_application
+    "time" -> R.string.context_source_time
+    "state" -> R.string.context_source_state
+    "event" -> R.string.context_source_event
+    "location" -> R.string.context_source_location
+    "plugin" -> R.string.context_source_plugin
+    else -> R.string.context_source_unknown
 }
 
 private data class ContextSourceSetup(val ready: Boolean, val detail: String)
@@ -675,9 +709,9 @@ private fun contextSourceSetup(context: Context, key: String): ContextSourceSetu
         ContextSourceSetup(
             ready = granted,
             detail = if (granted) {
-                "Usage access is granted for foreground-app context checks."
+                context.getString(R.string.inspector_setup_usage_granted)
             } else {
-                "Usage access is missing; application contexts cannot report foreground packages."
+                context.getString(R.string.inspector_setup_usage_missing)
             },
         )
     }
@@ -686,9 +720,9 @@ private fun contextSourceSetup(context: Context, key: String): ContextSourceSetu
         ContextSourceSetup(
             ready = true,
             detail = if (exactReady) {
-                "Clock source is registered and exact alarms are available for scheduled engine ticks."
+                context.getString(R.string.inspector_setup_clock_exact)
             } else {
-                "Clock source is registered; exact alarms are denied so scheduled engine ticks use the inexact fallback."
+                context.getString(R.string.inspector_setup_clock_inexact)
             },
         )
     }
@@ -698,9 +732,9 @@ private fun contextSourceSetup(context: Context, key: String): ContextSourceSetu
         ContextSourceSetup(
             ready = true,
             detail = if (wifiReady && locationReady) {
-                "Battery, charging, screen, headset, and WiFi-related state checks have required runtime access."
+                context.getString(R.string.inspector_setup_state_ready)
             } else {
-                "Battery, charging, screen, and headset checks are available; WiFi state may need location or nearby WiFi setup."
+                context.getString(R.string.inspector_setup_state_partial)
             },
         )
     }
@@ -708,16 +742,16 @@ private fun contextSourceSetup(context: Context, key: String): ContextSourceSetu
         val notificationReady = hasNotificationListenerAccess(context)
         val calendarReady = hasPermission(context, Manifest.permission.READ_CALENDAR)
         val calendarDetail = if (calendarReady) {
-            "Calendar events can be matched with redacted metadata."
+            context.getString(R.string.inspector_setup_calendar_ready)
         } else {
-            "Calendar triggers need Calendar access in Setup; sunrise/sunset matching uses configured coordinates."
+            context.getString(R.string.inspector_setup_calendar_missing)
         }
         ContextSourceSetup(
             ready = true,
             detail = if (notificationReady) {
-                "Boot, system, notification, NFC, calendar, and sun events are registered. Notification text is kept in-memory for matching and is not written to run logs. $calendarDetail"
+                context.getString(R.string.inspector_setup_event_ready, calendarDetail)
             } else {
-                "Boot, system, NFC, calendar, and sun events are registered. Notification events need Notification Access in Setup before Android will bind the listener. $calendarDetail"
+                context.getString(R.string.inspector_setup_event_notification_missing, calendarDetail)
             },
         )
     }
@@ -737,7 +771,7 @@ private fun contextSourceSetup(context: Context, key: String): ContextSourceSetu
             ),
         )
     }
-    else -> ContextSourceSetup(ready = true, detail = "Source setup status is not specialized yet.")
+    else -> ContextSourceSetup(ready = true, detail = context.getString(R.string.inspector_setup_source_generic))
 }
 
 private fun requiredContextSourceKeys(): Set<String> =
@@ -761,42 +795,60 @@ private fun hasNotificationListenerAccess(context: Context): Boolean {
     return enabledListeners?.contains(context.packageName, ignoreCase = true) == true
 }
 
+private val ContextSourceStatus.resourceId: Int
+    get() = when (this) {
+        ContextSourceStatus.Active -> R.string.inspector_status_active
+        ContextSourceStatus.Waiting -> R.string.inspector_status_waiting
+        ContextSourceStatus.NeedsSetup -> R.string.inspector_status_needs_setup
+        ContextSourceStatus.Missing -> R.string.inspector_status_missing
+        ContextSourceStatus.Error -> R.string.inspector_status_error
+    }
+
+private val ContextObservationStatus.resourceId: Int
+    get() = when (this) {
+        ContextObservationStatus.Loading -> R.string.inspector_observation_loading
+        ContextObservationStatus.Ready -> R.string.inspector_observation_ready
+        ContextObservationStatus.Stale -> R.string.inspector_observation_stale
+        ContextObservationStatus.Error -> R.string.inspector_observation_error
+    }
+
 private fun emptyContextInspectionSnapshot(nowMs: Long): ContextInspectionSnapshot =
     ContextInspectionSnapshot(generatedAtMs = nowMs, sources = emptyList(), profiles = emptyList())
 
-private fun formatRelativeTime(observedAtMs: Long, nowMs: Long): String {
+private fun formatRelativeTime(context: Context, observedAtMs: Long, nowMs: Long): String {
     val seconds = ((nowMs - observedAtMs) / 1000L).coerceAtLeast(0)
     return when {
-        seconds < 5 -> "just now"
-        seconds < 60 -> "${seconds}s ago"
-        seconds < 3_600 -> "${seconds / 60}m ago"
-        else -> "${seconds / 3_600}h ago"
+        seconds < 5 -> context.getString(R.string.inspector_time_just_now)
+        seconds < 60 -> context.getString(R.string.inspector_time_seconds, seconds)
+        seconds < 3_600 -> context.getString(R.string.inspector_time_minutes, seconds / 60)
+        else -> context.getString(R.string.inspector_time_hours, seconds / 3_600)
     }
 }
 
-private fun formatAbsoluteTime(observedAtMs: Long, nowMs: Long): String {
+private fun formatAbsoluteTime(context: Context, observedAtMs: Long, nowMs: Long): String {
     val formatted = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(observedAtMs))
-    return "$formatted - ${formatRelativeTime(observedAtMs, nowMs)}"
+    return context.getString(R.string.inspector_time_absolute, formatted, formatRelativeTime(context, observedAtMs, nowMs))
 }
 
-private fun locationDwellDetail(check: com.opentasker.core.contexts.ContextCheck, nowMs: Long): String? {
+private fun locationDwellDetail(context: Context, check: com.opentasker.core.contexts.ContextCheck, nowMs: Long): String? {
     if (check.spec.type != ContextType.LOCATION) return null
     val observation = check.lastObservation ?: return null
     val metadata = observation.event.metadata
     val state = metadata["dwellState"] ?: return null
     val dwellMillis = parseDwellMillis(check.spec.config)
-    val target = dwellMillis.takeIf { it > 0L }?.let { " of ${formatDuration(it)}" }.orEmpty()
+    val target = dwellMillis.takeIf { it > 0L }?.let { context.getString(R.string.inspector_dwell_target, formatDuration(context, it)) }.orEmpty()
     val observedAt = metadata["observedAtEpochMs"]?.toLongOrNull() ?: observation.observedAtMs
     val insideSince = metadata["insideSinceEpochMs"]?.toLongOrNull()
-    val insideFor = insideSince?.let { formatDuration((observedAt - it).coerceAtLeast(0L)) }
+    val insideFor = insideSince?.let { formatDuration(context, (observedAt - it).coerceAtLeast(0L)) }
 
     return when (state) {
-        "inside" -> insideFor?.let { "Dwell: inside for $it$target." } ?: "Dwell: inside; waiting for a stable entry time."
+        "inside" -> insideFor?.let { context.getString(R.string.inspector_dwell_inside, it, target) }
+            ?: context.getString(R.string.inspector_dwell_inside_waiting)
         "accuracy_blocked" -> insideFor?.let {
-            "Dwell: latest fix is inside but blocked by accuracy; retained timer at $it$target."
-        } ?: "Dwell: latest fix is inside but blocked by accuracy."
-        "outside" -> "Dwell: outside radius; timer reset."
-        "unknown" -> "Dwell: waiting for valid geofence config and location metadata."
+            context.getString(R.string.inspector_dwell_accuracy_blocked, it, target)
+        } ?: context.getString(R.string.inspector_dwell_accuracy_blocked_no_timer)
+        "outside" -> context.getString(R.string.inspector_dwell_outside)
+        "unknown" -> context.getString(R.string.inspector_dwell_unknown)
         else -> null
     }
 }
@@ -811,11 +863,11 @@ private fun parseDwellMillis(config: Map<String, String>): Long {
 private fun firstConfig(config: Map<String, String>, vararg keys: String): String =
     keys.firstNotNullOfOrNull { config[it]?.trim()?.takeIf(String::isNotBlank) }.orEmpty()
 
-private fun formatDuration(ms: Long): String {
+private fun formatDuration(context: Context, ms: Long): String {
     val seconds = (ms / 1000L).coerceAtLeast(0L)
     return when {
-        seconds < 60 -> "${seconds}s"
-        seconds < 3_600 -> "${seconds / 60}m ${seconds % 60}s"
-        else -> "${seconds / 3_600}h ${(seconds % 3_600) / 60}m"
+        seconds < 60 -> context.getString(R.string.inspector_duration_seconds, seconds)
+        seconds < 3_600 -> context.getString(R.string.inspector_duration_minutes_seconds, seconds / 60, seconds % 60)
+        else -> context.getString(R.string.inspector_duration_hours_minutes, seconds / 3_600, (seconds % 3_600) / 60)
     }
 }

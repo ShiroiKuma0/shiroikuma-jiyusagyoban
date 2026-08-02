@@ -3,9 +3,11 @@ package com.opentasker.ui.screens
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.opentasker.app.R
 import com.opentasker.core.capabilities.AutomationFeedbackRiskAnalyzer
 import com.opentasker.core.capabilities.ImportedProfileEnablePolicy
 import com.opentasker.core.contexts.NfcTagWriteSession
@@ -116,6 +118,14 @@ internal data class TaskerImportReviewState(
     val preview: TaskerImportPreview,
 )
 
+/** Snackbar payloads stay as resource IDs until the Compose collector resolves them. */
+data class UiMessage(
+    @StringRes val resId: Int,
+    val args: List<Any> = emptyList(),
+) {
+    fun resolve(context: Context): String = context.getString(resId, *args.toTypedArray())
+}
+
 internal data class OpenTaskerBundleReviewState(
     val bundle: OpenTaskerBundle,
     val plan: BundleImportPlan,
@@ -184,6 +194,39 @@ class ActiveAutomationViewModel(
     private val bundleRepository = OpenTaskerBundleRepository(db, variableRepository)
     private val runLogRetentionSettings = RunLogRetentionSettings(appContext)
     private val databaseBackupManager = DatabaseBackupManager(appContext, db)
+
+    private fun message(@StringRes resId: Int, vararg args: Any): UiMessage =
+        UiMessage(resId, args.toList())
+
+    private fun errorMessage(error: Throwable, fallbackRes: Int): UiMessage =
+        message(R.string.ui_error_message, error.message ?: appContext.getString(fallbackRes))
+
+    private fun legacyMessage(value: String): UiMessage = when {
+        value == "Task created" -> message(R.string.ui_message_task_created)
+        value == "Task updated" -> message(R.string.ui_message_task_updated)
+        value == "Action moved" -> message(R.string.ui_message_action_moved)
+        value == "Scene created" -> message(R.string.ui_message_scene_created)
+        value == "Scene updated" -> message(R.string.ui_message_scene_updated)
+        value == "Scene deleted" -> message(R.string.ui_message_scene_deleted)
+        value == "Profile created" -> message(R.string.ui_message_profile_created)
+        value == "Profile updated" -> message(R.string.ui_message_profile_updated)
+        value == "Profile deleted" -> message(R.string.ui_message_profile_deleted)
+        value == "Imported profile reviewed and enabled" -> message(R.string.ui_message_profile_reviewed)
+        value == "Template installed as a disabled profile" -> message(R.string.ui_message_template_installed)
+        value == "Edit undone" -> message(R.string.ui_message_edit_undone)
+        value == "No edit history available" -> message(R.string.ui_message_no_edit_history)
+        value == "Elements moved" -> message(R.string.ui_message_elements_moved)
+        value == "Element added" -> message(R.string.ui_message_element_added)
+        value == "Element updated" -> message(R.string.ui_message_element_updated)
+        value == "Action added" -> message(R.string.ui_message_action_added)
+        value == "Action updated" -> message(R.string.ui_message_action_updated)
+        value == "Context added" -> message(R.string.ui_message_context_added)
+        value == "Context updated" -> message(R.string.ui_message_context_updated)
+        value == "Variable created" -> message(R.string.ui_message_variable_created)
+        value.startsWith("Updated ") -> message(R.string.variables_updated, value.removePrefix("Updated "))
+        value.startsWith("Deleted ") -> message(R.string.variables_deleted, value.removePrefix("Deleted "))
+        else -> message(R.string.ui_error_message, value)
+    }
 
     private val profileDecodeResults = db.profileDao()
         .getAllAsFlow()
@@ -261,7 +304,7 @@ class ActiveAutomationViewModel(
     fun cancelExecution(executionId: Long) {
         viewModelScope.launch {
             val cancelled = ActiveExecutionRegistry.cancel(executionId)
-            events.send(if (cancelled) "Cancelling automation" else "That automation already finished")
+            events.send(message(if (cancelled) R.string.ui_message_cancelling_automation else R.string.ui_message_automation_finished))
         }
     }
 
@@ -270,7 +313,7 @@ class ActiveAutomationViewModel(
         .map { variables -> variables.toImmutableList() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
-    private val events = Channel<String>(Channel.BUFFERED)
+    private val events = Channel<UiMessage>(Channel.BUFFERED)
     val messages = events.receiveAsFlow()
 
     private val _runLogRetentionPolicy = MutableStateFlow(runLogRetentionSettings.load())
@@ -328,7 +371,7 @@ class ActiveAutomationViewModel(
             }.onSuccess { state ->
                 _diagnosticsState.value = state
             }.onFailure { error ->
-                events.send("Error: ${error.message ?: "Diagnostics could not be refreshed"}")
+                events.send(errorMessage(error, R.string.ui_error_diagnostics_refresh))
             }
         }
     }
@@ -455,13 +498,13 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess { blocked ->
                     if (blocked > 0) {
-                        events.send("Task is still used by $blocked automation(s). Reassign or clear those references first.")
+                        events.send(message(R.string.ui_task_still_used, blocked))
                     } else {
                         LocaleGrantStore(appContext).revokeAllForTask(task.id)
-                        events.send("Task deleted")
+                        events.send(message(R.string.ui_message_task_deleted))
                     }
                 }
-                .onFailure { events.send("Error: ${it.message ?: "Task delete failed"}") }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_task_delete)) }
         }
     }
 
@@ -605,9 +648,9 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess {
                     _taskerImportReview.value = it
-                    events.send("Tasker XML ready for review")
+                    events.send(message(R.string.ui_message_tasker_xml_ready))
                 }
-                .onFailure { events.send("Error: ${it.message ?: "Tasker XML import preview failed"}") }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_tasker_xml_preview)) }
             _taskerImportBusy.value = false
         }
     }
@@ -630,11 +673,14 @@ class ActiveAutomationViewModel(
                 .onSuccess { importReport ->
                     _taskerImportReview.value = null
                     events.send(
-                        "Imported ${importReport.insertedTasks} task${plural(importReport.insertedTasks)}, " +
-                            "${importReport.insertedProfiles} disabled profile${plural(importReport.insertedProfiles)}"
+                        message(
+                            R.string.ui_message_tasker_imported,
+                            importReport.insertedTasks,
+                            importReport.insertedProfiles,
+                        ),
                     )
                 }
-                .onFailure { events.send("Error: ${it.message ?: "Tasker XML import failed"}") }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_tasker_xml_import)) }
             _taskerImportBusy.value = false
         }
     }
@@ -659,12 +705,15 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess { bundle ->
                     events.send(
-                        "Exported ${bundle.tasks.size} task${plural(bundle.tasks.size)}, " +
-                            "${bundle.profiles.size} profile${plural(bundle.profiles.size)}, " +
-                            "${bundle.scenes.size} scene${plural(bundle.scenes.size)}"
+                        message(
+                            R.string.ui_message_bundle_exported,
+                            bundle.tasks.size,
+                            bundle.profiles.size,
+                            bundle.scenes.size,
+                        ),
                     )
                 }
-                .onFailure { events.send("Error: ${it.message ?: "OpenTasker bundle export failed"}") }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_bundle_export)) }
             _openTaskerBundleBusy.value = false
         }
     }
@@ -682,9 +731,9 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess {
                     _openTaskerBundleReview.value = it
-                    events.send("OpenTasker bundle ready for review")
+                    events.send(message(R.string.ui_message_bundle_ready))
                 }
-                .onFailure { events.send("Error: ${it.message ?: "OpenTasker bundle preview failed"}") }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_bundle_preview)) }
             _openTaskerBundleBusy.value = false
         }
     }
@@ -718,12 +767,15 @@ class ActiveAutomationViewModel(
                 .onSuccess { importReport ->
                     _openTaskerBundleReview.value = null
                     events.send(
-                        "Imported ${importReport.insertedTasks} task${plural(importReport.insertedTasks)}, " +
-                            "${importReport.insertedProfiles} disabled profile${plural(importReport.insertedProfiles)}, " +
-                            "${importReport.insertedScenes} scene${plural(importReport.insertedScenes)}"
+                        message(
+                            R.string.ui_message_bundle_imported,
+                            importReport.insertedTasks,
+                            importReport.insertedProfiles,
+                            importReport.insertedScenes,
+                        ),
                     )
                 }
-                .onFailure { events.send("Error: ${it.message ?: "OpenTasker bundle import failed"}") }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_bundle_import)) }
             _openTaskerBundleBusy.value = false
         }
     }
@@ -755,7 +807,7 @@ class ActiveAutomationViewModel(
                 throw cancelled
             } catch (error: Exception) {
                 _runLogPage.value = _runLogPage.value.copy(loading = false)
-                events.send("Error: ${error.message ?: "Run logs could not be loaded"}")
+                events.send(errorMessage(error, R.string.ui_error_run_logs_load))
             }
         }
     }
@@ -781,7 +833,7 @@ class ActiveAutomationViewModel(
                 throw cancelled
             } catch (error: Exception) {
                 _runLogPage.value = current.copy(loading = false)
-                events.send("Error: ${error.message ?: "More run logs could not be loaded"}")
+                events.send(errorMessage(error, R.string.ui_error_run_logs_more))
             }
         }
     }
@@ -799,9 +851,9 @@ class ActiveAutomationViewModel(
                         ?: error("Could not open the export destination")
                     output.use { RunLogExporter(db.runLogDao()).export(snapshot, format, it) }
                 }
-                events.send("Exported $exported run log entr${if (exported == 1) "y" else "ies"}")
+                events.send(message(R.string.ui_message_run_logs_exported, exported, if (exported == 1) "y" else "ies"))
             } catch (error: Exception) {
-                events.send("Error: ${error.message ?: "Run log export failed"}")
+                events.send(errorMessage(error, R.string.ui_error_run_log_export))
             }
         }
     }
@@ -825,7 +877,7 @@ class ActiveAutomationViewModel(
             }.onSuccess { preview ->
                 if (preview.prunableCount == 0) updateRunLogRetention(preview.policy)
                 else _runLogRetentionPreview.value = preview
-            }.onFailure { events.send("Error: ${it.message ?: "Retention preview failed"}") }
+            }.onFailure { events.send(errorMessage(it, R.string.ui_error_retention_preview)) }
         }
     }
 
@@ -848,11 +900,15 @@ class ActiveAutomationViewModel(
                 pruneRunLogs(normalized)
             }
                 .onSuccess { deleted ->
-                    val suffix = if (deleted > 0) "; pruned $deleted old entry${plural(deleted)}" else ""
-                    events.send("Run log retention updated$suffix")
+                    val suffix = if (deleted > 0) {
+                        appContext.getString(R.string.ui_message_retention_pruned, deleted, plural(deleted))
+                    } else {
+                        ""
+                    }
+                    events.send(message(R.string.ui_message_retention_updated, suffix))
                     refreshRunLogPage()
                 }
-                .onFailure { events.send("Error: ${it.message ?: "Run log retention update failed"}") }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_retention_update)) }
         }
     }
 
@@ -874,7 +930,7 @@ class ActiveAutomationViewModel(
                 }
                 appContext.startActivity(Intent.createChooser(intent, "Share diagnostic report").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             } catch (ex: Exception) {
-                events.send("Error: ${ex.message ?: "Failed to share diagnostic report"}")
+                events.send(errorMessage(ex, R.string.ui_error_share_diagnostics))
             }
         }
     }
@@ -883,21 +939,21 @@ class ActiveAutomationViewModel(
         launchBackupOperation {
             databaseBackupManager.backup()
                 .onSuccess { backup ->
-                    events.send("Backup created: ${backup.name}")
+                    events.send(message(R.string.ui_message_backup_created, backup.name))
                 }
-                .onFailure { events.send("Error: ${it.message ?: "Database backup failed"}") }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_backup)) }
         }
     }
 
     fun exportDatabaseBackup(uri: Uri) {
         launchBackupOperation {
             val backup = databaseBackupManager.backup().getOrElse {
-                events.send("Error: ${it.message ?: "Database backup failed"}")
+                events.send(errorMessage(it, R.string.ui_error_backup))
                 return@launchBackupOperation
             }
             databaseBackupManager.exportBackup(backup, uri)
-                .onSuccess { events.send("Backup exported: ${backup.name}") }
-                .onFailure { events.send("Error: ${it.message ?: "Database backup export failed"}") }
+                .onSuccess { events.send(message(R.string.ui_message_backup_exported, backup.name)) }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_backup_export)) }
         }
     }
 
@@ -918,7 +974,7 @@ class ActiveAutomationViewModel(
                         replacesPending = databaseBackupManager.pendingRestoreSummary(),
                     )
                 }
-                .onFailure { events.send("Error: ${it.message ?: "Database backup import failed"}") }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_backup_import)) }
         }
     }
 
@@ -927,9 +983,9 @@ class ActiveAutomationViewModel(
             databaseBackupManager.stageInspectedRestore()
                 .onSuccess {
                     _restoreReview.value = null
-                    events.send("Restore staged. Restart OpenTasker to apply it.")
+                    events.send(message(R.string.ui_message_restore_staged))
                 }
-                .onFailure { events.send("Error: ${it.message ?: "Staging the restore failed"}") }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_restore_stage)) }
         }
     }
 
@@ -944,9 +1000,7 @@ class ActiveAutomationViewModel(
     fun cancelPendingRestore() {
         launchBackupOperation {
             val cancelled = withContext(Dispatchers.IO) { databaseBackupManager.cancelPendingRestore() }
-            events.send(
-                if (cancelled) "Staged restore cancelled" else "There is no staged restore to cancel",
-            )
+            events.send(message(if (cancelled) R.string.ui_message_restore_cancelled else R.string.ui_message_no_staged_restore))
         }
     }
 
@@ -989,21 +1043,21 @@ class ActiveAutomationViewModel(
                 result.report.success -> "succeeded"
                 else -> "failed"
             }
-            events.send("${task.name} $status (${result.report.durationMs}ms)")
+            events.send(message(R.string.ui_message_run_status, task.name, status, result.report.durationMs))
         }
     }
 
     fun pinTaskShortcut(task: Task) {
         viewModelScope.launch {
             if (!TaskShortcutHelper.canPinShortcut(appContext)) {
-                events.send("Launcher does not support pinned shortcuts")
+                events.send(message(R.string.ui_message_shortcut_unsupported))
                 return@launch
             }
             val requested = TaskShortcutHelper.requestPinShortcut(appContext, task)
             if (requested) {
-                events.send("Pinning \"${task.name}\" to home screen")
+                events.send(message(R.string.ui_message_shortcut_pinning, task.name))
             } else {
-                events.send("Failed to pin shortcut")
+                events.send(message(R.string.ui_message_shortcut_failed))
             }
         }
     }
@@ -1018,8 +1072,8 @@ class ActiveAutomationViewModel(
                 db.editHistoryDao().deleteFor(EditHistoryDao.TYPE_TASK, taskId)
                 true
             }.onSuccess { undone ->
-                events.send(if (undone) "Edit undone" else "No edit history available")
-            }.onFailure { events.send("Error: ${it.message ?: "Undo failed"}") }
+                events.send(message(if (undone) R.string.ui_message_edit_undone else R.string.ui_message_no_edit_history))
+            }.onFailure { events.send(errorMessage(it, R.string.ui_error_undo)) }
         }
     }
 
@@ -1033,8 +1087,8 @@ class ActiveAutomationViewModel(
                 db.editHistoryDao().deleteFor(EditHistoryDao.TYPE_PROFILE, profileId)
                 true
             }.onSuccess { undone ->
-                events.send(if (undone) "Edit undone" else "No edit history available")
-            }.onFailure { events.send("Error: ${it.message ?: "Undo failed"}") }
+                events.send(message(if (undone) R.string.ui_message_edit_undone else R.string.ui_message_no_edit_history))
+            }.onFailure { events.send(errorMessage(it, R.string.ui_error_undo)) }
         }
     }
 
@@ -1042,12 +1096,12 @@ class ActiveAutomationViewModel(
         viewModelScope.launch {
             runCatching {
                 val globalName = requireNotNull(VariableNamePolicy.promoteToGlobal(name)) {
-                    "Invalid variable name"
+                    appContext.getString(R.string.ui_error_invalid_variable_name)
                 }
                 variableRepository.upsert(Variable(globalName, value, isGlobal = true, isSecret = isSecret))
-                events.send(successMessage)
+                events.send(legacyMessage(successMessage))
             }.onFailure { error ->
-                events.send("Error: ${error.message ?: "Variable could not be saved"}")
+                events.send(errorMessage(error, R.string.ui_error_variable_save))
             }
         }
     }
@@ -1055,8 +1109,8 @@ class ActiveAutomationViewModel(
     fun deleteVariable(name: String, successMessage: String) {
         viewModelScope.launch {
             runCatching { variableRepository.delete(name) }
-                .onSuccess { events.send(successMessage) }
-                .onFailure { events.send("Error: ${it.message ?: "Variable could not be deleted"}") }
+                .onSuccess { events.send(legacyMessage(successMessage)) }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_variable_delete)) }
         }
     }
 
@@ -1076,8 +1130,8 @@ class ActiveAutomationViewModel(
     private fun launchWithMessage(successMessage: String, block: suspend () -> Unit) {
         viewModelScope.launch {
             runCatching { block() }
-                .onSuccess { events.send(successMessage) }
-                .onFailure { events.send("Error: ${it.message ?: "Operation failed"}") }
+                .onSuccess { events.send(legacyMessage(successMessage)) }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
         }
     }
 }

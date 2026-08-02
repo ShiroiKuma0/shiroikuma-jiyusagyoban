@@ -33,6 +33,13 @@ class LocalizationSourceTest {
             "com/opentasker/ui/screens/SceneOverlayControls.kt",
             "com/opentasker/ui/screens/VariablesScreen.kt",
             "com/opentasker/widget/TaskWidgetConfigActivity.kt",
+            "com/opentasker/ui/screens/ActiveAutomationUi.kt",
+            "com/opentasker/ui/screens/ActiveAutomationViewModel.kt",
+            "com/opentasker/ui/screens/ContextInspectorScreen.kt",
+            "com/opentasker/ui/screens/RunLogScreenContent.kt",
+            "com/opentasker/ui/screens/DiagnosticsScreen.kt",
+            "com/opentasker/ui/screens/RunLogFilters.kt",
+            "com/opentasker/core/flow/AutomationFlowGraph.kt",
         )
         val forbiddenPatterns = mapOf(
             "Text literal" to Regex("""\bText\s*\(\s*""" + "\""),
@@ -40,6 +47,8 @@ class LocalizationSourceTest {
             "contentDescription literal" to Regex("""contentDescription\s*=\s*""" + "\""),
             "label text literal" to Regex("""label\s*=\s*\{\s*Text\s*\(\s*""" + "\""),
             "placeholder text literal" to Regex("""placeholder\s*=\s*\{\s*Text\s*\(\s*""" + "\""),
+            "body argument literal" to Regex("""\bbody\s*=\s*""" + "\""),
+            "values argument literal" to Regex("""\bvalues\s*=\s*""" + "\""),
         )
 
         val offenders = localizedFiles.flatMap { relativePath ->
@@ -53,6 +62,25 @@ class LocalizationSourceTest {
             "Hardcoded user-facing Compose strings found; use stringResource/R.string instead: $offenders",
             offenders.isEmpty(),
         )
+    }
+
+    @Test
+    fun secondarySurfaceViewModelMessagesResolveFromResourcesAtTheCollector() {
+        val viewModel = sourceRoot.resolve("com/opentasker/ui/screens/ActiveAutomationViewModel.kt").readText()
+        val ui = sourceRoot.resolve("com/opentasker/ui/screens/ActiveAutomationUi.kt").readText()
+
+        assertTrue("Snackbar channel must carry resource IDs", "Channel<UiMessage>" in viewModel)
+        assertFalse("ViewModel must not emit raw snackbar literals", Regex("events\\.send\\(\\s*\"").containsMatchIn(viewModel))
+        assertTrue("Compose collector must resolve the message in the current locale", "it.resolve(context)" in ui)
+    }
+
+    @Test
+    fun flowGraphUsesTheCurrentResourceBundleForGeneratedCopy() {
+        val flow = sourceRoot.resolve("com/opentasker/ui/screens/AutomationFlowScreen.kt").readText()
+        val graph = sourceRoot.resolve("com/opentasker/core/flow/AutomationFlowGraph.kt").readText()
+
+        assertTrue("Flow screen must pass localized copy into graph construction", "AutomationFlowStrings.from(resources)" in flow)
+        assertTrue("Flow graph must accept localized presentation copy", "AutomationFlowStrings" in graph)
     }
 
     @Test

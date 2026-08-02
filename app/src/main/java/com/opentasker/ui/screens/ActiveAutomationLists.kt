@@ -273,7 +273,11 @@ private fun WorkspaceSummaryCard(
             if (recentFailure != null) {
                 InlineNotice(
                     title = stringResource(R.string.workspace_recent_failure),
-                    body = "${recentFailure.taskName}: ${recentFailure.message.ifBlank { reviewDetails }}",
+                    body = stringResource(
+                        R.string.workspace_recent_failure_detail,
+                        recentFailure.taskName,
+                        recentFailure.message.ifBlank { reviewDetails },
+                    ),
                     color = MaterialTheme.colorScheme.error,
                 )
             }

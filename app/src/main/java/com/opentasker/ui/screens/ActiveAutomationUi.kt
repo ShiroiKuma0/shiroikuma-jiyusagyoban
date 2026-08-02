@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -192,16 +193,16 @@ private const val DELETE_TARGET_ACTION = "action"
 private const val DELETE_TARGET_CONTEXT = "context"
 
 
-private enum class OpenTaskerScreen(val label: String) {
-    Profiles("Profiles"),
-    Tasks("Tasks"),
-    Vars("Variables"),
-    Flow("Flow"),
-    Scenes("Scenes"),
-    Inspector("Inspector"),
-    Setup("Setup"),
-    RunLog("Run Log"),
-    Diagnostics("Diagnostics"),
+private enum class OpenTaskerScreen(@StringRes val labelRes: Int) {
+    Profiles(R.string.nav_profiles),
+    Tasks(R.string.nav_tasks),
+    Vars(R.string.nav_variables),
+    Flow(R.string.nav_flow),
+    Scenes(R.string.nav_scenes),
+    Inspector(R.string.nav_inspector),
+    Setup(R.string.nav_setup),
+    RunLog(R.string.nav_run_log),
+    Diagnostics(R.string.nav_diagnostics),
 }
 
 private val primaryNavigationScreens = listOf(
@@ -505,12 +506,12 @@ fun ActiveAutomationUi(
             }
         }
         if (!opened) {
-            scope.launch { snackbarHostState.showSnackbar("Flow target no longer exists") }
+            scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.ui_flow_target_missing)) }
         }
     }
 
     LaunchedEffect(Unit) {
-        viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
+        viewModel.messages.collect { snackbarHostState.showSnackbar(it.resolve(context)) }
     }
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(screen) {
@@ -529,15 +530,15 @@ fun ActiveAutomationUi(
 
     var showMoreDestinations by rememberSaveable { mutableStateOf(false) }
     val headerDetail = when (screen) {
-        OpenTaskerScreen.Profiles -> "${profiles.count { it.enabled }} enabled • ${profiles.size} total"
-        OpenTaskerScreen.Tasks -> "${tasks.sumOf { it.actions.size }} actions • ${tasks.size} tasks"
-        OpenTaskerScreen.Vars -> "${globalVariables.size} global variables"
-        OpenTaskerScreen.Flow -> "${profiles.size} profiles • ${tasks.size} tasks"
-        OpenTaskerScreen.Scenes -> "${scenes.sumOf { it.elements.size }} elements • ${scenes.size} scenes"
-        OpenTaskerScreen.Inspector -> "Live context health"
-        OpenTaskerScreen.Setup -> "Permission and reliability checks"
-        OpenTaskerScreen.RunLog -> "${runLogPage.totalCount} matching entries"
-        OpenTaskerScreen.Diagnostics -> "Engine, crashes, and app logs"
+        OpenTaskerScreen.Profiles -> stringResource(R.string.header_profiles_detail, profiles.count { it.enabled }, profiles.size)
+        OpenTaskerScreen.Tasks -> stringResource(R.string.header_tasks_detail, tasks.sumOf { it.actions.size }, tasks.size)
+        OpenTaskerScreen.Vars -> stringResource(R.string.header_variables_detail, globalVariables.size)
+        OpenTaskerScreen.Flow -> stringResource(R.string.header_flow_detail, profiles.size, tasks.size)
+        OpenTaskerScreen.Scenes -> stringResource(R.string.header_scenes_detail, scenes.sumOf { it.elements.size }, scenes.size)
+        OpenTaskerScreen.Inspector -> stringResource(R.string.header_inspector_detail)
+        OpenTaskerScreen.Setup -> stringResource(R.string.header_setup_detail)
+        OpenTaskerScreen.RunLog -> stringResource(R.string.header_run_log_detail, runLogPage.totalCount)
+        OpenTaskerScreen.Diagnostics -> stringResource(R.string.header_diagnostics_detail)
     }
 
     Scaffold(
@@ -607,7 +608,7 @@ fun ActiveAutomationUi(
                                 showMoreDestinations = false
                             },
                             icon = destination.icon(),
-                            label = destination.label,
+                            label = stringResource(destination.labelRes),
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -616,7 +617,7 @@ fun ActiveAutomationUi(
                             selected = screen in secondaryNavigationScreens || showMoreDestinations,
                             onClick = { showMoreDestinations = true },
                             icon = Icons.Outlined.MoreHoriz,
-                            label = "More",
+                            label = stringResource(R.string.nav_more),
                             modifier = Modifier.fillMaxWidth(),
                         )
                         DropdownMenu(
@@ -626,8 +627,8 @@ fun ActiveAutomationUi(
                         ) {
                             secondaryNavigationScreens.forEach { destination ->
                                 DropdownMenuItem(
-                                    text = { Text(destination.label) },
-                                    leadingIcon = { Icon(destination.icon(), contentDescription = destination.label) },
+                                    text = { Text(stringResource(destination.labelRes)) },
+                                    leadingIcon = { Icon(destination.icon(), contentDescription = stringResource(destination.labelRes)) },
                                     onClick = {
                                         screenOrdinal = destination.ordinal
                                         showMoreDestinations = false
@@ -725,7 +726,7 @@ fun ActiveAutomationUi(
                         screenOrdinal = OpenTaskerScreen.Profiles.ordinal
                         openContextPicker(profile)
                     } else {
-                        scope.launch { snackbarHostState.showSnackbar("Flow target no longer exists") }
+                        scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.ui_flow_target_missing)) }
                     }
                 },
                 onAddAction = { taskId ->
@@ -734,7 +735,7 @@ fun ActiveAutomationUi(
                         screenOrdinal = OpenTaskerScreen.Tasks.ordinal
                         openActionPicker(task)
                     } else {
-                        scope.launch { snackbarHostState.showSnackbar("Flow target no longer exists") }
+                        scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.ui_flow_target_missing)) }
                     }
                 },
             )
@@ -1089,7 +1090,7 @@ private fun OpenTaskerHeader(screen: OpenTaskerScreen, detail: String) {
                         maxLines = 1,
                     )
                     Text(
-                        screen.label,
+                        stringResource(screen.labelRes),
                         style = MaterialTheme.typography.titleLarge,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -1098,7 +1099,7 @@ private fun OpenTaskerHeader(screen: OpenTaskerScreen, detail: String) {
                 Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = screen.icon(),
-                        contentDescription = screen.label,
+                        contentDescription = stringResource(screen.labelRes),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp),
                     )

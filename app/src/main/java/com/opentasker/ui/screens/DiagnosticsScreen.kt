@@ -261,7 +261,7 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
                         stringResource(
                             R.string.diagnostics_health_signal,
                             signal.label,
-                            signal.state.name,
+                            stringResource(signal.state.resourceId),
                             signal.reason,
                         ),
                         style = MaterialTheme.typography.bodySmall,
@@ -339,3 +339,11 @@ private fun AppLogCard(entry: AppLogEntry, formatter: SimpleDateFormat) {
 }
 
 private const val CRASH_PREVIEW_LINES = 6
+
+private val HealthSignalState.resourceId: Int
+    get() = when (this) {
+        HealthSignalState.Ready -> R.string.diagnostics_health_state_ready
+        HealthSignalState.Loading -> R.string.diagnostics_health_state_loading
+        HealthSignalState.Stale -> R.string.diagnostics_health_state_stale
+        HealthSignalState.Error -> R.string.diagnostics_health_state_error
+    }

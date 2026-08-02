@@ -332,7 +332,7 @@ private fun RunLogFilterCard(
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 items(RunLogStatusFilter.entries.toList(), key = { it.name }) { filter ->
                     RunLogFilterChip(
-                        label = filter.label,
+                        label = stringResource(filter.labelRes),
                         selected = statusFilter == filter,
                         onClick = { onStatusFilterChange(filter) },
                     )
@@ -341,7 +341,7 @@ private fun RunLogFilterCard(
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 items(RunLogDateFilter.entries.toList(), key = { it.name }) { filter ->
                     RunLogFilterChip(
-                        label = filter.label,
+                        label = stringResource(filter.labelRes),
                         selected = dateFilter == filter,
                         onClick = { onDateFilterChange(filter) },
                     )
@@ -429,9 +429,9 @@ private fun RunLogSummaryCard(
                 }
                 StatusPill(
                     when {
-                        failures > 0 -> "$failures failed"
-                        skipped > 0 -> "$skipped skipped"
-                        else -> "Healthy"
+                        failures > 0 -> stringResource(R.string.run_log_summary_failed, failures)
+                        skipped > 0 -> stringResource(R.string.run_log_summary_skipped, skipped)
+                        else -> stringResource(R.string.run_log_summary_healthy)
                     },
                     when {
                         failures > 0 -> MaterialTheme.colorScheme.error
@@ -449,7 +449,7 @@ private fun RunLogSummaryCard(
             }
             latest?.let {
                 Text(
-                    "Latest: ${it.taskName}",
+                    stringResource(R.string.run_log_latest, it.taskName),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -561,8 +561,8 @@ private fun RunLogCard(entry: RunLogEntry) {
                 }
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                item { StatusPill(outcome.label, accent) }
-                item { StatusPill("${entry.durationMs} ms", accent) }
+                item { StatusPill(outcome.localizedLabel(), accent) }
+                item { StatusPill(stringResource(R.string.run_log_duration, entry.durationMs), accent) }
             }
             Column(Modifier.fillMaxWidth()) {
                 if (hasStructuredDiagnostics && diagnostics.detailLines.isNotEmpty()) {
@@ -634,16 +634,16 @@ private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
     ) {
-        StatusPill(trace.status.readableName(), color)
+        StatusPill(trace.status.localizedName(), color)
         Column(Modifier.weight(1f)) {
             Text(
-                "${trace.index + 1}. ${trace.label}",
+                stringResource(R.string.run_log_trace_indexed, trace.index + 1, trace.label),
                 style = MaterialTheme.typography.labelLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                "${trace.actionType} - ${trace.durationMs} ms - ${trace.message}",
+                stringResource(R.string.run_log_trace_detail, trace.actionType, trace.durationMs, trace.message),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
@@ -651,7 +651,7 @@ private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
             )
             trace.argumentSummary?.let { summary ->
                 Text(
-                    "Expanded: $summary",
+                    stringResource(R.string.run_log_trace_expanded, summary),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
@@ -661,7 +661,7 @@ private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
             if (trace.templateWarningCount > 0) {
                 Spacer(Modifier.height(4.dp))
                 StatusPill(
-                    "${trace.templateWarningCount} template warning${plural(trace.templateWarningCount)}",
+                    stringResource(R.string.run_log_template_warnings, trace.templateWarningCount),
                     MaterialTheme.colorScheme.error,
                 )
             }
@@ -739,7 +739,7 @@ private fun ExpressionDebugger(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    "${expressions.size} expression${plural(expressions.size)}",
+                    stringResource(R.string.run_log_expression_count, expressions.size),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -766,7 +766,7 @@ private fun ExpressionDebugger(
                         )
                     }
                     Text(
-                        "${expr.expression}  →  ${expr.value}",
+                        stringResource(R.string.run_log_expression_value, expr.expression, expr.value),
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -786,7 +786,7 @@ private fun ExpressionDebugger(
             }
             if (!expanded && expressions.size > 3) {
                 Text(
-                    "${expressions.size - 3} more",
+                    stringResource(R.string.run_log_expression_more, expressions.size - 3),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -974,8 +974,25 @@ private fun runLogTaskOptions(logs: List<RunLogEntry>, tasks: List<Task>): List<
         .sortedWith(compareBy<Pair<Long, String>> { it.second.lowercase() }.thenBy { it.first })
 }
 
-private fun ActionTraceStatus.readableName(): String =
-    name.lowercase().replaceFirstChar { it.titlecase(Locale.getDefault()) }
+@Composable
+private fun RunLogOutcome.localizedLabel(): String = stringResource(
+    when (this) {
+        RunLogOutcome.Succeeded -> R.string.status_succeeded
+        RunLogOutcome.Failed -> R.string.status_failed
+        RunLogOutcome.Skipped -> R.string.status_skipped
+        RunLogOutcome.Cancelled -> R.string.status_cancelled
+    },
+)
+
+@Composable
+private fun ActionTraceStatus.localizedName(): String = stringResource(
+    when (this) {
+        ActionTraceStatus.SUCCESS -> R.string.status_succeeded
+        ActionTraceStatus.FAILURE -> R.string.status_failed
+        ActionTraceStatus.TIMEOUT -> R.string.status_timeout
+        ActionTraceStatus.SKIPPED -> R.string.status_skipped
+    },
+)
 
 private fun plural(count: Int): String = if (count == 1) "" else "s"
 

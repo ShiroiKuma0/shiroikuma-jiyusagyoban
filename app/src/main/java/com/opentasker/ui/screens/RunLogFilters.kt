@@ -1,22 +1,24 @@
 package com.opentasker.ui.screens
 
+import androidx.annotation.StringRes
+import com.opentasker.app.R
 import com.opentasker.core.storage.RunLogQuery
 import com.opentasker.core.storage.RunLogStatusQuery
 import com.opentasker.core.storage.escapeRunLogLikeQuery
 
-enum class RunLogStatusFilter(val label: String) {
-    All("All"),
-    Succeeded("Succeeded"),
-    Failed("Failed"),
-    Skipped("Skipped"),
-    Cancelled("Cancelled"),
+enum class RunLogStatusFilter(@StringRes val labelRes: Int) {
+    All(R.string.run_log_filter_all),
+    Succeeded(R.string.run_log_filter_succeeded),
+    Failed(R.string.run_log_filter_failed),
+    Skipped(R.string.run_log_filter_skipped),
+    Cancelled(R.string.run_log_filter_cancelled),
 }
 
-enum class RunLogDateFilter(val label: String, val ageMillis: Long?) {
-    All("Any date", null),
-    Day("24 hours", 24L * 60 * 60 * 1_000),
-    Week("7 days", 7L * 24 * 60 * 60 * 1_000),
-    Month("30 days", 30L * 24 * 60 * 60 * 1_000),
+enum class RunLogDateFilter(@StringRes val labelRes: Int, val ageMillis: Long?) {
+    All(R.string.run_log_date_any, null),
+    Day(R.string.run_log_date_day, 24L * 60 * 60 * 1_000),
+    Week(R.string.run_log_date_week, 7L * 24 * 60 * 60 * 1_000),
+    Month(R.string.run_log_date_month, 30L * 24 * 60 * 60 * 1_000),
 }
 
 data class RunLogFilterState(

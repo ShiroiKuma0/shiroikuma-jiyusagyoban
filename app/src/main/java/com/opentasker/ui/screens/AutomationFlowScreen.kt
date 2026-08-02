@@ -45,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -74,9 +75,11 @@ fun AutomationFlowScreen(
     onAddContext: (Long) -> Unit = {},
     onAddAction: (Long) -> Unit = {},
 ) {
-    val graphs = remember(profiles, tasks) {
+    val resources = LocalContext.current.resources
+    val graphs = remember(profiles, tasks, resources) {
         val tasksById = tasks.associateBy { it.id }
-        profiles.map { profile -> AutomationFlowGraphBuilder.build(profile, tasksById) }
+        val strings = com.opentasker.core.flow.AutomationFlowStrings.from(resources)
+        profiles.map { profile -> AutomationFlowGraphBuilder.build(profile, tasksById, strings) }
     }
 
     if (profiles.isEmpty()) {

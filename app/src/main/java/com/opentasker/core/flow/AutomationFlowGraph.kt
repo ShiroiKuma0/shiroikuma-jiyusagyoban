@@ -12,6 +12,7 @@ data class AutomationFlowGraph(
     val nodes: List<AutomationFlowNode>,
     val edges: List<AutomationFlowEdge>,
     val warnings: List<String> = emptyList(),
+    val strings: AutomationFlowStrings = AutomationFlowStrings.English,
 ) {
     val contextNodes: List<AutomationFlowNode>
         get() = nodes.filter { it.kind == AutomationFlowNodeKind.CONTEXT }
@@ -40,15 +41,10 @@ data class AutomationFlowGraph(
 
     fun accessibilitySummary(): String {
         val actionCount = nodes.count { it.kind == AutomationFlowNodeKind.ACTION }
-        val enterTask = enterTaskNode?.title ?: "missing enter task"
-        val exitTask = exitTaskNode?.title ?: "no exit task"
-        val warningText = if (warnings.isEmpty()) {
-            "no warnings"
-        } else {
-            "${warnings.size} warning${plural(warnings.size)}"
-        }
-        return "$title: ${contextNodes.size} context${plural(contextNodes.size)}, " +
-            "$actionCount action${plural(actionCount)}, enter task $enterTask, exit task $exitTask, $warningText."
+        val enterTask = enterTaskNode?.title ?: strings.missingTaskTitle("enter")
+        val exitTask = exitTaskNode?.title ?: strings.noExitTask()
+        val warningText = if (warnings.isEmpty()) "no warnings" else "${warnings.size} warning${plural(warnings.size)}"
+        return strings.accessibilitySummary(title, contextNodes.size, actionCount, enterTask, exitTask, warningText)
     }
 }
 
@@ -62,17 +58,11 @@ data class AutomationFlowNode(
     val condition: String? = null,
     /** Structural flag so the UI can badge sub-task nodes without parsing the localized detail. */
     val isSubTask: Boolean = false,
+    val strings: AutomationFlowStrings = AutomationFlowStrings.English,
 ) {
     fun accessibilityLabel(): String {
         val kindName = kind.name.lowercase().replace('_', ' ')
-        val parts = buildList {
-            add(kindName)
-            add(title)
-            detail?.takeUnless { it.isBlank() }?.let(::add)
-            condition?.takeUnless { it.isBlank() }?.let { add("condition if $it") }
-            if (muted) add("inactive")
-        }
-        return parts.joinToString(". ")
+        return strings.nodeAccessibility(kindName, title, detail, condition, muted)
     }
 }
 
@@ -99,10 +89,17 @@ data class AutomationFlowEdge(
 )
 
 object AutomationFlowGraphBuilder {
-    fun build(profile: Profile, tasks: List<Task>): AutomationFlowGraph =
-        build(profile, tasks.associateBy { it.id })
+    fun build(
+        profile: Profile,
+        tasks: List<Task>,
+        strings: AutomationFlowStrings = AutomationFlowStrings.English,
+    ): AutomationFlowGraph = build(profile, tasks.associateBy { it.id }, strings)
 
-    fun build(profile: Profile, tasksById: Map<Long, Task>): AutomationFlowGraph {
+    fun build(
+        profile: Profile,
+        tasksById: Map<Long, Task>,
+        strings: AutomationFlowStrings = AutomationFlowStrings.English,
+    ): AutomationFlowGraph {
         val nodes = mutableListOf<AutomationFlowNode>()
         val edges = mutableListOf<AutomationFlowEdge>()
         val warnings = mutableListOf<String>()
@@ -113,25 +110,24 @@ object AutomationFlowGraphBuilder {
             kind = AutomationFlowNodeKind.PROFILE,
             title = profile.name,
             detail = listOf(
-                if (profile.enabled) "Enabled" else "Disabled",
-                "Mode ${profile.automationMode.name.lowercase()}",
-                "Cooldown ${profile.cooldownSec}s",
+                strings.profileDetail(profile.enabled, profile.automationMode.name.lowercase(), profile.cooldownSec),
             ).joinToString(" - "),
             muted = !profile.enabled,
             target = AutomationFlowTarget.Profile(profile.id),
+            strings = strings,
         )
 
         if (profile.contexts.isEmpty()) {
-            warnings += "Profile has no contexts."
+            warnings += strings.noContextsWarning()
         }
 
         profile.contexts.forEachIndexed { index, context ->
             val contextNodeId = "profile:${profile.id}:context:$index"
-            nodes += context.toNode(contextNodeId, profile.id, index)
+            nodes += context.toNode(contextNodeId, profile.id, index, strings)
             edges += AutomationFlowEdge(
                 fromId = contextNodeId,
                 toId = profileNodeId,
-                label = if (context.invert) "must not match" else "must match",
+                label = strings.contextEdge(context.invert),
             )
         }
 
@@ -146,10 +142,11 @@ object AutomationFlowGraphBuilder {
             task = tasksById[profile.enterTaskId],
             kind = AutomationFlowNodeKind.ENTER_TASK,
             edgeLabel = "enter",
+            strings = strings,
         )
 
         if (enterTaskNodeId == null) {
-            warnings += "Enter task ${profile.enterTaskId} is missing."
+            warnings += strings.missingTaskWarning("enter", profile.enterTaskId)
         }
 
         profile.exitTaskId?.let { exitTaskId ->
@@ -164,9 +161,10 @@ object AutomationFlowGraphBuilder {
                 task = tasksById[exitTaskId],
                 kind = AutomationFlowNodeKind.EXIT_TASK,
                 edgeLabel = "exit",
+                strings = strings,
             )
             if (exitTaskNodeId == null) {
-                warnings += "Exit task $exitTaskId is missing."
+                warnings += strings.missingTaskWarning("exit", exitTaskId)
             }
         }
 
@@ -176,6 +174,7 @@ object AutomationFlowGraphBuilder {
             nodes = nodes,
             edges = edges,
             warnings = warnings.distinct(),
+            strings = strings,
         )
     }
 
@@ -190,6 +189,7 @@ object AutomationFlowGraphBuilder {
         task: Task?,
         kind: AutomationFlowNodeKind,
         edgeLabel: String,
+        strings: AutomationFlowStrings,
     ): String? {
         val taskNodeId = "${edgeLabel}-task:$taskId"
         if (task == null) {
@@ -197,9 +197,10 @@ object AutomationFlowGraphBuilder {
                 id = taskNodeId,
                 kind = AutomationFlowNodeKind.MISSING,
                 title = "Missing ${edgeLabel} task",
-                detail = "Task id $taskId is referenced by $profileName",
+                detail = strings.missingTaskDetail(taskId, profileName),
                 muted = true,
                 target = AutomationFlowTarget.Profile(profileId),
+                strings = strings,
             )
             edges += AutomationFlowEdge(sourceNodeId, taskNodeId, edgeLabel)
             return null
@@ -209,23 +210,24 @@ object AutomationFlowGraphBuilder {
             id = taskNodeId,
             kind = kind,
             title = task.name,
-            detail = "${task.actions.size} action${plural(task.actions.size)} - priority ${task.priority}",
-            target = AutomationFlowTarget.Task(taskId),
+                detail = strings.taskDetail(task.actions.size, task.priority),
+                target = AutomationFlowTarget.Task(taskId),
+                strings = strings,
         )
         edges += AutomationFlowEdge(sourceNodeId, taskNodeId, edgeLabel)
 
         if (task.actions.isEmpty()) {
-            warnings += "${task.name} has no actions."
+            warnings += strings.noActionsWarning(task.name)
         }
 
         var previousNodeId = taskNodeId
         task.actions.forEachIndexed { index, action ->
             val actionNodeId = "$taskNodeId:action:$index"
-            nodes += action.toNode(actionNodeId, taskId, index)
+            nodes += action.toNode(actionNodeId, taskId, index, strings)
             edges += AutomationFlowEdge(
                 fromId = previousNodeId,
                 toId = actionNodeId,
-                label = action.edgeLabel(index),
+                label = action.edgeLabel(index, strings),
             )
             previousNodeId = actionNodeId
         }
@@ -233,48 +235,39 @@ object AutomationFlowGraphBuilder {
     }
 }
 
-private fun ContextSpec.toNode(id: String, profileId: Long, index: Int): AutomationFlowNode =
+private fun ContextSpec.toNode(id: String, profileId: Long, index: Int, strings: AutomationFlowStrings): AutomationFlowNode =
     AutomationFlowNode(
         id = id,
         kind = AutomationFlowNodeKind.CONTEXT,
-        title = "Context ${index + 1}: ${type.name.lowercase().replaceFirstChar { it.uppercase() }}",
-        detail = listOfNotNull(
-            if (invert) "Inverted" else null,
-            config.summaryOrNull(actionType = null),
-        ).joinToString(" - ").ifBlank { "No parameters" },
+        title = strings.contextTitle(index + 1, type.name.lowercase().replaceFirstChar { it.uppercase() }),
+        detail = strings.contextDetail(invert, config.summaryOrNull(actionType = null)),
         muted = invert,
         target = AutomationFlowTarget.Context(profileId, index),
+        strings = strings,
     )
 
-private fun ActionSpec.toNode(id: String, taskId: Long, index: Int): AutomationFlowNode {
+private fun ActionSpec.toNode(id: String, taskId: Long, index: Int, strings: AutomationFlowStrings): AutomationFlowNode {
     val subTaskRef = if (type == "task.run") {
         listOf("task", "name", "id").firstNotNullOfOrNull { args[it]?.trim()?.takeUnless(String::isBlank) }
     } else {
         null
     }
-    val title = when {
-        !label.isNullOrBlank() -> label
-        subTaskRef != null -> "Step ${index + 1}: run sub-task \"$subTaskRef\""
-        else -> "Step ${index + 1}: $type"
-    }
+    val title = strings.actionTitle(index + 1, subTaskRef, type, label)
     return AutomationFlowNode(
         id = id,
         kind = AutomationFlowNodeKind.ACTION,
         title = title,
-        detail = listOfNotNull(
-            if (subTaskRef != null) "sub-task -> $subTaskRef" else type,
-            args.summaryOrNull(actionType = type),
-            if (continueOnError) "continues after error" else null,
-        ).joinToString(" - "),
+        detail = strings.actionDetail(subTaskRef, type, args.summaryOrNull(actionType = type), continueOnError),
         target = AutomationFlowTarget.Action(taskId, index),
         condition = condition?.trim()?.takeUnless { it.isBlank() },
         isSubTask = subTaskRef != null,
+        strings = strings,
     )
 }
 
-private fun ActionSpec.edgeLabel(index: Int): String {
+private fun ActionSpec.edgeLabel(index: Int, strings: AutomationFlowStrings): String {
     val trimmedCondition = condition?.trim()?.takeUnless { it.isBlank() }
-    return trimmedCondition?.let { "if ${it.safePreview()}" } ?: if (index == 0) "step 1" else "then"
+    return strings.conditionalEdge(trimmedCondition?.safePreview().orEmpty(), index)
 }
 
 /**
