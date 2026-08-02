@@ -47,16 +47,33 @@ the per-item JSON directly instead of asking 白い熊 to screenshot. Rebuild it
 | namespace (R/BuildConfig pkg) | `com.opentasker.app` (**unchanged** from upstream) | `app/build.gradle.kts` |
 | App label | `白い熊 自由作業盤` | `app_name` in `app/src/main/res/values/strings.xml` |
 | App icon | black-yellow (yellow foreground + black background) | `app/src/main/res/mipmap/*`, `values/colors.xml` |
-| Version tail | `versionName = "<base>+N"`, `versionCode = <base>*10000+N` | `app/build.gradle.kts` fork blocks |
+| Version tail | `versionName = "<base>.<base date>.g<sha8>+NNN"`, `versionCode = <base>*10000+N` | `app/build.gradle.kts` fork blocks |
 | Signing | gitignored `keystore.properties` → `~/.android-keystores/shiroikuma-jiyusagyoban.jks` (alias `sagyoban`) | `app/build.gradle.kts` |
 
 ### Versioning & APK naming
-- Upstream base lives in `app/build.gradle.kts` as `appVersionName` (e.g. `0.2.60`) / `appVersionCode`
-  (e.g. `62`) — these track upstream and update automatically on rebase.
-- `BUILD_NUMBER` (in `gradle.properties`) is our per-build `N`: `versionName = "<base>+N"`,
-  `versionCode = <base>*10000 + N`. The `buildFork` task bumps it after every successful build; the
-  upstream-sync skill resets it to `1`.
-- APK: `shiroikuma-jiyusagyoban_<versionName>_arm64-v8a.apk`, copied to `~/tmp/`.
+- **Upstream tracking: `git`** — `custom` is rebased onto every upstream commit, so the fork
+  versionName pins the upstream base: `<upstream>.<base date>.g<sha>+<BUILD_NUMBER, 3 digits>`.
+  See the global **`git-versioning`** skill. (Upstream sat on `0.2.79` for the whole 10-commit
+  stretch that became `+2`/`+3` — the literal alone says nothing about how current we are.)
+- Upstream base lives in `app/build.gradle.kts` as `appVersionName` (e.g. `0.2.79`) / `appVersionCode`
+  (e.g. `81`) — these track upstream and update automatically on rebase. **Never hand-edit them.**
+- The pin is `git merge-base HEAD master` (the upstream commit our patches sit on — not our HEAD, not
+  `master`'s tip) shortened to 8 chars, plus that commit's own committer date. It moves only on a sync.
+- `BUILD_NUMBER` (in `gradle.properties`) is our per-build `N`:
+  `versionName = "<base>.<YYYY-MM-DD>.g<sha8>+<NNN>"`, `versionCode = <base code>*10000 + N`.
+  Zero-padded to 3 digits **in the name only**; `versionCode` and `gradle.properties` keep the plain
+  integer. The `buildFork` task bumps it after every successful build.
+- **Reset `BUILD_NUMBER` to `1` on EVERY version change — including a new `.g<sha>` part**, i.e. on
+  every upstream sync, whether or not upstream bumped its own version. `+N` therefore always reads as
+  "our Nth build on this upstream base".
+- Consequence to expect: when upstream ships commits *without* bumping `appVersionCode` (as on the
+  0.2.79 line), the reset lowers `versionCode` below the installed build. Deliver such a build with
+  **`adb install -r -d`** (`-d` = allow version-code downgrade); plain `-r` fails with
+  `INSTALL_FAILED_VERSION_DOWNGRADE`. Never `adb uninstall` to work around it — that wipes the
+  workspace database.
+- APK: `shiroikuma-jiyusagyoban_<versionName>_arm64-v8a.apk`, copied to `~/tmp/`. The versionName
+  contains no `_`, so the `shiroikuma-jiyusagyoban_*.apk` globs in `/adb-push`, `/scp` and
+  `/publish-version` still resolve one field per `_`.
 
 ### Build commands
 ```bash
@@ -92,10 +109,16 @@ default **`standard`**.
   phone must carry a `yyyy-MM-dd_HH-mm-ss` stamp (our format — `date +%Y-%m-%d_%H-%M-%S`, to the
   SECOND) in its FILENAME, e.g. `volume-panel-reorder_2026-06-26_12-56-22.json`. Date-only (or a
   `b`/`(2)` suffix) is **not** enough — a same-day re-push must get a fresh stamp so it never collides
-  and 白い熊 always knows which is current. **Keep only the LATEST copy in `/sdcard/tmp/`** (白い熊,
-  2026-07-12 — reverses the old never-prune rule): after a successful push/install/import, delete the
-  superseded APKs and imported JSONs from `/sdcard/tmp/` so only the current one remains. State the
-  exact current filename in the handover. (See the `version-pushed-files` memory.)
+  and 白い熊 always knows which is current. State the exact current filename in the handover.
+  (See the `version-pushed-files` memory.)
+- **NEVER delete an APK from the phone.** No `rm` of a superseded
+  `shiroikuma-jiyusagyoban_*.apk` in `/sdcard/tmp/`, no "prune older copies", no tidying — push the
+  new one and leave every earlier one where it is. The unique full-datetime/version filename is what
+  tells 白い熊 which is current; deleting is never needed for that and throws away a build they may
+  still want to roll back to. (白い熊, 2026-08-02 — reinstates the never-prune rule for APKs and
+  supersedes the 2026-07-12 "keep only the LATEST copy" note. Matches the global `adb-push` /
+  `after-build` standing rule of 2026-07-25.) Imported JSON bundles are unaffected: those may still
+  be tidied once imported.
 - **Always ask 白い熊 to confirm a shipped bundle, then sync the mirror.** Whenever you hand over a JSON
   bundle, explicitly **request confirmation** that it imported / works. The moment 白い熊 OKs it, update
   the workspace mirror (`~/〇/[666] 私資料/[666][60792] …`) to match and **commit it** — see the
@@ -103,8 +126,9 @@ default **`standard`**.
 - **Always run `adb` with `dangerouslyDisableSandbox: true`** (the sandbox blocks adb's server
   socket, so `adb devices` shows empty). Every `adb` invocation goes through the unsandboxed path.
 - **Install builds automatically over wireless adb** (白い熊, 2026-07-12 — reverses the old
-  never-install rule): after every build, `adb install -r` the new APK, push a copy to `/sdcard/tmp/`
-  (pruning older ones), and `am start` the app. `adb uninstall` stays forbidden. Full cycle: the
+  never-install rule): after every build, `adb install -r -d` the new APK, push a copy to
+  `/sdcard/tmp/` (leaving every older APK in place), and `am start` the app. `adb uninstall` stays
+  forbidden. Full cycle: the
   `dev-cycle` section of the `build-apk` skill.
 - **Dev cycle (2026-07-12).** The app exposes a broadcast bridge (`WorkspaceTransferReceiver`) for
   headless workspace transfer — `EXPORT_WORKSPACE` writes a full export to `/sdcard/tmp/`,
