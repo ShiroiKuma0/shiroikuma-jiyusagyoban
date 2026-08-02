@@ -33,7 +33,7 @@
 
 - Time/day schedules with presets, aliases, and ranges
 - Device state (battery, charging, headphones, screen, media playback, airplane, power save, Wi-Fi SSID)
-- App foreground detection via UsageStats
+- App foreground detection via UsageStats, with optional exact/glob Activity component matching and explicit unavailable-component reporting
 - Wi-Fi and data/internet connectivity via NetworkCallback
 - Notification listener with package/title/body filters
 - NFC tag scans with normalized ID matching and a one-time NDEF write helper

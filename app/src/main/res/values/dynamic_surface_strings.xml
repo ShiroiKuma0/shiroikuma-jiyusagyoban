@@ -18,6 +18,8 @@
 
     <string name="context_field_application_package_label" formatted="false">Package name</string>
     <string name="context_field_application_package_hint" formatted="false">com.example.app (personal profile only)</string>
+    <string name="context_field_application_component_label" formatted="false">Foreground component (optional)</string>
+    <string name="context_field_application_component_hint" formatted="false">com.example.app.PlayerActivity or com.example.app.*</string>
     <string name="context_field_time_start_label" formatted="false">Start HH:mm</string>
     <string name="context_field_time_start_hint" formatted="false">09:00</string>
     <string name="context_field_time_end_label" formatted="false">End HH:mm</string>

@@ -50,7 +50,12 @@ object ContextMatchEvaluator {
             .splitCsv()
             .map { it.lowercase(Locale.US) }
         if (configuredPackages.isEmpty()) return false
-        return foreground.lowercase(Locale.US) in configuredPackages
+        if (foreground.lowercase(Locale.US) !in configuredPackages) return false
+
+        val configuredComponent = firstConfig(spec, "component", "activity", "class")
+        if (configuredComponent.isBlank()) return true
+        val observedComponent = event.metadata["component"].orEmpty()
+        return ApplicationComponentMatcher.matches(configuredComponent, observedComponent)
     }
 
     private fun matchesTime(spec: ContextSpec, event: ContextEvent): Boolean {

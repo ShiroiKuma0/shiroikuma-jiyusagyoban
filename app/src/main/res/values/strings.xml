@@ -1004,6 +1004,8 @@
     <string name="inspector_observed">Observed %1$s</string>
     <string name="inspector_matched">matched=%1$b</string>
     <string name="inspector_metadata">%1$s=%2$s</string>
+    <string name="inspector_observed_component">Observed component: %1$s</string>
+    <string name="inspector_component_unavailable">Observed component: unavailable</string>
     <string name="inspector_oem_risk">%1$s background risk: %2$s</string>
     <string name="inspector_oem_summary">%1$s Open the Setup tab for OEM-specific steps.</string>
     <string name="inspector_time_just_now">just now</string>

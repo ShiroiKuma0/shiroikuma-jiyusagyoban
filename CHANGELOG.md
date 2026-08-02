@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Foreground precision**: application contexts can now constrain a package to an exact or bounded glob Activity component. UsageStats class names flow through the Context Inspector, while missing OEM component data is shown as unavailable and never degrades a configured component match to package-only.
+
 - **Database privacy**: OpenTasker now encrypts the complete Room database with the F-Droid-compatible SQLCipher Community Edition. A random database key is wrapped by Android Keystore, existing plaintext files migrate atomically before Room opens, managed backup validation understands encrypted files, and incorrect keys fail closed.
 
 - **Native release safety**: the local release gate now inspects every packaged ELF library and fails if any PT_LOAD segment is below 16 KB alignment. The current SQLCipher, DataStore, and Compose native payloads pass the audit.

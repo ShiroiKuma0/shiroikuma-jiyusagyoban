@@ -51,6 +51,7 @@ import com.opentasker.core.actions.ActionField
 import com.opentasker.core.actions.FieldType
 import com.opentasker.core.contexts.CalendarSunEventPresets
 import com.opentasker.core.contexts.ApplicationContextEvents
+import com.opentasker.core.contexts.ApplicationComponentMatcher
 import com.opentasker.core.contexts.DaySchedule
 import com.opentasker.core.contexts.EventContextPreset
 import com.opentasker.core.contexts.NfcTagWriteSession
@@ -96,7 +97,7 @@ internal fun ContextConfigDialog(
 ) {
     var invert by rememberSaveable(state.profile.id, state.index, state.type) { mutableStateOf(state.existing?.invert ?: false) }
     var config by rememberSaveable(state.profile.id, state.index, state.type) {
-        mutableStateOf(defaultContextConfig(state.type) + (state.existing?.config ?: emptyMap()))
+        mutableStateOf(defaultContextConfig(state.type) + canonicalContextConfig(state.type, state.existing?.config ?: emptyMap()))
     }
     var nfcWriteMessage by rememberSaveable(state.profile.id, state.index, state.type) { mutableStateOf<String?>(null) }
     val fields = contextFields(state.type)
@@ -248,7 +249,10 @@ internal fun contextHasInvalidValues(type: ContextType, config: Map<String, Stri
     val invalidPackage = packageName.isNotBlank() &&
         type in setOf(ContextType.APPLICATION, ContextType.EVENT, ContextType.PLUGIN) &&
         !PackageNamePolicy.isValid(packageName)
-    return invalidPackage || when (type) {
+    val component = config["component"]?.trim().orEmpty()
+    val invalidComponent = type == ContextType.APPLICATION && component.isNotBlank() &&
+        !ApplicationComponentMatcher.isValidPattern(component)
+    return invalidPackage || invalidComponent || when (type) {
         ContextType.TIME -> invalidClock("start") || invalidClock("end")
         ContextType.LOCATION ->
             outOfRange("latitude", -90.0, 90.0) ||
@@ -261,7 +265,10 @@ internal fun contextHasInvalidValues(type: ContextType, config: Map<String, Stri
 }
 
 private fun contextFields(type: ContextType): List<ActionField> = when (type) {
-    ContextType.APPLICATION -> listOf(ActionField("package", R.string.context_field_application_package_label, FieldType.APP, required = true, hintRes = R.string.context_field_application_package_hint))
+    ContextType.APPLICATION -> listOf(
+        ActionField("package", R.string.context_field_application_package_label, FieldType.APP, required = true, hintRes = R.string.context_field_application_package_hint),
+        ActionField("component", R.string.context_field_application_component_label, hintRes = R.string.context_field_application_component_hint),
+    )
     ContextType.TIME -> listOf(
         ActionField("start", R.string.context_field_time_start_label, required = true, hintRes = R.string.context_field_time_start_hint),
         ActionField("end", R.string.context_field_time_end_label, required = true, hintRes = R.string.context_field_time_end_hint),
@@ -307,7 +314,7 @@ private fun contextFields(type: ContextType): List<ActionField> = when (type) {
 }
 
 private fun contextConfigForSave(type: ContextType, config: Map<String, String>): Map<String, String> {
-    val nonBlank = config.filterValues { it.isNotBlank() }.toMutableMap()
+    val nonBlank = canonicalContextConfig(type, config).filterValues { it.isNotBlank() }.toMutableMap()
     config["package"]?.trim()?.takeIf(String::isNotBlank)?.let { nonBlank["package"] = it }
     if (type == ContextType.DAY) {
         val canonicalDays = DaySchedule.canonicalize(config["days"].orEmpty()).orEmpty()
@@ -332,6 +339,15 @@ private fun contextConfigForSave(type: ContextType, config: Map<String, String>)
         return result
     }
     return nonBlank
+}
+
+/** Canonicalize aliases used by imported bundles before the editor persists a context. */
+private fun canonicalContextConfig(type: ContextType, config: Map<String, String>): Map<String, String> {
+    if (type != ContextType.APPLICATION || config["component"].orEmpty().isNotBlank()) return config
+    val alias = listOf("activity", "class").firstNotNullOfOrNull { key ->
+        config[key]?.trim()?.takeIf(String::isNotBlank)
+    } ?: return config
+    return config + ("component" to alias)
 }
 
 private fun defaultContextConfig(type: ContextType): Map<String, String> = when (type) {

@@ -519,14 +519,30 @@ private fun ContextMetadataBlock(event: ContextEventObservation, nowMs: Long) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            event.event.metadata.entries.sortedBy { it.key }.forEach { (key, value) ->
+            event.event.metadata["component"]?.let { component ->
                 Text(
-                    stringResource(R.string.inspector_metadata, key, value),
+                    if (component.isBlank()) {
+                        stringResource(R.string.inspector_component_unavailable)
+                    } else {
+                        stringResource(R.string.inspector_observed_component, component)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+            }
+            event.event.metadata.entries
+                .filterNot { it.key == "component" || it.key == "component_status" }
+                .sortedBy { it.key }
+                .forEach { (key, value) ->
+                    Text(
+                        stringResource(R.string.inspector_metadata, key, value),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
             }
             Text(
                 formatAbsoluteTime(LocalContext.current, event.observedAtMs, nowMs),

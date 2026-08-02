@@ -26,4 +26,16 @@ class AppUsageMonitorTest {
 
         assertNull(selected)
     }
+
+    @Test
+    fun selectLatestForegroundEventPreservesObservedComponent() {
+        val selected = AppUsageMonitor.selectLatestForegroundEvent(
+            listOf(
+                ForegroundUsageEvent("com.example", "com.example.OldActivity", 100L),
+                ForegroundUsageEvent("com.example", "com.example.NewActivity", 200L),
+            ),
+        )
+
+        assertEquals("com.example.NewActivity", selected?.className)
+    }
 }

@@ -21,7 +21,7 @@ class AppUsageMonitor(
     private val appContext = context.applicationContext
     private val usageStatsManager = appContext.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
     private var monitorJob: Job? = null
-    private var lastForegroundPackage: String? = null
+    private var lastForegroundIdentity: ForegroundIdentity? = null
     private var warnedMissingAccess = false
 
     fun start(scope: CoroutineScope): Boolean {
@@ -38,7 +38,7 @@ class AppUsageMonitor(
                 }
 
                 warnedMissingAccess = false
-                pollForegroundPackage()
+                pollForegroundComponent()
                 delay(POLL_INTERVAL_MS)
             }
         }
@@ -50,19 +50,22 @@ class AppUsageMonitor(
         monitorJob = null
     }
 
-    private fun pollForegroundPackage() {
+    private fun pollForegroundComponent() {
         val now = System.currentTimeMillis()
-        val currentPackage = readForegroundPackage(now) ?: return
-        val previousPackage = lastForegroundPackage
+        val current = readForegroundEvent(now) ?: return
+        val currentPackage = current.packageName.trim()
+        val currentComponent = current.className.trim().ifBlank { null }
+        val identity = ForegroundIdentity(currentPackage, currentComponent)
+        val previous = lastForegroundIdentity
 
-        if (currentPackage == previousPackage) return
+        if (identity == previous) return
 
-        ApplicationContextEvents.publishForeground(currentPackage)
-        lastForegroundPackage = currentPackage
-        AppLogger.debug(TAG, "Foreground app changed: $previousPackage -> $currentPackage")
+        ApplicationContextEvents.publishForeground(currentPackage, currentComponent)
+        lastForegroundIdentity = identity
+        AppLogger.debug(TAG, "Foreground app changed: ${previous?.packageName} -> $currentPackage/$currentComponent")
     }
 
-    private fun readForegroundPackage(nowMillis: Long): String? {
+    private fun readForegroundEvent(nowMillis: Long): ForegroundUsageEvent? {
         return try {
             val usageEvents = usageStatsManager.queryEvents(nowMillis - LOOKBACK_WINDOW_MS, nowMillis)
             val event = UsageEvents.Event()
@@ -73,12 +76,13 @@ class AppUsageMonitor(
                 if (isForegroundEvent(event.eventType)) {
                     foregroundEvents += ForegroundUsageEvent(
                         packageName = event.packageName.orEmpty(),
+                        className = event.className.orEmpty(),
                         timestamp = event.timeStamp,
                     )
                 }
             }
 
-            selectLatestForegroundPackage(foregroundEvents)
+            selectLatestForegroundEvent(foregroundEvents)
         } catch (ex: SecurityException) {
             AppLogger.warn(TAG, "UsageStatsManager query denied; app-open triggers are paused", ex)
             null
@@ -101,15 +105,23 @@ class AppUsageMonitor(
                 (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && eventType == UsageEvents.Event.ACTIVITY_RESUMED)
 
         internal fun selectLatestForegroundPackage(events: List<ForegroundUsageEvent>): String? =
+            selectLatestForegroundEvent(events)?.packageName
+
+        internal fun selectLatestForegroundEvent(events: List<ForegroundUsageEvent>): ForegroundUsageEvent? =
             events
                 .asSequence()
                 .filter { it.packageName.isNotBlank() }
                 .maxByOrNull { it.timestamp }
-                ?.packageName
     }
 }
 
 internal data class ForegroundUsageEvent(
     val packageName: String,
+    val className: String = "",
     val timestamp: Long,
+)
+
+private data class ForegroundIdentity(
+    val packageName: String,
+    val component: String?,
 )

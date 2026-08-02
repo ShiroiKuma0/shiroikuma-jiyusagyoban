@@ -31,6 +31,27 @@ class ContextMatchEvaluatorTest {
     }
 
     @Test
+    fun applicationContextOptionallyMatchesExactOrGlobComponentWithoutDegrading() {
+        val exact = ContextSpec(
+            type = ContextType.APPLICATION,
+            config = mapOf("package" to "com.example.target", "component" to "com.example.PlayerActivity"),
+        )
+        val glob = exact.copy(config = exact.config + ("component" to "com.example.*"))
+        val packageOnly = exact.copy(config = mapOf("package" to "com.example.target"))
+        val matching = ContextEvent(
+            "app",
+            matched = true,
+            metadata = mapOf("foreground" to "com.example.target", "component" to "com.example.PlayerActivity"),
+        )
+
+        assertTrue(ContextMatchEvaluator.matches(exact, matching))
+        assertTrue(ContextMatchEvaluator.matches(glob, matching))
+        assertTrue(ContextMatchEvaluator.matches(packageOnly, matching.copy(metadata = mapOf("foreground" to "com.example.target"))))
+        assertFalse(ContextMatchEvaluator.matches(exact, matching.copy(metadata = mapOf("foreground" to "com.example.target"))))
+        assertFalse(ContextMatchEvaluator.matches(exact, matching.copy(metadata = mapOf("foreground" to "com.example.target", "component" to "com.example.OtherActivity"))))
+    }
+
+    @Test
     fun timeContextHonorsConfiguredWindowIncludingOvernightRanges() {
         val daytime = ContextSpec(ContextType.TIME, config = mapOf("start" to "09:00", "end" to "17:30"))
         val overnight = ContextSpec(ContextType.TIME, config = mapOf("start" to "22:00", "end" to "06:00"))
