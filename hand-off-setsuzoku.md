@@ -145,6 +145,13 @@ bug. Read `SceneActivity.kt` before inventing a key.
 | button caption | `label` | `text` |
 | panel background + border | **scene-level** `bgColor` / `borderColor` / `borderWidth` | a full-size RECTANGLE element |
 
+**Shape colours expand `%variables` only since `+020`.** `RECTANGLE`/`OVAL` read `sceneColor(cfg["bgColor"])`
+— the RAW map — while every other element goes through `v("...")`. A variable colour therefore resolved
+to a literal string, `sceneColor()` returned null and the shape drew **nothing**; a literal-colour
+sibling in the same icon rendered fine, which made it look like a layout bug. Fixed to
+`sceneColor(v("bgColor"))` (and `cornerRadius` likewise) in `SceneActivity.kt`. This repaired variable
+colours for shapes **across the whole workspace**, not just 接続.
+
 TEXT supports only `text`, `textSize`, `bold`, `textColor`, `align`. **There is no shadow key** — a
 "white shadow" is faked by drawing a white copy offset 2 dp behind the coloured copy.
 There is no arc/gauge element either (`TEXT/BUTTON/OVAL/RECTANGLE/PROGRESS/IMAGE/SLIDER/...`), so the

@@ -272,6 +272,8 @@ class SpeedTestAction : Action {
         val cap = phase.replaceFirstChar(Char::uppercase)
         ctx.variables.set("$prefix${cap}Avg", fmt(leg.averageMbps))
         ctx.variables.set("$prefix${cap}Peak", fmt(leg.peakMbps))
+        ctx.variables.set("$prefix${cap}AvgMB", mb(leg.averageMbps))
+        ctx.variables.set("$prefix${cap}PeakMB", mb(leg.peakMbps))
         ctx.variables.set("$prefix${cap}Mb", fmt(total.get() / 1_000_000.0))
         ctx.variables.set("$prefix${cap}Ms", latency.toString())
         ctx.variables.set("$prefix${cap}Streams", streams.toString())
@@ -441,6 +443,9 @@ class SpeedTestAction : Action {
         ctx.variables.set("${prefix}Cur", fmt(avg))
         ctx.variables.set("${prefix}Avg", fmt(avg))
         ctx.variables.set("${prefix}Peak", fmt(peak))
+        ctx.variables.set("${prefix}CurMB", mb(avg))
+        ctx.variables.set("${prefix}AvgMB", mb(avg))
+        ctx.variables.set("${prefix}PeakMB", mb(peak))
         ctx.variables.set("${prefix}Mb", fmt(total / 1_000_000.0))
         ctx.variables.set("${prefix}Secs", fmt(elapsedMs / 1000.0))
         ctx.variables.set("${prefix}Pct", (max(byPct, byTime).coerceIn(0.0, 1.0) * 100).roundToInt().toString())
@@ -503,6 +508,9 @@ class SpeedTestAction : Action {
         if (nanos <= 0) 0.0 else bytes * 8.0 * 1000.0 / nanos
 
     private fun fmt(value: Double): String = String.format(java.util.Locale.US, "%.2f", value)
+
+    /** Megabits/s → 1024-based megabytes/s (MiB/s), the unit 白い熊 reads speeds in. */
+    private fun mb(mbps: Double): String = fmt(mbps * 1_000_000.0 / 8.0 / 1_048_576.0)
 
     private companion object {
         /** Publish cadence. 250 ms is fast enough to look live and slow enough not to thrash the store. */
