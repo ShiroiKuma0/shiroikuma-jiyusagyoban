@@ -267,6 +267,14 @@
     <string name="catalog_action_state_temporary_field_key_hint" formatted="false">Unique channel, e.g. quiet-hours</string>
     <string name="catalog_action_state_temporary_field_duration_label" formatted="false">Duration (seconds)</string>
     <string name="catalog_action_state_temporary_field_duration_hint" formatted="false">1 to 604800 seconds</string>
+    <string name="catalog_action_ime_info_name" formatted="false">Get Keyboard Info</string>
+    <string name="catalog_action_ime_info_description" formatted="false">Report current and enabled keyboards</string>
+    <string name="catalog_action_ime_info_field_var_label" formatted="false">Output variable base</string>
+    <string name="catalog_action_ime_info_field_var_hint" formatted="false">Defaults to IME; writes _CURRENT, _ENABLED, and _COUNT</string>
+    <string name="catalog_action_ime_set_name" formatted="false">Switch Keyboard</string>
+    <string name="catalog_action_ime_set_description" formatted="false">Validate a keyboard and open the system picker</string>
+    <string name="catalog_action_ime_set_field_ime_id_label" formatted="false">Keyboard ID or package</string>
+    <string name="catalog_action_ime_set_field_ime_id_hint" formatted="false">Component ID from ime.info</string>
     <string name="catalog_action_volume_set_name" formatted="false">Set Volume</string>
     <string name="catalog_action_volume_set_description" formatted="false">Adjust volume for a stream</string>
     <string name="catalog_action_volume_set_field_stream_label" formatted="false">Stream</string>

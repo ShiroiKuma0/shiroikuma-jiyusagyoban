@@ -835,6 +835,30 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "ime.info",
+            nameRes = R.string.catalog_action_ime_info_name,
+            descriptionRes = R.string.catalog_action_ime_info_description,
+            categoryRes = R.string.catalog_category_settings,
+            fields = listOf(
+                ActionField("var", R.string.catalog_action_ime_info_field_var_label, hintRes = R.string.catalog_action_ime_info_field_var_hint),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "ime.set",
+            nameRes = R.string.catalog_action_ime_set_name,
+            descriptionRes = R.string.catalog_action_ime_set_description,
+            categoryRes = R.string.catalog_category_settings,
+            fields = listOf(
+                ActionField("ime_id", R.string.catalog_action_ime_set_field_ime_id_label, required = true, hintRes = R.string.catalog_action_ime_set_field_ime_id_hint),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "clipboard.get",
             nameRes = R.string.catalog_action_clipboard_get_name,
             descriptionRes = R.string.catalog_action_clipboard_get_description,

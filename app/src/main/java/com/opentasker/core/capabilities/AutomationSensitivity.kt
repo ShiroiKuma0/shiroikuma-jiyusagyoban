@@ -110,6 +110,8 @@ object AutomationSensitivityRegistry {
         "torch.set",
         "tile.set",
         "state.temporary",
+        "ime.info",
+        "ime.set",
         "app.launch",
         "app.kill",
         "home.go",

@@ -19,6 +19,8 @@ import com.opentasker.core.actions.HomeAssistantWebhookAction
 import com.opentasker.core.actions.HttpGetAction
 import com.opentasker.core.actions.HttpPostAction
 import com.opentasker.core.actions.HttpRequestAction
+import com.opentasker.core.actions.ImeInfoAction
+import com.opentasker.core.actions.ImeSetAction
 import com.opentasker.core.actions.KillAppAction
 import com.opentasker.core.actions.LaunchAppAction
 import com.opentasker.core.actions.LaunchIntentAction
@@ -129,6 +131,8 @@ private fun registerBuiltInActions() {
         HttpRequestAction(),
         HttpGetAction(),
         HttpPostAction(),
+        ImeInfoAction(),
+        ImeSetAction(),
         HomeAssistantWebhookAction(),
         MqttPublishAction(),
         PingAction(),

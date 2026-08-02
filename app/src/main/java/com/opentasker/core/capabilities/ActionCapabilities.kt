@@ -120,6 +120,8 @@ object ActionCapabilityRegistry {
         "lock" to ActionCapability(CapabilityLevel.Unsupported, "Device lock requires configured device-admin support.", R.string.capability_lock_unsupported),
         "tile.set" to ActionCapability(CapabilityLevel.Supported, "Updates a configured OpenTasker Quick Settings tile.", R.string.capability_tile_ready),
         "state.temporary" to ActionCapability(CapabilityLevel.Supported, "Applies a reversible setting and schedules a durable restore.", R.string.capability_temporary_state_ready),
+        "ime.info" to ActionCapability(CapabilityLevel.Supported, "Reports the current and enabled input methods.", R.string.capability_ime_info_ready),
+        "ime.set" to ActionCapability(CapabilityLevel.Unsupported, "Android requires user selection before a normal app can switch the active input method.", R.string.capability_ime_set_unsupported),
         "screen.off" to elevatedUnsupported("screen.off", "Screen-off requires privileged power management access.", R.string.capability_screen_off_unsupported),
         "wake" to elevatedUnsupported("wake", "Wake requires a foreground activity or privileged wake flow.", R.string.capability_wake_unsupported),
         TermuxScriptBackend.ACTION_ID to ActionCapability(
