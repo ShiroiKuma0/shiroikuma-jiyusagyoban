@@ -2,6 +2,7 @@ package com.opentasker.core.engine
 
 import android.content.Context
 import com.opentasker.core.contexts.ContextMatchEvaluator
+import com.opentasker.core.contexts.ContextEvent
 import com.opentasker.core.contexts.ContextSourceRegistry
 import com.opentasker.core.contexts.EventDemandContextSource
 import com.opentasker.core.contexts.SubscriptionReadyContextSource
@@ -84,6 +85,7 @@ class ProfileMatcher(
                         matched = effectiveMatched,
                         pulseContext = isPulseContext,
                         pulseSequence = if (isPulseContext) previous.pulseSequence + 1 else 0,
+                        event = if (isPulseContext && effectiveMatched) preparedEvent else null,
                     )
                 }
             } else {
@@ -102,7 +104,7 @@ class ProfileMatcher(
                 profileStateChangesFromSnapshots(snapshots, hasPulseContexts) { change ->
                     val startTime = System.currentTimeMillis()
                     when (change) {
-                        ProfileStateChange.Activated -> {
+                        is ProfileStateChange.Activated -> {
                             val reason = if (hasPulseContexts) "Profile activated by event pulse" else "Profile activated"
                             AppLogger.info(tag, reason)
                         }
@@ -132,6 +134,7 @@ class ProfileMatcher(
         return ProfileMatchSnapshot(
             allMatched = allMatched,
             pulseSequence = pulseSequence,
+            event = contextMatches.lastOrNull { it.event != null }?.event,
         )
     }
 
@@ -149,6 +152,7 @@ internal data class ContextMatchUpdate(
     val matched: Boolean,
     val pulseContext: Boolean,
     val pulseSequence: Long,
+    val event: ContextEvent? = null,
 ) {
     companion object {
         fun initial(pulseContext: Boolean): ContextMatchUpdate =
@@ -159,6 +163,7 @@ internal data class ContextMatchUpdate(
 internal data class ProfileMatchSnapshot(
     val allMatched: Boolean,
     val pulseSequence: Long,
+    val event: ContextEvent? = null,
 )
 
 private data class PulseAccumulator(
@@ -175,7 +180,7 @@ internal fun profileStateChangesFromSnapshots(
         snapshots.scan(PulseAccumulator(lastPulseSequence = 0, change = null)) { previous, snapshot ->
             val pulseChanged = snapshot.pulseSequence != previous.lastPulseSequence
             val change = if (pulseChanged && snapshot.pulseSequence > 0 && snapshot.allMatched) {
-                ProfileStateChange.Activated
+                ProfileStateChange.Activated(snapshot.event)
             } else {
                 null
             }
@@ -189,7 +194,7 @@ internal fun profileStateChangesFromSnapshots(
             .scan(Pair(false, false)) { (_, prev), now -> Pair(prev, now) }
             .mapNotNull { (prev, now) ->
                 val change = when {
-                    !prev && now -> ProfileStateChange.Activated
+                    !prev && now -> ProfileStateChange.Activated(null)
                     prev && !now -> ProfileStateChange.Deactivated
                     else -> null
                 }
@@ -217,6 +222,6 @@ internal fun evaluateWithOrGroups(
 }
 
 sealed class ProfileStateChange {
-    data object Activated : ProfileStateChange()
+    data class Activated(val event: ContextEvent?) : ProfileStateChange()
     data object Deactivated : ProfileStateChange()
 }

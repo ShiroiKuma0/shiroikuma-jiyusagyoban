@@ -136,6 +136,36 @@ object ContextMatchEvaluator {
             if (actualPackage !in packageAllowlist) return false
         }
 
+        val regex = spec.config["regex"]?.toBooleanStrictOrNull() ?: false
+
+        if (actualEvent.equals(ShareContextEvents.EVENT_SHARE, ignoreCase = true)) {
+            val mimeAllowlist = firstConfig(spec, "mime", "mimeType", "type")
+                .splitCsv()
+                .map { it.lowercase(Locale.US) }
+            if (mimeAllowlist.isNotEmpty()) {
+                val actualMime = event.metadata["mime"].orEmpty().lowercase(Locale.US)
+                if (mimeAllowlist.none { expected ->
+                        expected == actualMime ||
+                            (expected.endsWith("/*") && actualMime.startsWith(expected.removeSuffix("*")))
+                    }
+                ) return false
+            }
+
+            val textFilter = firstConfig(spec, "text", "textContains")
+            if (textFilter.isNotBlank() &&
+                !textMatches(event.metadata["text"].orEmpty(), textFilter, regex)
+            ) return false
+
+            val uriFilter = firstConfig(spec, "uri", "uriContains")
+            if (uriFilter.isNotBlank() &&
+                !textMatches(event.metadata["uris"].orEmpty(), uriFilter, regex)
+            ) return false
+
+            spec.config["multiple"]?.toBooleanStrictOrNull()?.let { expectedMultiple ->
+                if (event.metadata["multiple"]?.toBooleanStrictOrNull() != expectedMultiple) return false
+            }
+        }
+
         val topicAllowlist = firstConfig(spec, "topic", "topics")
             .splitCsv()
             .map { it.lowercase(Locale.US) }
@@ -158,7 +188,6 @@ object ContextMatchEvaluator {
             if (actualTagId !in configuredTagIds) return false
         }
 
-        val regex = spec.config["regex"]?.toBooleanStrictOrNull() ?: false
         val titleFilter = spec.config["title"]?.trim().orEmpty()
         if (titleFilter.isNotBlank() && !textMatches(event.metadata["title"].orEmpty(), titleFilter, regex)) {
             return false

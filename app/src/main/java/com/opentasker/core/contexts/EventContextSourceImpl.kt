@@ -24,6 +24,7 @@ import kotlinx.coroutines.launch
  *   - "boot_completed": manifest boot receiver restarted the engine
  *   - "tile_clicked": Quick Settings tile toggled
  *   - "push": authenticated UnifiedPush distributor delivery
+ *   - "share": sanitized Android Sharesheet text, URI, or file delivery
  */
 class EventContextSourceImpl : EventDemandContextSource {
     override val type = "event"
@@ -58,5 +59,6 @@ class EventContextSourceImpl : EventDemandContextSource {
         LocalePluginRequestQueryEvents.events(app),
         QuickSettingsTileContextEvents.events,
         PushContextEvents.events,
+        ShareContextEvents.events,
     )
 }

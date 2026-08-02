@@ -1,5 +1,6 @@
 package com.opentasker.core.engine
 
+import com.opentasker.core.contexts.ContextEvent
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import kotlinx.coroutines.flow.flowOf
@@ -23,7 +24,7 @@ class ProfileMatcherTest {
         ).toList()
 
         assertEquals(
-            listOf(ProfileStateChange.Activated, ProfileStateChange.Activated),
+            listOf(ProfileStateChange.Activated(null), ProfileStateChange.Activated(null)),
             changes,
         )
     }
@@ -40,7 +41,25 @@ class ProfileMatcherTest {
             hasPulseContexts = true,
         ).toList()
 
-        assertEquals(listOf(ProfileStateChange.Activated), changes)
+        assertEquals(listOf(ProfileStateChange.Activated(null)), changes)
+    }
+
+    @Test
+    fun matchingPulseCarriesSourceEventForTaskVariables() = runBlocking {
+        val event = ContextEvent(
+            type = "event",
+            matched = true,
+            metadata = mapOf("event" to "share", "text" to "hello"),
+        )
+        val changes = profileStateChangesFromSnapshots(
+            snapshots = flowOf(
+                ProfileMatchSnapshot(allMatched = false, pulseSequence = 0),
+                ProfileMatchSnapshot(allMatched = true, pulseSequence = 1, event = event),
+            ),
+            hasPulseContexts = true,
+        ).toList()
+
+        assertEquals(event, (changes.single() as ProfileStateChange.Activated).event)
     }
 
     @Test
@@ -56,7 +75,7 @@ class ProfileMatcherTest {
         ).toList()
 
         assertEquals(
-            listOf(ProfileStateChange.Activated, ProfileStateChange.Deactivated),
+            listOf(ProfileStateChange.Activated(null), ProfileStateChange.Deactivated),
             changes,
         )
     }

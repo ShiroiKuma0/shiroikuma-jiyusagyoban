@@ -38,6 +38,7 @@
 - Shake, Bluetooth connect/disconnect, package install/remove/replace
 - Quick Settings tile tap, home-screen widget/shortcut, boot
 - Authenticated `event=push` bridge for a de-googled UnifiedPush distributor; delivery IDs are deduplicated, payloads are bounded, and message content is redacted before matching/logging
+- Received Share (`ACTION_SEND`/`SEND_MULTIPLE`) trigger for bounded text, URLs, single files, and multiple files, with MIME/text/URI filters and `share_*` task variables
 - FOSS platform location/geofence — GPS/network fixes, balanced provider cadence, radius/accuracy/dwell evaluation, persisted dwell state, and API 36 background delivery evidence
 - Locale/Tasker condition plugins — polled as first-class context predicates with last-known-state caching
 - Home Assistant bridge proof of concept — bounded outbound JSON webhooks with HTTPS-by-default policy, redacted webhook secrets, and transient retry/backoff
@@ -68,6 +69,8 @@ The **Intent Dispatch** action supports bounded activity, explicit broadcast, an
 The **MQTT Publish** action uses a small in-app MQTT 3.1.1 QoS 0/1 client over platform sockets and TLS, so the F-Droid build adds no MQTT dependency. TLS is enabled by default; cleartext is restricted to private/local hosts and the Android 17 local-network grant. Payloads are capped at 64 KB, QoS 2 and wildcard publish topics are rejected, and username/password fields are redacted.
 
 The **push trigger spike** chooses a distributor-neutral UnifiedPush boundary instead of adding a polling client or a Google service. Setup creates a per-install token; a distributor adapter forwards an explicit `com.opentasker.action.PUSH_EVENT` broadcast with that token, topic, event ID, title, and message. The receiver authenticates the token, caps the message at 8 KiB, keeps only topic/title/event ID/size in event metadata, and suppresses duplicate topic/event-ID deliveries for 30 seconds. Delivery is at-least-once, so retry belongs to the distributor; no network retry is attempted inside the receiver. ntfy can be adapted to this same envelope later without changing profiles.
+
+The **Received Share trigger** registers OpenTasker in Android's Sharesheet for text, URLs, MIME-typed content, and one or more file/content URIs. It sanitizes and bounds every value before matching, rejects arbitrary Parcelable or oversized extras, and never opens a URI in the receiver. Matching share tasks receive `share_text`, `share_uri`, `share_uris`, `share_mime`, `share_count`, and `share_multiple` as run-scoped variables.
 
 Variable names follow Tasker's scope rule: an all-lowercase name is local to the current task, while any name containing an uppercase letter is global and durable. `var.persist` promotes an all-lowercase target to a global name, and the Variable vault applies the same normalization. Concurrent runs merge changes to different globals; if two stale snapshots change the same global, the first committed value is kept and the later conflict is recorded in the run log.
 
