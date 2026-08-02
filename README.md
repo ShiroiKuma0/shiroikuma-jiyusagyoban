@@ -30,7 +30,7 @@
 ### Triggers (contexts)
 
 - Time/day schedules with presets, aliases, and ranges
-- Device state (battery, charging, headphones, screen, airplane, power save, Wi-Fi SSID)
+- Device state (battery, charging, headphones, screen, media playback, airplane, power save, Wi-Fi SSID)
 - App foreground detection via UsageStats
 - Wi-Fi and data/internet connectivity via NetworkCallback
 - Notification listener with package/title/body filters

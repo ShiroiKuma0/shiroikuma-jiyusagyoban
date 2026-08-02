@@ -97,9 +97,13 @@ class StateContextSourceImpl : ContextSource {
         val deviceStateJob = launch {
             DeviceStateEvents.events.collect(::publishPatch)
         }
+        val mediaPlaybackJob = launch {
+            MediaPlaybackStateEvents.events(app).collect(::publishPatch)
+        }
 
         awaitClose {
             deviceStateJob.cancel()
+            mediaPlaybackJob.cancel()
             runCatching { app.unregisterReceiver(receiver) }
         }
     }
@@ -140,6 +144,10 @@ fun stateMatches(predicate: String, state: Map<String, String>): Boolean {
     val actualValue = state[normalizedKey] ?: return false
     val expectedValue = normalizeStateExpectedValue(normalizedKey, value.trim()) ?: return false
 
+    if (normalizedKey == "media_package" && op == "=") {
+        return MediaPlaybackStateEvents.packageMatches(actualValue, expectedValue)
+    }
+
     return when (op) {
         "=" -> actualValue == expectedValue
         ">=" -> numericCompare(actualValue, expectedValue) { actual, expected -> actual >= expected }
@@ -171,6 +179,8 @@ internal fun seedInitialState(app: Context): Map<String, String> {
     }
 
     seed["airplane"] = isAirplaneModeOn(app).toString()
+
+    seed += MediaPlaybackStateEvents.snapshot(app)
 
     val batteryIntent = app.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
     if (batteryIntent != null) {

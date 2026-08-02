@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Media context**: added a level-triggered `media_active` state with optional active-package matching. It observes local audio playback and accessible media sessions, emits stop transitions, and fails closed when notification-listener access is unavailable.
+
 - **Keyboard actions**: added `ime.info` for current/enabled input-method variables and `ime.set` for enabled-target validation plus the system picker. Android does not allow a normal app to silently choose another keyboard, so that limitation is reported explicitly.
 
 - **Temporary state**: added a bounded `state.temporary` action for brightness, volume, ringer mode, and DND. It captures the prior value, applies the requested setting, and uses a replaceable unique WorkManager job to restore it after a duration, including after process death.
