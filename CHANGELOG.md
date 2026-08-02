@@ -1,6 +1,7 @@
-# Changelog
+# Changelog — 白い熊 自由作業盤
 
-## Unreleased
+Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
+This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
 ## v0.2.82
 
@@ -78,9 +79,10 @@
 - **Quick Settings tiles**: added four active per-task tile slots with long-press configuration, persistent task/label/subtitle/icon/state settings, direct task dispatch, slot-aware tile events, and a functional `tile.set` action.
 
 - **Visual system**: the command-center shell now uses a calmer sage/graphite palette, larger readable type, tighter spacing tokens, compact headers, border-light navigation, and text-led status indicators. Profile/task summaries and action/context rows rely on grouping and hairline rhythm instead of nested outlined boxes. The nine-page redesign reference is preserved at `design/mockups/opentasker-command-center-v2.png`.
+## 0.2.79+1 — 2026-07-31
 
-- **Execution reliability**: service-owned task runs now pass through a persisted admission controller with global and per-profile active limits, burst windows, and a circuit breaker. Rejected runs are recorded as skipped with an explainable reason, while accepted leases are released safely even when cancellation unwinds the coroutine tree.
-- **Execution safety**: statically provable `task.run` cycles are surfaced during imported-profile review, and newly created or edited enabled profiles are held disabled until the feedback-loop risk is explicitly reviewed.
+**Rebased onto upstream OpenTasker 0.2.79.** The first build of the new line. Two upstream designs
+collided with fork designs and the fork's were kept; everything else upstream shipped came across.
 
 - **Setup clarity**: the checklist now separates engine baseline, enabled-automation requirements, optional integrations, and reliability guidance. Permission rows are derived from enabled profiles and reachable task actions, so an empty workspace no longer reports unrelated automation blockers.
 
@@ -121,60 +123,700 @@
 - **Release trust**: a generated `tools/release-truth.json` manifest now owns version/code, Android SDK, dependency, capability-count, bundle/Room schema, and immutable artifact-commit claims. The local quality gate validates the manifest against shipped source, README, and F-Droid metadata with configuration-cache-safe verification.
 
 - **Execution authoring**: profile editing can now select or clear an exit task; task editing exposes the previously stored collision policy; action editing exposes conditions and continue-after-failure; and task cards provide accessible move-up/down controls backed by a transactional history snapshot. Task collision admission now runs at the shared execution boundary for profile, manual, nested, widget/shortcut, notification, and external requests: Abort new logs a skipped run, Abort existing cancels the active coroutine tree, Wait serializes requests, and Run both permits overlap. Profile re-trigger mode remains the earlier profile-specific decision, while the referenced task's collision policy is the global last-mile rule.
+### What the fork kept
+The **action catalog stays inline-string** — our 158 entries with the `COLOR`, `WIDGET_LAYOUT` and
+`APP_PACKAGE` field types. Upstream converted its 69 entries to `@StringRes`; adopting that would have
+meant rewriting every fork action into string resources for a translation that will never exist.
 
-- **App authoring**: application, notification, app-launch/kill, intent-launch, and Locale plugin package fields now share a searchable installed-app picker. Results show icon, label, and package from Android's scoped package visibility, Application contexts can reuse the latest package observed by the Inspector, and validated manual entry remains available without requesting `QUERY_ALL_PACKAGES`.
+The **bundle format stays schema 5, id-free and name-based**. Upstream is still on id-bearing schema 2,
+and 0.2.79 added a rewriter that remaps task-to-task ids on import — a bug name-based linking does not
+have. Keeping ours also keeps `scene.show`, notification buttons and sub-task steps resolving by name
+across re-imports.
 
-- **Build supply chain**: the Gradle 9.4.1 binary distribution is now pinned with Gradle's published SHA-256, and the stale 8.13-era executable wrapper JAR has been regenerated from 9.4.1. The local release gate verifies the configured version/URL, distribution pin, and checked-in JAR against independent expected hashes before it invokes Gradle, records both hashes in its report, and has a release-truth contract that fails if the property, gate pin, or binary drifts. The documented wrapper-upgrade procedure treats the URL, distribution hash, JAR, JAR hash, scripts, and test as one rollback-friendly change. The gate's Room-schema Git check also resolves a mapped drive to its canonical share and supplies that exact safe-directory identity, so it works from the repository's supported `Z:\` location without weakening Git ownership checks globally.
+### What came from upstream
+**External intents are protocol v2 and asynchronous.** `RUN_TASK` no longer holds the broadcast open
+for a task that may run for half an hour: the receiver validates, hands the run to the foreground
+service, and replies `ACCEPTED` with an execution id the caller polls via `QUERY_EXECUTION`. Callers
+must declare `PROTOCOL_VERSION=2`. The fork's shutdown gate sits ahead of that handshake, so a stopped
+app answers 「is stopped」 rather than a version complaint the caller cannot act on; `QUERY_STATUS`
+stays ungated and still reports `STOPPED`.
 
-- **Bundle data integrity**: schema-1 OpenTasker exports now pass through an explicit, deterministic schema-1→2 migration with a checked-in golden fixture, while future schemas fail before domain decoding. Import review enumerates every same-name variable and requires an explicit keep, deterministic rename, or replace decision; safe programmatic imports preserve existing values by default, and replacing an existing secret changes its value without declassifying it. Task IDs are remapped across profile enter/exit links, scene gestures, `task.run`, and notification buttons inside one Room transaction, with rollback tests covering a conflict failure after task insertion. The first on-device secret replacement test also exposed and fixed Android Keystore rejecting the secret codec's caller-supplied GCM IV; encryption now lets the Keystore generate the nonce and stores it in the authenticated envelope.
+**Stored action arguments are redacted wherever they are displayed** — the task list and flow graph
+were joining raw arguments into their subtitles, so an `authorization` header or request body typed
+into an action appeared on screen and in screenshots. Nine credential-bearing fields now declare their
+sensitivity explicitly (`http.request` authorization/headers/query/body, `http.post` data, `sms.send`
+message, `script.termux.run` stdin), with `headers_var` and `body_file` marked structural so the
+name heuristic stops over-masking them. One canonical `<redacted>` placeholder replaces the copy the
+task runner kept.
 
-- **External task dispatch**: Locale setting-plugin fires and scene tap/long-press bindings now construct `RUN_TASK` requests through one explicit protocol-v2 builder instead of duplicating raw intent strings. Both paths had omitted `PROTOCOL_VERSION=2`, so the hardened external receiver rejected them before enqueue. The shared builder validates task IDs and variable names, bounds values/counts, preserves a canonical source label into the run log, and is protected by a source contract that rejects new raw internal `RUN_TASK` producers; unknown or legacy external protocol versions remain fail-closed.
+**A run can be cancelled**, and a cancelled run is its own outcome in the run log — distinct from
+Skipped, which means the run never started. Upstream's execution registry replaces the fork's
+equivalent, which was written the same week and did the same job.
 
-## v0.2.79
+Also inherited: reference-safe task deletion and rename, per-step variable-write records, the
+"scheduled jobs blocked by" diagnostic, `WRITE_SETTINGS` finally declared (so Set brightness and screen
+timeout can actually be granted), and `app.kill` marked Unsupported rather than advertising a
+force-stop it never had the privilege to perform.
 
-- **Backup & restore**: selecting a database to restore now opens a review instead of staging it immediately. Selection previously replaced the pending-restart journal outright, so a user could not inspect the candidate, could not tell it apart from a restore staged earlier, and had no way to back out. The review reports the source, size, schema version, compatibility, and profile/task/scene/variable/run-log counts, names the staged restore it would replace, and stages nothing until Stage is pressed. Setup gained a "Cancel staged restore" action that removes only the validated pending journal — backups, the live database, and the pre-restore snapshot are untouched — and the pending banner now describes what is actually queued (including a staged file that has since become unreadable).
+### Known gaps from the merge
+Upstream's **restore review is unwired** — its manager API is present, but the fork's ViewModel still
+stages a selected database immediately instead of showing the review-and-confirm step. And nothing now
+forces an explicit capability entry per action; unknown ids still fail closed, but the fork's 96
+unclassified actions rely on the shipped-action default.
 
-- **Run logs**: the Run Log now shows what the engine is running *right now* — task, origin, current step, and elapsed time — with a Cancel button for each. Previously the service tracked its jobs privately and the UI showed only completed runs, so a runaway automation (a long wait, a hung request, an accidental loop) was invisible and unstoppable short of force-stopping the app. Cancel unwinds the whole run including nested "run sub-task" steps and any bounded blocking action suspended inside it, and records a terminal **Cancelled** outcome — a distinct state from Skipped, which means the run never started.
+## 0.2.78+54 — 2026-07-31
 
-- **External intents (breaking, protocol v2)**: `RUN_TASK` is now asynchronous. It previously held the broadcast open with `goAsync()` until the whole task finished and returned its terminal success — but Android expects broadcast work to complete in roughly 10 seconds while an OpenTasker task can wait up to 30 minutes, so the reply reported an outcome that had not happened yet and the system could kill the receiver mid-run with no run-log entry. The receiver now authenticates, validates, hands the run to the foreground engine service, and replies immediately with `ACCEPTED` plus an execution ID; callers poll terminal status with the new `com.opentasker.action.QUERY_EXECUTION`. Results are retained for the 64 most recent executions and survive a process restart, and a run that was in flight when the engine died resolves to `FAILED` rather than leaving a caller polling forever. Callers must declare `com.opentasker.extra.PROTOCOL_VERSION=2`; a request without it is refused with an explicit error naming the required extra rather than being silently reinterpreted. `SET_PROFILE_ENABLED` and `QUERY_STATUS` are unchanged. See `docs/EXTERNAL_INTENTS.md`.
+**The app can be shut down, and it stays shut down.**
 
-- **Run logs**: each step now records the variables it actually set. Traces previously showed only the values that went *into* an action, so a finished run never answered "what did this task write?". Every step captures its task, global, and array deltas (added vs. updated; a rewrite of the same value is not recorded), and the Run Log renders them in an expandable per-step inspector next to the existing expression debugger. Secret-derived values are redacted at the serialization boundary, so the raw value never reaches the stored log.
+### Exit app fully
+The top-bar ⋮ menu gains 「Exit app fully」 and 「Restart engine」. Exit runs the tasks listed under
+Monitor ⇨ Run on exit — the mirror of Run on start, so the app never has to know a project name — then
+raises a report of everything **still** live, and only tears down once that is confirmed. The report
+comes first on purpose: a dialog shown after the app is gone cannot be read, and its whole value is
+naming what should already have stopped and had not. It is written to the run log too, so it survives
+the dialog.
 
-- **Engine**: the automation-mode dispatch rules (SINGLE suppression, RESTART preemption, the QUEUED cap, exit tasks never consuming cooldown) and cooldown reservation are now pure, directly tested components that the foreground service delegates to, instead of logic reachable only through a running service. Cooldown check-and-reserve is locked against the check-then-write race where two contexts matching the same profile in the same instant both start a run.
+Stopping the engine is not enough on its own to keep this app down. The per-minute exact alarm
+resurrects it, and the accessibility and notification-listener services are bound by the system, so the
+process returns within seconds however it is killed. Exit therefore sets a **persisted flag**, and every
+way back in — the resurrect alarm, boot, the quick-settings tile, widget and shortcut taps, notification
+buttons, sister-app token intents, the adb bridge's `RUN_TASK` — declines while it is set, writing a
+`停止中 — refused …` row to the run log rather than failing invisibly. Export, import and status queries
+are deliberately **not** gated: they start nothing.
 
-- **Actions**: the capability contract is now total and fails closed. An action that was registered but never classified used to report itself as "Ready" by default; every action now needs an explicit contract entry, and an unreviewed one is Unsupported. `app.kill` is marked Unsupported (force-stopping another app has always been impossible without privileged access, but it advertised itself as working and failed only at run time). `screen.timeout` is correctly gated on Write Settings, which the app now actually declares — `WRITE_SETTINGS` was missing from the manifest, so `Settings.System.canWrite()` could never become true and both it and Set brightness were permanently broken while claiming to be one grant away. Setup gained a "Modify system settings" row with a working deep link. Wake-on-LAN is gated on local network access on Android 17+. The README's action counts are now derived from the registry and verified (they had drifted to 58/59 against an actual 60).
+The process itself does not die, and cannot be made to. The accessibility service goes dormant instead —
+never `disableSelf()`, which would drop the grant and cost a trip through system settings — and the
+notification listener `requestUnbind()`s, which keeps its grant and rebinds silently when the app is
+opened again. Opening the app lifts the stop; so does a reboot, unless the new 「Start engine on boot」
+switch is off.
 
-- **Data integrity**: deleting or renaming a task is now reference-safe. Deletion previously checked only a profile's enter/exit task columns, so a task referenced by another task's "run sub-task" step, a notification button, or a scene tap/long-press gesture could be deleted out from under them; a rename silently broke every reference that named the task. Deleting a referenced task now lists every dependent object and requires an explicit choice — reassign them all to another task, or clear the optional ones — applied in a single transaction (a profile's enter task cannot be cleared, so only reassignment is offered when one is present). A rename pins name-based references to the task's stable id first. The same rewriter also fixes OpenTasker bundle import, which never remapped task-to-task references inside imported actions: an imported "run sub-task" step pointed at whatever local task happened to own the exporter's id.
+### Live now
+Monitor gains an honest list of everything the app is holding open — in-flight tasks, scenes, bubbles,
+the progress panel, the engine — each row stoppable on the spot. It is the same inventory the shutdown
+report draws from, deliberately: the moment you want to look at something that should not be running is
+usually not the moment you want to exit.
 
-- **Security**: stored action arguments are now redacted everywhere they are displayed, not just in runtime traces. The task list and the flow graph previously joined raw arguments into their subtitle, so an HTTP `authorization` header, request `body`, or query string typed into an action appeared on screen, in screenshots, and in accessibility semantics. A single shared formatter (`ActionArgumentSensitivity`) now decides what is masked, driven by an explicit `sensitive` flag on the action's registered field metadata and backed by an argument-name heuristic so unregistered actions and forward-compatible keys fail closed. `var.set` masks its value when the variable it writes is itself named like a secret, and a source guard prevents any new surface from rendering raw arguments.
+### Bubbles outlived the engine that owned them
+Freeze and flash bubbles were never torn down when the engine stopped. Their collectors died with its
+scope, but the windows belong to the WindowManager and stayed on screen — with `started` still true, so
+a restart never re-subscribed them. Both now stop properly, which is also why a restart re-establishes
+the whole overlay layer.
 
-- **Diagnostics**: the engine-health panel now shows a "Scheduled jobs blocked by" row that reports, in plain language, why the app's deferrable jobs (watchdog, log pruning) are still pending — app standby bucket, no connectivity, not charging, out of run quota, device thermal/power state, and so on — using Android 14+ `JobScheduler.getPendingJobReason`. It answers the common "why hasn't my scheduled automation fired" question; below Android 14 or when nothing is blocking, it reads "Nothing blocking".
-- **Security**: secret/taint flags on global and array variables are now monotonic — once a variable is marked sensitive it stays sensitive for the life of the run. A concurrent plain write from another parallel profile run can no longer race the flag off and leak the value into a later log or trace (the flag is set before the value is published and never cleared by a subsequent write).
-- **Run logs**: an action that fails while consuming a secret-derived argument now records its real error class and location (e.g. `threw: request failed for <redacted>`) instead of the opaque blanket "details redacted" message. The raw secret value is scrubbed from the message and the throwable cause is dropped, so failures stay debuggable without leaking the secret.
+### One privileged process leaked per install
+Shizuku keys a UserService by (component, **version**), and the 物理鍵 key grabber passes the app's
+versionCode so each build gets fresh code instead of a stale process holding the previous APK's
+`libevgrab.so`. The cost was that after an update the old version could no longer be named, so it was
+never unbound: five `shell`-owned `:keygrab` processes were alive after a single morning of builds.
+Every version ever bound is now recorded and swept, with a one-off window of recent build numbers to
+clear an existing backlog.
 
-## v0.2.78
+### The permission dialog's settings buttons did nothing
+Four separate faults, all of them old. `DialogActivity` is declared with an empty `taskAffinity` and
+`excludeFromRecents`, so launching a settings page backgrounded its own task, and the destroy that
+followed reported a `Cancelled` the user never chose; a per-minute profile then re-raised the modal on
+top of Settings within the minute, which is what made the button look broken. The Shizuku button pointed
+at upstream's `moe.shizuku.privileged.api`, which is not the fork installed here, so it silently fell
+through to a web page — and the missing `<queries>` pin would have hidden the fork anyway on Android 11+.
+Every failure was swallowed by a bare `runCatching {}`.
 
-- **Diagnostics**: the engine-health panel now flags a throttled app-standby bucket (`RARE`/`RESTRICTED`) with an explicit warning pointing to the battery-optimization exemption, and the overall health indicator treats any throttled bucket (not just `RESTRICTED`) as unhealthy.
-- **Contexts**: Location conditions gain a "Match when outside" toggle for geofence-exit automations ("fire when NOT at a place"), with dwell measured outside the radius. Existing inside-only geofences are unchanged, and the FOSS evaluator, matcher, and dwell tracker all honor the mode through the shared evaluator.
-- **UI**: selected filter chips and rows now use an opaque composited fill (`selectedContainerColor`) instead of a translucent alpha-on-alpha wash, so the selection reads as a distinct solid fill in both the AMOLED and light themes rather than being distinguishable only by its border.
-- **Security**: the exported external-trigger receivers (`AutomationTargetReceiver`, `LocaleSettingFireReceiver`) now declare `android:intentMatchingFlags="enforceIntentFilter"` so incoming intents must match their declared filters (blocking mismatched-action redirection), and debug builds enable StrictMode `detectUnsafeIntentLaunch()`.
-- **Networking**: the ACCESS_LOCAL_NETWORK (Android 17+) policy is now a pure, unit-tested function covering the below-37 no-op, granted, and denied/revoked paths; LAN actions continue to fail closed with a clear "grant it in Setup" message.
-- **Tasker import**: the `Wait` action now reads Tasker's five fixed time fields (ms/seconds/minutes/hours/days) by their argument index instead of a dense list, fixing imported waits that were mis-scaled by up to 1000× when zero fields were omitted from the export.
-- **Diagnostics**: detects Android 16 Advanced Protection Mode (API 36+, read defensively via reflection so it fails closed and is a no-op below 36) and surfaces its state plus a graceful-degradation note in the engine-health panel — OpenTasker's triggers keep working since it uses no Accessibility service, but privileged extensions may be limited while it is on.
+Now: the pill settles deliberately after a successful launch, a three-minute quiet window per requirement
+keeps the modal from stacking on the page it just opened (the task stays blocked and still logs), Shizuku
+resolves fork-first with both ids pinned, and anything that will not open says so. The setup guide URL is
+our own `shiroikuma-shizuku` page rather than upstream's, which describes a different app and a different
+APK. The manifest contract test now asserts the whole manager list, since it was only ever checking the
+id that was not the problem.
 
-## v0.2.77
+### Also
+- `SET_STARTUP_TASKS` on the adb bridge sets run-on-start / run-on-exit / start-on-boot **by task name**,
+  so the dev loop configures them instead of handing 白い熊 device steps.
+- `QUERY_STATUS` answers a new `STOPPED` boolean, ungated, so a caller can ask before firing something
+  that would be refused.
+- The stop flag is cached in memory: it is read from `onAccessibilityEvent`, which the framework calls on
+  the main thread for every window-state change on the device, and disk I/O does not belong there.
+- `hand-off-backup-automation.md` is now `sister-app-contract-backup-automation-hand-off.md`, with a header saying
+  plainly that it is implemented **by a sister app** and is not outstanding work here.
 
-### Roadmap drain (correctness, security, and consolidation)
+## 0.2.78+47 — 2026-07-28
 
-- **Engine**: sub-task (`task.run`) input variables are now scoped to the child invocation, so lowercase inputs no longer leak into the parent task's later actions. QUEUED-mode retriggers arriving while a task is running now queue instead of being dropped as "cooldown active" — the cooldown is reserved only when a fresh run actually starts. Notification-button taps run inside the foreground `AutomationService` instead of the receiver's ~10 s `goAsync` window, so long tasks (e.g. `flow.wait` up to 30 min) complete and log reliably.
-- **Actions**: the `download` action now delegates to the shared `HttpRequestAction` transport (same-origin redirects, atomic fsync'd writes, the 50 MB cap, cleartext-private DNS, and the LAN-permission gate) instead of a parallel OkHttp path; downloads land in the shared `user_files` sandbox so `file.*` actions can read them. `FileActions` reads/writes with no-follow (`O_NOFOLLOW`) semantics and rejects symlinked path components, closing a TOCTOU sandbox-escape window. Notification-button PendingIntents use a collision-free request-code allocator so a newer notification can no longer overwrite an older button's intent.
-- **Import/validation**: `InputValidation` field limits (name length, task priority, non-empty actions, blank action type, profile name/cooldown) are now enforced at the OpenTasker bundle import boundary and on profile save, instead of being an unenforced module.
-- **Scenes**: a scene slider bound to a task now fires it on release with the value exposed as a variable; task-firing overlay controls (button and bound slider) drop obscured touches (`filterTouchesWhenObscured`) as a tapjacking guard. The multi-selection is reconciled when the element list changes and is preserved while dragging a selected member. The resize handle and Run Log expression-debugger expand control now meet the 48 dp touch-target minimum.
-- **UI/polish**: flow-canvas connectors are drawn in density-correct dp (were raw px, misaligned at density ≠ 1×) and the sub-task badge keys off a structural node flag rather than an English literal. Removed the dead `PremiumComponents` module and the deprecated edge-to-edge status/navigation bar color setters.
+**The progress highlight lands on the category the app is actually writing.**
 
-## v0.2.76
+### The number was read one row too low
+A backup of 白い熊 Handy RSS drew 「UI fonts」 as the running item while the counter beneath it read
+「区分 4/9 — Downloaded images 883/3680」. The contract said `current` **counted what was finished**, so
+the relay activated `current + 1` — but no app in the family was ever written that way: Handy RSS,
+白い熊 音楽, 空中線 and 応用管理 all send the **position of the category they are writing**, paired with
+that category's own name in `text`. The contract line was the error, and it has been corrected: a number
+that survives the `index_total` guard is the 1-based position of the item being written now. Every app
+that sends numbers only — around fifteen of them — was drawn one row low; all of them are fixed by the
+same change. (An app that sends `item` was never affected: the id addresses the row directly.)
 
-### Deep audit fixes (2026-07-17)
+### A row the marker has left keeps a ✓, not a ▶
+Activating an item ticked off the **pending** rows above it and left previously-active ones alone, so
+each row the marker passed through kept its ▶ and a nine-row pane could claim four categories were
+running at once. Rows above the marker are now finished, whatever they were — except a failure or a skip,
+which is a verdict rather than a leftover.
+
+## 0.2.78+46 — 2026-07-28
+
+**The backup window becomes an ordinary window, gains a destination, and learns to stop.**
+
+### The panel is an Activity now, not a system overlay
+It floated over every app and answered to none of Android's gestures: Home did not put it away, it never
+appeared in recents, and during a backup that can run for an hour there was no way to set it aside and
+use the phone. It is now `ProgressPanelActivity` — **Home backgrounds it and the run carries on, recents
+lists it, tapping it there resumes exactly where it was**, and Back backgrounds rather than abandons.
+`singleTask` with its own task affinity, so it is a separate entry from the workspace UI and can never
+stack a second copy. Nothing about a run depended on the window: it is driven by the task and the app's
+broadcasts, and the panel only renders the state flow — so being backgrounded, folded or rotated changes
+nothing. The panel no longer needs "Display over other apps" (bubbles and scenes still do).
+
+### A destination you can change for one run (個別保存)
+A tappable pill above the list shows where this run will write. Tapping it turns the panel into a
+**folder browser** — sub-folders, 「‥ 上へ」, 「ここに保存」 — and the choice lands in `%BR_RunDir`:
+**the configured export directory and 01 are never touched**, and the override is cleared every time the
+plan opens, so it cannot leak into a later run. The pill tracks the folder being walked and says which
+of the three states it is in (`保存先` / `選択中` / `保存先（今回のみ）`). 保存中核 writes to
+`%BR_Dir` unless the pill overrode it; the repair sweep follows the same resolution.
+
+### 中止 actually stops the app
+It used to stop 自由作業盤 *listening* — the app carried on to the end, renamed its part-file into place
+and delivered a backup that had been cancelled. 保存中核 now fires **`CANCEL_EXPORT`** at the app, which
+deletes its partial and answers `ERROR:cancelled`. The wire contract gained the action, including the
+requirement that it be reachable from the **exported receiver**: a stop path on a non-exported service
+cannot be triggered by the app that started the export, which is exactly why Jami's three working stop
+buttons were useless to the batch.
+
+### Progress-panel fixes
+- **The highlight only moves down.** An app may revisit a category — Jami loops over accounts writing
+  each one's chat texts then its files — and following that faithfully made the marker jump between rows
+  during one apparent phase, which reads as a fault. Counters still update; the marker does not go back.
+- **The item pane lists what is actually being exported.** It was built from the saved selection while
+  the export ran the plan's per-run choice, so a category ticked in the plan was written but never shown.
+- **Folder-browser rows take taps.** The shared row renderer only attached a click handler to rows that
+  could unfold, which a folder entry cannot.
+
+## 0.2.78+41 — 2026-07-28
+
+**Two counters, and a highlight that points at the right thing.** The batch's progress pane was
+reading one number as two different things, and an app with a corpus made that visible.
+
+### The bug
+An app reports real counts as it works — but *what* it counts changes with the step: categories while
+it walks them, files or messages while it writes one of them. The relay read that number as a row
+index, so when 白い熊 GNU Jami exported its chat corpus and reported 「ファイル 1234/8942」, the panel
+tried to tick row 1234 and highlight row 1235 of a **nine-row** list. Nothing ticked, and a four-digit
+count sat under a row that was never the thing being written.
+
+### The contract gains three optional extras
+- **`item`** — the category id being written *right now*. The panel highlights that row and ticks off
+  everything above it, with no arithmetic. This is the fix; everything else is fallback.
+- **`bytes` / `bytes_total`** — the second counter.
+
+All additive: an app that sends none behaves exactly as before.
+
+### This side
+- `progress.item` gains **`key`** (address a row by category id) and **`index_total`** — a number is
+  honoured as a position only when the app's own total equals the number of rows on the pane, which is
+  precisely the case where the count really is a walk through the categories. Any other shape moves no
+  highlight, so a corpus count can no longer point at nothing.
+- Activating an item marks the still-pending items above it done — an export walks its items in order.
+- **Both counters on one line**: 「ファイル 1234/8942 · 512 MB / 4.2 GB」, byte sizes formatted as
+  everywhere else in the panel.
+- **Sub-options are no longer dropped from the item pane.** `progress.row` used to keep top-level rows
+  only; selected sub-options now appear indented under their group, so an app's parts (Jami's
+  `chat_texts` / `chat_files`) are visible as the rows they are.
+
+## 0.2.78+40 — 2026-07-28
+
+**Picking a couple of apps, and deciding once what each app backs up.** Two entries either side of
+「保存」: one that opens the same plan with nothing chosen, and one that edits every app's saved item
+selection in a single window.
+
+### 個別保存 — the plan, opened empty (`backup.plan` gains `preselect`)
+- The same window and the same behaviour as 「保存」, but **no app is ticked**. Tick one or two, press
+  保存開始. Backing up a single app no longer means opening the roster and deselecting thirty-two.
+- The items inside are unchanged: ticking an app brings its saved selection with it, already ticked,
+  and the run still writes only `%BR_RunApps` / `%BR_Run_<App>`, so saved defaults survive untouched.
+- `preselect` = `saved` (the default, what 「保存」 uses) or `none`.
+- Pressing the button with nothing ticked used to do nothing, silently; it now says so.
+
+### 保存項目一括選択 — the whole roster's items in one window (`backup.edititems`)
+- **A sweep, then an editor, in the same window.** Every app is asked for its current
+  `LIST_CATEGORIES` — one progress row each, 中止 available, frozen apps thawed and re-frozen — which
+  refreshes `%BR_Cat_<App>` so newly added items and changed labels appear. The window then becomes
+  the editor: each app unfolds to its items, ticked as its saved selection has them.
+- **保存 writes both places**: `%BR_Items_<App>` for every ticked app, and the matching line in
+  「保存復元の設定 -- [979][01]」, so the choice outlives a restart. It becomes the default every later
+  backup starts from.
+- **An app's own tick means "save this app"** — unticking one leaves its saved selection exactly as it
+  was, so editing a single app never disturbs the rest.
+- 保存中核 gains `%BR_Mode=list`: fetch the list, re-freeze, return — no dialog, no export.
+
+### The progress panel
+- `progress.show` gains **No item pane** (`single`): a run whose steps have nothing to list under them
+  drops the lower pane entirely and gives the step list the whole window, instead of drawing an empty
+  frame under a stray header.
+
+### The export contract, in this app too
+- This app's own `LIST_CATEGORIES` now sends the fourth field — `id⇥label⇥parent⇥on|off` — like the
+  sister apps it collects. Nothing here is large-derived-and-re-creatable, so every category is `on`.
+- An absent `items` extra now means **this app's default set** rather than "everything", which is what
+  the contract has always specified; the two coincide here only because nothing is opt-out.
+
+## 0.2.78+38 — 2026-07-28
+
+**The backup batch becomes one window.** 保存復元 used to be two lines of text on a floating panel
+and a wall-of-text summary dialog; a frozen app cost ten silent minutes; a failure could only be read,
+not acted on. The run now opens as a plan, becomes a live two-pane progress view, and ends as a report
+you can repair from — all in the same window.
+
+### The progress panel (new)
+- **Two auto-following panes** — the run's steps on top, the current step's items below. The active
+  row is parked `(lines-1)/2` down, so finished work stays visible above it and what is coming stays
+  visible below; a hand-scroll suspends the follow for 5 s so you can look ahead without being yanked
+  back. Finished rows are ticked and dimmed, failures washed red, the running row highlighted.
+- **Real counters, never a percentage** — 「アプリ 7/33」 in the header and the app's own live line
+  (「書籍 1234/8942」) indented under the item it belongs to.
+- **中止 stops within a second**, not at the end of the current wait: pressing it aborts the pending
+  `intent.send` reply as well as skipping the rest, then goes straight to the report.
+- **Fold-out rows** — a finished app opens to the items it exported and the path it wrote.
+- Actions: `progress.show` / `progress.row` / `progress.item` / `progress.finish` / `progress.hide`.
+  Addressing a panel that is not showing is a silent no-op, never a task failure.
+
+### The plan (new — `backup.plan`)
+- 「保存」 no longer starts anything. It opens the roster as a tick-list: every app selected, each
+  unfolding to its own items **with the app's labels and sub-option indentation**, ticked as that
+  app's saved selection has them. Select/deselect-all for the apps, and for the items inside each app;
+  a group item carries its sub-options with it.
+- The app's line folds it open; only its checkbox selects it. An item's line selects the item.
+- The choice is published to `%BR_RunApps` / `%BR_Run_<App>` and 「保存実行」 runs it — the saved
+  `%BR_Items_<App>` are never overwritten, so narrowing one run (or adding an item the saved selection
+  leaves out) is free.
+- `backup.runitems` resolves what an app should export now: the per-run choice, else the saved
+  selection, else empty — which the contract reads as the app's own defaults.
+
+### The report + repairs
+- At the end the item pane folds away, the button becomes OK, and the list stays browsable with live
+  ✓/✗ counts. A failed row opens to the **full** error text plus the repair that fits it:
+  **「全ファイルアクセスを許可」** (opens that app's All-files-access page), **「停止して起動管理へ」**
+  (force-stops a wedged/starved app and opens Huawei's アプリ起動管理 — it does *not* re-run, because
+  nothing changes until that setting does), and **「保存し直す」** for the app alone, plus
+  「失敗をすべて保存し直す」 for the lot.
+- Every retry first **sweeps that app's unreadable archives** — a killed export leaves a ZIP with no
+  end-of-central-directory record that is indistinguishable from a real backup until you try to
+  restore it.
+
+### 保存整理 — pruning (new — `backup.prune`)
+- The backup directory as a tick-list: one row per app, archives newest-first, everything but the
+  newest pre-ticked, per-app 「(11/12) · 554.8/605.2 MB」 and grand totals of both count and size.
+  Single files toggle by hand; nothing is deleted until 「削除」; the same window then reports what went.
+
+### Frozen apps, and not waiting on the dead
+- **`app.frozen`** (a plain PackageManager read) plus thaw → export → **re-freeze exactly what was
+  frozen**, on every exit path including failure and 中止. A `pm disable-user` app cannot receive
+  broadcasts at all, so a frozen target previously sat out the whole 600 s timeout in silence.
+- A **`LIST_CATEGORIES` pre-flight** doubles as a liveness probe: a dead or unimplemented app fails in
+  20 s instead of 600.
+- **`intent.send` gained a watchdog** that judges **progress, not noise**: each progress broadcast is
+  fingerprinted, and an app whose reports stop *changing* is given up on — which also catches an app
+  that heartbeats while hung. Reported apart as 応答途絶 (nothing arrived) vs 作業停止 (arrived,
+  unchanged).
+
+### Item picker
+- `backup.categories` parses a `LIST_CATEGORIES` reply natively (the optional fourth `on`/`off` field
+  is positional, which a chain of regexes cannot take apart safely), replacing eleven `var.replace`
+  steps in the core task.
+- The picker is now drawn from **the app's own defaults every time** — opening it is not an existing
+  choice, the choice is what you make in it — and it stores the whole catalogue (ids, labels,
+  parent/child structure, defaults) in `%BR_Cat_<App>`, which is what lets the plan window show proper
+  labels and indentation.
+- `param:mode` is gone from all 33 wrapper tasks (it made a hand-run wrapper warn about a missing
+  template value); mode travels in `%BR_Mode`.
+
+### Contract (`sister-app-contract-backup-automation-hand-off.md`)
+Generalised — no app-specific incidents — and hardened with what this run taught, with the self-test
+checklist replaced by "verification happens in 自由作業盤":
+- **Never export from a receiver.** `goAsync()` does not extend the broadcast window (~10 s foreground,
+  ~60 s background); overrun it and the system ANRs and kills the app mid-export. Foreground service,
+  `startForeground()` within 5 s, wakelock.
+- **A heartbeat is a promise, not a shield** — bound every blocking step (per-file timeout,
+  skip-and-continue with the skips counted in the reply, an overall ceiling that replies `ERROR:`).
+- **Write archives atomically** (`<name>.part` → rename), and delete the partial on every failure path.
+- **Never persist an in-progress flag**, and never let one outlive its export.
+- **Check `isExternalStorageManager()`** and reply exactly `ERROR:no-storage-access` — that string is
+  what arms the grant button; a raw `EACCES` can only be read.
+- **A fourth `LIST_CATEGORIES` field** declares each item's default (`on`/`off`, absent = `on`), so an
+  app can mark large, derived, re-creatable data opt-out; `items` absent now means the app's defaults.
+- An export that runs for minutes needs the OEM to allow it — a foreground service is not enough on
+  EMUI, which force-releases the wakelock and starves the process.
+
+### Fixes
+- `DELETE_ITEMS` can target Unfiled items (it required a real project).
+- The retired 保存進捗盤 scene is gone; the panel replaces it.
+
+## 0.2.78+11 — 2026-07-25
+
+**Self-registering backup roster.** Adding a sister app to the one-tap backup used to mean three
+manual steps behind one tap: pick the app, then hand-add its two settings rows, then discover the
+per-app wrapper task was missing when the item picker died on `sub-task not found`. Picking the app
+is now the whole job — three new task-editing actions let a task build out its own configuration.
+
+### Actions
+- **Add Action** (`task.addaction`, Tasks) — insert an action into ANOTHER task, but only if it isn't
+  there yet. Identity is *(action type + `name` arg)* — the pair `task.editaction` matches on — so
+  re-running never duplicates a row. Placement (`at`): `end`, `start`, a 0-based index, or **`sorted`**
+  — with `sortPattern`, a regex over the `name` arg whose first capture group is the sort key. A
+  sorted insert appends after the last matching action and then stable-sorts that whole region, so a
+  new entry lands in its alphabetical slot, equal keys keep the order they were added in, and actions
+  outside the region never move. Args are written **verbatim** — deliberately not expanded a second
+  time — so a label built with the literal-`%` trick lands in the target task as a literal
+  `%BR_Token_<App>` rather than that variable's value. Optional `store` reports `added` / `exists`.
+- **Task Exists** (`task.exists`, Tasks) — store `true`/`false` for whether a task of this name exists,
+  optionally scoped to one project, so a task can generate a missing sub-task instead of failing on it.
+- **Sort Group Tasks** (`tasks.sort`, Tasks) — put one Tasks-tab group back in alphabetical order,
+  positioned below the project's ungrouped tasks, for groups that grow a generated task per app.
+
+### Engine
+- The group-ordering rule that `tasks.launchers` applied to its generated group moves into a shared
+  `sortGroupTasksAlphabetically()`, so the launcher generator and `tasks.sort` order groups identically.
+
+### Workspace (保存復元 project)
+- **『保存対象選択』** now finishes the job for every app it picks: each one's `%BR_Token_<App>` /
+  `%BR_Items_<App>` pair is added to the `[979][01]` settings task if absent (whole Token/Items block
+  re-sorted by app name), and any app whose `保存 ⇨ <pkg>` wrapper is missing is handed to
+  『保存作成』 to be generated on the spot. A closing dialog names the apps still awaiting a pasted
+  token. The existence check defaults to *exists*, so a failed lookup can never trigger a regeneration
+  that would overwrite a wrapper's hand-written label.
+- **『保存作成』** ends by sorting the 保存タスク group, so a freshly generated wrapper sits with its
+  neighbours instead of at the bottom.
+
+## 0.2.78+8 — 2026-07-25
+
+One-tap backup of **every** 白い熊 app: this build is the app-side half of a cross-app export
+contract, plus the pickers, timeouts, and file naming the new **保存復元** workspace project needs.
+
+### The sister-app state-export contract
+- **`StateExportReceiver`** (exported, token-gated) answers two new actions:
+  - `shiroikuma.jiyusagyoban.action.EXPORT_STATE` — runs the full category-ZIP export headlessly
+    (no UI). String extras: `token`, `path` (absolute directory; **overrides** the configured SAF
+    directory), `items` (comma list of category ids; absent = everything), `progress_action`, plus
+    the reply trio `reply_action` / `reply_package` / `reply_id`. Replies
+    `OK:<path>|<bytes>|<human size>|<n> categories` or `ERROR:<reason>`.
+  - `shiroikuma.jiyusagyoban.action.LIST_CATEGORIES` — replies `OK:` + one `id<TAB>label` line per
+    exportable category, so a caller can offer a live item picker.
+- **Replies ride a fresh broadcast** back to the caller (`FLAG_INCLUDE_STOPPED_PACKAGES`), single-fire
+  guarded by an `AtomicBoolean`, sent from `goAsync()` + an IO dispatcher. EMUI severs both live
+  binders and the ordered-broadcast result between third-party apps, so this is the only channel that
+  works — the same shape renrakusaki's contacts backup proved.
+- **Progress broadcasts** while exporting: `app`, `text` (numbers-first display line), and structured
+  `current` / `total` (long) + `unit`. `SettingsBackup.export` takes an optional per-category
+  `onProgress` callback that feeds them.
+- **`AutomationAuth`** — `automation_enabled` (default off) + `automation_token` (24 random bytes,
+  hex, generated lazily, compared constant-time with `MessageDigest.isEqual`). Device-local: its
+  prefs file is deliberately **not** in the export map, so the token never travels in a backup.
+- **UI**: a master switch and a tap-to-copy token row (with Regenerate) appended to the **Export /
+  Import** section of the 白い熊 自由作業盤 UI page — same placement in every sister app.
+
+### Export file naming — the family convention
+- Backups are now named **`shiroikuma-jiyusagyoban_<yyyy-MM-dd_HH-mm-ss>.zip`** — English app name
+  plus datetime, **no version, no `-export` infix** — from both the automation path and the UI page,
+  so every sister app's backups sort and read alike in one shared directory.
+- The "Last export" query accepts the legacy `白い熊 自由作業盤-…` prefix too, so older backups stay
+  recognised.
+
+### Actions
+- **Pick From List → Variable** (`dialog.pickmulti`, Alert) — checkbox multi-select over arbitrary
+  items, with a bold **全選択** master toggle above a divider, optional display labels, and optional
+  parent ids: sub-options indent under their parent and follow its toggle. Current values pre-ticked;
+  cancel leaves the variable untouched.
+- **Pick One App → Variable** (`app.pick`, App) — the icon-tile app grid in one-tap mode, optionally
+  restricted to a package list (e.g. only the apps in a backup target list).
+- **Pick Apps → Variable** (`app.pickmulti`) gains **`include_self`**, so a backup-target list can
+  include 自由作業盤 itself; an own package already in the selection is now always shown.
+- **Send Intent** (`intent.send`) — receiver-mode `result_timeout` raised from 120 s to **600 s**: a
+  sister-app export legitimately runs for minutes.
+
+### Engine
+- Per-action budgets: `intent.send` gets 660 s (its 600 s ceiling plus slack) and `dialog.*` /
+  `app.pickmulti` get 600 s, so a blocking reply or a picker left open is no longer killed at 60 s.
+
+### Fixes
+- **`var.split` with `delete_base` destroyed the array it had just created** — `unset()` clears the
+  array store as well, so `flow.foreach` over a freshly split list saw zero items and silently
+  skipped the whole loop. The scalar is now removed *before* the array is stored.
+
+## 0.2.78+3 — 2026-07-25
+
+The UI page grows a full app-state Export/Import (Kōjiki-style category ZIP) and takes on the kxkb
+look; the Presets section moves to the bottom.
+
+### Export / Import — everything settable, as one ZIP
+- **First section at the top of the 白い熊 自由作業盤 UI page**: a settable export directory (SAF
+  tree picker, persisted device-locally, never itself exported), shown **red while unset, yellow once
+  set**, with a latest-export line beneath it (newest `白い熊 自由作業盤-*.zip` in the directory,
+  re-queried on page open and after every pick/export).
+- **The Export/Import panel** (black box, 2 dp yellow border): directory box + last-export line,
+  "Select all" + seven category checkboxes, and an ArcaneChat-style pill button row — Cancel alone on
+  the left, Import / Export grouped on the right.
+- **Categories** — "Workspace programming" (projects · tasks · profiles · scenes · variables — the
+  standard full JSON export as `workspace.json`) first, then UI theme (colours + font files),
+  Widgets, Bubbles, App settings (sort · projects · logs · picker), Share tiles, Task icons.
+- **Format** (`SettingsBackup`): a ZIP of plain per-category JSON files (type-tagged
+  SharedPreferences dumps that merge on import — never clear), real font/icon files under `fonts/` /
+  `icons/`, and a `manifest.json`. Runtime state and security grants (Locale tokens, Termux
+  allowlist) are deliberately excluded.
+- **The "+" → Import JSON… flow accepts the whole ZIP**: it detects the archive and imports its
+  `workspace.json` exactly as if the plain full-export JSON had been picked.
+- **Dialogs and the auto-close chain**: success dialogs are black-yellow with a yellow border. After
+  export, OK closes the info dialog, the panel, and the UI page; after import, "Later" closes the
+  whole chain and "Restart now" relaunches the app. Failures ("Export failed…", "No categories
+  selected.") leave the panel open.
+
+### UI page restyle (kxkb look) + Presets to the bottom
+- All section headings are 20 sp medium accent, **underlined only as wide as the heading text**,
+  sections separated by thin hairline spacers; rows follow the kxkb 16→32 dp indent cascade.
+- The Presets section (Reset to black & yellow) now sits at the very bottom, like Kōjiki's trailing
+  Reset row.
+- Long-pressing into the UI page (top-bar ⋮ or the Setup tab) now confirms with a short vibration.
+
+## 0.2.78+1 — 2026-07-25
+
+Upstream resync: the fork rebased onto OpenTasker **0.2.78** (from 0.2.76; 31 upstream commits across
+v0.2.77 "roadmap drain" + v0.2.78 + unreleased work). All fork features carry over unchanged;
+`BUILD_NUMBER` restarts at 1 on the new base (versionCode 800001).
+
+### Adopted from upstream
+- **Geofence-exit contexts** — Location conditions gain a "Match when outside" toggle (fire when NOT
+  at a place, dwell measured outside the radius); exposed in the fork's context editor as a checkbox.
+- **QUEUED-mode fix** — retriggers arriving while a task runs now queue instead of being dropped as
+  "cooldown active"; the cooldown is reserved only when a fresh run actually starts (merged with the
+  fork's per-run event-variable snapshots, which are preserved).
+- **Notification-button tasks run in the foreground service** — not the receiver's ~10 s window, so
+  long tasks (e.g. `flow.wait`) complete reliably; collision-free PendingIntent request codes.
+- **`download` via the shared `http.request` transport** — same-origin redirects, atomic fsync'd
+  writes, 50 MB cap, LAN-permission gate; no parallel OkHttp path.
+- **Tasker import `Wait` fix** — the five time fields are read by argument index, fixing imported
+  waits mis-scaled by up to 1000×.
+- **UI/security polish** — opaque selected-chip fill in both themes, intent-filter enforcement on the
+  exported trigger receivers, `FileActions` symlink/TOCTOU hardening, app-standby-bucket and
+  Advanced-Protection-Mode diagnostics readers, density-correct flow connectors.
+
+### Kept fork-side (upstream's counterparts intentionally not taken)
+- The fork's rewritten variable engine (`VariableStore`: project-scoped globals, `childScope`,
+  persistent-global cache), name-first `OpenTaskerBundle` format, and `task.run` sub-task machinery
+  supersede upstream's versions — upstream's sub-task-scoping fix addresses a leak the fork's
+  isolated child scopes never had.
+- Upstream's new import-time field-limit enforcement stays out: it would only endanger the fork's
+  hand-authored bundles.
+- The scene editor stays the fork's monolithic `SceneLibraryScreen`; upstream's split scene modules
+  and secondary Diagnostics screen remain dropped.
+
+## 0.2.76+31 — 2026-07-23
+
+A 通知明滅 alert-quality pair: the notification tone and the vibration now fire **together** (like a
+normal phone message alert), and Jami's internal auto-recovery notifications are silenced by their
+notification **channel** — display only, no tone, no vibration, no edge light.
+
+### `sound.play` — background playback (`wait=false`)
+- New `wait` arg on `sound.play`: `true` (default) keeps the old behavior — the task blocks until
+  playback finishes; **`false` starts playback and returns immediately**, the player releasing itself
+  on completion/error. Exposed in the action editor as a dropdown.
+- Why: 通知明滅点灯 played the Jami substitute tone to the **end** before reaching its vibrate
+  action — tone-then-buzz instead of the phone's simultaneous tone+buzz. With `wait=false` the tone,
+  the `%Tsuchi_Vib_Pattern` vibration, and the edge light all start together.
+
+### `%NOTIF_CHANNEL` — the notification event exposes the channel id
+- The notification trigger now threads the posting app's **notification-channel id** to the enter
+  task as `%NOTIF_CHANNEL` (per-invocation, alongside `%NOTIF_PACKAGE`/`%NOTIF_TITLE`/…, and as
+  `channel` in the event metadata) — the locale-proof way to tell an app's housekeeping channels
+  from its real message/call channels.
+
+### 通知明滅 workspace wiring (bundle `通知明滅点灯-v2`)
+- 通知明滅点灯 plays the Jami tone with `wait=false` (simultaneous tone + vibration + edge light).
+- The Jami watchdog filter now stops on `%NOTIF_PACKAGE == shiroikuma.jami &&
+  %NOTIF_CHANNEL == shiroikuma_watchdog` — covering **all** the connection watchdog's notifications
+  (auto-recoveries, error storms, network warnings) in every locale — with the old exact-title match
+  (「白い熊 Jami 自動回復」) kept as fallback. These notifications keep their shade entry but get no
+  tone, vibration, or edge light. (The watchdog channel's own system-default sound is silenced
+  device-side: 通知明滅 ⇨ Jami 消音 opens Jami's notification settings to mute the 自動回復 channel.)
+
+## 0.2.76+30 — 2026-07-23
+
+Two headline features since +5 — per-app share-sheet tiles (each its own on-device-generated relay
+APK), and a backup-guarded system language switch built on a new EMUI-proof cross-app reply channel —
+plus a batch of system-wide editor fixes.
+
+### 共有アプリ工房 — per-app share targets via on-device relay-APK generation
+- EMUI's share sheet renders **one tile per package**, so the fork's earlier ACTION_SEND
+  entry points (sharing shortcuts, activity aliases) all collapsed under the single 自由作業盤 tile.
+  The only way to a separate tile is a separate installed package — so each target now gets its own
+  tiny **relay APK, generated + signed + installed entirely on the phone** (no PC rebuild).
+- On-device APK engine (`core/share/relay/`): a fixed relay stub (`classes.dex` + `resources.arsc` +
+  binary-manifest template in `assets/relay/`) is specialised per target by rebuilding only the
+  manifest **string pool** (package/label/target — `RelayManifestTemplate`), swapping the icon PNG,
+  and assembling a hand-rolled **STORED + 4-byte-aligned zip** (`RelayApkBuilder`). Signed via
+  **apksig** with an on-device software RSA key + self-signed X.509 cert (`RelayKeystore` /
+  `RelayCertBuilder` — no BouncyCastle, nothing secret ships), installed over a **Shizuku streaming
+  `pm install` session** (`RelayInstaller`). The relay (`RelayActivity`) forwards to the exported
+  `ShareForwardActivity`, which **unfreezes the target** (Shizuku `pm enable`), forwards the content,
+  and drops a re-freeze bubble.
+- **共有アプリ工房** screen (`share.relays` action → `ShareAppsActivity`): add a frozen-inclusive app,
+  edit its tile name (prefilled) + icon, Generate / Regenerate / Reinstall / Remove, Shizuku-gated
+  with a copy-streams fallback; `ShareRelayStore` tracks each target (relay package, state, signing
+  fingerprint). New icon sources: the target's **other activity icons**, installed **icon packs**
+  (`appfilter`/`drawable.xml` parsing), and curated **framework drawables**.
+
+### System language switch (白い熊 雷起動盤) — backup-guarded
+- **`system.set_locale`** — persistent, root-less ja⇄en switch (`CHANGE_CONFIGURATION` +
+  `WRITE_SETTINGS`, hidden `updatePersistentConfiguration`). **Reorders** the existing `LocaleList`
+  (target first, keeps every other installed language) rather than replacing it — a naive
+  `LocaleList(target)` replace dropped English from the system.
+- **`system.get_locale`** — current locale tag (+ language-only) into variables, for the toggle and
+  the already-set guard.
+- Registered in the runtime + editor-metadata registries; `system.set_locale` mapped in the
+  capability registry (blocking, Write Settings) and surfaced on the **Setup tab** (Modify system
+  settings + adb-only Change configuration checks).
+- Guard: a locale change on EMUI once recreated `contacts2.db` empty (all contacts lost), so the
+  switch first backs up contacts via `白い熊 連絡先` (`shiroikuma.renrakusaki` `BACKUP_CONTACTS`) and
+  proceeds **only** on an `OK:` reply — otherwise vibrate + modal + refuse. Immediate on-tap flash +
+  persistent "backing up…" notification cover the wait.
+
+### Send Intent — `reply_via=receiver`, a binder-free cross-app reply channel
+- EMUI severs the ordered-broadcast result channel between third-party apps **and** drops a broadcast
+  carrying a live Binder (`ResultReceiver` *or* `PendingIntent`) into another app's manifest receiver.
+  New mode: pass only plain string extras (`reply_action` / `reply_package` / random `reply_id`),
+  sent **ordered** with `FLAG_INCLUDE_STOPPED_PACKAGES`; the target broadcasts the result back to our
+  **exported `IntentReplyReceiver`**, correlated by id (`IntentReplyBridge`). `shiroikuma.renrakusaki`
+  added to `<queries>`.
+
+### System-wide editor & reliability fixes
+- **Run Task** action editor now has a **Parameters** section (add / edit / delete `param:*`) that
+  merges the named parameters back on Save — previously Save rebuilt args from the visible fields and
+  **silently wiped** every parameter.
+- **Set Variable** value (and any field opting into `pathPicker`) gains a **folder icon** that opens
+  the system directory/file picker and fills a real filesystem path — no more typing paths by hand.
+- **Edit Task** dialog gets the yellow border used by the other editors; `dialog.text` can now drop
+  its Cancel button (OK-only acknowledgment).
+- Accessibility pre-flight tolerates the EMUI **unbind→rebind transient** (`awaitConnected`): a task
+  firing during a configuration change (e.g. the locale switch itself) is no longer spuriously blocked
+  with a "permission required" dialog.
+
+## 0.2.76+5 — 2026-07-22
+
+The flash-bubble release: 通知明滅 gets a semi-凍結融解 icon layer — while an app's notification
+is edge-flashing, its icon shows down the Desktop's LEFT edge (the mirror of the freeze bubbles on
+the right), with a single kill-all 全消灯 icon pinned below the stack. Tap and long-tap behaviors
+are UI-settable.
+
+### Flash bubbles — left-edge Desktop icons for flashing apps
+- `FlashBubbleStore` + `FlashBubbleOverlayManager` (`core/bubbles/`): one draggable
+  `TYPE_APPLICATION_OVERLAY` window per flashing app — its launcher icon + ⚡ badge + label —
+  anchored **top+left** and shown **only while the default home launcher (雷起動盤) is
+  foreground**, exactly like the freeze bubbles (which stay on the right; the stacks never mix).
+  Styling (icon size / corner / label size / weight / font) is shared with the existing Freeze
+  bubbles settings. Positions persist across restarts, rotation, and fold changes.
+- **Kill-all icon**: while flashing is ongoing, a single 全消灯 bubble (the app's own icon + ✕
+  badge) sits below the lowest app bubble; each newly flashing app inserts above it and pushes it
+  back to the bottom. Tap = run the kill-all task (same function as tapping the flash-ongoing
+  notification) and hide itself — **the per-app icons deliberately stay**; long-tap = hide it
+  without killing anything; drag to move.
+- **UI-settable gestures** (Settings → UI customization → *Flash bubbles (通知明滅)*): tap and
+  long-tap each pick from *Open app + kill flash* / *Kill flash only* / *Open app only* /
+  *Dismiss icon only* (defaults: tap = open + kill, long-tap = kill without opening). The
+  per-app kill task (default `通知明滅消灯`) and kill-all task (default `通知明滅全消灯`) are
+  also settable, so the layer stays generic. "Kill flash" runs the kill task with the bubble's
+  package injected as the **per-invocation `%APP_PACKAGE`** (the event-locals mechanism), so the
+  same workspace task serves the foreground profile and a bubble gesture — including dismissing
+  the app's notification and dropping the ongoing notification when it was the last flasher.
+- Five new bridge actions (System category) — the workspace's handle on the layer, since the
+  flashing state lives in workspace variables the app can't see: `bubble.flash_add` (package +
+  optional label; dedup, stacks below, pushes the kill icon down), `bubble.flash_remove`,
+  `bubble.flash_clear` (bubbles + kill icon — the 無効 path), `bubble.flashkill_show`,
+  `bubble.flashkill_hide`. Registered in the sensitivity catalog (local-only) and capability
+  map (overlay-permission notes on the two showing actions).
+
+### 通知明滅 workspace wiring (bundle)
+- `通知明滅点灯` adds the app's bubble + shows the kill-all icon right before the ongoing
+  notification; `通知明滅消灯` removes that app's bubble and hides the kill-all icon when the
+  last flash dies; `通知明滅全消灯` hides only the kill-all icon (app icons stay, per spec);
+  `通知明滅 ⇨ 無効 [37]` clears the whole layer. Task notes document the icon behavior.
+
+## 0.2.76+4 — 2026-07-20
+
+The hands-off-reload release: the adb bridge can now RUN a task, so the dev loop fires a
+project's 71 reload itself right after every settings import (白い熊: "You should be running 71
+yourself in update-situations like this - always"). Plus a 通知明滅 naming normalization and the
+companion-side half of protected-contact picture masking.
+
+### `RUN_TASK` bridge action
+- `WorkspaceTransferReceiver` gains `shiroikuma.jiyusagyoban.action.RUN_TASK` — run a task by
+  name over adb: `--es …extra.TASK '<task name>'` plus optional `--es …extra.PROJECT '<project>'`
+  to disambiguate (name-first, case-insensitive; an ambiguous name errors out instead of picking
+  one). Executes through `executeAndLogTask` exactly like a manual run and answers success +
+  duration in the ordered-broadcast result. Same explicit-component + protocol-extra gate as the
+  other bridge actions.
+
+### 通知明滅 variable normalization (workspace)
+- Every ALLCAPS variable renamed to the project's proper form: `TSUCHI_C_/F_/T_/B_<pkg>` →
+  `Tsuchi_C_/F_/T_/B_<pkg>`, `TSUCHI_HIDE_*` → `Tsuchi_Hide_*`, `TSUCHI_TONE_FILE_*` →
+  `Tsuchi_Tone_File_*` — across 71/01/37, 点灯, 再描画, 消灯, 全消灯, and both 保護試験 tasks
+  (including the literal probe string in the unset-detection). Scope is unchanged: these names
+  all contain lowercase package parts, so they were already project-globals. New-name rows were
+  seeded with current values in the same bundle; the 35 old ALLCAPS rows were swept via
+  `DELETE_ITEMS`; 71 was re-run headlessly over the new `RUN_TASK` action.
+
+### Protected-contact pictures — companion side (workspace)
+- Jami's file-transfer notifications ("Picture from <name>" + avatar + photo preview) bypass the
+  protected-contact masking that text messages already get. The fix lands in shiroikuma-jami
+  (handed off as `hand-off-protected-picture-notifications.md` in that repo); this side is ready:
+  `通知明滅の設定 [01]` defines `%Tsuchi_Hide_Body_Pic` (新着写真。) and `通知明滅 ⇨ 起動 [71]`
+  now pushes it as the `protected_body_picture` extra on the existing `SET_PROTECTED_CONTACTS`
+  broadcast (current Jami builds ignore the unknown extra harmlessly).
+
+## 0.2.76+3 — 2026-07-20
+
+The quiet-mode release: 通知明滅 now behaves like a real notification channel — the system-bar
+vibrate/silent tile mutes its tone, and every lighting notification also buzzes with a
+message-style vibration pattern (settable in the 01 設定 task), which itself respects silent mode.
+
+### `sound.play` volume streams (+2)
+- New optional `stream` arg: `media` (default — nothing else changes), `notification`, `ring`,
+  `alarm`, `system`, implemented via `AudioAttributes` (sonification content type), with a dropdown
+  in the action editor. Sounds on notification/ring/system follow the ringer mode, so the
+  vibrate/silent tile mutes them at the OS level — no ringer checks needed in tasks; media and
+  alarm keep playing regardless. The `volume` arg composes with any stream.
+- The 通知明滅 per-app tone (`通知明滅点灯`'s `sound.play`) now rides `stream: notification` — it
+  previously played on the media stream and sailed straight through quiet mode. Its loudness now
+  follows the notification volume slider. (Workspace bundle; 話す時計 and all other sounds stay on
+  media by design.)
+
+### Incoming-message vibration for 通知明滅 (+3)
+- `vibrate` gains a `pattern` arg — comma-separated ms alternating OFF,ON starting with an initial
+  delay (the Android waveform convention), e.g. `0,150,100,150` = buzz–pause–buzz. Segments and the
+  total are bounded to the existing 10 s cap; `millis` stays for one-shots.
+- `state.get` gains a `ringer` key → `normal` / `vibrate` / `silent` — the raw vibrator ignores the
+  ringer, so tasks gate themselves.
+- Workspace: `通知明滅点灯` vibrates `%Tsuchi_Vib_Pattern` right after the app-foreground stop (no
+  buzz while that app is open in front), gated on `ringer != silent`. The pattern is defined and
+  documented in `通知明滅の設定 [01]` (白い熊's tuned value: a triple buzz
+  `0,150,100,150,100,150`). Net behavior: normal = tone + buzz, vibrate = buzz only,
+  silent = light only.
+
+### 通知明滅: 白い熊 Jami 自動回復 exclusion (workspace, same day)
+- The `白い熊 Jami 自動回復` notification (the Jami connection watchdog's auto-recovery report)
+  no longer fires the tone, edge light, or wakedance — an early-stop guard in `通知明滅点灯`
+  matches its exact package + title before the tone plays or the unread flags are set.
+- `通知明滅試験` gained stage 0: a simulated 自動回復 notification that must produce no reaction,
+  so the exclusion is testable on demand.
+
+## 0.2.76+1 — 2026-07-20
+
+The upstream 0.2.76 resync release: the fork rebases onto upstream's v0.2.76 "deep audit" release
+(10 commits, 56 files), the new upstream schema bump is renumbered onto the fork chain, and
+upstream's enter/exit-task engine split is fused with the fork's per-event snapshot queue. No
+workspace (task/profile/scene) changes ride along — this is a pure engine/app release.
+
+### Upstream v0.2.76 — deep audit fixes (2026-07-17, merged 2026-07-20)
 
 - **Engine**: exit tasks now run on their own job slot and never consume the profile cooldown, so a cooldown, SINGLE-mode in-flight enter task, or RESTART can no longer silently drop the exit task. Closed a QUEUED lost-task race where a retrigger could be enqueued into a queue whose consumer had already decided to exit.
 - **Engine**: plugin conditions no longer flap — the shared Locale plugin poll source multiplexes every subscription, so the matcher now holds state for results addressed to a different plugin/bundle instead of driving every plugin context true→false→true each 30 s cycle. The internal `sun_tick` minute pulse can no longer satisfy a generic/blank-filter EVENT context (previously firing imported event profiles every minute); blank-event/blank-filter specs fail closed.
@@ -184,7 +826,166 @@
 - **UI**: fixed a Diagnostics crash from duplicate log keys (now keyed on a monotonic sequence) and stopped its polling while backgrounded. The one-time NFC write is disarmed on dialog close, expires after 60 s, and runs its tag I/O off the main thread. `deleteVariable` reports real success/failure instead of an optimistic toast; undo no longer reports false success; `updateTask`/`updateProfile` are transactional. Editing an unknown action type shows a message instead of a dead tap. The context editor blocks saving garbled TIME windows and out-of-range coordinates. New profiles default to disabled, the enter-task selection no longer resets mid-edit, and backup state loads off the main thread.
 - **Theming**: scene warning text follows the applied theme's luminance (was near-invisible in Light-app-on-dark-system), the Locale plugin edit activity honors the persisted theme, run-log detail lines no longer render twice, and the scene overlay is clamped on screen so it can't be dragged fully offscreen. Removed dead duplicate helpers.
 
-### Prior unreleased work
+### Fork-side resync work (+1)
+
+- **Database renumbering**: upstream's v8 (the `run_logs(timestamp)` and `edit_history(entityType,
+  entityId)` indexes) is renumbered onto the fork chain as **migration 19→20** — same scheme as the
+  previous resync (the fork chain occupies 5..17; upstream's 6/7/8 land as 18/19/20). Schema
+  `20.json` exported; an installed device migrates in place by just adding the two indexes.
+- **Engine fusion**: upstream's enter/exit job-slot split is merged INTO the fork's per-invocation
+  event-snapshot dispatch (+106) rather than replacing it — `dispatchTask` now carries both
+  `eventVars` and `isExit`, exit tasks run on the collision-free `-profileId` slot without consuming
+  the cooldown, and the QUEUED enqueue/drain decision sits under one lock while each queued run still
+  carries its own `%NOTIF_*` snapshot (notification bursts keep their per-event values).
+- **Adopted from upstream into fork-owned files**: transactional `updateTask`/`updateProfile`
+  (the fork's task data-loss guard, write tracing, and icon-file cleanup are retained; upstream's
+  corrupt-record-overwrite throw is deliberately NOT adopted — corrupt rows keep surfacing via the
+  decode-issues banner instead of hard-blocking every save), honest `tile.set` failure + an
+  Unsupported capability pill (nothing in the workspace uses it), real success/failure feedback on
+  variable delete, the profile editor refusing to save a dangling enter-task binding, and the new
+  editor fields — ping (timeout, result variable), download (timeout, size limit), sound.play
+  (volume), media.mute (stream).
+- **Kept fork-side where upstream diverged**: the ThemePrefs-driven `OpenTaskerTheme` (upstream's new
+  Locale-plugin theme code re-pointed at it), the rewritten scene library and the removed Diagnostics
+  destination, plain-string action metadata/capabilities (upstream moved to string resources), and
+  name-first task resolution in profile dispatch.
+- **Repairs**: restored the `plural` helper in `ActiveAutomationLists` that upstream's dead-code
+  sweep deleted out from under the fork's still-live call sites.
+- **Verified no-ops for the fork**: the new scene-overlay clamp applies only to drag gestures —
+  programmatically edge-placed fork scenes (電池線, 通知明滅枠, the 音楽 buttons) are unaffected.
+  `BUILD_NUMBER` reset for the 0.2.76 line (versionCode 780001).
+
+## 0.2.75+203 — 2026-07-19
+
+The workspace-health release: the app now tells you — truthfully, live, and from the top level — which
+tasks cannot run and why, instead of hiding a permanently-wrong "Unsupported" badge inside a task card
+while the task silently failed in 0 ms. Plus overlay quality-of-life for the 音楽端灯 buttons and a
+%variable cache-coherence fix.
+
+### Workspace health marks & truthful capability badges (+201..+203)
+
+- **`wake` un-broken.** Upstream capabilities-mapped `wake` through its "elevated power backend" —
+  which upstream never ships (`hasPrivilegedTransport()` is hardcoded `false`), so the action was
+  *permanently* Unsupported, and the task pre-flight **hard-failed any task containing a wake at
+  0 ms** (the セキュアカメラ / Freeze-bubble wakes). The fork's real `WakeAction` runs
+  `input keyevent 224` through ShizukuShell — so the capability is now a plain Shizuku-gated one,
+  exactly like `shell.run`. (`reboot`/`lock` stay Unsupported: their upstream implementations are
+  stubs that always fail.)
+- **Live action pill.** The capability pill on an action row now reflects reality: **hidden** when
+  the requirement is actually met (a standing "Needs setup" on a working action was a lie), **red +
+  what's missing** ("Needs setup — Shizuku not installed") when it isn't — and **tapping it
+  deep-links** to the settings screen / app that grants the requirement. Shizuku is verified
+  **binder-up + access-granted** (new `CapabilityState.isMetLive`), not upstream's
+  "manager app is installed". Everything re-evaluates on every app resume.
+- **Red ❗ propagation.** A task that cannot run right now — an Unsupported action, or a blocking
+  permission that is live-unmet (the exact pre-flight/0 ms condition) — gets a red ❗ on its **task
+  row**, on its **project filter chip** (All/Unfiled included), and on the **Tasks icon in the bottom
+  nav bar**. **Profiles inherit** the mark from the task they run (enter *and* exit task, resolved
+  name-first with id fallback exactly like the engine) → profile rows, Profiles-tab chips, and the
+  **Profiles nav icon**. All startup breakage is visible from the top level.
+- **Setup tab: Task health card.** Setup now opens with a health card driven by the *same* checks as
+  the marks — red, listing each blocked task and exactly what it's missing, with a "Show in Tasks"
+  jump; a green "all tasks can run" one-liner otherwise. Marks and Setup can no longer disagree.
+- **Setup contradictions fixed.** The "Shizuku power mode" card used to show a **green check** while
+  its body said *"disabled by the persisted kill switch … blocked until the backend is implemented"*.
+  Replaced by a real **Shizuku** card: green only when Shizuku is running *and* granted; distinct
+  states for not-installed / installed-but-not-running / running-but-not-granted — the last with a
+  **one-tap Grant** that pops Shizuku's own permission dialog. The **Termux script bridge** card had
+  the same disease (green on mere installation, body claiming the feature is unimplemented — it is
+  implemented in this fork): it now green-checks only when dispatch is really ready (installed +
+  ≥ 0.109 + RUN_COMMAND granted) and offers a **direct RUN_COMMAND runtime-permission request**.
+
+### Overlay QoL trio (+198..+200)
+
+- **`scene.show` numeric `vAlign`** (0..1): positions the scene's vertical **center** at that
+  fraction of the screen height, proportionally correct across fold states — `%Ongaku_Btny` now
+  drives the 音楽 良/削除 buttons' height as one knob.
+- **`keepScreenOn` arg** on `scene.show`: the overlay holds `FLAG_KEEP_SCREEN_ON` while shown —
+  EMUI let the screen time out over the player's own keep-awake flag whenever an overlay sat on top.
+- **Gradle configuration cache** enabled — `buildFork` made CC-safe (project values captured at
+  configuration time); warm re-runs configure in ~0.6 s.
+
+### %variable cache coherence (+196..+197)
+
+- **`PersistentGlobalScope.refreshFromDb()`** re-warms the %var cache after a bundle import and
+  after `DELETE_ITEMS` variable deletions — direct DAO writes had made imported variables invisible
+  to scene expansion until a process restart (the 音楽端灯 fade knobs rendered as tiny black
+  fallbacks).
+- **BUTTON scene-element `textColor`** is now `v()`-expanded live like every other element, so
+  `%Ongaku_Btncolor` drives the 良/削除 fade continuously.
+
+
+## 0.2.75+195 — 2026-07-16
+
+The 白い熊 音楽 migration release: the `音楽端灯` project moves from PowerAmp to the 白い熊 音楽 sister
+app, the audio-reactive meteors move natively INTO that app, and the fork rebases onto 38 new upstream
+commits (see the next section for everything that merge brought in).
+
+### 音楽端灯 → 白い熊 音楽 (shiroikuma.ongaku)
+- **Player contract**: the workspace now listens to `shiroikuma.ongaku.STATUS_CHANGED` /
+  `TRACK_CHANGED` broadcasts (extras: `paused`, `path`, `title`, `artist`, `favorite` → `%INTENT_*`
+  variables) and drives the player through its token-gated `AutomationActivity`
+  (`op` + `token`: `TOGGLE_FAVORITE`, `DELETE_CURRENT`, `PLAY_PLAYLIST` with `playlist` + `track`,
+  transport ops). PowerAmp support was removed entirely — tasks, profiles, scenes and 28 tuning
+  variables — not kept as legacy.
+- **良 (favorite) button**: toggles the current track's favorite in the player; flashes the coming
+  state; self-corrects from the re-broadcast.
+- **削除 (delete) button**: now shows a **confirmation dialog** (song title + artist + human path;
+  削除 / やめる) before firing — and the overlay buttons **hide instantly** when the dialog opens
+  (they float above dialogs; previously they lingered 2–3 s over it). Deletion happens inside the
+  player (skip → SAF delete → library row) instead of the old `NEXT` + raw `shell rm`.
+- **Button scenes tightened to 220×220 dp** — the old 300 dp-tall windows had an invisible tappable
+  band below the glyph that sat exactly over the player's pause button on the folded panel.
+- **Play Tenet / Play Lifting**: rewired to open the player and start the named playlist —
+  `Play Tenet` starts at the track "Freeport" via the `track` extra.
+
+### Meteors moved natively into 白い熊 音楽 — stack removed here (+193)
+- The audio-reactive edge meteors now render **inside the player**, beat-locked from its own decoder
+  tap — sample-accurate beats, working under Android Auto / Bluetooth offload, alive exactly while
+  music plays. The full renderer + beat-grid spec (all tuned values) was handed off to that repo.
+- Removed from this app: `MusicPulseSource` (the output-mix `Visualizer` beat source — **no
+  Visualizer remains, so audio offload is never blocked by this app**), the `EdgeMeteors` GPU
+  renderer, the `OngakuPulse` WebView JS bridge (+ its R8 keep rules), and the `music.viz.test`
+  diagnostic action. `SceneElementType.METEOR` survives as a decode tombstone so archived exports
+  still restore (such an element renders nothing).
+- The short-lived **Android Auto silence fallback** (+191: `Bridge.silentMs()`, meteors falling back
+  to the non-reactive animation when A2DP-offload kept the output mix silent) shipped and was then
+  superseded by the native move within the same release window.
+
+### DELETE_ITEMS bridge action (+192)
+- `WorkspaceTransferReceiver` gains `shiroikuma.jiyusagyoban.action.DELETE_ITEMS`: headless deletion
+  of named workspace items over adb — a JSON manifest (`projectName` + `tasks` / `profiles` /
+  `scenes` / `variables` name lists), resolved by (project, name). A shown scene is hidden first,
+  item notes are cleaned up, and variables are swept from both the project and super buckets.
+  Bundle import can only add/overwrite; this completes the headless dev cycle with removal.
+
+### App picker overhaul (+194, +195)
+- The multi-select app picker (Make Launcher Tasks, app-multiselect fields) is **near-fullscreen**
+  (97% × 94% — still a dialog, not a page).
+- Each tile shows the **package id under the label** — and since search always matched ids as well
+  as names, id-only hits are finally self-explanatory. The search hint says so.
+- **Icons 72 dp** (50% bigger), re-rasterized at true pixel size; the grid's cell width tracks the
+  icon size.
+- A ⚙ panel exposes **persistent sizing knobs**: icon dp (32–160), label sp (7–28, default 14,
+  **bold** by default with a Bold toggle), id sp (6–20), and **Pad↕ / Pad↔** grid + tile padding
+  (0–32 dp; vertical default tightened 12 → 4 dp).
+
+### Upstream resync (0.2.75/77, d4a99f5 — 38 commits)
+- `custom` was flattened and rebased onto the new upstream tip; every fork customization survived.
+  Fork-critical calls made during the merge: upstream's two new DB migrations renumbered onto the
+  fork chain (17→18 `variables.isSecret`, 18→19 `profiles.requiresRiskAcknowledgement`, final
+  version 19); upstream's ASCII-only variable-name policy NOT adopted in the store (it would have
+  silently killed Japanese-named variables); upstream's secret-variable name-pattern backfill
+  dropped (it would have irreversibly encrypted working `Pkey_*` globals); all ~60 fork action ids
+  registered in upstream's new sensitivity catalog so its fail-closed "unknown action" gate never
+  blocks fork tasks; the fork's name-first bundle format, scene pipeline, engine doze-hardening and
+  battery `EXTRA_PLUGGED` semantics kept over upstream's variants.
+- Everything upstream added in that span — the text/regex, date-time and structured-data action
+  packs, the full `http.request` action, off-main-thread task execution, live profile
+  reconciliation, the token-gated Locale receiver, encrypted secret variables, engine diagnostics,
+  fail-closed corrupt-payload storage and the rest — is itemized in the next section.
+
+## Upstream unreleased work merged on the 0.2.75/77 resync (2026-07-15)
 
 - **Diagnostics**: added a secondary Diagnostics destination with live engine heartbeat, active foreground-service types, app-standby bucket, exact-alarm delivery, last matcher failure, WorkManager watchdog stop reason, bounded process logs, and redacted crash previews. Shared diagnostic reports now include that health snapshot, up to 100 ring-buffer entries, and bounded crash excerpts; Authorization/Bearer credentials are redacted in addition to existing secret patterns.
 - **Background reliability**: time/day contexts now consume AlarmManager wake pulses in addition to an aligned in-process minute clock, so a Doze wake reaches the matcher instead of only producing a log line. Inexact fallback alarms use `setAndAllowWhileIdle`; a persisted service heartbeat and 15-minute WorkManager watchdog re-arm dropped ticks, and foreground-service timeout leaves a recovery alarm armed before shutdown.
@@ -466,578 +1267,624 @@ Tasker XML import UI and F-Droid release verification.
 - Added `tools/verify-fdroid-release.ps1` for release-tag checks, F-Droid lint/build execution, and signature-agnostic APK payload comparison against a signed upstream APK.
 - Verified local `fdroid lint` and WSL fdroidserver 2.4.4 `fdroid build --no-tarball com.opentasker.app:60` with Java 17 and Android SDK 35.
 
-## v0.2.57 - 2026-05-05
-
-Calendar and sun device smoke evidence.
-
-- Added `tools/collect-calendar-sun-evidence.ps1` to capture adb calendar/sun smoke evidence.
-- The harness launches OpenTasker, optionally grants Calendar access, captures package/service/provider evidence, and can require Calendar permission, CalendarProvider access, and foreground `AutomationService` state.
-- Verified the debug app on API 36 device `SM-S938B` with evidence `build/device-evidence/calendar-sun/20260505-152622`.
-- The smoke run confirmed `READ_CALENDAR` was granted, CalendarProvider calendar and instance queries succeeded, and `AutomationService` was foreground after app launch.
-- Patched the new adb evidence scripts for Windows PowerShell 5.1 process-argument compatibility.
-
-## v0.2.56 - 2026-05-05
-
-Calendar and sun context presets.
-
-- Added reusable Event context presets for during-meeting, before-meeting, all-day busy, at sunrise/sunset, and offset sunrise/sunset windows.
-- Added preset controls to the Event context editor when `event=calendar`, `event=sunrise`, or `event=sunset` is selected.
-- Presets preserve unrelated filters such as calendar allowlists while replacing the state/window fields they own.
-- Added JVM coverage for calendar preset coverage, sun offset windows, and preset application behavior.
-
-## v0.2.55 - 2026-05-05
-
-NFC write-helper flow.
-
-- Added an NFC tag write session that arms a one-time NDEF text-record write and consumes the next scanned tag while armed.
-- Supports writable and formattable NDEF tags with size/read-only failure messages surfaced through the write session.
-- Added an NFC write helper card to the Event context editor when `event=nfc` is selected.
-- MainActivity now gives armed writes priority over normal NFC trigger publication.
-- Added JVM coverage for NFC write-label normalization and payload-size estimation.
-
-## v0.2.54 - 2026-05-05
-
-Locale plugin validation harness.
-
-- Added `tools/validate-locale-plugin.ps1` to capture adb evidence for an installed Locale/Tasker-compatible plugin package.
-- The harness records package path, `dumpsys package`, resolver command output, contract-action checks, and a structured `summary.json`.
-- Supports required setting/condition contract checks and an optional synthetic `REQUEST_QUERY` broadcast to OpenTasker.
-- Documented the harness as the repeatable sample-plugin validation path for X3 follow-up testing.
-
-## v0.2.53 - 2026-05-05
-
-Locale request-query event handling.
-
-- Added a foreground-runtime listener for Locale `ACTION_REQUEST_QUERY` broadcasts from condition plugins.
-- Emits sanitized `event=locale_request_query` context events with the requested condition activity class and deterministic bundle JSON.
-- Rejects blank or malformed activity class names and reuses primitive-only bundle sanitization for request-query payloads.
-- Added package visibility for `REQUEST_QUERY` and JVM coverage for request-query event construction.
-
-## v0.2.52 - 2026-05-05
-
-Locale plugin configuration result handling.
-
-- Added explicit edit-setting and edit-condition intent resolution for Locale-compatible plugin configuration activities.
-- Fails closed when a plugin package exposes no matching configuration activity or multiple ambiguous activities.
-- Added guarded configuration result parsing that accepts only primitive bundle values and emits deterministic JSON plus bounded blurb text.
-- Reused the same string-only bundle safety policy for plugin-returned configuration data, rejecting null, nested, parcelable, and arbitrary object values.
-- Added JVM coverage for deterministic bundle JSON encoding and primitive-only configuration result sanitization.
-
-## v0.2.51 - 2026-05-05
-
-Locale condition unknown-state handling.
-
-- Added a bounded in-memory last-known-state cache for Locale condition plugin query results.
-- Resolves `RESULT_CONDITION_UNKNOWN` to the last known state for the same plugin package and guarded bundle.
-- Treats unknown condition results without history as unsatisfied instead of exposing an ambiguous success path.
-- Added JVM coverage for last-known fallback, no-history behavior, and bundle-scoped cache keys.
-
-## v0.2.50 - 2026-05-05
-
-Locale condition plugin query baseline.
-
-- Added `plugin.locale.query` to issue explicit `QUERY_CONDITION` ordered broadcasts to Locale/Tasker-compatible condition plugin receivers.
-- Added guarded parsing for Locale condition result codes: satisfied, unsatisfied, unknown, and unrecognized-result fail-closed handling.
-- Hardened Locale setting execution to resolve a single explicit receiver component before dispatch instead of broadcasting to an entire package.
-- Extended Locale plugin discovery metadata with setting/condition receiver permissions for future disclosure UI.
-- Added package-visibility queries for Locale execution receivers and JVM coverage for condition result-code mapping.
-
-## v0.2.49 - 2026-05-05
-
-Day schedule polish.
-
-- Added a shared `DaySchedule` parser for day contexts with canonical weekday order, weekday/weekend/daily aliases, numeric day tokens, and inclusive day ranges such as `MON-FRI`.
-- Updated Day context matching to use the shared parser so imported, typed, and UI-created schedules evaluate consistently.
-- Replaced raw Day context editing with quick presets, individual day toggles, canonical save output, and validation that blocks invalid day schedules before saving.
-- Improved profile and inspector summaries so Day contexts show human-readable labels such as `Weekdays`, `Weekends`, or `Every day`.
-- Added JVM coverage for day aliases, wrapped ranges, numeric tokens, and ContextMatchEvaluator day matching.
-
-## v0.2.48 - 2026-05-05
-
-Post-reconnect unplugged evidence checks.
-
-- Extended `tools/collect-location-evidence.ps1` with `-RequireRecentUnpluggedHistory`, `-MinimumUnpluggedHistorySeconds`, and `-MaximumUnpluggedHistoryAgeMinutes` for workflows where USB ADB is unavailable while the phone is unplugged.
-- Added recent unplugged interval parsing from `dumpsys battery` power and battery-change history so post-reconnect runs can fail closed on duration.
-- Captured post-reconnect API 36 evidence `build/device-evidence/location/20260505-125057`; the device history showed a recent unplugged interval from `2026-05-05T12:48:23.598` to `2026-05-05T12:50:14.389`, about 111 seconds, which was below the 600-second roadmap threshold.
-- Captured follow-up API 36 evidence `build/device-evidence/location/20260505-143254`; the recent unplugged interval from `2026-05-05T14:21:53.052` to `2026-05-05T14:32:08.107` lasted 615.055 seconds and satisfied the 600-second post-reconnect history gate with GPS/network provider cadence evidence present.
-
-## v0.2.47 - 2026-05-05
-
-Location durability evidence gates.
-
-- Extended `tools/collect-location-evidence.ps1` with structured battery parsing for plug state, charge counter, current, voltage, and sample deltas.
-- Added `-RequireUnpluggedSample` so future battery evidence fails closed if the device is connected to USB/AC/wireless/dock power before or after the sample.
-- Added `-RequireProviderCadenceEvidence` so Location evidence can assert that `dumpsys location` contains expected OpenTasker GPS/network cadence registrations or historical aggregates.
-- Verified the new collector gates on connected API 36 device `SM-S938B` with evidence `build/device-evidence/location/20260505-120448`; the run correctly detected USB power and GPS/network cadence, so it is tooling evidence only, not an unplugged battery reliability claim.
-
-## v0.2.46 - 2026-05-05
-
-Background Location delivery evidence.
-
-- Verified the installed/enabled `Location evidence log` template on connected API 36 device `SM-S938B` with the app sent home.
-- Used a shell-owned GPS test provider to deliver the template coordinates while `AutomationService` stayed foreground with `specialUse|location`.
-- Captured Room evidence under `build/device-evidence/location/20260505-085413` showing a successful `Location evidence log Task` run log after evidence collection started.
-- Extended `tools/collect-location-evidence.ps1` so `-RequireRunLogMessagePattern` can match the recent run-log message, task name, or the triggered task's action JSON.
-
-## v0.2.45 - 2026-05-05
-
-Location event evidence assertions.
-
-- Extended `tools/collect-location-evidence.ps1` to snapshot the debug app's Room database through `run-as`.
-- Writes `room-summary.json` with profile, task, and recent run-log counts/details when local Python/SQLite support is available.
-- Added optional `-RequireRunLogMessagePattern` and `-RequireLogcatPattern` checks so a background Location run can fail closed unless execution evidence is present.
-- Kept database capture non-fatal for non-debug or non-`run-as` builds while preserving foreground-service validation.
-
-## v0.2.44 - 2026-05-05
-
-Location evidence template.
-
-- Added a disabled-by-default `Location evidence log` profile template for configuring a test radius with latitude, longitude, radius, max-accuracy, and dwell slots.
-- The template installs as a normal Location context plus a log action, so future device smoke work can verify actual Location event delivery without manual context construction.
-- Kept the template setup-required with explicit foreground/background location and device Location prerequisites.
-- Added JVM coverage for the template catalog entry and generated Location context config.
-
-## v0.2.43 - 2026-05-05
-
-Location device evidence harness.
-
-- Added `tools/collect-location-evidence.ps1` to collect adb-backed foreground-service, permission, location, logcat, and battery snapshots for Location/geofence verification.
-- The harness writes timestamped JSON summaries and raw evidence files under ignored `build/device-evidence/location/`.
-- Supports optional permission grants and an app-to-home sample to verify the foreground automation service remains active while the app is backgrounded.
-- Verified the harness against connected API 36 device `SM-S938B`; a 10-second home/background sample kept `AutomationService` foreground with `specialUse|location` and recorded battery snapshots.
-
-## v0.2.42 - 2026-05-05
-
-Foreground service launch repair.
-
-- Started `AutomationService` from `MainActivity` using `ContextCompat.startForegroundService`.
-- Kept boot receiver startup intact while ensuring app launch also activates the automation engine.
-- Logged foreground-service startup failures from the activity path.
-- Added a JVM source contract test for the activity-to-service startup path.
-- Verified on a connected API 36 device that app launch starts the foreground service with the `specialUse|location` type after foreground/background location permissions and device location are enabled.
-
-## v0.2.41 - 2026-05-05
-
-Location policy disclosures.
-
-- Added shared Android location policy disclosure copy for Setup and Context Inspector.
-- Explains that Android 11+ background location is granted from app settings instead of the foreground permission dialog.
-- Explains that approximate foreground access limits background precision.
-- Adds Android 14+ foreground-service location gating copy when foreground and background location prerequisites are ready.
-- Added JVM coverage for the location disclosure policy text.
-
-## v0.2.40 - 2026-05-05
-
-Geofence cadence tuning.
-
-- Added a balanced location provider request policy for the FOSS `LocationManager` source.
-- Requests GPS updates less aggressively than network updates to reduce baseline location polling pressure.
-- Added cadence metadata to the waiting-for-location setup event for inspector/debug visibility.
-- Extended location setup rechecks from 30 seconds to 60 seconds.
-- Added JVM coverage for cadence defaults and validation.
-
-## v0.2.39 - 2026-05-05
-
-Geofence dwell cleanup.
-
-- Added profile-scoped persisted dwell-state cleanup for deleted profiles.
-- Cleared a profile's persisted Location dwell keys when its context list changes, preventing removed or reindexed geofences from retaining stale timers.
-- Routed the active automation view model through the application context so profile edits can maintain location dwell storage.
-- Kept enable/disable and profile metadata edits from resetting dwell timers when contexts are unchanged.
-
-## v0.2.38 - 2026-05-05
-
-Context Inspector dwell detail.
-
-- Added per-profile Location observation enrichment in the Context Inspector using the same persisted dwell state as runtime matching.
-- Added location check rows that show inside, outside, accuracy-blocked, or unknown dwell status with elapsed time against configured dwell duration.
-- Kept source cards raw while profile check rows display geofence-specific dwell metadata for the selected profile/context.
-- Added regression coverage for transformed Location observations during profile inspection.
-
-## v0.2.37 - 2026-05-05
-
-Persisted geofence dwell state.
-
-- Added profile/context-scoped Location dwell keys with config hashes so edited geofences do not reuse stale inside-since state.
-- Added a pure dwell-state tracker that preserves `insideSinceEpochMs` across accurate inside samples and clears it when a sample leaves the radius.
-- Persisted dwell state in app-local preferences so dwell timers can survive process restarts.
-- Wired ProfileMatcher to enrich Location context events with persisted dwell metadata before FOSS geofence evaluation.
-- Added regression coverage for first-entry persistence, dwell carry-forward, outside clearing, low-accuracy preservation, and stable key hashing.
-
-## v0.2.36 - 2026-05-05
-
-Live FOSS location source baseline.
-
-- Added a registered `location` context source backed by Android `LocationManager`, with GPS/network providers and last-known-fix seeding.
-- Added fail-closed source events for missing permissions, disabled providers, unavailable services, and source errors.
-- Declared the Android 14+ location foreground-service contract while keeping background geofence reliability gated behind background location and device verification.
-- Updated Setup and Context Inspector copy for foreground, approximate, precise, and background location states.
-- Added regression coverage for location event metadata, runtime source registration, and manifest foreground-service location declarations.
-
-## v0.2.35 - 2026-05-05
-
-Template regex policy.
-
-- Made regex-like template functions (`match`, `matches`, `regex`, and `replace`) explicitly unsupported.
-- Preserved fail-closed behavior by keeping the original template token when regex-like functions are used.
-- Kept existing bounded legacy `%var(regex:...)` behavior separate from the new template engine.
-- Added regression coverage for explicit regex-template rejection.
-
-## v0.2.34 - 2026-05-05
-
-Template condition expansion.
-
-- Added bounded `{{ ... }}` expansion to action conditions before legacy predicate evaluation.
-- Preserved legacy `%var` condition behavior and applied template expansion only when a condition contains template tokens.
-- Made template condition warnings fail closed by skipping the action instead of running on an unsafe or unknown expression.
-- Added regression coverage for template conditions, JSON path conditions, and warning-based condition skips.
-
-## v0.2.33 - 2026-05-05
-
-Per-expression template diagnostics.
-
-- Persisted bounded per-expression template trace lines beneath action trace summaries.
-- Parsed template trace lines back into structured run-log diagnostics with argument name, source scope, expression, value, and optional warning.
-- Rendered individual template expressions in Run Log trace rows, including source scope and redacted values for sensitive arguments.
-- Added regression coverage for persisted template trace lines, sensitive expression redaction, and structured parsing.
-
-## v0.2.32 - 2026-05-05
-
-Template run-log diagnostics.
-
-- Parsed template expansion details out of action trace messages into structured run-log diagnostics.
-- Added per-step expanded argument summaries and template warning counts to the Run Log UI.
-- Preserved ordinary parenthesized failure messages while recognizing generated template detail suffixes.
-- Added regression coverage for parsing expanded argument details, warning counts, and normal parenthesized messages.
-
-## v0.2.31 - 2026-05-05
-
-Runtime template argument expansion.
-
-- Wired action argument expansion through the bounded `TemplateExpressionEngine` after legacy `%var` expansion.
-- Added `VariableStore` template snapshots for task-local, event, global, and array scopes.
-- Added sanitized expanded-argument summaries, template warnings, and per-argument expansion traces to `ActionExecutionTrace`.
-- Redacted sensitive argument names such as tokens, keys, secrets, cookies, and passwords from run-log summaries.
-- Added regression coverage for runtime template expansion, event scope lookup, array lookup, warning propagation, and summary redaction.
-
-## v0.2.30 - 2026-05-05
-
-Template expression engine baseline.
-
-- Added a pure `TemplateExpressionEngine` for bounded `{{ ... }}` template expansion.
-- Added task/event/global scope precedence, explicit scope prefixes, array indexing/count/join support, and JSON path reads from scoped values.
-- Added safe string and math pipe functions with traces and warnings for debugging expansion behavior.
-- Added fail-closed limits for template length, expression count, function chains, resolved value size, output size, and unknown functions.
-- Documented the template expression baseline and added regression coverage for scope, defaults, string/math transforms, JSON paths, arrays, and expansion limits.
-
-## v0.2.29 - 2026-05-05
-
-FOSS geofence evaluator baseline.
-
-- Added a pure `FossGeofenceEvaluator` with Haversine distance, radius checks, optional max accuracy, and dwell-time evaluation.
-- Wired active Location context matching through the FOSS evaluator without adding Play Services dependencies.
-- Added Location editor fields for max accuracy and dwell seconds.
-- Reused the same evaluator for the older geofence trigger distance path and added regression coverage for radius, accuracy, dwell, and active context matching.
-
-## v0.2.28 - 2026-05-05
-
-Profile sharing manifest baseline.
-
-- Added a pure profile-share manifest model for OpenTasker bundles with stable slugs, counts, trust state, and submission metadata.
-- Added safety findings for unsupported/setup-required actions, schema warnings, lossy import warnings, and missing screenshots.
-- Added GitHub Discussions submission markdown generation without adding network publishing or verified-template claims.
-- Documented the sharing baseline and added unit coverage for manifest counts, blockers, slug validation, and submission text.
-
-## v0.2.27 - 2026-05-05
-
-Termux script readiness baseline.
-
-- Added a gated `script.termux.run` action with metadata and a runtime failure path that does not execute scripts.
-- Added Termux and Termux:Tasker package visibility and optional setup status detection.
-- Added Setup checklist copy for the Termux script bridge while excluding it from required readiness progress.
-- Documented the non-executing scripting baseline and added tests for package constants, manifest queries, and capability gating.
-
-## v0.2.26 - 2026-05-05
-
-Shizuku readiness baseline.
-
-- Added package visibility and runtime status detection for the Shizuku manager without linking the Shizuku API.
-- Added an optional Setup checklist row for Shizuku power mode that is excluded from required readiness progress.
-- Added elevated-action hints for Shizuku candidates while keeping restricted actions blocked.
-- Documented the safe readiness scope and added tests for status, action hints, and manifest package visibility.
-
-## v0.2.25 - 2026-05-05
-
-Scene library baseline.
-
-- Added a Room-backed Scenes tab that lists persisted scenes and supports safe scene creation/deletion.
-- Added scene validation for positive dimensions, empty scenes, element bounds, and missing tap/long-press task bindings.
-- Added scene cards with canvas summaries, element/binding previews, overlay-permission readiness status, and validation messages.
-- Documented the scene baseline and updated roadmap/version metadata for L2.
-- Added unit coverage for scene validation warnings, geometry errors, missing task references, and valid bounded elements.
-
-## v0.2.24 - 2026-05-05
-
-Visual flow baseline.
-
-- Added a pure automation flow graph model that maps profiles to contexts, enter/exit tasks, actions, edges, and warnings.
-- Added an optional Flow tab that renders read-only per-profile graphs from the active Room data without replacing the list/form editor.
-- Added graph warnings for missing tasks, empty contexts, and empty task lanes.
-- Documented the visual flow baseline and updated roadmap/version metadata for L1.
-- Added unit coverage for enter chains, exit chains, missing task references, and empty-context warnings.
-
-## v0.2.23 - 2026-05-05
-
-Dependency modernization baseline.
-
-- Added a Gradle version catalog for Android, Kotlin, Compose, Room, WorkManager, Coroutines, Hilt, Gson, and test dependency versions.
-- Converted root and app Gradle plugin/dependency declarations to catalog aliases without changing dependency versions.
-- Documented the staged dependency modernization order, risk rules, and verification gates for future upgrade batches.
-- Updated F-Droid draft metadata and version metadata for the centralized dependency baseline.
-
-## v0.2.22 - 2026-05-05
-
-F-Droid readiness baseline.
-
-- Added an `openTaskerDistribution=fdroid` Gradle profile without changing existing Android variant names.
-- Pinned Android build tools to `35.0.0` and exposed `BuildConfig.DISTRIBUTION`.
-- Added `verifyFdroidReadiness` to block common proprietary dependency families from the F-Droid profile.
-- Added CI coverage for the F-Droid release profile.
-- Added F-Droid readiness docs and a draft fdroiddata metadata file for `com.opentasker.app`.
-
-## v0.2.21 - 2026-05-05
-
-Tasker XML import baseline.
-
-- Added a secure Tasker XML parser that converts common task/profile/variable structures into an OpenTasker JSON bundle.
-- Added a migration report model with mapped actions, unsupported Tasker action placeholders, skipped profile/context warnings, variable counts, and scene exclusions.
-- Added an explicit unsupported imported Tasker action runtime failure path and capability metadata.
-- Documented the supported import surface and updated roadmap/README/version metadata for X10.
-- Added regression tests for action mapping, unsupported action preservation, profile skipping, variable import, scene warnings, and Wait conversion.
-
-## v0.2.20 - 2026-05-05
-
-Calendar and sun trigger baseline.
-
-- Added a local CalendarProvider event bridge that emits redacted `event=calendar` metadata for busy current or upcoming events.
-- Added sunrise/sunset matching with user-provided latitude/longitude, offset minutes, and bounded trigger windows.
-- Added Calendar access onboarding, Event context editor fields for calendar/sun filters, and Inspector setup copy.
-- Promoted the meeting-mode calendar template from planned to setup-required installation.
-- Updated roadmap/docs/version metadata and regression tests for calendar filtering, sun calculations, and template installation.
-
-## v0.2.19 - 2026-05-05
-
-NFC tag trigger baseline.
-
-- Added an NFC event bridge that accepts tag/tech/NDEF discovery intents and emits `event=nfc` context events with normalized tag IDs.
-- Routed cold-start and foreground NFC intents through `MainActivity` into the existing Event context source.
-- Added NFC tag ID filtering to Event contexts and exposed an NFC tag ID field in the context editor.
-- Promoted the nightstand NFC sleep template from planned to setup-required installation.
-- Updated inspector/setup copy, roadmap/docs/version metadata, and regression tests for NFC matching and template installation.
-
-## v0.2.18 - 2026-05-05
-
-Notification listener trigger baseline.
-
-- Added a `NotificationListenerService` event bridge that emits `event=notification` context events without logging notification text.
-- Merged notification events into the existing Event context source for profile matching and context inspection.
-- Added package allowlists, title/body filters, bounded regex matching, and fail-closed invalid-regex behavior for Event contexts.
-- Expanded the context editor for notification event filters and updated docs/version metadata for the X7 baseline.
-
-## v0.2.17 - 2026-05-05
-
-Context inspector baseline.
-
-- Added an Inspector tab with live registered context-source health, latest observed values, setup status, and source errors.
-- Added per-profile match explanations that show whether enabled profiles currently match and which context blocks activation.
-- Added a reusable context-inspection model with tests for source health, missing events, all-context matching, and inverted contexts.
-- Updated roadmap, project notes, README metadata, and app version metadata for the X6 baseline.
-
-## v0.2.16 — 2026-05-04
-
-Automation mode baseline.
-
-- Added per-profile automation modes: single, restart, queued, and parallel.
-- Added a Room v1-to-v2 migration that persists `automationMode` on profiles.
-- Added profile editor mode selection and profile cards showing the current mode.
-- Updated `AutomationService` dispatch so re-triggers can be skipped, restarted, queued, or run in parallel.
-- Added unit coverage for profile entity automation-mode round trips and legacy fallback.
-
-## v0.2.15 — 2026-05-04
-
-External automation target baseline.
-
-- Added a permission-scoped exported receiver for documented external automation intents.
-- Added external actions to run tasks, enable/disable profiles, query automation status, and pass task variables.
-- Persisted external task runs to the Room run log with action trace summaries.
-- Added manifest permission strings and security documentation for external callers.
-- Added unit coverage for external variable-name validation and documented variable extra names.
-
-## v0.2.14 — 2026-05-04
-
-Locale plugin host baseline.
-
-- Added Locale/Tasker-compatible setting plugin dispatch through a new `plugin.locale.fire` action.
-- Added explicit package validation, string-only JSON bundle decoding, bundle size limits, blurb handling, and timeout wrapping.
-- Added plugin discovery metadata for Locale edit-setting/edit-condition packages and requested permission disclosure.
-- Added manifest package visibility queries for Locale-compatible plugin discovery.
-- Documented the supported plugin host surface and added parser/trust-boundary unit tests.
-
-## v0.2.13 — 2026-05-04
-
-Open JSON bundle baseline.
-
-- Added schema-versioned OpenTasker JSON bundle models for profiles, tasks, actions, contexts, variables, scenes, and metadata.
-- Added deterministic export ordering and capability requirement metadata for setup-required or unsupported actions.
-- Added import planning/reporting with warnings for unsupported actions and lossy missing-reference handling.
-- Added Room-backed export/import repository logic with task ID remapping, variable upsert, profile remapping, and scene element link remapping.
-- Documented the v1 JSON bundle format and added unit coverage for sorting, capability metadata, validation, and JSON round trips.
-
-## v0.2.12 — 2026-05-04
-
-Profile template baseline.
-
-- Added an on-device profile template catalog with eight roadmap-backed starter patterns.
-- Added slot substitution for template names, context configs, and action arguments.
-- Added a Compose template picker and slot form that installs templates as disabled profiles with starter tasks.
-- Gated planned calendar, NFC, and external-intent templates so they are visible but cannot create broken profiles yet.
-- Added unit coverage for catalog completeness, unsupported-action gating, slot expansion, and planned-template blocking.
-
-## v0.2.11 — 2026-05-04
-
-Public documentation truthfulness pass.
-
-- Corrected README action counts and active runtime-context claims to match the compiled APK.
-- Clarified that plugin hosting, Tasker XML import/export, day schedules, and location/geofence runtime support are planned or still being hardened rather than shipped.
-- Updated architecture docs to describe the current foreground-service trigger monitors and action capability gates.
-- Removed stale audit/checkpoint documents that overclaimed completion against older source snapshots.
-
-## v0.2.10 — 2026-05-04
-
-Regression-test hardening pass.
-
-- Hardened cron step/range parsing so malformed expressions fail closed instead of throwing.
-- Added tests for malformed cron steps and valid minute/hour cron matching.
-- Added tests for variable scope shadowing and missing-variable expansion.
-- Updated README/roadmap metadata for the expanded regression coverage.
-
-## v0.2.9 — 2026-05-04
-
-Run log tracing baseline.
-
-- Added action execution traces with index, label, action type, duration, status, and message.
-- Persisted summarized action traces in task run-log messages.
-- Expanded run-log cards to show multi-line action trace summaries.
-- Added unit coverage for trace summary formatting.
-
-## v0.2.8 — 2026-05-04
-
-Capability gating baseline.
-
-- Added a central action capability registry for supported, setup-required, and unsupported actions.
-- Annotated task action rows and action picker cards with setup/unsupported status.
-- Disabled unsupported privileged or unimplemented actions in the add-action flow.
-- Added warning copy in action configuration dialogs for actions that require setup.
-- Added unit coverage for capability gating defaults.
-
-## v0.2.7 — 2026-05-04
-
-Runtime registry and stub-failure hardening pass.
-
-- Registered built-in action implementations and context sources during app startup.
-- Aligned runtime action IDs with the action metadata IDs saved by the Compose editor.
-- Replaced success-shaped action stubs with real behavior where practical and explicit unsupported failures where Android requires privileged access.
-- Implemented notification, intent launch, SMS send, volume, media-key, HTTP POST, and HTTPS download execution paths.
-- Removed unused placeholder context source files and stopped silently swallowing application-context polling errors.
-- Added unit coverage to ensure every UI action metadata ID has a runtime action implementation.
-
-## v0.2.6 — 2026-05-04
-
-App-open trigger hardening pass.
-
-- Removed the unused plain background `AppOpenService` and its manifest entry.
-- Added a foreground-service-owned `AppUsageMonitor` that polls `UsageStatsManager` only when usage access is granted.
-- Added opened/closed `AppEvent` dispatch when the foreground package changes.
-- Shared usage-access detection between setup UI and the app-open monitor.
-- Added focused unit coverage for foreground package selection.
-- Updated README/roadmap metadata for app-open monitoring.
-
-## v0.2.5 — 2026-05-04
-
-WiFi trigger hardening pass.
-
-- Replaced the manifest `CONNECTIVITY_CHANGE` receiver with a lifecycle-owned `ConnectivityManager.NetworkCallback`.
-- Added WiFi event dispatch from the foreground automation service with duplicate-state suppression.
-- Added Android 13 nearby WiFi devices permission metadata and setup checklist coverage.
-- Added SSID normalization tests for quoted and unknown platform values.
-- Updated README/roadmap metadata for platform-safe WiFi monitoring.
-
-## v0.2.4 — 2026-05-04
-
-Exact alarm hardening pass.
-
-- Removed `USE_EXACT_ALARM` so OpenTasker no longer declares the alarm-clock/calendar-only permission.
-- Added an app-owned time tick scheduler that uses exact `AlarmManager` delivery when allowed and inexact `setWindow()` fallback when exact alarms are denied.
-- Replaced the manifest `TIME_TICK` dependency with an internal scheduled receiver and exact-alarm permission-change rescheduling.
-- Added focused unit coverage for minute-boundary scheduling.
-- Updated setup text and README/roadmap metadata for exact-alarm fallback behavior.
-
-## v0.2.3 — 2026-05-04
-
-Permission onboarding pass.
-
-- Added a Setup tab with live status for Android runtime permissions and special access gates.
-- Added direct request/open-settings actions for notifications, exact alarms, battery optimization, usage access, notification access, overlay access, foreground/background location, Bluetooth, SMS, and DND access.
-- Added Bluetooth scan permission metadata for Android 12+ Bluetooth setup.
-- Updated README/version metadata for the setup checklist.
-
-## v0.2.2 — 2026-05-04
-
-Active UI reintegration pass.
-
-- Replaced the launcher-only status screen with a live Compose management UI.
-- Added profile creation, editing, enable/disable toggling, deletion, and context attachment backed by Room.
-- Added task creation, editing, deletion, and action add/edit/delete flows driven by the action metadata registry.
-- Restored run-log browsing inside the active APK.
-- Registered built-in action metadata during app startup so dynamic action forms are populated.
-- Updated README/version metadata to reflect the active UI state.
-
-## v0.2.1 — 2026-05-04
-
-Production hardening pass.
-
-- Fixed Windows and Linux Gradle bootstrap scripts so builds work from paths containing `--`.
-- Aligned app version metadata and README badge to the shipped APK version.
-- Re-enabled release minification and resource shrinking while keeping unsigned release builds possible without local secrets.
-- Consolidated release CI and added a push/PR build workflow.
-- Removed tracked local build artifacts and machine-specific configuration from the repository.
-- Replaced broken Hilt runtime entrypoints with the active non-Hilt application singleton wiring.
-- Hardened shell, intent, file, network, notification, settings, geofence, receiver, backup, and JSON parsing paths.
-- Added Room schema export and focused validation unit tests.
-- Improved shared Compose component semantics and light-theme error contrast.
-
-## v0.2.0 — 2026-05-04
-
-Full UI layer with database integration and action editor.
-
-- **Database integration:** Room DAOs with StateFlow live updates for profiles and tasks
-- **Profile CRUD:** Create, edit, delete profiles with persistence
-- **Task CRUD:** Create, edit, delete tasks with action lists
-- **Action editor:** Dynamic form generation for registered action definitions based on metadata registry
-- **Context picker:** Multi-select context families with predicate configuration (app, time, day, location, state, event)
-- **Action metadata system:** Comprehensive metadata for all built-in actions with field types and validation
-- **Task list screen:** Dedicated view to browse and manage all tasks
-- **Profile enable/disable toggle:** Toggle profiles on/off with database update
-- **Gradle 8.9 toolchain:** Updated from 8.7 for AGP 8.7.2 compatibility
-- **Lint baseline:** Suppressed MissingPermission and CoarseFineLocation warnings
-
-## v0.1.0 — 2026-05-03
-
-Initial scaffold.
-
-- Project skeleton: Kotlin 2.0 + Jetpack Compose + Material 3
-- Core data model: Profile / Context / Task / Action / Scene / Variable
-- AMOLED-black default theme
-- Architecture document (`docs/ARCHITECTURE.md`)
-- Roadmap (`ROADMAP.md`) tracking parity with Tasker feature surface
-- MIT license, shields.io badges
+## 0.2.75+189 — 2026-07-12
+
+The **cool-running release**: the 音楽端灯 meteors move from a WebView canvas to a **native METEOR
+scene element** — same dance, roughly **a third of the CPU** during music playback (~195 % → ~60 %,
+measured) — plus a headless **adb workspace-transfer bridge** (broadcast-driven export/import) that
+powers a fully automated build-test cycle, physically **rounded screen corners** with their own knob,
+and a 電池線 fix that stops the charging flame at 100 % and turns the line blue.
+
+### 音楽端灯 — native METEOR element (the heat fix)
+- **Why:** the phone heated up badly while playing music. Systematic measurement (live `top`
+  sampling per variant, thread-level breakdown) traced the load to **WebView's per-frame canvas
+  machinery, not the meteor math**:
+  - the real meteor page cost **~185–195 % CPU** sustained (app process + WebView renderer);
+  - a bare full-screen canvas drawing ONE line at 60 fps already cost **~60 %**;
+  - four edge-strip canvases cost **more** (~110 %) — per-layer commit overhead, not pixels;
+  - an rAF loop with **no** canvas drawing cost ~0 % — the commit path itself was the furnace.
+- **New scene element `METEOR`** (`scenes/EdgeMeteors.kt` + a `SceneActivity` renderer branch):
+  a 1:1 native port of the meteor page — perimeter ribbons in a rounded-rect band, layered glow,
+  comet-taper core, white-hot head star, per-ribbon twinkle, hue drift, and the full **音楽反応 v3
+  tempo-locked** behaviour (beat-grid pump, auto-gain-normalised dynamics, onset fallback) — drawn
+  by the app's **own RenderThread** like the 電池線 charging fire, reading
+  **`MusicPulseSource.Bridge` natively** (no JS bridge, no WebView renderer process at all).
+- **Three rendering pathologies found and eliminated on the way** (each measured, each ~190 %+):
+  - `BlurMaskFilter` Gaussian glow — CPU-rasterized per blurred path on a hardware canvas (~225 %);
+  - wide anti-aliased **stroked paths** (even 3-point ones) — HWUI software-rasterizes every stroke
+    into a mask texture on its `hwuiTask` threads each frame;
+  - the band's **even-odd ring `clipPath`** — a full-window coverage mask rasterized every frame;
+    this was the invariant cost across ALL variants, the original WebView page included.
+- **Final architecture — GPU-native primitives only**: every ribbon is split at the screen corners
+  it crosses into 1–3 **axis-aligned capsules** (`drawRoundRect`); the glow is concentric widening
+  capsules with a Gaussian-ish alpha falloff; the core taper is a per-run axis-aligned
+  `LinearGradient`; the band's inner hole is punched by **one `PorterDuff.CLEAR` round-rect**
+  instead of a clip. Result: `hwuiTask` raster threads at **0.0 %**, RenderThread ~21 %,
+  **~60 % total at 60 fps / ~50 % at 45 fps** (vs ~195 %), dance visually intact.
+- **Physically rounded screen corners** (白い熊's design): four **opaque-black corner masks** drawn
+  over the band — ribbons run into the corner squarely underneath and emerge from behind the curve.
+  The mask path is static and HWUI-cached (rebuilt only on size/radius change), so it is free.
+  Its radius is an independent live knob **`%Ongaku_Corner`** (default 18; `0` = square corners,
+  `32` = the band's own rounding) in `音楽端灯の設定 [01]`.
+- **All knobs are now %var-live**: the METEOR config maps every `%Ongaku_*` variable through the
+  scene engine's live expansion, so palette, speeds, glow, fps, reactive tuning — everything —
+  applies **instantly without re-showing the scene** (the WebView read them once at page load).
+- **The FPS cap became a true linear heat dial**: a capped-out frame is skipped before the sim
+  step — no state write, no recompose, no draw, no commit — so `%Ongaku_Maxfps` now scales cost
+  almost proportionally. Default retuned **60 → 45** (visually smooth, measurably cooler);
+  the dead interim `Ongaku_Glowres` knob was removed from 設定.
+- Invisible ribbons (fade-in/fade-out ends of life) skip all drawing; `METEOR` is editable in the
+  scene editor (element-type list, defaults, size).
+- Screen-off gating as before: the element leaves composition when the display sleeps — the frame
+  loop stops dead, nothing computes in the dark.
+
+### Workspace-transfer bridge — headless export/import over adb
+- **New `WorkspaceTransferReceiver`** (`core/transfer/`), an exported ordered-broadcast bridge
+  gated by the shared protocol extra (same convention as the widget bridges):
+  - **`shiroikuma.jiyusagyoban.action.EXPORT_WORKSPACE`** — writes a full workspace export
+    (tasks, profiles, scenes, variables, templates, projects, groups, item metadata) as an
+    OpenTaskerBundle JSON to `/sdcard/tmp/白い熊 自由作業盤.<yyyy-MM-dd_HH-mm-ss>.json` (or an
+    explicit `extra.PATH`), answering with the written path and item counts;
+  - **`shiroikuma.jiyusagyoban.action.IMPORT_BUNDLE`** — imports the bundle JSON at `extra.PATH`
+    (a bare filename resolves against `/sdcard/tmp`) with the standard strategies (merge projects,
+    overwrite same-name items in place), answering with a human-readable import summary and any
+    validation warnings; failures return the error message in the broadcast result.
+- Powers the new **fully automated dev cycle**: baseline export → mirror sync → build →
+  `adb install -r` → push bundles → headless import → test → final export → archive — no manual
+  file picking anywhere.
+
+### 電池線 — stop the charging flame at 100 %, full-charge line goes blue (workspace-side)
+- `denchi.update` gained a gate: at **100 % battery `%Charging` is forced to `false`**, so the
+  charging fire stops while the plug stays in (it previously burned forever on a full battery,
+  since EXTRA_PLUGGED-based charging detection stays true).
+- **`%Denchi_Full`** (the 100 % line colour) changed green → **blue `#0000FF`**; label updated.
+- Both tasks re-shipped fully literate (labels on every action + task notes).
+
+### Packaging & docs
+- Dev-workflow overhaul recorded in `CLAUDE.md` and the repo skills (`build-apk`,
+  `workspace-mirror`): wireless adb (direct or via the `skhw` ssh tunnel), automatic
+  `adb install -r`, `/sdcard/tmp` keeps only the current APK, end-of-cycle archives the final
+  export and APK to the on-phone backup tree.
+- Version tail: builds `+182` – `+189`; `versionCode = 770189`.
+
+## 0.2.75+181 — 2026-07-11
+
+The **music-reactive release**: the 音楽端灯 edge-light meteors now **dance to the actual music** —
+tempo-locked to a beat grid the engine derives live from the device's output mix — plus a
+narrow-screen (folded-cover) layout mode, a fix for the 物理鍵 grabber silently dead since the
+variable-demotion campaign, and a Visualizer feasibility diagnostic.
+
+### 音楽端灯 — 音楽反応: tempo-locked, audio-reactive meteors
+- New engine component **`MusicPulseSource`** (`core/media`): taps the device **output mix** via
+  `Visualizer` on audio session 0 with the **push capture listener** at the device max rate
+  (~20 Hz) and distills it into small live signals:
+  - **level** — smoothed loudness 0..1 (fast attack, slow release);
+  - **beat** — a decaying 0..1 impulse on bass onsets (low-FFT-bin flux over a ~2 s running
+    average, with a **180 ms refractory** so one drum hit is one onset);
+  - a **beat grid** — tempo + phase + confidence, from inter-onset-interval clustering **folded
+    into the 60–180 BPM band** (half/double-time hits agree), modal cluster ±8 %, gentle period
+    tracking, and **PLL-style anchor nudging** toward on-beat onsets; confidence fades out ~2 s
+    after onsets stop (quiet outros, pauses).
+- **Nothing is recorded** — the Visualizer yields transient 8-bit visualization snapshots only.
+- The bridge is injected into WEB scene elements as **`window.OngakuPulse`**
+  (`level()/beat()/bpm()/beatPhase()/tempoConf()`), polled from the page's rAF loop (R8 keep rule
+  for the `@JavascriptInterface` methods).
+- **Ref-counted lifecycle**: the Visualizer exists only while a reactive scene element is visible
+  AND the screen is on AND the knob is on — the scene's `musicPulse` config is live-%var-expanded
+  (`%Ongaku_Reactive`), so flipping the knob to `0` releases the capture completely.
+- The meteor canvas gained a reactive branch (scene bundle):
+  - with a confident tempo, the whole flow **pumps precisely ON each grid beat** —
+    `exp(-beatPhase × sharpness)`: sharp attack at the beat instant, decaying to the next
+    (metronomic, immune to missed/extra onsets); ribbons **flash** and head stars **swell** on
+    the same grid;
+  - the **baseline speed follows the music's dynamics, auto-gain normalised** against the track's
+    own rolling min/max (~8 s window) — mastering compression holds raw RMS nearly constant, which
+    froze speed in the first iteration; normalisation restores the full slow↔fast swing;
+  - low tempo confidence falls back to per-onset surges with a gentle drift; `Ongaku_Reactive=0`
+    reverts to the original random walk exactly.
+- **Five knobs, recipe-documented** in `音楽端灯の設定 [01]`: `%Ongaku_Reactive` (master),
+  `%Ongaku_Reactgain` (dynamics→speed sensitivity), `%Ongaku_Reactpulse` (beat flash),
+  `%Ongaku_Reactkick` (pump depth), `%Ongaku_Reactsharp` (pump shape: 2 = swell … 10 = jab). All
+  nine tuning labels (incl. `Speedmin/Speedmax/Twinkle/Headglow`) were rewritten as **cross-linked
+  recipes** — every label states its reactive-mode role and names partner knobs with concrete
+  setting ideas (EDM jab, ballad breathing, flash-only, no-stall floor …).
+
+### `music.viz.test` — Visualizer feasibility diagnostic
+- New Media action: taps `Visualizer(0)` for N seconds (play music!) and reports frames received,
+  live-frame share, peak RMS and peak bass energy, ending in a clear ✅/🔴 verdict — this decided
+  the reactive pipeline was buildable on the Mate XT before any of it was written.
+- Handles two verified EMUI quirks: a fresh `Visualizer(0)` can arrive **already enabled** (resize
+  then throws "wrong state 2" — disable → resize best-effort → re-enable), and **polled**
+  `getWaveForm()` is throttled to ~4 Hz (hence the push listener in the real pipeline).
+- Wired into the capability pre-flight (Microphone, blocking); manifest gains
+  `MODIFY_AUDIO_SETTINGS`; ships with a `視覚化試験` task in the 音楽端灯 project.
+
+### 物理鍵 — grabber dead since the variable demotion (fix)
+- The 2026-07-05 demotion campaign renamed the `%PKEY_*` super-globals to project-scoped
+  `%Pkey_*` and rewrote every task — but the engine's `ShizukuKeyEventListener` still read the
+  deleted ALL-CAPS names from the super-global bucket, so `enabled()` was permanently false and
+  the volume-key grabber (double-press → camera etc.) had been silently dead since that day.
+  It now resolves the MixedCase project-globals via `snapshotAll()` (the listener runs outside any
+  task, so it can't know the owning project's id), keeping the legacy ALL-CAPS names as fallback.
+- Same class of fix for the edge-bar long-swipe threshold: `SceneActivity` read the demoted
+  `%LONGSWIPE_DP` and silently fell back to the default — now `%Longswipe_Dp` first.
+- A full audit of all 40 demoted names found no other live code readers; stale prose mentions in
+  18 item notes were refreshed on-device via a minimal notes bundle.
+
+### Narrow screen — compact layout on the folded cover panel
+- Under **480 dp** window width (the folded Mate XT cover, ~336 dp; semi/unfolded stay regular),
+  the list layouts switch to a compact mode:
+  - the per-level **group indent shrinks 56 → 14 dp** (the old indent ate ~17 % of the panel);
+  - list side gutters 16 → 6 dp; task-card inner padding 16 → 10 dp;
+  - action rows **reflow: each argument on its own full-width line** — the key pill plus a value
+    that takes the whole rest of the row and **wraps to 2 lines** before ellipsising, so
+    `%Ongaku_*`-length names read in full instead of "Ong…".
+
+### Workspace content (bundles, not APK)
+- **Battery 割 display**: the short battery form (`%ST_BattShort` — the `batt-fold` widget and the
+  相撲字時計 overlays) now renders round tens as 九割/八割/…/一割 instead of 九〇/八〇 (non-round
+  values like 八五 and 100 = 全 unchanged; same character width, so no layout shifts).
+- The 18 pre-demotion variable names still mentioned in task/scene **notes** were freshened to the
+  current `%MixedCase` names (and the 画面操作 01 note's "super-global" claim corrected to
+  project-global).
+
+## 0.2.75+175 — 2026-07-09
+
+The **living-overlay release**: a native **charging-fire animation** on the battery line, a rewritten
+**buttery-smooth music edge-light** canvas, strict **screen-off gating** so no overlay ever computes
+behind a dark screen, a full set of **documented tuning variables** in the projects' `[01]` settings
+tasks, a **task-target bridge** for sister launchers, and an action-row fix so variable names always
+render in full.
+
+### 電池線 — charging fire (native scene renderer)
+- While charging (and only with the screen on), **two fire-comets glide in from both ends of the
+  battery line, meet in the middle** with a red-orange collision bloom, and slide back out — a
+  seamless, breathing loop (cosine-eased turnarounds, so it never jumps or disappears).
+- Each comet has a **blood-red → hot orange-red gradient body** (soft-blurred capsule) and a red head
+  glow — no white anywhere in the flame.
+- **Red star-cross glints** twinkle at each flame tip: tiny `+`-shaped strokes flashing in and out on
+  fast per-glint cycles — a genuine red sparkle instead of a solid dot.
+- An **ember burst** sprays red sparks in all directions from each tip (bright red-orange at birth,
+  cooling to deep crimson), arcing down under gravity into the scene's below-line head-room.
+- A decaying **heat field** tints the bar deep red where a comet just passed — a lingering
+  "residual fire" trail (~1.3 s time-constant) that cools back to the line's own colour.
+- The visible bar itself stays a thin strip (`barThickness` config, default 3 dp) at the top of the
+  now-taller scene; the line keeps its state colours (base / low-battery red / full green) at all
+  times, and the whole overlay stays fully tap-through.
+- **Fully variable-tunable** via the scene config → `電池線の設定 [01]`: `%Denchi_Cycle` (seconds per
+  converge-and-return breath), `%Denchi_Hibana` (ember count), `%Denchi_Kirameki` (glint count),
+  `%Denchi_Nokoribi` (heat-trail linger seconds; `0` disables the trail loop entirely).
+- The effect exists in composition **only while `charging && screen-on`** — unplugging or blanking
+  the screen stops the animation clock dead (zero off-screen CPU).
+
+### 音楽端灯 — smooth, rich, heat-controlled edge-light (scene canvas)
+- The WebView canvas hot loop was rewritten **allocation-free**: no per-frame arrays (the perimeter
+  mapper writes globals), per-ribbon colours resolved once at spawn, in-place particle compaction,
+  and the ribbon core drawn as **one gradient stroke** instead of 24 per-segment strokes — roughly
+  **9× fewer draw calls per frame**. This eliminated the GC-pause stutter ("choppy, interrupted").
+- Runs at the **full display refresh rate** with a settable cap: `%Ongaku_Maxfps`
+  (`0` = uncapped, `60` = default, `30` = power-saver) — the overheating control.
+- **New eye-candy knobs**, all injected as canvas variables: `%Ongaku_Headglow` (a near-white head
+  star melting into the ribbon colour — shooting-star tips), `%Ongaku_Twinkle` (per-ribbon shimmer
+  depth), `%Ongaku_Huedrift` (deg/s — a ribbon's colour slowly walks the colour wheel as it orbits).
+- Palette reworked: the original bright multicolour set **plus blood-reds** (`#ff0000`, `#c00000`,
+  `#ff2a00`) interleaved, so ~1 in 4 meteors runs red among the bright ones.
+
+### Screen-off gating (engine)
+- New opt-in WEB-element config **`pauseWhenScreenOff`**: when the display turns off, the native
+  renderer calls `WebView.onPause()` *and* `window.__scenePlay(false)` (a JS hook the page defines),
+  freezing both the compositor and the rAF loop; both resume on screen-on. **Opt-in by design** so
+  通知明滅's over-lockscreen wakedance scenes — which must draw while the screen is off — are
+  untouched.
+- The battery-line comet effect leaves composition entirely on screen-off (same guarantee, native).
+
+### Settings-task workflow
+- Both projects' `[01]` settings tasks now carry the **complete knob set with a documentation label
+  on every action** — the task doubles as the manual. Re-running the project's `⇨ 起動 [71]` task
+  (which runs `[01]`) idempotently applies any settings change; a live scene reloads with the new
+  values automatically.
+
+### Task-target bridge (sister-launcher integration)
+- New **`GET_TASK_TARGET_PACKAGE`** ordered-broadcast receiver: a sister launcher holding one of our
+  run-task shortcuts can ask *which app the task ultimately opens* (by task name or id) and point its
+  "app info" / "uninstall" menu entries at that app instead of at us. Newer shortcuts additionally
+  bake the target package into the shortcut intent's extras.
+
+### UI fixes
+- **Action rows: variable names always render in full.** The arg renderer's hard 160 dp cap on
+  non-last values (the `var.set` *name*) truncated most real-world names on a wide screen; names now
+  take their natural width, with a 3:1 weight backstop so the value keeps ≥~25% of the row and a
+  pathological name ellipsises at ~75% instead of pushing the value off.
+
+## 0.2.75+164 — 2026-07-05
+
+A large feature release over 0.2.75+127: the **相撲字時計** fold-aware over-lockscreen clock, a **task & action UI overhaul**, a full **Variables-tab redesign** with an in-app **dead-globals analyzer** and hard guards against scope leaks, a new **Edit Action** action, tap-through **permission deep-links**, and a switch to **event-local** notification/broadcast variables.
+
+### 相撲字時計 — fold-aware overlay clock
+- A new over-lockscreen overlay clock rendered in **相撲字 (sumo-script)** style, ported from the Tasker 時間と日付 project and driven entirely by the app. Three layouts — **folded / semi-folded / unfolded** — swap automatically with the device's fold state.
+- **`%FOLD` via the HALL sensor**: a `fold` event context reads the hinge/HALL sensor and publishes the fold state, so the clock (and any task) can branch on `%FOLD`.
+- The wide (semi/unfolded) layout **centres the time itself** on screen, with 午前/午後 and the weekday placed relative to it (center-anchored scene positioning, `xc`).
+- Scenes are **touch-through** — the overlay passes taps to whatever is beneath it.
+- An **app-multiselect picker** dialog chooses which apps hide the clock; the selection is committed to the blacklist variable *and* written back into the 設定 task so it survives the next startup.
+- Bundles are **id-free / name-based** (zero ids; everything referenced by unique name), so a re-import can't dangle a profile→task link.
+
+### Task & action UI overhaul
+- Redesigned **action rows** with UI-settable styling.
+- **Per-task and per-action menus** with **clipboards** — copy/cut/paste actions between tasks and duplicate tasks.
+- Removed the olive accent throughout (**olive-free theme**).
+
+### Variables tab — redesign
+- Variable **name in blue, value bold**, both at action-view sizes — colours and sizes independently **UI-settable** (defaulting to parity with the action editor). Name and value share **one line**; the folded view is a single line.
+- **Row padding** defaults to 2px and is settable.
+- A yellow **magnifying-glass** icon sits to the right of the search bar.
+- **Foldable scope sections** (Global, Project-global, …) with larger underlined headings, a fold triangle to the right of each heading, slight indentation, and a **live count** in parentheses.
+- **Project-filter pills** in the top bar scope the list (and the project-global counts) to the selected project; a pill expands with a wrap-around rounded border around its members when unfolded.
+
+### Dead-globals analyzer + scope guards
+- A **"Clean up dead globals"** analyzer folds into the Variables tab. It classifies every persisted global and lists — per category, expandable — exactly what will be deleted and where:
+  - **Shadow-copies** — a super-global duplicating a live project-global (with the twin project named).
+  - **Orphans** — globals referenced by no task, profile, scene, or widget template.
+  - **Dangling project-globals** — rows whose `projectId` points to a deleted/re-created project (previously invisible to both the analyzer and the Var tab).
+- Deletion is **cache-consistent** (the in-memory global cache updates in lockstep with the DB).
+- **Hard guards against the root cause** of scope leaks:
+  - Deleting a project now **cascades to its variables** (they can't re-home to a dead project id).
+  - Startup **sweeps dangling** project-globals before warming the cache.
+  - `set()` redirects a MixedCase name written at projectId 0 to **task-local**, and import **skips** MixedCase-at-0 — so a project-scoped name can never land in the super-global bucket.
+
+### New action
+- **Edit Action** (`task.editaction`) — programmatically edit another task's action: locate it by index or by `matchType`/`matchName`, set one arg, and persist. Used by the clock's blacklist picker to keep its 設定 task in sync.
+
+### Engine & permissions
+- **Tap-through permission deep-links**: the permission block/warning dialog shows an **"Open &lt;permission&gt; settings →"** pill per missing permission, deep-linking straight to the correct System settings page (via `CapabilityState.settingsIntent`), on the shared dialog host and the task pre-flight block.
+- **Event-local notification/broadcast variables**: `%NOTIF_*` (notification listener) and `%INTENT_*` (broadcast receiver — e.g. Poweramp's ~30 `TRACK_CHANGED` extras) are **no longer persisted as super-globals**. They're threaded per-invocation to the triggered enter task via the event's `vars`, and a startup sweep clears any stale copies — keeping the global namespace to genuine app/engine state.
+
+## 0.2.75+127 — 2026-07-03
+
+A point release over 0.2.75+122 — one targeted fix.
+
+### Fixes
+- **Huawei Mate XT foldable**: restored the folded-portrait wakedance fold-compensation the upstream reconcile had dropped. On the folded cover panel held in portrait, EMUI reserves a 105px top system-bar strip and confines the over-lockscreen wakedance Activity below it, clipping the 通知明滅 black mask + edge-light. The fix pulls that window up 105px so the blink covers the full panel again — applied **only** in that one state (folded landscape, semi-folded, unfolded, and the screen-on overlay blink are all untouched).
+
+## 0.2.75+122 — 2026-07-03
+
+A large update over 0.2.75+36: cross-app **protected contacts**, a **drag-reorder** pass across the app, a **Review Import** overhaul, **critical data-loss hardening**, task-card & group-header **styling controls**, a **Termux keyboard** trick, and a resync onto the latest OpenTasker.
+
+### Protected contacts (cross-app privacy)
+- Companion feature with the sister apps (白い熊 GNU Jami, 白い熊 Arcane Chat): for a marked contact, the messenger posts a **content-free notification** (a fixed “着信あり：新着伝言。” body) instead of the sender name / message text, so lock-screen and Android-Auto read-outs stay private. A per-package marker keeps it opt-in per messenger.
+- 自由作業盤 pushes the protected-contact list to each messenger over an ordered broadcast, and can **read it back** (a `GET_PROTECTED_CONTACTS` query channel) to verify state.
+- A **保護試験** test group (per-messenger checks + a cumulative check) confirms each messenger's stored list with a 🟢/🔴 dialog.
+
+### Review Import
+- Importing a JSON bundle now opens a near-full-screen **Review import**: per-category counts (“Tasks: N”, with “N exists” flagged), a **folder tree** (project → type → group → items) showing exactly where each item lands (and marking projects/groups that will be created), a **global conflict strategy** with per-item overrides (Overwrite / Overwrite + backup / Keep both), and Cancel/Import.
+- Review typography (per-text sizes, a readable sky-blue conflict colour, row padding) is UI-settable.
+- **An import never downgrades a Manual-sorted tab** — a partial import no longer silently re-sorts untouched groups.
+
+### Drag-reorder & projects
+- **Tasks, the Projects tab, and the top project-tabs** all support drag-to-reorder (the Projects tab's up/down arrows are gone; a long-press on a project tab gives a grab haptic).
+- **Projects tab**: tap a project to make it active; the current project is clearly highlighted (accent border + tint).
+
+### Task list & group-header styling
+- Icon-less task cards stay **compact** and honour the padding settings; the empty “add icon” placeholder is small and visually subdued.
+- Shrunk the ⋮ menu buttons so they no longer inflate rows/headers — **“Padding between cards”** and **“Padding inside group headers”** are now actually respected.
+- **Group-header background** is a settable ARGB, with a settable **header border** (thin yellow by default).
+- The **task-icon-size** slider now works; the **advanced full-screen, category-foldable action picker** is restored and default-on; an **app-picker** (choose from installed apps) is on app.kill / app.launch / intent.launch / intent.send / notify.dismiss.
+
+
+### Reliability & engine
+- **Critical data-loss fix**: hardened task-action persistence against a strict-decode landmine that could blank a task's whole action list after an app update (tolerant storage codec + an overwrite guard + write logging).
+- **Battery**: removed the engine's permanent partial wake-lock, gated the shake / orientation / app-usage sensors to run only when a profile needs them, and stopped eager high-accuracy GPS.
+- Generic **Send Intent** gained ordered-broadcast **result capture** (`result_var`).
+
+### More
+- **Termux keyboard**: an edge-bar up-swipe re-focuses Termux to bring its IME back (for mosh/emacs sessions where a screen tap won't).
+- Themed black/yellow **snackbar & flash** everywhere; **oval-bar borders** (settable width + colour) on the volume/brightness panels; the **Variables** tab's folded rows now show each variable's value.
+- The open tab + active project **persist across app exit**.
+
+### Upstream
+- Resynced onto **OpenTasker 0.2.75 / code 77**, including upstream's hardened database-backup publishing (WAL-checkpointed, schema-validated backups).
+
+## 0.2.75+36 — 2026-06-27
+
+**Pure-black, yellow-framed popups everywhere**, a task **icon from a song's album art**, and a **redesigned launcher shortcut picker** — now a tall floating dialog whose tasks are organised into bordered folder-boxes, with its own UI-customization controls.
+
+### Menus & dialogs
+- **All popup menus and dialogs are now true black with a yellow border**, matching the cards and search box — no more the lifted, brownish Material surface. The theme's `surfaceContainer*` roles are pinned to pure black, and a shared `ThemedDropdownMenu` (black container + 1.5 dp yellow border) backs **every** dropdown: the `+` FAB menu, the project switcher, the scene / widget / sort / font menus, and the action-clipboard menu. Standalone dialogs (task icon, etc.) carry the same yellow rounded frame.
+
+### Task icons
+- **New "Audio" icon source** in the task icon picker (App / Picture / Emoji / **Audio** / Clear): pick an **mp3 / ogg / flac / m4a** and the task takes its **embedded album art** as the icon — extracted with `MediaMetadataRetriever`, centre-cropped and snapshotted to a PNG like the other sources. A toast tells you if the file has no embedded artwork.
+
+### Launcher shortcut picker (add-to-home-screen → 白い熊 自由作業盤)
+- **Now a floating dialog**, not a fullscreen page: a tall + wide (94 % × 90 %) card with a **yellow rounded frame** over a dimmed scrim. Dismiss by tapping outside or the bottom **Cancel** button (black background, yellow rounded border).
+- **Tasks are organised by group.** Each project, unfolded, shows its groups as **bordered rounded folder-boxes** — a folded group is visibly a closed box, so its siblings below can no longer be mistaken for its contents — then the project's ungrouped tasks. Groups **nest**, order is preserved, expanded group contents are indented deeper, and the old misleading play-arrow on task rows is gone.
+- **New UI-customization → Shortcut picker section:** font size, row spacing, indent per level, group-box roundness, group-box border, and font — all applied live.
+
+## 0.2.75+31 — 2026-06-26
+
+**Move actions around freely** — long-press to multi-select and **clone / copy / cut / delete / paste** actions within and **between** tasks — plus a workspace-wide shift to **name-based linking**: scenes, scene-element task links, and `task.run` all resolve by **name** (not fragile ids), imports **overwrite in place**, and item names are now **unique within a project**. And `sound.play` can read tones anywhere in shared storage.
+
+### Task editor — action multi-select & clipboard
+- **Long-press an action** in a task to select it (multi-select by long-pressing / tapping more rows; selected rows are highlighted with a ✓). The long-press menu acts on the **whole selection**: **Clone** (duplicate in place), **Copy**, **Cut**, **Delete**.
+- **Paste before / Paste after** the long-pressed action (shown once something has been copied/cut). An app-wide **`ActionClipboard`** holds the copied/cut actions, so you can **move actions between tasks**, not just within one.
+- The drag handle keeps its own long-press reorder; a plain tap still expands a row (or toggles its selection while selecting).
+
+### Link everything by name (no more broken links on re-import)
+- **`scene.show` / `scene.hide`** resolve a scene by **`(project, name)`** — the scene in the calling task's project wins, then any-project by name (deterministic by position then id), then a numeric id only as a legacy fallback. `VariableStore.projectId` is exposed so the action knows the caller's project.
+- **Scene element task links** — tap, long-press, and the edge-gesture handlers — now carry a **task name** (`tapTaskName` / `longPressTaskName`, JSON-only, no migration) and resolve **name-first** at run time *and* on import. A re-imported or recreated task no longer silently drops a slider/button's action: the editor stores the name on pick, **export back-fills** names from ids, and **import re-binds** by name → the bundle id map → the raw id.
+- **`task.run`** resolves **name-first** (exact, then case-insensitive), with the numeric id only as a legacy fallback — matching the scene/profile resolvers.
+
+### Import — overwrite in place
+- **Profiles and scenes now overwrite *in place*** on import (reuse the existing row id, matched by name), just like tasks already did — so a re-import **keeps each item's id, group membership, and notes** instead of deleting + re-inserting and orphaning them. A profile overwrite preserves its enabled state.
+- The **default conflict strategy is now Overwrite** (in place), and the conflict dialog leads with it. The "missing tap task" import warning no longer misfires when a scene element carries a name to re-bind against.
+
+### Name uniqueness
+- The **task / profile / scene editors block a duplicate name within the same project**, and the **project editor blocks a duplicate project name** — Save is disabled with an inline error (widget templates already did this).
+- Enforced at the DB level by **UNIQUE indices** on `(projectId, name)` for tasks/profiles/scenes and `(name)` for projects (**DB schema v16 → v17**, `MIGRATION_16_17`). The migration **self-heals** first — any pre-existing collision is renamed `"<name> (<id>)"` so the index build can never fail; SQLite treats Unfiled (null-project) rows as distinct, so the editor's UI check covers those.
+
+### Sound
+- **`sound.play` — all-files access.** A new **All-files capability** (`Environment.isExternalStorageManager()` / `MANAGE_EXTERNAL_STORAGE` on API 30+, `READ_EXTERNAL_STORAGE` below) lets `sound.play` read custom tones **anywhere in shared storage** (e.g. the 通知明滅 Jami notification tone), surfaced as a capability pill on the action and a new **"All files access"** row on the Setup tab with a deep-link to grant it.
+
+## 0.2.75+25 — 2026-06-25
+
+**Freeze bubbles** — a native port of the Tasker 凍結 融解 re-freeze workflow — plus a tiled app picker, app-icon launcher tasks, an inline freeze toggle + tappable task icon, fully styleable bubbles, and every numeric UI-customization setting converted to a slider.
+
+### Freeze bubbles
+- **Per-task "Freeze bubble" flag** (DB **v16**, `MIGRATION_15_16`). Running a flagged task queues a re-freeze bubble for the app it launches/unfreezes (package read from its `app.launch` / `app.unfreeze` action). Toggle it in the task editor **or inline on the expanded task card**; **Make Launcher Tasks enables it by default**.
+- **Desktop-gated overlay** — bubbles render as draggable `TYPE_APPLICATION_OVERLAY` windows shown **only while the default home launcher is foreground** (auto-detected), hidden everywhere else. Each shows the app's icon + a ❄ badge + label.
+- **Tap a bubble → freeze the app** (`app.freeze` via Shizuku) and remove it; **long-tap → dismiss only**. Bubbles are **draggable**, **persist across reboots** (`FreezeBubbleStore`), de-dupe per app, and **re-clamp on rotation / fold** keeping their position relative to the top-right edge.
+- **Fully styleable** under *UI customization → Freeze bubbles*: icon size, icon roundness, label size, label weight, and label font — with a **live preview**.
+- The Setup tab's **Overlay access** row now notes freeze bubbles.
+
+### Launcher tasks & icons
+- The **Make Launcher Tasks** app picker is now a **yellow-bordered grid of app-icon tiles** (icon + name, multi-select with a check badge), replacing the plain text list — shared with every app-package field.
+- Generated unfreeze-then-launch tasks now **default their icon to the selected app's icon**.
+- A task's **icon is tappable in the list** — opens the icon picker (App / Picture / Emoji / Clear) without opening the editor; tasks with no icon show an "add icon" affordance when expanded. The picker is a shared component (`TaskIconEditorRow` / `TaskIconPickerDialog`) used by both the card and the editor.
+
+### UI customization
+- **Every numeric setting is now a slider** (was +/− steppers): Borders → Border width; Typography → Text size; Flash / toast → Border width, Corner radius, Text size; plus the freeze-bubble sizes. The flash and bubble sections keep their live previews.
+
+### Infrastructure
+- New `FreezeBubbleStore` (SharedPreferences) + `FreezeBubbleOverlayManager`, started from `AutomationService`; bubble enqueue hooked into `executeAndLogTask` (covers every run path). `TaskIconStore` gains a context-free `saveFromApp(pkg)` for non-UI callers.
+
+## 0.2.75+18 — 2026-06-23
+
+**Home-screen shortcuts that run a task directly**, each with a **persisted custom icon** (from an app, a picture, or an emoji), a **launcher shortcut picker**, a global **icon-size** control, and **cross-device icon transfer** in exports.
+
+### Task shortcuts
+- **Launcher "create shortcut" picker** — a new `CreateTaskShortcutActivity` registers for the system `CREATE_SHORTCUT` flow, so long-pressing the home screen → *Shortcuts* → **白い熊 自由作業盤** opens a **foldable projects → tasks picker** (all projects folded by default); choosing a task drops a home-screen shortcut that runs it.
+- The in-app **Pin to home screen** path now uses the task's custom icon (previously always the app icon).
+- **`TaskRunActivity` is now exported**, so a third-party launcher (e.g. 白い熊 雷起動盤 / raikidoban) that fires the raw shortcut intent itself can start the task — fixes the launcher's "this shortcut isn't associated with a valid app". Shortcuts carry the task **id + name**, so they survive a task re-import.
+
+### Per-task icon
+- Assign a task's icon in its editor from three sources: an **installed app's icon**, a **picture** (photo picker), or an **emoji / glyph** (new `EmojiPickerDialog` — type or tap a quick-pick, with a live preview). The chosen icon is **snapshotted to a PNG** in app storage (`TaskIconStore`) at pick time, so it keeps displaying even if the source picture is deleted or the source app is frozen, and is **baked as a bitmap** into shortcuts so it survives in the launcher regardless of the app's state.
+- The icon shows in the **editor preview**, next to the task in the **task list** (folded and unfolded), and on its **shortcut**; no icon set → the app's launcher icon.
+- **Global task-icon size** — a new **slider with a live preview** under *UI customization → Task list* (`ThemePrefs.taskIconSizeDp`, 16–96 dp) sizes every task's icon on its card.
+- The **app picker** dialog was rebuilt as a **yellow-bordered grid of app-icon tiles** (icon + name), replacing the plain text list — used here and by every app-package field.
+
+### Import / export
+- Task icons now **travel across devices**: an export embeds each icon as base64 (`Task.iconData`); import **re-materializes** it into local storage (reusing the existing local file on a same-device re-import). The bundle schema stays **v4** — the field is additive, so older builds ignore it — and `iconData` is never written to the database.
+
+### Schema
+- **DB v15** — new `tasks.iconPath` column (the saved icon's path) with a `14 → 15` migration; existing data is untouched on update.
+
+## 0.2.75+11 — 2026-06-23
+
+Re-based the **entire fork onto upstream OpenTasker 0.2.75**, and added **Turn Screen Off**, **Freeze / Unfreeze App** + a **multi-select launcher-task generator**, a **capability-aware action editor**, and the screen-off **通知明滅 wakedance**.
+
+### Re-synced onto upstream 0.2.75
+- Rebased the whole fork delta from upstream **0.2.68 → 0.2.75**, keeping every customization (~31 file overlaps resolved by hand). The full pre-resync history is preserved in `backup/custom-0.2.68-pre-resync`.
+- Inherited upstream's intervening work: **Locale plugin** interop (both *condition* contexts and a *setting* target), **encrypted DB backup** (AES-256-GCM), a real **Shizuku** elevated backend + **Termux** script dispatch, scene **multi-select / alignment guides / resize**, a **visual flow editor** (zoom, edge routing, branch & subflow markers), `var.persist`, dotted/bracketed `var.set` JSON paths, **RE2/J** linear-time regex, a **Run-Log expression debugger**, and a large batch of concurrency / teardown / schema-drift hardening, plus i18n scaffolding.
+- Our **DB schema stays at v14** — no migration when you update; existing data is untouched. Upstream's redundant per-item `group` tag is dropped in favour of our richer project grouping. Gradle dependency-verification is disabled (it only fights local builds).
+
+### New actions
+- **Turn Screen Off** (`screen.off`) — accessibility `GLOBAL_ACTION_LOCK_SCREEN` first (no Shizuku needed), Shizuku `KEYCODE_SLEEP` fallback; no longer greyed out.
+- **Freeze App** (`app.freeze`) / **Unfreeze App** (`app.unfreeze`) — disable/enable any app through Shizuku (`pm disable-user` / `pm enable`).
+- **Make Launcher Tasks** (`tasks.launchers`) — a **multi-select app picker** (all installed user apps, *including frozen ones*, searchable) that writes one **unfreeze-then-launch** task per chosen app into a named project group, **re-sorted alphabetically on every run**, skipping duplicates; the group is auto-created beneath the generator task.
+
+### The 通知明滅 screen-off wakedance
+- When a notification arrives **screen-off**, the device now **wakes over the lockscreen** and rotates through every unread app (colour + sender + preview) before sleeping, repeating on a sub-minute timer. Beats EMUI's ~2 s teardown via a `SCREEN_BRIGHT` wakelock, draw-before-wake, an **opaque show-when-locked `WakedanceActivity`**, and a clean self-sleep — no lockscreen or wallpaper flash.
+- New engine primitives: a **`sec_tick`** sub-minute event trigger; `state.get screen=on/off`; `wake` / `screen.off` via Shizuku key events.
+
+### Capability-aware action editor
+- Each action now shows a **live status pill** — **red** with a one-tap **deep-link to the exact Settings screen** when its permission/service isn't set up, **yellow** (FYI) when it is — evaluated against the **same checks the Setup tab uses** (accessibility, Shizuku, modify-settings, overlay, Do-Not-Disturb, notifications). Consistent across the action picker, the in-task list, and the config dialog.
+- New **`APP_PACKAGE`** field type — type a package name / `%variable`, or pick from an installed-apps list.
+
+### Battery, scenes & recomposition
+- **Charging detection = `EXTRA_PLUGGED` only** — Huawei lingers `isCharging`/status after unplug, so charging state now follows the plug (covers wireless, drops instantly). The **電池線** battery line turns **solid red while charging**.
+- **Per-variable scene recomposition** (`derivedStateOf`) — a scene element re-renders only when *its own* expanded values change, not on every global write, cutting idle overlay CPU.
+
+### Profiles & engine
+- Profiles now link their **enter/exit task by NAME** (DB **v14** + migration) with the id as fallback, so re-importing a task — which re-ids it — no longer orphans the profile (“Missing task #N”).
+- The **Monitor** tab aggregates engine task-activity and a widget-pull log.
+
+### Docs
+- **README** fully rewritten: a two-line title (白い熊 自由作業盤 / ShiroiKuma Jiyūsagyōban), the *Jiyūsagyōban* gloss, the full **Triggers** + **115-action** tables, and fork-vs-upstream feature sections.
+
+## 0.2.68+107 — 2026-06-21
+
+The **通知明滅 notification edge-light** port, a **self-healing always-on engine** with a live **Monitor tab**, new **notification / broadcast / orientation / app-foreground triggers**, the **music edge-light** & a full **edge-gesture** system, **item grouping** across every tab, and reliability fixes for OEM battery management.
+
+### 通知明滅 — notification edge-lights (new project port)
+- A notification from a configured app **frames the whole screen in that app's colour** as a permanent edge light; several lit apps share **one frame that cycles** through their colours and titles (~2 s each). Built entirely from tasks + a full-screen tap-through WebView scene, with per-app colours and an `%TSUCHI_*` slot model rebuilt into the cycle list.
+- **Three off-paths:** a persistent **“all-off”** control notification (tap → clear every light, keep the apps' own notifications); and **entering an app** (via its notification or the launcher) → that app's light off and its notification dismissed, while the others keep glowing. Ongoing/persistent notifications never light; a notification arriving while you're already in the app doesn't light it; per-app gates (e.g. blink only on missed calls).
+
+### Triggers (new)
+- **Notification trigger** — an `EVENT` context (`event=notification`, optional `package` allowlist) fires a profile when a matching app posts a notification.
+- **Broadcast (Intent Received) trigger** (`7c7c343`) — fire on any system/app broadcast action, with **typed intent extras** parsed into variables; profiles now **reload live** as you edit them.
+- **Device-orientation trigger** (`8060ddc`) — an `EVENT` source for portrait / landscape / reverse changes, exposed as `%DEVICE_ORIENTATION`; orientation is named by the **on-screen** orientation, not the device-natural angle (`4e17243`), fixing foldables.
+- **App-to-foreground trigger** (`8060ddc`) — fires when an app comes to the foreground (`%APP_PACKAGE`), fed from the accessibility service so it works where OEM UsageStats is dead (`3bcec99`). Powers the **Previous/Next App** switcher (`bd45920`, `9037117`).
+
+### Notifications
+- **`%NOTIF_*` super-globals** (`8bc12c7`) — a posting notification's package, title and body, plus its **ongoing flag** (`%NOTIF_ONGOING`, `4001fb3`), exposed for tasks to read.
+- **Per-invocation event vars** (`3a3715e`) — each event now carries its own `%NOTIF_*` snapshot, threaded through the matcher and the **task queue** to the fired task and injected as locals that shadow the shared globals, so a **burst from different apps never mixes up** colours/titles under a QUEUED profile.
+- **`notify.show tap_task`** (`c7737de`) — run a task when a notification body is tapped (works while collapsed).
+- **Dismiss Notifications** (`notify.dismiss`, `7e3ead6`) — cancel another app's clearable notifications **by package**, via the notification-listener service.
+- **`scene.show` expands `%vars`** in element configs at show time (`23f4611`) — so an overlay reflects live globals (the edge-light colour/title).
+
+### Engine & reliability
+- **Survives OEM battery management** (`d695587`) — the foreground service holds a partial **wakelock** and a Doze-proof **minute alarm resurrects** it if the process is reaped.
+- **Survives coroutine death** (`d181881`) — the engine scope uses a `SupervisorJob` so one failed trigger can't cascade and freeze the rest; a **heartbeat** stamps the per-minute tick and **re-arms** the engine within ~2.5 min if it ever stalls.
+- **Auto-run on start** (`d181881`) — pick tasks (e.g. a master “start everything”) to run automatically on every fresh engine start, so overlays/state return after an app update or reboot without manual intervention.
+
+### Monitor tab (new)
+- A left-most **Monitor** tab (`fff63ed`) showing engine status / uptime / seconds-since-last-tick, the **overlays actually on screen**, each enabled profile's **real activity** (a trigger firing ≠ its overlay being drawn), and a **history** of every start / re-arm / resurrect — refreshing every second.
+- The **“Run on start”** picker (`fff63ed`, `5921666`) — a bordered dialog that groups tasks by project, folds per project, and keeps each project's **manual task order**; every monitor section folds.
+
+### Scenes & edge overlays
+- **Music edge-light** (`ec036a2`) — a WebView scene element, a full-screen overlay mode, edge HUDs and custom fonts.
+- **Edge-gesture system** — fraction-height edge strips and invisible swipe-only sliders (`291f8f4`); a full edge-bar gesture set with **per-third placement** (`a01678d`); **short/long swipe** + a bottom edge bar, headings honouring fonts (`21959fd`); a **bottom edge bar via an accessibility overlay** that captures the flush gesture-nav area (`ebde11f`); edge-swipe **direction detection** + task-id remap on import (`eb4d91b`).
+- **Live sliders, edge-centred panels, tap-outside-close, drag-to-keep-alive** (`45512c4`); a **font picker** in element style (`956db2b`).
+- **Battery line charge sweep** now **ping-pongs** (left↔right) instead of snapping back (`d0831ae`).
+
+### Actions
+- **Take Screenshot** (`nav.screenshot`, `a2a489d`) — system screenshot via accessibility.
+- **Previous App / Next App** (`bd45920`) — switch using the accessibility foreground history.
+- **Percent volume / brightness** + **editable dropdown** fields (`446a5da`).
+- **Hybrid Back / Recents** (`1380db3`) — accessibility first, Shizuku fallback, with an accessibility-setup row.
+
+### Items, grouping & navigation
+- **Grouping on all five tabs** (`c2fcbaa`) with direct **New group / New subgroup**, **nested subgroups** and **foldable per-item notes** (`a5431af`); **drag** rows into groups (`acce065`) or **out** to an *Ungrouped* zone (`e1257d9`); a new group **inherits the item's project** (`326e873`).
+- **Project sort toggle, group-delete cascade, collapsed-task quick-run** (`901ee01`); fixed folded-nav covering the screen, **last-tab memory**, and **swipe between tabs** (`e30a42a`); a **Settings link stays** on already-granted permissions (`a68f269`).
+
+### Import / export
+- **Overwrite-in-place** (`b0d69cb`) — re-importing a task keeps its id, so profiles and scenes stay linked (no more “Missing task”).
+- **Export everything** from the project menu + **timestamped** default filenames (`1340cde`).
+
+## 0.2.68+16 — 2026-06-17
+
+A **battery line** (電池線): a thin bar over the status bar showing charge, built from a new scene element and a full-width overlay mode.
+
+### Scenes
+- **Progress-bar element** (`PROGRESS`) — a new scene element type: a horizontal fill bar whose `value` (0–100), `fillColor` and `trackColor` are variable-bound and **re-render live**. A truthy `charging` flag draws a **red sweeping glow** along the fill — advanced by a delay-driven state loop so it animates inside the system-overlay window (where an infinite-transition frame clock doesn't reliably tick) — over a static red tint. It's a first-class element in the editor (palette entry, default size 220 × 12).
+- **Full-width overlay** — `scene.show fullWidth=true` shows a non-modal overlay that spans the whole screen width and lays out **over the status bar**, flush to the top edge (`FLAG_LAYOUT_IN_SCREEN | FLAG_LAYOUT_NO_LIMITS`). Scene-card elements sized `widthDp`/`heightDp ≤ 0` fill the card, so a single element can span the entire bar.
+
+### Actions
+- **Get Device State** (`state.get`) — charging detection hardened: it now also consults the live `BatteryManager.isCharging`, not only the sticky battery intent's `plugged` / `status`, so charge state is reliable across OEMs.
+
+### 電池線 (battery line)
+- These compose into a battery line: a full-width **3 dp** bar at the very top whose length tracks battery %, coloured **amber** normally, **red** ≤ 20 %, **green** at 100 %, with the red charging glow while plugged in — refreshed every minute and updated **instantly** on plug-in/out via a `charging=true` state trigger.
+
+### Docs
+- Recorded 白い熊's version-controlled Tasker reference projects directory in `CLAUDE.md` (the porting source for the kanji clock, battery line, etc.).
+
+## 0.2.68+10 — 2026-06-17
+
+Live home-screen widgets and widget UX, on top of the 0.2.68+3 widget/clock system.
+
+### Actions
+- **Get Device State** (`state.get`) — read battery % (zero-padded), charging, WiFi-enabled and airplane-mode into variables; no permissions needed. Drives the live status widgets.
+- **Toggle Airplane Mode** (`airplane.toggle`) — fixed: the `AIRPLANE_MODE` broadcast is system-only and fails from the Shizuku shell, which previously failed the whole action even though the setting applied. The broadcast is now best-effort, so success tracks the setting write (and dependent widgets update).
+
+### Home-screen widgets & the kanji clock
+- **Live status widgets** — WiFi (無線 / 無線無し), Airplane (機内 / 機内無し) and Battery (八割三分 / 全, with a charging line) read real device state every minute; tapping the WiFi or Airplane widget toggles it through Shizuku and the kanji flips instantly.
+- **Tap task bound by name** — a widget's tap task is stored by **name** and resolved at tap time, so it survives bundle re-imports (no re-pointing). The widget config now offers a **task picker** dropdown instead of a typed task name.
+- **Themed tap feedback** — widget taps give an immediate **vibration** plus a black-and-yellow **Flash** confirmation anchored at the bottom of the screen (a system toast can't be recoloured on a modern targetSdk); failures still surface.
+- **Legible preview thumbnails** — template thumbnails render at a canvas scaled to the template's largest font, with `%vars` expanded against the live globals, then scaled down — so big-screen clock templates read as mini widgets instead of a narrow wrapped strip.
+- **Wider one-line widgets** — the rendered-bitmap cap was raised 1440 → 2880 px and the one-line time templates set `maxLines = 1`, so a wide one-line widget renders at full width instead of wrapping.
+
+### Theme
+- **Serif / Minchō font** — `font: "serif"` (also `明朝` / `mincho`) renders CJK in the built-in serif family (= 明朝 / Minchō), so widgets can use Minchō without importing a font; `"sans"` / `"gothic"` fall back to sans-serif.
+
+### Infrastructure
+- Declared the **VIBRATE** permission (widget-tap haptics).
+
+## 0.2.68+3 — 2026-06-16
+
+Rebased onto **OpenTasker 0.2.68** (up from 0.2.60), with a large round of new fork features on top.
+
+### Scenes — a floating-overlay UI builder
+- Build interactive overlays from elements and show them with **Show Scene** (`scene.show`) / **Hide Scene** (`scene.hide`) — as a foreground panel or, with “display over other apps”, a **system-wide overlay** that floats over any app and works from background triggers.
+- **Element types**: Text, Button, Edit Text, Slider (horizontal & vertical), **Number picker** (− / + stepper), Checkbox, Toggle, Spinner, Image, Rectangle, Oval.
+- **Inputs write variables**: sliders, steppers, checkboxes, toggles, spinners and text fields set a `%var` (case-scoped) and run a per-element tap task; shown scenes **re-render live** when a bound variable changes.
+- **Styling**: per-element text/label colour, size, bold, alignment, background and border; **panel styling** (background, corner radius, modal scrim, border) with black/yellow theme defaults.
+- **`scene.show` options**: position (top/center/bottom), modal vs tap-through HUD, auto-dismiss timeout, dismiss-on-outside — plus **per-scene defaults** so a scene remembers how it likes to show.
+- **Editor**: drag-to-move and **drag-to-resize** on a live canvas, a **live styling preview**, element **duplicate** and **z-order** (bring forward / send back), and a project-aware library.
+
+### Home-screen widgets & a template library
+- **Set Widget** (`widget.set`) renders a styled bitmap widget from a layout (text / columns / rows, fonts, colours, padding) with a visual **layout editor** — RGBA colour pickers, ± number steppers, per-field sliders, a resizable preview, and **Tasker Widget V2 import**.
+- A **Template Library** (new “Widgets” tab) of named layouts referenced by name — edit once, every widget using it updates. File & clipboard import/export; templates also travel inside JSON bundles.
+- **Pull / placeholder model**: bind a placed widget to a template, and **Refresh Widgets** (`widget.refresh`) re-renders them all from current variables — no per-widget wiring. Plus a `SET_WIDGET_NAME` broadcast receiver.
+- **Fonts**: import `.ttf` / `.otf`, delete from the picker, UTF-8 names preserved.
+
+### Kanji clock (時間と日付)
+- A modular, fully app-driven port of the Tasker 勘亭流 kanji clock/date: calc tasks compose spoken-kanji time and date into `%DT_*` variables, two widget templates (clock & date), and a per-minute refresh.
+- New **every-minute “clock tick”** EVENT trigger (`event=minute`) to drive it.
+
+### Variables
+- **Persistent, project-scoped globals** with case-based scoping: `%ALLCAPS` → app-wide super-global, `%MixedCase` → project-global, `%lowercase` → task-local. Globals now **survive across runs and reboots**. The Vars tab shows super-globals plus the selected project’s globals.
+
+### UI & navigation
+- **Uniform top bar** — the project selector now appears on every tab.
+- **Name search** on every list tab (Profiles, Tasks, Scenes, Vars, Widgets): a pinned, case-insensitive filter.
+- **Multi-select** with batch delete / move-to-project across Profiles, Tasks, Scenes, Vars and Widgets.
+- **Help tab** — concepts, variable scoping, the bundle schema and an auto-generated action reference, in collapsible sections.
+- **Unified import/export** — one JSON-bundle engine with a per-tab “+” menu (New / Import / Export), a persistent import-result dialog and clearer conflict prompts.
+- Foldable cards on every list tab; a horizontally-scrollable bottom navigation.
+
+### Infrastructure
+- **Room DB v10**; export **bundle schema v4** (widget templates; per-scene styling & defaults; project-scoped variables).
+- CI build workflows disabled (local builds only).
+
+## 0.2.60+35 — 2026-06-15
+
+The action catalogue grew from a few dozen built-ins to **~100**. New built-in actions, grouped:
+
+### Actions — Variables & Arrays (pure logic, no permissions)
+- **Variable Clear** (`var.clear`) — unset a variable (and any array of the same name).
+- **Variable Split** (`var.split`) — split a value into an array (custom delimiter; empty = per character).
+- **Variable Join** (`var.join`) — join an array back into a single value.
+- **Variable Search Replace** (`var.replace`) — regex replace; optionally capture matches to an array; ignore-case / multi-line.
+- **Variable Convert** (`var.convert`) — upper / lower / trim / length / reverse / capitalize / URL-encode/decode / Base64-encode/decode / MD5 / SHA-1 / SHA-256.
+- **Variable Add** (`var.add`) — add a number to a numeric variable, with wrap-around and round.
+- **Parse/Format DateTime** (`datetime`) — now / epoch-seconds / epoch-millis / formatted input → a formatted output string.
+- **Array Set / Push / Pop / Clear** (`array.set` / `array.push` / `array.pop` / `array.clear`).
+- **Array Process** (`array.process`) — sort / sort-desc / numeric / reverse / shuffle / unique / squash.
+- **Arrays Merge** (`array.merge`) — concatenate several arrays into one.
+
+### Actions — Dialogs
+- **Input Dialog** (`dialog.input`), **List Dialog** (`dialog.list`), **Text Dialog** (`dialog.text`).
+- Backed by a transparent host activity + a `CompletableDeferred` result bridge, so the task **suspends until the user answers**; themed black-and-yellow, with an optional close-after timeout, and they cancel cleanly (the task never hangs).
+
+### Actions — Interface gestures (new opt-in `AccessibilityService`)
+- **Back** (`nav.back`), **Recents** (`nav.recents`), **Notifications Panel** (`panel.notifications`), **Quick Settings** (`panel.quicksettings`), **Power Dialog** (`nav.power`), **Lock Screen** (`screen.lock`, Android 9+). Global-action only — no screen content is read.
+
+### Actions — Platform
+- **Flash** (`flash`) — reworked into a styled overlay window: per-flash text / background / border colours, nine anchor positions with X/Y dp offsets, an **HTML** toggle, and defaults from the UI; falls back to a plain toast without overlay permission.
+- **Comment** (`flow.comment`) — a labelled no-op for documenting a task.
+- **Set Clipboard** (`clipboard.set`), **Get Clipboard** (`clipboard.get`).
+- **Compose Email** (`email.compose`), **Set Wallpaper** (`wallpaper.set`).
+- **Open File** (`file.open`) — via a new `FileProvider` over the app sandbox.
+- **Move File** (`file.move`), **Create Directory** (`file.mkdir`).
+- **List Apps** (`apps.list`), **Keyboard Picker** (`ime.pick`), **Wi-Fi Settings** (`wifi.settings`).
+- **Place Call** (`call.place`) — `CALL_PHONE`, else opens the dialer.
+- **Profile Status** (`profile.toggle`) — enable / disable / toggle a profile by name.
+- **Get Setting** (`setting.get`), **Set Setting** (`setting.put`) — read any of System/Secure/Global; write System via Write-Settings (Secure/Global via Shizuku).
+- **Auto Brightness** (`brightness.auto`).
+- **Set Volume** (`volume.set`) — per-stream (music / ring / alarm / notification / call / system).
+
+### Actions — Elevated tier (via Shizuku)
+- **Run Shell** (`shell.run`) — runs `sh -c <cmd>` with ADB/root privileges; stores `%stdout` / `%stderr` / `%exit`; optional ignore-exit-code.
+- Rerouted through Shizuku (now functional, previously stubbed): **Toggle Wi-Fi** (Android 10+), **Toggle Airplane Mode**, **Toggle Mobile Data**, **Take Screenshot** (`screencap`), **Secure/Global Set Setting**.
+- New: **Location Mode** (`location.mode`), **Set Keyboard** (`ime.set`).
+
+### Actions — Flagship & flow
+- **Send Intent** (`intent.send`) — the reason the fork exists: fire an arbitrary intent (action, category, MIME, data, three `key:value` extras, target package/class, broadcast / activity / service).
+- **Named task parameters** — Run Task passes `param:<name>`; sub-task reads `{{ param.name }}` / `%@name`.
+- **Return Values** (`task.return`) — return named values to the caller (`%prefix_name`, `%prefix_ok`, `%prefix_error`).
+- **Fail** (`flow.fail`) — signal a task error.
+
+### Features
+- **Projects** — Tasker-style grouping of profiles/tasks/scenes: data model, DB migration, top-bar switcher, management UI, move-between-projects, per-project filtering, Unfiled catch-all.
+- **Per-tab sorting** — Alphabetical or Manual per tab (Profiles / Tasks / Scenes), with long-press **drag-and-drop** reorder; persisted and round-tripped through export/import.
+- **白い熊 自由作業盤 UI customization page** — colours (background / text / accent / surface / border), border width, font (incl. imported `.ttf`/`.otf`) and text scale, live; plus a configurable **Flash / toast** section (colours, border width, corner radius, text size, weight) with a live preview.
+- **JSON export/import** — versioned bundles (**schema v3**): export all / a project / hand-picked items; per-item, per-project and selective export; conflict prompt (overwrite vs keep-both) and unique-name handling on import; preserves each item's manual **position** and the tab's **sort method**.
+- **Editor & workflow** — advanced full-screen, searchable, category-folded **action picker**; **foldable task list**; **full-screen action editor**; **RGBA colour-picker** fields (4 sliders + preview); **drag-to-reorder actions**; task-name picker for Run Task; continue-on-error toggle.
+
+### Changed
+- Renamed all user-facing **“OpenTasker” → “白い熊 自由作業盤”** (top bar, export/import dialogs, the home-screen widget, permission prompts, OEM battery-guidance, notifications/channels, NFC/file/backup messages, Shizuku/Termux setup text). Code identifiers, logcat tags, notification-channel IDs and the upstream URL were left intact.
+- **Black-and-yellow** as the default theme; pure `#FFFF00` throughout; a yellow border on every dialog; fixed the Material3 1.4 button-label colour so labels render full-strength.
+- Capability badges updated: the elevated actions moved from **Unsupported → Requires setup (Shizuku)**.
+
+### Infrastructure
+- `applicationId` `shiroikuma.jiyusagyoban`; black-yellow launcher icon; signed release; **side-by-side** install with upstream.
+- Added: an `AccessibilityService`, a `FileProvider`, and **Shizuku** (`dev.rikka.shizuku:api` + `:provider`).
+- **Room DB v6** — `position` columns on profiles/tasks/scenes; **export bundle schema v3**.

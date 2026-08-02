@@ -1,7 +1,6 @@
 package com.opentasker.core.storage
 
 import com.opentasker.core.model.Variable
-import com.opentasker.core.model.DEFAULT_PROJECT_ID
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import kotlinx.coroutines.async
@@ -9,7 +8,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -42,35 +40,54 @@ class VariableSecretStorageTest {
         val dao = FakeVariableDao()
         val repository = VariableRepository(dao, codec(newKey()))
 
-        repository.upsert(Variable("API_TOKEN", "token-123", isGlobal = true, isSecret = true))
+        repository.upsert(Variable("API_TOKEN", "token-123", isSecret = true))
 
-        val stored = dao.get("API_TOKEN")!!
+        val stored = dao.get(0, "API_TOKEN")!!
         assertTrue(stored.isSecret)
         assertNotEquals("token-123", stored.value)
         assertFalse(stored.value.contains("token-123"))
         assertEquals("token-123", repository.observeGlobals().first().single().value)
     }
 
+    /**
+     * The fork stores a variable name **verbatim** — it strips only a leading `%` sigil and trims.
+     * Upstream canonicalised case to encode scope; here scope is derived from the name's first
+     * character at read time, and names may be Japanese, so rewriting or ASCII-validating them at the
+     * storage boundary would corrupt them. Only an empty name is refused.
+     */
     @Test
-    fun globalWritesUseCanonicalScopePolicy() = runBlocking {
+    fun storageStripsOnlyTheSigilAndKeepsTheNameVerbatim() = runBlocking {
         val dao = FakeVariableDao()
         val repository = VariableRepository(dao, codec(newKey()))
 
-        repository.upsert(Variable("%counter", "7", isGlobal = true))
-        repository.importVariable(Variable("myValue", "8", isGlobal = true))
+        repository.upsert(Variable("%counter", "7"))
+        repository.importVariable(Variable("myValue", "8"))
+        repository.upsert(Variable("  %電池  ", "満"))
 
-        assertEquals("7", dao.get("Counter")?.value)
-        assertEquals("8", dao.get("myValue")?.value)
-        assertTrue(runCatching {
-            repository.upsert(Variable("localName", "invalid", isGlobal = false))
-        }.isFailure)
+        assertEquals("7", dao.get(0, "counter")?.value)
+        assertEquals("8", dao.get(0, "myValue")?.value)
+        assertEquals("満", dao.get(0, "電池")?.value)
+        assertTrue(runCatching { repository.upsert(Variable("%", "nameless")) }.isFailure)
+    }
+
+    @Test
+    fun projectScopedAndSuperGlobalOfTheSameNameAreDistinctRows() = runBlocking {
+        val dao = FakeVariableDao()
+        val repository = VariableRepository(dao, codec(newKey()))
+
+        repository.upsert(Variable("DT_Ampmn", "super"))
+        repository.upsert(Variable("DT_Ampmn", "project", projectId = 12))
+
+        assertEquals("super", dao.get(0, "DT_Ampmn")?.value)
+        assertEquals("project", dao.get(12, "DT_Ampmn")?.value)
+        assertEquals(2, dao.getAll().size)
     }
 
     @Test
     fun concurrentDisjointGlobalCommitsMergeWithoutLoss() = runBlocking {
         val dao = FakeVariableDao(
-            VariableEntity("ALPHA", "0", isGlobal = true),
-            VariableEntity("BETA", "0", isGlobal = true),
+            VariableEntity(projectId = 0, name = "ALPHA", value = "0"),
+            VariableEntity(projectId = 0, name = "BETA", value = "0"),
         )
         val key = newKey()
         val first = VariableRepository(dao, codec(key))
@@ -98,7 +115,7 @@ class VariableSecretStorageTest {
 
     @Test
     fun concurrentSameGlobalCommitKeepsFirstCommittedValue() = runBlocking {
-        val dao = FakeVariableDao(VariableEntity("COUNT", "0", isGlobal = true))
+        val dao = FakeVariableDao(VariableEntity(projectId = 0, name = "COUNT", value = "0"))
         val key = newKey()
         val first = VariableRepository(dao, codec(key))
         val second = VariableRepository(dao, codec(key))
@@ -128,7 +145,7 @@ class VariableSecretStorageTest {
     fun missingOrReplacedKeystoreKeyRequiresReentryWithoutReturningCiphertext() = runBlocking {
         val dao = FakeVariableDao()
         VariableRepository(dao, codec(newKey())).upsert(
-            Variable("API_TOKEN", "token-123", isGlobal = true, isSecret = true),
+            Variable("API_TOKEN", "token-123", isSecret = true),
         )
 
         val restoredOnDifferentDevice = VariableRepository(dao, codec(newKey()))
@@ -148,13 +165,13 @@ class VariableSecretStorageTest {
     @Test
     fun legacyNameMaskedVariablesAreEncryptedBeforeReadOrExport() = runBlocking {
         val dao = FakeVariableDao(
-            VariableEntity("PASSWORD", "legacy-plaintext", isGlobal = true, isSecret = true),
-            VariableEntity("COUNT", "7", isGlobal = true),
+            VariableEntity(projectId = 0, name = "PASSWORD", value = "legacy-plaintext", isSecret = true),
+            VariableEntity(projectId = 0, name = "COUNT", value = "7"),
         )
         val repository = VariableRepository(dao, codec(newKey()))
 
         val observed = repository.observeGlobals().first()
-        val storedSecret = dao.get("PASSWORD")!!
+        val storedSecret = dao.get(0, "PASSWORD")!!
         val exported = repository.ordinaryExport()
 
         assertTrue(storedSecret.isSecret)
@@ -168,20 +185,20 @@ class VariableSecretStorageTest {
     fun legacyValueThatOnlyLooksLikeAnEnvelopeIsStillEncrypted() = runBlocking {
         val legacyValue = "otsec:v1:not-a-valid-envelope"
         val dao = FakeVariableDao(
-            VariableEntity("API_TOKEN", legacyValue, isGlobal = true, isSecret = true),
+            VariableEntity(projectId = 0, name = "API_TOKEN", value = legacyValue, isSecret = true),
         )
         val repository = VariableRepository(dao, codec(newKey()))
 
         repository.requireEncryptedSecretRows()
 
-        assertNotEquals(legacyValue, dao.get("API_TOKEN")!!.value)
+        assertNotEquals(legacyValue, dao.get(0, "API_TOKEN")!!.value)
         assertEquals(legacyValue, repository.runtimeGlobals().values["API_TOKEN"])
     }
 
     @Test
     fun backupGuardFailsClosedWhenLegacyPlaintextCannotBeEncrypted() = runBlocking {
         val dao = FakeVariableDao(
-            VariableEntity("API_TOKEN", "legacy-plaintext", isGlobal = true, isSecret = true),
+            VariableEntity(projectId = 0, name = "API_TOKEN", value = "legacy-plaintext", isSecret = true),
         )
         val repository = VariableRepository(
             dao,
@@ -196,30 +213,30 @@ class VariableSecretStorageTest {
         val failure = runCatching { repository.requireEncryptedSecretRows() }.exceptionOrNull()
 
         assertTrue(failure is IllegalStateException)
-        assertEquals("legacy-plaintext", dao.get("API_TOKEN")!!.value)
+        assertEquals("legacy-plaintext", dao.get(0, "API_TOKEN")!!.value)
     }
 
     private fun codec(key: SecretKey): VariableSecretCodec = AesGcmVariableSecretCodec(keyProvider = { key })
 
     private fun newKey(): SecretKey = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
 
+    /**
+     * In-memory [VariableDao]. A row's identity is **(projectId, name)** — the fork scopes variables by
+     * project bucket and derives global/local from the name's case, so the old single-key `name` lookup
+     * would silently merge a project-scoped `%DT_Ampmn` with the super-global of the same name.
+     */
     private class FakeVariableDao(vararg initial: VariableEntity) : VariableDao {
         private val state = MutableStateFlow(initial.toList())
 
+        private fun VariableEntity.sameRowAs(other: VariableEntity) =
+            projectId == other.projectId && name == other.name
+
         override suspend fun insert(v: VariableEntity) {
-            state.value = state.value.filterNot { it.name == v.name && it.projectId == v.projectId } + v
+            state.value = state.value.filterNot { it.sameRowAs(v) } + v
         }
 
         override suspend fun insertAll(values: List<VariableEntity>) {
             values.forEach { insert(it) }
-        }
-
-        override suspend fun upsert(v: VariableEntity) {
-            insert(v)
-        }
-
-        override suspend fun upsertAll(values: List<VariableEntity>) {
-            values.forEach { upsert(it) }
         }
 
         override suspend fun update(v: VariableEntity) {
@@ -227,44 +244,28 @@ class VariableSecretStorageTest {
         }
 
         override suspend fun delete(v: VariableEntity) {
-            deleteByNameInProject(v.name, v.projectId)
+            delete(v.projectId, v.name)
         }
 
-        override suspend fun deleteByName(name: String) {
-            deleteByNameInProject(name, DEFAULT_PROJECT_ID)
+        override suspend fun delete(projectId: Long, name: String) {
+            state.value = state.value.filterNot { it.projectId == projectId && it.name == name }
         }
 
-        override suspend fun deleteByNameInProject(name: String, projectId: Long) {
-            state.value = state.value.filterNot { it.name == name && it.projectId == projectId }
+        override suspend fun deleteDangling(): Int = 0
+
+        override suspend fun deleteStaleEventVars(): Int {
+            val stale = state.value.filter {
+                it.projectId == 0L && (it.name.startsWith("INTENT_") || it.name.startsWith("NOTIF_"))
+            }
+            state.value = state.value - stale.toSet()
+            return stale.size
         }
 
-        override suspend fun get(name: String): VariableEntity? = state.value.firstOrNull { it.name == name }
-
-        override suspend fun getInProject(name: String, projectId: Long): VariableEntity? =
-            state.value.firstOrNull { it.name == name && it.projectId == projectId }
+        override suspend fun get(projectId: Long, name: String): VariableEntity? =
+            state.value.firstOrNull { it.projectId == projectId && it.name == name }
 
         override suspend fun getAll(): List<VariableEntity> = state.value
 
-        override suspend fun getAllInProject(projectId: Long): List<VariableEntity> =
-            state.value.filter { it.projectId == projectId }
-
-        override suspend fun getAllGlobal(): List<VariableEntity> = state.value.filter { it.isGlobal }
-
-        override suspend fun getAllGlobalInProject(projectId: Long): List<VariableEntity> =
-            state.value.filter { it.isGlobal && it.projectId == projectId }
-
-        override fun getAllGlobalAsFlow(): Flow<List<VariableEntity>> = state
-
-        override fun getAllGlobalAsFlowInProject(projectId: Long): Flow<List<VariableEntity>> =
-            state.map { values -> values.filter { it.isGlobal && it.projectId == projectId } }
-
-        override fun getAllGlobalAsFlowAll(): Flow<List<VariableEntity>> = state.map { values -> values.filter { it.isGlobal } }
-
-        override suspend fun countInProject(projectId: Long, name: String): Int =
-            state.value.count { it.projectId == projectId && it.name == name }
-
-        override suspend fun deleteAllInProject(projectId: Long) {
-            state.value = state.value.filterNot { it.projectId == projectId }
-        }
+        override fun getAllAsFlow(): Flow<List<VariableEntity>> = state
     }
 }

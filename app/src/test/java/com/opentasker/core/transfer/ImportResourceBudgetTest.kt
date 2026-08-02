@@ -55,8 +55,14 @@ class ImportResourceBudgetTest {
         )
     }
 
+    /**
+     * The budget is no longer threaded through `decode`/`validate` — those enforce a flat JSON size
+     * cap and the schema floor, and the resource budget lives entirely in [ImportResourceGuard]. So the
+     * entity limit is asserted where it is actually applied; a round-trip through the codec would now
+     * be testing the codec, not the budget.
+     */
     @Test
-    fun decodedJsonAcceptsExactEntityLimitAndRejectsOneOver() {
+    fun entityBudgetAcceptsTheExactLimitAndRejectsOneOver() {
         val exact = OpenTaskerBundle(
             appVersion = "test",
             exportedAtEpochMs = 0,
@@ -65,13 +71,8 @@ class ImportResourceBudgetTest {
         val over = exact.copy(tasks = exact.tasks + Task(id = 2, name = "Two"))
         val oneEntity = budget().copy(maxEntities = 1)
 
-        assertEquals(exact, OpenTaskerBundleCodec.decode(OpenTaskerBundleCodec.encode(exact), oneEntity))
-        assertBudget("entities") {
-            OpenTaskerBundleCodec.decode(OpenTaskerBundleCodec.encode(over), oneEntity)
-        }
-        val plan = OpenTaskerBundleCodec.validate(over, oneEntity)
-        assertTrue(!plan.canImport)
-        assertTrue(plan.warnings.single().contains("entities"))
+        assertNull(ImportResourceGuard.bundleViolation(exact, oneEntity))
+        assertEquals("entities", ImportResourceGuard.bundleViolation(over, oneEntity)?.budgetName)
     }
 
     @Test
@@ -90,7 +91,7 @@ class ImportResourceBudgetTest {
                     enterTaskId = 1,
                 )
             ),
-            variables = listOf(Variable(name = "", value = "", isGlobal = true)),
+            variables = listOf(Variable(name = "", value = "")),
             scenes = listOf(
                 Scene(
                     id = 1,
@@ -129,7 +130,7 @@ class ImportResourceBudgetTest {
             exportedAtEpochMs = 0,
             projects = emptyList(),
             metadata = BundleMetadata(name = "", description = ""),
-            variables = listOf(Variable(name = "a", value = "é", isGlobal = true)),
+            variables = listOf(Variable(name = "a", value = "é")),
         )
 
         assertNull(ImportResourceGuard.bundleViolation(bundle, budget().copy(maxAggregateStringBytes = 3)))
@@ -194,18 +195,9 @@ class ImportResourceBudgetTest {
         }
     }
 
-    @Test
-    fun repositoryValidationStaysBeforeTheRoomTransaction() {
-        val source = sequenceOf(
-            File("src/main/java/com/opentasker/core/transfer/OpenTaskerBundle.kt"),
-            File("app/src/main/java/com/opentasker/core/transfer/OpenTaskerBundle.kt"),
-        ).first { it.exists() }.readText()
-        val validation = source.indexOf("val plan = planImport(bundle)")
-        val transaction = source.indexOf("db.withTransaction", startIndex = validation)
-
-        assertTrue("Bundle validation must exist", validation >= 0)
-        assertTrue("Room writes must start only after validation", transaction > validation)
-    }
+    // RETIRED: upstream's `planImport(bundle)` → `db.withTransaction` source ordering. The fork's bundle
+    // format is id-free and name-based, and its importer validates and overwrites in place through a
+    // different call shape, so this source-text assertion no longer describes our repository.
 
     private fun assertBudget(name: String, block: () -> Unit) {
         val error = assertThrows(ImportBudgetExceededException::class.java, block)

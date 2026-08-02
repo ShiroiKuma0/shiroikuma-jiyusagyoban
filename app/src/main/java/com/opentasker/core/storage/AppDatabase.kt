@@ -1,29 +1,26 @@
 package com.opentasker.core.storage
 
 import androidx.room.Database
-import androidx.room.AutoMigration
 import androidx.room.RoomDatabase
 
-const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 10
+// Fork numbering: upstream v6 (variables.isSecret), v7 (profiles.requiresRiskAcknowledgement) and
+// v8 (run_logs/edit_history indexes) are renumbered 18/19/20 here because the fork chain already
+// occupies 5..17.
+const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 20
 
 @Database(
-    entities = [ProjectEntity::class, ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class, EditHistoryEntity::class],
+    entities = [ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class, EditHistoryEntity::class, ProjectEntity::class, ItemMetaEntity::class, ItemGroupEntity::class],
     version = OPEN_TASKER_DATABASE_SCHEMA_VERSION,
     exportSchema = true,
-    autoMigrations = [
-        AutoMigration(from = 2, to = 3),
-        AutoMigration(from = 3, to = 4),
-        AutoMigration(from = 4, to = 5),
-        AutoMigration(from = 7, to = 8),
-        AutoMigration(from = 9, to = 10),
-    ],
 )
 abstract class AppDatabase : RoomDatabase() {
-    abstract fun projectDao(): ProjectDao
     abstract fun profileDao(): ProfileDao
     abstract fun taskDao(): TaskDao
     abstract fun sceneDao(): SceneDao
     abstract fun variableDao(): VariableDao
     abstract fun runLogDao(): RunLogDao
     abstract fun editHistoryDao(): EditHistoryDao
+    abstract fun projectDao(): ProjectDao
+    abstract fun itemMetaDao(): ItemMetaDao
+    abstract fun itemGroupDao(): ItemGroupDao
 }
