@@ -35,6 +35,8 @@ object DiagnosticExport {
         sb.appendLine("--- Engine Health ---")
         try {
             val health = EngineHealthReader.read(context, now)
+            sb.appendLine("Overall state: ${health.assessment.state}")
+            sb.appendLine("Overall reason: ${redactSensitive(health.assessment.reason)}")
             sb.appendLine("Service running: ${health.serviceRunning}")
             sb.appendLine("Last heartbeat: ${formatTimestamp(health.lastHeartbeatAtMillis, dateFormat)}")
             sb.appendLine("Foreground service types: ${health.activeForegroundServiceTypes}")
@@ -42,6 +44,11 @@ object DiagnosticExport {
             sb.appendLine("Exact alarm: ${health.exactAlarmStatus}")
             sb.appendLine("Last matcher error: ${health.lastMatcherError ?: "none"}")
             sb.appendLine("Last worker stop reason: ${health.lastWorkerStopReason ?: "none"}")
+            sb.appendLine("Active executions: ${health.activeExecutionCount}")
+            sb.appendLine("Pending external executions: ${health.pendingExecutionCount}")
+            health.signals.forEach { signal ->
+                sb.appendLine("Health signal ${signal.key}: ${signal.state} — ${redactSensitive(signal.reason)}")
+            }
         } catch (e: Exception) {
             sb.appendLine("  (failed to read engine health: ${redactSensitive(e.message.orEmpty())})")
         }

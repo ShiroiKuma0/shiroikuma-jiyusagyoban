@@ -8,7 +8,9 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.opentasker.core.engine.EngineHeartbeatStore
 import com.opentasker.core.engine.EngineWatchdogWorker
+import com.opentasker.core.engine.ActiveExecutionRegistry
 import com.opentasker.core.engine.needsRecovery
+import com.opentasker.core.external.ExternalExecutions
 import com.opentasker.core.scheduling.AlarmSchedulePrecision
 import com.opentasker.core.scheduling.ExactAlarmSupport
 import kotlinx.coroutines.flow.first
@@ -32,7 +34,16 @@ data class EngineHealthStatus(
      * unavailable (below Android 14). Answers the "why hasn't my scheduled automation fired" case.
      */
     val pendingScheduledJobReasons: String? = null,
+    val activeExecutionCount: Int = 0,
+    val pendingExecutionCount: Int = 0,
+    val signals: List<HealthSignal> = emptyList(),
 )
+
+val EngineHealthStatus.assessment: HealthAssessment
+    get() = assessHealth(signals)
+
+val EngineHealthStatus.healthy: Boolean
+    get() = assessment.healthy
 
 object EngineHealthReader {
     suspend fun read(context: Context, nowMillis: Long = System.currentTimeMillis()): EngineHealthStatus {
@@ -44,22 +55,108 @@ object EngineHealthReader {
                 .firstOrNull()
                 ?.stopReason
         }.getOrNull()
+        val pendingReasons = readPendingScheduledJobReasons(context)
+        val activeExecutionCount = ActiveExecutionRegistry.active.value.size
+        val pendingExecutionCount = ExternalExecutions.snapshot(context)
+            .count { !it.state.isTerminal }
+        val serviceState = when {
+            persisted.heartbeat.lastAliveAtMillis <= 0L -> HealthSignalState.Loading
+            persisted.heartbeat.needsRecovery(nowMillis) -> HealthSignalState.Stale
+            else -> HealthSignalState.Ready
+        }
+        val serviceReason = when (serviceState) {
+            HealthSignalState.Loading -> "The engine has not published its first heartbeat."
+            HealthSignalState.Stale -> "Last heartbeat was ${ageLabel(nowMillis - persisted.heartbeat.lastAliveAtMillis)} ago."
+            else -> "Heartbeat is current."
+        }
+        val matcherState = if (persisted.lastMatcherError != null) HealthSignalState.Error else serviceState
+        val matcherReason = persisted.lastMatcherError?.let(DiagnosticExport::redactSensitive)
+            ?: if (matcherState == HealthSignalState.Ready) "Profile matchers are reporting normally." else serviceReason
+        val standbyState = if (standbyBucketThrottled(context)) HealthSignalState.Stale else HealthSignalState.Ready
+        val exactAlarm = ExactAlarmSupport.schedulePrecision(context)
+        val exactAlarmState = if (exactAlarm == AlarmSchedulePrecision.Exact) {
+            HealthSignalState.Ready
+        } else {
+            HealthSignalState.Stale
+        }
+        val watchdogState = when {
+            workerStopReason == null || workerStopReason == WorkInfo.STOP_REASON_NOT_STOPPED -> HealthSignalState.Ready
+            else -> HealthSignalState.Error
+        }
+        val scheduledState = if (pendingReasons == null) HealthSignalState.Ready else HealthSignalState.Stale
+        val signals = listOf(
+            HealthSignal("engine", "Automation service", serviceState, persisted.heartbeat.lastAliveAtMillis, serviceReason),
+            HealthSignal("matchers", "Profile matchers", matcherState, persisted.lastMatcherErrorAtMillis.takeIf { it > 0 } ?: persisted.heartbeat.lastAliveAtMillis, matcherReason),
+            HealthSignal(
+                "standby",
+                "App standby",
+                standbyState,
+                nowMillis,
+                if (standbyState == HealthSignalState.Ready) "${standbyBucketLabel(context)} does not currently throttle delivery." else "${standbyBucketLabel(context)} may delay alarms and workers.",
+            ),
+            HealthSignal(
+                "exact-alarm",
+                "Time alarms",
+                exactAlarmState,
+                nowMillis,
+                if (exactAlarmState == HealthSignalState.Ready) "Exact alarm delivery is available." else "Exact alarms are unavailable; using the inexact Doze fallback.",
+            ),
+            HealthSignal(
+                "watchdog",
+                "Watchdog worker",
+                watchdogState,
+                nowMillis,
+                workerStopReason?.let(::workerStopReasonLabel) ?: "No worker stop failure is recorded.",
+            ),
+            HealthSignal(
+                "scheduled-jobs",
+                "Scheduled jobs",
+                scheduledState,
+                nowMillis,
+                pendingReasons?.let { "Blocked by $it." } ?: "No pending scheduler constraints are reported.",
+            ),
+            HealthSignal(
+                "advanced-protection",
+                "Advanced Protection",
+                if (AdvancedProtectionReader.isEnabled(context)) HealthSignalState.Stale else HealthSignalState.Ready,
+                nowMillis,
+                if (AdvancedProtectionReader.isEnabled(context)) "Android Advanced Protection is enabled and may limit privileged extensions." else "Advanced Protection is not limiting this app.",
+                required = false,
+            ),
+            HealthSignal(
+                "executions",
+                "Pending executions",
+                HealthSignalState.Ready,
+                nowMillis,
+                "$pendingExecutionCount external and $activeExecutionCount active execution(s) are tracked.",
+                required = false,
+            ),
+        )
         return EngineHealthStatus(
-            serviceRunning = !persisted.heartbeat.needsRecovery(nowMillis),
+            serviceRunning = serviceState == HealthSignalState.Ready,
             lastHeartbeatAtMillis = persisted.heartbeat.lastAliveAtMillis,
             activeForegroundServiceTypes = foregroundServiceTypeLabel(persisted.heartbeat.foregroundServiceTypes),
             standbyBucket = standbyBucketLabel(context),
             standbyThrottled = standbyBucketThrottled(context),
             advancedProtectionEnabled = AdvancedProtectionReader.isEnabled(context),
-            exactAlarmStatus = when (ExactAlarmSupport.schedulePrecision(context)) {
+            exactAlarmStatus = when (exactAlarm) {
                 AlarmSchedulePrecision.Exact -> "Exact allowed"
                 AlarmSchedulePrecision.InexactFallback -> "Inexact Doze fallback"
             },
             lastMatcherError = persisted.lastMatcherError?.let(DiagnosticExport::redactSensitive),
             lastMatcherErrorAtMillis = persisted.lastMatcherErrorAtMillis,
             lastWorkerStopReason = workerStopReason?.let(::workerStopReasonLabel),
-            pendingScheduledJobReasons = readPendingScheduledJobReasons(context),
+            pendingScheduledJobReasons = pendingReasons,
+            activeExecutionCount = activeExecutionCount,
+            pendingExecutionCount = pendingExecutionCount,
+            signals = signals,
         )
+    }
+
+    internal fun ageLabel(ageMillis: Long): String = when {
+        ageMillis < 1_000L -> "less than a second"
+        ageMillis < 60_000L -> "${ageMillis / 1_000L}s"
+        else -> "${ageMillis / 60_000L}m"
     }
 
     /**

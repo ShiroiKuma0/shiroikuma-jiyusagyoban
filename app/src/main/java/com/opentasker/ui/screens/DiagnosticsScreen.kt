@@ -35,6 +35,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.diagnostics.EngineHealthStatus
+import com.opentasker.core.diagnostics.HealthSignalState
+import com.opentasker.core.diagnostics.assessment
+import com.opentasker.core.diagnostics.healthy
 import com.opentasker.core.logging.AppLogEntry
 import com.opentasker.ui.theme.DesignSystem
 import java.text.SimpleDateFormat
@@ -50,7 +53,7 @@ fun DiagnosticsScreen(
 ) {
     val formatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
     val health = state.health
-    val healthy = health?.let { it.serviceRunning && !it.standbyThrottled && it.lastMatcherError == null } == true
+    val healthy = health?.healthy == true
 
     LazyColumn(
         modifier = Modifier
@@ -62,6 +65,7 @@ fun DiagnosticsScreen(
         item {
             DiagnosticSummaryCard(
                 healthy = healthy,
+                reason = health?.assessment?.reason,
                 onRefresh = onRefresh,
                 onShare = onShare,
             )
@@ -103,6 +107,7 @@ fun DiagnosticsScreen(
 @Composable
 private fun DiagnosticSummaryCard(
     healthy: Boolean,
+    reason: String?,
     onRefresh: () -> Unit,
     onShare: () -> Unit,
 ) {
@@ -141,6 +146,13 @@ private fun DiagnosticSummaryCard(
                         style = MaterialTheme.typography.labelLarge,
                         color = statusColor,
                     )
+                    reason?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
                 IconButton(onClick = onRefresh) {
                     Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.diagnostics_refresh))
@@ -223,6 +235,40 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
                 stringResource(R.string.diagnostics_pending_jobs),
                 health?.pendingScheduledJobReasons ?: stringResource(R.string.diagnostics_pending_jobs_none),
             )
+            HealthRow(
+                stringResource(R.string.diagnostics_active_executions),
+                health?.activeExecutionCount?.toString() ?: stringResource(R.string.diagnostics_loading),
+            )
+            HealthRow(
+                stringResource(R.string.diagnostics_pending_executions),
+                health?.pendingExecutionCount?.toString() ?: stringResource(R.string.diagnostics_loading),
+            )
+            if (health?.signals?.isNotEmpty() == true) {
+                Text(
+                    stringResource(R.string.diagnostics_health_evidence),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                health.signals.forEach { signal ->
+                    val color = when (signal.state) {
+                        HealthSignalState.Ready -> MaterialTheme.colorScheme.tertiary
+                        HealthSignalState.Loading -> MaterialTheme.colorScheme.secondary
+                        HealthSignalState.Stale,
+                        HealthSignalState.Error,
+                        -> MaterialTheme.colorScheme.error
+                    }
+                    Text(
+                        stringResource(
+                            R.string.diagnostics_health_signal,
+                            signal.label,
+                            signal.state.name,
+                            signal.reason,
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = color,
+                    )
+                }
+            }
         }
     }
 }

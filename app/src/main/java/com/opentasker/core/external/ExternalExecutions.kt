@@ -64,6 +64,11 @@ object ExternalExecutions {
         return ledger.get(executionId)
     }
 
+    fun snapshot(context: Context): List<ExternalExecutionRecord> {
+        store(context)
+        return ledger.snapshot()
+    }
+
     /**
      * Resolves executions that were accepted or in flight when the process died. They can never
      * complete, and leaving them non-terminal would make a caller poll forever.
