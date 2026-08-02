@@ -111,6 +111,72 @@ interface counters instead.
 
 ---
 
+## 5b. UNITS — 白い熊's convention (2026-08-02)
+
+**Speeds are shown in `MB/s`, 1024-based (MiB/s), as the headline figure**, with the megabit value
+close by in **smaller grey text**. Numbers are **bold**; labels are not — the number must read bolder
+than its label.
+
+The engine publishes both for every figure:
+
+| Megabits (decimal, 10^6) | 1024-based MB/s |
+| --- | --- |
+| `%SPD_Cur` `%SPD_Avg` `%SPD_Peak` | `%SPD_CurMB` `%SPD_AvgMB` `%SPD_PeakMB` |
+| `%SPD_DownAvg` `%SPD_DownPeak` | `%SPD_DownAvgMB` `%SPD_DownPeakMB` |
+| `%SPD_UpAvg` `%SPD_UpPeak` | `%SPD_UpAvgMB` `%SPD_UpPeakMB` |
+
+Conversion: `MiB/s = Mb/s * 1_000_000 / 8 / 1_048_576`.
+
+**Still owed:** 白い熊 wants the primary unit **settable in the UI**. Not yet implemented — a scene
+cannot branch on a variable, so it needs either two scene variants or a native conditional/format
+element. Both units are always published, so only the presentation choice is missing.
+
+---
+
+## 5c. Scene renderer — the config keys are NOT what you would guess
+
+Unknown config keys are **silently ignored**, so a wrong name renders nothing and looks like a layout
+bug. Read `SceneActivity.kt` before inventing a key.
+
+| Want | Correct key | What I wrongly used |
+| --- | --- | --- |
+| fill colour | `bgColor` | `fillColor` (only PROGRESS uses that) |
+| border | `borderColor`, `borderWidth` | `strokeColor`, `strokeWidth` |
+| button caption | `label` | `text` |
+| panel background + border | **scene-level** `bgColor` / `borderColor` / `borderWidth` | a full-size RECTANGLE element |
+
+TEXT supports only `text`, `textSize`, `bold`, `textColor`, `align`. **There is no shadow key** — a
+"white shadow" is faked by drawing a white copy offset 2 dp behind the coloured copy.
+There is no arc/gauge element either (`TEXT/BUTTON/OVAL/RECTANGLE/PROGRESS/IMAGE/SLIDER/...`), so the
+SIM icon is composed from rounded RECTANGLEs and the speedometer is a big number over a bar.
+
+`scene.show` takes `dismissOnOutside=false` and `keepScreenOn=true` — without the first, a stray touch
+kills a running test, which happened.
+
+---
+
+## 5d. Control path when adb is down
+
+adb's TCP listener dies (reboot/timeout) and then `adb connect` gives "no route to host". **ssh to
+`skhw` drives the bridge fine** and is the better fallback:
+
+```bash
+scp file.json skhw:~/tmp/          # ~/tmp on skhw IS /sdcard/tmp
+ssh skhw "am broadcast -a shiroikuma.jiyusagyoban.action.RUN_TASK \
+  --ei shiroikuma.jiyusagyoban.extra.PROTOCOL 1 \
+  --es shiroikuma.jiyusagyoban.extra.TASK '...' \
+  -n shiroikuma.jiyusagyoban/com.opentasker.core.transfer.WorkspaceTransferReceiver"
+```
+
+**But `screencap` over ssh returns 0 bytes** (Termux UID lacks the permission) and ssh cannot install
+an APK. So over ssh a chat can show a scene but not see it, and 白い熊 must install builds by hand.
+**Restore adb first** (`adb tcpip 5555` over USB) — without it the visual iteration loop cannot close.
+
+**Scene preview without running a test** — verified, and the way to iterate on layout:
+`接続 試験 -- 画面下見` (live) / `接続 試験 -- 報告下見` (report) / `接続 試験 -- 画面下見閉` (close).
+
+---
+
 ## 6. Workspace conventions that cost real time
 
 - **Variable NAME arguments are bare — no `%`.** Live workspace: **619 bare vs 3 with `%`**. The
