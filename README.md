@@ -3,7 +3,7 @@
 [![Version](https://img.shields.io/badge/version-0.2.79-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
-[![Kotlin](https://img.shields.io/badge/kotlin-2.3.21-7f52ff.svg)](https://kotlinlang.org)
+[![Kotlin](https://img.shields.io/badge/kotlin-2.4.10-7f52ff.svg)](https://kotlinlang.org)
 
 **OpenTasker** is a fully open-source, on-device, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android.
 
@@ -206,17 +206,17 @@ Treat a wrapper upgrade as one atomic change: run `gradlew wrapper --gradle-vers
 
 | Property | Value |
 |----------|-------|
-| Kotlin | 2.3.21 |
+| Kotlin | 2.4.10 |
 | Gradle | 9.4.1 |
 | AGP | 9.2.1 |
-| KSP | 2.3.7 |
+| KSP | 2.3.10 |
 | Build Tools | 36.0.0 |
 | JDK | 17 or 21 |
 | Min SDK | 26 (Android 8.0) |
 | Compile SDK | 37 |
 | Target SDK | 37 |
 | Room | 2.8.4 |
-| Compose BOM | 2026.05.00 |
+| Compose BOM | 2026.06.00 |
 | WorkManager | 2.11.2 |
 
 All dependency versions are centralized in `gradle/libs.versions.toml`.
