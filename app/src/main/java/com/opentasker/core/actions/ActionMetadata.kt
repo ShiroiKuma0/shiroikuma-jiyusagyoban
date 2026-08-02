@@ -793,6 +793,23 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "integration.home_assistant.webhook",
+            nameRes = R.string.catalog_action_home_assistant_webhook_name,
+            descriptionRes = R.string.catalog_action_home_assistant_webhook_description,
+            categoryRes = R.string.catalog_category_network,
+            fields = listOf(
+                ActionField("url", R.string.catalog_action_home_assistant_webhook_field_url_label, required = true, hintRes = R.string.catalog_action_home_assistant_webhook_field_url_hint, sensitive = true),
+                ActionField("payload", R.string.catalog_action_home_assistant_webhook_field_payload_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_home_assistant_webhook_field_payload_hint, sensitive = true),
+                ActionField("timeout_sec", R.string.catalog_action_home_assistant_webhook_field_timeout_label, FieldType.NUMBER, hintRes = R.string.catalog_action_home_assistant_webhook_field_timeout_hint, numberRule = integerRule(1, 30)),
+                ActionField("retries", R.string.catalog_action_home_assistant_webhook_field_retries_label, FieldType.NUMBER, hintRes = R.string.catalog_action_home_assistant_webhook_field_retries_hint, numberRule = integerRule(0, 3)),
+                ActionField("backoff_ms", R.string.catalog_action_home_assistant_webhook_field_backoff_label, FieldType.NUMBER, hintRes = R.string.catalog_action_home_assistant_webhook_field_backoff_hint, numberRule = integerRule(100, 5_000)),
+                ActionField("allow_http", R.string.catalog_action_home_assistant_webhook_field_allow_http_label, FieldType.CHECKBOX, hintRes = R.string.catalog_action_home_assistant_webhook_field_allow_http_hint),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "http.get",
             nameRes = R.string.catalog_action_http_get_name,
             descriptionRes = R.string.catalog_action_http_get_description,

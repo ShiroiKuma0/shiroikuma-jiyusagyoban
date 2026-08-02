@@ -15,7 +15,7 @@
 
 - **Profiles, contexts, tasks, actions** — a complete Room-backed automation pipeline with a Compose UI
 - **7 context families** — Application, Time, Day, Location, State, Event, and Plugin (Locale/Tasker condition)
-- **60 built-in actions** plus engine-handled flow control (`task.run`, `if`/`else`/`end if`, `for each`/`end for`, `stop`)
+- **61 built-in actions** plus engine-handled flow control (`task.run`, `if`/`else`/`end if`, `for each`/`end for`, `stop`)
 - **Template expressions** — bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math/date functions, traces, and strict regex policy
 - **First-class secret variables** — AES-256-GCM Android Keystore storage, deliberate reveal/re-entry UX, and provenance-based redaction for derived action arguments, logs, traces, and failures
 - **One redaction boundary for stored arguments** — credential-bearing action arguments (HTTP authorization/headers/query/body, request payloads, script stdin, SMS text) are masked wherever they are displayed, including the task list, flow graph, and previews, so they cannot leak through a screenshot or accessibility semantics; unregistered actions and unknown keys fail closed
@@ -37,15 +37,16 @@
 - Quick Settings tile tap, home-screen widget/shortcut, boot
 - FOSS platform location/geofence — GPS/network fixes, balanced provider cadence, radius/accuracy/dwell evaluation, persisted dwell state, and API 36 background delivery evidence
 - Locale/Tasker condition plugins — polled as first-class context predicates with last-known-state caching
+- Home Assistant bridge proof of concept — bounded outbound JSON webhooks with HTTPS-by-default policy, redacted webhook secrets, and transient retry/backoff
 
-### Actions (60 registered + 7 engine-handled)
+### Actions (61 registered + 7 engine-handled)
 
 | Category | Count | Examples |
 |----------|------:|---------|
 | Settings | 11 | Wi-Fi, Bluetooth, brightness, volume, airplane, mobile data, screen timeout, DND, ringer mode, torch, tile state |
 | App | 7 | launch intent, launch app, kill, go home, open URL, SMS, screenshot |
 | File | 5 | read, write, append, delete, list |
-| Network | 6 | HTTP Request, legacy GET/POST aliases, ping, download, Wake-on-LAN |
+| Network | 7 | HTTP Request, Home Assistant webhook, legacy GET/POST aliases, ping, download, Wake-on-LAN |
 | Media | 6 | play, stop, pause, next, previous, mute |
 | System | 6 | vibrate, reboot, lock, screen off, wake, log |
 | Notification | 3 | notify/toast, cancel, TTS speak |

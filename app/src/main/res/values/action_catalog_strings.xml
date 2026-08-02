@@ -355,6 +355,20 @@
     <string name="catalog_action_http_post_field_var_hint" formatted="false">%var</string>
     <string name="catalog_action_http_post_field_allow_http_label" formatted="false">Allow HTTP</string>
     <string name="catalog_action_http_post_field_allow_http_hint" formatted="false">Allow plain HTTP for LAN/private-network hosts only</string>
+    <string name="catalog_action_home_assistant_webhook_name" formatted="false">Home Assistant Webhook</string>
+    <string name="catalog_action_home_assistant_webhook_description" formatted="false">Send a bounded JSON event to a Home Assistant webhook with transient retry</string>
+    <string name="catalog_action_home_assistant_webhook_field_url_label" formatted="false">Webhook URL</string>
+    <string name="catalog_action_home_assistant_webhook_field_url_hint" formatted="false">HTTPS webhook URL; the secret path is redacted from display</string>
+    <string name="catalog_action_home_assistant_webhook_field_payload_label" formatted="false">JSON payload</string>
+    <string name="catalog_action_home_assistant_webhook_field_payload_hint" formatted="false">JSON object, maximum 16 KB; payload is redacted from display</string>
+    <string name="catalog_action_home_assistant_webhook_field_timeout_label" formatted="false">Timeout (seconds)</string>
+    <string name="catalog_action_home_assistant_webhook_field_timeout_hint" formatted="false">Default: 15 (1-30)</string>
+    <string name="catalog_action_home_assistant_webhook_field_retries_label" formatted="false">Retries</string>
+    <string name="catalog_action_home_assistant_webhook_field_retries_hint" formatted="false">Transient failures only; default: 2 (0-3)</string>
+    <string name="catalog_action_home_assistant_webhook_field_backoff_label" formatted="false">Retry backoff (ms)</string>
+    <string name="catalog_action_home_assistant_webhook_field_backoff_hint" formatted="false">Initial delay; exponential and capped at 10 seconds (100-5000)</string>
+    <string name="catalog_action_home_assistant_webhook_field_allow_http_label" formatted="false">Allow HTTP</string>
+    <string name="catalog_action_home_assistant_webhook_field_allow_http_hint" formatted="false">Only for private-LAN endpoints; ACCESS_LOCAL_NETWORK and host policy still apply</string>
     <string name="catalog_action_ping_name" formatted="false">Ping Host</string>
     <string name="catalog_action_ping_description" formatted="false">Ping a network host</string>
     <string name="catalog_action_ping_field_host_label" formatted="false">Host address</string>

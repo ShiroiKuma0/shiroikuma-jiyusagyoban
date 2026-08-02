@@ -12,6 +12,7 @@ import com.opentasker.core.actions.DoNotDisturbAction
 import com.opentasker.core.actions.DeleteFileAction
 import com.opentasker.core.actions.DownloadAction
 import com.opentasker.core.actions.GoHomeAction
+import com.opentasker.core.actions.HomeAssistantWebhookAction
 import com.opentasker.core.actions.HttpGetAction
 import com.opentasker.core.actions.HttpPostAction
 import com.opentasker.core.actions.HttpRequestAction
@@ -119,6 +120,7 @@ private fun registerBuiltInActions() {
         HttpRequestAction(),
         HttpGetAction(),
         HttpPostAction(),
+        HomeAssistantWebhookAction(),
         PingAction(),
         DownloadAction(),
         WakeOnLanAction(),

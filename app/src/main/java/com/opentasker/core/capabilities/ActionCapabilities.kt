@@ -78,6 +78,7 @@ object ActionCapabilityRegistry {
         "http.request",
         "http.get",
         "http.post",
+        "integration.home_assistant.webhook",
         "ping",
         "download",
         // Device feedback covered by normal manifest permissions.

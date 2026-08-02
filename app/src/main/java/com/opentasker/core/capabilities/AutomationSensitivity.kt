@@ -80,6 +80,7 @@ object AutomationSensitivityRegistry {
         "http.request",
         "http.get",
         "http.post",
+        "integration.home_assistant.webhook",
         "ping",
         "download",
         "wol",
