@@ -10,6 +10,7 @@ import androidx.room.Query
 import androidx.room.Update
 import kotlinx.serialization.encodeToString
 import com.opentasker.core.model.AutomationMode
+import com.opentasker.core.model.ContextExpressionNode
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.DEFAULT_PROJECT_ID
@@ -32,8 +33,15 @@ data class ProfileEntity(
 
     fun toDomainDecodeResult(): StorageDecodeResult<Profile> {
         val mode = runCatching { AutomationMode.valueOf(automationMode) }.getOrDefault(AutomationMode.SINGLE)
-        val contexts = runCatching { StorageJson.decodeFromString<List<ContextSpec>>(contextsJson) }
-            .getOrElse { error ->
+        val decodedContexts = runCatching {
+            StoredProfileContexts(
+                contexts = StorageJson.decodeFromString<List<ContextSpec>>(contextsJson),
+                expression = null,
+            )
+        }.recoverCatching {
+            val payload = StorageJson.decodeFromString<StoredProfileContexts>(contextsJson)
+            StoredProfileContexts(payload.contexts, payload.expression)
+        }.getOrElse { error ->
                 return StorageDecodeResult(
                     value = Profile(
                         id,
@@ -57,6 +65,7 @@ data class ProfileEntity(
                     ),
                 )
             }
+        val contexts = decodedContexts.contexts
 
         return StorageDecodeResult(
             value = Profile(
@@ -71,6 +80,7 @@ data class ProfileEntity(
                 profileGroup,
                 requiresRiskAcknowledgement,
                 projectId,
+                decodedContexts.expression,
             ),
         )
     }
@@ -83,11 +93,21 @@ fun Profile.toEntity() = ProfileEntity(
     enterTaskId,
     exitTaskId,
     cooldownSec,
-    StorageJson.encodeToString(contexts),
+    if (contextExpression == null) {
+        StorageJson.encodeToString(contexts)
+    } else {
+        StorageJson.encodeToString(StoredProfileContexts(contexts, contextExpression))
+    },
     automationMode.name,
     group,
     requiresRiskAcknowledgement,
     projectId,
+)
+
+@kotlinx.serialization.Serializable
+private data class StoredProfileContexts(
+    val contexts: List<ContextSpec>,
+    val expression: ContextExpressionNode? = null,
 )
 
 @Dao

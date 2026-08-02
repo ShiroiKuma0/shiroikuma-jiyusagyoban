@@ -426,6 +426,13 @@ private fun ProfileInspectorCard(profile: ProfileInspection, nowMs: Long) {
                     color = color,
                 )
             }
+            if (profile.logicExplanation.isNotBlank()) {
+                Text(
+                    profile.logicExplanation,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+            }
             if (profile.contexts.isEmpty()) {
                 InspectorNotice(
                     title = stringResource(R.string.inspector_no_contexts),

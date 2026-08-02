@@ -1,6 +1,8 @@
 package com.opentasker.core.contexts
 
 import com.opentasker.core.model.ContextSpec
+import com.opentasker.core.model.ContextBooleanOperator
+import com.opentasker.core.model.ContextExpressionNode
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import org.junit.Assert.assertEquals
@@ -54,6 +56,46 @@ class ContextInspectorTest {
         assertTrue(result.matching)
         assertEquals("All contexts currently match.", result.summary)
         assertEquals(listOf(true, true), result.contexts.map { it.effectiveMatched })
+    }
+
+    @Test
+    fun profileInspectionExplainsAndEvaluatesNestedContextExpression() {
+        val profile = Profile(
+            id = 11,
+            name = "Nested state",
+            enabled = true,
+            enterTaskId = 10,
+            contexts = listOf(
+                ContextSpec(ContextType.STATE, mapOf("key" to "charging", "value" to "true")),
+                ContextSpec(ContextType.STATE, mapOf("key" to "screen", "value" to "on")),
+                ContextSpec(ContextType.STATE, mapOf("predicate" to "battery_level>=80")),
+            ),
+            contextExpression = ContextExpressionNode.group(
+                ContextBooleanOperator.OR,
+                listOf(
+                    ContextExpressionNode.group(
+                        ContextBooleanOperator.AND,
+                        listOf(ContextExpressionNode.leaf(0), ContextExpressionNode.leaf(1)),
+                    ),
+                    ContextExpressionNode(contextIndex = 2, invert = true),
+                ),
+            ),
+        )
+        val source = ContextSourceSnapshot(
+            key = "state",
+            label = "Device state",
+            registered = true,
+            lastObservation = ContextEventObservation(
+                ContextEvent("state", true, mapOf("charging" to "true", "screen" to "on", "battery_level" to "20")),
+                observedAtMs = 1000,
+            ),
+        )
+
+        val result = inspectProfiles(listOf(profile), listOf(source)).single()
+
+        assertTrue(result.matching)
+        assertTrue(result.logicExplanation.startsWith("ANY("))
+        assertEquals(listOf(true, true, false), result.contexts.map { it.effectiveMatched })
     }
 
     @Test

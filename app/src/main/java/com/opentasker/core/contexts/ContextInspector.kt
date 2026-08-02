@@ -1,6 +1,9 @@
 package com.opentasker.core.contexts
 
 import com.opentasker.core.model.ContextSpec
+import com.opentasker.core.model.ContextBooleanOperator
+import com.opentasker.core.model.ContextExpressionNode
+import com.opentasker.core.model.isValidForContextCount
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import java.util.Locale
@@ -65,6 +68,7 @@ data class ProfileInspection(
     val matching: Boolean,
     val summary: String,
     val contexts: List<ContextCheck>,
+    val logicExplanation: String = "",
 )
 
 data class ContextCheck(
@@ -99,7 +103,7 @@ fun inspectProfile(
     val checks = profile.contexts.mapIndexed { index, spec ->
         inspectContextForProfile(profile, index, spec, sourcesByKey, observationTransformer)
     }
-    val contextsMatch = checks.isNotEmpty() && evaluateChecksWithOrGroups(checks)
+    val contextsMatch = checks.isNotEmpty() && evaluateChecks(checks, profile.contextExpression)
     val matching = profile.enabled && contextsMatch
     val summary = when {
         !profile.enabled -> "Profile is disabled."
@@ -115,6 +119,7 @@ fun inspectProfile(
         matching = matching,
         summary = summary,
         contexts = checks,
+        logicExplanation = profile.contextExpression?.let { explainContextExpression(it, checks) }.orEmpty(),
     )
 }
 
@@ -150,6 +155,39 @@ internal fun evaluateChecksWithOrGroups(checks: List<ContextCheck>): Boolean {
         }
     }
     return andTerms.all { it } && orGroups.values.all { it }
+}
+
+internal fun evaluateChecks(
+    checks: List<ContextCheck>,
+    expression: ContextExpressionNode?,
+): Boolean = if (expression == null) {
+    evaluateChecksWithOrGroups(checks)
+} else if (!expression.isValidForContextCount(checks.size)) {
+    false
+} else {
+    expression.evaluate(checks.map { it.effectiveMatched })
+}
+
+internal fun explainContextExpression(
+    expression: ContextExpressionNode,
+    checks: List<ContextCheck>,
+): String {
+    fun explain(node: ContextExpressionNode): String = when {
+        node.isLeaf() -> {
+            val check = node.contextIndex?.let(checks::getOrNull)
+            "Context ${(node.contextIndex ?: -1) + 1}=${if (check?.effectiveMatched == true) "match" else "no match"}"
+        }
+        node.operator != null && node.children.isNotEmpty() -> {
+            val operator = when (node.operator) {
+                ContextBooleanOperator.AND -> "ALL"
+                ContextBooleanOperator.OR -> "ANY"
+            }
+            val body = node.children.joinToString(", ", transform = ::explain)
+            if (node.invert) "NOT($operator($body))" else "$operator($body)"
+        }
+        else -> "Invalid context group"
+    }
+    return explain(expression)
 }
 
 private fun inspectContextForProfile(

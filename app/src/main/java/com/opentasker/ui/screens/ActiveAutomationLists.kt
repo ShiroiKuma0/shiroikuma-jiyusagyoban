@@ -89,6 +89,7 @@ internal fun ProfilesScreen(
     onDeleteProfile: (Profile) -> Unit,
     onToggleProfile: (Profile, Boolean) -> Unit,
     onAddContext: (Profile) -> Unit,
+    onEditContextLogic: (Profile) -> Unit,
     onEditContext: (Profile, Int, ContextSpec) -> Unit,
     onDeleteContext: (Profile, Int) -> Unit,
     contentPadding: PaddingValues,
@@ -220,6 +221,7 @@ internal fun ProfilesScreen(
                 onDelete = { onDeleteProfile(profile) },
                 onToggle = { onToggleProfile(profile, it) },
                 onAddContext = { onAddContext(profile) },
+                onEditContextLogic = { onEditContextLogic(profile) },
                 onEditContext = { index, context -> onEditContext(profile, index, context) },
                 onDeleteContext = { index -> onDeleteContext(profile, index) },
                 onPreflight = { onPreflightProfile(profile) },
@@ -416,6 +418,7 @@ private fun ProfileCard(
     onToggle: (Boolean) -> Unit,
     onPreflight: () -> Unit,
     onAddContext: () -> Unit,
+    onEditContextLogic: () -> Unit,
     onEditContext: (Int, ContextSpec) -> Unit,
     onDeleteContext: (Int) -> Unit,
 ) {
@@ -427,6 +430,7 @@ private fun ProfileCard(
     val toggleDescription = stringResource(R.string.a11y_profile_status, profile.name)
     val editDescription = stringResource(R.string.a11y_edit_profile, profile.name)
     val addContextDescription = stringResource(R.string.a11y_add_context_to_profile, profile.name)
+    val editContextLogicDescription = stringResource(R.string.profile_edit_context_logic)
     val deleteDescription = stringResource(R.string.a11y_delete_profile, profile.name)
     Card(
         modifier = Modifier
@@ -514,6 +518,15 @@ private fun ProfileCard(
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.profile_add_context))
+                }
+                OutlinedButton(
+                    onClick = onEditContextLogic,
+                    enabled = profile.contexts.size >= 2,
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics { contentDescription = editContextLogicDescription },
+                ) {
+                    Text(stringResource(R.string.profile_edit_context_logic))
                 }
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {

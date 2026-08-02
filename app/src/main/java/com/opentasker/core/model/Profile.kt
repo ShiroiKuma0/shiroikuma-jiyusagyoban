@@ -3,8 +3,8 @@ package com.opentasker.core.model
 import kotlinx.serialization.Serializable
 
 /**
- * A Profile binds one or more Contexts to a Task.
- * The profile is "active" while ALL of its contexts match.
+ * A Profile binds one or more Contexts to a Task. Legacy profiles use implicit AND semantics;
+ * profiles with [contextExpression] evaluate that explicit nested boolean tree instead.
  * Activation runs [enterTaskId]; deactivation runs [exitTaskId] (if set).
  */
 @Serializable
@@ -20,6 +20,7 @@ data class Profile(
     val group: String? = null,
     val requiresRiskAcknowledgement: Boolean = false,
     val projectId: Long = DEFAULT_PROJECT_ID,
+    val contextExpression: ContextExpressionNode? = null,
 )
 
 @Serializable

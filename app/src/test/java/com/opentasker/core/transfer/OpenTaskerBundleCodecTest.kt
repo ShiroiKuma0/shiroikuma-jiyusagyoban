@@ -3,6 +3,8 @@ package com.opentasker.core.transfer
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.capabilities.AutomationPower
 import com.opentasker.core.model.ActionSpec
+import com.opentasker.core.model.ContextBooleanOperator
+import com.opentasker.core.model.ContextExpressionNode
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
@@ -302,6 +304,54 @@ class OpenTaskerBundleCodecTest {
         val decoded = OpenTaskerBundleCodec.decode(OpenTaskerBundleCodec.encode(bundle))
 
         assertEquals(bundle, decoded)
+    }
+
+    @Test
+    fun jsonRoundTripPreservesNestedContextExpression() {
+        val profile = Profile(
+            id = 4,
+            name = "Nested profile",
+            enterTaskId = 1,
+            contexts = listOf(ContextSpec(ContextType.STATE), ContextSpec(ContextType.EVENT)),
+            contextExpression = ContextExpressionNode.group(
+                ContextBooleanOperator.OR,
+                listOf(ContextExpressionNode.leaf(0), ContextExpressionNode.leaf(1)),
+            ),
+        )
+        val bundle = OpenTaskerBundleCodec.build(
+            appVersion = "0.2.79",
+            exportedAtEpochMs = 123L,
+            profiles = listOf(profile),
+            tasks = listOf(Task(id = 1, name = "Task", actions = listOf(ActionSpec(type = "log")))),
+        )
+
+        val decoded = OpenTaskerBundleCodec.decode(OpenTaskerBundleCodec.encode(bundle))
+
+        assertEquals(profile, decoded.profiles.single())
+        assertTrue(OpenTaskerBundleCodec.validate(bundle).canImport)
+    }
+
+    @Test
+    fun invalidNestedContextExpressionIsRejectedAtImportBoundary() {
+        val bundle = OpenTaskerBundle(
+            appVersion = "0.2.79",
+            exportedAtEpochMs = 123L,
+            profiles = listOf(
+                Profile(
+                    id = 4,
+                    name = "Invalid nested profile",
+                    enterTaskId = 1,
+                    contexts = listOf(ContextSpec(ContextType.STATE)),
+                    contextExpression = ContextExpressionNode.leaf(7),
+                ),
+            ),
+            tasks = listOf(Task(id = 1, name = "Task", actions = listOf(ActionSpec(type = "log")))),
+        )
+
+        val plan = OpenTaskerBundleCodec.validate(bundle)
+
+        assertFalse(plan.canImport)
+        assertTrue(plan.warnings.any { it.contains("contextExpression") })
     }
 
     @Test

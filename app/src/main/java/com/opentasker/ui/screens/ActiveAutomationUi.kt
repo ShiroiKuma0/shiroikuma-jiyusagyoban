@@ -300,6 +300,7 @@ fun ActiveAutomationUi(
     var contextEditProfileId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var contextEditTypeName by rememberSaveable { mutableStateOf<String?>(null) }
     var contextEditIndex by rememberSaveable { mutableIntStateOf(NO_DIALOG_INDEX) }
+    var contextLogicProfileId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var pendingDeleteKind by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingDeleteOwnerId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var pendingDeleteIndex by rememberSaveable { mutableIntStateOf(NO_DIALOG_INDEX) }
@@ -383,6 +384,8 @@ fun ActiveAutomationUi(
             ContextEditState(profile = profile, type = type, index = index, existing = existing)
         }
     }
+    val contextLogicProfile = contextLogicProfileId.takeIf { it != NO_DIALOG_ENTITY_ID }
+        ?.let { profileId -> profiles.firstOrNull { it.id == profileId } }
     val pendingDelete = when (pendingDeleteKind) {
         DELETE_TARGET_PROFILE -> profiles.firstOrNull { it.id == pendingDeleteOwnerId }
             ?.let { DeleteTarget.ProfileTarget(it) }
@@ -456,6 +459,9 @@ fun ActiveAutomationUi(
         contextEditProfileId = NO_DIALOG_ENTITY_ID
         contextEditTypeName = null
         contextEditIndex = NO_DIALOG_INDEX
+    }
+    fun clearContextLogic() {
+        contextLogicProfileId = NO_DIALOG_ENTITY_ID
     }
     fun openDeleteProfile(profile: Profile) {
         pendingDeleteKind = DELETE_TARGET_PROFILE
@@ -706,6 +712,7 @@ fun ActiveAutomationUi(
                     }
                 },
                 onAddContext = { openContextPicker(it) },
+                onEditContextLogic = { contextLogicProfileId = it.id },
                 onEditContext = { profile, index, context ->
                     openContextEdit(profile, context.type, index)
                 },
@@ -888,7 +895,10 @@ fun ActiveAutomationUi(
                         "Action removed",
                     )
                     is DeleteTarget.ContextTarget -> viewModel.updateProfile(
-                        target.profile.copy(contexts = target.profile.contexts.filterIndexed { i, _ -> i != target.index }),
+                        target.profile.copy(
+                            contexts = target.profile.contexts.filterIndexed { i, _ -> i != target.index },
+                            contextExpression = target.profile.contextExpression?.removeLeaf(target.index),
+                        ),
                         "Context removed",
                     )
                 }
@@ -1106,11 +1116,30 @@ fun ActiveAutomationUi(
                 val updatedContexts = state.index?.let { index ->
                     state.profile.contexts.mapIndexed { i, existing -> if (i == index) context else existing }
                 } ?: (state.profile.contexts + context)
+                val updatedExpression = if (state.index == null) {
+                    state.profile.contextExpression?.appendLeaf(updatedContexts.lastIndex)
+                } else {
+                    state.profile.contextExpression
+                }
                 viewModel.updateProfile(
-                    state.profile.copy(contexts = updatedContexts),
+                    state.profile.copy(contexts = updatedContexts, contextExpression = updatedExpression),
                     if (state.index == null) "Context added" else "Context updated",
                 )
                 clearContextEdit()
+            },
+        )
+    }
+
+    contextLogicProfile?.let { profile ->
+        ContextGroupingDialog(
+            profile = profile,
+            onDismiss = { clearContextLogic() },
+            onSave = { expression ->
+                viewModel.updateProfile(
+                    profile.copy(contextExpression = expression),
+                    context.getString(R.string.context_logic_updated),
+                )
+                clearContextLogic()
             },
         )
     }

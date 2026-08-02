@@ -11,6 +11,8 @@ import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ContextExpressionNode
+import com.opentasker.core.model.isValidForContextCount
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -121,7 +123,7 @@ class ProfileMatcher(
         contextMatches: Array<ContextMatchUpdate>,
     ): ProfileMatchSnapshot {
         val startTime = System.currentTimeMillis()
-        val allMatched = evaluateWithOrGroups(contextMatches, profile.contexts)
+        val allMatched = evaluateContextExpression(contextMatches, profile.contexts, profile.contextExpression)
         val pulseSequence = contextMatches
             .filter { it.pulseContext }
             .sumOf { it.pulseSequence }
@@ -219,6 +221,16 @@ internal fun evaluateWithOrGroups(
         }
     }
     return andTerms.all { it } && orGroups.values.all { it }
+}
+
+internal fun evaluateContextExpression(
+    contextMatches: Array<ContextMatchUpdate>,
+    specs: List<ContextSpec>,
+    expression: ContextExpressionNode?,
+): Boolean {
+    if (expression == null) return evaluateWithOrGroups(contextMatches, specs)
+    if (!expression.isValidForContextCount(specs.size)) return false
+    return expression.evaluate(contextMatches.map { it.matched })
 }
 
 sealed class ProfileStateChange {

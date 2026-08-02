@@ -3,6 +3,8 @@ package com.opentasker.core.engine
 import com.opentasker.core.contexts.ContextEvent
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
+import com.opentasker.core.model.ContextBooleanOperator
+import com.opentasker.core.model.ContextExpressionNode
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
@@ -128,5 +130,29 @@ class ProfileMatcherTest {
     @Test
     fun emptyContextMatchesReturnsFalse() {
         assertFalse(evaluateWithOrGroups(emptyArray(), emptyList()))
+    }
+
+    @Test
+    fun nestedExpressionSupportsAndOrAndNotWithoutChangingLegacyEvaluation() {
+        val expression = ContextExpressionNode.group(
+            ContextBooleanOperator.OR,
+            listOf(
+                ContextExpressionNode.group(
+                    ContextBooleanOperator.AND,
+                    listOf(ContextExpressionNode.leaf(0), ContextExpressionNode.leaf(1)),
+                ),
+                ContextExpressionNode(contextIndex = 2, invert = true),
+            ),
+        )
+        val specs = listOf(
+            ContextSpec(ContextType.STATE),
+            ContextSpec(ContextType.STATE),
+            ContextSpec(ContextType.STATE),
+        )
+
+        assertTrue(evaluateContextExpression(arrayOf(match(true), match(true), match(true)), specs, expression))
+        assertTrue(evaluateContextExpression(arrayOf(match(false), match(false), match(false)), specs, expression))
+        assertFalse(evaluateContextExpression(arrayOf(match(false), match(false), match(true)), specs, expression))
+        assertFalse(evaluateWithOrGroups(arrayOf(match(true), match(false)), specs.take(2)))
     }
 }

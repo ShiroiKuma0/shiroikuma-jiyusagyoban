@@ -115,6 +115,7 @@
     <string name="profile_new">New profile</string>
     <string name="profile_delete">Delete Profile</string>
     <string name="profile_add_context">Add Context</string>
+    <string name="profile_edit_context_logic">Edit context logic</string>
 
     <!-- Task editor -->
     <string name="task_name_label">Task name</string>
@@ -149,6 +150,16 @@
 
     <!-- Context editor -->
     <string name="context_invert_match">Invert match</string>
+    <string name="context_logic_title">Context logic</string>
+    <string name="context_logic_helper">Contexts default to ALL. Change a group to ANY, turn on NOT, or group the first two members to build a nested expression.</string>
+    <string name="context_logic_invalid">This grouping is invalid and cannot be saved.</string>
+    <string name="context_logic_group">Group</string>
+    <string name="context_logic_all">ALL</string>
+    <string name="context_logic_any">ANY</string>
+    <string name="context_logic_not">NOT</string>
+    <string name="context_logic_leaf">Context %1$d: %2$s</string>
+    <string name="context_logic_group_first_two">Group first two as ANY</string>
+    <string name="context_logic_updated">Context logic updated</string>
     <string name="context_day_schedule">Day schedule</string>
     <string name="context_days_label">Days *</string>
     <string name="context_days_hint">weekdays, weekends, MON-FRI</string>

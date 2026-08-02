@@ -23,6 +23,7 @@
 - **Coherent execution controls** — per-profile single/restart/queued/parallel re-trigger behavior, followed by a global per-task abort-new/abort-existing/run-both/wait collision policy across profile, manual, nested, widget, notification, and external runs
 - **Action-level flow controls** — atomic action reordering plus optional conditions and continue-after-failure behavior, with those semantics preserved through storage and bundle round trips
 - **Profile groups** — organize profiles into named groups with filter chips
+- **Nested context logic** — author backward-compatible ALL/ANY/NOT groups over profile contexts; the Inspector explains the evaluated tree
 - **Local projects** — scope tasks, profiles, scenes, and variables behind a shared project boundary with explicit reassignment on deletion
 
 ### Triggers (contexts)

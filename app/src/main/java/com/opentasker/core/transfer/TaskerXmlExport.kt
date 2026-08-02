@@ -186,6 +186,10 @@ object TaskerXmlExporter {
         }
         sb.appendLine("    <nme>${escapeXml(profile.name)}</nme>")
 
+        if (profile.contextExpression != null) {
+            warnings += "Profile '${profile.name}' uses nested context grouping; Tasker XML cannot represent the grouping, so only leaf contexts were exported."
+        }
+
         profile.contexts.forEachIndexed { index, context ->
             val exported = exportContext(context, index)
             if (exported != null) {

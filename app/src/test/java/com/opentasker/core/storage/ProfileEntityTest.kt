@@ -1,10 +1,15 @@
 package com.opentasker.core.storage
 
 import com.opentasker.core.model.AutomationMode
+import com.opentasker.core.model.ContextBooleanOperator
+import com.opentasker.core.model.ContextExpressionNode
+import com.opentasker.core.model.ContextSpec
+import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProfileEntityTest {
@@ -32,6 +37,27 @@ class ProfileEntityTest {
         )
 
         assertEquals(true, profile.toEntity().toDomain().requiresRiskAcknowledgement)
+    }
+
+    @Test
+    fun profileEntityRoundTripPreservesNestedContextExpression() {
+        val profile = Profile(
+            id = 9,
+            name = "Nested",
+            enterTaskId = 42,
+            contexts = listOf(
+                ContextSpec(ContextType.STATE),
+                ContextSpec(ContextType.EVENT),
+            ),
+            contextExpression = ContextExpressionNode.group(
+                ContextBooleanOperator.OR,
+                listOf(ContextExpressionNode.leaf(0), ContextExpressionNode.leaf(1)),
+            ),
+        )
+
+        val entity = profile.toEntity()
+        assertTrue(entity.contextsJson.trimStart().startsWith("{"))
+        assertEquals(profile, entity.toDomain())
     }
 
     @Test

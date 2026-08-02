@@ -15,6 +15,7 @@ import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import com.opentasker.core.model.DEFAULT_PROJECT_ID
 import com.opentasker.core.model.VariableNamePolicy
+import com.opentasker.core.model.isValidForContextCount
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.ProjectEntity
 import com.opentasker.core.storage.VariableRepository
@@ -402,6 +403,11 @@ object OpenTaskerBundleCodec {
                 .forEach { error ->
                     warnings += "Invalid profile '${profile.name}' (${error.field}): ${error.message}."
                 }
+            if (profile.contextExpression != null &&
+                !profile.contextExpression.isValidForContextCount(profile.contexts.size)
+            ) {
+                warnings += "Invalid profile '${profile.name}' (contextExpression): leaf references or group structure are invalid."
+            }
         }
 
         return BundleImportPlan(
