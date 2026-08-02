@@ -79,6 +79,68 @@ This lists what the fork adds; upstream's own history lives in the OpenTasker re
 - **Quick Settings tiles**: added four active per-task tile slots with long-press configuration, persistent task/label/subtitle/icon/state settings, direct task dispatch, slot-aware tile events, and a functional `tile.set` action.
 
 - **Visual system**: the command-center shell now uses a calmer sage/graphite palette, larger readable type, tighter spacing tokens, compact headers, border-light navigation, and text-led status indicators. Profile/task summaries and action/context rows rely on grouping and hairline rhythm instead of nested outlined boxes. The nine-page redesign reference is preserved at `design/mockups/opentasker-command-center-v2.png`.
+## 0.2.79.2026-08-02.g915979d9+004 — 2026-08-02
+
+**Rebased onto upstream `915979d9`** — ten upstream commits that never bumped upstream's own version,
+which is exactly why the version string changed shape this release (see below).
+
+### The version now names the upstream commit we sit on
+
+`<upstream version>.<base commit date>.g<8-char base sha>+<NNN>`. Upstream sat on `0.2.79` for this
+whole ten-commit stretch, so the bare literal said nothing about how current the fork was. The pin is
+`git merge-base HEAD master` — the upstream commit our patches sit on, not our own HEAD and not
+`master`'s tip — plus that commit's own committer date so builds sort chronologically. `+N` is
+zero-padded to three digits in the name only; `versionCode` keeps the plain integer
+(`appVersionCode * 10000 + N`) and upstream's literals are read back, never edited.
+
+`BUILD_NUMBER` resets to `1` on **every** sync, including one where only the sha moves. When upstream
+ships commits without bumping `appVersionCode` that makes the new `versionCode` lower than the
+installed one, so deliveries now use `adb install -r -d`.
+
+Implementation note: the pin is computed with `providers.exec`, not a raw `ProcessBuilder` — Gradle's
+configuration cache refuses an external process started at configuration time.
+
+### Skipped and cancelled runs are no longer reported as failures
+
+Upstream's new admission controller applies each task's collision policy at the shared execution
+boundary, so a scene slider that fires repeatedly during a drag now records genuine *Skipped* runs.
+Those are stored with `success = false` — correct for the record, but three UI surfaces read that raw
+flag and called them failures: the Run Log's red "Last failure" banner, the workspace card's
+`recentFailure`, and the Monitor tab's per-task failure count (whose own hint reads "red = at least
+one run failed"). All three now classify through `RunLogEntry.outcome()`, which already distinguished
+`Failed` / `Skipped` / `Cancelled`. Skipped runs stay fully visible as their own state.
+
+### The top bar shows the installed version
+
+The full version string sits to the right of 白い熊 自由作業盤, bottom-aligned and at 66% of the name's
+size (taken from the ambient text style, not hardcoded), so a glance says which build is running. The
+name yields width first, so the version is never the part that gets ellipsized.
+
+### Upstream designs deliberately not adopted
+
+Four collisions, each with the corresponding upstream contract test retired and commented:
+
+- **Bundle format** — upstream added a schema-1→2 migration and task-id remapping; the fork's format
+  is id-free and name-based, so `OpenTaskerBundle.kt` stayed ours.
+- **Typed action fields** — upstream reworked `ActionField` into `@StringRes` labels plus
+  `FieldType.TASK/APP/FILE` with validation rules. The fork's inline-string catalog cannot be
+  expressed in it; the orphaned `ActionFieldPolicy.kt` was removed.
+- **The visual redesign** — upstream's sage/graphite palette against our black-and-yellow. `Theme.kt`,
+  the screens and the launcher icons stayed ours. Upstream's retuned `DesignSystem` spacing and radii
+  *were* taken, so the UI is slightly denser than before.
+- **Run-log pagination and export UI** — needs upstream's ViewModel, which we kept fork-side.
+
+### Worth recording: our scene gestures never used upstream's broken path
+
+Upstream fixed scene tap/long-press bindings that built raw `RUN_TASK` intents without
+`PROTOCOL_VERSION=2` and were rejected before enqueue. That fix is inert here: `scene.show` routes to
+the fork's `SceneOverlayManager`, whose gesture handler calls `executeAndLogTask(…, source = "Scene")`
+directly in-process — no intent, no receiver. Upstream's `SceneOverlayService.fireRunTask` is not
+reached. Verified on-device: a scene button tap ran its task and logged `Source: Other: Scene`.
+
+Also taken from upstream: the Android Keystore GCM-IV fix in the secret codec, feedback-loop risk
+analysis, and a corrupt-task guard on widget/shortcut taps.
+
 ## 0.2.79+1 — 2026-07-31
 
 **Rebased onto upstream OpenTasker 0.2.79.** The first build of the new line. Two upstream designs

@@ -7,7 +7,11 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.79+1`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.79.2026-08-02.g915979d9+004`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+
+> The version names the upstream commit the fork is rebased on:
+> `<upstream version>.<base commit date>.g<8-char upstream sha>+<build>`. Upstream's own version
+> string stands still for months between releases, so the sha is what says how current this fork is.
 
 </div>
 
