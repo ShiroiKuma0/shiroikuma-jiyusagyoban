@@ -50,4 +50,27 @@ class SceneElementDraftsTest {
         assertEquals("100", element.config["max"])
         assertEquals("50", element.config["value"])
     }
+
+    @Test
+    fun imageDraftStartsWithoutAPlaceholderSource() {
+        val element = SceneElementDrafts.defaultElement(Scene(id = 1, name = "Panel", widthDp = 320, heightDp = 240), SceneElementType.IMAGE)
+
+        assertEquals("", element.config["source"])
+        assertEquals("true", element.config["decorative"])
+        assertTrue(SceneElementConfigValidator.validate(element).any { "source" in it })
+    }
+
+    @Test
+    fun sliderConfigRequiresValueWithinBounds() {
+        val invalid = SceneElement(
+            type = SceneElementType.SLIDER,
+            xDp = 0,
+            yDp = 0,
+            widthDp = 100,
+            heightDp = 40,
+            config = mapOf("min" to "10", "max" to "20", "value" to "21"),
+        )
+
+        assertTrue(SceneElementConfigValidator.validate(invalid).any { "between" in it })
+    }
 }

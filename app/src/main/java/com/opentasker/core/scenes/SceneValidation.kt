@@ -2,6 +2,7 @@ package com.opentasker.core.scenes
 
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
+import com.opentasker.core.model.SceneElementType
 import com.opentasker.core.model.Task
 
 data class SceneIssue(
@@ -55,5 +56,42 @@ object SceneValidator {
                 add(SceneIssue(SceneIssueSeverity.ERROR, "$label references missing long-press task $taskId."))
             }
         }
+        SceneElementConfigValidator.validate(element).forEach { issue ->
+            add(SceneIssue(SceneIssueSeverity.ERROR, "$label: $issue"))
+        }
     }
+}
+
+/** Shared config rules used by the editor, import boundary, scene diagnostics, and overlay. */
+object SceneElementConfigValidator {
+    fun validate(element: SceneElement): List<String> = validate(element.type, element.config)
+
+    fun validate(type: SceneElementType, config: Map<String, String>): List<String> = buildList {
+        when (type) {
+            SceneElementType.SLIDER -> {
+                val min = config["min"]?.toIntOrNull()
+                val max = config["max"]?.toIntOrNull()
+                val value = (config["value"] ?: config["progress"])?.toIntOrNull()
+                if (min == null) add("slider minimum must be an integer")
+                if (max == null) add("slider maximum must be an integer")
+                if (value == null) add("slider value must be an integer")
+                if (min != null && max != null && min > max) add("slider minimum must not exceed maximum")
+                if (min != null && max != null && value != null && value !in min..max) {
+                    add("slider value must be between minimum and maximum")
+                }
+            }
+            SceneElementType.IMAGE -> {
+                if (!SceneImageLoader.isSupportedSource(config["source"].orEmpty())) {
+                    add("image source must be a supported content or resource URI")
+                }
+                val decorative = config["decorative"].equals("true", ignoreCase = true)
+                if (!decorative && config["content_description"].orEmpty().isBlank()) {
+                    add("image must be marked decorative or have a content description")
+                }
+            }
+            else -> Unit
+        }
+    }
+
+    fun isValid(element: SceneElement): Boolean = validate(element).isEmpty()
 }

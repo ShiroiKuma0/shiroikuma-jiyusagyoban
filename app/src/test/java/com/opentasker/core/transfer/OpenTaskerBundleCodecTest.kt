@@ -9,6 +9,9 @@ import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Project
+import com.opentasker.core.model.Scene
+import com.opentasker.core.model.SceneElement
+import com.opentasker.core.model.SceneElementType
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import com.opentasker.core.validation.InputValidation
@@ -225,6 +228,38 @@ class OpenTaskerBundleCodecTest {
 
         assertFalse(plan.canImport)
         assertTrue(plan.warnings.any { it.startsWith("Invalid action") && it.contains("cannot be empty") })
+    }
+
+    @Test
+    fun validateBlocksInvalidSceneElementConfig() {
+        val plan = OpenTaskerBundleCodec.validate(
+            OpenTaskerBundle(
+                appVersion = "0.2.79",
+                exportedAtEpochMs = 123L,
+                scenes = listOf(
+                    Scene(
+                        id = 1,
+                        name = "Broken scene",
+                        widthDp = 200,
+                        heightDp = 120,
+                        elements = listOf(
+                            SceneElement(
+                                id = 1,
+                                type = SceneElementType.IMAGE,
+                                xDp = 0,
+                                yDp = 0,
+                                widthDp = 80,
+                                heightDp = 60,
+                                config = mapOf("source" to "Image"),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        assertFalse(plan.canImport)
+        assertTrue(plan.warnings.any { it.startsWith("Invalid scene 'Broken scene'") })
     }
 
     @Test

@@ -119,7 +119,7 @@ Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON 
 - Shared installed-app picker across application, notification, action, and Locale plugin editors, with label/package search, app icons, validated manual entry, and a latest-observed Inspector shortcut
 - Metadata-driven action forms with stable-value selectors, bounded number validation, task/app/file pickers, and forward-compatible preservation of unfamiliar imported arguments
 - Guided profile templates with variable slots and safety notes
-- Scene element editor with drag-to-move, resize handles, multi-select, alignment guides, scaled canvas previews, overlay launch, and tap/long-press task bindings
+- Scene element editor with drag-to-move, resize handles, multi-select, alignment guides, scaled canvas previews, overlay launch, accessible image metadata, validated sliders, and tap/long-press task bindings
 - Flow graphs with zoom/pan canvas previews, edge routing, branch/subflow markers, node deep links, and picker-backed add commands
 - Profile and task search bars
 - One global search across profiles, tasks, actions, variables, and scenes, including named references, with live results and deep links into the matching editor or library surface

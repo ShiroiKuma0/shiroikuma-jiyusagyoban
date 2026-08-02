@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -27,12 +28,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -44,9 +47,12 @@ import com.opentasker.core.model.SceneElement
 import com.opentasker.core.model.SceneElementType
 import com.opentasker.core.model.Task
 import com.opentasker.core.scenes.SceneElementConfigResolver
+import com.opentasker.core.scenes.SceneElementConfigValidator
 import com.opentasker.core.scenes.SceneElementDrafts
 import com.opentasker.core.scenes.SceneImageLoader
 import com.opentasker.ui.theme.DesignSystem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 internal fun sceneElementEditorState(
     scenes: List<Scene>,
@@ -144,6 +150,13 @@ internal fun SceneElementEditorDialog(
     var sliderMax by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initialSlider.max.toString()) }
     var sliderValue by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initialSlider.value.toString()) }
     var imageSource by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.config["source"] ?: "") }
+    var imageDescription by rememberSaveable(state.scene.id, state.index) {
+        mutableStateOf(initial.config["content_description"] ?: "")
+    }
+    var imageDecorative by rememberSaveable(state.scene.id, state.index) {
+        mutableStateOf(initial.config["decorative"].equals("true", ignoreCase = true))
+    }
+    var imageSourceValid by rememberSaveable(state.scene.id, state.index) { mutableStateOf(false) }
     var tapTaskId by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.tapTaskId) }
     var longPressTaskId by rememberSaveable(state.scene.id, state.index) { mutableStateOf(initial.longPressTaskId) }
 
@@ -154,8 +167,20 @@ internal fun SceneElementEditorDialog(
     val parsedSliderMin = sliderMin.toIntOrNull()
     val parsedSliderMax = sliderMax.toIntOrNull()
     val parsedSliderValue = sliderValue.toIntOrNull()
-    val sliderValid = type != SceneElementType.SLIDER ||
-        (parsedSliderMin != null && parsedSliderMax != null && parsedSliderValue != null && parsedSliderMin <= parsedSliderMax)
+    val configForValidation = when (type) {
+        SceneElementType.SLIDER -> mapOf(
+            "min" to sliderMin,
+            "max" to sliderMax,
+            "value" to sliderValue,
+        )
+        SceneElementType.IMAGE -> mapOf(
+            "source" to imageSource,
+            "content_description" to imageDescription,
+            "decorative" to imageDecorative.toString(),
+        )
+        else -> emptyMap()
+    }
+    val configValid = SceneElementConfigValidator.validate(type, configForValidation).isEmpty()
     val canSave = parsedX != null &&
         parsedY != null &&
         parsedWidth != null &&
@@ -164,11 +189,27 @@ internal fun SceneElementEditorDialog(
         parsedY >= 0 &&
         parsedWidth > 0 &&
         parsedHeight > 0 &&
-        sliderValid
+        configValid && (type != SceneElementType.IMAGE || imageSourceValid)
     val defaultTextLabel = stringResource(R.string.scene_element_type_text)
     val defaultButtonLabel = stringResource(R.string.scene_element_type_button)
     val defaultSliderLabel = stringResource(R.string.scene_element_type_slider)
-    val defaultImageLabel = stringResource(R.string.scene_element_type_image)
+    LaunchedEffect(type, imageSource, parsedWidth, parsedHeight) {
+        imageSourceValid = false
+        if (
+            type == SceneElementType.IMAGE &&
+            parsedWidth != null && parsedHeight != null &&
+            SceneImageLoader.isSupportedSource(imageSource)
+        ) {
+            imageSourceValid = withContext(Dispatchers.IO) {
+                SceneImageLoader.load(
+                    context = context,
+                    source = imageSource,
+                    targetWidthPx = parsedWidth.coerceAtLeast(1),
+                    targetHeightPx = parsedHeight.coerceAtLeast(1),
+                ) != null
+            }
+        }
+    }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching {
@@ -209,6 +250,8 @@ internal fun SceneElementEditorDialog(
                         sliderMax = defaults.config["max"] ?: "100"
                         sliderValue = defaults.config["value"] ?: "50"
                         imageSource = defaults.config["source"] ?: ""
+                        imageDescription = defaults.config["content_description"].orEmpty()
+                        imageDecorative = defaults.config["decorative"].equals("true", ignoreCase = true)
                     },
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
@@ -279,6 +322,25 @@ internal fun SceneElementEditorDialog(
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
+                        OutlinedTextField(
+                            value = imageDescription,
+                            onValueChange = { imageDescription = it.take(160) },
+                            label = { Text(stringResource(R.string.label_image_description)) },
+                            singleLine = true,
+                            enabled = !imageDecorative,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = imageDecorative, onCheckedChange = { imageDecorative = it })
+                            Text(stringResource(R.string.label_image_decorative))
+                        }
+                        if (imageSource.isNotBlank() && !imageSourceValid) {
+                            Text(
+                                stringResource(R.string.scene_image_repair_required),
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
                         OutlinedButton(
                             onClick = { imagePicker.launch(arrayOf("image/*")) },
                             modifier = Modifier.fillMaxWidth(),
@@ -322,10 +384,11 @@ internal fun SceneElementEditorDialog(
                                 sliderMax = sliderMax,
                                 sliderValue = sliderValue,
                                 imageSource = imageSource,
+                                imageDescription = imageDescription,
+                                imageDecorative = imageDecorative,
                                 defaultTextLabel = defaultTextLabel,
                                 defaultButtonLabel = defaultButtonLabel,
                                 defaultSliderLabel = defaultSliderLabel,
-                                defaultImageLabel = defaultImageLabel,
                             ),
                             tapTaskId = tapTaskId,
                             longPressTaskId = longPressTaskId,
@@ -489,10 +552,11 @@ private fun elementConfig(
     sliderMax: String,
     sliderValue: String,
     imageSource: String,
+    imageDescription: String,
+    imageDecorative: Boolean,
     defaultTextLabel: String,
     defaultButtonLabel: String,
     defaultSliderLabel: String,
-    defaultImageLabel: String,
 ): Map<String, String> = when (type) {
     SceneElementType.TEXT -> mapOf("text" to label.ifBlank { defaultTextLabel })
     SceneElementType.BUTTON -> mapOf("label" to label.ifBlank { defaultButtonLabel })
@@ -507,6 +571,10 @@ private fun elementConfig(
             "value" to value.toString(),
         )
     }
-    SceneElementType.IMAGE -> mapOf("source" to imageSource.ifBlank { defaultImageLabel })
+    SceneElementType.IMAGE -> mapOf(
+        "source" to imageSource.trim(),
+        "content_description" to imageDescription.trim(),
+        "decorative" to imageDecorative.toString(),
+    )
     else -> emptyMap()
 }

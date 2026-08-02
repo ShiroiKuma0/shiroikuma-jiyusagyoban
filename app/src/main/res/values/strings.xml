@@ -548,6 +548,7 @@
     <string name="action_create_task">Create Task</string>
     <string name="action_add_step">Add Step</string>
     <string name="action_choose_image">Choose image</string>
+    <string name="scene_image_repair_required">Choose a readable image URI before saving.</string>
     <string name="action_task_binding_missing_id">Missing task ID %1$d — choose another task or None</string>
     <string name="action_task_binding_missing_name">Legacy task “%1$s” was not found — choose another task or None</string>
     <string name="action_task_binding_ambiguous_name">Legacy task “%1$s” is ambiguous — choose the intended task by ID</string>
@@ -573,6 +574,8 @@
     <string name="label_button_label">Button label</string>
     <string name="label_slider_label">Slider label</string>
     <string name="label_image_label_or_uri">Image label or URI</string>
+    <string name="label_image_description">Image description</string>
+    <string name="label_image_decorative">Decorative image (hide from accessibility)</string>
     <string name="label_tap_task">Tap task</string>
     <string name="label_long_press_task">Long-press task</string>
     <string name="label_more">More</string>

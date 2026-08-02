@@ -180,6 +180,12 @@ class SceneOverlayService : Service() {
     }
 
     private fun buildElementView(element: SceneElement, widthPx: Int, heightPx: Int): View {
+        if (
+            element.type == SceneElementType.SLIDER ||
+            element.type == SceneElementType.IMAGE
+        ) {
+            if (!SceneElementConfigValidator.isValid(element)) return unsupportedElementView(element)
+        }
         return when (element.type) {
             SceneElementType.BUTTON -> Button(this).apply {
                 text = element.config["label"] ?: getString(R.string.scene_overlay_default_button)
@@ -263,7 +269,14 @@ class SceneOverlayService : Service() {
                     ImageView(this).apply {
                         setImageBitmap(bitmap)
                         scaleType = ImageView.ScaleType.CENTER_CROP
-                        contentDescription = element.config["contentDescription"]
+                        contentDescription = element.config["content_description"]?.trim()?.takeIf { it.isNotEmpty() }
+                        importantForAccessibility = if (
+                            element.config["decorative"].equals("true", ignoreCase = true)
+                        ) {
+                            View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                        } else {
+                            View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                        }
                     }
                 } else {
                     unsupportedElementView(element)

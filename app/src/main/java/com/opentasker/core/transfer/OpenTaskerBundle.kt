@@ -21,6 +21,7 @@ import com.opentasker.core.storage.ProjectEntity
 import com.opentasker.core.storage.VariableRepository
 import com.opentasker.core.storage.isEffectivelySecret
 import com.opentasker.core.storage.toEntity
+import com.opentasker.core.scenes.SceneElementConfigValidator
 import com.opentasker.core.validation.InputValidation
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -331,6 +332,11 @@ object OpenTaskerBundleCodec {
 
         bundle.scenes.forEach { scene ->
             scene.elements.forEach { element ->
+                SceneElementConfigValidator.validate(element).forEach { issue ->
+                    warnings += "Invalid scene '${scene.name}' element ${element.id}: $issue."
+                }
+            }
+            scene.elements.forEach { element ->
                 if (element.tapTaskId != null && element.tapTaskId !in taskIds) {
                     lossyWarnings += "Scene '${scene.name}' element ${element.id} references missing tap task ${element.tapTaskId}; the link will be dropped."
                 }
@@ -437,7 +443,8 @@ object OpenTaskerBundleCodec {
             startsWith("Invalid task ") ||
             startsWith("Invalid action ") ||
             startsWith("Invalid profile ") ||
-            startsWith("Invalid variable name ")
+            startsWith("Invalid variable name ") ||
+            startsWith("Invalid scene ")
 
     private fun duplicateLongs(values: List<Long>): List<Long> =
         values.groupingBy { it }

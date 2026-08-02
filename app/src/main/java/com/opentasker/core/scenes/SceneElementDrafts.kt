@@ -40,7 +40,11 @@ object SceneElementDrafts {
             "max" to "100",
             "value" to "50",
         )
-        SceneElementType.IMAGE -> mapOf("source" to "Image")
+        SceneElementType.IMAGE -> mapOf(
+            "source" to "",
+            "content_description" to "",
+            "decorative" to "true",
+        )
         else -> emptyMap()
     }
 

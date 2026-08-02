@@ -71,4 +71,23 @@ class SceneValidatorTest {
 
         assertTrue(issues.isEmpty())
     }
+
+    @Test
+    fun validateReportsInvalidImageAndSliderConfig() {
+        val scene = Scene(
+            id = 1,
+            name = "Panel",
+            widthDp = 200,
+            heightDp = 120,
+            elements = listOf(
+                SceneElement(1, SceneElementType.IMAGE, 0, 0, 80, 60, config = mapOf("source" to "Image")),
+                SceneElement(2, SceneElementType.SLIDER, 0, 60, 100, 40, config = mapOf("min" to "5", "max" to "2", "value" to "3")),
+            ),
+        )
+
+        val issues = SceneValidator.validate(scene, emptyList())
+
+        assertTrue(issues.any { it.message.contains("supported content") })
+        assertTrue(issues.any { it.message.contains("must not exceed") })
+    }
 }
