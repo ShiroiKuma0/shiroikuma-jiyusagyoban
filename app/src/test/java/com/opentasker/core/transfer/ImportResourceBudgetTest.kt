@@ -80,6 +80,7 @@ class ImportResourceBudgetTest {
             appVersion = "",
             exportedAtEpochMs = 0,
             metadata = BundleMetadata(name = "", description = ""),
+            projects = emptyList(),
             tasks = listOf(Task(id = 1, name = "", actions = listOf(ActionSpec(type = "")))),
             profiles = listOf(
                 Profile(
@@ -126,6 +127,7 @@ class ImportResourceBudgetTest {
         val bundle = OpenTaskerBundle(
             appVersion = "",
             exportedAtEpochMs = 0,
+            projects = emptyList(),
             metadata = BundleMetadata(name = "", description = ""),
             variables = listOf(Variable(name = "a", value = "é", isGlobal = true)),
         )

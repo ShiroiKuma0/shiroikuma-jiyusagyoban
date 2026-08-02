@@ -6,13 +6,17 @@ import com.opentasker.core.capabilities.AutomationPower
 import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.references.AutomationReferenceRewriter
+import com.opentasker.core.references.AutomationReferenceIndex
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.Project
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
+import com.opentasker.core.model.DEFAULT_PROJECT_ID
 import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.ProjectEntity
 import com.opentasker.core.storage.VariableRepository
 import com.opentasker.core.storage.isEffectivelySecret
 import com.opentasker.core.storage.toEntity
@@ -25,6 +29,7 @@ import kotlinx.serialization.json.Json
 
 const val OPEN_TASKER_BUNDLE_SCHEMA_VERSION = 2
 private val SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMAS = 1..OPEN_TASKER_BUNDLE_SCHEMA_VERSION
+private fun projectVariableKey(projectId: Long, name: String): String = "$projectId:$name"
 
 @Serializable
 data class OpenTaskerBundle(
@@ -32,6 +37,7 @@ data class OpenTaskerBundle(
     val appVersion: String,
     val exportedAtEpochMs: Long,
     val metadata: BundleMetadata = BundleMetadata(),
+    val projects: List<Project> = listOf(Project(DEFAULT_PROJECT_ID, "Default", 0)),
     val tasks: List<Task> = emptyList(),
     val profiles: List<Profile> = emptyList(),
     val variables: List<Variable> = emptyList(),
@@ -131,6 +137,7 @@ object OpenTaskerBundleCodec {
         tasks: List<Task>,
         variables: List<Variable> = emptyList(),
         scenes: List<Scene> = emptyList(),
+        projects: List<Project> = listOf(Project(DEFAULT_PROJECT_ID, "Default", 0)),
         omittedSecretVariableCount: Int = 0,
         name: String = "OpenTasker Export",
         description: String = "",
@@ -140,8 +147,10 @@ object OpenTaskerBundleCodec {
         val omittedSecretCount = omittedSecretVariableCount + variables.count { it.isSecret }
         val sortedVariables = variables
             .filterNot { it.isSecret }
-            .sortedWith(compareBy<Variable> { it.name.lowercase() }.thenBy { it.name })
+            .sortedWith(compareBy<Variable> { it.projectId }.thenBy { it.name.lowercase() }.thenBy { it.name })
         val sortedScenes = scenes.sortedWith(compareBy<Scene> { it.name.lowercase() }.thenBy { it.id })
+        val sortedProjects = (projects.ifEmpty { listOf(Project(DEFAULT_PROJECT_ID, "Default", 0)) })
+            .sortedWith(compareBy<Project> { it.position }.thenBy { it.name.lowercase() }.thenBy { it.id })
         val capabilityRequirements = capabilityRequirements(sortedTasks)
         val powerRequests = powerRequests(sortedTasks, sortedProfiles)
         val base = OpenTaskerBundle(
@@ -158,6 +167,7 @@ object OpenTaskerBundleCodec {
                 capabilityRequirements = capabilityRequirements,
                 powerRequests = powerRequests,
             ),
+            projects = sortedProjects,
             tasks = sortedTasks,
             profiles = sortedProfiles,
             variables = sortedVariables,
@@ -214,6 +224,7 @@ object OpenTaskerBundleCodec {
                 description = source.metadata.description,
                 warnings = source.metadata.warnings + migrationWarning,
             ),
+            projects = listOf(Project(DEFAULT_PROJECT_ID, "Default", 0)),
             tasks = source.tasks,
             profiles = source.profiles,
             variables = source.variables,
@@ -251,14 +262,35 @@ object OpenTaskerBundleCodec {
         duplicateLongs(bundle.tasks.map { it.id }).takeIf { it.isNotEmpty() }?.let { duplicates ->
             warnings += "Bundle has duplicate task ids: ${duplicates.joinToString()}."
         }
-        duplicateStrings(bundle.variables.map { it.name }).takeIf { it.isNotEmpty() }?.let { duplicates ->
-            warnings += "Bundle has duplicate variable names: ${duplicates.joinToString()}."
+        duplicateLongs(bundle.projects.map { it.id }).takeIf { it.isNotEmpty() }?.let { duplicates ->
+            warnings += "Bundle has duplicate project ids: ${duplicates.joinToString()}."
         }
-        val normalizedVariableNames = bundle.variables.mapNotNull { variable ->
-            VariableNamePolicy.normalizeForScope(variable.name, variable.isGlobal)
+        duplicateStrings(bundle.projects.map { it.name.lowercase() }).takeIf { it.isNotEmpty() }?.let { duplicates ->
+            warnings += "Bundle has duplicate project names: ${duplicates.joinToString()}."
         }
-        duplicateStrings(normalizedVariableNames).takeIf { it.isNotEmpty() }?.let { duplicates ->
-            warnings += "Bundle has duplicate normalized variable names: ${duplicates.joinToString()}."
+        val projectIds = bundle.projects.map { it.id }.toSet()
+        if (DEFAULT_PROJECT_ID !in projectIds) {
+            warnings += "Bundle is missing the Default project."
+        }
+        bundle.tasks.filterNot { it.projectId in projectIds }.forEach { task ->
+            warnings += "Task '${task.name}' references missing project ${task.projectId}."
+        }
+        bundle.profiles.filterNot { it.projectId in projectIds }.forEach { profile ->
+            warnings += "Profile '${profile.name}' references missing project ${profile.projectId}."
+        }
+        bundle.scenes.filterNot { it.projectId in projectIds }.forEach { scene ->
+            warnings += "Scene '${scene.name}' references missing project ${scene.projectId}."
+        }
+        bundle.variables.filterNot { it.projectId in projectIds }.forEach { variable ->
+            warnings += "Variable '${variable.name}' references missing project ${variable.projectId}."
+        }
+        duplicateStrings(bundle.variables.map { projectVariableKey(it.projectId, it.name) }).takeIf { it.isNotEmpty() }?.let { duplicates ->
+            warnings += "Bundle has duplicate variable names: ${duplicates.joinToString { it.substringAfter(':') }}."
+        }
+        duplicateStrings(bundle.variables.mapNotNull { variable ->
+            VariableNamePolicy.normalizeForScope(variable.name, variable.isGlobal)?.let { projectVariableKey(variable.projectId, it) }
+        }).takeIf { it.isNotEmpty() }?.let { duplicates ->
+            warnings += "Bundle has duplicate normalized variable names: ${duplicates.joinToString { it.substringAfter(':') }}."
         }
         bundle.variables.forEach { variable ->
             if (VariableNamePolicy.normalizeForScope(variable.name, variable.isGlobal) == null) {
@@ -270,6 +302,9 @@ object OpenTaskerBundleCodec {
         }
 
         val taskIds = bundle.tasks.map { it.id }.toSet()
+        val tasksById = bundle.tasks.associateBy { it.id }
+        val profilesById = bundle.profiles.associateBy { it.id }
+        val scenesById = bundle.scenes.associateBy { it.id }
         bundle.profiles.forEach { profile ->
             if (profile.enterTaskId !in taskIds) {
                 lossyWarnings += "Profile '${profile.name}' references missing enter task ${profile.enterTaskId} and will be skipped."
@@ -277,6 +312,19 @@ object OpenTaskerBundleCodec {
             val exitTaskId = profile.exitTaskId
             if (exitTaskId != null && exitTaskId !in taskIds) {
                 lossyWarnings += "Profile '${profile.name}' references missing exit task $exitTaskId; the exit task will be dropped."
+            }
+        }
+
+        AutomationReferenceIndex.build(bundle.profiles, bundle.tasks, bundle.scenes).forEach { reference ->
+            val ownerProjectId = when (reference.site.ownerKind) {
+                com.opentasker.core.references.TaskReferenceSite.OwnerKind.PROFILE -> profilesById[reference.site.ownerId]?.projectId
+                com.opentasker.core.references.TaskReferenceSite.OwnerKind.TASK -> tasksById[reference.site.ownerId]?.projectId
+                com.opentasker.core.references.TaskReferenceSite.OwnerKind.SCENE -> scenesById[reference.site.ownerId]?.projectId
+            }
+            val targets = bundle.tasks.filter { reference.ref.matches(it) }
+            if (ownerProjectId != null && targets.any { it.projectId != ownerProjectId }) {
+                warnings += "Cross-project reference from '${reference.site.ownerName}' to " +
+                    "${targets.joinToString { "'${it.name}'" }} must be reviewed."
             }
         }
 
@@ -368,6 +416,13 @@ object OpenTaskerBundleCodec {
     private fun String.isBlockingImportWarning(): Boolean =
         startsWith("Unsupported schema version") ||
             startsWith("Bundle has duplicate task ids") ||
+            startsWith("Bundle has duplicate project ids") ||
+            startsWith("Bundle has duplicate project names") ||
+            startsWith("Bundle is missing the Default project") ||
+            startsWith("Task '") && contains("references missing project") ||
+            startsWith("Profile '") && contains("references missing project") ||
+            startsWith("Scene '") && contains("references missing project") ||
+            startsWith("Variable '") && contains("references missing project") ||
             startsWith("Bundle has duplicate variable names") ||
             startsWith("Bundle has duplicate normalized variable names") ||
             startsWith("Bundle contains secret variable values") ||
@@ -441,17 +496,20 @@ class OpenTaskerBundleRepository(
         val base = OpenTaskerBundleCodec.validate(bundle)
         if (!base.canImport) return base
 
-        val occupiedNames = db.variableDao().getAll().associateBy { it.name }.toMutableMap()
+        val projectIdMap = resolveProjectIds(bundle.projects, createMissing = false)
+        val occupiedNames = db.variableDao().getAll().associateBy { variableKey(it.projectId, it.name) }.toMutableMap()
         val reservedNames = occupiedNames.keys.toMutableSet()
         bundle.variables.mapNotNullTo(reservedNames) { variable ->
-            VariableNamePolicy.normalizeForScope(variable.name, variable.isGlobal)
+            val normalized = VariableNamePolicy.normalizeForScope(variable.name, variable.isGlobal) ?: return@mapNotNullTo null
+            variableKey(projectIdMap[variable.projectId] ?: DEFAULT_PROJECT_ID, normalized)
         }
         val conflicts = bundle.variables
             .sortedWith(compareBy<Variable> { it.name.lowercase() }.thenBy { it.name })
             .mapNotNull { variable ->
                 val storageName = VariableNamePolicy.normalizeForScope(variable.name, variable.isGlobal)
                     ?: return@mapNotNull null
-                val existing = occupiedNames[storageName] ?: return@mapNotNull null
+                val targetProjectId = projectIdMap[variable.projectId] ?: DEFAULT_PROJECT_ID
+                val existing = occupiedNames[variableKey(targetProjectId, storageName)] ?: return@mapNotNull null
                 VariableImportConflict(
                     name = storageName,
                     existingIsSecret = existing.isEffectivelySecret(),
@@ -471,6 +529,7 @@ class OpenTaskerBundleRepository(
         val profiles = db.profileDao().getAll().map { it.toDomain() }
         val variableExport = variableRepository.ordinaryExport()
         val scenes = db.sceneDao().getAll().map { it.toDomain() }
+        val projects = db.projectDao().getAll().map { it.toDomain() }
 
         return OpenTaskerBundleCodec.build(
             appVersion = appVersion,
@@ -479,6 +538,7 @@ class OpenTaskerBundleRepository(
             tasks = tasks,
             variables = variableExport.variables,
             scenes = scenes,
+            projects = projects,
             omittedSecretVariableCount = variableExport.omittedSecretCount,
             name = name,
             description = description,
@@ -500,10 +560,11 @@ class OpenTaskerBundleRepository(
         val lossyWarnings = plan.lossyWarnings.toMutableList()
 
         db.withTransaction {
+            val projectIdMap = resolveProjectIds(bundle.projects, createMissing = true)
             val taskIdMap = mutableMapOf<Long, Long>()
             val insertedTaskRecords = mutableListOf<Task>()
             bundle.tasks.sortedWith(compareBy<Task> { it.name.lowercase() }.thenBy { it.id }).forEach { task ->
-                val newId = db.taskDao().insert(task.copy(id = 0).toEntity())
+                val newId = db.taskDao().insert(task.copy(id = 0, projectId = projectIdMap[task.projectId] ?: DEFAULT_PROJECT_ID).toEntity())
                 taskIdMap[task.id] = newId
                 insertedTaskRecords += task.copy(id = newId)
                 insertedTasks++
@@ -521,9 +582,14 @@ class OpenTaskerBundleRepository(
             bundle.variables.sortedWith(compareBy<Variable> { it.name.lowercase() }.thenBy { it.name }).forEach { variable ->
                 val storageName = VariableNamePolicy.normalizeForScope(variable.name, variable.isGlobal)
                     ?: throw IllegalArgumentException("Invalid variable name '${variable.name}'")
-                val existing = db.variableDao().get(storageName)
+                val targetProjectId = projectIdMap[variable.projectId] ?: DEFAULT_PROJECT_ID
+                val existing = if (targetProjectId == DEFAULT_PROJECT_ID) {
+                    db.variableDao().get(storageName)
+                } else {
+                    db.variableDao().getInProject(storageName, targetProjectId)
+                }
                 if (existing == null) {
-                    variableRepository.importVariable(variable.copy(name = storageName))
+                    variableRepository.importVariable(variable.copy(name = storageName, projectId = targetProjectId))
                     insertedVariables++
                     return@forEach
                 }
@@ -542,17 +608,22 @@ class OpenTaskerBundleRepository(
                         require(normalizedRename != storageName) {
                             "Renamed variable '$storageName' must use a different name."
                         }
-                        require(db.variableDao().get(normalizedRename) == null) {
+                        val renamedExists = if (targetProjectId == DEFAULT_PROJECT_ID) {
+                            db.variableDao().get(normalizedRename) != null
+                        } else {
+                            db.variableDao().getInProject(normalizedRename, targetProjectId) != null
+                        }
+                        require(!renamedExists) {
                             "Renamed variable '$normalizedRename' already exists."
                         }
-                        variableRepository.importVariable(variable.copy(name = normalizedRename))
+                        variableRepository.importVariable(variable.copy(name = normalizedRename, projectId = targetProjectId))
                         insertedVariables++
                         importWarnings += "Renamed imported variable '$storageName' to '$normalizedRename'."
                     }
                     VariableConflictAction.REPLACE_EXISTING -> {
                         val keepSecret = existing.isEffectivelySecret()
                         variableRepository.importVariable(
-                            variable.copy(name = storageName, isSecret = keepSecret || variable.isSecret),
+                            variable.copy(name = storageName, isSecret = keepSecret || variable.isSecret, projectId = targetProjectId),
                         )
                         val suffix = if (keepSecret) " and kept it secret" else ""
                         importWarnings += "Replaced existing variable '$storageName'$suffix."
@@ -572,6 +643,7 @@ class OpenTaskerBundleRepository(
                     requiresRiskAcknowledgement = true,
                     enterTaskId = enterTaskId,
                     exitTaskId = profile.exitTaskId?.let { taskIdMap[it] },
+                    projectId = projectIdMap[profile.projectId] ?: DEFAULT_PROJECT_ID,
                 )
                 db.profileDao().insert(remappedProfile.toEntity())
                 insertedProfiles++
@@ -581,7 +653,7 @@ class OpenTaskerBundleRepository(
                 val remappedElements = scene.elements.map { element ->
                     remapSceneElement(element, taskIdMap)
                 }
-                db.sceneDao().insert(scene.copy(id = 0, elements = remappedElements).toEntity())
+                db.sceneDao().insert(scene.copy(id = 0, elements = remappedElements, projectId = projectIdMap[scene.projectId] ?: DEFAULT_PROJECT_ID).toEntity())
                 insertedScenes++
             }
         }
@@ -601,6 +673,31 @@ class OpenTaskerBundleRepository(
             tapTaskId = element.tapTaskId?.let { taskIdMap[it] },
             longPressTaskId = element.longPressTaskId?.let { taskIdMap[it] },
         )
+
+    private suspend fun resolveProjectIds(projects: List<Project>, createMissing: Boolean): Map<Long, Long> {
+        val existing = db.projectDao().getAll()
+        val byName = existing.associateBy { it.name.trim().lowercase() }.toMutableMap()
+        val ids = mutableMapOf<Long, Long>()
+        projects.ifEmpty { listOf(Project(DEFAULT_PROJECT_ID, "Default", 0)) }
+            .sortedWith(compareBy<Project> { it.position }.thenBy { it.name.lowercase() }.thenBy { it.id })
+            .forEach { project ->
+                val normalizedName = project.name.trim().lowercase()
+                val target = byName[normalizedName] ?: if (createMissing) {
+                    val id = db.projectDao().insert(
+                        ProjectEntity(id = 0, name = project.name.trim(), position = project.position),
+                    )
+                    ProjectEntity(id = id, name = project.name.trim(), position = project.position)
+                        .also { byName[normalizedName] = it }
+                } else {
+                    null
+                }
+                if (target != null) ids[project.id] = target.id
+            }
+        ids.putIfAbsent(DEFAULT_PROJECT_ID, existing.firstOrNull { it.id == DEFAULT_PROJECT_ID }?.id ?: DEFAULT_PROJECT_ID)
+        return ids
+    }
+
+    private fun variableKey(projectId: Long, name: String): String = "$projectId:$name"
 
     private fun nextImportedVariableName(
         original: String,

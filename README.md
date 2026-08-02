@@ -23,6 +23,7 @@
 - **Coherent execution controls** — per-profile single/restart/queued/parallel re-trigger behavior, followed by a global per-task abort-new/abort-existing/run-both/wait collision policy across profile, manual, nested, widget, notification, and external runs
 - **Action-level flow controls** — atomic action reordering plus optional conditions and continue-after-failure behavior, with those semantics preserved through storage and bundle round trips
 - **Profile groups** — organize profiles into named groups with filter chips
+- **Local projects** — scope tasks, profiles, scenes, and variables behind a shared project boundary with explicit reassignment on deletion
 
 ### Triggers (contexts)
 
@@ -87,7 +88,7 @@ Variable names follow Tasker's scope rule: an all-lowercase name is local to the
 - **Locale/Tasker plugin host** — setting dispatch, condition queries, configuration parsing, request-query events, bundle validation, and last-known-state fallback
 - **Locale/Tasker condition context** — condition plugins as first-class profile predicates polled every 30 seconds
 - **External automation target** — signature-scoped intents to run tasks, toggle profiles, query status, and pass variables. Task runs are asynchronous (protocol v2): the receiver validates and enqueues, then returns an execution ID that callers poll with `QUERY_EXECUTION`, because a broadcast cannot stay open for a task that may wait minutes. Callers must send `PROTOCOL_VERSION=2`; see [docs/EXTERNAL_INTENTS.md](docs/EXTERNAL_INTENTS.md)
-- **OpenTasker JSON bundles** — schema-versioned export/import with deterministic legacy migrations, computed action-power manifests, data-to-external-chain warnings, explicit keep/rename/replace review for variable-name conflicts, disabled-by-default installation, explicit first-enable acknowledgement, and secret values omitted by design
+- **OpenTasker JSON bundles** — schema-versioned export/import with deterministic legacy migrations, project membership preservation, computed action-power manifests, data-to-external-chain warnings, explicit keep/rename/replace review for variable-name conflicts, disabled-by-default installation, explicit first-enable acknowledgement, and secret values omitted by design
 - **Tasker XML import/export** — preview with migration/capability warnings, deterministic mapped/unsupported/lossy reporting, and safe batches for notification, variable, media, settings, and flow actions
 - **Profile sharing** — offline share manifests with editable local preview, screenshot attachments, safety findings, import-plan review, and GitHub Discussions submission text; unverified shares stay blocked until the existing import review passes
 

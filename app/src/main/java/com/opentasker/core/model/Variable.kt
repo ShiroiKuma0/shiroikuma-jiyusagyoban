@@ -16,4 +16,5 @@ data class Variable(
     val isGlobal: Boolean,
     val isSecret: Boolean = false,
     @Transient val secretAvailable: Boolean = true,
+    val projectId: Long = DEFAULT_PROJECT_ID,
 )

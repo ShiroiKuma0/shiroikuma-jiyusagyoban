@@ -6,6 +6,7 @@ import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.Project
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import com.opentasker.core.validation.InputValidation
@@ -301,6 +302,33 @@ class OpenTaskerBundleCodecTest {
         val decoded = OpenTaskerBundleCodec.decode(OpenTaskerBundleCodec.encode(bundle))
 
         assertEquals(bundle, decoded)
+    }
+
+    @Test
+    fun projectMembershipRoundTripsAndCrossProjectReferencesAreReported() {
+        val bundle = OpenTaskerBundleCodec.build(
+            appVersion = "0.2.79",
+            exportedAtEpochMs = 123L,
+            projects = listOf(
+                Project(id = 8, name = "Work", position = 1),
+                Project(id = 1, name = "Default", position = 0),
+            ),
+            tasks = listOf(
+                Task(id = 10, name = "Work task", projectId = 8, actions = listOf(ActionSpec(type = "log"))),
+                Task(id = 11, name = "Default task", projectId = 1, actions = listOf(ActionSpec(type = "task.run", args = mapOf("task" to "10")))),
+            ),
+            profiles = listOf(Profile(id = 12, name = "Default profile", enterTaskId = 11, projectId = 1)),
+            variables = listOf(
+                Variable(name = "%TOKEN", value = "work", isGlobal = true, projectId = 8),
+                Variable(name = "%TOKEN", value = "default", isGlobal = true, projectId = 1),
+            ),
+        )
+
+        val decoded = OpenTaskerBundleCodec.decode(OpenTaskerBundleCodec.encode(bundle))
+
+        assertEquals(bundle, decoded)
+        assertTrue(bundle.metadata.warnings.any { it.startsWith("Cross-project reference") })
+        assertTrue(OpenTaskerBundleCodec.validate(bundle).canImport)
     }
 
     @Test

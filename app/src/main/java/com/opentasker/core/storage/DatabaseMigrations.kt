@@ -85,6 +85,53 @@ object DatabaseMigrations {
         }
     }
 
+    val MIGRATION_8_9 = object : Migration(8, 9) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `projects` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `name` TEXT NOT NULL,
+                    `position` INTEGER NOT NULL
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_projects_name` ON `projects` (`name`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_projects_position` ON `projects` (`position`)")
+            db.execSQL("INSERT OR IGNORE INTO `projects` (`id`, `name`, `position`) VALUES (1, 'Default', 0)")
+
+            db.execSQL("ALTER TABLE `tasks` ADD COLUMN `projectId` INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_tasks_projectId` ON `tasks` (`projectId`)")
+            db.execSQL("ALTER TABLE `profiles` ADD COLUMN `projectId` INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_profiles_projectId` ON `profiles` (`projectId`)")
+            db.execSQL("ALTER TABLE `scenes` ADD COLUMN `projectId` INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_scenes_projectId` ON `scenes` (`projectId`)")
+
+            db.execSQL(
+                """
+                CREATE TABLE `variables_new` (
+                    `name` TEXT NOT NULL,
+                    `value` TEXT NOT NULL,
+                    `isGlobal` INTEGER NOT NULL,
+                    `isSecret` INTEGER NOT NULL,
+                    `projectId` INTEGER NOT NULL,
+                    PRIMARY KEY(`projectId`, `name`)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                """
+                INSERT INTO `variables_new` (`name`, `value`, `isGlobal`, `isSecret`, `projectId`)
+                SELECT `name`, `value`, `isGlobal`, `isSecret`, 1 FROM `variables`
+                """.trimIndent(),
+            )
+            db.execSQL("DROP TABLE `variables`")
+            db.execSQL("ALTER TABLE `variables_new` RENAME TO `variables`")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_variables_name` ON `variables` (`name`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_variables_projectId` ON `variables` (`projectId`)")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -94,6 +141,7 @@ object DatabaseMigrations {
             MIGRATION_5_6,
             MIGRATION_6_7,
             MIGRATION_7_8,
+            MIGRATION_8_9,
         )
     }
 }
@@ -126,9 +174,14 @@ object DatabaseMigrations {
  * Version 7:
  *   - profiles: adds requiresRiskAcknowledgement for imported-profile first-enable gating
  *
- * Version 8 (current):
+ * Version 8:
  *   - run_logs: adds index on timestamp (reactive recent query + retention pruning)
  *   - edit_history: adds composite index on (entityType, entityId)
+ *
+ * Version 9:
+ *   - projects: adds the default workspace project and ordering
+ *   - profiles, tasks, scenes: adds projectId (legacy rows backfill to Default)
+ *   - variables: migrates to a composite (projectId, name) key for project-scoped values
  *
  * To add a migration:
  * 1. Increment database version in @Database annotation

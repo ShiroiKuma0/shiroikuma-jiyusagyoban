@@ -33,6 +33,8 @@
 
 - **Intent dispatch**: generalized `intent.launch` into bounded activity, explicit broadcast, and explicit service delivery with URI/MIME support, allowlisted flags, capped primitive extras, ordered-broadcast result capture, and exported-target checks. Unsafe URI schemes, parcelable-style extras, ambiguous or non-exported external targets, and unapproved implicit broadcast/service dispatch fail closed.
 
+- **Local projects**: added a first-class Room-backed workspace boundary with atomic Default-project migration, project-scoped runtime variables, shared filtering across automation surfaces, project-preserving bundle import/export, cross-project reference warnings, and explicit variable-safe reassignment before deletion.
+
 - **Flow validation**: added a complex graph fixture covering multiple contexts, conditional branch labels, subflow markers, missing-task repair targets, continuation semantics, and screen-reader summaries. The Flow surface keeps zoom/pan and picker-backed add commands, while direct drag/drop persistence remains deferred until those editor paths have broader UI coverage.
 
 - **Release trust**: a generated `tools/release-truth.json` manifest now owns version/code, Android SDK, dependency, capability-count, bundle/Room schema, and immutable artifact-commit claims. The local quality gate validates the manifest against shipped source, README, and F-Droid metadata with configuration-cache-safe verification.

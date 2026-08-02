@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.model.Variable
 import com.opentasker.core.model.VariableNamePolicy
+import com.opentasker.core.model.DEFAULT_PROJECT_ID
 import com.opentasker.core.storage.AesGcmVariableSecretCodec
 import com.opentasker.ui.theme.DesignSystem
 
@@ -57,13 +58,16 @@ import com.opentasker.ui.theme.DesignSystem
 fun VariablesScreen(
     variables: List<Variable>,
     contentPadding: PaddingValues,
-    onUpdate: (name: String, value: String, isSecret: Boolean, successMessage: String) -> Unit,
-    onDelete: (name: String, successMessage: String) -> Unit,
+    projectId: Long = DEFAULT_PROJECT_ID,
+    onUpdate: (name: String, value: String, isSecret: Boolean, successMessage: String, projectId: Long) -> Unit,
+    onDelete: (name: String, successMessage: String, projectId: Long) -> Unit,
     onMessage: (String) -> Unit,
 ) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var editTargetName by rememberSaveable { mutableStateOf<String?>(null) }
+    var editTargetProjectId by rememberSaveable { mutableStateOf(DEFAULT_PROJECT_ID) }
     var pendingDeleteName by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingDeleteProjectId by rememberSaveable { mutableStateOf(DEFAULT_PROJECT_ID) }
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
 
     val filtered = remember(variables, searchQuery) {
@@ -121,18 +125,24 @@ fun VariablesScreen(
                 )
             }
         } else {
-            items(filtered, key = { it.name }) { variable ->
+            items(filtered, key = { "${it.projectId}:${it.name}" }) { variable ->
                 VariableRow(
                     variable = variable,
-                    onEdit = { editTargetName = variable.name },
-                    onDelete = { pendingDeleteName = variable.name },
+                    onEdit = {
+                        editTargetName = variable.name
+                        editTargetProjectId = variable.projectId
+                    },
+                    onDelete = {
+                        pendingDeleteName = variable.name
+                        pendingDeleteProjectId = variable.projectId
+                    },
                 )
             }
         }
     }
 
-    val editTarget = remember(variables, editTargetName) {
-        editTargetName?.let { targetName -> variables.firstOrNull { it.name == targetName } }
+    val editTarget = remember(variables, editTargetName, editTargetProjectId) {
+        editTargetName?.let { targetName -> variables.firstOrNull { it.name == targetName && it.projectId == editTargetProjectId } }
     }
 
     if (showCreateDialog) {
@@ -142,7 +152,7 @@ fun VariablesScreen(
             existingNames = variables.mapTo(hashSetOf()) { it.name },
             onDismiss = { showCreateDialog = false },
             onSave = { name, value, isSecret ->
-                onUpdate(name, value, isSecret, createdMsg)
+                onUpdate(name, value, isSecret, createdMsg, projectId)
                 showCreateDialog = false
             },
         )
@@ -171,7 +181,7 @@ fun VariablesScreen(
                     onClick = {
                         // Success/failure feedback is emitted by the ViewModel after the
                         // delete actually resolves, not optimistically at click time.
-                        onDelete(name, deletedMsg)
+                        onDelete(name, deletedMsg, pendingDeleteProjectId)
                         pendingDeleteName = null
                         if (editTargetName == name) editTargetName = null
                     },
@@ -192,7 +202,7 @@ fun VariablesScreen(
             existingNames = variables.mapTo(hashSetOf()) { it.name },
             onDismiss = { editTargetName = null },
             onSave = { name, newValue, isSecret ->
-                onUpdate(name, newValue, isSecret, updatedMsg)
+                onUpdate(name, newValue, isSecret, updatedMsg, target.projectId)
                 editTargetName = null
             },
         )

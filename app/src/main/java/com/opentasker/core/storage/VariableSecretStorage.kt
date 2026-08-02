@@ -5,6 +5,7 @@ import android.security.keystore.KeyProperties
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.Variable
 import com.opentasker.core.model.VariableNamePolicy
+import com.opentasker.core.model.DEFAULT_PROJECT_ID
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
 import java.security.SecureRandom
@@ -152,6 +153,7 @@ data class RuntimeVariableValue(
     val value: String,
     val isSecret: Boolean,
     val isGlobal: Boolean = true,
+    val projectId: Long = DEFAULT_PROJECT_ID,
 )
 
 data class RuntimeVariableCommitResult(
@@ -175,10 +177,15 @@ class VariableRepository(
     private val migrationMutex = Mutex()
     @Volatile private var legacyMigrationAttempted = false
 
-    fun observeGlobals(): Flow<List<Variable>> = flow {
+    fun observeGlobals(projectId: Long? = DEFAULT_PROJECT_ID): Flow<List<Variable>> = flow {
         migrateLegacySensitiveVariables()
+        val source = when (projectId) {
+            null -> dao.getAllGlobalAsFlowAll()
+            DEFAULT_PROJECT_ID -> dao.getAllGlobalAsFlow()
+            else -> dao.getAllGlobalAsFlowInProject(projectId)
+        }
         emitAll(
-            dao.getAllGlobalAsFlow().map { entities ->
+            source.map { entities ->
                 entities.map(::decodeForDomain)
             },
         )
@@ -190,21 +197,29 @@ class VariableRepository(
         }
     }
 
-    suspend fun delete(name: String) {
-        storageMutationMutex.withLock { dao.deleteByName(name) }
+    suspend fun delete(name: String, projectId: Long = DEFAULT_PROJECT_ID) {
+        storageMutationMutex.withLock {
+            if (projectId == DEFAULT_PROJECT_ID) dao.deleteByName(name)
+            else dao.deleteByNameInProject(name, projectId)
+        }
     }
 
     suspend fun importVariable(variable: Variable) {
         val normalized = variable.normalizedForStorage()
         val entity = normalized.toStoredEntity(secretCodec)
         storageMutationMutex.withLock {
-            if (dao.get(normalized.name) == null) dao.insert(entity) else dao.update(entity)
+            val existing = if (normalized.projectId == DEFAULT_PROJECT_ID) {
+                dao.get(normalized.name)
+            } else {
+                dao.getInProject(normalized.name, normalized.projectId)
+            }
+            if (existing == null) dao.insert(entity) else dao.update(entity)
         }
     }
 
-    suspend fun ordinaryExport(): OrdinaryVariableExport {
+    suspend fun ordinaryExport(projectId: Long? = null): OrdinaryVariableExport {
         migrateLegacySensitiveVariables()
-        val entities = dao.getAll()
+        val entities = projectId?.let { dao.getAllInProject(it) } ?: dao.getAll()
         return OrdinaryVariableExport(
             variables = entities
                 .filterNot(VariableEntity::isEffectivelySecret)
@@ -213,16 +228,17 @@ class VariableRepository(
         )
     }
 
-    suspend fun runtimeGlobals(): RuntimeVariableSeed {
+    suspend fun runtimeGlobals(projectId: Long = DEFAULT_PROJECT_ID): RuntimeVariableSeed {
         migrateLegacySensitiveVariables()
-        return readRuntimeGlobals()
+        return readRuntimeGlobals(projectId)
     }
 
-    private suspend fun readRuntimeGlobals(): RuntimeVariableSeed {
+    private suspend fun readRuntimeGlobals(projectId: Long = DEFAULT_PROJECT_ID): RuntimeVariableSeed {
         val values = linkedMapOf<String, String>()
         val secretNames = linkedSetOf<String>()
         val unavailable = linkedSetOf<String>()
-        dao.getAllGlobal().sortedBy { it.name }.forEach { entity ->
+        val entities = if (projectId == DEFAULT_PROJECT_ID) dao.getAllGlobal() else dao.getAllGlobalInProject(projectId)
+        entities.sortedBy { it.name }.forEach { entity ->
             if (!entity.isEffectivelySecret()) {
                 values[entity.name] = entity.value
                 return@forEach
@@ -254,7 +270,7 @@ class VariableRepository(
         if (values.isEmpty()) return RuntimeVariableCommitResult(emptyList(), emptyList())
         migrateLegacySensitiveVariables()
         return storageMutationMutex.withLock {
-            val current = readRuntimeGlobals()
+            val current = readRuntimeGlobals(values.firstOrNull()?.projectId ?: DEFAULT_PROJECT_ID)
             val accepted = mutableListOf<RuntimeVariableValue>()
             val appliedNames = mutableListOf<String>()
             val conflictedNames = mutableListOf<String>()
@@ -323,6 +339,7 @@ class VariableRepository(
             isGlobal = entity.isGlobal,
             isSecret = true,
             secretAvailable = decoded.isSuccess,
+            projectId = entity.projectId,
         )
     }
 
@@ -330,8 +347,9 @@ class VariableRepository(
         Variable(
             name = value.name,
             value = value.value,
-            isGlobal = true,
-            isSecret = value.isSecret,
+        isGlobal = true,
+        isSecret = value.isSecret,
+        projectId = value.projectId,
         ).normalizedForStorage().toStoredEntity(secretCodec)
 
     companion object {

@@ -88,7 +88,7 @@ suspend fun executeAndLogTask(
     val variables = VariableStore()
     val variableRepository = VariableRepository(db.variableDao())
     val persistedGlobals = runCatching {
-        variableRepository.runtimeGlobals()
+        variableRepository.runtimeGlobals(task.projectId)
     }.getOrElse { error ->
         AppLogger.error(logTag, "Failed to hydrate global variables", error)
         RuntimeVariableSeed(emptyMap(), emptySet(), emptySet())
@@ -222,6 +222,7 @@ suspend fun executeAndLogTask(
         baselineSensitiveGlobals,
         variables.globalSensitiveSnapshot(),
         logTag,
+        projectId = task.projectId,
     )
     AppLogger.info(logTag, "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)")
     val terminalReason = ExecutionTerminalReason(
@@ -295,11 +296,12 @@ fun changedGlobals(
     after: Map<String, String>,
     beforeSensitive: Set<String> = emptySet(),
     afterSensitive: Set<String> = emptySet(),
+    projectId: Long = com.opentasker.core.model.DEFAULT_PROJECT_ID,
 ): List<RuntimeVariableValue> =
     after.asSequence()
         .filter { (name, value) -> before[name] != value || (name in beforeSensitive) != (name in afterSensitive) }
         .sortedBy { it.key }
-        .map { (name, value) -> RuntimeVariableValue(name, value, isSecret = name in afterSensitive) }
+        .map { (name, value) -> RuntimeVariableValue(name, value, isSecret = name in afterSensitive, projectId = projectId) }
         .toList()
 
 /**
@@ -315,8 +317,9 @@ private suspend fun persistChangedGlobals(
     beforeSensitive: Set<String>,
     afterSensitive: Set<String>,
     logTag: String,
+    projectId: Long = com.opentasker.core.model.DEFAULT_PROJECT_ID,
 ): List<String> {
-    val changed = changedGlobals(before, after, beforeSensitive, afterSensitive)
+    val changed = changedGlobals(before, after, beforeSensitive, afterSensitive, projectId)
     if (changed.isEmpty()) return emptyList()
     val commit = runCatching {
         variableRepository.persistRuntimeAtomically(persistedBaseline, changed)

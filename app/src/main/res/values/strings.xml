@@ -1047,4 +1047,20 @@
     <string name="preflight_warning_item">Warning: %1$s</string>
     <string name="preflight_no_values">none</string>
     <string name="ui_error_preflight">Unable to create the preflight report.</string>
+    <string name="projects_scope_label">Project scope</string>
+    <string name="projects_all">All projects</string>
+    <string name="projects_manage">Manage projects</string>
+    <string name="projects_new_name">New project name</string>
+    <string name="projects_create">Create project</string>
+    <string name="projects_move_up">Move project up</string>
+    <string name="projects_move_down">Move project down</string>
+    <string name="projects_delete_title">Delete project %1$s?</string>
+    <string name="projects_delete_body">All tasks, profiles, scenes, and variables will be reassigned to the selected project. Variable name conflicts must be resolved first.</string>
+    <string name="projects_choose_destination">Choose destination project</string>
+    <string name="action_rename">Rename</string>
+    <string name="action_done">Done</string>
+    <string name="ui_message_project_created">Project created</string>
+    <string name="ui_message_project_renamed">Project renamed</string>
+    <string name="ui_message_project_reordered">Project reordered</string>
+    <string name="ui_message_project_deleted">Project deleted</string>
 </resources>

@@ -486,7 +486,7 @@ tasks.register("verifyRoomSchema") {
 
     doLast {
         check(schemaDir.isDirectory) { "Room schema directory missing: $schemaDir" }
-        val currentVersion = 8
+        val currentVersion = 9
         val missing = (1..currentVersion).filter { !File(schemaDir, "$it.json").isFile }
         check(missing.isEmpty()) {
             "Room schema files missing for version(s): ${missing.joinToString()}. Run a build to regenerate, then commit."

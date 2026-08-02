@@ -1,6 +1,7 @@
 package com.opentasker.core.storage
 
 import com.opentasker.core.model.Variable
+import com.opentasker.core.model.DEFAULT_PROJECT_ID
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import kotlinx.coroutines.async
@@ -8,6 +9,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -205,7 +207,7 @@ class VariableSecretStorageTest {
         private val state = MutableStateFlow(initial.toList())
 
         override suspend fun insert(v: VariableEntity) {
-            state.value = state.value.filterNot { it.name == v.name } + v
+            state.value = state.value.filterNot { it.name == v.name && it.projectId == v.projectId } + v
         }
 
         override suspend fun insertAll(values: List<VariableEntity>) {
@@ -217,19 +219,44 @@ class VariableSecretStorageTest {
         }
 
         override suspend fun delete(v: VariableEntity) {
-            deleteByName(v.name)
+            deleteByNameInProject(v.name, v.projectId)
         }
 
         override suspend fun deleteByName(name: String) {
-            state.value = state.value.filterNot { it.name == name }
+            deleteByNameInProject(name, DEFAULT_PROJECT_ID)
+        }
+
+        override suspend fun deleteByNameInProject(name: String, projectId: Long) {
+            state.value = state.value.filterNot { it.name == name && it.projectId == projectId }
         }
 
         override suspend fun get(name: String): VariableEntity? = state.value.firstOrNull { it.name == name }
 
+        override suspend fun getInProject(name: String, projectId: Long): VariableEntity? =
+            state.value.firstOrNull { it.name == name && it.projectId == projectId }
+
         override suspend fun getAll(): List<VariableEntity> = state.value
+
+        override suspend fun getAllInProject(projectId: Long): List<VariableEntity> =
+            state.value.filter { it.projectId == projectId }
 
         override suspend fun getAllGlobal(): List<VariableEntity> = state.value.filter { it.isGlobal }
 
+        override suspend fun getAllGlobalInProject(projectId: Long): List<VariableEntity> =
+            state.value.filter { it.isGlobal && it.projectId == projectId }
+
         override fun getAllGlobalAsFlow(): Flow<List<VariableEntity>> = state
+
+        override fun getAllGlobalAsFlowInProject(projectId: Long): Flow<List<VariableEntity>> =
+            state.map { values -> values.filter { it.isGlobal && it.projectId == projectId } }
+
+        override fun getAllGlobalAsFlowAll(): Flow<List<VariableEntity>> = state.map { values -> values.filter { it.isGlobal } }
+
+        override suspend fun countInProject(projectId: Long, name: String): Int =
+            state.value.count { it.projectId == projectId && it.name == name }
+
+        override suspend fun deleteAllInProject(projectId: Long) {
+            state.value = state.value.filterNot { it.projectId == projectId }
+        }
     }
 }

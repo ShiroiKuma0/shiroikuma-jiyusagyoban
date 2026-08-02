@@ -22,6 +22,7 @@ internal data class ImportResourceBudget(
     val maxJsonChars: Int = 16 * 1024 * 1024,
     val maxXmlChars: Int = 4 * 1024 * 1024,
     val maxEntities: Long = 5_000,
+    val maxProjects: Long = 100,
     val maxActions: Long = 20_000,
     val maxContexts: Long = 10_000,
     val maxSceneElements: Long = 10_000,
@@ -72,6 +73,7 @@ internal object ImportResourceGuard {
         bundle: OpenTaskerBundle,
         budget: ImportResourceBudget = ImportResourceBudget.Default,
     ): ImportBudgetExceededException? {
+        violation("projects", bundle.projects.size.toLong(), budget.maxProjects)?.let { return it }
         val entityCount = bundle.tasks.size.toLong() +
             bundle.profiles.size +
             bundle.variables.size +
@@ -100,6 +102,7 @@ internal object ImportResourceGuard {
 
     private fun OpenTaskerBundle.aggregateStringBytes(): Long {
         var bytes = appVersion.utf8ByteLength()
+        projects.forEach { project -> bytes += project.name.utf8ByteLength() }
         bytes += metadata.name.utf8ByteLength()
         bytes += metadata.description.utf8ByteLength()
         metadata.warnings.forEach { bytes += it.utf8ByteLength() }

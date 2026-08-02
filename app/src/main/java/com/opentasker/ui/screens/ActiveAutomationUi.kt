@@ -253,6 +253,7 @@ fun ActiveAutomationUi(
     val profiles by viewModel.profiles.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
     val scenes by viewModel.scenes.collectAsState()
+    val projects by viewModel.projects.collectAsState()
     val runLogs by viewModel.runLogs.collectAsState()
     val runLogPage by viewModel.runLogPage.collectAsState()
     val runLogFilters by viewModel.runLogFilters.collectAsState()
@@ -268,6 +269,14 @@ fun ActiveAutomationUi(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var screenOrdinal by rememberSaveable { mutableIntStateOf(0) }
+    var selectedProjectId by rememberSaveable { mutableStateOf<Long?>(null) }
+    LaunchedEffect(projects, selectedProjectId) {
+        if (selectedProjectId != null && projects.none { it.id == selectedProjectId }) selectedProjectId = null
+    }
+    val projectTasks = remember(tasks, selectedProjectId) { tasks.filter { selectedProjectId == null || it.projectId == selectedProjectId } }
+    val projectProfiles = remember(profiles, selectedProjectId) { profiles.filter { selectedProjectId == null || it.projectId == selectedProjectId } }
+    val projectScenes = remember(scenes, selectedProjectId) { scenes.filter { selectedProjectId == null || it.projectId == selectedProjectId } }
+    val projectVariables = remember(globalVariables, selectedProjectId) { globalVariables.filter { selectedProjectId == null || it.projectId == selectedProjectId } }
     val screen = OpenTaskerScreen.entries.getOrElse(screenOrdinal) { OpenTaskerScreen.Profiles }
     var taskDialogId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var showCreateTaskDialog by rememberSaveable { mutableStateOf(false) }
@@ -556,15 +565,28 @@ fun ActiveAutomationUi(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            OpenTaskerHeader(screen = screen, detail = headerDetail)
+            Column {
+                OpenTaskerHeader(screen = screen, detail = headerDetail)
+                if (screen in setOf(OpenTaskerScreen.Profiles, OpenTaskerScreen.Tasks, OpenTaskerScreen.Vars, OpenTaskerScreen.Scenes, OpenTaskerScreen.Flow)) {
+                    ProjectScopeBar(
+                        projects = projects,
+                        selectedProjectId = selectedProjectId,
+                        onSelectProject = { selectedProjectId = it },
+                        onCreateProject = viewModel::createProject,
+                        onRenameProject = viewModel::renameProject,
+                        onReorderProject = viewModel::reorderProject,
+                        onDeleteProject = viewModel::deleteProject,
+                    )
+                }
+            }
         },
         floatingActionButton = {
             when (screen) {
                 OpenTaskerScreen.Profiles -> {
-                    val createLabel = stringResource(if (tasks.isEmpty()) R.string.task_new else R.string.profile_new)
+                    val createLabel = stringResource(if (projectTasks.isEmpty()) R.string.task_new else R.string.profile_new)
                     ExtendedFloatingActionButton(
                         onClick = {
-                            if (tasks.isEmpty()) {
+                            if (projectTasks.isEmpty()) {
                                 showCreateTaskDialog = true
                             } else {
                                 showCreateProfileDialog = true
@@ -651,8 +673,8 @@ fun ActiveAutomationUi(
     ) { innerPadding ->
         when (screen) {
             OpenTaskerScreen.Profiles -> ProfilesScreen(
-                profiles = profiles,
-                tasks = tasks,
+                profiles = projectProfiles,
+                tasks = projectTasks,
                 runLogs = runLogs,
                 storageDecodeIssues = storageDecodeIssues,
                 onCreateTaskFirst = {
@@ -694,7 +716,7 @@ fun ActiveAutomationUi(
             )
 
             OpenTaskerScreen.Tasks -> TasksScreen(
-                tasks = tasks,
+                tasks = projectTasks,
                 storageDecodeIssues = storageDecodeIssues,
                 onCreateTask = { showCreateTaskDialog = true },
                 onEditTask = { openTaskDialog(it) },
@@ -727,8 +749,8 @@ fun ActiveAutomationUi(
             )
 
             OpenTaskerScreen.Flow -> AutomationFlowScreen(
-                profiles = profiles,
-                tasks = tasks,
+                profiles = projectProfiles,
+                tasks = projectTasks,
                 contentPadding = innerPadding,
                 onNodeTargetSelected = openFlowTarget,
                 onAddContext = { profileId ->
@@ -752,17 +774,24 @@ fun ActiveAutomationUi(
             )
 
             OpenTaskerScreen.Vars -> VariablesScreen(
-                variables = globalVariables,
+                variables = projectVariables,
                 contentPadding = innerPadding,
-                onUpdate = viewModel::updateVariable,
-                onDelete = viewModel::deleteVariable,
+                projectId = selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID,
+                onUpdate = { name, value, isSecret, successMessage, projectId ->
+                    viewModel.updateVariable(name, value, isSecret, successMessage, projectId)
+                },
+                onDelete = { name, successMessage, projectId ->
+                    viewModel.deleteVariable(name, successMessage, projectId)
+                },
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
             )
 
             OpenTaskerScreen.Scenes -> SceneLibraryScreen(
-                scenes = scenes,
-                tasks = tasks,
-                onCreateScene = viewModel::createScene,
+                scenes = projectScenes,
+                tasks = projectTasks,
+                onCreateScene = { name, width, height ->
+                    viewModel.createScene(name, width, height, selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID)
+                },
                 onUpdateScene = viewModel::updateScene,
                 onDeleteScene = { openDeleteScene(it) },
                 contentPadding = innerPadding,
@@ -934,7 +963,7 @@ fun ActiveAutomationUi(
             task = null,
             onDismiss = { showCreateTaskDialog = false },
             onSave = { name, priority, collisionMode ->
-                viewModel.createTask(name, priority, collisionMode)
+            viewModel.createTask(name, priority, collisionMode, selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID)
                 showCreateTaskDialog = false
             },
         )
@@ -960,10 +989,10 @@ fun ActiveAutomationUi(
     if (showCreateProfileDialog) {
         ProfileEditorDialog(
             profile = null,
-            tasks = tasks,
+            tasks = projectTasks,
             onDismiss = { showCreateProfileDialog = false },
             onSave = { name, enabled, enterTaskId, exitTaskId, cooldown, automationMode, group ->
-                viewModel.createProfile(name, enabled, enterTaskId, exitTaskId, cooldown, automationMode, group)
+                viewModel.createProfile(name, enabled, enterTaskId, exitTaskId, cooldown, automationMode, group, selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID)
                 showCreateProfileDialog = false
             },
         )

@@ -30,6 +30,8 @@ import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.Project
+import com.opentasker.core.model.DEFAULT_PROJECT_ID
 import com.opentasker.core.validation.InputValidation
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Scene
@@ -58,6 +60,7 @@ import com.opentasker.core.storage.RunLogSnapshot
 import com.opentasker.core.storage.RunLogTaskOption
 import com.opentasker.core.storage.StorageDecodeIssue
 import com.opentasker.core.storage.VariableRepository
+import com.opentasker.core.storage.ProjectEntity
 import com.opentasker.core.storage.minimumTimestamp
 import com.opentasker.core.storage.loadPage
 import com.opentasker.core.storage.normalized
@@ -235,6 +238,10 @@ class ActiveAutomationViewModel(
         value == "Profile created" -> message(R.string.ui_message_profile_created)
         value == "Profile updated" -> message(R.string.ui_message_profile_updated)
         value == "Profile deleted" -> message(R.string.ui_message_profile_deleted)
+        value == "Project created" -> message(R.string.ui_message_project_created)
+        value == "Project renamed" -> message(R.string.ui_message_project_renamed)
+        value == "Project reordered" -> message(R.string.ui_message_project_reordered)
+        value == "Project deleted" -> message(R.string.ui_message_project_deleted)
         value == "Imported profile reviewed and enabled" -> message(R.string.ui_message_profile_reviewed)
         value == "Template installed as a disabled profile" -> message(R.string.ui_message_template_installed)
         value == "Edit undone" -> message(R.string.ui_message_edit_undone)
@@ -302,6 +309,13 @@ class ActiveAutomationViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
+    val projects: StateFlow<ImmutableList<Project>> = db.projectDao()
+        .getAllAsFlow()
+        .map { entities ->
+            entities.map(ProjectEntity::toDomain).sortedWith(compareBy<Project> { it.position }.thenBy { it.id }).toImmutableList()
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
+
     val runLogs: StateFlow<ImmutableList<RunLogEntry>> = db.runLogDao()
         .getRecentFlow()
         .map { entities -> entities.map { it.toDomain() }.toImmutableList() }
@@ -333,7 +347,7 @@ class ActiveAutomationViewModel(
     }
 
     val globalVariables: StateFlow<ImmutableList<Variable>> = variableRepository
-        .observeGlobals()
+        .observeGlobals(null)
         .map { variables -> variables.toImmutableList() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
@@ -409,12 +423,13 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun createTask(name: String, priority: Int, collisionMode: CollisionMode) = launchWithMessage("Task created") {
+    fun createTask(name: String, priority: Int, collisionMode: CollisionMode, projectId: Long = DEFAULT_PROJECT_ID) = launchWithMessage("Task created") {
         db.taskDao().insert(
             Task(
                 name = name.trim(),
                 priority = priority.coerceIn(0, 10),
                 collisionMode = collisionMode,
+                projectId = projectId,
             ).toEntity(),
         )
     }
@@ -541,12 +556,13 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun createScene(name: String, widthDp: Int, heightDp: Int) = launchWithMessage("Scene created") {
+    fun createScene(name: String, widthDp: Int, heightDp: Int, projectId: Long = DEFAULT_PROJECT_ID) = launchWithMessage("Scene created") {
         db.sceneDao().insert(
             Scene(
                 name = name.trim(),
                 widthDp = widthDp.coerceIn(120, 1440),
                 heightDp = heightDp.coerceIn(80, 2560),
+                projectId = projectId,
             ).toEntity()
         )
     }
@@ -575,7 +591,7 @@ class ActiveAutomationViewModel(
         db.sceneDao().delete(scene.toEntity())
     }
 
-    fun createProfile(name: String, enabled: Boolean, enterTaskId: Long, exitTaskId: Long?, cooldownSec: Int, automationMode: AutomationMode, group: String? = null) =
+    fun createProfile(name: String, enabled: Boolean, enterTaskId: Long, exitTaskId: Long?, cooldownSec: Int, automationMode: AutomationMode, group: String? = null, projectId: Long = DEFAULT_PROJECT_ID) =
         launchWithMessage("Profile created") {
             val profile = Profile(
                 name = name.trim(),
@@ -585,6 +601,7 @@ class ActiveAutomationViewModel(
                 cooldownSec = cooldownSec.coerceAtLeast(0),
                 automationMode = automationMode,
                 group = group,
+                projectId = projectId,
             )
             requireValidProfileFieldLimits(profile)
             db.profileDao().insert(reviewFeedbackRisk(profile).toEntity())
@@ -625,6 +642,60 @@ class ActiveAutomationViewModel(
                 db.profileDao().update(reviewedProfile.toEntity())
             }
         }
+
+    fun createProject(name: String) = launchWithMessage("Project created") {
+        val normalized = validateProjectName(name)
+        require(db.projectDao().getAll().none { it.name.equals(normalized, ignoreCase = true) }) {
+            "A project with that name already exists."
+        }
+        val nextPosition = (db.projectDao().getAll().maxOfOrNull { it.position } ?: -1) + 1
+        db.projectDao().insert(ProjectEntity(name = normalized, position = nextPosition))
+    }
+
+    fun renameProject(project: Project, name: String) = launchWithMessage("Project renamed") {
+        require(project.id != DEFAULT_PROJECT_ID) { "The Default project cannot be renamed." }
+        val normalized = validateProjectName(name)
+        require(db.projectDao().getAll().none { it.id != project.id && it.name.equals(normalized, ignoreCase = true) }) {
+            "A project with that name already exists."
+        }
+        db.projectDao().update(ProjectEntity(project.id, normalized, project.position))
+    }
+
+    fun reorderProject(project: Project, direction: Int) = launchWithMessage("Project reordered") {
+        val ordered = db.projectDao().getAll().sortedWith(compareBy<ProjectEntity> { it.position }.thenBy { it.id })
+        val index = ordered.indexOfFirst { it.id == project.id }
+        val targetIndex = (index + direction.coerceIn(-1, 1)).coerceIn(0, ordered.lastIndex)
+        if (index < 0 || targetIndex == index) return@launchWithMessage
+        val other = ordered[targetIndex]
+        db.projectDao().update(other.copy(position = project.position))
+        db.projectDao().update(ProjectEntity(project.id, project.name, other.position))
+    }
+
+    fun deleteProject(project: Project, targetProject: Project) = launchWithMessage("Project deleted") {
+        require(project.id != DEFAULT_PROJECT_ID) { "The Default project cannot be deleted." }
+        require(project.id != targetProject.id) { "Choose a different destination project." }
+        db.withTransaction {
+            val sourceVariables = db.variableDao().getAllInProject(project.id)
+            val targetNames = db.variableDao().getAllInProject(targetProject.id).map { it.name }.toSet()
+            val collisions = sourceVariables.map { it.name }.filter { it in targetNames }
+            require(collisions.isEmpty()) {
+                "Reassignment would overwrite variables: ${collisions.joinToString()}. Rename or remove them first."
+            }
+            db.taskDao().reassignProject(project.id, targetProject.id)
+            db.profileDao().reassignProject(project.id, targetProject.id)
+            db.sceneDao().reassignProject(project.id, targetProject.id)
+            sourceVariables.forEach { db.variableDao().insert(it.copy(projectId = targetProject.id)) }
+            db.variableDao().deleteAllInProject(project.id)
+            check(db.projectDao().deleteIfNotDefault(project.id) == 1) { "Project no longer exists." }
+        }
+    }
+
+    private fun validateProjectName(name: String): String {
+        val normalized = name.trim()
+        require(normalized.isNotEmpty()) { "Project name cannot be empty." }
+        require(normalized.length <= 64) { "Project names must be 64 characters or fewer." }
+        return normalized
+    }
 
     private suspend fun reviewFeedbackRisk(profile: Profile): Profile {
         if (!profile.enabled || profile.requiresRiskAcknowledgement) return profile
@@ -1255,13 +1326,13 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun updateVariable(name: String, value: String, isSecret: Boolean, successMessage: String) {
+    fun updateVariable(name: String, value: String, isSecret: Boolean, successMessage: String, projectId: Long = DEFAULT_PROJECT_ID) {
         viewModelScope.launch {
             runCatching {
                 val globalName = requireNotNull(VariableNamePolicy.promoteToGlobal(name)) {
                     appContext.getString(R.string.ui_error_invalid_variable_name)
                 }
-                variableRepository.upsert(Variable(globalName, value, isGlobal = true, isSecret = isSecret))
+                variableRepository.upsert(Variable(globalName, value, isGlobal = true, isSecret = isSecret, projectId = projectId))
                 events.send(legacyMessage(successMessage))
             }.onFailure { error ->
                 events.send(errorMessage(error, R.string.ui_error_variable_save))
@@ -1269,9 +1340,9 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun deleteVariable(name: String, successMessage: String) {
+    fun deleteVariable(name: String, successMessage: String, projectId: Long = DEFAULT_PROJECT_ID) {
         viewModelScope.launch {
-            runCatching { variableRepository.delete(name) }
+            runCatching { variableRepository.delete(name, projectId) }
                 .onSuccess { events.send(legacyMessage(successMessage)) }
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_variable_delete)) }
         }

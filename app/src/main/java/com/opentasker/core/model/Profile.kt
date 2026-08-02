@@ -19,6 +19,7 @@ data class Profile(
     val automationMode: AutomationMode = AutomationMode.SINGLE,
     val group: String? = null,
     val requiresRiskAcknowledgement: Boolean = false,
+    val projectId: Long = DEFAULT_PROJECT_ID,
 )
 
 @Serializable

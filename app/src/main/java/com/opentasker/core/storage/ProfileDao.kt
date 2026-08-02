@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Entity
 import androidx.room.Insert
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Update
@@ -11,8 +12,9 @@ import kotlinx.serialization.encodeToString
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ContextSpec
+import com.opentasker.core.model.DEFAULT_PROJECT_ID
 
-@Entity("profiles")
+@Entity("profiles", indices = [Index("projectId")])
 data class ProfileEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
@@ -24,6 +26,7 @@ data class ProfileEntity(
     val automationMode: String = AutomationMode.SINGLE.name,
     val profileGroup: String? = null,
     val requiresRiskAcknowledgement: Boolean = false,
+    @androidx.room.ColumnInfo(defaultValue = "1") val projectId: Long = DEFAULT_PROJECT_ID,
 ) {
     fun toDomain(): Profile = toDomainDecodeResult().requireDecoded()
 
@@ -43,6 +46,7 @@ data class ProfileEntity(
                         mode,
                         profileGroup,
                         requiresRiskAcknowledgement,
+                        projectId,
                     ),
                     issue = StorageDecodeIssue(
                         recordType = StorageRecordType.PROFILE,
@@ -66,6 +70,7 @@ data class ProfileEntity(
                 mode,
                 profileGroup,
                 requiresRiskAcknowledgement,
+                projectId,
             ),
         )
     }
@@ -82,6 +87,7 @@ fun Profile.toEntity() = ProfileEntity(
     automationMode.name,
     group,
     requiresRiskAcknowledgement,
+    projectId,
 )
 
 @Dao
@@ -94,4 +100,6 @@ interface ProfileDao {
     @Query("SELECT * FROM profiles WHERE enabled = 1 AND requiresRiskAcknowledgement = 0")
     suspend fun getAllEnabled(): List<ProfileEntity>
     @Query("SELECT * FROM profiles") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<ProfileEntity>>
+    @Query("UPDATE profiles SET projectId = :targetProjectId WHERE projectId = :sourceProjectId")
+    suspend fun reassignProject(sourceProjectId: Long, targetProjectId: Long)
 }
