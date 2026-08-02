@@ -223,8 +223,20 @@ class AutomationService : Service() {
             val runSource = AutomationTargetContract.runSourceLabel(
                 intent.getStringExtra(AutomationTargetContract.EXTRA_RUN_SOURCE),
             )
+            val producer = intent.getStringExtra(AutomationTargetContract.EXTRA_EXECUTION_PRODUCER)
+                ?: ExecutionProducer.fromSource(runSource).wireValue
+            val parentExecutionId = intent.getStringExtra(AutomationTargetContract.EXTRA_PARENT_EXECUTION_ID)
             if (executionId != null && taskId != null) {
-                scope.launch { runExternalTask(executionId, taskId, variables, runSource) }
+                scope.launch {
+                    runExternalTask(
+                        executionId = executionId,
+                        taskId = taskId,
+                        variables = variables,
+                        runSource = runSource,
+                        producer = producer,
+                        parentExecutionId = parentExecutionId,
+                    )
+                }
             }
             return START_STICKY
         }
@@ -556,6 +568,11 @@ class AutomationService : Service() {
             audioForegroundService = audioForegroundServiceEligibility,
             admissionController = executionAdmission,
             profileId = profile.id,
+            execution = ExecutionEnvelope.create(
+                task = task,
+                source = "Profile: ${profile.name}",
+                profileId = profile.id,
+            ),
         )
         if (result.logInserted) {
             pruneRunLogs(force = false)
@@ -581,23 +598,58 @@ class AutomationService : Service() {
         taskId: Long,
         variables: Map<String, String>,
         runSource: String,
+        producer: String,
+        parentExecutionId: String?,
     ) {
+        val storedExecution = ExternalExecutions.get(this, executionId)
+        val envelopeTask = Task(
+            id = taskId,
+            name = storedExecution?.taskName ?: "Task $taskId",
+        )
+        val execution = ExecutionEnvelope(
+            executionId = executionId,
+            producer = ExecutionProducer.fromWireValue(producer),
+            taskId = taskId,
+            taskName = envelopeTask.name,
+            source = runSource,
+            parentExecutionId = parentExecutionId ?: storedExecution?.parentExecutionId,
+            createdAtMs = storedExecution?.acceptedAtMs ?: System.currentTimeMillis(),
+        )
         fun fail(reason: String) {
             AppLogger.warn(TAG, "External execution $executionId failed: $reason")
             ExternalExecutions.update(this, executionId, ExternalExecutionState.FAILED, error = reason)
         }
 
         try {
-            val entity = db.taskDao().getById(taskId) ?: return fail("Task $taskId no longer exists.")
+            val entity = db.taskDao().getById(taskId)
+            if (entity == null) {
+                val reason = "Task $taskId no longer exists."
+                logSkippedRun(
+                    db = db,
+                    task = envelopeTask,
+                    source = execution.source,
+                    reason = reason,
+                    execution = execution,
+                    terminalReason = ExecutionTerminalReason(
+                        ExecutionTerminalReasonCode.TASK_NOT_FOUND,
+                        reason,
+                    ),
+                )
+                return fail(reason)
+            }
             val decoded = entity.toDomainDecodeResult()
             decoded.issue?.let { issue ->
                 val reason = issue.recoveryMessage()
                 logSkippedRun(
                     db = db,
                     task = decoded.value,
-                    source = runSource,
+                    source = execution.source,
                     reason = reason,
-                    metadata = listOf("execution=$executionId"),
+                    execution = execution,
+                    terminalReason = ExecutionTerminalReason(
+                        ExecutionTerminalReasonCode.TASK_CORRUPT,
+                        reason,
+                    ),
                 )
                 return fail(reason)
             }
@@ -606,12 +658,13 @@ class AutomationService : Service() {
                 appContext = this,
                 db = db,
                 task = decoded.value,
-                source = runSource,
-                metadata = listOf("execution=$executionId", "Variables: ${variables.size} provided"),
+                source = execution.source,
+                metadata = listOf("Variables: ${variables.size} provided"),
                 initialVariables = variables,
                 audioForegroundService = audioForegroundServiceEligibility,
                 logTag = TAG,
                 admissionController = executionAdmission,
+                execution = execution.copy(taskName = decoded.value.name),
             )
             ExternalExecutions.update(
                 context = this,
@@ -662,6 +715,14 @@ class AutomationService : Service() {
                     source = NotificationActionReceiver.SOURCE,
                     reason = reason,
                     metadata = listOf("button=$buttonLabel"),
+                    execution = ExecutionEnvelope.create(
+                        task = decoded.value,
+                        source = NotificationActionReceiver.SOURCE,
+                    ),
+                    terminalReason = ExecutionTerminalReason(
+                        ExecutionTerminalReasonCode.TASK_CORRUPT,
+                        reason,
+                    ),
                 )
                 return
             }
@@ -674,6 +735,10 @@ class AutomationService : Service() {
                 metadata = listOf("button=$buttonLabel"),
                 audioForegroundService = audioForegroundServiceEligibility,
                 admissionController = executionAdmission,
+                execution = ExecutionEnvelope.create(
+                    task = task,
+                    source = NotificationActionReceiver.SOURCE,
+                ),
             )
             if (result.logInserted) pruneRunLogs(force = false)
             val status = when {
@@ -701,6 +766,15 @@ class AutomationService : Service() {
                 source = "Profile: ${profile.name}",
                 reason = reason,
                 metadata = profileRunMetadata(profile),
+                execution = ExecutionEnvelope.create(
+                    task = task,
+                    source = "Profile: ${profile.name}",
+                    profileId = profile.id,
+                ),
+                terminalReason = ExecutionTerminalReason(
+                    ExecutionTerminalReasonCode.COLLISION_SKIPPED,
+                    reason,
+                ),
             )
             if (inserted) pruneRunLogs(force = false)
         }
@@ -737,7 +811,6 @@ class AutomationService : Service() {
     }
 
     private fun profileRunMetadata(profile: Profile): List<String> = buildList {
-        add("Profile ID: ${profile.id}")
         add("Mode: ${profile.automationMode.name.lowercase()}")
         if (profile.cooldownSec > 0) add("Cooldown: ${profile.cooldownSec}s")
     }

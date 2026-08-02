@@ -24,6 +24,7 @@ data class TaskExecutionResult(
     val report: TaskRunReport,
     val logInserted: Boolean,
     val skippedReason: String? = null,
+    val execution: ExecutionEnvelope,
 )
 
 suspend fun executeAndLogTask(
@@ -38,25 +39,49 @@ suspend fun executeAndLogTask(
     logTag: String = TAG,
     admissionController: ExecutionAdmissionController = ExecutionAdmissionController.Default,
     profileId: Long? = null,
+    execution: ExecutionEnvelope = ExecutionEnvelope.create(task, source, profileId = profileId),
 ): TaskExecutionResult = withContext(Dispatchers.IO) {
+    val accepted = ExecutionCommandLedger.accept(execution)
+    if (!accepted.isNew) {
+        val reason = ExecutionTerminalReason(
+            ExecutionTerminalReasonCode.DUPLICATE_DELIVERY,
+            "Duplicate execution delivery ignored.",
+        ).render()
+        return@withContext TaskExecutionResult(
+            report = collisionSkippedReport(task, reason),
+            logInserted = false,
+            skippedReason = reason,
+            execution = execution,
+        )
+    }
     val admission = admissionController.tryAcquire(profileId)
     if (!admission.accepted) {
         val reason = admission.reason ?: "Execution admission rejected this run."
+        val terminalReason = ExecutionTerminalReason(ExecutionTerminalReasonCode.ADMISSION_REJECTED, reason)
+        ExecutionCommandLedger.transition(
+            execution.executionId,
+            ExecutionLedgerState.SKIPPED,
+            terminalReason,
+        )
         val inserted = logSkippedRun(
             db = db,
             task = task,
-            source = source,
+            source = execution.source,
             reason = reason,
             metadata = metadata,
+            execution = execution,
+            terminalReason = terminalReason,
         )
         return@withContext TaskExecutionResult(
             report = collisionSkippedReport(task, reason),
             logInserted = inserted,
             skippedReason = reason,
+            execution = execution,
         )
     }
     val admissionLease = requireNotNull(admission.lease)
     try {
+    ExecutionCommandLedger.transition(execution.executionId, ExecutionLedgerState.RUNNING)
     // Run the whole task off the caller's thread. Manual runs (ViewModel), widget/shortcut, and
     // notification-action paths call this from the main thread; without this hop, blocking actions
     // (HTTP, file, ping) would throw NetworkOnMainThreadException and fail silently.
@@ -104,9 +129,12 @@ suspend fun executeAndLogTask(
             val admittedExecutionId = ActiveExecutionRegistry.register(
                 taskId = task.id,
                 taskName = task.name,
-                source = source,
+                source = execution.source,
                 job = currentCoroutineContext()[Job],
                 startedAtMs = System.currentTimeMillis(),
+                executionId = execution.executionId,
+                parentExecutionId = execution.parentExecutionId,
+                producer = execution.producer.wireValue,
             )
             executionId = admittedExecutionId
             try {
@@ -126,6 +154,15 @@ suspend fun executeAndLogTask(
         // suspending write here would be dropped and the run would vanish without a trace.
         withContext(NonCancellable) {
             executionId?.let(ActiveExecutionRegistry::unregister)
+            val terminalReason = ExecutionTerminalReason(
+                ExecutionTerminalReasonCode.CANCELLED,
+                cancellation.message ?: ActiveExecutionRegistry.CANCELLED_BY_USER,
+            )
+            ExecutionCommandLedger.transition(
+                execution.executionId,
+                ExecutionLedgerState.CANCELLED,
+                terminalReason,
+            )
             insertRunLog(
                 db,
                 RunLogEntry(
@@ -135,12 +172,14 @@ suspend fun executeAndLogTask(
                     durationMs = 0,
                     success = false,
                     message = cancelledRunLogMessage(
-                        source = source,
+                        source = execution.source,
                         reason = cancellation.message ?: ActiveExecutionRegistry.CANCELLED_BY_USER,
+                        execution = execution,
+                        terminalReason = terminalReason,
                         metadata = metadata,
                     ),
-                    source = RunLogSource.classify(source).key,
-                    sourceLabel = RunLogSource.classify(source).label,
+                    source = RunLogSource.classify(execution.source).key,
+                    sourceLabel = RunLogSource.classify(execution.source).label,
                 ),
             )
         }
@@ -149,17 +188,29 @@ suspend fun executeAndLogTask(
     val report = when (collisionOutcome) {
         is TaskCollisionOutcome.Executed -> collisionOutcome.value
         is TaskCollisionOutcome.Skipped -> {
+            val terminalReason = ExecutionTerminalReason(
+                ExecutionTerminalReasonCode.COLLISION_SKIPPED,
+                collisionOutcome.reason,
+            )
+            ExecutionCommandLedger.transition(
+                execution.executionId,
+                ExecutionLedgerState.SKIPPED,
+                terminalReason,
+            )
             val inserted = logSkippedRun(
                 db = db,
                 task = task,
-                source = source,
+                source = execution.source,
                 reason = collisionOutcome.reason,
                 metadata = metadata,
+                execution = execution,
+                terminalReason = terminalReason,
             )
             return@withContext TaskExecutionResult(
                 report = collisionSkippedReport(task, collisionOutcome.reason),
                 logInserted = inserted,
                 skippedReason = collisionOutcome.reason,
+                execution = execution,
             )
         }
     }
@@ -173,7 +224,15 @@ suspend fun executeAndLogTask(
         logTag,
     )
     AppLogger.info(logTag, "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)")
-    val classified = RunLogSource.classify(source)
+    val terminalReason = ExecutionTerminalReason(
+        if (report.success) ExecutionTerminalReasonCode.COMPLETED else ExecutionTerminalReasonCode.TASK_FAILED,
+    )
+    ExecutionCommandLedger.transition(
+        execution.executionId,
+        if (report.success) ExecutionLedgerState.SUCCEEDED else ExecutionLedgerState.FAILED,
+        terminalReason,
+    )
+    val classified = RunLogSource.classify(execution.source)
     val riskMetadata = taskPowerRunLogMetadata(task)
     val logEntry = RunLogEntry(
         taskId = task.id,
@@ -182,7 +241,9 @@ suspend fun executeAndLogTask(
         durationMs = report.durationMs,
         success = report.success,
         message = runLogMessage(
-            source = source,
+            source = execution.source,
+            execution = execution,
+            terminalReason = terminalReason,
             metadata = riskMetadata + metadata + globalCommitMetadata,
             traces = report.traces,
         ),
@@ -190,7 +251,7 @@ suspend fun executeAndLogTask(
         sourceLabel = classified.label,
     )
     val inserted = insertRunLog(db, logEntry)
-    TaskExecutionResult(report, inserted)
+    TaskExecutionResult(report, inserted, execution = execution)
     } finally {
         admissionLease.release()
     }
@@ -279,8 +340,17 @@ suspend fun logSkippedRun(
     source: String,
     reason: String,
     metadata: List<String> = emptyList(),
+    execution: ExecutionEnvelope? = null,
+    terminalReason: ExecutionTerminalReason? = null,
 ): Boolean {
-    val classified = RunLogSource.classify(source)
+    val envelope = execution ?: ExecutionEnvelope.create(task, source)
+    ExecutionCommandLedger.accept(envelope)
+    val resolvedReason = terminalReason ?: ExecutionTerminalReason(
+        ExecutionTerminalReasonCode.UNKNOWN,
+        reason,
+    )
+    ExecutionCommandLedger.transition(envelope.executionId, ExecutionLedgerState.SKIPPED, resolvedReason)
+    val classified = RunLogSource.classify(envelope.source)
     return insertRunLog(
         db,
         RunLogEntry(
@@ -289,8 +359,10 @@ suspend fun logSkippedRun(
             durationMs = 0,
             success = false,
             message = skippedRunLogMessage(
-                source = source,
+                source = envelope.source,
                 reason = reason,
+                execution = envelope,
+                terminalReason = resolvedReason,
                 metadata = metadata,
             ),
             source = classified.key,

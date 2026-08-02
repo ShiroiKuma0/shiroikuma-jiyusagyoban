@@ -59,7 +59,8 @@ class AutomationTargetContractTest {
         assertTrue(scene.contains("AutomationTargetContract.internalRunTaskIntent("))
         assertTrue(scene.contains("InternalTaskRunSource.SCENE_OVERLAY"))
         assertTrue(service.contains("AutomationTargetContract.EXTRA_RUN_SOURCE"))
-        assertTrue(service.contains("runExternalTask(executionId, taskId, variables, runSource)"))
+        assertTrue(service.contains("runExternalTask("))
+        assertTrue(service.contains("parentExecutionId = parentExecutionId"))
 
         val mainSourceRoot = listOf(
             File("src/main/java"),

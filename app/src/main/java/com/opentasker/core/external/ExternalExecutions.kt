@@ -24,10 +24,24 @@ object ExternalExecutions {
         return store
     }
 
-    fun accept(context: Context, taskId: Long, taskName: String, nowMs: Long = System.currentTimeMillis()): String {
+    fun accept(
+        context: Context,
+        taskId: Long,
+        taskName: String,
+        nowMs: Long = System.currentTimeMillis(),
+        executionId: String = UUID.randomUUID().toString(),
+        producer: String = "external",
+        parentExecutionId: String? = null,
+    ): String {
         val store = store(context)
-        val executionId = UUID.randomUUID().toString()
-        ledger.accept(executionId, taskId, taskName, nowMs)
+        ledger.accept(
+            executionId = executionId,
+            taskId = taskId,
+            taskName = taskName,
+            nowMs = nowMs,
+            producer = producer,
+            parentExecutionId = parentExecutionId,
+        )
         store.save(ledger.snapshot())
         return executionId
     }

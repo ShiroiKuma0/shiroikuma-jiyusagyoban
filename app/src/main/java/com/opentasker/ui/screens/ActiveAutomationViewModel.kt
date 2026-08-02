@@ -18,6 +18,7 @@ import com.opentasker.core.diagnostics.RunLogExportFormat
 import com.opentasker.core.diagnostics.RunLogExporter
 import com.opentasker.core.engine.ActiveExecution
 import com.opentasker.core.engine.ActiveExecutionRegistry
+import com.opentasker.core.engine.ExecutionEnvelope
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.model.AutomationMode
@@ -981,6 +982,7 @@ class ActiveAutomationViewModel(
                 db = db,
                 task = task,
                 source = "Manual run",
+                execution = ExecutionEnvelope.create(task, "Manual run"),
             )
             val status = when {
                 result.skippedReason != null -> "skipped"

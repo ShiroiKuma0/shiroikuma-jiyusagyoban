@@ -17,6 +17,9 @@ data class ActiveExecution(
     val stepIndex: Int = 0,
     val stepLabel: String? = null,
     val cancelling: Boolean = false,
+    val executionId: String = id.toString(),
+    val parentExecutionId: String? = null,
+    val producer: String = ExecutionProducer.OTHER.wireValue,
 )
 
 /**
@@ -37,7 +40,16 @@ object ActiveExecutionRegistry {
 
     val active: StateFlow<List<ActiveExecution>> = executions.asStateFlow()
 
-    fun register(taskId: Long, taskName: String, source: String, job: Job?, startedAtMs: Long): Long {
+    fun register(
+        taskId: Long,
+        taskName: String,
+        source: String,
+        job: Job?,
+        startedAtMs: Long,
+        executionId: String? = null,
+        parentExecutionId: String? = null,
+        producer: String? = null,
+    ): Long {
         val id = nextId.getAndIncrement()
         synchronized(jobs) {
             if (job != null) jobs[id] = job
@@ -47,6 +59,9 @@ object ActiveExecutionRegistry {
                 taskName = taskName,
                 source = source,
                 startedAtMs = startedAtMs,
+                executionId = executionId ?: id.toString(),
+                parentExecutionId = parentExecutionId,
+                producer = producer ?: ExecutionProducer.fromSource(source).wireValue,
             )
         }
         return id

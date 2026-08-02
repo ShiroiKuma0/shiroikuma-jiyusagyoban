@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.widget.Toast
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.engine.executeAndLogTask
+import com.opentasker.core.engine.ExecutionEnvelope
 import com.opentasker.core.engine.logSkippedRun
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.storage.recoveryMessage
@@ -47,6 +48,7 @@ class TaskRunActivity : Activity() {
                             db = db,
                             task = task,
                             source = source,
+                            execution = ExecutionEnvelope.create(task, source),
                             visibleActivity = true,
                         )
                         val status = when {

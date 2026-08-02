@@ -16,6 +16,8 @@ object RunLogSource {
     const val NOTIFICATION_ACTION = "notification_action"
     const val WIDGET = "widget"
     const val SHORTCUT = "shortcut"
+    const val LOCALE_PLUGIN = "locale_plugin"
+    const val SCENE_OVERLAY = "scene_overlay"
     const val OTHER = "other"
 
     data class Classified(val key: String, val label: String?)
@@ -37,6 +39,10 @@ object RunLogSource {
                 Classified(WIDGET, null)
             trimmed.equals("Shortcut", ignoreCase = true) ->
                 Classified(SHORTCUT, null)
+            trimmed.equals("Locale plugin", ignoreCase = true) ->
+                Classified(LOCALE_PLUGIN, null)
+            trimmed.equals("Scene overlay", ignoreCase = true) ->
+                Classified(SCENE_OVERLAY, null)
             trimmed.isBlank() ->
                 Classified(OTHER, null)
             else ->
@@ -53,6 +59,8 @@ object RunLogSource {
         NOTIFICATION_ACTION -> "Notification action"
         WIDGET -> "Widget"
         SHORTCUT -> "Shortcut"
+        LOCALE_PLUGIN -> "Locale plugin"
+        SCENE_OVERLAY -> "Scene overlay"
         OTHER -> "Other"
         else -> "Unknown"
     }

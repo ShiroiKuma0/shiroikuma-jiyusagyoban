@@ -30,6 +30,8 @@ data class ExternalExecutionRecord(
     val updatedAtMs: Long,
     val durationMs: Long = 0,
     val error: String? = null,
+    val producer: String = "external",
+    val parentExecutionId: String? = null,
 )
 
 /**
@@ -42,8 +44,16 @@ data class ExternalExecutionRecord(
 class ExternalExecutionLedger(private val capacity: Int = DEFAULT_CAPACITY) {
     private val records = LinkedHashMap<String, ExternalExecutionRecord>()
 
-    fun accept(executionId: String, taskId: Long, taskName: String, nowMs: Long): ExternalExecutionRecord =
+    fun accept(
+        executionId: String,
+        taskId: Long,
+        taskName: String,
+        nowMs: Long,
+        producer: String = "external",
+        parentExecutionId: String? = null,
+    ): ExternalExecutionRecord =
         synchronized(records) {
+            records[executionId]?.let { return@synchronized it }
             val record = ExternalExecutionRecord(
                 executionId = executionId,
                 taskId = taskId,
@@ -51,6 +61,8 @@ class ExternalExecutionLedger(private val capacity: Int = DEFAULT_CAPACITY) {
                 state = ExternalExecutionState.ACCEPTED,
                 acceptedAtMs = nowMs,
                 updatedAtMs = nowMs,
+                producer = producer,
+                parentExecutionId = parentExecutionId,
             )
             records[executionId] = record
             evictOverflow()
@@ -146,6 +158,8 @@ class ExternalExecutionStore(context: Context) {
         record.updatedAtMs.toString(),
         record.durationMs.toString(),
         record.error.orEmpty().sanitize(),
+        record.producer.sanitize(),
+        record.parentExecutionId.orEmpty().sanitize(),
     ).joinToString(FIELD_SEPARATOR)
 
     private fun decode(raw: String): ExternalExecutionRecord? {
@@ -160,6 +174,8 @@ class ExternalExecutionStore(context: Context) {
             updatedAtMs = parts[5].toLongOrNull() ?: return null,
             durationMs = parts[6].toLongOrNull() ?: 0,
             error = parts[7].takeIf { it.isNotBlank() },
+            producer = parts.getOrNull(8)?.takeIf { it.isNotBlank() } ?: "external",
+            parentExecutionId = parts.getOrNull(9)?.takeIf { it.isNotBlank() },
         )
     }
 

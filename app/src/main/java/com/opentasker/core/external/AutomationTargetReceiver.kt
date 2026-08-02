@@ -8,12 +8,15 @@ import android.os.Bundle
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import androidx.core.content.ContextCompat
 import com.opentasker.core.engine.AutomationService
+import com.opentasker.core.engine.ExecutionEnvelope
+import com.opentasker.core.engine.ExecutionProducer
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.storage.toEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 enum class InternalTaskRunSource(
     val wireValue: String,
@@ -62,6 +65,8 @@ object AutomationTargetContract {
     const val EXTRA_EXECUTION_STATE = "com.opentasker.extra.EXECUTION_STATE"
     const val EXTRA_EXECUTION_TERMINAL = "com.opentasker.extra.EXECUTION_TERMINAL"
     const val EXTRA_RUN_SOURCE = "com.opentasker.extra.RUN_SOURCE"
+    const val EXTRA_PARENT_EXECUTION_ID = "com.opentasker.extra.PARENT_EXECUTION_ID"
+    const val EXTRA_EXECUTION_PRODUCER = "com.opentasker.extra.EXECUTION_PRODUCER"
 
     const val VARIABLE_EXTRA_PREFIX = "com.opentasker.var."
     const val DEFAULT_RUN_SOURCE = "External intent"
@@ -87,6 +92,8 @@ object AutomationTargetContract {
         taskId: Long,
         source: InternalTaskRunSource,
         variables: Map<String, String> = emptyMap(),
+        executionId: String = UUID.randomUUID().toString(),
+        parentExecutionId: String? = null,
     ): Intent {
         require(taskId > 0) { "Task id must be positive." }
         variables.keys.forEach { variableName ->
@@ -97,6 +104,9 @@ object AutomationTargetContract {
             putExtra(EXTRA_PROTOCOL_VERSION, PROTOCOL_VERSION)
             putExtra(EXTRA_TASK_ID, taskId)
             putExtra(EXTRA_RUN_SOURCE, source.wireValue)
+            putExtra(EXTRA_EXECUTION_ID, executionId)
+            putExtra(EXTRA_EXECUTION_PRODUCER, source.wireValue)
+            parentExecutionId?.let { putExtra(EXTRA_PARENT_EXECUTION_ID, it) }
             variables.entries
                 .sortedBy { it.key }
                 .take(MAX_SUPPLIED_VARIABLES)
@@ -166,32 +176,48 @@ class AutomationTargetReceiver : BroadcastReceiver() {
         val runSource = AutomationTargetContract.runSourceLabel(
             intent.getStringExtra(AutomationTargetContract.EXTRA_RUN_SOURCE),
         )
-        val executionId = ExternalExecutions.accept(appContext, task.id, task.name)
+        val requestedExecutionId = intent
+            .getStringExtra(AutomationTargetContract.EXTRA_EXECUTION_ID)
+            ?.trim()
+            ?.takeIf(ExecutionEnvelope::isValidExecutionId)
+        val requestedParentExecutionId = intent
+            .getStringExtra(AutomationTargetContract.EXTRA_PARENT_EXECUTION_ID)
+            ?.trim()
+            ?.takeIf(ExecutionEnvelope::isValidExecutionId)
+        val existing = requestedExecutionId?.let { ExternalExecutions.get(appContext, it) }
+        val producer = intent.getStringExtra(AutomationTargetContract.EXTRA_EXECUTION_PRODUCER)
+            ?.trim()
+            ?.takeIf { value -> ExecutionProducer.entries.any { it.wireValue == value } }
+            ?: InternalTaskRunSource.entries
+                .firstOrNull { it.wireValue == intent.getStringExtra(AutomationTargetContract.EXTRA_RUN_SOURCE) }
+                ?.wireValue
+            ?: ExecutionProducer.fromSource(runSource).wireValue
+        val executionId = ExternalExecutions.accept(
+            context = appContext,
+            taskId = task.id,
+            taskName = task.name,
+            executionId = requestedExecutionId ?: UUID.randomUUID().toString(),
+            producer = producer,
+            parentExecutionId = requestedParentExecutionId,
+        )
+
+        // Re-delivery of a command with the same id is an acknowledgement, not a second run.
+        if (existing != null) return acceptedResponse(existing)
 
         val serviceIntent = Intent(appContext, AutomationService::class.java).apply {
             action = AutomationService.ACTION_RUN_EXTERNAL_TASK
             putExtra(AutomationTargetContract.EXTRA_EXECUTION_ID, executionId)
             putExtra(AutomationTargetContract.EXTRA_TASK_ID, task.id)
             putExtra(AutomationTargetContract.EXTRA_RUN_SOURCE, runSource)
+            putExtra(AutomationTargetContract.EXTRA_EXECUTION_PRODUCER, producer)
+            requestedParentExecutionId?.let { putExtra(AutomationTargetContract.EXTRA_PARENT_EXECUTION_ID, it) }
             suppliedVariables.forEach { (name, value) ->
                 putExtra(AutomationTargetContract.variableExtraName(name), value)
             }
         }
         return try {
             ContextCompat.startForegroundService(appContext, serviceIntent)
-            TargetResponse(
-                Activity.RESULT_OK,
-                Bundle().apply {
-                    putInt(AutomationTargetContract.EXTRA_PROTOCOL_VERSION, AutomationTargetContract.PROTOCOL_VERSION)
-                    putBoolean(AutomationTargetContract.EXTRA_ACCEPTED, true)
-                    putString(AutomationTargetContract.EXTRA_EXECUTION_ID, executionId)
-                    putString(
-                        AutomationTargetContract.EXTRA_EXECUTION_STATE,
-                        ExternalExecutionState.ACCEPTED.name,
-                    )
-                    putBoolean(AutomationTargetContract.EXTRA_EXECUTION_TERMINAL, false)
-                },
-            )
+            acceptedResponse(requireNotNull(ExternalExecutions.get(appContext, executionId)))
         } catch (e: Exception) {
             ExternalExecutions.update(
                 appContext,
@@ -224,6 +250,12 @@ class AutomationTargetReceiver : BroadcastReceiver() {
                 putString(AutomationTargetContract.EXTRA_EXECUTION_ID, executionId)
                 putString(AutomationTargetContract.EXTRA_EXECUTION_STATE, state.name)
                 putBoolean(AutomationTargetContract.EXTRA_EXECUTION_TERMINAL, state.isTerminal)
+                record?.parentExecutionId?.let {
+                    putString(AutomationTargetContract.EXTRA_PARENT_EXECUTION_ID, it)
+                }
+                record?.producer?.let {
+                    putString(AutomationTargetContract.EXTRA_EXECUTION_PRODUCER, it)
+                }
                 record?.let {
                     putLong(AutomationTargetContract.EXTRA_TASK_ID, it.taskId)
                     putLong(AutomationTargetContract.EXTRA_TASK_DURATION_MS, it.durationMs)
@@ -335,6 +367,21 @@ class AutomationTargetReceiver : BroadcastReceiver() {
             extras.apply { putString(AutomationTargetContract.EXTRA_ERROR, message) },
         )
     }
+
+    private fun acceptedResponse(record: ExternalExecutionRecord): TargetResponse = TargetResponse(
+        Activity.RESULT_OK,
+        Bundle().apply {
+            putInt(AutomationTargetContract.EXTRA_PROTOCOL_VERSION, AutomationTargetContract.PROTOCOL_VERSION)
+            putBoolean(AutomationTargetContract.EXTRA_ACCEPTED, true)
+            putString(AutomationTargetContract.EXTRA_EXECUTION_ID, record.executionId)
+            putString(AutomationTargetContract.EXTRA_EXECUTION_STATE, record.state.name)
+            putBoolean(AutomationTargetContract.EXTRA_EXECUTION_TERMINAL, record.state.isTerminal)
+            record.parentExecutionId?.let {
+                putString(AutomationTargetContract.EXTRA_PARENT_EXECUTION_ID, it)
+            }
+            putString(AutomationTargetContract.EXTRA_EXECUTION_PRODUCER, record.producer)
+        },
+    )
 
     companion object {
         private const val TAG = "AutomationTargetReceiver"

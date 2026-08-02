@@ -13,6 +13,10 @@ enum class RunLogOutcome(val label: String) {
 
 data class RunLogDiagnostics(
     val source: String? = null,
+    val executionId: String? = null,
+    val parentExecutionId: String? = null,
+    val producer: String? = null,
+    val terminalReason: String? = null,
     val decision: String? = null,
     val reason: String? = null,
     val traces: List<RunLogActionDiagnostic> = emptyList(),
@@ -66,11 +70,15 @@ fun RunLogEntry.outcome(): RunLogOutcome {
 
 fun runLogMessage(
     source: String,
+    execution: ExecutionEnvelope? = null,
+    terminalReason: ExecutionTerminalReason? = null,
     metadata: List<String> = emptyList(),
     traces: List<ActionExecutionTrace> = emptyList(),
 ): String = buildList {
-    add("Source: ${source.trim()}")
-    metadata
+    add("Source: ${(execution?.source ?: source).trim()}")
+    execution?.metadataLines().orEmpty()
+        .plus(terminalReason?.let { listOf("Terminal reason: ${it.render()}") }.orEmpty())
+        .plus(metadata)
         .map { it.trim() }
         .filter { it.isNotBlank() }
         .forEach(::add)
@@ -80,12 +88,16 @@ fun runLogMessage(
 fun skippedRunLogMessage(
     source: String,
     reason: String,
+    execution: ExecutionEnvelope? = null,
+    terminalReason: ExecutionTerminalReason? = null,
     metadata: List<String> = emptyList(),
 ): String = buildList {
-    add("Source: ${source.trim()}")
+    add("Source: ${(execution?.source ?: source).trim()}")
     add("Decision: $SKIPPED_DECISION")
     add("Reason: ${reason.trim()}")
-    metadata
+    execution?.metadataLines().orEmpty()
+        .plus(terminalReason?.let { listOf("Terminal reason: ${it.render()}") }.orEmpty())
+        .plus(metadata)
         .map { it.trim() }
         .filter { it.isNotBlank() }
         .forEach(::add)
@@ -98,12 +110,16 @@ fun skippedRunLogMessage(
 fun cancelledRunLogMessage(
     source: String,
     reason: String,
+    execution: ExecutionEnvelope? = null,
+    terminalReason: ExecutionTerminalReason? = null,
     metadata: List<String> = emptyList(),
 ): String = buildList {
-    add("Source: ${source.trim()}")
+    add("Source: ${(execution?.source ?: source).trim()}")
     add("Decision: $CANCELLED_DECISION")
     add("Reason: ${reason.trim()}")
-    metadata
+    execution?.metadataLines().orEmpty()
+        .plus(terminalReason?.let { listOf("Terminal reason: ${it.render()}") }.orEmpty())
+        .plus(metadata)
         .map { it.trim() }
         .filter { it.isNotBlank() }
         .forEach(::add)
@@ -113,6 +129,10 @@ fun String.toRunLogDiagnostics(): RunLogDiagnostics {
     if (isBlank()) return RunLogDiagnostics()
 
     var source: String? = null
+    var executionId: String? = null
+    var parentExecutionId: String? = null
+    var producer: String? = null
+    var terminalReason: String? = null
     var decision: String? = null
     var reason: String? = null
     val traces = mutableListOf<RunLogActionDiagnostic>()
@@ -125,6 +145,10 @@ fun String.toRunLogDiagnostics(): RunLogDiagnostics {
             when {
                 line == LEGACY_EXTERNAL_SOURCE -> source = LEGACY_EXTERNAL_SOURCE
                 line.startsWith(SOURCE_PREFIX, ignoreCase = true) -> source = line.valueAfterPrefix(SOURCE_PREFIX)
+                line.startsWith(EXECUTION_ID_PREFIX, ignoreCase = true) -> executionId = line.valueAfterPrefix(EXECUTION_ID_PREFIX)
+                line.startsWith(PARENT_EXECUTION_ID_PREFIX, ignoreCase = true) -> parentExecutionId = line.valueAfterPrefix(PARENT_EXECUTION_ID_PREFIX)
+                line.startsWith(PRODUCER_PREFIX, ignoreCase = true) -> producer = line.valueAfterPrefix(PRODUCER_PREFIX)
+                line.startsWith(TERMINAL_REASON_PREFIX, ignoreCase = true) -> terminalReason = line.valueAfterPrefix(TERMINAL_REASON_PREFIX)
                 line.startsWith(DECISION_PREFIX, ignoreCase = true) -> decision = line.valueAfterPrefix(DECISION_PREFIX)
                 line.startsWith(REASON_PREFIX, ignoreCase = true) -> reason = line.valueAfterPrefix(REASON_PREFIX)
                 line.startsWith(VARIABLE_CHANGE_PREFIX, ignoreCase = true) -> {
@@ -151,6 +175,10 @@ fun String.toRunLogDiagnostics(): RunLogDiagnostics {
 
     return RunLogDiagnostics(
         source = source?.takeIf { it.isNotBlank() },
+        executionId = executionId?.takeIf { it.isNotBlank() },
+        parentExecutionId = parentExecutionId?.takeIf { it.isNotBlank() },
+        producer = producer?.takeIf { it.isNotBlank() },
+        terminalReason = terminalReason?.takeIf { it.isNotBlank() },
         decision = decision?.takeIf { it.isNotBlank() },
         reason = reason?.takeIf { it.isNotBlank() },
         traces = traces,
@@ -244,6 +272,10 @@ private data class ParsedTraceMessage(
 
 private val tracePattern = Regex("""^(\d+)\. ([a-z]+): (.*?) \[([^]]+)] (\d+)ms - (.*)$""")
 private const val SOURCE_PREFIX = "Source:"
+private const val EXECUTION_ID_PREFIX = "Execution ID:"
+private const val PARENT_EXECUTION_ID_PREFIX = "Parent execution ID:"
+private const val PRODUCER_PREFIX = "Producer:"
+private const val TERMINAL_REASON_PREFIX = "Terminal reason:"
 private const val DECISION_PREFIX = "Decision:"
 private const val REASON_PREFIX = "Reason:"
 private const val ARGUMENTS_DETAIL_PREFIX = "args:"
