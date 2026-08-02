@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.79.2026-08-02.g915979d9+004`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.79.2026-08-02.g915979d9+025`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 > The version names the upstream commit the fork is rebased on:
 > `<upstream version>.<base commit date>.g<8-char upstream sha>+<build>`. Upstream's own version
@@ -19,7 +19,7 @@
 
 It is a native **Kotlin + Jetpack Compose** automation engine — profiles bind **triggers** to **tasks**, tasks run **actions**, all persisted in Room, no Hilt, no native code. Built on OpenTasker and extended into a markedly more capable tool than OpenTasker — and, in everyday use, than Tasker itself. It installs **side-by-side** with upstream (application id `shiroikuma.jiyusagyoban`), so both can coexist.
 
-> A fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions: a generic **Send Intent** action, cross-app **protected contacts** (content-free notifications for private senders), a screen-off **notification wakedance**, **app freeze/unfreeze + launcher-task generation**, a fully app-driven **kanji clock**, **projects + foldable groups + scoped variables**, full **drag-to-reorder** (tasks, projects, project-tabs), a **Review Import** workflow, a **capability-aware action editor**, **home-screen task shortcuts with custom icons**, **Desktop re-freeze bubbles**, home-screen **widgets + a template library**, **living scene overlays** (a charging fire on the battery line, a **natively-rendered, music-reactive, tempo-locked** music edge-light — all screen-off gated), **per-app share-sheet tiles** (each generated as its own signed relay APK, on-device), a **backup-guarded system language switch**, a **full app-state Export/Import** (everything settable as one category ZIP), **one-tap backup of every sister app** (a plan → run → report window: pick apps and items, watch two live panes, repair what failed without leaving it), a headless **adb automation bridge** (workspace export/import broadcasts), sub-minute triggers, and a black-and-yellow theme.
+> A fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions: a generic **Send Intent** action, cross-app **protected contacts** (content-free notifications for private senders), a screen-off **notification wakedance**, **app freeze/unfreeze + launcher-task generation**, a fully app-driven **kanji clock**, **projects + foldable groups + scoped variables**, full **drag-to-reorder** (tasks, projects, project-tabs), a **Review Import** workflow, a **capability-aware action editor**, **home-screen task shortcuts with custom icons**, **Desktop re-freeze bubbles**, home-screen **widgets + a template library**, **living scene overlays** (a charging fire on the battery line, a **natively-rendered, music-reactive, tempo-locked** music edge-light — all screen-off gated), **per-app share-sheet tiles** (each generated as its own signed relay APK, on-device), a **backup-guarded system language switch**, a **full app-state Export/Import** (everything settable as one category ZIP), **one-tap backup of every sister app** (a plan → run → report window: pick apps and items, watch two live panes, repair what failed without leaving it), a headless **adb automation bridge** (workspace export/import broadcasts), **per-SIM speed testing** (real throughput and a real round-trip ping on each SIM and over WiFi, with root-free data-SIM switching), sub-minute triggers, and a black-and-yellow theme.
 
 ---
 
@@ -153,6 +153,28 @@ regex-captured key; `task.exists` lets a task check for a sub-task before callin
 alphabetises a group that grows a generated task per app. All that's left for you is pasting the
 app's token.
 
+### 📶 接続 — what each SIM is actually doing
+Speed varies by where you are, and this phone carries two SIMs. **Speed Test** measures real download
+and upload throughput over **one chosen transport** — it pins its own network, so the leg runs on the SIM
+you asked for. Shaped like Ookla's: the **clock** is the limiter rather than a byte count (a size cap that
+binds first ends the leg inside TCP slow-start and under-reports a fast link), **eight parallel streams**
+because a single TCP stream is bounded by `window / RTT`, the first two seconds excluded from the headline
+as ramp, and the nearest server **discovered at run time** from Ookla's own distance-ordered list. Live
+figures publish into `%SPD_*` as it runs — instantaneous rate, average, peak, percent and a direction
+glyph — so a scene animates without polling.
+
+Throughput is read from the **kernel's per-UID counters**, which advance only when bytes leave the
+interface: counting a `write()` as sent measures the socket buffer, not the network, and overstated every
+upload. The measurement window closes at the last counted byte rather than when the workers return, and
+the leg stops at its deadline instead of draining afterwards — a leg used to run 12 s past its 10 s with
+nothing moving, quietly dragging the average down. **Cancel Speed Test** stops a run in under 200 ms.
+
+Latency is a **real round trip** — the TCP handshake to the server the leg will use, taken before the
+transfer while the link is idle, since measuring under load reports bufferbloat instead. **Set Data SIM**
+and **List SIMs** move mobile data between slots **without root** (through Shizuku), addressing SIMs by
+**slot rather than subscription id**, because a phone accumulates stale subIds and a hardcoded one breaks
+the day a SIM is re-seated.
+
 ### 📊 Monitor, widgets & theme
 A **Monitor** tab aggregates engine task-activity and widget pulls. A styled-bitmap **home-screen widget engine** with a visual layout editor (Tasker Widget V2 import) and a **named-template library**. A black-and-yellow **AMOLED theme** + a kxkb-styled UI-customization page (text-wide underlined headings), unified JSON import/export, multi-select, and an in-app Help/Docs tab.
 
@@ -176,13 +198,13 @@ A profile is active while **all** its contexts match. Seven families:
 
 ---
 
-## Actions — **148 built-in** (＋ engine flow control)
+## Actions — **160 built-in** (＋ engine flow control)
 
 > Bold = added or materially extended in this fork.
 
-**App (19)** — **Send Intent** *(＋ `reply_via=receiver` binder-free reply channel, waits up to 600 s)* · **Launch Intent** · Launch App · **Freeze App** · **Unfreeze App** · **Make Launcher Tasks** · **Generate Share Relays** · **Pick Apps → Variable** *(icon-tile grid, pre-ticked)* · **Pick One App → Variable** *(one-tap, restrictable)* · Kill App · Go Home · Next App · Previous App · Open URL · Send SMS · Call · Compose Email · List Apps · Take Screenshot
+**App (24)** — **Send Intent** *(＋ `reply_via=receiver` binder-free reply channel, waits up to 600 s)* · **Launch Intent** · Launch App · **Freeze App** · **Unfreeze App** · **Make Launcher Tasks** · **Generate Share Relays** · **Pick Apps → Variable** *(icon-tile grid, pre-ticked)* · **Pick One App → Variable** *(one-tap, restrictable)* · Kill App · Go Home · Next App · Previous App · Open URL · Send SMS · Call · Compose Email · List Apps · Take Screenshot
 
-**System (23)** — **Turn Screen Off** · **Wake Device** · **Run Shell** (Shizuku) · **Show Scene** · **Hide Scene** · **Set Widget** · **Refresh Widgets** · **Flash Bubble Add / Remove / Clear** · **Flash Kill Icon Show / Hide** · Flash · Vibrate · Reboot Device · Lock Device · Set / Get Clipboard · Set Wallpaper · Set / Pick Keyboard · Profile Status · Log Message
+**System (31)** — **Set Data SIM** *(root-free, by slot, via Shizuku)* · **List SIMs** · **Turn Screen Off** · **Wake Device** · **Run Shell** (Shizuku) · **Show Scene** · **Hide Scene** · **Set Widget** · **Refresh Widgets** · **Flash Bubble Add / Remove / Clear** · **Flash Kill Icon Show / Hide** · Flash · Vibrate · Reboot Device · Lock Device · Set / Get Clipboard · Set Wallpaper · Set / Pick Keyboard · Profile Status · Log Message
 
 **Settings (20)** — Toggle WiFi · Toggle Bluetooth · Toggle Mobile Data · Toggle Airplane Mode · Toggle Torch · Set / Auto Brightness · Set Volume · Get Volume · Set Ringer Mode · Set Do Not Disturb · Set Screen Timeout · Location Mode · Set Tile State · **Get Locale** · **Set Locale** *(reorders the list — keeps other languages)* · **Get Device State** (battery / charging-plugged / WiFi / airplane → vars) · Get / Put Setting · WiFi Settings
 
@@ -190,17 +212,19 @@ A profile is active while **all** its contexts match. Seven families:
 
 **Flow (11)** — If · Else · End If · For Each · End For · Run Task · Return Values · Stop · Fail · Wait · Comment
 
-**File (8)** — Read · Write · Append · Move · Delete · List Files · Create Directory · Open File
+**File (9)** — Read · Write · Append · Move · Delete · List Files · Create Directory · Open File
 
-**Interface (7)** — Back · Recents · Lock Screen · Notifications Panel · Quick Settings · Power Dialog · Take Screenshot *(accessibility global actions)*
+**Interface (8)** — Back · Recents · Lock Screen · Notifications Panel · Quick Settings · Power Dialog · Take Screenshot *(accessibility global actions)*
 
-**Media (6)** — Play / Stop / Pause Sound · Next / Previous Track · Mute
+**Media (9)** — Play / Stop / Pause Sound · Next / Previous Track · Mute
 
-**Network (6)** — HTTP Request *(any method, headers, body, timeouts, response capture)* · HTTP GET · HTTP POST · Download File · Ping Host · Wake-on-LAN
+**Network (8)** — **Speed Test** *(per-transport throughput, wire-measured, with a real TCP-handshake ping)* · **Cancel Speed Test** · HTTP Request *(any method, headers, body, timeouts, response capture)* · HTTP GET · HTTP POST · Download File · Ping Host · Wake-on-LAN
 
 **Notification (4)** — Show Notification *(tap-task + 3 action buttons)* · Cancel Notification · **Dismiss App Notifications** *(by package)* · Say (Text-to-Speech)
 
 **Alert (4)** — Input Dialog · List Dialog · Text Dialog · **Pick From List → Variable** *(checkbox multi-select with a 全選択 master toggle and indented sub-options)*
+
+**Tasks (4)** — **Add Action to Task** *(idempotent, optionally re-sorting the matched block)* · **Task Exists** · **Sort Tasks** · **Edit Action**
 
 **Plugin (2)** — Locale Plugin Setting · Locale Plugin Condition
 
