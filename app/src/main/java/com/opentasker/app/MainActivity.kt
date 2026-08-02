@@ -1,8 +1,11 @@
 package com.opentasker.app
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
+import android.window.OnBackInvokedCallback
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.lifecycle.lifecycleScope
 import com.opentasker.core.logging.AppLogger
 import androidx.activity.compose.setContent
@@ -26,8 +29,20 @@ import com.opentasker.ui.theme.ThemeMode
 import com.opentasker.ui.theme.ThemePreference
 
 class MainActivity : ComponentActivity() {
+    private val rootBackCallback = object : OnBackPressedCallback(true) {
+        override fun handleOnBackPressed() {
+            finish()
+        }
+    }
+
+    private val predictiveBackCallback = OnBackInvokedCallback {
+        onBackPressedDispatcher.onBackPressed()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        onBackPressedDispatcher.addCallback(this, rootBackCallback)
+        registerPredictiveBackCallback()
         enableEdgeToEdge()
         
         setContent {
@@ -49,6 +64,11 @@ class MainActivity : ComponentActivity() {
         }
         startAutomationService()
         handleNfcIntent(intent)
+    }
+
+    override fun onDestroy() {
+        unregisterPredictiveBackCallback()
+        super.onDestroy()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -86,5 +106,18 @@ class MainActivity : ComponentActivity() {
         }.onFailure { error ->
             AppLogger.error("MainActivity", "Failed to start OpenTasker automation service", error)
         }
+    }
+
+    private fun registerPredictiveBackCallback() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        onBackInvokedDispatcher.registerOnBackInvokedCallback(
+            android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+            predictiveBackCallback,
+        )
+    }
+
+    private fun unregisterPredictiveBackCallback() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        onBackInvokedDispatcher.unregisterOnBackInvokedCallback(predictiveBackCallback)
     }
 }

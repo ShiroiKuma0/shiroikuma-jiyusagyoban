@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add an explicit Android predictive-back callback bridge with a legacy-compatible root-screen fallback and lifecycle-safe teardown.
+
 ## v0.2.80
 
 - Add a build-gated `event=sms_received` SMS/MMS trigger with sanitized sender/body metadata, sender/body filters, Android 17 OTP-delay disclosure, and Play-artifact exclusion.
