@@ -47,7 +47,14 @@ sealed class ActionResult {
 interface Action {
     val id: String                 // stable, e.g. "wifi.toggle"
     val category: ActionCategory
+    /** Whether the engine may repeat this action after a transient failure. */
+    val retrySafety: ActionRetrySafety get() = ActionRetrySafety.NEVER
     suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult
+}
+
+enum class ActionRetrySafety {
+    NEVER,
+    IDEMPOTENT,
 }
 
 enum class ActionCategory {

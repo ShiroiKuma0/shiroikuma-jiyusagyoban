@@ -57,4 +57,21 @@ class FlowStructureTest {
         )
         assertNotNull(s.error)
     }
+
+    @Test
+    fun pairsTryCatchEndtry() {
+        val s = FlowStructure.analyze(
+            listOf(a(FlowControl.TRY), a("x"), a(FlowControl.CATCH), a("y"), a(FlowControl.ENDTRY)),
+        )
+        assertNull(s.error)
+        assertEquals(2, s.tryToCatch[0])
+        assertEquals(4, s.tryToEndtry[0])
+        assertEquals(4, s.catchToEndtry[2])
+    }
+
+    @Test
+    fun rejectsInvalidTryBoundsAndDuplicateCatch() {
+        assertNotNull(FlowStructure.analyze(listOf(ActionSpec(type = FlowControl.TRY, args = mapOf("max_attempts" to "6")), a(FlowControl.ENDTRY))).error)
+        assertNotNull(FlowStructure.analyze(listOf(a(FlowControl.TRY), a(FlowControl.CATCH), a(FlowControl.CATCH), a(FlowControl.ENDTRY))).error)
+    }
 }

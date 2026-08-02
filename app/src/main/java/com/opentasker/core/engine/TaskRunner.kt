@@ -10,6 +10,7 @@ import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
 
 /** Resolves a sub-task by id or name for the `task.run` action. */
@@ -42,6 +43,18 @@ class TaskRunner(
         val itemVar: String,
         val sensitive: Boolean,
         var index: Int,
+    )
+
+    private enum class TryPhase { BODY, CATCH }
+
+    private class TryFrame(
+        val tryIndex: Int,
+        val catchIndex: Int?,
+        val endIndex: Int,
+        val config: FlowControl.TryConfig,
+        val loopDepth: Int,
+        var attempt: Int = 1,
+        var phase: TryPhase = TryPhase.BODY,
     )
 
     suspend fun run(task: Task): TaskRunReport {
@@ -140,6 +153,9 @@ class TaskRunner(
         }
 
         val loopStack = ArrayDeque<LoopFrame>()
+        val tryStack = ArrayDeque<TryFrame>()
+        val handledFailureIndices = mutableSetOf<Int>()
+        var unhandledFailure = false
         try {
             var pc = 0
             var steps = 0
@@ -148,14 +164,18 @@ class TaskRunner(
                     val failure = ActionResult.Failure("flow step budget ($MAX_FLOW_STEPS) exceeded")
                     results += failure
                     traces += markerTrace(pc, task.actions[pc], failure, ActionTraceStatus.FAILURE)
+                    unhandledFailure = true
                     break
                 }
                 val spec = task.actions[pc]
                 if (FlowControl.isControl(spec.type)) {
-                    val outcome = stepControl(pc, spec, structure, loopStack)
+                    val outcome = stepControl(pc, spec, structure, loopStack, tryStack)
                     results += outcome.result
                     traces += outcome.trace
-                    if (outcome.halt) break
+                    if (outcome.halt) {
+                        if (outcome.result is ActionResult.Failure) unhandledFailure = true
+                        break
+                    }
                     pc = outcome.nextPc
                     continue
                 }
@@ -164,7 +184,18 @@ class TaskRunner(
                 val (result, trace) = runOne(pc, spec)
                 results += result
                 traces += trace
-                if (result is ActionResult.Failure && !spec.continueOnError) break
+                if (result is ActionResult.Failure) {
+                    val recoveryPc = recoverFailure(pc, spec, result, structure, loopStack, tryStack)
+                    if (recoveryPc != null) {
+                        handledFailureIndices += results.lastIndex
+                        pc = recoveryPc
+                        continue
+                    }
+                    if (!spec.continueOnError) {
+                        unhandledFailure = true
+                        break
+                    }
+                }
                 pc++
             }
         } finally {
@@ -177,7 +208,9 @@ class TaskRunner(
             durationMs = System.currentTimeMillis() - started,
             results = results,
             traces = traces,
-            success = results.all { it is ActionResult.Success || it is ActionResult.Skip }
+            success = !unhandledFailure && results.withIndex().all { (index, result) ->
+                result !is ActionResult.Failure || index in handledFailureIndices
+            }
         )
     }
 
@@ -193,6 +226,7 @@ class TaskRunner(
         spec: ActionSpec,
         structure: FlowStructure,
         loopStack: ArrayDeque<LoopFrame>,
+        tryStack: ArrayDeque<TryFrame>,
     ): ControlOutcome {
         fun outcome(message: String, nextPc: Int, halt: Boolean = false) = ControlOutcome(
             result = ActionResult.Success,
@@ -252,9 +286,115 @@ class TaskRunner(
                     }
                 }
             }
+            FlowControl.TRY -> {
+                val config = FlowControl.parseTryConfig(spec.args)
+                    ?: return ControlOutcome(
+                        result = ActionResult.Failure("invalid flow.try retry bounds"),
+                        trace = markerTrace(pc, spec, ActionResult.Failure("invalid flow.try retry bounds"), ActionTraceStatus.FAILURE),
+                        nextPc = pc + 1,
+                        halt = true,
+                    )
+                tryStack.addLast(
+                    TryFrame(
+                        tryIndex = pc,
+                        catchIndex = structure.tryToCatch[pc],
+                        endIndex = structure.tryToEndtry.getValue(pc),
+                        config = config,
+                        loopDepth = loopStack.size,
+                    ),
+                )
+                outcome("try attempt 1/${config.maxAttempts}", pc + 1)
+            }
+            FlowControl.CATCH -> {
+                val frame = tryStack.lastOrNull()
+                if (frame == null || frame.catchIndex != pc) {
+                    ControlOutcome(
+                        result = ActionResult.Failure("flow.catch without an active try"),
+                        trace = markerTrace(pc, spec, ActionResult.Failure("flow.catch without an active try"), ActionTraceStatus.FAILURE),
+                        nextPc = pc + 1,
+                        halt = true,
+                    )
+                } else if (frame.phase == TryPhase.BODY) {
+                    // The try body completed normally; skip the handler and its end marker.
+                    tryStack.removeLast()
+                    outcome("catch skipped; try succeeded", frame.endIndex + 1)
+                } else {
+                    ctx.variables.set(FLOW_ERROR_CAUGHT, "true")
+                    outcome("catch", pc + 1)
+                }
+            }
+            FlowControl.ENDTRY -> {
+                val frame = tryStack.removeLastOrNull()
+                if (frame == null || frame.endIndex != pc) {
+                    ControlOutcome(
+                        result = ActionResult.Failure("flow.endtry without an active try"),
+                        trace = markerTrace(pc, spec, ActionResult.Failure("flow.endtry without an active try"), ActionTraceStatus.FAILURE),
+                        nextPc = pc + 1,
+                        halt = true,
+                    )
+                } else {
+                    outcome("endtry", pc + 1)
+                }
+            }
             FlowControl.STOP -> outcome("stop", pc + 1, halt = true)
             else -> outcome(spec.type, pc + 1)
         }
+    }
+
+    private suspend fun recoverFailure(
+        pc: Int,
+        spec: ActionSpec,
+        failure: ActionResult.Failure,
+        structure: FlowStructure,
+        loopStack: ArrayDeque<LoopFrame>,
+        tryStack: ArrayDeque<TryFrame>,
+    ): Int? {
+        while (true) {
+            val frame = tryStack.asReversed().firstOrNull { candidate ->
+                candidate.phase == TryPhase.BODY && pc > candidate.tryIndex && pc < candidate.endIndex
+            } ?: return null
+
+            while (tryStack.lastOrNull() !== frame) tryStack.removeLast()
+            if (frame.attempt < frame.config.maxAttempts &&
+                ActionRegistry.get(spec.type)?.retrySafety == ActionRetrySafety.IDEMPOTENT
+            ) {
+                setFailureVariables(pc, spec, failure, frame.attempt, retrying = true)
+                frame.attempt++
+                clearLoopsToDepth(loopStack, frame.loopDepth)
+                val waitMs = retryBackoffMs(frame.config.backoffMs, frame.attempt - 1)
+                if (waitMs > 0) delay(waitMs)
+                return frame.tryIndex + 1
+            }
+
+            frame.catchIndex?.let { catchIndex ->
+                setFailureVariables(pc, spec, failure, frame.attempt, retrying = false)
+                ctx.variables.set(FLOW_ERROR_CAUGHT, "false")
+                frame.phase = TryPhase.CATCH
+                clearLoopsToDepth(loopStack, frame.loopDepth)
+                return catchIndex + 1
+            }
+
+            // An uncaught nested failure propagates to the enclosing try block.
+            tryStack.removeLast()
+        }
+    }
+
+    private fun setFailureVariables(
+        pc: Int,
+        spec: ActionSpec,
+        failure: ActionResult.Failure,
+        attempt: Int,
+        retrying: Boolean,
+    ) {
+        ctx.variables.set(FLOW_ERROR_MESSAGE, failure.message)
+        ctx.variables.set(FLOW_ERROR_ACTION, spec.type)
+        ctx.variables.set(FLOW_ERROR_INDEX, (pc + 1).toString())
+        ctx.variables.set(FLOW_ERROR_ATTEMPT, attempt.toString())
+        ctx.variables.set(FLOW_ERROR_RETRYING, retrying.toString())
+    }
+
+    private fun clearLoopsToDepth(loopStack: ArrayDeque<LoopFrame>, depth: Int) {
+        while (loopStack.size > depth) loopStack.removeLast()
     }
 
     private fun markerTrace(
@@ -505,6 +645,18 @@ val SUB_TASK_REF_KEYS = listOf("task", "name", "id")
 
 /** Safety cap on total interpreted steps to bound pathological flow.foreach loops. */
 private const val MAX_FLOW_STEPS = 100_000
+private const val FLOW_ERROR_MESSAGE = "FLOW_ERROR_MESSAGE"
+private const val FLOW_ERROR_ACTION = "FLOW_ERROR_ACTION"
+private const val FLOW_ERROR_INDEX = "FLOW_ERROR_INDEX"
+private const val FLOW_ERROR_ATTEMPT = "FLOW_ERROR_ATTEMPT"
+private const val FLOW_ERROR_RETRYING = "FLOW_ERROR_RETRYING"
+private const val FLOW_ERROR_CAUGHT = "FLOW_ERROR_CAUGHT"
+
+private fun retryBackoffMs(baseMs: Long, retryNumber: Int): Long {
+    if (baseMs <= 0L) return 0L
+    val multiplier = 1L shl retryNumber.coerceIn(0, 16)
+    return (baseMs * multiplier).coerceAtMost(FlowControl.MAX_BACKOFF_MS)
+}
 
 data class ActionExecutionTrace(
     val index: Int,

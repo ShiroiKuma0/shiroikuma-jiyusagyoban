@@ -820,6 +820,37 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "flow.try",
+            nameRes = R.string.catalog_action_flow_try_name,
+            descriptionRes = R.string.catalog_action_flow_try_description,
+            categoryRes = R.string.catalog_category_flow,
+            fields = listOf(
+                ActionField("max_attempts", R.string.catalog_action_flow_try_field_max_attempts_label, FieldType.NUMBER, hintRes = R.string.catalog_action_flow_try_field_max_attempts_hint, numberRule = integerRule(1, 5)),
+                ActionField("backoff_ms", R.string.catalog_action_flow_try_field_backoff_label, FieldType.NUMBER, hintRes = R.string.catalog_action_flow_try_field_backoff_hint, numberRule = integerRule(0, 60_000)),
+            ),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "flow.catch",
+            nameRes = R.string.catalog_action_flow_catch_name,
+            descriptionRes = R.string.catalog_action_flow_catch_description,
+            categoryRes = R.string.catalog_category_flow,
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "flow.endtry",
+            nameRes = R.string.catalog_action_flow_endtry_name,
+            descriptionRes = R.string.catalog_action_flow_endtry_description,
+            categoryRes = R.string.catalog_category_flow,
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "state.temporary",
             nameRes = R.string.catalog_action_state_temporary_name,
             descriptionRes = R.string.catalog_action_state_temporary_description,

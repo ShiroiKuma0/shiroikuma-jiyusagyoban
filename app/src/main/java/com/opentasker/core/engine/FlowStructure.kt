@@ -9,9 +9,26 @@ object FlowControl {
     const val ENDIF = "flow.endif"
     const val FOREACH = "flow.foreach"
     const val ENDFOR = "flow.endfor"
+    const val TRY = "flow.try"
+    const val CATCH = "flow.catch"
+    const val ENDTRY = "flow.endtry"
     const val STOP = "flow.stop"
 
-    val ALL = setOf(IF, ELSE, ENDIF, FOREACH, ENDFOR, STOP)
+    val ALL = setOf(IF, ELSE, ENDIF, FOREACH, ENDFOR, TRY, CATCH, ENDTRY, STOP)
+
+    const val DEFAULT_MAX_ATTEMPTS = 1
+    const val MAX_ATTEMPTS = 5
+    const val MAX_BACKOFF_MS = 60_000L
+
+    data class TryConfig(val maxAttempts: Int, val backoffMs: Long)
+
+    fun parseTryConfig(args: Map<String, String>): TryConfig? {
+        val attempts = args["max_attempts"]?.trim()?.takeIf(String::isNotBlank)?.toIntOrNull()
+            ?: DEFAULT_MAX_ATTEMPTS
+        val backoff = args["backoff_ms"]?.trim()?.takeIf(String::isNotBlank)?.toLongOrNull() ?: 0L
+        if (attempts !in 1..MAX_ATTEMPTS || backoff !in 0..MAX_BACKOFF_MS) return null
+        return TryConfig(attempts, backoff)
+    }
 
     fun isControl(type: String): Boolean = type in ALL
 }
@@ -34,6 +51,12 @@ data class FlowStructure(
     val foreachToEndfor: Map<Int, Int>,
     /** flow.endfor index -> matching flow.foreach index. */
     val endforToForeach: Map<Int, Int>,
+    /** flow.try index -> matching flow.catch index, when a catch block is present. */
+    val tryToCatch: Map<Int, Int>,
+    /** flow.try index -> matching flow.endtry index. */
+    val tryToEndtry: Map<Int, Int>,
+    /** flow.catch index -> matching flow.endtry index. */
+    val catchToEndtry: Map<Int, Int>,
     val error: String? = null,
 ) {
     companion object {
@@ -43,15 +66,29 @@ data class FlowStructure(
             val elseToEndif = mutableMapOf<Int, Int>()
             val foreachToEndfor = mutableMapOf<Int, Int>()
             val endforToForeach = mutableMapOf<Int, Int>()
+            val tryToCatch = mutableMapOf<Int, Int>()
+            val tryToEndtry = mutableMapOf<Int, Int>()
+            val catchToEndtry = mutableMapOf<Int, Int>()
 
             // Stack entries: marker type + opening index (+ optional else index for if-blocks).
-            data class Frame(val type: String, val openIndex: Int, var elseIndex: Int? = null)
+            data class Frame(
+                val type: String,
+                val openIndex: Int,
+                var elseIndex: Int? = null,
+                var catchIndex: Int? = null,
+            )
             val stack = ArrayDeque<Frame>()
 
             actions.forEachIndexed { index, spec ->
                 when (spec.type) {
                     FlowControl.IF -> stack.addLast(Frame(FlowControl.IF, index))
                     FlowControl.FOREACH -> stack.addLast(Frame(FlowControl.FOREACH, index))
+                    FlowControl.TRY -> {
+                        if (FlowControl.parseTryConfig(spec.args) == null) {
+                            return error("invalid flow.try retry bounds at step ${index + 1}")
+                        }
+                        stack.addLast(Frame(FlowControl.TRY, index))
+                    }
                     FlowControl.ELSE -> {
                         val frame = stack.lastOrNull()
                             ?: return error("flow.else without matching flow.if at step ${index + 1}")
@@ -84,20 +121,52 @@ data class FlowStructure(
                         foreachToEndfor[frame.openIndex] = index
                         endforToForeach[index] = frame.openIndex
                     }
+                    FlowControl.CATCH -> {
+                        val frame = stack.lastOrNull()
+                            ?: return error("flow.catch without matching flow.try at step ${index + 1}")
+                        if (frame.type != FlowControl.TRY) {
+                            return error("flow.catch inside a ${frame.type} block at step ${index + 1}")
+                        }
+                        if (frame.catchIndex != null) {
+                            return error("duplicate flow.catch at step ${index + 1}")
+                        }
+                        frame.catchIndex = index
+                    }
+                    FlowControl.ENDTRY -> {
+                        val frame = stack.removeLastOrNull()
+                            ?: return error("flow.endtry without matching flow.try at step ${index + 1}")
+                        if (frame.type != FlowControl.TRY) {
+                            return error("flow.endtry closing a ${frame.type} block at step ${index + 1}")
+                        }
+                        frame.catchIndex?.let { catchIndex ->
+                            tryToCatch[frame.openIndex] = catchIndex
+                            catchToEndtry[catchIndex] = index
+                        }
+                        tryToEndtry[frame.openIndex] = index
+                    }
                 }
             }
 
             if (stack.isNotEmpty()) {
                 val unclosed = stack.last()
-                val marker = if (unclosed.type == FlowControl.IF) "flow.if" else "flow.foreach"
+                val marker = unclosed.type
                 return error("unclosed $marker block opened at step ${unclosed.openIndex + 1}")
             }
 
-            return FlowStructure(ifToElse, ifToEndif, elseToEndif, foreachToEndfor, endforToForeach)
+            return FlowStructure(
+                ifToElse,
+                ifToEndif,
+                elseToEndif,
+                foreachToEndfor,
+                endforToForeach,
+                tryToCatch,
+                tryToEndtry,
+                catchToEndtry,
+            )
         }
 
         private fun error(message: String) = FlowStructure(
-            emptyMap(), emptyMap(), emptyMap(), emptyMap(), emptyMap(), error = message,
+            emptyMap(), emptyMap(), emptyMap(), emptyMap(), emptyMap(), emptyMap(), emptyMap(), emptyMap(), error = message,
         )
     }
 }

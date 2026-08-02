@@ -22,7 +22,7 @@
                      },
     "capabilities":  {
                          "registeredActions":  68,
-                         "engineHandledActions":  7,
+                         "engineHandledActions":  10,
                          "contextFamilies":  7,
                          "bundleSchemaVersion":  2,
                          "roomSchemaVersion":  10

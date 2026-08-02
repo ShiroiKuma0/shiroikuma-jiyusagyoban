@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Failure recovery**: added structured Try/Catch/End Try flow blocks with bounded exponential retry for explicitly idempotent actions, redacted `FLOW_ERROR_*` handler variables, and honest validation of retry bounds and block nesting.
+
 - **Monitor and editor coverage**: callback monitor registration now has explicit retryable lifecycle semantics, AppUsage permission loss is covered as a pause/resume policy, shake debounce and exact-alarm fallback are locked down, and Compose task-editor drafts are tested across saved-instance restoration.
 
 - **Build toolchain**: synchronized Kotlin 2.4.10, KSP 2.3.10, Compose BOM 2026.06.00, Lifecycle 2.11.0, Coroutines 1.11.0, and stable immutable collections 0.5.1. Gradle remains pinned at 9.4.1, with refreshed SHA-256 verification metadata for the complete resolved graph.

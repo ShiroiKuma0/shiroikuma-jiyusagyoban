@@ -4,6 +4,7 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.engine.ActionRetrySafety
 import java.io.File
 import java.io.IOException
 import java.net.URI
@@ -180,6 +181,7 @@ class HttpGetAction(
 ) : Action {
     override val id = "http.get"
     override val category = ActionCategory.NET
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         if (args["url"].isNullOrBlank()) return ActionResult.Failure("missing url")

@@ -174,9 +174,19 @@
     <string name="catalog_action_flow_foreach_field_var_hint" formatted="false">item</string>
     <string name="catalog_action_flow_endfor_name" formatted="false">End For</string>
     <string name="catalog_action_flow_endfor_description" formatted="false">Closes the matching For Each loop</string>
-    <string name="catalog_action_flow_stop_name" formatted="false">Stop</string>
-    <string name="catalog_action_flow_stop_description" formatted="false">Halt the rest of the task immediately</string>
-    <string name="catalog_action_intent_launch_name" formatted="false">Launch Intent</string>
+      <string name="catalog_action_flow_stop_name" formatted="false">Stop</string>
+      <string name="catalog_action_flow_stop_description" formatted="false">Halt the rest of the task immediately</string>
+      <string name="catalog_action_flow_try_name" formatted="false">Try</string>
+      <string name="catalog_action_flow_try_description" formatted="false">Run a bounded, retryable block and optionally handle its failure with Catch</string>
+      <string name="catalog_action_flow_try_field_max_attempts_label" formatted="false">Maximum attempts</string>
+      <string name="catalog_action_flow_try_field_max_attempts_hint" formatted="false">1–5; retries require an idempotent action</string>
+      <string name="catalog_action_flow_try_field_backoff_label" formatted="false">Base backoff (ms)</string>
+      <string name="catalog_action_flow_try_field_backoff_hint" formatted="false">0–60000; exponential between retries</string>
+      <string name="catalog_action_flow_catch_name" formatted="false">Catch</string>
+      <string name="catalog_action_flow_catch_description" formatted="false">Handle a failed Try block using FLOW_ERROR_* variables</string>
+      <string name="catalog_action_flow_endtry_name" formatted="false">End Try</string>
+      <string name="catalog_action_flow_endtry_description" formatted="false">Closes the matching Try/Catch block</string>
+      <string name="catalog_action_intent_launch_name" formatted="false">Launch Intent</string>
     <string name="catalog_action_intent_launch_description" formatted="false">Dispatch a bounded activity, broadcast, or service intent</string>
     <string name="catalog_category_app" formatted="false">App</string>
     <string name="catalog_action_intent_launch_field_package_label" formatted="false">Package name</string>

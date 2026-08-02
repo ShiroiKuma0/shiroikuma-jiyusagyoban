@@ -17,7 +17,7 @@
 
 - **Profiles, contexts, tasks, actions** — a complete Room-backed automation pipeline with a Compose UI
 - **7 context families** — Application, Time, Day, Location, State, Event, and Plugin (Locale/Tasker condition)
-- **68 built-in actions** plus engine-handled flow control (`task.run`, `if`/`else`/`end if`, `for each`/`end for`, `stop`)
+- **68 built-in actions** plus engine-handled flow control (`task.run`, `if`/`else`/`end if`, `for each`/`end for`, `try`/`catch`/`end try`, `stop`)
 - **Template expressions** — bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math/date functions, traces, and strict regex policy
 - **Side-effect-free preflight reviews** — preview a task or profile with synthetic event variables, expanded inputs, branch decisions, setup gaps, intended effects, and explicit blockers before any action runs
 - **First-class secret variables** — AES-256-GCM Android Keystore storage, deliberate reveal/re-entry UX, and provenance-based redaction for derived action arguments, logs, traces, and failures
@@ -47,7 +47,7 @@
 - Locale/Tasker condition plugins — polled as first-class context predicates with last-known-state caching
 - Home Assistant bridge proof of concept — bounded outbound JSON webhooks with HTTPS-by-default policy, redacted webhook secrets, and transient retry/backoff
 
-### Actions (68 registered + 7 engine-handled)
+### Actions (68 registered + 10 engine-handled)
 
 | Category | Count | Examples |
 |----------|------:|---------|
@@ -59,7 +59,7 @@
 | System | 7 | vibrate, clipboard set, reboot, lock, screen off, wake, log |
 | Notification | 3 | notify/toast, cancel, TTS speak |
 | Variable | 13 | set variable, clipboard get, contacts lookup, read data (JSON/CSV/XML/HTML), date-time (format/parse/add), text (match/replace/split/join/substring) |
-| Flow | 1+7 | wait; engine: task.run, if/else/end if, for each/end for, stop |
+| Flow | 1+10 | wait; engine: task.run, if/else/end if, for each/end for, try/catch/end try, stop |
 | Plugin | 2 | Locale setting dispatch, Locale condition query |
 | Script | 1 | SHA-256-pinned Termux `RUN_COMMAND` with bounded result capture |
 | Import | 1 | unsupported Tasker action placeholder |
