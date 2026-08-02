@@ -632,8 +632,11 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_tile_set_description,
             categoryRes = R.string.catalog_category_settings,
             fields = listOf(
+                ActionField("slot", R.string.catalog_action_tile_set_field_slot_label, FieldType.NUMBER, required = true, hintRes = R.string.catalog_action_tile_set_field_slot_hint, numberRule = integerRule(1, 4)),
                 ActionField("state", R.string.catalog_action_tile_set_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_tile_set_field_state_hint, options = listOf(option("active", R.string.action_option_active), option("inactive", R.string.action_option_inactive))),
                 ActionField("label", R.string.catalog_action_tile_set_field_label_label, required = false, hintRes = R.string.catalog_action_tile_set_field_label_hint),
+                ActionField("subtitle", R.string.catalog_action_tile_set_field_subtitle_label, required = false, hintRes = R.string.catalog_action_tile_set_field_subtitle_hint),
+                ActionField("icon", R.string.catalog_action_tile_set_field_icon_label, required = false, hintRes = R.string.catalog_action_tile_set_field_icon_hint, options = listOf(option("play", R.string.action_option_tile_icon_play), option("star", R.string.action_option_tile_icon_star), option("settings", R.string.action_option_tile_icon_settings), option("bolt", R.string.action_option_tile_icon_bolt))),
             )
         )
     )

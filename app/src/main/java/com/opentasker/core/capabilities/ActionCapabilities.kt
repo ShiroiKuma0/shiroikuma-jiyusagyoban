@@ -118,7 +118,7 @@ object ActionCapabilityRegistry {
         "tts.speak" to audioOutputCapability("Uses Android TTS engine to speak text aloud."),
         "reboot" to elevatedUnsupported("reboot", "Reboot requires privileged device-owner or system app access.", R.string.capability_reboot_unsupported),
         "lock" to ActionCapability(CapabilityLevel.Unsupported, "Device lock requires configured device-admin support.", R.string.capability_lock_unsupported),
-        "tile.set" to ActionCapability(CapabilityLevel.Unsupported, "Quick Settings tile updates are not functional yet; per-task tiles are a planned feature.", R.string.capability_tile_unsupported),
+        "tile.set" to ActionCapability(CapabilityLevel.Supported, "Updates a configured OpenTasker Quick Settings tile.", R.string.capability_tile_ready),
         "screen.off" to elevatedUnsupported("screen.off", "Screen-off requires privileged power management access.", R.string.capability_screen_off_unsupported),
         "wake" to elevatedUnsupported("wake", "Wake requires a foreground activity or privileged wake flow.", R.string.capability_wake_unsupported),
         TermuxScriptBackend.ACTION_ID to ActionCapability(

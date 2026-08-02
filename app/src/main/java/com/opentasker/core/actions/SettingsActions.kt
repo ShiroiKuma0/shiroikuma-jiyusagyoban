@@ -19,6 +19,8 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.contexts.QuickSettingsTileStore
+import com.opentasker.core.contexts.requestRefresh
 import com.opentasker.core.platform.AndroidAudioHardening
 import com.opentasker.core.platform.AudioUsageEligibility
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -360,18 +362,28 @@ class TileStateAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val state = args["state"] ?: return ActionResult.Failure("missing state argument")
-        when (state.lowercase()) {
-            "active", "on", "true", "inactive", "off", "false" -> Unit
+        val active = when (state.lowercase()) {
+            "active", "on", "true" -> true
+            "inactive", "off", "false" -> false
             else -> return ActionResult.Failure("invalid state: $state (use active/inactive)")
         }
-        // Nothing consumes tile state yet: there is no tile registry write and no
-        // requestListeningState wiring. Reporting Success here was a lie users could not
-        // detect until their tile never changed. Per-task Quick Settings tiles are a
-        // planned feature; until it lands this action fails honestly like the other
-        // unsupported device-control stubs.
-        return ActionResult.Failure(
-            "tile.set is not functional yet: OpenTasker does not publish updatable Quick Settings tiles",
-        )
+        val slot = args["slot"]?.trim()?.ifBlank { "1" }?.toIntOrNull()
+            ?: return ActionResult.Failure("invalid tile slot (use 1-${com.opentasker.core.contexts.QuickSettingsTileSlots.COUNT})")
+        val store = QuickSettingsTileStore(ctx.app)
+        val current = runCatching { store.load(slot) }
+            .getOrElse { return ActionResult.Failure(it.message ?: "invalid tile slot") }
+        if (current.taskId == null) return ActionResult.Failure("tile slot $slot has no bound task")
+        runCatching {
+            store.setState(
+                slot = slot,
+                active = active,
+                label = args["label"],
+                subtitle = args["subtitle"],
+                iconKey = args["icon"],
+            )
+        }.getOrElse { return ActionResult.Failure(it.message ?: "tile update failed") }
+        store.requestRefresh(ctx.app, slot)
+        return ActionResult.Success
     }
 }
 

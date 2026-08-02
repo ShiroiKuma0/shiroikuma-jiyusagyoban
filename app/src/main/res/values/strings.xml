@@ -1,6 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
     <string name="app_name">OpenTasker</string>
+    <string name="qs_tile_subtitle_default">Tap to run task</string>
+    <string name="qs_tile_config_title">Configure Quick Settings tile</string>
+    <string name="qs_tile_config_subtitle">Bind a task, label, subtitle, and icon for tile slot %1$d.</string>
+    <string name="qs_tile_choose_task">Task</string>
+    <string name="qs_tile_task_id">Task ID %1$d</string>
+    <string name="qs_tile_no_tasks">Create a task before binding this tile.</string>
+    <string name="qs_tile_label">Label</string>
+    <string name="qs_tile_label_hint">Shown in Quick Settings</string>
+    <string name="qs_tile_subtitle">Subtitle</string>
+    <string name="qs_tile_subtitle_hint">Short supporting text</string>
+    <string name="qs_tile_icon">Icon</string>
+    <string name="qs_tile_save">Save tile</string>
+    <string name="qs_tile_saved">Quick Settings tile saved.</string>
+    <string name="qs_tile_default_label">Task tile %1$d</string>
     <string name="permission_automation_label">Control OpenTasker automations</string>
     <string name="permission_automation_description">Allows same-signer integrations to run OpenTasker tasks, toggle profiles, and query automation status through documented intents.</string>
     <string name="error_prefix">Error: %1$s</string>

@@ -81,7 +81,7 @@ class ActionContractCompletenessTest {
     fun permanentStubsAreUnsupportedRatherThanAdvertisedAsWorking() {
         // These always fail at run time on any unprivileged Android build; the contract has to say
         // so up front instead of letting a user add them and discover it in a run log.
-        listOf("app.kill", "wifi.toggle", "airplane.toggle", "mobile.toggle", "reboot", "lock", "screen.off", "wake", "screenshot.take", "tile.set")
+        listOf("app.kill", "wifi.toggle", "airplane.toggle", "mobile.toggle", "reboot", "lock", "screen.off", "wake", "screenshot.take")
             .forEach { actionId ->
                 assertEquals(
                     "$actionId must be Unsupported",

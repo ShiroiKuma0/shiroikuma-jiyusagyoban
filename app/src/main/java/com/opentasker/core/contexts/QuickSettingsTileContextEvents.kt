@@ -13,18 +13,20 @@ object QuickSettingsTileContextEvents {
 
     val events: Flow<ContextEvent> = tileEvents.asSharedFlow()
 
-    fun publishTileClicked(active: Boolean): Boolean {
-        return tileEvents.tryEmit(buildEvent(active))
+    fun publishTileClicked(active: Boolean, slot: Int = QuickSettingsTileSlots.DEFAULT): Boolean {
+        return tileEvents.tryEmit(buildEvent(active, slot))
     }
 
     fun buildEvent(
         active: Boolean,
+        slot: Int = QuickSettingsTileSlots.DEFAULT,
         nowMs: Long = System.currentTimeMillis(),
     ): ContextEvent = ContextEvent(
         type = "event",
         matched = true,
         metadata = mapOf(
             "event" to EVENT_TILE_CLICKED,
+            "tileSlot" to slot.toString(),
             "tileActive" to active.toString(),
             "observedAtEpochMs" to nowMs.toString(),
         ),
