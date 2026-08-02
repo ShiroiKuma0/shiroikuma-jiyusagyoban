@@ -111,6 +111,7 @@ Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON 
 - Scene element editor with drag-to-move, resize handles, multi-select, alignment guides, scaled canvas previews, overlay launch, and tap/long-press task bindings
 - Flow graphs with zoom/pan canvas previews, edge routing, branch/subflow markers, node deep links, and picker-backed add commands
 - Profile and task search bars
+- One global search across profiles, tasks, actions, variables, and scenes, including named references, with live results and deep links into the matching editor or library surface
 - Saveable editor/dialog state across rotation and resize
 
 ### Distribution

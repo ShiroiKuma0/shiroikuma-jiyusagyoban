@@ -33,6 +33,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,6 +60,8 @@ fun VariablesScreen(
     variables: List<Variable>,
     contentPadding: PaddingValues,
     projectId: Long = DEFAULT_PROJECT_ID,
+    focusVariableName: String? = null,
+    focusVariableProjectId: Long = DEFAULT_PROJECT_ID,
     onUpdate: (name: String, value: String, isSecret: Boolean, successMessage: String, projectId: Long) -> Unit,
     onDelete: (name: String, successMessage: String, projectId: Long) -> Unit,
     onMessage: (String) -> Unit,
@@ -69,6 +72,16 @@ fun VariablesScreen(
     var pendingDeleteName by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingDeleteProjectId by rememberSaveable { mutableStateOf(DEFAULT_PROJECT_ID) }
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(focusVariableName, focusVariableProjectId, variables) {
+        val target = focusVariableName?.let { name ->
+            variables.firstOrNull { it.name == name && it.projectId == focusVariableProjectId }
+        }
+        if (target != null) {
+            editTargetName = target.name
+            editTargetProjectId = target.projectId
+        }
+    }
 
     val filtered = remember(variables, searchQuery) {
         if (searchQuery.isBlank()) variables

@@ -140,6 +140,7 @@ import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
+import com.opentasker.core.search.GlobalSearchResultKind
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.EditHistoryDao
@@ -270,6 +271,10 @@ fun ActiveAutomationUi(
     val scope = rememberCoroutineScope()
     var screenOrdinal by rememberSaveable { mutableIntStateOf(0) }
     var selectedProjectId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var showGlobalSearchDialog by rememberSaveable { mutableStateOf(false) }
+    var focusedVariableName by rememberSaveable { mutableStateOf<String?>(null) }
+    var focusedVariableProjectId by rememberSaveable { mutableLongStateOf(com.opentasker.core.model.DEFAULT_PROJECT_ID) }
+    var focusedSceneId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     LaunchedEffect(projects, selectedProjectId) {
         if (selectedProjectId != null && projects.none { it.id == selectedProjectId }) selectedProjectId = null
     }
@@ -572,7 +577,11 @@ fun ActiveAutomationUi(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column {
-                OpenTaskerHeader(screen = screen, detail = headerDetail)
+                OpenTaskerHeader(
+                    screen = screen,
+                    detail = headerDetail,
+                    onOpenSearch = { showGlobalSearchDialog = true },
+                )
                 if (screen in setOf(OpenTaskerScreen.Profiles, OpenTaskerScreen.Tasks, OpenTaskerScreen.Vars, OpenTaskerScreen.Scenes, OpenTaskerScreen.Flow)) {
                     ProjectScopeBar(
                         projects = projects,
@@ -784,6 +793,8 @@ fun ActiveAutomationUi(
                 variables = projectVariables,
                 contentPadding = innerPadding,
                 projectId = selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID,
+                focusVariableName = focusedVariableName,
+                focusVariableProjectId = focusedVariableProjectId,
                 onUpdate = { name, value, isSecret, successMessage, projectId ->
                     viewModel.updateVariable(name, value, isSecret, successMessage, projectId)
                 },
@@ -796,6 +807,7 @@ fun ActiveAutomationUi(
             OpenTaskerScreen.Scenes -> SceneLibraryScreen(
                 scenes = projectScenes,
                 tasks = projectTasks,
+                focusSceneId = focusedSceneId.takeIf { it != NO_DIALOG_ENTITY_ID },
                 onCreateScene = { name, width, height ->
                     viewModel.createScene(name, width, height, selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID)
                 },
@@ -965,6 +977,52 @@ fun ActiveAutomationUi(
             busy = preflightBusy,
             onDismiss = viewModel::clearPreflightReview,
             onRerun = viewModel::rerunPreflight,
+        )
+    }
+
+    if (showGlobalSearchDialog) {
+        GlobalSearchDialog(
+            profiles = profiles,
+            tasks = tasks,
+            variables = globalVariables,
+            scenes = scenes,
+            onDismiss = { showGlobalSearchDialog = false },
+            onSelect = { result ->
+                showGlobalSearchDialog = false
+                selectedProjectId = result.projectId
+                when (result.kind) {
+                    GlobalSearchResultKind.PROFILE -> profiles.firstOrNull { it.id == result.entityId }?.let {
+                        screenOrdinal = OpenTaskerScreen.Profiles.ordinal
+                        openProfileDialog(it)
+                    }
+
+                    GlobalSearchResultKind.TASK -> tasks.firstOrNull { it.id == result.entityId }?.let {
+                        screenOrdinal = OpenTaskerScreen.Tasks.ordinal
+                        openTaskDialog(it)
+                    }
+
+                    GlobalSearchResultKind.ACTION -> {
+                        val task = tasks.firstOrNull { it.id == result.entityId }
+                        val action = result.actionIndex?.let { task?.actions?.getOrNull(it) }
+                        val metadata = action?.let { ActionMetadataRegistry.get(it.type) }
+                        if (task != null && metadata != null) {
+                            screenOrdinal = OpenTaskerScreen.Tasks.ordinal
+                            openActionEdit(task, metadata, result.actionIndex)
+                        }
+                    }
+
+                    GlobalSearchResultKind.VARIABLE -> {
+                        focusedVariableName = result.variableName
+                        focusedVariableProjectId = result.projectId
+                        screenOrdinal = OpenTaskerScreen.Vars.ordinal
+                    }
+
+                    GlobalSearchResultKind.SCENE -> {
+                        focusedSceneId = result.entityId
+                        screenOrdinal = OpenTaskerScreen.Scenes.ordinal
+                    }
+                }
+            },
         )
     }
 
@@ -1148,7 +1206,11 @@ fun ActiveAutomationUi(
 private const val DIAGNOSTICS_REFRESH_INTERVAL_MS = 5_000L
 
 @Composable
-private fun OpenTaskerHeader(screen: OpenTaskerScreen, detail: String) {
+private fun OpenTaskerHeader(
+    screen: OpenTaskerScreen,
+    detail: String,
+    onOpenSearch: () -> Unit,
+) {
     val appName = stringResource(R.string.app_name)
     Surface(
         color = MaterialTheme.colorScheme.background,
@@ -1184,6 +1246,12 @@ private fun OpenTaskerHeader(screen: OpenTaskerScreen, detail: String) {
                         style = MaterialTheme.typography.titleLarge,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                IconButton(onClick = onOpenSearch) {
+                    Icon(
+                        imageVector = Icons.Filled.Search,
+                        contentDescription = stringResource(R.string.global_search_content_description),
                     )
                 }
                 Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {

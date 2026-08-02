@@ -18,6 +18,18 @@
     <string name="nav_scenes">Scenes</string>
     <string name="nav_inspector">Inspector</string>
     <string name="nav_diagnostics">Diagnostics</string>
+    <string name="global_search_content_description">Search all automations</string>
+    <string name="global_search_title">Search OpenTasker</string>
+    <string name="global_search_label">Search profiles, tasks, actions, variables, and scenes</string>
+    <string name="global_search_hint">Try a name, action type, or variable reference</string>
+    <string name="global_search_clear">Clear global search</string>
+    <string name="global_search_prompt">Type to search across every project.</string>
+    <string name="global_search_no_results">No matching profiles, tasks, actions, variables, or scenes.</string>
+    <string name="global_search_result_profile">Profile</string>
+    <string name="global_search_result_task">Task</string>
+    <string name="global_search_result_action">Action</string>
+    <string name="global_search_result_variable">Variable</string>
+    <string name="global_search_result_scene">Scene</string>
 
     <!-- Common actions -->
     <string name="action_create">Create</string>

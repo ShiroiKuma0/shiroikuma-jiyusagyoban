@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,6 +26,7 @@ import com.opentasker.ui.theme.DesignSystem
 fun SceneLibraryScreen(
     scenes: List<Scene>,
     tasks: List<Task>,
+    focusSceneId: Long? = null,
     onCreateScene: (String, Int, Int) -> Unit,
     onUpdateScene: (Scene, String) -> Unit,
     onDeleteScene: (Scene) -> Unit,
@@ -36,11 +38,17 @@ fun SceneLibraryScreen(
     var pendingElementDeleteSceneId by rememberSaveable { mutableStateOf<Long?>(null) }
     var pendingElementDeleteIndex by rememberSaveable { mutableStateOf<Int?>(null) }
     val sortedScenes = remember(scenes) { scenes.sortedBy { it.name.lowercase() } }
+    val listState = rememberLazyListState()
     val elementEditor = remember(scenes, elementEditorSceneId, elementEditorIndex) {
         sceneElementEditorState(scenes, elementEditorSceneId, elementEditorIndex, allowNew = true)
     }
     val pendingElementDelete = remember(scenes, pendingElementDeleteSceneId, pendingElementDeleteIndex) {
         sceneElementEditorState(scenes, pendingElementDeleteSceneId, pendingElementDeleteIndex, allowNew = false)
+    }
+
+    LaunchedEffect(focusSceneId, sortedScenes) {
+        val focusedIndex = focusSceneId?.let { id -> sortedScenes.indexOfFirst { it.id == id } } ?: -1
+        if (focusedIndex >= 0) listState.animateScrollToItem(focusedIndex + 1)
     }
 
     LaunchedEffect(elementEditorSceneId, elementEditor) {
@@ -121,6 +129,7 @@ fun SceneLibraryScreen(
     }
 
     LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding),

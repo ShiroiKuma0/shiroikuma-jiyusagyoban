@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Global search**: added a live cross-project search for profiles, tasks, actions, variables, and scenes. Results include task/profile/scene references and deep-link into the matching editor or library surface without indexing secret variable values.
+
 - **Visual system**: the command-center shell now uses a calmer sage/graphite palette, larger readable type, tighter spacing tokens, compact headers, border-light navigation, and text-led status indicators. Profile/task summaries and action/context rows rely on grouping and hairline rhythm instead of nested outlined boxes. The nine-page redesign reference is preserved at `design/mockups/opentasker-command-center-v2.png`.
 
 - **Execution reliability**: service-owned task runs now pass through a persisted admission controller with global and per-profile active limits, burst windows, and a circuit breaker. Rejected runs are recorded as skipped with an explainable reason, while accepted leases are released safely even when cancellation unwinds the coroutine tree.
