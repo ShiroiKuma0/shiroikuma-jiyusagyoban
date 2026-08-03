@@ -22,7 +22,7 @@ class LocalReleaseGateContractTest {
         assertTrue(build.contains("resolutionResult.allComponents"))
         assertTrue(build.contains("RepositoriesMode.FAIL_ON_PROJECT_REPOS"))
         assertTrue(build.contains("<sha256 value="))
-        assertTrue(build.contains("minimumTests.set(856)"))
+        assertTrue(build.contains("minimumTests.set(858)"))
         assertTrue(manifest.contains("android.permission.VIBRATE"))
     }
 // RETIRED: upstream's release-gate process (one documented command owning every local release
