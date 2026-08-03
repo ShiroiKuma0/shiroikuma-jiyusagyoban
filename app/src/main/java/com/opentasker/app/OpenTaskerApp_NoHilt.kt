@@ -91,6 +91,7 @@ class OpenTaskerApp_NoHilt : Application() {
         }
 
         RunLogPruneWorker.enqueue(this)
+        com.opentasker.core.engine.BandPruneWorker.enqueue(this)
         EngineWatchdogWorker.enqueue(this)
     }
 

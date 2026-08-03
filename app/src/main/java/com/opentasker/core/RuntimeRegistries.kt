@@ -6,6 +6,8 @@ import com.opentasker.core.actions.BackupCategoriesAction
 import com.opentasker.core.actions.BackupEditItemsAction
 import com.opentasker.core.actions.BackupPlanAction
 import com.opentasker.core.actions.BackupRunItemsAction
+import com.opentasker.core.actions.BandChartsAction
+import com.opentasker.core.actions.BandSyncAction
 import com.opentasker.core.actions.GetLocationAction
 import com.opentasker.core.actions.PruneBackupsAction
 import com.opentasker.core.actions.DataReadAction
@@ -315,6 +317,8 @@ private fun registerBuiltInActions() {
         CancelSpeedTestAction(),
         SetDataSimAction(),
         GetLocationAction(),
+        BandSyncAction(),
+        BandChartsAction(),
         ReadSimsAction(),
         LocationModeAction(),
         SetImeAction(),

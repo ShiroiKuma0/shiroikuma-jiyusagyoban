@@ -183,6 +183,20 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
             android:theme="@style/Theme.OpenTasker" />
 
+        <!--
+            健康 — the band charts, in their own window rather than a tab (白い熊, 2026-08-03).
+            Its own taskAffinity so it is a separate entry in recents from the automation editor:
+            opening the charts from a launcher shortcut must not drag 自由作業盤's back stack along.
+        -->
+        <activity
+            android:name="com.opentasker.ui.charts.BandChartsActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".band"
+            android:label="健康"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -89,6 +89,91 @@ This lists what the fork adds; upstream's own history lives in the OpenTasker re
 - **Quick Settings tiles**: added four active per-task tile slots with long-press configuration, persistent task/label/subtitle/icon/state settings, direct task dispatch, slot-aware tile events, and a functional `tile.set` action.
 
 - **Visual system**: the command-center shell now uses a calmer sage/graphite palette, larger readable type, tighter spacing tokens, compact headers, border-light navigation, and text-led status indicators. Profile/task summaries and action/context rows rely on grouping and hairline rhythm instead of nested outlined boxes. The nine-page redesign reference is preserved at `design/mockups/opentasker-command-center-v2.png`.
+## 0.2.79.2026-08-02.g915979d9+036 — 2026-08-03
+
+**「健康」 — the Hume Band's history, pulled over BLE, archived, and drawn honestly.**
+A new project reads the band's stored health data — heart rate, HRV, SpO₂, temperature, sleep and
+steps — into the workspace, keeps an append-only archive of every record it has ever seen, measures
+how much of the band's own memory it can still reach, and draws it all in its own window.
+
+### Talking to the band
+
+`band.sync` connects, drains every stream and disconnects; the link is never held open. The band
+requires no pairing and no authentication, which is its design and not ours. Two details are the
+difference between working and silently wrong: the MTU must be raised to 247, because sleep frames
+are 130 bytes and the default 23-byte ATT MTU truncates them without an error, and CONTINUE paging
+must carry a **zero** date rather than the original start date, which otherwise restarts the stream
+forever.
+
+The dedupe key is **the band's own wall clock**, never epoch millis. At a daylight-saving fall-back
+the same wall-clock hour happens twice, and an epoch key would store that hour's records a second
+time.
+
+The firmware defines a mode that erases the band's stored history. It is not merely unused here — a
+source-guard test fails the build if the opcode, the words "erase"/"factoryReset"/"clearBand", or an
+`Int`-taking frame builder ever appear in the band package. There is no way to name a raw mode byte,
+so the destructive command cannot be expressed.
+
+A sync that finds nothing is a **success**, not a failure; a sync that starts while one is already
+running **skips**. A stream that times out is recorded and the sync moves on, because the band's ring
+buffer is the real risk and banking six streams beats abandoning the run over one.
+
+### The census — the part that measures what cannot be looked up
+
+The band's buffers are small and overwrite their oldest records silently, and their true depth is
+documented nowhere. So it is measured: a gap that came back with no loss proves the buffer is **at
+least** that deep, and a gap that did lose records proves it is **at most** that deep. The two bounds
+converge from opposite sides over days of ordinary use. A stream that errored is excluded entirely —
+counting it as "no loss" would inflate the lower bound with a sync that never read anything.
+
+### The archive
+
+Every new record is appended to a monthly JSONL file, one line each, never rewritten. The database is
+what the app queries and is pruned on a schedule; the archive is the record and is not.
+
+### 「健康」, in its own window
+
+Not a tab. `band.charts` opens a fullscreen window, so a task — and therefore a launcher shortcut —
+leads straight to the data without going through an app about automation.
+
+The charts follow one rule, in 白い熊's words: *as close to the actual measurements as possible.*
+Nothing drawn is a value that was not measured.
+
+- **No averaging.** Decimation is Largest-Triangle-Three-Buckets, which *selects real samples* and
+  preserves the visual envelope. Its buckets are anchored to absolute time, so the selection does not
+  crawl while panning.
+- **Filters flag; they never replace or delete.** The textbook outlier filter substitutes a window
+  median, which would draw a number that never occurred. A flagged sample stays, is shown as a ✕ at
+  its real value, and is counted in the footer.
+- **Smoothing is monotone cubic (PCHIP)**, chosen for a guarantee rather than for looks: the minimum
+  and maximum of the drawn curve equal those of the retained samples. An overshooting spline would
+  draw an SpO₂ of 101 %. That guarantee is a unit test.
+- **Every chart carries its own accounting** — samples, rejected, gaps, no-reading — tappable to
+  reveal exactly what was dropped. That is a feature, not debug output: it is what makes filtering
+  trustworthy at all.
+
+### Two things the band does that no document mentions
+
+The `hr` stream carries **two different measurement populations** — a periodic series and an extra
+reading taken at each SpO₂ measurement, running **+7.46 bpm** higher. Merged, they make a sawtooth
+that consumes the outlier filter's entire rejection budget. They are told apart by an exact timestamp
+join with the SpO₂ stream; the obvious heuristic, reading the seconds field, misclassifies a quarter
+of them.
+
+And the **gap threshold is measured, not assumed.** The periodic heart-rate series is nominally
+sampled every 120 seconds; it really runs at 240. Believing the nominal figure declared 231 of 848
+intervals to be gaps and shredded the chart into 235 fragments.
+
+The full protocol, every record layout, and the reason behind each filtering decision are written up
+in `docs/hume-band-protocol.md`.
+
+### Also
+
+`band.sync` publishes live progress into variables as it runs, so a scene bound to those names
+animates with no polling — and the window shows a spinner and a seconds counter from the instant the
+button is pressed, because connecting takes seconds and a still progress bar is indistinguishable
+from nothing happening.
+
 ## 0.2.79.2026-08-02.g915979d9+031 — 2026-08-03
 
 **接続 keeps a history — and the engine grew four capabilities to let a workspace build one.**

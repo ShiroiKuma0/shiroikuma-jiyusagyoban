@@ -572,8 +572,8 @@ fun registerActionMetadata() {
             description = "Create a directory (and parents) within the app's files",
             category = "File",
             fields = listOf(
-                ActionField("shared", "In shared storage", FieldType.TEXT, hint = "true = resolve under /sdcard (your own tree, visible to a file manager) instead of the app's private files"),
                 ActionField("path", "Path", required = true, hint = "directory path"),
+                ActionField("shared", "In shared storage", FieldType.TEXT, hint = "true = resolve under /sdcard (your own tree, visible to a file manager) instead of the app's private files"),
             )
         )
     )
@@ -908,6 +908,38 @@ fun registerActionMetadata() {
                 ActionField("store_stderr", "Store stderr in", hint = "variable (default: stderr)"),
                 ActionField("store_exit", "Store exit code in", hint = "variable (default: exit)"),
                 ActionField("ignore_exit", "Ignore exit code", FieldType.CHECKBOX, hint = "succeed even if exit code is non-zero"),
+            )
+        )
+    )
+
+    // --- 健康: the Hume Band's stored health history ----------------------------------------------
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "band.sync",
+            name = "Sync Band",
+            description = "Pull the Hume Band's stored history — heart rate, HRV, SpO2, temperature, sleep, steps — into the workspace. Connects, drains every stream and disconnects; the link is never held open",
+            category = "Health",
+            fields = listOf(
+                ActionField("from", "Read from", FieldType.TEXT, hint = "auto (default) = last successful sync minus the overlap, or 3 days back if there has never been one. A number = that many days. Or an exact yyyy-MM-dd HH:mm:ss"),
+                ActionField("streams", "Streams", FieldType.TEXT, hint = "blank = all. Comma list of: hr, hrv, spo2, temp, sleep, daily, detail"),
+                ActionField("address", "Band address", FieldType.TEXT, hint = "blank = the configured one. A MAC, e.g. D5:A7:06:DC:A1:3A"),
+                ActionField("prefix", "Variable prefix", FieldType.TEXT, hint = "default BAND_ — writes <prefix>Phase, Pct, Records, Inserted, Stream, Summary while it runs"),
+                ActionField("timeout_sec", "Whole-session timeout (s)", FieldType.NUMBER, hint = "default 180, coerced 15..600. A stream that times out is recorded and the sync moves on"),
+                ActionField("backup", "Write the JSONL archive", FieldType.CHECKBOX, hint = "default on — one line per NEW record, appended, never rewritten"),
+                ActionField("store", "Store summary in", FieldType.TEXT, hint = "variable to receive the one-line result"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "band.charts",
+            name = "Show Band Charts",
+            description = "Open 健康 in its own fullscreen window — the band's heart rate, HRV, SpO2, temperature and stress as smooth charts. Put a launcher shortcut on the task that runs this and the icon opens straight onto the data",
+            category = "Health",
+            fields = listOf(
+                ActionField("metric", "Only this metric", FieldType.TEXT, hint = "blank = all of them. One of: hr, hrv, spo2, temp, stress"),
+                ActionField("span_minutes", "Initial span (minutes)", FieldType.NUMBER, hint = "blank = 24 hours. e.g. 360 for six hours, 60 for one"),
             )
         )
     )
@@ -1917,9 +1949,9 @@ fun registerActionMetadata() {
             description = "Read file contents into a variable",
             category = "File",
             fields = listOf(
-                ActionField("shared", "In shared storage", FieldType.TEXT, hint = "true = resolve under /sdcard (your own tree, visible to a file manager) instead of the app's private files"),
                 ActionField("path", "File path", required = true),
                 ActionField("var", "Store in variable", required = true, hint = "%var"),
+                ActionField("shared", "In shared storage", FieldType.TEXT, hint = "true = resolve under /sdcard (your own tree, visible to a file manager) instead of the app's private files"),
             )
         )
     )
@@ -1931,9 +1963,9 @@ fun registerActionMetadata() {
             description = "Write contents to a file (overwrites)",
             category = "File",
             fields = listOf(
-                ActionField("shared", "In shared storage", FieldType.TEXT, hint = "true = resolve under /sdcard (your own tree, visible to a file manager) instead of the app's private files"),
                 ActionField("path", "File path", required = true),
                 ActionField("text", "Content", FieldType.MULTILINE, required = true),
+                ActionField("shared", "In shared storage", FieldType.TEXT, hint = "true = resolve under /sdcard (your own tree, visible to a file manager) instead of the app's private files"),
             )
         )
     )
@@ -1945,9 +1977,9 @@ fun registerActionMetadata() {
             description = "Append contents to a file",
             category = "File",
             fields = listOf(
-                ActionField("shared", "In shared storage", FieldType.TEXT, hint = "true = resolve under /sdcard (your own tree, visible to a file manager) instead of the app's private files"),
                 ActionField("path", "File path", required = true),
                 ActionField("text", "Content", FieldType.MULTILINE, required = true),
+                ActionField("shared", "In shared storage", FieldType.TEXT, hint = "true = resolve under /sdcard (your own tree, visible to a file manager) instead of the app's private files"),
             )
         )
     )
