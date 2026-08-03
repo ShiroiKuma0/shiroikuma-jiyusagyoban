@@ -44,9 +44,9 @@ class RuntimeRegistriesTest {
 
         assertFieldKeys("brightness.set", "brightness")
         assertFieldKeys("screenshot.take", "path", "store")
-        assertFieldKeys("file.read", "path", "var")
-        assertFieldKeys("file.write", "path", "text")
-        assertFieldKeys("file.append", "path", "text")
+        assertFieldKeys("file.read", "path", "var", "shared")
+        assertFieldKeys("file.write", "path", "text", "shared")
+        assertFieldKeys("file.append", "path", "text", "shared")
         assertFieldKeys("file.list", "path", "var", "pattern")
         assertFieldKeys(
             "http.request",

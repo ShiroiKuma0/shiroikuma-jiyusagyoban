@@ -235,6 +235,46 @@ object DatabaseMigrations {
         }
     }
 
+    /**
+     * Band health history: four tables for the Hume Band V2 sync.
+     *
+     * Every statement below is Room's OWN generated SQL, lifted verbatim out of
+     * app/schemas/…/21.json with the literal table name substituted for ${TABLE_NAME}. Hand-writing
+     * it is how you get an identity-hash mismatch at runtime — the column order, the NOT NULL flags
+     * and the index name all have to match what Room expects byte for byte.
+     */
+    val MIGRATION_20_21 = object : Migration(20, 21) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `band_samples` (`metric` TEXT NOT NULL, " +
+                    "`localTs` INTEGER NOT NULL, `epochMs` INTEGER NOT NULL, `value` REAL NOT NULL, " +
+                    "`syncId` INTEGER NOT NULL, PRIMARY KEY(`metric`, `localTs`))",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_band_samples_metric_epochMs` " +
+                    "ON `band_samples` (`metric`, `epochMs`)",
+            )
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `band_daily` (`localDate` INTEGER NOT NULL, " +
+                    "`steps` INTEGER NOT NULL, `distanceM` REAL NOT NULL, `calories` REAL NOT NULL, " +
+                    "`rawExercise` INTEGER NOT NULL, `rawTail` TEXT NOT NULL, `syncId` INTEGER NOT NULL, " +
+                    "PRIMARY KEY(`localDate`))",
+            )
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `band_sleep` (`startLocalTs` INTEGER NOT NULL, " +
+                    "`minutes` INTEGER NOT NULL, `stages` TEXT NOT NULL, `syncId` INTEGER NOT NULL, " +
+                    "PRIMARY KEY(`startLocalTs`))",
+            )
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `band_syncs` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`startedAt` INTEGER NOT NULL, `finishedAt` INTEGER NOT NULL, `ok` INTEGER NOT NULL, " +
+                    "`address` TEXT NOT NULL, `firmware` TEXT, `battery` INTEGER, `mtu` INTEGER, " +
+                    "`requestedFrom` INTEGER NOT NULL, `source` TEXT NOT NULL, `statsJson` TEXT NOT NULL, " +
+                    "`message` TEXT NOT NULL)",
+            )
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -256,6 +296,7 @@ object DatabaseMigrations {
             MIGRATION_17_18,
             MIGRATION_18_19,
             MIGRATION_19_20,
+            MIGRATION_20_21,
         )
     }
 }
@@ -295,10 +336,17 @@ object DatabaseMigrations {
  *   - profiles: adds requiresRiskAcknowledgement for imported-profile first-enable gating
  *     (upstream v7, renumbered)
  *
- * Version 20 (current):
+ * Version 20:
  *   - run_logs: adds index on timestamp (reactive recent query + retention pruning)
  *   - edit_history: adds composite index on (entityType, entityId)
  *     (upstream v8, renumbered)
+ *
+ * Version 21 (current):
+ *   - band_samples / band_daily / band_sleep / band_syncs: the Hume Band V2 health history.
+ *     band_samples is keyed on (metric, localTs) where localTs is the BAND's own wall clock as
+ *     yyyyMMddHHmmss — never epoch millis, so a re-sync in another timezone or across a DST
+ *     fall-back hour cannot double a row. band_syncs is deliberately never pruned: its value is
+ *     the multi-day series that measures the band's ring-buffer depth.
  *
  * To add a migration:
  * 1. Increment database version in @Database annotation

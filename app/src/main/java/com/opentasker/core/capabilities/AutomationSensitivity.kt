@@ -160,6 +160,11 @@ object AutomationSensitivityRegistry {
     )
 
     private val dataAccessActionIds = setOf(
+        // Reads personal health history off the band — heart rate, sleep, blood pressure.
+        "band.sync",
+        // Puts that same health history on screen. It transmits nothing, but it displays a body's
+        // worth of it, which is the thing worth declaring.
+        "band.charts",
         "clipboard.get",
         "contacts.lookup",
         "plugin.locale.query",
@@ -188,6 +193,8 @@ object AutomationSensitivityRegistry {
     )
 
     private val deviceControlActionIds = setOf(
+        // Drives the Bluetooth radio and connects to a paired-free peripheral.
+        "band.sync",
         "backup.prune",
         "clipboard.set",
         "notify.show",
