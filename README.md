@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.79.2026-08-02.g915979d9+031`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.81.2026-08-02.g97059d7b+002`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 > The version names the upstream commit the fork is rebased on:
 > `<upstream version>.<base commit date>.g<8-char upstream sha>+<build>`. Upstream's own version
@@ -205,19 +205,19 @@ A profile is active while **all** its contexts match. Seven families:
 
 ---
 
-## Actions — **161 built-in** (＋ engine flow control)
+## Actions — **175 built-in** (＋ engine flow control)
 
 > Bold = added or materially extended in this fork.
 
-**App (24)** — **Send Intent** *(＋ `reply_via=receiver` binder-free reply channel, waits up to 600 s)* · **Launch Intent** · Launch App · **Freeze App** · **Unfreeze App** · **Make Launcher Tasks** · **Generate Share Relays** · **Pick Apps → Variable** *(icon-tile grid, pre-ticked)* · **Pick One App → Variable** *(one-tap, restrictable)* · Kill App · Go Home · Next App · Previous App · Open URL · Send SMS · Call · Compose Email · List Apps · Take Screenshot
+**App (27)** — **Send Intent** *(＋ `reply_via=receiver` binder-free reply channel, waits up to 600 s)* · **Launch Intent** · Launch App · **Freeze App** · **Unfreeze App** · **Make Launcher Tasks** · **Generate Share Relays** · **Pick Apps → Variable** *(icon-tile grid, pre-ticked)* · **Pick One App → Variable** *(one-tap, restrictable)* · Kill App · Go Home · Next App · Previous App · Open URL · Send SMS · Call · Compose Email · List Apps · Take Screenshot · Archive App · Unarchive App · Publish Shortcut
 
 **System (32)** — **Get Location** *(framework LocationManager, no Play Services; publishes the fix's age)* · **Set Data SIM** *(root-free, by slot, via Shizuku)* · **List SIMs** · **Turn Screen Off** · **Wake Device** · **Run Shell** (Shizuku) · **Show Scene** · **Hide Scene** · **Set Widget** · **Refresh Widgets** · **Flash Bubble Add / Remove / Clear** · **Flash Kill Icon Show / Hide** · Flash · Vibrate · Reboot Device · Lock Device · Set / Get Clipboard · Set Wallpaper · Set / Pick Keyboard · Profile Status · Log Message
 
-**Settings (20)** — Toggle WiFi · Toggle Bluetooth · Toggle Mobile Data · Toggle Airplane Mode · Toggle Torch · Set / Auto Brightness · Set Volume · Get Volume · Set Ringer Mode · Set Do Not Disturb · Set Screen Timeout · Location Mode · Set Tile State · **Get Locale** · **Set Locale** *(reorders the list — keeps other languages)* · **Get Device State** (battery / charging-plugged / WiFi / airplane → vars) · Get / Put Setting · WiFi Settings
+**Settings (24)** — Toggle WiFi · Toggle Bluetooth · Toggle Mobile Data · Toggle Airplane Mode · Toggle Torch · Set / Auto Brightness · Set Volume · Get Volume · Set Ringer Mode · Set Do Not Disturb · Set Screen Timeout · Location Mode · Set Tile State · **Get Locale** · **Set Locale** *(reorders the list — keeps other languages)* · **Get Device State** (battery / charging-plugged / WiFi / airplane → vars) · Get / Put Setting · WiFi Settings · Set Zen Rule · Clear Zen Rule · Temporary State *(applies a setting and restores it after a duration, surviving process death)* · Get Keyboard Info
 
-**Variable (24)** — Set Variable · **Persist Variable** · Variable Clear · **Variable Split** · Variable Join · Variable Add · Variable Convert · Variable Search Replace · Parse/Format DateTime · Read Data *(JSON/CSV/XML → vars, path selectors)* · Format / Parse / Add Date-Time · Match / Replace / Split / Join / Substring Text *(linear-time RE2 regex)* · Array Set / Push / Pop / Clear / Process · Arrays Merge
+**Variable (25)** — Set Variable · **Persist Variable** · Variable Clear · **Variable Split** · Variable Join · Variable Add · Variable Convert · Variable Search Replace · Parse/Format DateTime · Read Data *(JSON/CSV/XML → vars, path selectors)* · Format / Parse / Add Date-Time · Match / Replace / Split / Join / Substring Text *(linear-time RE2 regex)* · Array Set / Push / Pop / Clear / Process · Arrays Merge · Lookup Contact
 
-**Flow (11)** — If · Else · End If · For Each · End For · Run Task · Return Values · Stop · Fail · Wait · Comment
+**Flow (14)** — If · Else · End If · For Each · End For · Run Task · Return Values · Stop · Fail · Wait · Comment · Try · Catch · End Try *(bounded exponential retry, `FLOW_ERROR_*` handler variables)*
 
 **File (9)** *(＋ `shared` — resolve in your own storage instead of the app sandbox)* — Read · Write · Append · Move · Delete · List Files · Create Directory · Open File
 
@@ -225,9 +225,9 @@ A profile is active while **all** its contexts match. Seven families:
 
 **Media (9)** — Play / Stop / Pause Sound · Next / Previous Track · Mute
 
-**Network (8)** — **Speed Test** *(per-transport throughput, wire-measured, with a real TCP-handshake ping)* · **Cancel Speed Test** · HTTP Request *(any method, headers, body, timeouts, response capture)* · HTTP GET · HTTP POST · Download File · Ping Host · Wake-on-LAN
+**Network (10)** — **Speed Test** *(per-transport throughput, wire-measured, with a real TCP-handshake ping)* · **Cancel Speed Test** · HTTP Request *(any method, headers, body, timeouts, response capture)* · HTTP GET · HTTP POST · Download File · Ping Host · Wake-on-LAN · Home Assistant Webhook · MQTT Publish
 
-**Notification (4)** — Show Notification *(tap-task + 3 action buttons)* · Cancel Notification · **Dismiss App Notifications** *(by package)* · Say (Text-to-Speech)
+**Notification (5)** — Show Notification *(tap-task + 3 action buttons)* · Cancel Notification · **Dismiss App Notifications** *(by package)* · Say (Text-to-Speech) · Progress Notification
 
 **Alert (4)** — Input Dialog · List Dialog · Text Dialog · **Pick From List → Variable** *(checkbox multi-select with a 全選択 master toggle and indented sub-options)*
 
