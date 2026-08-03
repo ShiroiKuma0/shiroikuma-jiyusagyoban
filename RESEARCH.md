@@ -1,223 +1,252 @@
 # Research — OpenTasker
 
-**Date:** 2026-08-02  
-**Scope:** Repository, product documentation, tests and history, Android/platform changes, dependencies, security guidance, direct competitors, adjacent automation systems, community signals, and academic/engineering research. This file replaces the previous research synthesis.  
-**Confidence:** **Verified** means checked in the current tree or a primary source; **Likely** means corroborated by several sources but still needing device/product validation; **Exploratory** means a candidate for discovery only.
+Date: 2026-08-02 — replaces all prior research.
+
+Tree state at time of writing: HEAD `1e702ba`, v0.2.81 / code 83, Room schema 10, 235 main + 180 JVM-test + 15 instrumentation Kotlin files, 979 `@Test` methods, 74 registered + 10 engine-handled actions, 7 context families, targetSdk 37.
+
+Confidence labels: **Verified** = read in this tree or a primary source during this pass. **Likely** = corroborated by secondary sources only. **Needs live validation** = requires a device, emulator, or external account.
 
 ## Executive Summary
 
-OpenTasker is a serious local-first Android automation product, not a toy workflow editor. The current mainline at `1e702ba` has 235 production Kotlin files, 180 JVM test files, 15 instrumentation-test files, Room schema v10, Compose screens for nine major surfaces, explicit execution policies, bounded task evaluation, encrypted secret handling, external protocol v2, diagnostics, import/export, and F-Droid release metadata. The mainline includes global/per-profile execution admission, burst controls, a persisted circuit breaker, feedback-risk analysis, adaptive navigation coverage, and predictive-back handling.
+OpenTasker is the most rigorously-engineered app in the FOSS Android automation category, and the survey confirms it holds an axis no competitor holds simultaneously: current target SDK, zero F-Droid anti-features, encrypted storage, SBOM+OSV release gating, a capability contract that resolves unreviewed actions to *unsupported*, and per-profile match explanations. Every other project in the survey picked one of two failure modes — **safe and stalled** (Easer: no feature code since 2022, still no run log against a nine-year-old issue; PhoneProfilesPlus: froze `targetSdk` at 28, ejected from f-droid.org, flagged by Play Protect) or **powerful and broken** (Klick'r: Android 15 gesture bug `blocked` since 2025-01; AutoJs6: a 7 GB RAM issue then a maintainer suspension notice; Key Mapper: perpetual Shizuku-bridge breakage). The third path OpenTasker chose is validated. Its cost is authoring expressiveness, and the fix is *not* more privilege — it is editor-layer and ecosystem-layer power.
 
-The product’s defensible position is inspectable, offline automation with explicit capabilities, redacted evidence, and bounded execution. Tasker and MacroDroid win on breadth and onboarding; Automate and Node-RED demonstrate reusable flow and failure semantics; Home Assistant and n8n demonstrate run modes, execution history, and retries. None of those findings justify a cloud marketplace, unrestricted screen-driving agent, or arbitrary-code parity goal.
+The highest-value direction is **"why did my automation not run, and where exactly did it break."** 129 of 190 analysed Home Assistant forum threads (68%) are debugging, and existing tools fix none of them (TOSEM 2025). Tasker's own tracker has 38 votes on "improved debugging" with no developer response, 26 on "Enhanced Run Log", 25 on undo, 41 on rename-with-reference-update. Apple Shortcuts has no debugger at all. Node-RED has none in core. **Nobody has shipped a debugger for automation on a phone**, and OpenTasker already owns every hard prerequisite: action-level traces, `EngineHealthReader`, `ExecutionEnvelope`, `PreflightRunner`, `EditHistoryEntity(previousJson,nextJson)`, and `ExecutionAdmissionController`.
 
-Highest-value next work, in priority order:
+Top opportunities, priority order:
 
-1. Finish the execution-safety contract: normalize every producer through one structured command/event ledger, carry one execution identity through admission, service, run log, external status, and Diagnostics, and make loop/storm decisions explainable and redacted.
-2. Make release and capability truth machine-checkable across Gradle, manifest, README, CLAUDE, CHANGELOG, and F-Droid metadata. Current F-Droid metadata still pins an older commit, and CLAUDE contains historical version/capability claims.
-3. Make Setup and Diagnostics freshness-aware and capability-derived so a user can distinguish Loading, Ready, Stale, and Error for each required subsystem.
-4. Add adaptive large-screen/resize evidence and a Macrobenchmark/Baseline Profile decision; the mockup is a desktop-like command center, while current UI verification is mostly source/unit coverage.
-5. Preserve the local-only boundary while improving safe authoring: global search, reusable local subflows, lossless imports, actionable failure catch/retry, and privacy-preserving Android APIs.
+1. **Fix the undo/redo corrupt-payload write** — the only real correctness bug found; it violates the repo's own fail-closed doctrine and silently persists undecodable JSON. (Verified)
+2. **Close the release-truth gap** — `tools/release-truth.json`'s `dependencies` block is generated but never asserted and is currently stale; the generator would regress `engineHandledActions` 10→7 if re-run. (Verified)
+3. **Make `flow.try` retry honest** — the editor exposes `max_attempts` for every try block, but only 1 of 74 actions is `IDEMPOTENT`, so it is a no-op for the other 73. (Verified)
+4. **Harden dependency verification** — 1396 checksums all carry `origin="Generated by Gradle"` with `verify-signatures=false`: trust-on-first-fetch, not independent verification. (Verified)
+5. **Inter-profile causal-loop detection** — `MAX_SUBTASK_DEPTH` guards intra-run recursion only; an A→B→A profile cycle is invisible to it and surfaces only as an unexplained rate-limiter storm. (Verified)
+6. **`ApplicationExitInfo` correlation + missed-trigger reconciliation** — turns the category's #1 complaint (OEM process killing, endorsed by Tasker's own author) into a machine answer. Zero occurrences in the tree today. (Verified)
+7. **Typed output→input variable picker** — the single largest authoring-UX delta in the survey (vFlow, Apple Shortcuts). Editor-only change; storage stays `{{ }}` text. (Verified)
+8. **Variable rename/delete reference safety** — `AutomationReferenceIndex.OwnerKind` covers `PROFILE, TASK, SCENE` but not `VARIABLE`; the machinery exists. (Verified)
+9. **Publish `docs/`, unpublish the raw research dump** — `.gitignore`'s `*.md` leaves the whole `docs/` tree untracked (README's link 404s on GitHub) while a 60 KB raw agent transcript *is* committed. (Verified)
+10. **Held-execution replay + simulate-trigger** — converts bounded admission from silent data loss into a reviewable queue, and closes the debug loop.
 
 ## Product Map
 
-### Current product boundary (Verified)
+### Core workflows
 
-- **Runtime:** one Kotlin/Compose Android app, `minSdk = 26`, compile/target API 37. The app manifest declares foreground-service types, boot recovery, notification listener, exact alarms, local network, Bluetooth/location, widgets, Quick Settings, Locale, Termux, and a signature-protected automation target.
-- **Domain model:** profiles contain context predicates and tasks; actions include typed forms and engine-handled flow nodes; scenes, variables, run history, edit history, and external execution state persist in Room schema v10.
-- **Execution:** `SINGLE`, `RESTART`, `QUEUED`, and `PARALLEL` policies feed a bounded `TaskRunner`. `ExecutionAdmissionController` now limits active work to 8 globally/2 per profile, burst starts to 32 globally/8 per profile in 10 seconds, and trips a 60-second persisted circuit after three strikes.
-- **Authoring surfaces:** `ActiveAutomationUi` exposes Profiles, Tasks, Variables, Flow, Scenes, Inspector, Setup, Run Log, and Diagnostics. Primary navigation keeps Profiles/Tasks/Setup/Run Log visible and places secondary tools under More. `rememberSaveable` preserves editor state across common navigation changes.
-- **Integrations:** Locale-compatible plugins, v2 external dispatch, Tasker XML staging through OpenTasker JSON, encrypted bundle import/export, widgets/shortcuts/Quick Settings, notifications, local HTTP, Shizuku capability discovery, and Termux command execution. Privileged paths fail closed when capability evidence is missing.
-- **Distribution:** local release scripts verify the Gradle distribution/wrapper, dependency metadata, SBOM, and OSV results. F-Droid metadata and the release-truth manifest agree on v0.2.81/code 83 and its immutable artifact commit. There is no `.github/` hosted workflow in the current tree.
+- **Author**: profile = context predicates (7 families, optional ALL/ANY/NOT tree) → enter/exit tasks = ordered `ActionSpec` list with per-action condition and `continueOnError`, plus engine flow nodes (`if`/`else`, `for each`, `try`/`catch`, `task.run`, `stop`).
+- **Execute**: `AutomationService` (FGS `specialUse|location`) → `ProfileMatcher` → `ExecutionAdmissionController` (8 global / 2 per-profile active, 32/8 burst per 10 s, 3-strike 60 s circuit) → `TaskRunner` → `run_logs` with action traces.
+- **Inspect**: Context Inspector (live source health, Loading/Ready/Stale/Error, per-profile match explanation), Run Log (keyset paging, SQL filters, redacted export), Diagnostics (heartbeat, standby bucket, FGS type, exact alarms, watchdog), live in-flight view with per-run cancellation.
+- **Preflight**: `PreflightRunner` — side-effect-free preview with synthetic event variables, expanded inputs, branch decisions, setup gaps, blockers.
+- **Transfer**: OpenTasker JSON bundles (schema v2, deterministic ordering, budget-capped preflight, disabled-by-default install), Tasker XML import/export, encrypted `.otbackup` v2, offline share manifests.
 
-### Maturity and evidence (Verified/Likely)
+### Personas
 
-- **Verified:** repository history through `1e702ba` is dominated by hardening, migration safety, diagnostics, locale, release-gate, execution, and adaptive-navigation changes rather than only UI churn.
-- **Verified:** exported Room schemas and hand-written migrations cover versions 1–10; JSON payloads make explicit versioning and lossless migration important.
-- **Verified:** source-level tests cover contracts, imports, redaction, execution policies, diagnostics, locale, and release truth. No current emulator/OEM run report is checked into the repository, so background behavior remains **Likely**, not verified.
-- **Verified:** `design/mockups/opentasker-command-center-menu.png` depicts a polished Catppuccin/AMOLED command center with metrics, active execution, health, Setup, Flow, Scenes, and Inspector. Source screens cover the surfaces, but current Diagnostics does not yet expose every mockup metric (for example CPU/memory/uptime).
-- **Verified:** root `README.md` and current metadata are aligned to v0.2.81; `CLAUDE.md` and files under `docs/research/` retain explicitly historical release snapshots.
+- Privacy-conscious users who want automation without an account or analytics.
+- Tasker/MacroDroid/Automate migrants who want the familiar vocabulary with safer defaults and open distribution.
+- Power users combining Termux, HTTP, MQTT, variables, scenes, and plugins, expecting secrets and destructive actions to stay bounded.
+- F-Droid packagers needing reproducible builds and truthful metadata.
+- **Out of the safe core**: unrestricted screen-driving agents, hidden APIs, root assumptions, arbitrary shell/JS by default, server-backed sharing.
 
-### User segments and boundaries
+### Platform and distribution
 
-- Privacy-conscious Android users who want useful automation without an account, analytics dependency, or cloud control plane.
-- Tasker, MacroDroid, and Automate migrants who value familiar contexts/actions but want clearer state, safer defaults, and open distribution.
-- Power users combining Termux, HTTP, variables, scenes, plugins, and flow control while expecting secrets and destructive actions to remain bounded.
-- Maintainers and packagers who need reproducible builds, truthful metadata, migration evidence, and rollback-friendly releases.
-- **Out of scope for the safe core:** unrestricted accessibility/screen-driving agents, hidden APIs, root-only assumptions, arbitrary Java/shell by default, and server-backed template sharing.
+Single Gradle app module plus `:baselineprofile`. No flavors — distribution is a `-PopenTaskerDistribution=standard|fdroid|play` property driving `BuildConfig` and six manifest placeholders (Play strips SMS/phone-state). Release signing is env-var driven; absent keys produce the unsigned APK F-Droid consumes. No `.github/` — CI was deliberately deleted (`3d88f83`); the gate is `tools/verify-local-release.ps1` → `:app:localQualityGate` (lint, androidTest compile, Room schema drift, release truth, resolved-dependency policy, CycloneDX SBOM + OSV batch query, JVM test floor, seeded-failure proof, 16 KB native alignment, performance evidence, documentation truth) plus Play and F-Droid release builds and a configuration-cache reuse assertion.
+
+### Key integrations and data flows
+
+Locale/Tasker plugin **host** (setting dispatch, condition query, request-query events) and Locale setting **plugin** (`LocaleSettingEditActivity` + `LocaleSettingFireReceiver` are exported, so Tasker/MacroDroid can already run OpenTasker tasks — but there is no `EDIT_CONDITION`/`QUERY_CONDITION` component, so they cannot use OpenTasker's contexts as conditions). Signature-permission external intent API with async protocol v2. UnifiedPush-shaped `event=push` broadcast bridge. In-app MQTT 3.1.1 client over platform sockets. Home Assistant outbound webhook. Termux `RUN_COMMAND` with a SHA-256 allowlist. Shizuku status detection only — `ShizukuShellRunner.hasPrivilegedTransport()` is a hard-coded `false`, so the entire elevated pathway is honest scaffolding that cannot reach `Ready`.
 
 ## Competitive Landscape
 
-### Tasker — breadth and ecosystem benchmark
+### vFlow (GPL-2.0, 1209★, v1.5.2 2026-05-23) — the architecture to learn from
 
-Tasker’s profile/context/task/action/scene mental model and extensive plugins remain the breadth benchmark. Its 6.5/6.6 change logs show continued platform integration, permission management, Shizuku, sunrise/sunset, and import improvements. The research signal is to make migration, search, privilege state, and external protocol excellent; it is not to copy arbitrary code or root-equivalent actions.
+**Learn:** one uniform `ActionModule` abstraction for triggers, actions, and control flow; every module self-describes `InputDefinition`/`OutputDefinition`/permissions/summary; **typed magic variables** where step N's typed output is selectable as step N+1's input so the editor only offers compatible sources; dynamic parameter visibility; an optional per-module custom-editor escape hatch; an aggregate permission request before a workflow runs.
+**Avoid:** minSdk 29 (drops Android 8/9); a side-loaded privileged `vFlowCore.dex` (wrecks reproducibility); a single 21-comment mega-issue as the backlog; and its own issue #15 — a permission health check that reports healthy on first launch, i.e. fail-*open*, the exact trap OpenTasker's contract avoids.
 
-### MacroDroid — onboarding and local templates
+### Easer (GPL-3.0, 969★) — the cautionary tale
 
-MacroDroid’s trigger/action/constraint vocabulary and template store shorten time-to-first-success. Community comparisons consistently describe it as easier than Tasker. OpenTasker should copy progressive disclosure, concise forms, local examples, and visible active state, while retaining offline sharing and no commercial/account dependency.
+**Learn:** the Script/Profile split makes reuse first-class; "dynamics" flow event payloads into operations; out-of-process **Remote Skill plugin APKs** over AIDL with a published example repo; rare operations nothing else has (`operation_wireguard`, raw TCP/UDP send, `event_tcp_trip` round-trip probe, script-controls-script).
+**Avoid:** no run log — issue #21 "Add log functionality to aid with debugging" has been open since **2017-07-07**. Last feature commit 2022-08-27; 243 open issues serving as the only roadmap. Declaring a plugin API "unstable" and then freezing it.
 
-### LlamaLab Automate — visual flow and failure identity
+### PhoneProfilesPlus (Apache-2.0, 647★, 7.1.2 2025-09-24) — event semantics worth copying
 
-Automate documents fibers, variables, fork/join, and Catch Failure blocks. Its strongest lesson is explicit failure identity and recoverable control flow. OpenTasker should keep graph bounds and static cycle detection, then add bounded catch/retry/finally semantics rather than unbounded fork expressiveness.
+**Learn:** event **priority**, paired profile-on-start/profile-on-end, automatic **state restoration when an event ends**, start/end **delay**, an "ignore manual activation" flag, and a **helper-APK privilege split** (`PhoneProfilesPlusExtender`, `PPPPutSettings`) that keeps privileged capability outside the main app's threat boundary.
+**Avoid:** the whole reason it can do that — `targetSdk` frozen at **28**, which costs it Play Protect trust and f-droid.org inclusion and forces `AndroidHiddenApiBypass` + `DexMaker`. Its issue #154 also shows users find "Event" the wrong word for a level condition; OpenTasker's "context" is the better name.
 
-### Samsung Modes and Routines — platform-native clarity
+### Automation, by Jens Schröder (GPL-3.0, 1.8.7 2026-03-10) — the only actively-released FOSS rule engine on f-droid.org
 
-Samsung exposes conditions/actions, active mode state, recommendations, and searchable entry points. It validates a “what is active now?” surface and contextual permission prompts. It is not a fit for OpenTasker’s cross-device/open distribution goals, but its concise state presentation is a useful UI benchmark.
+**Learn:** 29 triggers / 34 actions, and the six cheap sensor triggers OpenTasker lacks — `speed` (GPS velocity), `activityDetection`, `proximity`, `deviceOrientation`, `roaming`, `tethering` — plus `checkVariable` **as a trigger** (variable-change reactivity, not just a condition) and `profileActive` (one rule's state triggering another). Its fdroiddata entry declares a dedicated `fdroidFlavor` with a minimal, documented degoogling seam.
+**Avoid:** a self-hosted Gitea plus a static HTML "known problems" page instead of a tracker — the project is un-auditable from outside and invisible to contributors.
 
-### PhoneProfilesPlus / Easer / KeyMapper — adjacent open-source lessons
+### Home Assistant + n8n + Node-RED — the observability playbook
 
-PhoneProfilesPlus shows the durability of explicit profiles and a mature FOSS user base; Easer shows the cost of maintenance drift; KeyMapper demonstrates how accessibility, gestures, and intent macros expand policy and privacy risk. OpenTasker should keep explicit capabilities and fail-closed privilege boundaries rather than treat screen control as a core promise.
+**Learn:** HA's per-run **traces** (step timeline, a graph of the *executed* path, per-node data and result, the config **as it was at execution time**, arrows to walk the last 5 runs, bounded by `stored_traces`) and `max` + `max_exceeded: silent|<level>` per automation; n8n's **Debug in Editor** (pin a failed execution's data and re-run from the failing node), the executions-vs-workflow-history split, and a dedicated **error workflow** with an Error Trigger; Node-RED's **scoped Catch** with an explicit "only previously unhandled" fallback tier, a structured error object carrying `source.id/type/name/count`, and a runtime **loop counter** with a hard uncatchable cap at 9.
+**Avoid:** n8n issue #10763 — a node whose retry *succeeded* is still reported as errored. That is a test case, not a pattern.
 
-### Node-RED / Home Assistant / n8n — reliability patterns, not Android competitors
+### Tasker + MacroDroid — the market signal, not the design
 
-Node-RED’s subflows, context scopes, Catch/Status nodes, and explicit non-recursion; Home Assistant’s single/restart/queued/parallel automation modes; and n8n’s retry, continue-on-fail, execution history, and error workflows all point toward structured run identity, concurrency policy, and explainable terminal outcomes. These systems support the execution-ledger roadmap item, not a cloud/server rewrite.
+**Learn from their trackers, not their code.** Tasker's 1,002 open ideas rank: OR-logic in contexts (171 — OpenTasker has it), a separate non-Google share account (54), **rename variables with auto-updating references (41)**, **improved debugging (38, no dev response)**, grouped/collapsible tasks (31), **a grace period before state contexts activate (27, marked Planned)**, **enhanced run log (26 — "fails to tell users what exactly went wrong")**, undo (25), search (13), plus a standing "source control for Tasker" request for commit/diff/branch. MacroDroid shipped a bare **`Goto` action** in 5.62 — evidence that even a "simple" tool's users demand real control flow.
+**Avoid:** Tasker's 2025-26 strategy is Shizuku-as-escape-hatch, arbitrary Java with an LLM assistant, and becoming an OEM assistant target. MacroDroid's template store is account-bound with Firebase Analytics + Crashlytics always on and AdMob for non-Pro — and `AlexeiCrystal/macrodroid-store-vulnerability` documents now-fixed authorization logic that permitted access to any account and any published macro. That is the concrete argument against ever adding a hosted marketplace.
 
-### AI screen agents — rejected core direction
+### Apple Shortcuts + HTTP Shortcuts — authoring benchmarks
 
-Mobile-use, DroidRun, AutoDroid, DroidBot-GPT, and VisionTasker show research momentum in GUI agents. They also introduce ambient data access, nondeterministic actions, accessibility/policy exposure, and difficult replay. They may be useful as an explicitly sandboxed experiment, but they are not a safe default automation primitive for OpenTasker.
+**Learn:** Shortcuts' Magic Variables (an action's output is implicitly referenceable downstream, the token rendered with the producing action's icon, with an inline type-cast menu) and App Intents' mandatory **parameter-summary sentence** — the action row *is* one grammatical sentence for any parameter value. HTTP Shortcuts (MIT, 16 open issues, best hygiene in the survey) contributes client-certificate auth plus certificate pinning, typed prompt-at-runtime variables, and password-protected archive export.
+**Avoid:** Shortcuts has *no debugger* — users abuse modal `Show Alert`, and a third-party app (Logger) exists purely to be the missing console. HTTP Shortcuts' browser-based Web Editor is a network authoring surface OpenTasker's local-only boundary must not grow.
 
 ## Security, Privacy, and Reliability
 
-### Strengths already present
+### Bugs and risks found
 
-- **Secrets:** Keystore-backed secret variables, redaction in logs/previews, bounded encrypted bundle transfer, and explicit recovery boundaries align with OWASP MASVS storage guidance.
-- **Execution:** admission leases are acquired before hydration, released idempotently, and logged as skips when capacity/circuit policy rejects work. The controller is persisted enough to survive process restarts.
-- **Imports:** Tasker/OpenTasker/backup flows stage data for review, use schema/version checks, and protect against secret collisions and pathologically large payloads.
-- **Supply chain:** Gradle wrapper bootstrap, dependency verification metadata, SBOM generation, and OSV querying are part of `tools/verify-local-release.ps1`. The wrapper distribution has a SHA-256 pin; the remaining risk is proving all bootstrap artifacts and release metadata are aligned.
-- **Android privacy:** Android 17’s Contact Picker offers field-scoped grants, a better path than broad contacts permission for the planned contacts action. Advanced Protection callbacks and new background restrictions should be represented as capability evidence, not guessed state.
+- **Undo/redo persists undecodable payloads.** `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationViewModel.kt:1346-1351, 1364-1368, 1381-1386`. `decodeFromString<Task>(targetJson).takeIf { it.id == entityId }?.toEntity()` falls back to `current.copy(actionsJson = targetJson)` on `null`, writes it inside the transaction, and returns success. `TaskDao.kt:43` requires that column to decode as `List<ActionSpec>`; on the ID-mismatch branch a whole-Task JSON object is written into it. Same shape for `contextsJson` and `elementsJson`. No log, no user-visible error, and no distinction between "decode failed" and "wrong entity". Every other stored-payload path fails closed (`e2f8786`). **Verified.**
+- **Dependency verification is trust-on-first-fetch.** `gradle/verification-metadata.xml`: 824 components, 1396 SHA-256s, **every one** `origin="Generated by Gradle"`, and `<verify-signatures>false</verify-signatures>`. No blanket `trusted-artifacts` (good), but the checksums record whatever was downloaded rather than upstream-published values, and no PGP signature is checked. **Verified.**
+- **`flow.try` retry is a no-op for 73 of 74 actions.** `TaskRunner.kt:358-360` gates retry on `retrySafety == IDEMPOTENT`; `Action.kt:51` defaults to `NEVER` and only `HttpRequestAction.kt:184` overrides it. The `max_attempts` and `backoff_ms` fields are offered in the editor for every try block regardless. **Verified.**
+- **Release truth has unverified fields.** `VerifyReleaseTruthTask` asserts `application`, `android`, and `capabilities` keys but never touches the `dependencies` block — which currently claims `kotlin 2.3.21`, `ksp 2.3.7`, `composeBom 2026.05.00` against `libs.versions.toml`'s `2.4.10` / `2.3.10` / `2026.06.00`. Worse, `tools/generate-release-truth.ps1` hardcodes `engineHandledActions = 7` while the committed file and README say 10 — regenerating today would silently regress the claim. `roomSchemaVersion` is scraped from a `val currentVersion = 10` literal in the build script rather than `OPEN_TASKER_DATABASE_SCHEMA_VERSION` in `AppDatabase.kt:7`. Four separate hardcoded copies of the same facts exist (`verifyDocumentationTruth` 74/7/10, `verifyRoomSchema` 10, the truth file, the generator). **Verified.**
+- **A documentation gate that covers nothing on a clean checkout.** `app/build.gradle.kts:754-757` passes `CLAUDE.md` and `docs/research/*` through `.filter(File::isFile)`. Those paths are gitignored, so on an F-Droid or fresh-clone build the historical-claim scan silently has zero inputs and always passes. **Verified.**
+- **Inter-profile causal loops are undetected.** `TaskRunner.kt:475` enforces `MAX_SUBTASK_DEPTH` for nested `task.run`, but an action whose effect satisfies another profile's context starts a *fresh depth-0 run*. Only `ExecutionAdmissionController`'s rate limit and circuit breaker catch it, as an unexplained storm with no named cause. CHI 2019 classifies this as the Infinite Loop bug; Node-RED solves it with a hard uncatchable loop counter. **Verified.**
+- **Kotlin CVE-2026-53914 / GHSA-r937-wjx7-w2jp** (CVSS 6.7, published 2026-06-26): unsafe deserialization in Kotlin build-cache metadata, affects **before 2.4.20**; the tree is on 2.4.10 and 2.4.20 is only at Beta2. Build-time, local, high-privilege — not shipped in the APK. Mitigation now is refusing untrusted remote build caches. **Verified.**
+- **Netty 4.1.93 / 4.1.110 appear in `verification-metadata.xml`** with ~15 2026 advisories, several high. Confirmed **not** in the shipped APK — unzipping `app-release-unsigned.apk` yields zero `netty` strings — so risk is confined to the build classpath, but it will keep tripping SCA scans. **Verified.**
+- **The public repo carries a raw AI agent transcript.** `docs/research/raw-research-output.txt` is tracked (60,688 bytes) and opens with `Agent completed. agent_id: l1-research-phase, agent_type: research…`. `app/build.gradle.kts:755` names `CLAUDE.md` in committed source. Both violate the standing no-AI-references-in-committed-content rule. **Verified.**
+- Clean bill elsewhere: OkHttp 5.4.0, jsoup 1.22.2, Okio 3.17.0, kotlinx-serialization 1.11.0, androidx.sqlite/Room — no applicable advisories. Zero `TODO`/`FIXME`/`HACK`/`XXX`, zero `!!`, zero `Thread.sleep`, zero `runBlocking`, zero `GlobalScope` in `app/src/main`. One unlogged empty catch (`SettingsActions.kt:352`, an idempotent torch-callback unregister) and seven log-only catches, all on receiver or crash-handler boundaries where throwing would be worse. **Verified.**
 
-### Material residual risks
+### Missing guardrails
 
-- **Execution feedback:** admission currently explains capacity/circuit decisions, but direct causal-chain metadata and one structured event model are not yet shared by every producer, external response, run log, and Diagnostics projection.
-- **Freshness:** `EngineHealthReader` observes service heartbeat, standby bucket, foreground types, exact alarm state, matcher errors, WorkManager state, and pending JobScheduler reasons, but `DiagnosticsScreen` still reduces that to coarse healthy/not-healthy logic without subsystem age and remediation state.
-- **Manifest surface:** many high-risk permissions and exported components are intentional but need capability-to-feature evidence, especially notification listener, overlays, exact alarms, SMS/phone placeholders, local network, and Termux.
-- **Release truth:** `fdroid/metadata/com.opentasker.app.yml` and `tools/release-truth.json` agree on v0.2.81/code 83 and artifact commit `cd8f68c`; the release gate verifies the pin, version, capability counts, SDK levels, and schema versions together.
-- **Documentation drift:** `CLAUDE.md`, archived research, and the roadmap contain historical counts/statuses. A contributor can follow a stale “planned” instruction even when code has shipped.
-- **Device/OEM variance:** background restrictions, foreground-service policy, exact alarms, predictive back, large screens, 16 KB page compatibility, and vendor process killing require emulator and physical-device evidence; source tests cannot prove them.
+- No **`ApplicationExitInfo`** use anywhere (`getHistoricalProcessExitReasons`, API 30+) — the app cannot tell a user *why* the engine stopped, despite `EngineHeartbeatStore` already recording *that* it stopped. Android 17 adds a `"MemoryLimiter:AnonSwap"` description for the new per-device RAM caps.
+- No **missed-trigger reconciliation**: nothing records an expected next-fire time to compare against actual fires, so a Doze or OEM-kill gap is invisible after the fact.
+- No **profile priority** field, so two profiles whose contexts are simultaneously satisfiable and whose tasks write the same setting resolve nondeterministically. CHI 2019 measured this as the worst-accuracy bug class (40.5% correct).
+- No **Direct Boot** storage (`createInDeviceProtectedStorage()`, stable in DataStore 1.2.0), so triggers cannot arm before first unlock — matching the widely-reported post-reboot dead zone.
+- **StrictMode** has `detectUnsafeIntentLaunch()` but not Android 17's `detectImplicitUriPermissionGrant()`, the forward detector for Android 18 enforcement on `ACTION_SEND` URI grants — directly relevant to `ShareReceiverActivity` and `IntentDispatchFlag.GRANT_READ_URI`.
+- **`verifyJvmTestCount` floor is 522** against 979 actual tests — nearly half the suite could be deleted without tripping the gate.
+- **No coverage measurement** (no Kover, no JaCoCo) anywhere in the build.
 
-### Security/reliability priorities
+### Recovery and rollback
 
-1. Keep all execution admission, retries, loop detection, and cancellations bounded and redacted.
-2. Use one execution ID and structured terminal reason for manual, context, widget, shortcut, Quick Settings, Locale, Scene, notification, external, and worker producers.
-3. Derive Setup requirements from enabled capabilities and show age/state/remediation in Diagnostics.
-4. Validate 16 KB compatibility, predictive back, adaptive layouts, and Android 17 behavior under the local release gate.
-5. Prefer platform-scoped grants (Contact Picker, Companion Device, App Links) over broad permissions or ambient accessibility.
+`ExecutionAdmissionController` skips are terminal — a circuit trip or capacity rejection discards the triggering event. Zapier's model is better: park it in a **HELD** state with the captured input and require a human to replay; never auto-replay held work. `RunLogPruneWorker` prunes by retention with no carve-out for held or user-starred runs, so a dead-letter queue would silently evaporate (n8n's pruning explicitly exempts annotated and non-terminal executions). `EditHistoryEntity` already stores `previousJson`/`nextJson`, which is everything needed for a semantic diff of an edit — currently unused for review.
 
 ## Architecture Assessment
 
-### What is coherent
+### Module and boundary improvements
 
-- The UI → engine → Room layering is clear in `docs/ARCHITECTURE.md`, and dependency direction is mostly explicit.
-- `AutomationTargetContract.internalRunTaskIntent()` is now the single protocol-v2 builder. `AutomationTargetReceiver` rejects missing/old protocol versions, and Locale/Scene producers use the builder. The previous research claim that those producers bypassed protocol v2 is **fixed** by commit 961d400 and must not be reintroduced.
-- Action metadata, typed forms, validation, redaction, execution controls, and diagnostics are moving toward one capability contract. Tests include source guards for protocol usage and migration/serialization behavior.
-- Room schema exports and hand-written migrations make storage changes reviewable, while local release scripts provide a practical quality gate without relying on hosted CI.
+- **Two unlinked action registries.** `core/RuntimeRegistries.kt` (74 hand-maintained constructor calls) and `core/actions/ActionMetadata.kt` (1267 lines of editor metadata keyed by the same strings) have no compile-time link; metadata key drift is a documented past bug class (v0.2.62). Adding one action currently touches **nine files** (`RuntimeRegistries`, `ActionMetadata`, `ActionCapabilities`, `ActionArgumentSensitivity`, `action_catalog_strings.xml`, `release-truth.json`, a test, CHANGELOG, README) — and the commit history confirms this is the dominant change shape. A single declaration site is the highest-leverage refactor available.
+- **`ui/screens` is a god-package**: 29 files, the four largest files in the repo (`ActiveAutomationViewModel.kt` 1535, `ActiveAutomationUi.kt` 1496, `PermissionOnboardingScreen.kt` 1301, `ActiveAutomationLists.kt` 1013), with ~6300 lines forming one logical screen split *by file size* to satisfy a self-imposed 1500-line cap rather than by responsibility. It has been split twice and is churning again (58 combined changes in 200 commits). Klick'r's `core/{common,dumb,smart}` + `feature/{backup,notifications,smart-debugging,tutorial,…}` layout proves the shape works at this size.
+- **Vestigial naming**: `OpenTaskerApp_NoHilt.kt` encodes a removal completed long ago, and the name is asserted in a baseline-profile check at `app/build.gradle.kts:723`, so renaming requires touching a gate.
+- **Four Quick Settings tile services** are one-line subclasses needing 16 manifest lines each; a fifth slot means editing the manifest again.
+- Three HTTP actions (`http.request`, `http.get`, `http.post`) live in one file with the latter two as thin aliases, inflating the 74 count.
 
-### Where seams remain
+### Refactor candidates
 
-- Producer adapters still converge through several manual paths before `AutomationService`; a structured normalized command/event ledger would make exactly-once, cancellation, retry, and replay properties testable across adapters.
-- `RunLogDiagnostics` parses semi-structured Source/Decision/Reason text. This is useful for humans but fragile for machine projections, external status, and future analytics; retain redaction while moving to typed fields.
-- `EngineHealthReader` has richer evidence than the UI displays. A subsystem state model should preserve timestamps, stop reasons, and remediation without claiming “healthy” from one boolean.
-- The single-module build is productive now, but Room 3.0’s new `androidx.room3` package and KSP-only code generation make migration a deliberate breaking project, not a version bump.
-- Compose, Kotlin, KSP, Room, WorkManager, and OkHttp are all moving quickly. The current pinned set is coherent; synchronized upgrade batches with compile/test/schema evidence are safer than piecemeal updates.
-- No hosted CI is present. Local gates are strong, but release confidence depends on a repeatable maintainer workflow and artifacts that prove device, reproducibility, and metadata checks.
+- `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationViewModel.kt` — split by domain (profiles / tasks / edit history / import), not by line count.
+- `app/src/main/java/com/opentasker/core/actions/ActionMetadata.kt` — fold into the action declaration.
+- `app/src/main/java/com/opentasker/core/actions/TemporaryStateAction.kt` — hosts `TemporaryStateRevertWorker` inside a 300-line action file, away from the other two workers in `core/engine`.
+- `app/build.gradle.kts` — 900+ lines with twelve custom verification tasks and four hardcoded capability literals; extract to `buildSrc` or a convention plugin so the literals have one home.
 
-### Recommended architectural direction
+### Test and documentation gaps
 
-Keep the local-first layered model. Add a typed execution envelope with producer, profile/task, execution ID, admission decision, causal parent, redaction-safe inputs, retry/circuit state, and terminal reason. Project that envelope into Run Log, external status, and Diagnostics. Generate a capability/release snapshot consumed by docs and metadata. Treat device validation and benchmark evidence as first-class release artifacts.
+- Zero test coverage: `core/scheduling` (`ExactAlarmSupport`), `core/resilience` (`GracefulDegradation`), `automation/receiver` (`TimeEventReceiver`), `ui/utils`. Thin relative to size: `core/model` (8 sources, 2 tests) and `ui/screens` (29 sources including the four largest files, 21 JVM tests).
+- **`.gitignore`'s `*.md` makes the entire `docs/` tree untracked.** README links `docs/EXTERNAL_INTENTS.md` at line 112, which **404s on GitHub**. Fifteen genuinely useful docs (ARCHITECTURE, FDROID_READINESS, TEMPLATE_EXPRESSIONS, TERMUX_SCRIPTING, OPEN_JSON_BUNDLE, SHIZUKU, …) are invisible to contributors and F-Droid reviewers, while the raw research transcript is the one thing that *is* published. Exactly inverted. `RESEARCH.md` and `ROADMAP.md` are also tracked despite `AGENTS.md` stating README is the only committed `.md` (they predate the ignore rule).
+- `CLAUDE.md` is two releases stale (says v0.2.79 / schema v8 / 43 actions vs 0.2.81 / v10 / 74), still lists the deleted `.github/workflows/build-release.yml` as a Key File, still documents Hilt as in-stack, and its gotcha #9 describes an AGP 8.9.1 / Compose BOM 2025.07.00 toolchain two upgrades out of date — its dependency-ceiling claims should not be trusted without re-verification.
+- `Roadmap_Blocked.md` lists UnifiedPush `event=push` (RD32), MQTT publish (RD34), and the Home Assistant webhook bridge as blocked, but README documents all three as shipped. Those entries should be deleted.
+- **i18n is effectively absent**: 1,789 base strings; `values-es` has 34 (1.9%); the other twelve locale dirs contain only an empty `<resources/>` with a comment. No `android:localeConfig` and no `androidResources { generateLocaleConfig = true }`, so the Android 13+ per-app language picker is unavailable and twelve empty resource dirs ship in every APK.
+- No update path for GitHub-release installs (no `UpdateChecker`, no release-feed poll); F-Droid installs are covered by F-Droid.
 
 ## Rejected Ideas
 
-- **Cloud template marketplace or mandatory account:** conflicts with the strongest differentiator (offline ownership), expands privacy and moderation obligations, and competes poorly with TaskerNet/MacroDroid ecosystems.
-- **Unrestricted AI/screen-driving automation:** nondeterministic, difficult to replay, accessibility-sensitive, and too privileged for the default engine. Keep any experiment sandboxed and opt-in.
-- **Arbitrary Java/shell/root parity with Tasker:** increases attack surface and OEM breakage faster than it increases reliable user value. Prefer explicit Termux/Shizuku capability contracts.
-- **Unbounded parallelism or recursive flow graphs:** adjacent systems support explicit modes and non-recursion for a reason; preserve admission, nesting, step, and duration limits.
-- **Room 3 migration as a routine dependency bump:** Room 3.0’s package/codegen changes make this a dedicated migration project with schema and performance evidence.
-- **Hosted CI as a prerequisite for every change:** local release gates are the current product constraint. Improve artifact evidence and add CI only when a maintainer chooses a hosting/trust model.
-- **Broad contacts/notification/accessibility permissions by default:** use field-scoped or feature-scoped platform grants and show capability state instead.
+- **Accessibility screen-driving / image-match automation.** Klick'r issue #599 (Android 15 gestures stop randomly) has been labeled `blocked` since 2025-01-16 and Key Mapper's Shizuku System Bridge breaks on every wireless-debugging re-prompt (#2026, #2071). ROADMAP already carries a P3 *evaluation* item — this evidence supports "no" for the default engine, and the eval should record it rather than a new item being filed.
+- **JS/Lua scripting sandbox.** AutoJs6 issue #372 is a 7 GB RAM blowup, #167 is scheduled scripts freezing, and #407 is the maintainer's own indefinite project-suspension notice (2025-05-30). Three of six Auto.js forks are `NOASSERTION`-licensed, which blocks F-Droid outright.
+- **Cloud template marketplace or hosted share account.** `AlexeiCrystal/macrodroid-store-vulnerability` documents now-fixed authorization logic in MacroDroid's store that permitted access to any account and any published macro. Offline manifests plus QR/text import already deliver the sharing value without moderation, account, or breach obligations.
+- **Browser-based web editor** (HTTP Shortcuts). A network authoring surface contradicts the local-only boundary.
+- **`RangingManager` / UWB proximity trigger.** Already in `Roadmap_Blocked.md`, blocked on ranging-capable hardware. Do not re-file.
+- **Health Connect, Weblate, F-Droid reproducibility evidence, TalkBack sweep, Shizuku device evidence, API 37 device matrix, background audio, BAL `IntentSender` opt-in.** All already in `Roadmap_Blocked.md` with correct blockers. Note specifically that the BAL entry has already verified `MODE_BACKGROUND_ACTIVITY_START_ALLOWED` is unused anywhere in the tree, so there is nothing to migrate away from.
+- **Glance migration now.** Answers the existing P3 eval: Glance stable is still **1.1.1 (2024-10-16)** and 1.2.0 has sat at **rc01 since 2025-12-03** with no stable in eight months; `glance-wear-tiles` is deprecated. Wait for 1.2.0 stable.
+- **Navigation3 migration now.** Answers the existing P3 eval: core is stable (1.0.0 2025-11-19, now 1.1.5), but deep links only arrived in **1.2.0-alpha03** and those factory functions **already broke at alpha05**; result passing is alpha-only. Minimum bar: Navigation3 **1.2.0 stable**.
+- **Ambient-noise-level trigger** (Automation has one). Requires a continuously-held `RECORD_AUDIO` grant for a trigger — irreconcilable with the privacy posture. The other five sensor triggers from that project are fine.
+- **Multi-user / work-profile automation.** Android 17 blocks cross-profile loopback outright, work-profile automation needs device-policy standing the app deliberately does not hold, and a local-first single-device engine has no multi-tenant story. Revisit only if a work-profile *trigger* (which MacroDroid ships) is requested by real users.
+- **Freezing `targetSdk` to keep privileged behaviour** (PhoneProfilesPlus's choice). It cost that project f-droid.org inclusion and Play Protect trust.
+- **Obfuscated evasion builds** (Klick'r ships one). Destroys reproducibility and contradicts fail-closed honesty.
+- **Deleting `docs/archive/ui-snapshots/*.kt.bak`.** Fifteen dead files from an abandoned UI generation, but they are `.bak` and already untracked, so they cost nothing but disk. Housekeeping, not roadmap work.
+- **Room 3 migration and hosted CI** — unchanged from the prior pass; Room 3's package and codegen change is a dedicated project, and CI was deliberately removed in `3d88f83`.
 
 ## Sources
 
-### Android and platform
-
-- https://developer.android.com/about/versions/17/features
-- https://developer.android.com/about/versions/17/summary
+### Android platform and APIs
 - https://developer.android.com/about/versions/17/behavior-changes-17
+- https://developer.android.com/about/versions/17/behavior-changes-all
+- https://developer.android.com/about/versions/17/features
 - https://developer.android.com/about/versions/16/behavior-changes-16
-- https://developer.android.com/about/versions/16/behavior-changes-all
-- https://developer.android.com/guide/practices/page-sizes
-- https://developer.android.com/develop/ui/shortcuts
-- https://developer.android.com/reference/android/app/NotificationManager#addAutomaticZenRule(android.app.AutomaticZenRule)
-- https://developer.android.com/training/app-links/add-applinks
-- https://developer.android.com/guide/components/intents-filters
-- https://developer.android.com/topic/architecture
-- https://developer.android.com/privacy-and-security/advanced-protection-mode
-- https://developer.android.com/about/versions/17/features/contact-picker
+- https://developer.android.com/develop/background-work/services/fgs/changes
+- https://developer.android.com/develop/background-work/services/fgs/timeout
+- https://developer.android.com/topic/performance/power/power-details
+- https://developer.android.com/develop/ui/views/notifications/live-update
+- https://developer.android.com/reference/android/app/ApplicationExitInfo
+- https://developer.android.com/reference/android/ranging/RangingManager
+- https://developer.android.com/develop/ui/views/quicksettings-tiles
 
-### AndroidX, Kotlin, and build security
-
-- https://developer.android.com/jetpack/androidx/releases/room
-- https://developer.android.com/jetpack/androidx/releases/room3
+### AndroidX, Kotlin, build, and supply chain
 - https://developer.android.com/jetpack/androidx/releases/work
-- https://developer.android.com/develop/ui/compose/bom
-- https://kotlinlang.org/docs/whatsnew24.html
-- https://github.com/google/ksp/releases/tag/2.3.10
-- https://github.com/Kotlin/kotlinx.coroutines/releases/tag/1.11.0
-- https://github.com/square/okhttp/releases
-- https://docs.gradle.org/current/userguide/gradle_wrapper.html
+- https://developer.android.com/jetpack/androidx/releases/room
+- https://developer.android.com/jetpack/androidx/releases/datastore
+- https://developer.android.com/jetpack/androidx/releases/glance
+- https://developer.android.com/jetpack/androidx/releases/navigation3
+- https://developer.android.com/jetpack/androidx/releases/appfunctions
+- https://github.com/square/okhttp/blob/master/CHANGELOG.md
+- https://github.com/advisories/GHSA-r937-wjx7-w2jp
+- https://nvd.nist.gov/vuln/detail/CVE-2026-53914
 - https://docs.gradle.org/current/userguide/dependency_verification.html
-- https://google.github.io/osv.dev/api/
 
-### Security, packaging, and reproducibility
+### Distribution
+- https://f-droid.org/en/docs/Inclusion_Policy/
+- https://f-droid.org/en/docs/Reproducible_Builds/
+- https://f-droid.org/en/docs/Anti-Features/
+- https://developer.android.com/developer-verification
+- https://developer.android.com/developer-verification/guides/limited-distribution
+- https://android-developers.googleblog.com/2026/06/android-developer-verification.html
+- https://f-droid.org/en/2025/09/29/google-developer-registration-decree.html
 
-- https://mas.owasp.org/MASTG/knowledge/android/MASVS-STORAGE/MASTG-KNOW-0047/
-- https://mas.owasp.org/MASTG/0x05d-Testing-Data-Storage/
-- https://mas.owasp.org/checklists/MASVS-STORAGE/
-- https://f-droid.org/docs/Build_Metadata_Reference/
-- https://f-droid.org/docs/Reproducible_Builds/
-- https://f-droid.org/en/docs/Submitting_to_F-Droid_Quick_Start_Guide/
-
-### Competitors and adjacent systems
-
-- https://tasker.joaoapps.com/userguide/en/index.html
-- https://tasker.joaoapps.com/changes/changes6.6.html
-- https://www.macrodroid.com/
-- https://templates.macrodroid.com/
-- https://www.llamalab.com/automate/doc/index.html
-- https://llamalab.com/automate/doc/block/failure_catch.html
-- https://llamalab.com/automate/doc/block/fork.html
-- https://www.samsung.com/my/support/mobile-devices/how-to-use-routines-on-your-samsung-galaxy-device/
-- https://github.com/henrichg/PhoneProfilesPlus
-- https://github.com/renyuneyun/Easer
+### FOSS competitors
+- https://github.com/ChaoMixian/vFlow
+- https://github.com/renyuneyun/Easer · https://github.com/renyuneyun/Easer/issues/21
+- https://github.com/henrichg/PhoneProfilesPlus/blob/master/docs/ppp_features.md
+- https://f-droid.org/en/packages/com.jens.automation2/ · https://gitlab.com/fdroid/fdroiddata/-/blob/master/metadata/com.jens.automation2.yml
+- https://github.com/Nain57/Smart-AutoClicker · https://github.com/Nain57/Smart-AutoClicker/issues/599
+- https://github.com/Waboodoo/HTTP-Shortcuts
 - https://github.com/keymapperorg/KeyMapper
-- https://nodered.org/docs/developing-flows/flow-structure
-- https://nodered.org/docs/user-guide/handling-errors
-- https://nodered.org/docs/user-guide/runtime/logging
-- https://www.home-assistant.io/docs/automation/modes/
-- https://www.home-assistant.io/docs/scripts
-- https://n8n-io-n8n.mintlify.app/workflows/error-handling
-- https://www.mintlify.com/n8n-io/n8n/api/executions
-- https://github.com/UnifiedPush/android-connector
-- https://github.com/binwiederhier/ntfy
+- https://github.com/SuperMonster003/AutoJs6/issues/407 · https://github.com/SuperMonster003/AutoJs6/issues/372
+- https://github.com/KieronQuinn/Smartspacer · https://github.com/KieronQuinn/SmartspacerPluginRepository
+- https://github.com/RikkaApps/Shizuku/issues/2180
 
-### Community, lists, and research
+### Commercial competitors and community signal
+- https://tasker.helprace.com/s1-general/ideas/top · https://tasker.helprace.com/i22-improved-debugging · https://tasker.helprace.com/i900-source-control-for-tasker
+- https://tasker.joaoapps.com/changes/changes6.6.html
+- https://www.macrodroid.com/privacypolicy · https://github.com/AlexeiCrystal/macrodroid-store-vulnerability
+- https://llamalab.com/automate/doc/block/failure_catch.html
+- https://support.apple.com/guide/shortcuts/use-variables-apdd02c2780c/ios · https://developer.apple.com/videos/play/wwdc2024/10210/
+- https://www.macstories.net/reviews/logger-for-shortcuts/
+- https://news.ycombinator.com/item?id=42254433
+- https://dontkillmyapp.com/ · https://dontkillmyapp.com/samsung
+- https://www.androidauthority.com/march-pixel-update-broke-location-rules-3651512/
+- https://www.androidauthority.com/one-ui-8-5-routine-scheduling-3648715/
+- https://www.macrodroidforum.com/index.php?threads/accessibility-settings-not-working.3058/
 
-- https://github.com/guifelix/awesome-tasker
-- https://github.com/dariubs/awesome-workflow-automation
-- https://github.com/androiddevnotes/awesome-android-kotlin-apps
-- https://www.reddit.com/r/androidapps/comments/1glnrt9
-- https://www.reddit.com/r/fossdroid/comments/1h41kxl
-- https://github.com/henrichg/PhoneProfilesPlus/issues
-- https://arxiv.org/abs/2408.04755
-- https://arxiv.org/abs/2308.15272
-- https://arxiv.org/abs/2111.11562
-- https://arxiv.org/abs/1802.01790
+### Adjacent workflow systems
+- https://www.home-assistant.io/docs/automation/troubleshooting/ · https://www.home-assistant.io/docs/automation/modes/
+- https://www.home-assistant.io/docs/blueprint/schema/ · https://www.home-assistant.io/docs/blueprint/selectors/ · https://github.com/home-assistant/core/issues/123025
+- https://nodered.org/docs/user-guide/handling-errors · https://nodered.org/docs/user-guide/projects/
+- https://docs.n8n.io/flow-logic/error-handling/ · https://docs.n8n.io/workflows/executions/debug/ · https://docs.n8n.io/data/data-pinning/ · https://docs.n8n.io/hosting/scaling/execution-data/
+- https://www.activepieces.com/docs/flows/versioning
+- https://zapier.com/help/autoreplay/
+- https://temporal.io/blog/saga-pattern-made-easy
+- https://www.windmill.dev/docs/flows/flow_approval
+- https://companion.home-assistant.io/docs/notifications/notification-commands · https://companion.home-assistant.io/docs/core/sensors
+- https://docs.ntfy.sh/publish/ · https://unifiedpush.org/developers/spec/android/
+
+### Academic
+- https://dl.acm.org/doi/10.1145/3290605.3300782 — Brackenbury et al., *How Users Interpret Bugs in Trigger-Action Programming*, CHI 2019 (the ten-bug taxonomy)
+- https://dl.acm.org/doi/full/10.1145/3731450 · https://arxiv.org/abs/2408.04755 — Anik et al., TOSEM 2025 (129/190 threads are debugging)
+- https://dl.acm.org/doi/abs/10.1145/3569506 — Zhang et al., *Helping Users Debug Trigger-Action Programs*, IMWUT 2022
+- https://dl.acm.org/doi/10.1145/3411764.3445567 · https://github.com/UChicagoSUPERgroup/tapdiff — Zhao et al., CHI 2021 (semantic diff of TAP programs)
+- https://ieeexplore.ieee.org/document/8811900 — Zhang et al., *AutoTap*, ICSE 2019 (LTL invariants for novices)
+- https://arxiv.org/abs/2402.13024 · https://arxiv.org/abs/2510.03078 — SmartEx and counterfactual explanations for rule-based environments
+- https://dl.acm.org/doi/10.1145/2858036.2858556 — Ur et al., *TAP in the Wild*, CHI 2016 (users heavily duplicate each other's programs)
+- https://www.sciencedirect.com/science/article/abs/pii/S1071581925001703 — Corradini et al. 2025 (event/state comprehension)
 
 ## Open Questions
 
-- **Device evidence:** Which API 35–37 devices and OEM battery policies are release-blocking for foreground services, exact alarms, notification listeners, overlays, and background receivers?
-- **Execution contract:** Which producer adapters still need an end-to-end test from source event through admission, service, terminal run log, external response, and Diagnostics?
-- **Capability UX:** What is the minimum evidence and remediation copy that makes Setup actionable without asking for permissions that no enabled automation needs?
-- **Large screens:** Which pane, navigation, and editor state transitions fail at 600 dp, 840 dp, fold/unfold, rotation, and font-scale extremes?
-- **Performance:** Do cold start, first navigation, run-log pagination, and flow editing need a Baseline Profile, and what budget is acceptable on API 35+ devices?
-- **Release truth:** Should the generated capability/release snapshot be a checked-in artifact, a build output, or both, and who owns updating F-Droid’s immutable commit pin?
-- **Storage:** What is the migration and benchmark plan if Room 3 becomes desirable, given the new package and KSP-only code generation?
-- **Community:** Which local bundle/template workflow gives users safe sharing without introducing account, moderation, or remote-secret risks?
+- **Debug-capture boundary.** Deep debuggability requires showing the *real* values that flowed through each action, which is in direct tension with the redaction guarantee that makes OpenTasker worth choosing. Is debug capture an ephemeral, per-task, opt-in **elevated capability with its own visible state** (recommended) or a logging verbosity level? This decision gates the entire debugger track and cannot be answered by inspecting the code.
+- **Plugin SDK trust model.** If out-of-process action/condition plugins ship, what proves a plugin APK is trustworthy without a marketplace — signature pinning by the user at install, a capability manifest reviewed like a bundle import, or both? Easer's frozen "unstable" API is the failure mode to avoid.
+- **F-Droid signing key custody.** Google's Developer Verification enforces from **2026-09-30** in Brazil, Indonesia, Singapore, and Thailand, with global rollout in 2027; F-Droid is explicitly out of scope "yet". Package-name registration requires proving ownership with an APK signed by the private key, and Limited Distribution caps at 20 devices. Who owns the long-lived signing key, and is it backed up as if package-name ownership depends on it?
+- **Run-log growth budget.** Traces with per-step variable snapshots, replayable payloads, and held executions will make `run_logs` the largest table and the hottest write path on a battery-sensitive foreground service. What per-profile trace cap and total-size ceiling are acceptable before the feature is built, rather than retrofitted?
+- **Whether `RESEARCH.md` and `ROADMAP.md` should stay tracked.** They contradict the repo's stated rule that README is the only committed `.md`. A concurrent Codex session committed both in `50d998b` on 2026-08-02, so two agents are now writing the same two files — the maintainer needs to pick one owner before the next pass.
