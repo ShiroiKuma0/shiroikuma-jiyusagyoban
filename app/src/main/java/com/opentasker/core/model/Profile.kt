@@ -26,6 +26,10 @@ data class Profile(
     val exitTaskName: String = "",
     val group: String? = null,              // upstream's profile-group tag; our project grouping is canonical (kept for source compatibility)
     val requiresRiskAcknowledgement: Boolean = false,
+    // Upstream 0.2.80 nested ALL/ANY/NOT context grouping. The fork does not ship the authoring UI
+    // for it, so this stays null and every read path takes upstream's own legacy branch: contexts are
+    // combined with implicit AND, exactly as the fork has always evaluated them.
+    val contextExpression: ContextExpressionNode? = null,
 )
 
 @Serializable

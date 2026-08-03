@@ -3,10 +3,11 @@ package com.opentasker.core.storage
 import androidx.room.Database
 import androidx.room.RoomDatabase
 
-// Fork numbering: upstream v6 (variables.isSecret), v7 (profiles.requiresRiskAcknowledgement) and
-// v8 (run_logs/edit_history indexes) are renumbered 18/19/20 here because the fork chain already
-// occupies 5..17.
-const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 21
+// Fork numbering: upstream v6 (variables.isSecret), v7 (profiles.requiresRiskAcknowledgement),
+// v8 (run_logs/edit_history indexes) and v10 (edit_history undo/redo) are renumbered 18/19/20/22
+// here because the fork chain already occupies 5..17 and 21. Upstream's v9 (projects) is absent on
+// purpose: the fork introduced projects in its own chain long before upstream did.
+const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 22
 
 @Database(
     entities = [ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class, EditHistoryEntity::class, ProjectEntity::class, ItemMetaEntity::class, ItemGroupEntity::class, BandSampleEntity::class, BandDailyEntity::class, BandSleepEntity::class, BandSyncEntity::class],

@@ -2437,4 +2437,39 @@ fun registerActionMetadata() {
             ),
         ),
     )
+
+    // Upstream 0.2.80 structured failure recovery. TaskRunner already implements the TRY/CATCH/
+    // ENDTRY frames and the bounded retry; without these entries the blocks exist in the engine
+    // but cannot be added in the editor.
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "flow.try",
+            name = "Try",
+            description = "Run a bounded, retryable block and optionally handle its failure with Catch",
+            category = "Flow",
+            fields = listOf(
+                ActionField("max_attempts", "Maximum attempts", FieldType.NUMBER, hint = "1–5; retries require an idempotent action"),
+                ActionField("backoff_ms", "Base backoff (ms)", FieldType.NUMBER, hint = "0–60000; exponential between retries"),
+            ),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "flow.catch",
+            name = "Catch",
+            description = "Handle a failed Try block using FLOW_ERROR_* variables",
+            category = "Flow",
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "flow.endtry",
+            name = "End Try",
+            description = "Closes the matching Try/Catch block",
+            category = "Flow",
+        )
+    )
 }

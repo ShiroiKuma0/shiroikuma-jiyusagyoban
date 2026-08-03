@@ -275,6 +275,19 @@ object DatabaseMigrations {
         }
     }
 
+    /**
+     * Upstream v10, renumbered onto the end of the fork chain: durable undo/redo for task, profile,
+     * and scene edits. Upstream's own 8→9 (the projects table and projectId columns) is NOT repeated
+     * here — the fork already introduced projects in its own chain, so only the edit_history columns
+     * are genuinely new.
+     */
+    val MIGRATION_21_22 = object : Migration(21, 22) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `edit_history` ADD COLUMN `nextJson` TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE `edit_history` ADD COLUMN `isUndone` INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -297,6 +310,7 @@ object DatabaseMigrations {
             MIGRATION_18_19,
             MIGRATION_19_20,
             MIGRATION_20_21,
+            MIGRATION_21_22,
         )
     }
 }
@@ -347,6 +361,10 @@ object DatabaseMigrations {
  *     yyyyMMddHHmmss — never epoch millis, so a re-sync in another timezone or across a DST
  *     fall-back hour cannot double a row. band_syncs is deliberately never pruned: its value is
  *     the multi-day series that measures the band's ring-buffer depth.
+ *
+ * Version 22 (current):
+ *   - edit_history: adds nextJson and isUndone so per-entity stacks support redo
+ *     (upstream v10, renumbered)
  *
  * To add a migration:
  * 1. Increment database version in @Database annotation
