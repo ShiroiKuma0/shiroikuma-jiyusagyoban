@@ -138,6 +138,7 @@ object AutomationSensitivityRegistry {
         "sim.data.set",
         "sim.list",
         "state.get",
+        "location.get",
         "net.speedtest",
         "net.speedtest.cancel",
         "task.addaction",
