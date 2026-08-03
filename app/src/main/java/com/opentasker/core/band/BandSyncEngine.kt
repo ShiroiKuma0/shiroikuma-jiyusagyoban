@@ -361,14 +361,13 @@ object BandSyncEngine {
     private suspend fun readFirmware(client: BandGattClient): String? {
         if (!client.send(BandCommand.info(BandInfoQuery.FIRMWARE))) return null
         val reply = awaitReply(client, BandInfoQuery.FIRMWARE.opcode) ?: return null
-        if (reply.size < 5) return null
-        return (1..4).joinToString(".") { (reply[it].toInt() and 0xFF).toString() }
+        return BandProtocol.parseFirmware(reply)
     }
 
     private suspend fun readBattery(client: BandGattClient): Int? {
         if (!client.send(BandCommand.info(BandInfoQuery.BATTERY))) return null
         val reply = awaitReply(client, BandInfoQuery.BATTERY.opcode) ?: return null
-        return if (reply.size >= 2) reply[1].toInt() and 0xFF else null
+        return BandProtocol.parseBattery(reply)
     }
 
     /** Info replies share the notify characteristic with stream frames, so match on the opcode. */

@@ -212,4 +212,23 @@ object BandProtocol {
     /** A frame whose last byte is 0xFF ends its stream. Observed terminators are two bytes and carry no records. */
     fun isTerminator(frame: ByteArray): Boolean =
         frame.isNotEmpty() && frame[frame.size - 1] == 0xFF.toByte()
+
+    /**
+     * Firmware version out of a `0x27` reply: four bytes, one per dotted component.
+     *
+     * Captured from 白い熊's band 2026-08-02: `27 00 00 02 05` -> "0.0.2.5".
+     */
+    fun parseFirmware(reply: ByteArray): String? {
+        if (reply.size < 5) return null
+        return (1..4).joinToString(".") { (reply[it].toInt() and 0xFF).toString() }
+    }
+
+    /**
+     * Battery percentage out of a `0x13` reply: one byte.
+     *
+     * Captured 2026-08-02: `13 4c` -> 76 %.
+     */
+    fun parseBattery(reply: ByteArray): Int? =
+        if (reply.size >= 2) reply[1].toInt() and 0xFF else null
+
 }

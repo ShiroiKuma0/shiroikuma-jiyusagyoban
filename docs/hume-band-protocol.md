@@ -309,7 +309,60 @@ and `グラフ -- [727]`.
 
 ---
 
-## 6. Known and open
+## 6. Golden frames — real bytes, and where they are asserted
+
+Captured off 白い熊's band on **2026-08-02 at 15:23 local**. Every decode below was verified against
+the device. These were the ground truth the sync hand-off carried; that file is gone, so they live
+here and — more importantly — as executable assertions in `BandProtocolTest` and `BandRecordsTest`.
+
+```
+0x55 heart rate      550000260802152034 49    -> 2026-08-02 15:20:34, 73 bpm
+                     550100260802151530 4a    -> 2026-08-02 15:15:30, 74 bpm
+0x56 HRV             560000260802151930 45 4f 00 4f 00 00
+                       -> 15:19:30 · HRV 69 · vascular 79 · HR 0 · stress 79 · SBP 0 · DBP 0
+                     560200260802151530 2c 2f 4a 2f 72 40
+                       -> 15:15:30 · HRV 44 · vascular 47 · HR 74 · stress 47 · SBP 114 · DBP 64
+0x66 SpO2            660000260802152034 60    -> 15:20:34, 96 %
+0x65 temperature     650000260802145900 6c01  -> 14:59:00, 0x016c = 364 -> 36.4 °C
+0x52 detail          5200002608021519314500e30105002400210000000000000000
+                       -> 15:19:31 · 69 steps · 4.83 kcal · 0.05 km
+                       -> per-minute [36,0,33,0,0,0,0,0,0,0], summing to the record's own 69
+0x51 daily           51 00 260802 5b180000 660a0000 5f020000 94b20000 0000 18000000
+                       -> 2026-08-02 · 6235 steps · 6.07 km · 457.16 kcal
+                     51 01 260801 3c270000 f9110000 64030000 210b0100 0000 24000000
+                       -> 2026-08-01 · 10044 steps · 8.68 km · 683.85 kcal
+0x53 sleep           530000 260802052857 16 020202050505050202020202020202020202020202020000…
+                       -> start 05:28:57 · 22 minutes · light×3, awake×4, light×15
+
+info replies         13 4c            -> battery 76 %
+                     27 00000205      -> firmware "0.0.2.5"
+                     22 d5a706dca13a  -> D5:A7:06:DC:A1:3A
+                     41 260802152305  -> band clock 2026-08-02 15:23:05
+                     4b 1027          -> step goal 10000 (LE16 0x2710)
+                     57 ff            -> no alarms (a bare terminator)
+```
+
+Command frames, likewise asserted byte-for-byte:
+
+```
+GET TIME             41 00 00 00 00 00 00 00 00 00 00 00 00 00 00 41
+HR from 2026-07-28   55 00 00 00 26 07 28 00 00 00 00 00 00 00 00 AA
+HR CONTINUE          55 02 00 00 00 00 00 00 00 00 00 00 00 00 00 57   <- note the ZERO date
+```
+
+---
+
+## 7. Known and open
+
+Two assumptions carried over from the sync hand-off's on-device checklist, still unverified:
+
+- **One BLE notification equals one frame.** Everything downstream assumes it, and the frame-counted
+  paging rule loses its meaning if notifications are ever fragmented. The granted MTU is logged into
+  every census row, so the evidence is being collected. If fragmentation ever shows up, this needs a
+  reassembly layer — say so rather than working around it.
+- **Sleep stage `4` has never been observed.** Codes 1/2/3/5 are deep/light/REM/awake. Stage 4 is
+  counted as unknown; log it if it ever appears.
+
 
 - **Hume's own views** are the model for the eventual "power views". Its `H` tab draws an **hourly
   min/max envelope** — one capsule per hour, not one measurement — with `D`/`W`/`M` above it. Its day
