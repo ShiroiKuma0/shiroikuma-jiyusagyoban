@@ -39,26 +39,10 @@ class ProfileEntityTest {
         assertEquals(true, profile.toEntity().toDomain().requiresRiskAcknowledgement)
     }
 
-    @Test
-    fun profileEntityRoundTripPreservesNestedContextExpression() {
-        val profile = Profile(
-            id = 9,
-            name = "Nested",
-            enterTaskId = 42,
-            contexts = listOf(
-                ContextSpec(ContextType.STATE),
-                ContextSpec(ContextType.EVENT),
-            ),
-            contextExpression = ContextExpressionNode.group(
-                ContextBooleanOperator.OR,
-                listOf(ContextExpressionNode.leaf(0), ContextExpressionNode.leaf(1)),
-            ),
-        )
 
-        val entity = profile.toEntity()
-        assertTrue(entity.contextsJson.trimStart().startsWith("{"))
-        assertEquals(profile, entity.toDomain())
-    }
+    // Dropped in the 0.2.81 upstream sync: Profile.contextExpression exists so upstream's read paths
+    // compile, but the fork ships no authoring UI for nested ALL/ANY/NOT groups and does not persist
+    // the expression, so it cannot survive an entity round trip. See Profile.contextExpression.
 
     @Test
     fun unknownAutomationModeFallsBackToSingle() {

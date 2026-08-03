@@ -160,14 +160,10 @@ class ContextMonitorLifecycleTest {
         assertFalse("Inspector must not start the shake sensor", "ShakeDetector" in source)
     }
 
-    @Test
-    fun contextInspectorCollectorsFollowVisibleScreenLifecycle() {
-        val source = sourceFile("com/opentasker/ui/screens/ContextInspectorScreen.kt").readText()
 
-        assertTrue("Inspector must expose an explicit visible-state start", "fun startObserving()" in source)
-        assertTrue("Inspector must stop collectors when the screen leaves composition", "onDispose { viewModel.stopObserving() }" in source)
-        assertTrue("Inspector must surface age-aware observation state", "observationStatus(nowMs)" in source)
-    }
+    // Dropped in the 0.2.81 upstream sync: upstream's demand-counted calendar/sun bus is not adopted.
+    // The fork keeps its own CalendarSunContextEvents, whose per-second tick drives the kanji clock,
+    // the 電池線 battery line, 話す時計 and the blink port, and therefore has no visible-state gating.
 
     private fun profile(id: Long, vararg contexts: ContextSpec): Profile = Profile(
         id = id,
