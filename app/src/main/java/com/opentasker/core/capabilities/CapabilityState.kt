@@ -45,6 +45,11 @@ object CapabilityState {
         }
         CapabilityRequirement.Microphone ->
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        // Coarse is enough to satisfy the action: it falls back to whatever fix it can get, and a
+        // town-level position is all the history needs.
+        CapabilityRequirement.Location ->
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
     }
 
     /**
@@ -85,6 +90,8 @@ object CapabilityState {
                 )
             CapabilityRequirement.Microphone ->
                 Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + context.packageName))
+            CapabilityRequirement.Location ->
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + context.packageName))
         }
         return intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
@@ -102,6 +109,7 @@ object CapabilityState {
         CapabilityRequirement.AllFiles -> "Needs All files access to read files outside the app (e.g. tones in shared storage)."
         CapabilityRequirement.DeviceAdmin -> "Needs Device admin enabled."
         CapabilityRequirement.Microphone -> "Needs the Microphone permission."
+        CapabilityRequirement.Location -> "Needs the Location permission."
     }
 
     /** Short status-pill text for the current state of [req] (granted vs. not). */
@@ -117,6 +125,7 @@ object CapabilityState {
         CapabilityRequirement.AllFiles -> if (met) "All files access on" else "All files access off"
         CapabilityRequirement.DeviceAdmin -> if (met) "Device admin on" else "Device admin off"
         CapabilityRequirement.Microphone -> if (met) "Microphone allowed" else "Microphone off"
+        CapabilityRequirement.Location -> if (met) "Location allowed" else "Location off"
     }
 
     /** Short button text for the fix action. */
@@ -132,6 +141,7 @@ object CapabilityState {
         CapabilityRequirement.AllFiles -> "Grant All files access"
         CapabilityRequirement.DeviceAdmin -> "Enable device admin"
         CapabilityRequirement.Microphone -> "Grant microphone"
+        CapabilityRequirement.Location -> "Grant location"
     }
 
     /** Short noun for a permission, for the run-time block dialog (“needs: Accessibility”). */
@@ -147,6 +157,7 @@ object CapabilityState {
         CapabilityRequirement.AllFiles -> "All files access"
         CapabilityRequirement.DeviceAdmin -> "Device admin"
         CapabilityRequirement.Microphone -> "Microphone"
+        CapabilityRequirement.Location -> "Location"
     }
 
     /** A missing, blocking permission and the action types in the task that need it. */
