@@ -29,7 +29,9 @@ class ReadFileAction : Action {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         val varName = args["var"] ?: args["variable"] ?: "result"
         return try {
-            val file = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
+            val file = safeTarget(ctx, path, shared = sharedArg(args))
+                ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
+            if (!file.exists()) return ActionResult.Failure("no such file: $path")
             if (file.length() > MAX_READ_BYTES) {
                 return ActionResult.Failure("file exceeds ${MAX_READ_BYTES / 1024 / 1024} MB read limit (${file.length()} bytes)")
             }
@@ -62,12 +64,13 @@ class WriteFileAction : Action {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         val text = args["text"] ?: args["content"] ?: ""
         return try {
-            val file = safeUserFile(ctx, path) ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
+            val file = safeTarget(ctx, path, shared = sharedArg(args))
+                ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
             val bytes = text.toByteArray(Charsets.UTF_8).size
             if (bytes > MAX_FILE_BYTES) {
                 return ActionResult.Failure("content exceeds ${MAX_FILE_BYTES / 1024 / 1024} MB write limit ($bytes bytes)")
             }
-            createSandboxDirs(ctx, file)
+            createSandboxDirs(ctx, file, sharedArg(args))
             writeNoFollow(file, text, append = false)
             ctx.logger("Write ${file.name}")
             ActionResult.Success
@@ -92,7 +95,8 @@ class AppendFileAction : Action {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
         val text = args["text"] ?: args["content"] ?: ""
         return try {
-            val file = safeUserFile(ctx, path) ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
+            val file = safeTarget(ctx, path, shared = sharedArg(args))
+                ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
             val bytes = text.toByteArray(Charsets.UTF_8).size
             if (bytes > MAX_FILE_BYTES) {
                 return ActionResult.Failure("append content exceeds ${MAX_FILE_BYTES / 1024 / 1024} MB write limit ($bytes bytes)")
@@ -101,7 +105,7 @@ class AppendFileAction : Action {
             if (projectedSize > MAX_FILE_BYTES) {
                 return ActionResult.Failure("append would exceed ${MAX_FILE_BYTES / 1024 / 1024} MB file limit ($projectedSize bytes)")
             }
-            createSandboxDirs(ctx, file)
+            createSandboxDirs(ctx, file, sharedArg(args))
             writeNoFollow(file, text, append = true)
             ctx.logger("Append to ${file.name}")
             ActionResult.Success
@@ -232,7 +236,8 @@ class MakeDirectoryAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
-        val dir = safeUserFile(ctx, path) ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
+        val dir = safeTarget(ctx, path, shared = sharedArg(args))
+            ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
         return if (dir.isDirectory || dir.mkdirs()) {
             ctx.logger("Created directory ${dir.name}")
             ActionResult.Success
@@ -279,6 +284,52 @@ internal fun safeUserFile(ctx: ActionContext, path: String, mustExist: Boolean =
 }
 
 /**
+ * The base a file action resolves against: the private sandbox by default, shared storage when the
+ * action opts in with `shared`.
+ *
+ * The sandbox is the right default — a task should not be able to touch the whole filesystem by
+ * accident, and an absolute path is folded into it rather than escaping. But some files are the
+ * user's own and belong in their own tree, where a file manager and their backups can see them;
+ * 接続's run history is one. This makes that an explicit per-action choice instead of a silent
+ * rewrite into a directory nothing else can reach.
+ *
+ * Shared paths keep every protection the sandbox has — lexical normalization, containment under the
+ * external-storage root, the symlink component scan and no-follow open — only the base differs. It
+ * grants no access the app does not already hold for its backups.
+ */
+internal fun fileBase(ctx: ActionContext, shared: Boolean): File =
+    if (shared) android.os.Environment.getExternalStorageDirectory().canonicalFile
+    else File(ctx.app.filesDir, "user_files").canonicalFile
+
+internal fun safeTarget(
+    ctx: ActionContext,
+    path: String,
+    mustExist: Boolean = false,
+    shared: Boolean = false,
+): File? {
+    if (path.isBlank() || path.contains('\u0000')) return null
+    val base = fileBase(ctx, shared)
+    // An absolute path under the base is expressed relative to it, so "/sdcard/x" and "x" mean the
+    // same file. Every spelling of the external root has to be recognised, not just the canonical
+    // one: /sdcard is a symlink to /storage/emulated/0, so matching on the canonical path alone
+    // turned "/sdcard/〇/…" into "/storage/emulated/0/sdcard/〇/…" — a real doubled root that got
+    // created and written to, silently.
+    val relative = if (!shared) path else {
+        val root = EXTERNAL_ROOTS.plus(base.path)
+            .firstOrNull { path == it || path.startsWith("$it/") }
+        if (root != null) path.removePrefix(root) else path
+    }
+    return resolveSandboxTarget(base, relative, mustExist)
+}
+
+/** Every spelling of the primary external volume; /sdcard and /storage/self/primary are symlinks. */
+private val EXTERNAL_ROOTS = listOf("/sdcard", "/storage/emulated/0", "/storage/self/primary")
+
+/** `shared=true` on a file action: resolve against the user's storage instead of the sandbox. */
+internal fun sharedArg(args: Map<String, String>): Boolean =
+    args["shared"]?.trim()?.lowercase() in setOf("true", "1", "yes", "on")
+
+/**
  * Resolves [path] against the sandbox [baseDir] and refuses anything that could escape it,
  * including symlink-based TOCTOU escapes. The target is resolved lexically (NOT canonicalized) so a
  * malicious symlink component is detected rather than transparently followed and hidden, then every
@@ -308,9 +359,9 @@ private fun containsSymlinkComponent(baseDir: File, target: File): Boolean {
 }
 
 /** Creates the sandboxed parent directories, then re-verifies no symlink component slipped in. */
-private fun createSandboxDirs(ctx: ActionContext, file: File) {
+private fun createSandboxDirs(ctx: ActionContext, file: File, shared: Boolean = false) {
     file.parentFile?.mkdirs()
-    val baseDir = File(ctx.app.filesDir, "user_files").canonicalFile
+    val baseDir = fileBase(ctx, shared)
     if (containsSymlinkComponent(baseDir, file)) {
         throw java.io.IOException("path component became a symlink")
     }

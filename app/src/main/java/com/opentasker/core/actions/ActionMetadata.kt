@@ -572,6 +572,7 @@ fun registerActionMetadata() {
             description = "Create a directory (and parents) within the app's files",
             category = "File",
             fields = listOf(
+                ActionField("shared", "In shared storage", FieldType.TEXT, hint = "true = resolve under /sdcard (your own tree, visible to a file manager) instead of the app's private files"),
                 ActionField("path", "Path", required = true, hint = "directory path"),
             )
         )
@@ -848,7 +849,7 @@ fun registerActionMetadata() {
         ActionMetadata(
             id = "dialog.input",
             name = "Input Dialog",
-            description = "Prompt for text and store the result in a variable",
+            description = "Prompt for text and store the result in a variable. Also writes <store>_ok — true when confirmed, false when cancelled — so an answer deliberately left EMPTY can be told apart from backing out",
             category = "Alert",
             fields = listOf(
                 ActionField("title", "Title"),
@@ -909,6 +910,20 @@ fun registerActionMetadata() {
                 ActionField("ignore_exit", "Ignore exit code", FieldType.CHECKBOX, hint = "succeed even if exit code is non-zero"),
             )
         )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "location.get",
+            name = "Get Location",
+            description = "Put the device's current position into variables. Uses Android's own LocationManager (no Play Services); accepts a recent cached fix rather than waking GPS for a phone that has not moved",
+            category = "System",
+            fields = listOf(
+                ActionField("prefix", "Variable prefix", FieldType.TEXT, hint = "default LOC_ — writes <prefix>Lat, Lon, Acc, AgeMs, Provider, Ok"),
+                ActionField("max_age_ms", "Accept a fix this old (ms)", FieldType.NUMBER, hint = "default 120000 — a cached fix this fresh is used as-is, costing no GPS time"),
+                ActionField("timeout_ms", "Wait for a fresh fix (ms)", FieldType.NUMBER, hint = "default 20000 — on timeout it falls back to the newest stale fix rather than failing"),
+            ),
+        ),
     )
 
     // --- 接続: measuring each SIM's real throughput ------------------------------------------------
@@ -1902,6 +1917,7 @@ fun registerActionMetadata() {
             description = "Read file contents into a variable",
             category = "File",
             fields = listOf(
+                ActionField("shared", "In shared storage", FieldType.TEXT, hint = "true = resolve under /sdcard (your own tree, visible to a file manager) instead of the app's private files"),
                 ActionField("path", "File path", required = true),
                 ActionField("var", "Store in variable", required = true, hint = "%var"),
             )
@@ -1915,6 +1931,7 @@ fun registerActionMetadata() {
             description = "Write contents to a file (overwrites)",
             category = "File",
             fields = listOf(
+                ActionField("shared", "In shared storage", FieldType.TEXT, hint = "true = resolve under /sdcard (your own tree, visible to a file manager) instead of the app's private files"),
                 ActionField("path", "File path", required = true),
                 ActionField("text", "Content", FieldType.MULTILINE, required = true),
             )
@@ -1928,6 +1945,7 @@ fun registerActionMetadata() {
             description = "Append contents to a file",
             category = "File",
             fields = listOf(
+                ActionField("shared", "In shared storage", FieldType.TEXT, hint = "true = resolve under /sdcard (your own tree, visible to a file manager) instead of the app's private files"),
                 ActionField("path", "File path", required = true),
                 ActionField("text", "Content", FieldType.MULTILINE, required = true),
             )

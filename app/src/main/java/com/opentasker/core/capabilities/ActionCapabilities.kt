@@ -24,6 +24,7 @@ enum class CapabilityRequirement {
     AllFiles,
     DeviceAdmin,
     Microphone,
+    Location,
 }
 
 data class ActionCapability(
@@ -116,6 +117,8 @@ object ActionCapabilityRegistry {
         // MODIFY_PHONE_STATE — held by shell, so Shizuku is the whole requirement.
         "sim.data.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Switches the SIM that carries mobile data — requires Shizuku installed, started, and access granted to this app.", CapabilityRequirement.Shizuku, blocking = true),
         "sim.list" to ActionCapability(CapabilityLevel.Supported, "Reads the active SIM slots and which one carries data."),
+        // Reads a fix through the framework LocationManager; the permission is the whole requirement.
+        "location.get" to ActionCapability(CapabilityLevel.RequiresSetup, "Reads the device's position into variables — needs the Location permission.", CapabilityRequirement.Location, blocking = true),
         // Pins its own network and transfers over it; no special access beyond the declared
         // CHANGE_NETWORK_STATE, and it never changes the system's default route.
         "net.speedtest.cancel" to ActionCapability(CapabilityLevel.Supported, "Aborts a running speed test immediately."),
