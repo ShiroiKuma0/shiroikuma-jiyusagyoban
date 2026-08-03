@@ -666,7 +666,7 @@ val verifyJvmTestCount = tasks.register<VerifyJvmTestCountTask>("verifyJvmTestCo
     description = "Fails if the passing JVM test count drops below the release floor."
     dependsOn("testDebugUnitTest")
     resultsDirectory.set(layout.buildDirectory.dir("test-results/testDebugUnitTest"))
-    minimumTests.set(856)
+    minimumTests.set(858)
 }
 
 val qualityGateSeedFailure = providers.gradleProperty("openTaskerQualityGateSeedFailure")
