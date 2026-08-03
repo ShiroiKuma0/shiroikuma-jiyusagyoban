@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.79.2026-08-02.g915979d9+025`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.79.2026-08-02.g915979d9+031`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 > The version names the upstream commit the fork is rebased on:
 > `<upstream version>.<base commit date>.g<8-char upstream sha>+<build>`. Upstream's own version
@@ -175,6 +175,13 @@ and **List SIMs** move mobile data between slots **without root** (through Shizu
 **slot rather than subscription id**, because a phone accumulates stale subIds and a hardcoded one breaks
 the day a SIM is re-seated.
 
+Every run is **kept**: where it happened, what it measured, and the fix's age — because indoors a phone
+often cannot get a fresh position, and a coordinate worth keeping is not automatically one worth trusting.
+The history is a **scrollable HTML page inside a scene** whose rows act: the coordinates open that spot in
+**白い熊 地図**, and a pill beside the place name lets a place be **named once and read back on every run
+there**. It is written to your own tree as append-only JSON lines, so renaming costs a line and clearing
+the name costs a line, and nothing already recorded is ever rewritten.
+
 ### 📊 Monitor, widgets & theme
 A **Monitor** tab aggregates engine task-activity and widget pulls. A styled-bitmap **home-screen widget engine** with a visual layout editor (Tasker Widget V2 import) and a **named-template library**. A black-and-yellow **AMOLED theme** + a kxkb-styled UI-customization page (text-wide underlined headings), unified JSON import/export, multi-select, and an in-app Help/Docs tab.
 
@@ -198,13 +205,13 @@ A profile is active while **all** its contexts match. Seven families:
 
 ---
 
-## Actions — **160 built-in** (＋ engine flow control)
+## Actions — **161 built-in** (＋ engine flow control)
 
 > Bold = added or materially extended in this fork.
 
 **App (24)** — **Send Intent** *(＋ `reply_via=receiver` binder-free reply channel, waits up to 600 s)* · **Launch Intent** · Launch App · **Freeze App** · **Unfreeze App** · **Make Launcher Tasks** · **Generate Share Relays** · **Pick Apps → Variable** *(icon-tile grid, pre-ticked)* · **Pick One App → Variable** *(one-tap, restrictable)* · Kill App · Go Home · Next App · Previous App · Open URL · Send SMS · Call · Compose Email · List Apps · Take Screenshot
 
-**System (31)** — **Set Data SIM** *(root-free, by slot, via Shizuku)* · **List SIMs** · **Turn Screen Off** · **Wake Device** · **Run Shell** (Shizuku) · **Show Scene** · **Hide Scene** · **Set Widget** · **Refresh Widgets** · **Flash Bubble Add / Remove / Clear** · **Flash Kill Icon Show / Hide** · Flash · Vibrate · Reboot Device · Lock Device · Set / Get Clipboard · Set Wallpaper · Set / Pick Keyboard · Profile Status · Log Message
+**System (32)** — **Get Location** *(framework LocationManager, no Play Services; publishes the fix's age)* · **Set Data SIM** *(root-free, by slot, via Shizuku)* · **List SIMs** · **Turn Screen Off** · **Wake Device** · **Run Shell** (Shizuku) · **Show Scene** · **Hide Scene** · **Set Widget** · **Refresh Widgets** · **Flash Bubble Add / Remove / Clear** · **Flash Kill Icon Show / Hide** · Flash · Vibrate · Reboot Device · Lock Device · Set / Get Clipboard · Set Wallpaper · Set / Pick Keyboard · Profile Status · Log Message
 
 **Settings (20)** — Toggle WiFi · Toggle Bluetooth · Toggle Mobile Data · Toggle Airplane Mode · Toggle Torch · Set / Auto Brightness · Set Volume · Get Volume · Set Ringer Mode · Set Do Not Disturb · Set Screen Timeout · Location Mode · Set Tile State · **Get Locale** · **Set Locale** *(reorders the list — keeps other languages)* · **Get Device State** (battery / charging-plugged / WiFi / airplane → vars) · Get / Put Setting · WiFi Settings
 
@@ -212,7 +219,7 @@ A profile is active while **all** its contexts match. Seven families:
 
 **Flow (11)** — If · Else · End If · For Each · End For · Run Task · Return Values · Stop · Fail · Wait · Comment
 
-**File (9)** — Read · Write · Append · Move · Delete · List Files · Create Directory · Open File
+**File (9)** *(＋ `shared` — resolve in your own storage instead of the app sandbox)* — Read · Write · Append · Move · Delete · List Files · Create Directory · Open File
 
 **Interface (8)** — Back · Recents · Lock Screen · Notifications Panel · Quick Settings · Power Dialog · Take Screenshot *(accessibility global actions)*
 
