@@ -22,6 +22,7 @@ enum class InternalTaskRunSource(
 ) {
     LOCALE_PLUGIN("locale_plugin", "Locale plugin"),
     SCENE_OVERLAY("scene_overlay", "Scene overlay"),
+    QUICK_SETTINGS_TILE("quick_settings_tile", "Quick Settings tile"),
 }
 
 object AutomationTargetContract {

@@ -1,4 +1,5 @@
 import java.io.File
+import java.util.Properties
 import java.net.URLEncoder
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
@@ -85,7 +86,6 @@ abstract class VerifyDocumentationTruthTask : DefaultTask() {
         )
     }
 }
-import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -168,7 +168,6 @@ require(selectedDistribution in allowedDistributions) {
 }
 val smsActionAvailable = selectedDistribution != "play"
 val smsReceiveAvailable = selectedDistribution != "play"
-val hasReleaseSigning = listOf(
 val hasReleaseSigning = useKeystoreProperties || listOf(
     releaseKeystorePath,
     releaseKeystorePassword,
@@ -1030,6 +1029,8 @@ tasks.register<VerifyNativePageAlignmentTask>("verifyNativePageAlignment") {
     description = "Checks that packaged native ELFs are read-only and have 16 KB PT_LOAD alignment."
     dependsOn("packageDebug")
     apk.set(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk"))
+}
+
 // --- shiroikuma fork: archive naming + one-shot build task ---
 base {
     archivesName = "shiroikuma-jiyusagyoban_${forkVersionName}_arm64-v8a"
