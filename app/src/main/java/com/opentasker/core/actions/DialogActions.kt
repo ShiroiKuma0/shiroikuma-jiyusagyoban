@@ -55,9 +55,18 @@ class InputDialogAction : Action {
             putExtra(DialogActivity.EXTRA_DEFAULT, args["default"].orEmpty())
             putExtra(DialogActivity.EXTRA_INPUT_TYPE, args["input_type"].orEmpty())
         }
+        // Confirmed-but-empty and cancelled both store "", so a task could not tell "the user
+        // cleared this on purpose" from "the user backed out" — which makes deleting a saved value
+        // impossible. <store>_ok separates them.
         when (outcome) {
-            is DialogOutcome.Confirmed -> ctx.variables.set(store, outcome.value)
-            DialogOutcome.Cancelled -> ctx.variables.set(store, "")
+            is DialogOutcome.Confirmed -> {
+                ctx.variables.set(store, outcome.value)
+                ctx.variables.set("${store}_ok", "true")
+            }
+            DialogOutcome.Cancelled -> {
+                ctx.variables.set(store, "")
+                ctx.variables.set("${store}_ok", "false")
+            }
         }
         ctx.logger("Input dialog → %$store")
         return ActionResult.Success

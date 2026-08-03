@@ -6,6 +6,7 @@ import com.opentasker.core.actions.BackupCategoriesAction
 import com.opentasker.core.actions.BackupEditItemsAction
 import com.opentasker.core.actions.BackupPlanAction
 import com.opentasker.core.actions.BackupRunItemsAction
+import com.opentasker.core.actions.GetLocationAction
 import com.opentasker.core.actions.PruneBackupsAction
 import com.opentasker.core.actions.DataReadAction
 import com.opentasker.core.actions.FinishProgressPanelAction
@@ -313,6 +314,7 @@ private fun registerBuiltInActions() {
         SpeedTestAction(),
         CancelSpeedTestAction(),
         SetDataSimAction(),
+        GetLocationAction(),
         ReadSimsAction(),
         LocationModeAction(),
         SetImeAction(),

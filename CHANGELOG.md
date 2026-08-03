@@ -79,6 +79,73 @@ This lists what the fork adds; upstream's own history lives in the OpenTasker re
 - **Quick Settings tiles**: added four active per-task tile slots with long-press configuration, persistent task/label/subtitle/icon/state settings, direct task dispatch, slot-aware tile events, and a functional `tile.set` action.
 
 - **Visual system**: the command-center shell now uses a calmer sage/graphite palette, larger readable type, tighter spacing tokens, compact headers, border-light navigation, and text-led status indicators. Profile/task summaries and action/context rows rely on grouping and hairline rhythm instead of nested outlined boxes. The nine-page redesign reference is preserved at `design/mockups/opentasker-command-center-v2.png`.
+## 0.2.79.2026-08-02.g915979d9+031 — 2026-08-03
+
+**接続 keeps a history — and the engine grew four capabilities to let a workspace build one.**
+Every speed run now records where it happened and what it measured; the history is browsable,
+each row opens its spot on the map, and a place can be named once and read back on every run
+there. None of that needed 接続-specific code in the app: what it needed was four general
+primitives that any project can use.
+
+### A position, without Play Services
+
+`location.get` reads a fix through the framework `LocationManager`, matching the FOSS geofence
+source this app already ships. It accepts a cached fix when one is fresh enough (`max_age_ms`),
+because a phone that has not moved has nothing new to say and waking GPS for it costs time and
+battery; otherwise it waits `timeout_ms` for an update and, failing that, **falls back to the
+newest stale fix rather than failing the task**. It publishes the fix's **age** alongside it,
+which matters more than it sounds: on this device, indoors, GPS does not lock and the network
+provider does not answer, so the position is routinely hours old. A coordinate worth keeping is
+not automatically a coordinate worth trusting, and the age is what lets the caller tell.
+
+It carries a new **`Location` capability requirement**, so it gets the same red status pill,
+Settings deep-link and pre-flight block as every other permission-bearing action.
+
+### Scene pages can act
+
+The `WEB` scene element renders arbitrary HTML and scrolls by touch, but it had no
+`WebViewClient` — so a link could be shown and never followed. It now has a link bridge:
+
+- `task://run?task=<name>&<var>=<value>…` sets each extra parameter as a global, then runs that
+  task — the same contract a scene button has, plus arguments.
+- Any other scheme (`geo:`, `tel:`, `https:`) is handed to Android as a VIEW intent.
+
+That is what makes a **scrollable list of unknown length** possible in a scene at all: elements
+are laid out at fixed coordinates, so a list has no natural home among them, but an HTML page
+does — and now its rows can do something when tapped.
+
+### Files where the user can see them
+
+File actions resolve every path inside the app's private `user_files`, and an absolute path is
+not rejected but **folded into the sandbox**, so writing to `/sdcard/…` quietly succeeded and
+produced a file nothing else could reach. `shared=true` on read/write/append/mkdir resolves
+against the user's own storage instead, keeping every protection the sandbox has — lexical
+containment, the symlink component scan, no-follow open — and granting nothing the app did not
+already hold for its backups.
+
+Two sharp edges were filed down in passing: `/sdcard` is a symlink to `/storage/emulated/0`, so
+matching only the canonical root produced a very real doubled `/sdcard/sdcard/…` tree; and
+`file.read` reported a missing file with the same message as a sandbox escape, which sends you
+hunting the wrong bug.
+
+### A dialog can tell "clear this" from "never mind"
+
+`dialog.input` stored an empty string for both a cancelled dialog and one confirmed with the
+field cleared, so a task could not implement deletion: the two outcomes were indistinguishable.
+It now also writes **`<store>_ok`** — true when confirmed, false when cancelled. An answer
+deliberately left empty is a decision, and the engine now says so.
+
+### 接続's history
+
+Built entirely in the workspace on those four: each run appends one JSON object to
+`接続履歴.jsonl` in 白い熊's backup tree, with its position, the reverse-geocoded place name
+(OpenStreetMap Nominatim, after the run — a geocoder request during a measurement would be
+measured), the fix's age, and all three legs. The list is an HTML page in a scene; a row's
+coordinates open it in 白い熊 地図, and the pill beside the place name writes `接続地点名.jsonl`,
+keyed by coordinates rounded to ~11 m, so naming a place names every run there — past and
+future. Both files are append-only and newest-wins, so renaming costs one line and clearing the
+name writes an empty value that reads back as no name.
+
 ## 0.2.79.2026-08-02.g915979d9+025 — 2026-08-02
 
 **接続 — measuring real throughput on each SIM.** 白い熊's speed varies by location, and the phone

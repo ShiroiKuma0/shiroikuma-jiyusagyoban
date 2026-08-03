@@ -2,6 +2,7 @@ package com.opentasker.scenes
 
 import android.graphics.BitmapFactory
 import android.graphics.drawable.ColorDrawable
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
@@ -971,6 +972,40 @@ internal fun SceneElementView(
                         isVerticalScrollBarEnabled = false
                         isHorizontalScrollBarEnabled = false
                         settings.javaScriptEnabled = true
+                        // Links become actions. Without a client the WebView tries to NAVIGATE, which
+                        // for a page loaded from a null base URL simply fails — so an HTML list could
+                        // be shown but never acted on.
+                        //
+                        //   task://run?task=<name>&<var>=<value>…   set each extra query parameter as a
+                        //                                           global, then run that task
+                        //   anything else (geo:, tel:, https:, …)   handed to Android as a VIEW intent
+                        //
+                        // Variables are set BEFORE the task starts so it can read them as ordinary
+                        // globals — the same contract a scene button has, plus arguments.
+                        webViewClient = object : android.webkit.WebViewClient() {
+                            override fun shouldOverrideUrlLoading(
+                                view: android.webkit.WebView,
+                                request: android.webkit.WebResourceRequest,
+                            ): Boolean {
+                                val uri = request.url ?: return false
+                                if (uri.scheme.equals("task", ignoreCase = true)) {
+                                    val target = uri.getQueryParameter("task")?.trim().orEmpty()
+                                    if (target.isEmpty()) return true
+                                    uri.queryParameterNames
+                                        .filter { it != "task" && it.isNotBlank() }
+                                        .forEach { name -> onSetVar(name, uri.getQueryParameter(name).orEmpty()) }
+                                    onRunTask(target)
+                                    return true
+                                }
+                                runCatching {
+                                    ctx.startActivity(
+                                        Intent(Intent.ACTION_VIEW, Uri.parse(uri.toString()))
+                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                    )
+                                }
+                                return true
+                            }
+                        }
                     }
                 },
                 update = { wv ->
