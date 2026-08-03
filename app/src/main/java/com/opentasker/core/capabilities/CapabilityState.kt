@@ -50,6 +50,11 @@ object CapabilityState {
         CapabilityRequirement.Location ->
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
                 ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        // BLUETOOTH_CONNECT only exists from API 31; below that the legacy manifest permissions are
+        // install-time and always held, so there is nothing for the user to grant.
+        CapabilityRequirement.Bluetooth ->
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
     }
 
     /**
@@ -92,6 +97,8 @@ object CapabilityState {
                 Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + context.packageName))
             CapabilityRequirement.Location ->
                 Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + context.packageName))
+            CapabilityRequirement.Bluetooth ->
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + context.packageName))
         }
         return intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
@@ -110,6 +117,7 @@ object CapabilityState {
         CapabilityRequirement.DeviceAdmin -> "Needs Device admin enabled."
         CapabilityRequirement.Microphone -> "Needs the Microphone permission."
         CapabilityRequirement.Location -> "Needs the Location permission."
+        CapabilityRequirement.Bluetooth -> "Needs the Nearby devices (Bluetooth) permission."
     }
 
     /** Short status-pill text for the current state of [req] (granted vs. not). */
@@ -126,6 +134,7 @@ object CapabilityState {
         CapabilityRequirement.DeviceAdmin -> if (met) "Device admin on" else "Device admin off"
         CapabilityRequirement.Microphone -> if (met) "Microphone allowed" else "Microphone off"
         CapabilityRequirement.Location -> if (met) "Location allowed" else "Location off"
+        CapabilityRequirement.Bluetooth -> if (met) "Bluetooth allowed" else "Bluetooth off"
     }
 
     /** Short button text for the fix action. */
@@ -142,6 +151,7 @@ object CapabilityState {
         CapabilityRequirement.DeviceAdmin -> "Enable device admin"
         CapabilityRequirement.Microphone -> "Grant microphone"
         CapabilityRequirement.Location -> "Grant location"
+        CapabilityRequirement.Bluetooth -> "Grant Bluetooth"
     }
 
     /** Short noun for a permission, for the run-time block dialog (“needs: Accessibility”). */
@@ -158,6 +168,7 @@ object CapabilityState {
         CapabilityRequirement.DeviceAdmin -> "Device admin"
         CapabilityRequirement.Microphone -> "Microphone"
         CapabilityRequirement.Location -> "Location"
+        CapabilityRequirement.Bluetooth -> "Bluetooth"
     }
 
     /** A missing, blocking permission and the action types in the task that need it. */
