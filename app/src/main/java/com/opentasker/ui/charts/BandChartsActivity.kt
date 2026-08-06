@@ -14,9 +14,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.opentasker.app.OpenTaskerApp_NoHilt
-import com.opentasker.ui.screens.BandScreen
+import com.opentasker.core.band.BandSettings
 import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemeStore
 
@@ -33,7 +38,7 @@ import com.opentasker.ui.theme.ThemeStore
  * through the existing CREATE_SHORTCUT picker — so an icon on the home screen leads straight here.
  *
  * `singleTask` (see the manifest) so returning resumes rather than stacking a second copy. The window
- * owns nothing: [BandScreen] reads the database and [com.opentasker.core.band.BandSyncState], both of
+ * owns nothing: the screens read the database and [com.opentasker.core.band.BandSyncState], both of
  * which outlive it, so a rotation or a trip to Home costs nothing and a sync started here survives
  * the window being closed.
  */
@@ -53,30 +58,54 @@ class BandChartsActivity : ComponentActivity() {
     }
 
     private fun renderFrom(intent: Intent?) {
-        val metric = intent?.getStringExtra(EXTRA_METRIC)?.takeIf { it.isNotBlank() }
-        val spanMinutes = intent?.getIntExtra(EXTRA_SPAN_MINUTES, 0)?.takeIf { it > 0 }
+        val deepLink = intent?.getStringExtra(EXTRA_METRIC)?.takeIf { it.isNotBlank() }
+        // Read once per launch rather than per frame: `健康の設定 -- [727][01]` writes it through the
+        // band.charts action, so it is already settled by the time this window is created.
+        val language = BandLanguage.parse(BandSettings.language(applicationContext))
         setContent {
             val themePrefs by ThemeStore.state.collectAsState()
             OpenTaskerTheme(prefs = themePrefs) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background,
-                ) {
-                    // Edge-to-edge draws under the system bars, and 白い熊's status bar carries the
-                    // kanji clock overlay — without this the first card sits underneath it.
-                    BandScreen(
-                        db = OpenTaskerApp_NoHilt.db,
-                        contentPadding = WindowInsets.systemBars.asPaddingValues(),
-                        onlyMetric = metric,
-                        initialSpanMinutes = spanMinutes,
-                    )
+                CompositionLocalProvider(LocalBandLanguage provides language) {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background,
+                    ) {
+                        // Edge-to-edge draws under the system bars, and 白い熊's status bar carries the
+                        // kanji clock overlay — without this the first card sits underneath it.
+                        val insets = WindowInsets.systemBars.asPaddingValues()
+                        val model: BandDashboardModel = viewModel(
+                            factory = BandDashboardModelFactory(
+                                OpenTaskerApp_NoHilt.db,
+                                applicationContext,
+                            ),
+                        )
+                        // One piece of navigation state, not a navigation library: this window has
+                        // exactly two destinations and a back gesture between them.
+                        var selected by rememberSaveable(deepLink) { mutableStateOf(deepLink) }
+                        val state by model.state.collectAsState()
+
+                        if (selected == null) {
+                            BandDashboardScreen(
+                                model = model,
+                                contentPadding = insets,
+                                onOpenMetric = { selected = it },
+                            )
+                        } else {
+                            MetricDetailScreen(
+                                state = state,
+                                metricKey = selected!!,
+                                contentPadding = insets,
+                                onBack = { selected = null },
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 
     companion object {
-        /** Optional: show only this metric (`hr`, `hrv`, `spo2`, `temp`, `stress`). */
+        /** Optional: open straight onto one metric instead of the dashboard. */
         const val EXTRA_METRIC = "shiroikuma.jiyusagyoban.extra.BAND_METRIC"
 
         /** Optional: initial visible span in minutes. Absent means 24 hours. */

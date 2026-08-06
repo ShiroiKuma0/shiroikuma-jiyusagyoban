@@ -28,9 +28,10 @@ object ChartPipeline {
         raw: List<ChartPoint>,
         spec: MetricSpec,
         gapMultiplier: Int = 3,
+        mixedCadence: Boolean = false,
     ): QualifiedChunk {
         val qualified = ChartQualify.qualify(raw, spec)
-        val threshold = gapThresholdMs(qualified.retained(), spec, gapMultiplier)
+        val threshold = gapThresholdMs(qualified.retained(), spec, gapMultiplier, mixedCadence)
         val (segments, gaps) = ChartSegments.split(qualified, threshold)
         return QualifiedChunk(
             segments = segments,
@@ -56,13 +57,27 @@ object ChartPipeline {
      * *tighter* than the metric is documented to be, while a band that samples more slowly than
      * advertised is believed.
      */
-    fun gapThresholdMs(points: List<ChartPoint>, spec: MetricSpec, multiplier: Int): Long {
+    fun gapThresholdMs(
+        points: List<ChartPoint>,
+        spec: MetricSpec,
+        multiplier: Int,
+        mixedCadence: Boolean = false,
+    ): Long {
         val nominal = spec.cadenceSec * 1000L
         if (points.size < 8) return nominal * multiplier
         val intervals = LongArray(points.size - 1) { points[it + 1].tMs - points[it].tMs }
         intervals.sort()
-        val median = intervals[intervals.size / 2]
-        return maxOf(nominal, median) * multiplier
+        // The median is the right statistic for ONE series and the wrong one for a mixture. Pooled
+        // heart rate interleaves a 120 s and a 600 s cadence: its median lands at 176 s, so the
+        // threshold falls at 528 s — just under the 600 s spacing that is perfectly ordinary wherever
+        // only the SpO₂-coincident reading exists. Measured on real data that declared 67 spurious
+        // ~10-minute gaps out of 70, tinting most of the chart red over nothing.
+        //
+        // A high percentile survives the mixture: it sits above the slower mode instead of between
+        // the two. Only the pooled series needs it, so the caller says so rather than every metric
+        // paying for it.
+        val representative = if (mixedCadence) intervals[(intervals.size * 9) / 10] else intervals[intervals.size / 2]
+        return maxOf(nominal, representative) * multiplier
     }
 
     /**

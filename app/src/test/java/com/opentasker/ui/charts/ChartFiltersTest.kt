@@ -148,12 +148,11 @@ class ChartQualifyTest {
 
     @Test
     fun `step counts keep their zeros`() {
-        val steps = MetricSpec(
-            key = "steps_min", label = "歩数", unit = "", cadenceSec = 60,
-            validMin = 0.0, validMax = 250.0, zeroIsNoReading = false, slewPerStep = null,
-            hampelHalfWindow = 0, hampelSigmas = 0.0, hampelMinScale = 1.0,
-            yMin = 0.0, yMax = 200.0, decimals = 0,
-        )
+        // The real spec, not a stand-in: 0 being a measurement rather than a sentinel is a property
+        // of the shipped row, and testing a copy would let the shipped one drift away from it.
+        val steps = MetricSpecs.STEPS
+        assertFalse("steps must declare that 0 is real", steps.zeroIsNoReading)
+        assertEquals("steps must never be filtered", 0, steps.hampelHalfWindow)
         val out = ChartQualify.qualify(series(0.0, 12.0, 0.0, 0.0, 30.0, cadenceSec = 60), steps)
         assertEquals("0 is a real step count", 5, out.points.size)
         assertEquals(0, out.noReading)

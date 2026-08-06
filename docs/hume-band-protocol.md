@@ -144,6 +144,91 @@ One record is one **segment**, not one night. Stage codes are stored **raw**: `1
 `3` = REM, `5` = awake. Do not use the Hume plugin's re-coded scheme. Sleep chunks are noon-to-noon, so
 a night spanning midnight is one session rather than two halves.
 
+### Three of the HRV record's six fields are not measurements
+
+Established 2026-08-06 by forensic analysis of 2 131 records, each claim independently re-verified.
+This section overrides anything earlier in this document that treats `hrv`, `stress`/`vascular`,
+`sbp` or `dbp` as physiological readings.
+
+#### The record comes in two kinds
+
+| | n | `hrv` range | median | asleep |
+|---|---|---|---|---|
+| **A** — HR/BP triple present | 1 644 | 15–94 | 31 | 53 % |
+| **B** — that triple absent | 487 | 50–99 | 75 | 0.4 % |
+
+**Nothing is ever partially missing** — `hrv_hr`, `sbp` and `dbp` vanish together or not at all, so it
+is a whole-record success or failure, not per-field sentinels. `P(B | hrv < 50) = 0.000`;
+`P(B | hrv ≥ 50) = 0.638`. **The apparent 15–99 range of `hrv` is these two populations pooled.**
+
+#### `hrv` is not HRV
+
+It is a device state index. Two binary firmware flags — sleep mode, and whether the optical read
+succeeded — explain **74 % of its variance**; adding real step data adds 0.2 points. The evidence:
+
+- **Wrong-sign coupling to heart rate.** Same-record pairing gives Pearson **+0.383** pooled and
+  **+0.179** asleep. Every genuine variability metric is *negative*, both physiologically and by the
+  `RR = 60000/HR` non-linearity.
+- **No sleep-stage information at all.** Deep 21.0, light 21.0, REM 20.5 — effect size ≈ 0 between
+  all three. Real HRV separates these strongly (SDNN roughly halves from REM to deep).
+- **It is near-random within a state.** Lag-1 autocorrelation +0.196 asleep, where the *same
+  record's* heart rate holds +0.595.
+- **It switches like a flag, not a signal.** At sleep onset it locks into 15–21 within one or two
+  2-minute records; heart rate ramps over 40 minutes across the same boundary.
+- **It is not motion artefact either.** Awake-but-stationary (no steps ±15 min, median 48) resembles
+  awake-and-moving (54), not asleep (21); with record type controlled, 46 vs 44, p = 0.29. The
+  reference channel `hrv_hr` *does* respond correctly across the same split, so the test had power.
+- The band never transmits RR intervals, so no real HRV could be computed from what it sends.
+
+It is charted as **バンド状態指数 / Band State Index**, split by record type, with no band ladder and
+no unit, and it is **not** a 健康指数 component.
+
+#### `sbp` / `dbp` are generated inside a ±10 mmHg clamp
+
+Across 1 644 records systolic occupies **every integer 110–129 and never leaves it**; diastolic every
+integer 60–79 and never leaves it. That is **120 ± 10 and 70 ± 10** — the calibration window this
+class of SDK clamps its output to. Six days of ordinary life does not keep real systolic pressure
+inside a twenty-point box.
+
+They also carry no memory: lag-1 autocorrelation −0.015 and −0.020, mean|Δ|/σ of 1.14 and 1.16
+against 1.13 for independent draws, while heart rate on the same records holds +0.59.
+
+The chart is kept at 白い熊's request, chipped "not a measurement", with the above in its info sheet.
+The FDA's September 2025 safety communication against unauthorised cuffless blood-pressure devices is
+cited there too.
+
+### `vascular` and `stress` are the same byte, and both are a lookup on `hrv`
+
+The HRV record's offset `[10]` (stored as `vascular`) and offset `[12]` (stored as `stress`) are
+**identical in 2038 of 2038 samples**, and in both golden frames. One number is being stored under two
+names, and at least one of those labels is wrong; the data cannot say which.
+
+Nor does it behave like a stress index. Asleep it is pinned at ~45 — **850 of 872 samples in 40–49** —
+while awake it scatters across 10–99. A real stress measure falls during sleep; this does the
+opposite, which is what a placeholder written when nothing was measured would look like.
+
+Real HRV-derived stress indices do exist and are validated — Baevsky's Stress Index has a normal range
+of 80–150, rising 1.5–2× under mild and 5–10× under severe stress
+([AJP-Regu 2025](https://journals.physiology.org/doi/full/10.1152/ajpregu.00243.2024)) — but every one
+of them needs **beat-to-beat RR intervals, which this band never sends.** So the number is very
+unlikely to be one.
+
+Worse than duplicated — **derived**. The vendor's own chain reconstructs exactly:
+
+- **Type B: `stress` = ⌊hrv/2⌋ or ⌈hrv/2⌉, plus either 20 or 45 — 487 of 487, 100.00 %.**
+- **Type A: `stress` ∈ 43…47 when `hrv` ≤ 45, and ∈ 10…14 when `hrv` ≥ 46 — 1 632 of 1 644, 99.27 %.**
+
+The residual entropy is 1.94 bits ≈ log₂5: the spread *is* a five-value uniform dither. The field
+carries **zero** independent information, so it has no chart. Its `MetricSpec` is kept so the decoder
+and the archive stay unchanged and the finding stays checkable.
+
+One irony worth recording: the chain maps *high* `hrv` → *low* stress, so the firmware treats byte [9]
+as HRV in the conventional "higher = more relaxed" sense — while the data show it is highest when
+awake and active. The vendor's own derivation is inverted against the physiology it invokes.
+
+All fields keep being decoded and stored, so history stays continuous. Do not relabel any of them as
+physiology without evidence that does not currently exist.
+
 ### Heart rate carries two populations
 
 `0x55` interleaves a 120-second periodic series with an extra reading taken at each SpO₂ measurement,
@@ -284,6 +369,26 @@ Room rows
  └─ S6 MAP       data→pixel affine + Path build            [per frame]
 ```
 
+### The gap threshold must match the series it is drawn over
+
+`ChartPipeline.gapThresholdMs` takes the *median* interval, which is right for one series and wrong
+for a mixture. Pooled heart rate interleaves a 120 s and a 600 s cadence, so its median lands at 176 s
+and the threshold at 528 s — just under the 600 s spacing that is perfectly ordinary wherever only the
+SpO₂-coincident reading exists. That manufactured **67 spurious ~10-minute gaps out of 70**, and on
+the real dashboard it tinted the heart-rate card with **52 gaps** where there are 4.
+
+`mixedCadence = true` switches to the 90th percentile, which sits above the slower mode instead of
+between the two. Only the pooled series sets it.
+
+### The Hampel filter does not belong on a capsule chart
+
+It is an instrument for smoothing a *line*, and it assumes one population. Pointed at pooled heart
+rate it flags the interleaving itself — the +7.46 bpm second population reads as a sawtooth of
+outliers and burns the entire rejection budget on real readings: **102 of them** on 白い熊's data,
+against 2 once it is switched off. An hourly envelope needs no such filter anyway, since its ends are
+two real readings rather than a curve fitted through them. Capsules keep the range and sentinel gates
+and skip Hampel.
+
 ### Filter before decimate — the order is not negotiable
 
 LTTB's selection criterion is maximum triangle area, so it *deliberately prefers extremes*. Decimate
@@ -395,6 +500,25 @@ raw value. Reproducing Hume's number is separate work needing a second reference
 
 ---
 
+### 健康指数 — our own composite, and why it is not Hume's
+
+Hume's Health Score is 0–900 from resting heart rate, HRV, heart-rate stability, SpO₂ and sleep
+quality — every input is something we measure — but **the weights are withheld** and part of it comes
+from Body Pod data that does not exist here. Its neighbours on that screen are worse: Metabolic
+Momentum, "Life Added 1.9 days" and "Pace of Aging 0.5×" come from undisclosed algorithms, and the
+vendor's own consumer report calls the life-added figure a *model-based estimate, not the result of a
+controlled clinical study*, noting there is *no universal clinical standard for wearable biological
+age estimation*. None of it is reproduced.
+
+`HealthIndex` is ours instead: 0–100, five components, every breakpoint and weight a constant in the
+file and printed in the info panel beside each component's actual contribution. It is falsifiable,
+which is the entire difference.
+
+**It refuses rather than guesses.** A component with no data is reported missing and named, and the
+index is labelled partial — never imputed, never defaulted. Scoring a night the band did not record
+as though sleep were bad is the failure this design exists to prevent, and `HealthIndexTest` asserts
+it directly.
+
 ## 5. Where 「健康」 lives
 
 **Its own fullscreen window**, `BandChartsActivity` — not a tab (白い熊, 2026-08-03). It was briefly a
@@ -503,17 +627,35 @@ started emitting one.
 - Hume drops single-sample dips that we keep: on 2026-08-03 our minimum was 52 bpm (one sample at
   11:39:30, neighbours 85 and 72) against Hume's 55. Our decode is faithful; the difference is their
   display filtering. **Do not "fix" our number to match theirs.**
-- **A trap waiting for the envelope work.** `ChartPipeline.gapThresholdMs` takes the *median* interval,
-  which is right for one series and wrong for a mixture. Pooled heart rate interleaves a 120 s and a
-  600 s cadence, so its median lands at 176 s, the threshold at 528 s — just under the 600 s spacing
-  that is perfectly normal wherever only the SpO₂-coincident reading exists. That manufactures **67
-  spurious ~10-minute gaps out of 70**. Nothing pools today (the line renders the periodic series,
-  whose gaps are correct), so this is not a bug yet — but the first envelope built on the pooled
-  population will hit it. Use the constituent series' thresholds, or a high percentile, not the median
-  of a bimodal distribution.
-- The current renderer is **scaffolding**. Pinch-zoom, the special renderers (steps bars, blood-pressure
-  dumbbells, sleep hypnogram, sleep ribbon), the crosshair and the theme knobs are all unbuilt. The
-  pipeline in §4 is view-independent and survives any redesign of the drawing.
-- `transformable(canPan = …)` interop with a scrolling list is **unprototyped**. It needs answering
-  before the power views are designed, because the documented fallback (pinch-only `transformable` plus
-  a horizontal `draggable`) changes the layout.
+- The **crosshair** and the ~35 `ThemePrefs` knobs with a live preview are still unbuilt.
+- **A sleep stage `4`** would show as 不明 rather than being folded into a neighbour. It has never
+  appeared; if it does, that is the signal to revisit §7.
+### The gesture question, answered 2026-08-06
+
+`transformable(canPan = …)` **works**, and the documented fallback — pinch-only `transformable` plus a
+separate horizontal `draggable` — is not needed. The power views can be laid out on the assumption
+that one modifier handles pinch and horizontal pan while the enclosing `LazyColumn` keeps its scroll.
+
+`rememberChartGestureModifier` in `ui/charts/ChartGestureBox.kt` is the whole of it:
+
+```kotlin
+canPan = { abs(it.x) > abs(it.y) * 1.4f }   // ~35° either side of the horizontal
+```
+
+Compose consults `canPan` *before* the transformable claims a pan, so refusing the vertical ones lets
+them fall through to the list. Zoom never goes through the predicate at all — a two-finger spread is
+not a pan — which a vertical pinch confirms.
+
+Six instrumented tests drive real touch streams through it on the Mate XT
+(`ChartGestureInteropTest`), and one of them is the **control**: the same harness with a bare
+`transformable` swallows the vertical drag and the list stays frozen. That is the bug `canPan`
+prevents, reproduced on demand. A green suite proves nothing without it — `swipe()` could have been
+producing touch streams too gentle to trigger anything and every other assertion would still pass. If
+the control ever starts passing, the positive test has lost its teeth.
+
+Running instrumented tests at all needed two build changes, both debug-only and neither touching the
+release build: the debug variant takes `applicationIdSuffix = ".debug"` so it installs **alongside**
+the release APK rather than failing on a signature mismatch (the only way through would have been
+`adb uninstall`, which destroys the workspace database), and `app/src/debug/AndroidManifest.xml`
+drops the `com.opentasker.permission.AUTOMATION` declaration, since two packages cannot both own a
+custom permission.
