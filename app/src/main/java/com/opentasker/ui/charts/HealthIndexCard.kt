@@ -1,0 +1,294 @@
+package com.opentasker.ui.charts
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+
+/**
+ * 健康指数 — the one composite number, and the only one that shows its working.
+ *
+ * The card is deliberately not a gauge with a needle. A gauge implies precision the inputs do not
+ * have; a number with its five components listed underneath, each with its measurement and its
+ * contribution, says exactly as much as is actually known. Tapping opens the full arithmetic.
+ */
+@Composable
+fun HealthIndexCard(index: HealthIndexResult, onClick: () -> Unit) {
+    val lang = LocalBandLanguage.current
+    Card(
+        Modifier.fillMaxWidth().clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    BandText.indexTitle[lang],
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                )
+                if (index.partial) {
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(ChartPalette.BAND_WARN.copy(alpha = 0.16f))
+                            .padding(horizontal = 9.dp, vertical = 3.dp),
+                    ) {
+                        Text(
+                            BandText.indexPartial[lang],
+                            style = MaterialTheme.typography.labelSmall,
+                            color = ChartPalette.BAND_WARN,
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                }
+                // The index is the one card whose whole point is an explanation, and a card that
+                // merely happens to be tappable does not advertise that. The ring does.
+                InfoCircle(diameter = 28.dp, onClick = onClick)
+            }
+
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    index.value?.toString() ?: "—",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    BandText.indexOutOf[lang].format(index.band[lang]),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ChartPalette.AXIS_TEXT,
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
+            }
+
+            index.components.forEach { ComponentRow(it) }
+
+            if (index.partial) {
+                Text(
+                    BandText.indexPartialNote[lang].format(
+                        index.missing.joinToString(if (lang == BandLanguage.EN) ", " else "・") { it[lang] },
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ChartPalette.AXIS_TEXT,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ComponentRow(c: IndexComponent) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        // English component names are markedly longer than the Japanese ones ("Heart-rate
+        // stability" against 心拍安定性), so the column is sized per language rather than to the
+        // shorter of the two and left to wrap.
+        val lang = LocalBandLanguage.current
+        Text(
+            c.label[lang],
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.width(if (lang == BandLanguage.EN) 116.dp else 84.dp),
+            color = if (c.score == null) ChartPalette.AXIS_TEXT else MaterialTheme.colorScheme.onSurface,
+        )
+        Box(Modifier.weight(1f)) {
+            ScoreBar(c.score)
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            if (c.score == null) "—" else "${c.score}",
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.width(28.dp),
+            color = if (c.score == null) ChartPalette.AXIS_TEXT else MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+/**
+ * One component's 0–100, as a bar.
+ *
+ * A missing component draws an empty track rather than a zero-length bar, because those are
+ * different claims: "we measured nothing" and "we measured the worst possible value" must not look
+ * the same.
+ */
+@Composable
+private fun ScoreBar(score: Int?) {
+    Canvas(Modifier.fillMaxWidth().height(6.dp)) {
+        val r = size.height / 2f
+        drawRoundRect(
+            color = Color.White.copy(alpha = 0.08f),
+            size = size,
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(r, r),
+        )
+        if (score == null) return@Canvas
+        val w = size.width * (score / 100f)
+        if (w <= 0f) return@Canvas
+        drawRoundRect(
+            color = ChartPalette.sequential(score / 100f),
+            size = Size(w.coerceAtLeast(size.height), size.height),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(r, r),
+        )
+    }
+}
+
+/** The full arithmetic, for the detail screen. Every breakpoint and weight, printed. */
+@Composable
+fun HealthIndexDetail(index: HealthIndexResult) {
+    val lang = LocalBandLanguage.current
+    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text(
+            Loc(
+                "This index is not a reproduction of Hume's Health Score.",
+                "この指数は Hume の Health Score の再現ではありません。",
+            )[lang],
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            Loc(
+                "Hume's 0–900 is built from resting heart rate, HRV, heart-rate stability, blood " +
+                    "oxygen and sleep — every ingredient is something this app measures. But the " +
+                    "weight given to each is not published, and body-composition readings from " +
+                    "their Body Pod are mixed in as well. So their number cannot be reproduced.\n\n" +
+                    "\"Metabolic Momentum\", \"Life Added 1.9 days\" and \"Pace of Aging 0.5×\" on the " +
+                    "same screen go further still. The manufacturer's own material describes the " +
+                    "life-added figure as a model-based estimate rather than the result of a " +
+                    "controlled clinical study, and there is no established clinical standard for " +
+                    "biological age from a wearable. A number that cannot be checked and cannot be " +
+                    "wrong is not a measurement, so none of it was built.\n\n" +
+                    "This is an index whose every breakpoint and weight is written on this screen " +
+                    "instead. If you disagree with one, you can change it. A hidden formula does " +
+                    "not allow that.",
+                "Hume の 0〜900 は、安静時心拍・心拍変動・心拍の安定性・血中酸素・睡眠から作られていて、" +
+                    "その材料はどれもこのアプリが測っているものです。しかし各項目の重みは公開されておらず、" +
+                    "体組成計（Body Pod）の値も混ざります。だから同じ数字は出せません。\n\n" +
+                    "同じ画面にある「Metabolic Momentum」「Life Added 1.9 日」「Pace of Aging 0.5×」は" +
+                    "さらに踏み込めません。メーカー自身の資料が、寿命が延びたという数字を" +
+                    "「モデルによる推定であって、対照臨床試験の結果ではない」と書いており、" +
+                    "ウェアラブルの生物学的年齢に確立された臨床基準は存在しません。" +
+                    "検証できず、外れようもない数字は測定ではないので、作りませんでした。\n\n" +
+                    "代わりにこれは、区切りも重みも全部この画面に書いてある指数です。" +
+                    "納得できなければ数字を変えられます。隠された式にはそれができません。",
+            )[lang],
+            style = MaterialTheme.typography.bodySmall,
+            color = ChartPalette.AXIS_TEXT,
+        )
+
+        Text(
+            Loc("How to read it", "この数字の読み方")[lang],
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            Loc(
+                "Each component is scored 0–100 against the breakpoints printed below it, and the " +
+                    "index is their weighted mean. The breakpoints are the SAME edges as each " +
+                    "metric's own band ladder, so a card reading \"Standard\" and its component here " +
+                    "can never contradict one another.\n\n" +
+                    "A component summarises a WINDOW — a median or a percentile over the last day or " +
+                    "the last night — while a card's big number is that same window's median. Neither " +
+                    "is the single most recent reading, because one reading of a noisy series says " +
+                    "very little.\n\n" +
+                    "85 and above is Excellent, 70–84 Good, 55–69 Standard, 40–54 Low.",
+                "各項目は下に書いてある区切りで 0〜100 点にし、重み付き平均をとったものがこの指数です。" +
+                    "区切りは各グラフの帯（目安）とまったく同じ値なので、カードが「標準」と出ている" +
+                    "のにここだけ極端に低い、ということは起こりません。\n\n" +
+                    "各項目は「期間」をまとめた数字です — 直近一日、または直近の一晩の中央値や" +
+                    "パーセンタイル。カードの大きな数字も同じ期間の中央値で、どちらも" +
+                    "「いちばん新しい一回の測定」ではありません。ばらつく数値の一回分は" +
+                    "ほとんど何も語らないからです。\n\n" +
+                    "85 以上でとても良い、70〜84 で良い、55〜69 で標準、40〜54 で低い。",
+            )[lang],
+            style = MaterialTheme.typography.bodySmall,
+            color = ChartPalette.AXIS_TEXT,
+        )
+
+        Text(
+            BandText.indexTargets[lang],
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            Loc(
+                "Resting heart rate and sleep are the two you can actually move, and they carry a " +
+                    "quarter of the index each. Resting heart rate falls with aerobic fitness over " +
+                    "weeks — 50 bpm scores full marks, 85 scores nothing. Sleep wants 7–9 hours with " +
+                    "a healthy share of deep and REM; more than nine scores LOWER, not higher.\n\n" +
+                    "Heart-rate stability and blood oxygen are mostly not under your control day to " +
+                    "day — they are here because a sustained fall in either is worth noticing, not " +
+                    "because they are targets.\n\n" +
+                    "HRV is worth watching as a trend rather than aiming at. Note that this band " +
+                    "reports HRV LOWER during sleep than awake, which is backwards from how HRV is " +
+                    "normally described, so its numbers should not be compared with another device's.",
+                "動かせるのは実質「安静時心拍」と「睡眠」の二つで、どちらも指数の四分の一を占めます。" +
+                    "安静時心拍は数週間の有酸素運動で下がります — 50 bpm で満点、85 bpm で 0 点。" +
+                    "睡眠は 7〜9 時間、かつ深い睡眠と REM の割合が高いほど良い。" +
+                    "九時間を超えると点は**下がります**、上がりません。\n\n" +
+                    "心拍安定性と血中酸素は、日々どうこうできるものではありません。" +
+                    "目標というより「続けて下がったら気づくため」に入れてあります。\n\n" +
+                    "心拍変動は狙う数字ではなく、傾向を見るもの。なおこのバンドは睡眠中の心拍変動を" +
+                    "起きているときより**低く**返します。一般的な心拍変動の説明とは逆なので、" +
+                    "他機種の数値と比べないでください。",
+            )[lang],
+            style = MaterialTheme.typography.bodySmall,
+            color = ChartPalette.AXIS_TEXT,
+        )
+
+        index.components.forEach { c ->
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Row {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(
+                        if (c.score == null) ChartPalette.UNKNOWN else ChartPalette.sequential(c.score / 100f),
+                    ).align(Alignment.CenterVertically))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        c.label[lang],
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        BandText.indexWeight[lang].format((c.weight * 100).toInt()),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = ChartPalette.AXIS_TEXT,
+                    )
+                }
+                Text(c.scale[lang], style = MaterialTheme.typography.bodySmall, color = ChartPalette.AXIS_TEXT)
+                Text(
+                    if (c.score == null) {
+                        BandText.indexMissing[lang].format(c.missingReason?.get(lang).orEmpty())
+                    } else {
+                        BandText.indexContribution[lang]
+                            .format(c.measured ?: 0.0, c.unit, c.score, c.contribution)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (c.score == null) ChartPalette.BAND_WARN else MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+    }
+}

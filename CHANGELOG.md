@@ -3,6 +3,128 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.81.2026-08-02.g97059d7b+017 — 2026-08-06
+
+**Three of the band's six HRV-record fields turned out not to be measurements.**
+
+白い熊 noticed the Health Index scoring HRV 15/100 while the HRV card beside it read "Standard", and
+asked whether that was inconsistent. It was — and chasing it down, with three research agents and a
+forensic pass over 2 131 records, found something larger.
+
+### `hrv` is not HRV
+
+It is a device state index. Two binary firmware flags — whether the band thinks you are asleep, and
+whether the optical read succeeded — explain **74 % of its variance**; adding real step data adds 0.2
+points. It correlates **positively** with heart rate (+0.383 pooled, +0.179 asleep) where every real
+variability metric is negative. It carries **no sleep-stage information at all** (deep 21.0, light
+21.0, REM 20.5). It switches at the sleep boundary within one or two records where heart rate ramps
+over forty minutes. And it is near-random within a state where the same record's heart rate holds an
+autocorrelation of +0.59.
+
+It is not motion artefact either — the hypothesis both the literature and I favoured. Awake-but-
+stationary (no steps for 15 minutes, median 48) looks like awake-and-moving (54), not asleep (21).
+
+The records come in **two kinds**: 1 644 carrying a heart rate and blood pressure (values 15–94) and
+487 where that whole triple failed (50–99), never partially. The apparent 15–99 range was those two
+populations pooled.
+
+So: **removed from 健康指数**, its 25 % redistributed across the four survivors, with nothing
+substituted — there is no other field here that measures autonomic tone. The chart survives as
+**Band State Index**, split by record type, with no band ladder and no unit.
+
+### Blood pressure is generated inside a ±10 mmHg clamp
+
+Across 1 644 records systolic occupies **every integer from 110 to 129 and never leaves it**;
+diastolic every integer from 60 to 79. That is 120 ± 10 and 70 ± 10 — the calibration window this
+class of SDK clamps to. Six days of ordinary life does not keep real systolic pressure inside a
+twenty-point box. They carry no memory either: lag-1 autocorrelation −0.015 and −0.020 against 1.13
+for independent draws.
+
+Kept at 白い熊's request, chipped **"not a measurement"**, with the evidence and the FDA's September
+2025 communication in its info sheet.
+
+### "Vascular age" / "stress" is a lookup on the same byte
+
+Reconstructed exactly: type B is `⌊hrv/2⌋` plus 20 or 45, **487 of 487**; type A is 43…47 when
+`hrv ≤ 45` and 10…14 when `hrv ≥ 46`, 1 632 of 1 644. Residual entropy 1.94 bits ≈ log₂5 — the spread
+is a uniform dither. Zero independent information, so the chart is gone. The decoder and archive are
+untouched so the finding stays checkable.
+
+The firmware maps *high* `hrv` → *low* stress, treating it as HRV in the conventional
+"higher = more relaxed" sense — while the data show it is highest when awake and active.
+
+### Also
+
+The Health Index gains an `i` — "How to read it" and "What to aim for" — and a ringed accent `i` now
+marks every screen that has an explanation behind it. Line-metric headlines are the 24-hour median
+rather than the latest reading, and the index reads the same window on the same band ladders, with a
+test asserting the two can never drift apart again.
+
+## 0.2.81.2026-08-02.g97059d7b+009 — 2026-08-06
+
+**「健康」 is a real dashboard now, and the scaffolding is gone.**
+
+One page opened from `グラフ -- [727]`: the last sync time and a 同期 button with live feedback, then
+eight full-width cards. Tap any card for a full-screen view that opens on the last 24 hours and
+pinch-zooms and pans across the whole history. The numbers sit **above** each plot rather than beside
+it, which is a third of the plot width Hume spends on two lines of text.
+
+`MetricLineChart.kt`, `BandChartsSection.kt` and `BandScreen.kt` are deleted. The pipeline they sat on
+— filters, segmentation, LTTB, PCHIP, viewport, ticks — was always the asset and is untouched.
+
+### Four new renderers
+
+Hourly **capsules** (heart rate, SpO₂) spanning each hour's real min–max; blood-pressure **dumbbells**
+with systolic and diastolic on **one** mmHg axis; a sleep **hypnogram** stepped between the raw stage
+codes with no interpolation, because there is no value between "deep" and "REM"; and step **bars**,
+where a zero-height bar is a real measurement rather than a gap.
+
+### 健康指数 — a score that can be wrong
+
+Hume's Health Score draws on resting heart rate, HRV, heart-rate stability, SpO₂ and sleep quality —
+all of which we measure — but its weights are withheld and part of it needs a Body Pod. Its
+neighbours are worse: the vendor's own consumer report calls "Life Added: 1.9 days" a *model-based
+estimate, not the result of a controlled clinical study*, and notes there is *no universal clinical
+standard for wearable biological age estimation*. Metabolic Momentum, Capacity, Strain, Recovery and
+Pace of Aging are all dropped.
+
+In their place, ours: 0–100 from five components, every breakpoint and weight a constant in
+`HealthIndex.kt` and printed in the info panel beside each component's contribution today. **It
+refuses rather than guesses** — a component with no data is named as missing and the index says it is
+partial, never scored as zero. That distinction is what stops a night the band did not record from
+reading as a bad night.
+
+### `vascular` and `stress` are the same byte
+
+Found while researching stress: HRV-record offsets `[10]` and `[12]` are **identical in 2038 of 2038
+samples**, and in both golden frames. One number, two names. It also does not behave like stress —
+asleep it is pinned at ~45 (850 of 872 samples in 40–49) and awake it scatters 10–99, the opposite of
+what a stress measure does.
+
+So one series is drawn, called **バンド指標** rather than ストレス, and its info panel says exactly
+that. Real HRV stress indices are validated science (Baevsky's Stress Index: normal 80–150, rising
+1.5–2× under mild stress) but they need beat-to-beat RR intervals **this band never sends** — the
+panel says that too, rather than implying our number is one of them.
+
+### Two chart bugs the dashboard exposed
+
+The heart-rate card first drew **52 gaps** where there are 4: the gap analysis ran on the split
+periodic series while the capsules were drawn from the pooled one. And running Hampel over the pooled
+series flagged **102 real readings** as outliers, because the +7.46 bpm second population looks
+exactly like a sawtooth of them. Gap analysis now follows the series it is drawn over, and capsules
+skip Hampel entirely — an envelope's ends are two real readings, not a curve fitted through them.
+
+### Colour is computed, not chosen
+
+Every palette was run through the data-viz validator against this app's own near-black surface. The
+obvious hypnogram colours fail outright: **violet REM against blue light-sleep measures ΔE 1.9 under
+protanopia and 9.8 with normal colour vision**. Two sleep stages nobody can tell apart is not a
+stylistic quibble, so the stages use the one ordering of the documented slots that clears every gate.
+Hume's rainbow ramps are not reproduced either — a rainbow has no perceptual order, so a reader cannot
+tell which end means "more".
+
+1 009 unit tests and 6 instrumented gesture tests, all green.
+
 ## 0.2.81.2026-08-02.g97059d7b+004 — 2026-08-06
 
 **The band was quietly throwing data away, and now it cannot do so unnoticed.**

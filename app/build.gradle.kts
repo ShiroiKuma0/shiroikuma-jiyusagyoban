@@ -236,6 +236,16 @@ android {
     buildTypes {
         getByName("debug") {
             isPseudoLocalesEnabled = true
+            // Side by side with the installed release build, never on top of it.
+            //
+            // The release APK is signed with the fork's own key, so a debug APK sharing its
+            // applicationId cannot update it — the install fails INSTALL_FAILED_UPDATE_INCOMPATIBLE,
+            // and the only way through would be `adb uninstall`, which destroys the workspace
+            // database. That made `connectedAndroidTest` unrunnable on a real phone: the one device
+            // an instrumented test is worth running on is the one carrying the data.
+            //
+            // With a distinct id the two coexist and the release build is never touched.
+            applicationIdSuffix = ".debug"
         }
     release {
             isMinifyEnabled = true

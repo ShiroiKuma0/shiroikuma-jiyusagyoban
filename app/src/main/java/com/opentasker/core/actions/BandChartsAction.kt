@@ -4,6 +4,7 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.band.BandSettings
 import com.opentasker.ui.charts.BandChartsActivity
 
 /**
@@ -35,6 +36,10 @@ class BandChartsAction : Action {
                 ?: return ActionResult.Failure("span_minutes must be a positive whole number of minutes")
         }
 
+        // Persisted, not merely passed: the system can resume this window long after the task that
+        // opened it has finished, and it has to come back up in the same language.
+        args["lang"]?.trim()?.takeIf { it.isNotEmpty() }?.let { BandSettings.setLanguage(ctx.app, it) }
+
         return try {
             BandChartsActivity.open(ctx.app, metric, spanMinutes)
             ActionResult.Success
@@ -45,6 +50,6 @@ class BandChartsAction : Action {
 
     private companion object {
         /** The line metrics [com.opentasker.ui.charts.MetricSpecs] can draw. */
-        val KNOWN_METRICS = setOf("hr", "hrv", "spo2", "temp", "stress")
+        val KNOWN_METRICS = setOf("hr", "hrv", "spo2", "temp", "stress", "steps_min", "bp", "sleep", "index")
     }
 }

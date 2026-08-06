@@ -938,8 +938,9 @@ fun registerActionMetadata() {
             description = "Open 健康 in its own fullscreen window — the band's heart rate, HRV, SpO2, temperature and stress as smooth charts. Put a launcher shortcut on the task that runs this and the icon opens straight onto the data",
             category = "Health",
             fields = listOf(
-                ActionField("metric", "Only this metric", FieldType.TEXT, hint = "blank = all of them. One of: hr, hrv, spo2, temp, stress"),
+                ActionField("metric", "Only this metric", FieldType.TEXT, hint = "blank = the dashboard. One of: hr, hrv, spo2, temp, stress, steps_min, bp, sleep, index"),
                 ActionField("span_minutes", "Initial span (minutes)", FieldType.NUMBER, hint = "blank = 24 hours. e.g. 360 for six hours, 60 for one"),
+                ActionField("lang", "Display language", FieldType.TEXT, hint = "en-US or ja-JP. Blank keeps whatever was set last; the default is en-US"),
             )
         )
     )
