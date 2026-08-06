@@ -3,6 +3,96 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.81.2026-08-02.g97059d7b+004 — 2026-08-06
+
+**The band was quietly throwing data away, and now it cannot do so unnoticed.**
+
+Four questions had been carried as unknown since the 「健康」 work began. All four are now settled by
+measurement against a week of real data — ten syncs, 16 242 archived records, 2026-07-31 → 08-06 —
+and two of the answers contradict what was written down.
+
+### The band ignores the date you ask for
+
+It returns its **entire ring buffer** on every stream of every sync. Sync 8 asked for records from
+2026-08-05 07:41 and was handed heart rate from 2026-08-01 18:59. That makes the oldest record it
+returns a direct reading of its buffer floor, free, on every sync — which is the whole detector.
+
+Watching that floor gives three numbers per stream: **headroom** (how long a sync may be missed),
+**floor advance** (the band evicted something) and **lost window** (it evicted something *we had
+never read*). The last is the only honest loss figure, and it is exact —
+`oldest(now) − newest(previous read)`. On the existing archive it reproduces the two real HRV holes,
+13.4 h and 2.1 h, and reads zero everywhere else. Both are now assertions in `BandCensusTest`, taken
+from the archive's own timestamps.
+
+Measured capacities: heart rate **2048 records** (saturated — a power of two) ≈ 4.6 days; **HRV about
+21 hours** and rolling since day one; SpO₂, temperature, steps and sleep have not overflowed once in
+six days. HRV is the binding constraint, and 15.5 h of HRV, stress and blood pressure had already
+been lost to it before this was understood.
+
+### Every "lost records" number the app ever printed was fake
+
+Loss used to be `expected − inserted`, with `expected` from a nominal cadence. Heart rate is
+documented at 120 s and really runs at a 240 s median, so it ran 2× high; `detail` was listed at 60 s
+when one detail record is a **ten-minute** bucket, so it ran 10× high. One sync reported "detail lost
+1913" having lost precisely nothing.
+
+Fixing the constants would not have saved it: the band skips slots constantly — the periodic
+heart-rate series fills only 51–77 % of its own nominal slots overnight while demonstrably on the
+wrist — so any cadence-based expectation manufactures loss out of a band that simply did not measure.
+It is gone, replaced by the floor reading. Old census rows still decode; the retired fields are just
+unknown keys now.
+
+The claim that the buffer was "about three days deep" was never a measurement either. The first sync
+asked for three days, because the fallback is three days, and got three days.
+
+### 自動同期 — sync every four hours, and speak only when something is wrong
+
+A new profile and task in 「健康」 fire at 00:00, 04:00, 08:00, 12:00, 16:00 and 20:00 — six times a
+day against HRV's ~21 h, a 5.4× margin that still holds if the band quadruples its HRV rate. The cost
+is a few seconds of BLE each time.
+
+It is silent on success. It warns in exactly two cases: a sync that **could not go through** while
+enough of the shallowest buffer has been consumed (threshold `Band_WarnAtPct`, default 60 %, editable
+in 健康の設定), or a lost window above zero — which should never happen, and if it does means the
+four-hour cadence itself is too slow. There is deliberately no routine nudge; a warning that shows
+every day is not a warning.
+
+`band.sync` now publishes `BAND_Ok`, `HeadroomHours`, `HeadroomStream`, `AgeHours`, `LastSuccess`,
+`LostHours`, `LostStreams` and `PressurePct` on **every** path including failure, sourced from the
+database — because the run that most needs to explain itself is the one that could not connect.
+
+「健康」 also gains the standard 71/01/37 trio in an `起動無効` group — `健康 ⇨ 起動 -- [727][71]` loads
+the settings and enables the profile, `⇨ 無効 -- [727][37]` disables it — wired into
+`起動完了`'s two chains as `r7_` so it starts and stops with every other project. This matters more
+than housekeeping: **a profile always imports disabled no matter what the bundle says**, so
+`自動同期` was inert from import until the 71 task first ran it.
+
+The 「健康」 window's staleness banner is fixed too. It used to warn whenever the oldest held record
+was under 24 h old, which HRV satisfies permanently, so it was on every single time and therefore
+said nothing.
+
+### One notification is one frame — measured, not assumed
+
+Records-per-notification lands exactly on `floor(244 / stride)` for four independent strides at once:
+24 for heart rate and SpO₂, 22 for temperature, 16 for HRV, 9 for detail. Sleep, whose 130-byte frames
+are the largest and the only ones that could plausibly fragment, came back at **exactly 255 records in
+255 frames**. Every stream in all nine working syncs ended on its terminator, never on an idle
+timeout, which frame-counted paging could not manage if our notification count diverged from the
+band's. The census now records the longest and shortest notification per stream, so the rule stays
+self-monitoring rather than merely once-checked.
+
+### The heart-rate gaps are the band, not us
+
+The ~47 gaps across six days were suspected of being a pipeline defect. They are not. Every one has
+other sensor streams alive inside it — SpO₂ in 47 of 47, plus temperature, HRV and steps — so the band
+was worn and recording and simply did not write a heart-rate sample. Hume's own hourly capsules for
+2026-08-04 agree with our decode to the bpm (its headline 58–91, our pooled range 58–91) and show no
+data we lack. The overnight stretch nobody had checked is checked: 51–77 % slot fill on every one of
+six nights, none anomalous.
+
+Sleep stage `4` is likewise settled: 2 970 stage-minutes over six nights, codes `{1, 2, 3, 5}` only,
+zero occurrences — and Hume's own sleep screen shows exactly four stages.
+
 ## 0.2.81.2026-08-02.g97059d7b+003 — 2026-08-06
 
 **Launching an app by intent action works again.**

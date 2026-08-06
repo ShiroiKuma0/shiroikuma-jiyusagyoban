@@ -11,6 +11,7 @@ import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 /**
  * `Sync Band` — pull the Hume Band's stored history into the workspace.
@@ -70,6 +71,12 @@ class BandSyncAction : Action {
             },
         )
 
+        // Unconditionally, and from the DATABASE rather than from this run: the case that matters is
+        // the failed one. A sync that could not reach the band still has to be able to tell a Profile
+        // how long it has been since one did and how much buffer is left, because that is precisely
+        // when a warning is worth raising.
+        publishStatus(ctx, prefix, outcome)
+
         return when (outcome) {
             is BandSyncOutcome.Ok -> {
                 val text = listOfNotNull(outcome.summary, outcome.warning).joinToString(" — ")
@@ -94,4 +101,43 @@ class BandSyncAction : Action {
             }
         }
     }
+
+    /**
+     * The buffer-pressure variables, written on every path.
+     *
+     * The band overwrites its oldest records silently and hands back its whole buffer on every sync,
+     * so `Headroom` — the shallowest stream's depth — is exactly how long a sync may be missed before
+     * something is gone for good. On 白い熊's band that is HRV at roughly 21 h, against four days and
+     * more for heart rate; the shallow one is what a warning has to be built on.
+     *
+     * `Lost` is measured, not estimated: it is the window between the newest record banked last time
+     * and the oldest the band can still produce. It should read 0 forever once 自動同期 is running,
+     * and anything else means the sync cadence is too slow for the buffer.
+     */
+    private suspend fun publishStatus(
+        ctx: ActionContext,
+        prefix: String,
+        outcome: BandSyncOutcome,
+    ) = runCatching {
+        val status = BandSyncEngine.status(OpenTaskerApp_NoHilt.db)
+        val age = status.ageHours(System.currentTimeMillis())
+        ctx.variables.set("${prefix}Ok", (outcome is BandSyncOutcome.Ok).toString())
+        ctx.variables.set("${prefix}HeadroomHours", status.headroom?.let { "%.1f".format(it.depthSec / 3600.0) } ?: "")
+        ctx.variables.set("${prefix}HeadroomStream", status.headroom?.stream ?: "")
+        ctx.variables.set("${prefix}AgeHours", age?.let { "%.1f".format(it) } ?: "")
+        ctx.variables.set("${prefix}LastSuccess", status.lastSuccessAtMillis?.let(::formatMillis) ?: "")
+        ctx.variables.set("${prefix}LostHours", "%.1f".format(status.lostSec / 3600.0))
+        ctx.variables.set("${prefix}LostStreams", status.lostStreams.joinToString(","))
+        // The arithmetic belongs here, not in a Profile's condition string: how much of the
+        // shallowest buffer has been eaten since the last successful sync, 0-100+. A task then only
+        // has to compare one number against a threshold it can show 白い熊 in plain sight.
+        ctx.variables.set("${prefix}PressurePct", status.pressurePct(System.currentTimeMillis())?.toString() ?: "0")
+    }.getOrElse {
+        // A status readout must never turn a good sync into a failed task.
+        ctx.logger("Band sync: could not publish status — ${it.message}")
+    }
+
+    private fun formatMillis(millis: Long): String = DateTimeFormatter
+        .ofPattern("yyyy-MM-dd HH:mm:ss")
+        .format(LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(millis), java.time.ZoneId.systemDefault()))
 }

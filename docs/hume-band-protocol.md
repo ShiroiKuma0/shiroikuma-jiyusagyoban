@@ -47,6 +47,36 @@ the start date again restarts the stream from the beginning, forever.
 Records are sliced out of a frame *before* the terminator check, because the terminating frame still
 carries data.
 
+### One notification is one frame — measured, not assumed
+
+This was carried as an open assumption for months, and the frame-counted rule above is meaningless
+without it. It is now settled against ten syncs (2026-08-06).
+
+A frame is packed with **whole records up to the granted payload**. Once `maxFrameBytes` was
+instrumented the rule could be read straight off the wire, and every stream's longest notification is
+exactly `floor(244 / stride) × stride`:
+
+| stream | stride | records/frame | longest frame | measured |
+|---|---|---|---|---|
+| `hr` | 10 | 24 | 240 | **240** |
+| `spo2` | 10 | 24 | 240 | **240** |
+| `hrv` | 15 | 16 | 240 | **240** |
+| `temp` | 11 | 22 | 242 | **242** |
+| `detail` | 25 | 9 | 225 | **225** |
+| `sleep` | whole frame | 1 | 130 | **130** — and 255 records in 255 frames, exactly 1.0000 |
+
+Five independent strides landing on their own arithmetic simultaneously is not a coincidence, and
+nothing ever exceeds the 244-byte payload. Sleep is the decisive case anyway: its 130-byte frames are
+the largest and the only ones that could plausibly fragment, and they arrive one record per
+notification. Fragmentation is in any case impossible at the granted MTU — 247 on every sync — and
+every stream in every working sync has ended on `TERMINATOR`, never `IDLE_TIMEOUT`, which
+frame-counted paging could not manage if our notification count diverged from the band's.
+
+`BandStreamStat.maxFrameBytes` / `minFrameBytes` record the extremes on every stream of every sync, so
+the rule stays self-monitoring rather than merely once-checked: a max above `MTU − 3` means
+fragmentation has appeared, and a max collapsing toward 20 means the MTU request silently failed and
+frames are arriving truncated. `BandRecordsTest` asserts the ceiling.
+
 ### The mode byte, and the one that is absent
 
 `BandReadMode` has exactly two members: `START (0x00)` and `CONTINUE (0x02)`.
@@ -135,31 +165,103 @@ A **+7.46 bpm** bias, and a median step of 5.0 bpm across a series boundary agai
 Merged, that is a systematic sawtooth every fifth slot which consumes the outlier filter's entire
 rejection budget.
 
-**Split them for the line; pool them for envelopes and summaries.** Hume's own day range (55–103 on
-2026-08-03) matches the *pooled* population, not the periodic series alone. And the pooled series has
-essentially no gaps: over 15:00–18:43 the periodic series has one 14-minute hole and the pooled series
-has none.
+**Split them for the line; pool them for envelopes and summaries.** Hume's own day range matches the
+*pooled* population, not the periodic series alone — confirmed twice over: 55–103 on 2026-08-03, and on
+2026-08-04 Hume's H-tab headline of **58–91 bpm** against our pooled 08:00–15:00 range of **58–91 bpm**,
+exact, with our hourly min/max matching all seven of its capsules.
+
+### The heart-rate gaps are the band, not us
+
+The periodic series has ~47 gaps over 12 min across six days (11.2 % of its span). They were suspected
+of being a pipeline defect. They are not, and the question is closed three independent ways:
+
+1. **Every one of the 47 has other sensor streams alive inside it** — SpO₂ in 47 of 47, plus
+   temperature, HRV and steps. Not one gap has every stream silent, so the band was worn and
+   recording; it simply did not write a periodic HR sample in those slots.
+2. **Hume has no data we lack.** Across the 60-minute hole at 2026-08-04 12:10–13:10, Hume's 12 PM
+   capsule reads ~62–84 against our six readings' 60–85. Its numbers come from the same handful of
+   samples ours do.
+3. We read the entire ring buffer on every sync, so there is no mechanism by which a record the band
+   still holds could fail to reach us.
+
+The overnight stretch that was flagged as unchecked is checked: the periodic series fills 51–77 % of
+its nominal slots on every one of six nights, with no night anomalous. Overnight is not different from
+daytime — the series is sparse everywhere. **A gap where the band did not measure is the correct and
+honest rendering**, so nothing here needs fixing.
 
 ---
 
-## 3. The census
+## 3. The census, and the buffer-drop detector
 
-The band's buffers are small and overwrite silently. Nothing on our side deletes anything — the Hume
-app never sends the destructive mode either, and a factory reset is the only thing that empties the
-band — so what `band_syncs` measures is the band's own ring buffer.
+The band's buffers are ring buffers and overwrite silently. Nothing on our side deletes anything — the
+Hume app never sends the destructive mode either, and a factory reset is the only thing that empties
+the band — so what `band_syncs` measures is the band's own eviction. It is never pruned; it is a few
+rows a day and it is the entire measurement series.
 
-Its depth **cannot be looked up; it can only be measured**, over days of real use with varied gaps:
+### The band ignores the requested start date
 
-- a sync whose gap came back with **no** loss says the buffer is **at least** that deep — a lower bound;
-- a sync that **did** lose records says it is **at most** that deep — an upper bound;
-- a stream that errored or timed out says nothing at all and is excluded, because counting it as
-  "no loss" would inflate the lower bound with a sync that never read anything.
+The fact everything else rests on, measured over ten syncs (2026-08-06): **the band returns its whole
+buffer on every stream of every sync, regardless of the `from` date on the wire.** Sync 8 asked for
+records from 2026-08-05 07:41 and was handed heart rate from 2026-08-01 18:59.
 
-`band_syncs` is never pruned. It is a few rows a day and it is the entire measurement series.
+So `oldestLocalTs` is a direct reading of the buffer floor, free, on every sync. Watch the floor:
+while it stands still nothing was evicted, and when it moves forward the band discarded everything it
+passed over. `BandFrom`/`overlapMinutes` still exist and are harmless, but they buy nothing for these
+streams — the overlap they request is arriving anyway.
 
-Nominal cadences, in seconds: `hr` 120, `hrv` 120, `spo2` 600, `temp` 1800, `detail` 60. Daily and sleep
-are event-shaped rather than sampled, so "expected records" is meaningless for them and inventing a
-number would manufacture fake loss.
+### The three numbers
+
+| field | meaning |
+|---|---|
+| `bufferDepthSec` | `newest − oldest` — the **headroom**, how long a sync may be missed |
+| `floorAdvancedSec` | how far the floor moved since the last read of *this* stream — eviction |
+| `lostWindowSec` | `oldest(now) − newest(previous read)` — what was evicted **unread**. The loss |
+
+Eviction is not loss. HR's floor advanced 25 h between syncs 7 and 8 and cost nothing, because the new
+floor was still far behind what the previous sync had banked. `lostWindowSec` is the only honest
+number, and it is exact: on 白い熊's archive it reproduces the two real HRV holes — 13.4 h and 2.1 h —
+and reads zero everywhere else. Both are asserted in `BandCensusTest` from the archive's own stamps.
+
+The previous read is resolved **per stream**, over a window of recent syncs. `同期状態 -- [727]` probes
+with `streams=hr` alone, and taking the last successful sync wholesale would give every other stream a
+null previous-read and report a spurious loss on the next full sync.
+
+### Measured capacities
+
+From the last full sync of 2026-08-06. A buffer that has been seen to roll has its capacity pinned by
+saturation; one that has not is only known to hold *at least* what it has been watched holding.
+
+| stream | records held | depth | evicting? |
+|---|---|---|---|
+| `hr` | **2048** — saturated, a power of two | ~111 h (4.6 d) | yes, since 2026-08-05 |
+| `hrv` (+`vascular`/`stress`/`sbp`/`dbp`) | ~600 | **~21.5 h** | yes, continuously |
+| `spo2` | 837, growing | >141 h | never |
+| `temp` | 273, growing | >140 h | never |
+| `detail` | 1630, growing | >141 h | never |
+| `sleep` | 36 segments, growing | >127 h | never |
+
+**HRV is the binding constraint at about 21 hours**, against four and a half days for heart rate.
+`自動同期 -- [727]` syncs every four hours against it — a 5.4× margin, which still holds if the band
+ever quadruples its HRV rate.
+
+### The estimator that was here before, and why it is gone
+
+Loss used to be `expectedRecords − inserted`, with `expectedRecords` derived from a nominal cadence.
+Every number it produced was wrong. `hr` is documented at 120 s and really runs at a 240 s median, so
+it ran 2× high; `detail` was listed at 60 s, but one detail record is a **ten-minute** bucket, so it
+ran 10× high — one sync reported "detail lost 1913" having lost precisely nothing.
+
+Fixing the constants would not have saved it. The band skips slots constantly: the periodic heart-rate
+series fills only 51–77 % of its own nominal slots overnight while demonstrably on the wrist. *Any*
+cadence-based expectation manufactures loss out of a band that simply did not measure. **The floor is
+an observation; an expectation is a guess.**
+
+`BAND_CADENCE_SEC` survives as the nominal reference for the chart gap thresholds. It no longer drives
+anything in the census.
+
+> **Where "the buffer is about three days deep" came from.** It was never a measurement. The first
+> sync requested `from = 2026-07-31 00:00` because `BandSyncArgs.FALLBACK_DAYS = 3`, and got three days
+> back. We asked for three days and got three days. It bounded the request, never the buffer.
 
 ---
 
@@ -304,8 +406,33 @@ A task reaches it through the `band.charts` action, and a launcher shortcut reac
 existing `CREATE_SHORTCUT` picker, so a home-screen icon opens straight onto the data. The window owns
 nothing: a sync started in it survives the window closing.
 
-The 「健康」 project ships four tasks — `健康の設定 -- [727][01]`, `同期 -- [727]`, `同期状態 -- [727]`
-and `グラフ -- [727]`.
+The 「健康」 project ships seven tasks and one profile. The standard 71/01/37 trio leads the list in an
+`起動無効` group, exactly as every other project:
+
+| pos | task | |
+|---|---|---|
+| 0 | `健康 ⇨ 起動 -- [727][71]` | run the 01, then enable the profile |
+| 1 | `健康の設定 -- [727][01]` | every setting, including `Band_WarnAtPct` |
+| 2 | `健康 ⇨ 無効 -- [727][37]` | disable the profile |
+| 3–6 | `同期`, `自動同期`, `同期状態`, `グラフ` | the working tasks, ungrouped |
+
+`起動完了 ⇨ 起動 -- [717][71]` and `⇨ 無効 -- [717][37]` run the trio's ends as `r7_`, so 健康 starts
+and stops with everything else.
+
+**Group membership lives in `itemMeta.groupName`, not on the task row** — and an `itemMeta` note
+replaces the whole row on import, so a bundle that ships a grouped task without its meta silently
+drops it out of its group.
+
+**`自動同期` is what keeps the buffer question closed.** It fires on `clock_tick` with
+`everyMinutes = 240`, so at 00:00, 04:00, 08:00, 12:00, 16:00 and 20:00, against the ~21 h HRV
+constraint of §3. It syncs silently and warns only when something is actually wrong: a sync that
+could not go through *and* enough time gone that the shallowest buffer is within reach, or a
+`lostWindowSec` above zero — which should never happen, and if it does means the cadence itself is
+too slow. There is deliberately no routine nudge; a warning that shows every day is not a warning.
+
+> **A profile always imports DISABLED, whatever the bundle says.** `自動同期` sat inert from the
+> moment it was imported until `[727][71]` was run. This is exactly what the 71 task is for, and it is
+> why shipping a profile without its 71 ships something that never runs.
 
 ---
 
@@ -352,24 +479,38 @@ HR CONTINUE          55 02 00 00 00 00 00 00 00 00 00 00 00 00 00 57   <- note t
 
 ---
 
-## 7. Known and open
+## 7. Settled, and still open
 
-Two assumptions carried over from the sync hand-off's on-device checklist, still unverified:
+### Settled on 2026-08-06
 
-- **One BLE notification equals one frame.** Everything downstream assumes it, and the frame-counted
-  paging rule loses its meaning if notifications are ever fragmented. The granted MTU is logged into
-  every census row, so the evidence is being collected. If fragmentation ever shows up, this needs a
-  reassembly layer — say so rather than working around it.
-- **Sleep stage `4` has never been observed.** Codes 1/2/3/5 are deep/light/REM/awake. Stage 4 is
-  counted as unknown; log it if it ever appears.
+Both of the sync hand-off's unverified assumptions, and the gap question, are now measured. They are
+written up where they belong — one notification per frame in §1, the gaps in §2, the buffer detector
+in §3 — and each carries a regression test. Do not reopen them from the older prose.
 
+**Sleep stage `4` does not exist.** Over 2 970 stage-minutes in 36 segments across six nights the raw
+codes are `{1: 630, 2: 1527, 3: 590, 5: 223}` — **zero** occurrences of 4, or of anything else. Hume's
+own sleep screen shows exactly four stages (Awake / REM / Light / Deep), matching the four codes. Our
+proportions — light 51 %, deep 21 %, REM 20 %, awake 8 % — are physiologically ordinary, whereas the
+vendor plugin's re-coding would yield REM 8 % and awake 20 %, which is not. The `unknown` bucket in
+`BandSleepSegment` stays: it costs nothing and it is how we would find out if a firmware update
+started emitting one.
+
+### Still open
 
 - **Hume's own views** are the model for the eventual "power views". Its `H` tab draws an **hourly
   min/max envelope** — one capsule per hour, not one measurement — with `D`/`W`/`M` above it. Its day
   range matches our *pooled* heart-rate population.
 - Hume drops single-sample dips that we keep: on 2026-08-03 our minimum was 52 bpm (one sample at
   11:39:30, neighbours 85 and 72) against Hume's 55. Our decode is faithful; the difference is their
-  display filtering.
+  display filtering. **Do not "fix" our number to match theirs.**
+- **A trap waiting for the envelope work.** `ChartPipeline.gapThresholdMs` takes the *median* interval,
+  which is right for one series and wrong for a mixture. Pooled heart rate interleaves a 120 s and a
+  600 s cadence, so its median lands at 176 s, the threshold at 528 s — just under the 600 s spacing
+  that is perfectly normal wherever only the SpO₂-coincident reading exists. That manufactures **67
+  spurious ~10-minute gaps out of 70**. Nothing pools today (the line renders the periodic series,
+  whose gaps are correct), so this is not a bug yet — but the first envelope built on the pooled
+  population will hit it. Use the constituent series' thresholds, or a high percentile, not the median
+  of a bimodal distribution.
 - The current renderer is **scaffolding**. Pinch-zoom, the special renderers (steps bars, blood-pressure
   dumbbells, sleep hypnogram, sleep ribbon), the crosshair and the theme knobs are all unbuilt. The
   pipeline in §4 is view-independent and survives any redesign of the drawing.

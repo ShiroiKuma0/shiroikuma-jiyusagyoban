@@ -88,6 +88,10 @@ data class BandStreamRow(
     val inserted: Int,
     val oldestLocalTs: Long?,
     val newestLocalTs: Long?,
+    /** How much wall clock the band is still holding — the headroom before this stream loses. */
+    val bufferDepthSec: Long,
+    /** What the band overwrote before this sync could read it. Zero unless something was truly lost. */
+    val lostWindowSec: Long,
     val end: String,
     val error: String?,
 )
@@ -238,19 +242,28 @@ class BandViewModel(
     }
 
     /**
-     * Warn when the oldest record the band still holds is close to the measured floor — that is the
-     * signal that the next gap risks losing data for good.
+     * Say what was actually lost, and how much room is left.
+     *
+     * This used to warn whenever the oldest held record was under 24 h old — which HRV satisfies
+     * permanently, its buffer being about 21 h deep — so it was on every single time and therefore
+     * said nothing. A warning that is always showing is not a warning.
+     *
+     * Loss is now measured rather than inferred: `lostWindowSec` is the window between the newest
+     * record banked last time and the oldest the band can still produce, so it is non-zero only when
+     * something genuinely went over the edge unread. Headroom is reported alongside as plain fact,
+     * not as an alarm — 自動同期 is what keeps it from ever mattering.
      */
     private fun stalenessWarning(streams: List<BandStreamRow>): String? {
-        val worst = streams.filter { it.oldestLocalTs != null && BAND_CADENCE_SEC.containsKey(it.key) }
-            .minByOrNull { it.oldestLocalTs!! } ?: return null
-        val hours = hoursSince(worst.oldestLocalTs!!) ?: return null
-        return if (hours < 24) {
-            "The band's oldest %s record is only %.0f h old — sync more often than that or data is lost."
-                .format(worst.key, hours)
-        } else {
-            null
+        val lost = streams.filter { it.error == null && it.lostWindowSec > 0 }
+        if (lost.isNotEmpty()) {
+            val worst = lost.maxByOrNull { it.lostWindowSec }!!
+            return "Lost %.1f h of %s — the band overwrote it before this sync reached it."
+                .format(worst.lostWindowSec / 3600.0, lost.joinToString(", ") { it.key })
         }
+        val tightest = streams.filter { it.error == null && it.bufferDepthSec > 0 }
+            .minByOrNull { it.bufferDepthSec } ?: return null
+        return "%s is the shallowest buffer at %.0f h — that is how long a sync may be missed."
+            .format(tightest.key, tightest.bufferDepthSec / 3600.0)
     }
 }
 
@@ -273,6 +286,8 @@ private fun BandStreamStat.toRow(key: String) = BandStreamRow(
     inserted = inserted,
     oldestLocalTs = oldestLocalTs,
     newestLocalTs = newestLocalTs,
+    bufferDepthSec = bufferDepthSec,
+    lostWindowSec = lostWindowSec,
     end = end,
     error = error,
 )
@@ -508,8 +523,9 @@ private fun BandCapacityCard(estimates: List<BandCapacityEstimate>) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Buffer depth — measured", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Text(
-                "The band overwrites its oldest records. These bounds close in as syncs happen at " +
-                    "varied gaps: a clean gap is a floor, a lossy one a ceiling.",
+                "The band hands back its whole buffer every sync, so the oldest record it still " +
+                    "holds is a direct reading of the floor. Once a buffer has been seen to roll, " +
+                    "its depth is its capacity; until then it is only known to hold at least this much.",
                 style = MaterialTheme.typography.bodySmall,
             )
             if (estimates.isEmpty()) {
@@ -521,10 +537,10 @@ private fun BandCapacityCard(estimates: List<BandCapacityEstimate>) {
                     Text(e.stream, modifier = Modifier.width(90.dp), style = MaterialTheme.typography.bodyMedium)
                     Text(
                         buildString {
-                            append(e.lowerBoundHours?.let { "≥ %.1f h".format(it) } ?: "—")
-                            append("  ")
-                            append(e.upperBoundHours?.let { "≤ %.1f h".format(it) } ?: "")
+                            append(if (e.everEvicted) "" else "≥ ")
+                            append("%.1f h".format(e.minDepthSec / 3600.0))
                             append("  (${e.confidence}, max ${e.maxRecordsSeen})")
+                            if (e.lostSec > 0) append("  · lost %.1f h".format(e.lostSec / 3600.0))
                         },
                         style = MaterialTheme.typography.bodySmall,
                     )

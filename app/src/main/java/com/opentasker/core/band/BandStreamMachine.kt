@@ -40,6 +40,19 @@ class BandStreamMachine(
     var pages: Int = 0
         private set
 
+    /**
+     * Longest and shortest notification seen, in bytes — including the terminating one.
+     *
+     * Everything downstream assumes one notification is one frame, and frame-counted paging is
+     * meaningless if that ever stops being true. Recording the extremes is what lets the census say
+     * so instead of the stream quietly mis-paging: a max above the granted payload means
+     * fragmentation, and a max near 20 means the MTU request failed and frames are truncated.
+     */
+    var maxFrameBytes: Int = 0
+        private set
+    var minFrameBytes: Int = 0
+        private set
+
     private val collected = mutableListOf<BandParsedFrame>()
 
     /** Everything parsed so far, flattened. */
@@ -47,6 +60,8 @@ class BandStreamMachine(
         collected.fold(BandParsedFrame()) { acc, f -> acc + f }
 
     fun onFrame(frame: ByteArray): BandStreamStep {
+        maxFrameBytes = maxOf(maxFrameBytes, frame.size)
+        minFrameBytes = if (minFrameBytes == 0) frame.size else minOf(minFrameBytes, frame.size)
         val parsedFrame = BandRecords.parse(stream, frame)
         if (parsedFrame.recordCount > 0) collected += parsedFrame
 
