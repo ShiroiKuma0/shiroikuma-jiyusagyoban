@@ -12,6 +12,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.time.LocalDate
@@ -123,8 +124,10 @@ object BandSyncEngine {
             db.bandSyncDao().stampDevice(syncId, firmware, battery, client.grantedMtu)
 
             val payload = client.grantedMtu - 3
-            val previous = db.bandSyncDao().lastSuccessful()
-            val gapSeconds = previous?.let { (startedAt - it.startedAt) / 1000 } ?: 0L
+            // Per STREAM, not per sync: 同期状態 probes with streams=hr alone, and taking the last
+            // successful sync wholesale would hand every other stream a null previous-read and blind
+            // the loss detector for exactly one cycle after every status check.
+            val previousReads = previousReadsPerStream(db)
 
             val whole = withTimeoutOrNull(request.timeoutSec * 1000L) {
                 request.streams.forEachIndexed { index, stream ->
@@ -141,7 +144,10 @@ object BandSyncEngine {
                         return@forEachIndexed
                     }
 
-                    stats[stream.key] = drainStream(client, stream, request.from, db, syncId, zone, gapSeconds)
+                    stats[stream.key] = drainStream(
+                        client, stream, request.from, db, syncId, zone,
+                        previousReads[stream.key],
+                    )
                     BandSyncState.counted(
                         stats.values.sumOf { it.records },
                         stats.values.sumOf { it.inserted },
@@ -194,7 +200,7 @@ object BandSyncEngine {
         db: AppDatabase,
         syncId: Long,
         zone: ZoneId,
-        gapSeconds: Long,
+        previous: BandStreamStat?,
     ): BandStreamStat {
         val began = System.currentTimeMillis()
         val machine = BandStreamMachine(stream)
@@ -220,7 +226,6 @@ object BandSyncEngine {
         // Banked as each stream lands; the header and census bracket them at the end, so a stream
         // that times out later cannot cost the archive what earlier streams already wrote.
         bank(syncId, written.lines)
-        val expected = BandCensus.expectedRecords(stream.key, gapSeconds)
         return BandStreamStat(
             frames = machine.frames,
             pages = machine.pages,
@@ -229,12 +234,39 @@ object BandSyncEngine {
             duplicates = parsed.recordCount - written.inserted,
             oldestLocalTs = written.oldest,
             newestLocalTs = written.newest,
-            expectedRecords = expected,
-            lostRecords = BandCensus.lostRecords(expected, written.inserted),
+            // The band hands back its whole ring buffer regardless of the date we asked for, so
+            // `oldest` IS the buffer floor and these three are a direct reading of it.
+            bufferDepthSec = BandCensus.bufferDepthSec(written.oldest, written.newest),
+            floorAdvancedSec = BandCensus.floorAdvancedSec(previous?.oldestLocalTs, written.oldest),
+            lostWindowSec = BandCensus.lostWindowSec(previous?.newestLocalTs, written.oldest),
+            maxFrameBytes = machine.maxFrameBytes,
+            minFrameBytes = machine.minFrameBytes,
             elapsedMs = System.currentTimeMillis() - began,
             end = end.name,
             error = if (end == BandStreamEnd.IDLE_TIMEOUT) "no frame for ${BandGattClient.FRAME_IDLE_TIMEOUT_MS}ms" else null,
         )
+    }
+
+    /**
+     * The last real read of each stream, newest first.
+     *
+     * Scans back over recent syncs rather than taking the single latest, because a stream is only
+     * evidence about itself: a `streams=hr` probe says nothing about where HRV's floor was, and
+     * treating it as the previous read would report a spurious loss on the next full sync.
+     */
+    private suspend fun previousReadsPerStream(db: AppDatabase): Map<String, BandStreamStat> {
+        val out = mutableMapOf<String, BandStreamStat>()
+        for (row in db.bandSyncDao().recent(PREVIOUS_READ_LOOKBACK)) {
+            if (!row.ok) continue
+            val stats = runCatching {
+                statsJson.decodeFromString<Map<String, BandStreamStat>>(row.statsJson)
+            }.getOrNull() ?: continue
+            for ((key, stat) in stats) {
+                if (key in out || stat.error != null || stat.newestLocalTs == null) continue
+                out[key] = stat
+            }
+        }
+        return out
     }
 
     private data class Written(
@@ -390,8 +422,72 @@ object BandSyncEngine {
         ).atZone(zone).toInstant().toEpochMilli()
     }.getOrDefault(0L)
 
+    /**
+     * Everything a Profile needs in order to decide whether to warn.
+     *
+     * Read back out of the database rather than returned from a run, because the case that matters
+     * most is the one where the run **failed**: a sync that could not connect still has to be able to
+     * say how long it has been since one did, and how much headroom is left before that becomes loss.
+     */
+    suspend fun status(db: AppDatabase): BandStatus = withContext(Dispatchers.IO) {
+        val rows = db.bandSyncDao().recent(STATUS_LOOKBACK)
+        val decoded = rows.filter { it.ok }.mapNotNull { row ->
+            val stats = runCatching {
+                statsJson.decodeFromString<Map<String, BandStreamStat>>(row.statsJson)
+            }.getOrNull() ?: return@mapNotNull null
+            row to stats
+        }
+        val last = decoded.firstOrNull()
+        val evicting = decoded.flatMap { (_, stats) ->
+            stats.filterValues { it.error == null && it.floorAdvancedSec > 0 }.keys
+        }.toSet()
+        val lastStats = last?.second.orEmpty()
+        val lost = lastStats.filterValues { it.error == null && it.lostWindowSec > 0 }
+        BandStatus(
+            lastSuccessAtMillis = last?.first?.startedAt,
+            headroom = BandCensus.tightest(lastStats, evicting),
+            lostSec = lost.values.sumOf { it.lostWindowSec },
+            lostStreams = lost.keys.sorted(),
+        )
+    }
+
     private const val INFO_REPLY_TIMEOUT_MS = 3_000L
     private const val INFO_REPLY_ATTEMPTS = 4
+
+    /**
+     * How far back to look for a stream's previous read.
+     *
+     * Generous rather than tight: 同期状態 fires an hr-only probe whenever 白い熊 checks the status,
+     * so several consecutive rows can be partial, and a short window would silently give up on the
+     * quieter streams.
+     */
+    private const val PREVIOUS_READ_LOOKBACK = 40
+    private const val STATUS_LOOKBACK = 40
+}
+
+/** The answer to "is anything about to be lost, and has anything been?" — see [BandSyncEngine.status]. */
+data class BandStatus(
+    val lastSuccessAtMillis: Long?,
+    val headroom: BandHeadroom?,
+    val lostSec: Long,
+    val lostStreams: List<String>,
+) {
+    /** Hours since the last successful sync, or null if there has never been one. */
+    fun ageHours(nowMillis: Long): Double? =
+        lastSuccessAtMillis?.let { (nowMillis - it) / 3_600_000.0 }
+
+    /**
+     * How much of the shallowest buffer has been consumed since the last successful sync, as a
+     * percentage. 100 means the next record to fall off the end is one we have never seen.
+     *
+     * Null only when there is nothing to divide by — no successful sync yet, or no measured depth —
+     * in which case there is no pressure to report rather than infinite pressure.
+     */
+    fun pressurePct(nowMillis: Long): Int? {
+        val depthHours = headroom?.depthSec?.takeIf { it > 0 }?.div(3600.0) ?: return null
+        val age = ageHours(nowMillis) ?: return null
+        return ((age / depthHours) * 100).toInt().coerceAtLeast(0)
+    }
 }
 
 /** yyyyMMddHHmmss, the same shape the records use. */

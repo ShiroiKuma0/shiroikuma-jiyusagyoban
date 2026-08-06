@@ -156,4 +156,66 @@ class BandRecordsTest {
     fun `per-minute offsets roll over a month end instead of inventing day 32`() {
         assertEquals(20260901000500L, BandRecords.addMinutes(20260831235500L, 10))
     }
+
+    /**
+     * One BLE notification is one frame, packed with whole records up to the granted payload.
+     *
+     * This was an open assumption for months and is now measured. At the granted MTU of 247 the
+     * payload is 244 bytes, and the records-per-notification observed on 白い熊's band lands exactly
+     * on `floor(244 / stride)` for four independent strides at once — 24 for heart rate and SpO₂ at
+     * stride 10, 22 for temperature at 11, 16 for HRV at 15, 9 for detail at 25 — while sleep, whose
+     * 130-byte frames are the largest and the only ones that could plausibly fragment, came back at
+     * exactly 255 records in 255 frames.
+     *
+     * Four strides cannot coincide with that arithmetic by chance, so the packing rule is real. The
+     * assertion here is the *ceiling*: a frame may be short (the last one usually is), but it can
+     * never carry more than the payload holds. If it ever does, notifications are being coalesced and
+     * the frame-counted paging rule has lost its meaning.
+     */
+    @Test
+    fun `a frame never carries more records than the granted payload can hold`() {
+        val payload = 247 - 3
+        // stride, one real record, and the metric emitted exactly once per record. HRV and detail
+        // fan a single record out into several samples — and detail's per-minute samples carry
+        // SHIFTED timestamps — so records have to be counted by an anchor metric, not by rows or by
+        // distinct stamps.
+        data class Case(val stride: Int, val golden: String, val anchor: String)
+        val cases = mapOf(
+            BandStream.HEART_RATE to Case(10, "550000260802152034 49", BandMetric.HEART_RATE),
+            BandStream.SPO2 to Case(10, "660000260802152034 60", BandMetric.SPO2),
+            BandStream.TEMPERATURE to Case(11, "650000260802145900 6c01", BandMetric.TEMPERATURE),
+            BandStream.HRV to Case(15, "560000260802151930 45 4f 00 4f 00 00", BandMetric.HRV),
+            BandStream.DETAIL to Case(
+                25,
+                "5200002608021519314500e30105002400210000000000000000",
+                BandMetric.STEPS_BUCKET,
+            ),
+        )
+        for ((stream, case) in cases) {
+            // The golden lines are quoted to the byte from the capture, and detail's carries one
+            // trailing pad byte past its stride; take exactly one record's worth.
+            val one = hex(case.golden).copyOf(case.stride)
+            val fit = payload / case.stride
+            val frame = ByteArray(fit * case.stride) { one[it % case.stride] }
+            val records = BandRecords.parse(stream, frame).samples.count { it.metric == case.anchor }
+            assertTrue(
+                "$stream: $records records in a $payload-byte payload exceeds " +
+                    "floor($payload/${case.stride})=$fit",
+                records <= fit,
+            )
+            // …and the frame really is packed full, which is what makes the ceiling meaningful.
+            assertEquals("$stream should fill its payload", fit, records)
+        }
+    }
+
+    /** The machine reports the extremes it saw, which is what makes the rule above self-monitoring. */
+    @Test
+    fun `the stream machine records the longest and shortest notification`() {
+        val machine = BandStreamMachine(BandStream.HEART_RATE)
+        machine.onFrame(ByteArray(240) { 0 })
+        machine.onFrame(ByteArray(20) { 0 })
+        machine.onFrame(ByteArray(100) { 0 })
+        assertEquals(240, machine.maxFrameBytes)
+        assertEquals(20, machine.minFrameBytes)
+    }
 }
