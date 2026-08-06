@@ -15,6 +15,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -64,8 +65,15 @@ class BandChartsActivity : ComponentActivity() {
         val language = BandLanguage.parse(BandSettings.language(applicationContext))
         setContent {
             val themePrefs by ThemeStore.state.collectAsState()
+            // The chart style is derived from the same prefs the rest of the theme reads, so a slider
+            // moved on the UI page changes these charts the next time this window composes — no
+            // separate store, no second source of truth.
+            val chartStyle = remember(themePrefs) { ChartStyle.from(themePrefs) }
             OpenTaskerTheme(prefs = themePrefs) {
-                CompositionLocalProvider(LocalBandLanguage provides language) {
+                CompositionLocalProvider(
+                    LocalBandLanguage provides language,
+                    LocalChartStyle provides chartStyle,
+                ) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background,

@@ -93,6 +93,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.unit.sp
 import com.opentasker.ui.theme.FontOption
+import com.opentasker.ui.charts.ChartPaletteVerdict
+import com.opentasker.ui.charts.ChartStylePreview
 import com.opentasker.ui.theme.ThemePrefs
 import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.launch
@@ -120,6 +122,7 @@ fun UiCustomizationScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var colorTarget by remember { mutableStateOf<ColorTarget?>(null) }
+    var chartColorTarget by remember { mutableStateOf<ChartColorTarget?>(null) }
     var showFontPicker by remember { mutableStateOf(false) }
     var showBubbleFontPicker by remember { mutableStateOf(false) }
     var showPickerFontPicker by remember { mutableStateOf(false) }
@@ -663,6 +666,212 @@ fun UiCustomizationScreen(
                 )
             }
 
+
+            // --- 「健康」 charts — the numbers the band screens draw with ---------------------
+            item { SectionHeader("「健康」 charts") }
+            item { ChartLivePreview(level = 1, prefs = prefs) }
+
+            item { SubHeader(1, "Sizes") }
+            item {
+                SliderRow(
+                    level = 1, label = "Preview height",
+                    value = prefs.chartPreviewHeightDp, valueText = "${prefs.chartPreviewHeightDp} dp",
+                    range = ThemePrefs.CHART_PREVIEW_H_MIN.toFloat()..ThemePrefs.CHART_PREVIEW_H_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(chartPreviewHeightDp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Full-screen height",
+                    value = prefs.chartDetailHeightDp, valueText = "${prefs.chartDetailHeightDp} dp",
+                    range = ThemePrefs.CHART_DETAIL_H_MIN.toFloat()..ThemePrefs.CHART_DETAIL_H_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(chartDetailHeightDp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Space between cards",
+                    value = prefs.chartCardGapDp, valueText = "${prefs.chartCardGapDp} dp",
+                    range = 0f..ThemePrefs.CHART_GAP_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(chartCardGapDp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Axis label size",
+                    value = prefs.chartAxisTextSp, valueText = "${prefs.chartAxisTextSp} sp",
+                    range = ThemePrefs.CHART_AXIS_SP_MIN.toFloat()..ThemePrefs.CHART_AXIS_SP_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(chartAxisTextSp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Headline number size",
+                    value = prefs.chartHeadlineSp, valueText = "${prefs.chartHeadlineSp} sp",
+                    range = ThemePrefs.CHART_HEADLINE_MIN.toFloat()..ThemePrefs.CHART_HEADLINE_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(chartHeadlineSp = v) } },
+                )
+            }
+
+            item { SubHeader(1, "Marks") }
+            item {
+                SliderRow(
+                    level = 1, label = "Line width",
+                    value = prefs.chartLineWidthDp, valueText = "${prefs.chartLineWidthDp} dp",
+                    range = 1f..ThemePrefs.CHART_LINE_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(chartLineWidthDp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Sample dot size",
+                    value = prefs.chartDotSizeDp, valueText = "${prefs.chartDotSizeDp} dp",
+                    range = 0f..ThemePrefs.CHART_DOT_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(chartDotSizeDp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Hourly capsule width",
+                    value = prefs.chartCapsuleWidthDp, valueText = "${prefs.chartCapsuleWidthDp} dp",
+                    range = 2f..ThemePrefs.CHART_MARK_W_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(chartCapsuleWidthDp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Step bar width",
+                    value = prefs.chartBarWidthDp, valueText = "${prefs.chartBarWidthDp} dp",
+                    range = 1f..ThemePrefs.CHART_MARK_W_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(chartBarWidthDp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Blood-pressure cap width",
+                    value = prefs.chartDumbbellWidthDp, valueText = "${prefs.chartDumbbellWidthDp} dp",
+                    range = 2f..ThemePrefs.CHART_MARK_W_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(chartDumbbellWidthDp = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Sleep block height",
+                    value = prefs.chartHypnogramBandPct, valueText = "${prefs.chartHypnogramBandPct} % of its row",
+                    range = 10f..100f,
+                    onChange = { v -> ThemeStore.update { it.copy(chartHypnogramBandPct = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Rounded data-end radius",
+                    value = prefs.chartCornerRadiusDp, valueText = "${prefs.chartCornerRadiusDp} dp",
+                    range = 0f..ThemePrefs.CHART_CORNER_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(chartCornerRadiusDp = v) } },
+                )
+            }
+
+            item { SubHeader(1, "Ink") }
+            item { ChartColorRow(1, ChartColorTarget.Grid, prefs) { chartColorTarget = it } }
+            item {
+                SliderRow(
+                    level = 1, label = "Grid opacity",
+                    value = prefs.chartGridOpacityPct, valueText = "${prefs.chartGridOpacityPct} %",
+                    range = 0f..100f,
+                    onChange = { v -> ThemeStore.update { it.copy(chartGridOpacityPct = v) } },
+                )
+            }
+            item { ChartColorRow(1, ChartColorTarget.AxisText, prefs) { chartColorTarget = it } }
+            item {
+                SliderRow(
+                    level = 1, label = "Area fill under a line",
+                    value = prefs.chartFillOpacityPct, valueText = "${prefs.chartFillOpacityPct} %",
+                    range = 0f..100f,
+                    onChange = { v -> ThemeStore.update { it.copy(chartFillOpacityPct = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Glow behind a line",
+                    value = prefs.chartGlowOpacityPct, valueText = "${prefs.chartGlowOpacityPct} %",
+                    range = 0f..100f,
+                    onChange = { v -> ThemeStore.update { it.copy(chartGlowOpacityPct = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "No-measurement tint",
+                    value = prefs.chartGapTintPct, valueText = "${prefs.chartGapTintPct} %",
+                    range = 0f..100f,
+                    onChange = { v -> ThemeStore.update { it.copy(chartGapTintPct = v) } },
+                )
+            }
+
+            item { SubHeader(1, "What gets drawn") }
+            item {
+                SwitchRow(
+                    level = 1, label = "Grid",
+                    description = "The recessive lines behind the data.",
+                    checked = prefs.chartShowGrid,
+                    onCheckedChange = { v -> ThemeStore.update { it.copy(chartShowGrid = v) } },
+                )
+            }
+            item {
+                SwitchRow(
+                    level = 1, label = "Sample dots",
+                    description = "The real readings, drawn over the smoothed line. Turning these off hides where the curve is interpolating.",
+                    checked = prefs.chartShowDots,
+                    onCheckedChange = { v -> ThemeStore.update { it.copy(chartShowDots = v) } },
+                )
+            }
+            item {
+                SwitchRow(
+                    level = 1, label = "Flagged-sample ✕ marks",
+                    description = "Readings the outlier filter dropped, shown at their real value.",
+                    checked = prefs.chartShowRejected,
+                    onCheckedChange = { v -> ThemeStore.update { it.copy(chartShowRejected = v) } },
+                )
+            }
+            item {
+                SwitchRow(
+                    level = 1, label = "Tint stretches with no measurement",
+                    description = "Off, a gap looks the same as a flat reading — the chart stops showing that the band was not measuring.",
+                    checked = prefs.chartShowGaps,
+                    onCheckedChange = { v -> ThemeStore.update { it.copy(chartShowGaps = v) } },
+                )
+            }
+            item {
+                SliderRow(
+                    level = 1, label = "Opening time span",
+                    value = prefs.chartDefaultSpanHours, valueText = "${prefs.chartDefaultSpanHours} h",
+                    range = 1f..ThemePrefs.CHART_SPAN_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(chartDefaultSpanHours = v) } },
+                )
+            }
+            item { ChartCurveRow(1, prefs.chartCurveMode) { v -> ThemeStore.update { it.copy(chartCurveMode = v) } } }
+
+            item { SubHeader(1, "Series colours") }
+            item { ChartColorRow(1, ChartColorTarget.HeartRate, prefs) { chartColorTarget = it } }
+            item { ChartColorRow(1, ChartColorTarget.BandState, prefs) { chartColorTarget = it } }
+            item { ChartColorRow(1, ChartColorTarget.Spo2, prefs) { chartColorTarget = it } }
+            item { ChartColorRow(1, ChartColorTarget.Temperature, prefs) { chartColorTarget = it } }
+            item { ChartColorRow(1, ChartColorTarget.Steps, prefs) { chartColorTarget = it } }
+            item { ChartColorRow(1, ChartColorTarget.Systolic, prefs) { chartColorTarget = it } }
+            item { ChartColorRow(1, ChartColorTarget.Diastolic, prefs) { chartColorTarget = it } }
+            item { ChartColorRow(1, ChartColorTarget.SleepDeep, prefs) { chartColorTarget = it } }
+            item { ChartColorRow(1, ChartColorTarget.SleepLight, prefs) { chartColorTarget = it } }
+            item { ChartColorRow(1, ChartColorTarget.SleepRem, prefs) { chartColorTarget = it } }
+            item { ChartColorRow(1, ChartColorTarget.SleepAwake, prefs) { chartColorTarget = it } }
+            item {
+                ActionRow(
+                    level = 1,
+                    label = "Restore the validated chart palette",
+                    description = "Puts every chart knob above back to what shipped — the colours that pass the checks in the preview.",
+                    actionLabel = "Restore",
+                    onAction = { ThemeStore.resetChartsToDefault() },
+                )
+            }
+
             // --- Presets — at the very bottom (白い熊 2026-07-25), like Kōjiki's trailing Reset row ---
             item { SectionHeader("Presets") }
             item {
@@ -686,6 +895,18 @@ fun UiCustomizationScreen(
                 onBack()
             },
             onDirChanged = { eximRefresh++ },
+        )
+    }
+
+    chartColorTarget?.let { target ->
+        ColorPickerDialog(
+            title = target.label,
+            initial = target.get(prefs),
+            onDismiss = { chartColorTarget = null },
+            onConfirm = { argb ->
+                ThemeStore.update { target.set(it, argb) }
+                chartColorTarget = null
+            },
         )
     }
 
@@ -1340,6 +1561,129 @@ private fun FontPickerDialog(
 }
 
 // ---- model helpers ------------------------------------------------------------------------------
+
+/**
+ * A sub-heading inside a section.
+ *
+ * The chart section has thirty-odd rows, which is more than one flat list can be read as. It groups
+ * into sizes / marks / ink / what-gets-drawn / colours, and those groups deserve labels without each
+ * becoming a full [SectionHeader] with its own rule above it.
+ */
+@Composable
+private fun SubHeader(level: Int, title: String) {
+    Text(
+        title,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = rowStartPadding(level), end = 16.dp, top = 14.dp, bottom = 2.dp),
+    )
+}
+
+/**
+ * The live 「健康」 chart preview, plus the colour verdict beneath it.
+ *
+ * The preview runs the app's real chart renderers over made-up data, so every slider above shows its
+ * effect immediately and none of it depends on the band having ever been synced. The verdict runs the
+ * colour-blindness and contrast arithmetic on whatever is currently picked — advisory, never a block,
+ * with the one-tap restore at the bottom of the section.
+ */
+@Composable
+private fun ChartLivePreview(level: Int, prefs: ThemePrefs) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = rowStartPadding(level), end = 16.dp, top = 8.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text("Live preview", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Surface(color = Color(ThemePrefs.NEAR_BLACK), shape = RoundedCornerShape(12.dp)) {
+            ChartStylePreview(prefs, Modifier.padding(10.dp))
+        }
+        Text("Colour check", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        ChartPaletteVerdict(prefs)
+    }
+}
+
+/** How a line joins its samples. STEP is the honest one for a value read at a fixed cadence. */
+private val CHART_CURVE_OPTIONS = listOf(
+    "PCHIP" to "Smooth curve (no overshoot)",
+    "LINEAR" to "Straight lines",
+    "STEP" to "Held until the next reading",
+)
+
+@Composable
+private fun ChartCurveRow(level: Int, value: String, onPick: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        RowScaffold(level, onClick = { expanded = true }) {
+            Text("Line shape", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Text(
+                CHART_CURVE_OPTIONS.firstOrNull { it.first == value }?.second ?: value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            CHART_CURVE_OPTIONS.forEach { (v, text) ->
+                DropdownMenuItem(text = { Text(text) }, onClick = { onPick(v); expanded = false })
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChartColorRow(
+    level: Int,
+    target: ChartColorTarget,
+    prefs: ThemePrefs,
+    onPick: (ChartColorTarget) -> Unit,
+) {
+    val value = target.get(prefs)
+    RowScaffold(level, onClick = { onPick(target) }) {
+        Column(Modifier.weight(1f)) {
+            Text(target.label, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                if (value == target.get(ThemePrefs.DEFAULT)) "Default - ${hex6(value)}" else hex6(value),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Box(
+            Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(Color(value))
+                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
+        )
+    }
+}
+
+/**
+ * The chart colours, as lambdas rather than another arm on [ColorTarget]'s two `when` blocks.
+ *
+ * Eleven more entries there would have meant thirty-three more lines across three places that must
+ * stay in step; here each slot states its getter and setter once, next to its own name.
+ */
+private enum class ChartColorTarget(
+    val label: String,
+    val get: (ThemePrefs) -> Int,
+    val set: (ThemePrefs, Int) -> ThemePrefs,
+) {
+    Grid("Grid lines", { it.chartGridColor }, { p, v -> p.copy(chartGridColor = v) }),
+    AxisText("Axis + caption ink", { it.chartAxisTextColor }, { p, v -> p.copy(chartAxisTextColor = v) }),
+    HeartRate("心拍 — heart rate", { it.chartColorHeartRate }, { p, v -> p.copy(chartColorHeartRate = v) }),
+    BandState("バンド状態指数 — band state index", { it.chartColorBandState }, { p, v -> p.copy(chartColorBandState = v) }),
+    Spo2("血中酸素 — blood oxygen", { it.chartColorSpo2 }, { p, v -> p.copy(chartColorSpo2 = v) }),
+    Temperature("体温 — temperature", { it.chartColorTemperature }, { p, v -> p.copy(chartColorTemperature = v) }),
+    Steps("歩数 — steps", { it.chartColorSteps }, { p, v -> p.copy(chartColorSteps = v) }),
+    Systolic("収縮期 — systolic", { it.chartColorSystolic }, { p, v -> p.copy(chartColorSystolic = v) }),
+    Diastolic("拡張期 — diastolic", { it.chartColorDiastolic }, { p, v -> p.copy(chartColorDiastolic = v) }),
+    SleepDeep("睡眠 深い — deep", { it.chartColorSleepDeep }, { p, v -> p.copy(chartColorSleepDeep = v) }),
+    SleepLight("睡眠 浅い — light", { it.chartColorSleepLight }, { p, v -> p.copy(chartColorSleepLight = v) }),
+    SleepRem("睡眠 REM", { it.chartColorSleepRem }, { p, v -> p.copy(chartColorSleepRem = v) }),
+    SleepAwake("睡眠 覚醒 — awake", { it.chartColorSleepAwake }, { p, v -> p.copy(chartColorSleepAwake = v) }),
+}
 
 private enum class ColorTarget(val label: String, val default: Int) {
     Background("Background", ThemePrefs.DEFAULT.background),

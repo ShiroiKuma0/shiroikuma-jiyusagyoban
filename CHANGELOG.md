@@ -3,6 +3,83 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.81.2026-08-02.g97059d7b+020 — 2026-08-06
+
+**The crosshair only existed on the dashboard.** 白い熊 opened 歩数 full-screen, tapped a bar, and
+nothing happened — correctly, because `MetricDetailScreen` never wired it up. The full-screen views
+got the pinch/pan modifier and no crosshair at all.
+
+They have one now, and it takes the gesture the screen actually had spare: **tap to plant it, tap it
+again to clear**. It stays put, so you can put it on a spike and then pinch and pan around it — which
+is what that screen is for. The dashboard keeps long-press-and-drag, because a tap there already
+means "open this metric".
+
+With the line planted, the full-screen headline reads **that instant** instead of the 24-hour
+summary, and a line under the plot says when — or `no reading there` when the crosshair is parked in
+a stretch the band did not measure. 睡眠 reads out the stage. Before the first tap that line is the
+hint that the gesture exists at all; an undiscoverable gesture is the same as no gesture, which is
+exactly how this shipped.
+
+`readoutPoints` now lives on `MetricChart`, so the preview card, the plot and the full-screen readout
+cannot disagree about what the crosshair is pointing at — including for capsule and bar metrics,
+which have no line to sample.
+
+Five new instrumented tests, run on the Mate XT in the same modifier order the screen uses: a tap
+plants it, a second tap in the same place clears it, a tap elsewhere moves it, and neither pan nor
+pinch is lost to it. All 11 gesture tests green.
+
+## 0.2.81.2026-08-02.g97059d7b+018 — 2026-08-06
+
+**The last three 「健康」 backlog items, built together.**
+
+### A crosshair through every chart at once
+
+Long-press any plot and drag: one vertical line runs through **every** card, and each one reads out
+its own value at that instant instead of its window summary. Heart rate shows the reading at 03:12,
+睡眠 shows the stage you were in, 血中酸素 shows the dip — the cross-reading that was previously only
+possible by opening each card separately and lining the time axes up by eye.
+
+It is long-press rather than touch because the cards live in a scrolling list and the detail charts
+already claim pinch and horizontal drag; `detectDragGesturesAfterLongPress` takes the pointer only
+after the finger has been still, so a scroll flick and a pinch both still reach their usual handlers.
+
+Two consequences worth stating. Sleep gave up its own night-spanning viewport and joined the shared
+clock — cross-reading is impossible if each chart is on a different one. And the readout **refuses
+across a gap**: park the line in the middle of a four-hour hole and it says nothing rather than
+printing the value from either edge, which would state a reading for a time the band was not
+measuring.
+
+### A day-by-day table
+
+Deliberately a table, not a chart. The plots answer "what happened today"; this answers "**was
+Tuesday better than Monday**", and a reader comparing two days wants two numbers side by side rather
+than two points to measure against an axis. Columns: 健康指数, resting heart rate, sleep with its
+deep/REM split, steps, and the SpO₂ low.
+
+A night belongs to the day it **started** — Tuesday's sleep is the night you went to bed on Tuesday
+— matching the band's own noon-to-noon chunking. The longest session of a day is the one shown, so a
+nap never displaces the actual night, and a day that would be all dashes gets no row at all.
+
+### Thirty-five chart knobs, with a live preview and a colour check
+
+Everything the charts used to hard-code is now on the UI page beside the rest of the appearance
+settings: preview and full-screen heights, card spacing, axis and headline text, line width, dot
+size, capsule / bar / dumbbell widths, sleep block height, corner radius, grid / fill / glow / gap
+opacities, four "what gets drawn" switches, the opening time span, the line shape (smooth, straight,
+or held-until-the-next-reading), and eleven series colours.
+
+The preview runs **the app's real renderers** over made-up data, so it cannot drift from what it
+claims to preview, and it works on a device that has never synced the band.
+
+Two things came out of doing it. The mark weights are now **dp rather than raw pixels**, which fixes
+a quiet density bug — the old `STROKE = 2f` was two device pixels, so on a 3× screen the line was a
+third of its intended weight and got thinner the better the display. And the colour validation
+that had only ever run on a laptop now **runs on the phone**: `PaletteCheck` is a faithful Kotlin
+port of the data-viz validator — same OKLab conversion, same Machado–Oliveira–Fernandes CVD
+transforms, same thresholds — reporting live on whatever has been picked. It is advisory, never a
+block, with a one-tap restore beside it. Hume's violet REM beside a blue stage measures ΔE 1.9 under
+protanopia and is now a **failing unit test** rather than a paragraph of prose.
+
 ## 0.2.81.2026-08-02.g97059d7b+017 — 2026-08-06
 
 **Three of the band's six HRV-record fields turned out not to be measurements.**

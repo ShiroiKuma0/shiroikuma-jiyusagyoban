@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.pinch
 import androidx.compose.ui.test.swipe
@@ -183,6 +184,127 @@ class ChartGestureInteropTest {
             "zoom must not depend on the pan axis (zoom=${recorder.zoom})",
             recorder.zoom > 1.05f,
         )
+    }
+
+    // --- the crosshair, in the modifier order the full-screen detail actually uses -------------
+
+    /**
+     * The chart-shaped box with BOTH gestures on it, stacked exactly as `MetricDetailScreen` stacks
+     * them: `crosshairTapInput` first, then the pan/zoom modifier.
+     *
+     * The order is the thing under test. Two `pointerInput` modifiers on one node share the pointer
+     * stream, and if the transformable claimed a plain tap the crosshair would never fire — which is
+     * precisely the symptom 白い熊 reported ("clicking individual points doesn't display anything").
+     */
+    @Composable
+    private fun CrosshairHarness(recorder: Recorder, crosshair: CrosshairState, viewport: ChartViewport) {
+        LazyColumn(state = rememberLazyListState(), modifier = Modifier.fillMaxSize().testTag(LIST)) {
+            items((0 until 40).toList()) { index ->
+                if (index == CHART_ROW) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                            .background(Color.DarkGray)
+                            .crosshairTapInput(crosshair, viewport)
+                            .then(
+                                rememberChartGestureModifier(
+                                    onZoom = recorder::onZoom,
+                                    onPan = recorder::onPan,
+                                ),
+                            )
+                            .testTag(CHART),
+                    ) { Text("chart") }
+                } else {
+                    Box(Modifier.fillMaxWidth().height(80.dp)) { Text("row $index") }
+                }
+            }
+        }
+    }
+
+    private fun harnessViewport() =
+        ChartViewport(initialEndMs = 1_000_000_000L, initialSpanMs = 24 * 3_600_000L)
+            .apply { plotWidthPx = 1000f }
+
+    @Test
+    fun aTapPlacesTheCrosshair() {
+        val crosshair = CrosshairState()
+        val viewport = harnessViewport()
+        rule.setContent { CrosshairHarness(Recorder(), crosshair, viewport) }
+
+        rule.onNodeWithTag(CHART).performTouchInput { click(center) }
+        rule.waitForIdle()
+
+        assertTrue("a plain tap must place the crosshair — it did not", crosshair.active)
+    }
+
+    /** Tapping where it already is means "put it away", not "move it three pixels". */
+    @Test
+    fun tappingTheSameSpotAgainClearsIt() {
+        val crosshair = CrosshairState()
+        val viewport = harnessViewport()
+        rule.setContent { CrosshairHarness(Recorder(), crosshair, viewport) }
+
+        rule.onNodeWithTag(CHART).performTouchInput { click(center) }
+        rule.waitForIdle()
+        assertTrue(crosshair.active)
+
+        rule.onNodeWithTag(CHART).performTouchInput { click(center) }
+        rule.waitForIdle()
+        assertTrue("a second tap in the same place must clear it", !crosshair.active)
+    }
+
+    @Test
+    fun tappingElsewhereMovesItRatherThanClearingIt() {
+        val crosshair = CrosshairState()
+        val viewport = harnessViewport()
+        rule.setContent { CrosshairHarness(Recorder(), crosshair, viewport) }
+
+        rule.onNodeWithTag(CHART).performTouchInput { click(center) }
+        rule.waitForIdle()
+        val first = crosshair.tMs
+
+        rule.onNodeWithTag(CHART).performTouchInput { click(center.copy(x = center.x - 300f)) }
+        rule.waitForIdle()
+
+        assertTrue("still placed", crosshair.active)
+        assertTrue("a tap elsewhere must move it (was $first, now ${crosshair.tMs})", crosshair.tMs != first)
+    }
+
+    /** The crosshair must not cost the screen its pan — both live on the same node. */
+    @Test
+    fun theCrosshairDoesNotSwallowThePan() {
+        val recorder = Recorder()
+        val crosshair = CrosshairState()
+        val viewport = harnessViewport()
+        rule.setContent { CrosshairHarness(recorder, crosshair, viewport) }
+
+        rule.onNodeWithTag(CHART).performTouchInput {
+            swipe(start = center, end = center.copy(x = center.x - 400f), durationMillis = 300)
+        }
+        rule.waitForIdle()
+
+        assertTrue("a horizontal drag must still pan", recorder.panEvents > 0)
+        assertTrue("a drag is not a tap and must not plant the crosshair", !crosshair.active)
+    }
+
+    @Test
+    fun theCrosshairDoesNotCostTheChartItsPinch() {
+        val recorder = Recorder()
+        val crosshair = CrosshairState()
+        val viewport = harnessViewport()
+        rule.setContent { CrosshairHarness(recorder, crosshair, viewport) }
+
+        rule.onNodeWithTag(CHART).performTouchInput {
+            pinch(
+                start0 = center + Offset(-60f, 0f), end0 = center + Offset(-220f, 0f),
+                start1 = center + Offset(60f, 0f), end1 = center + Offset(220f, 0f),
+                durationMillis = 400,
+            )
+        }
+        rule.waitForIdle()
+
+        assertTrue("a pinch must still zoom (zoom=${recorder.zoom})", recorder.zoom > 1.2f)
     }
 
     /**

@@ -519,6 +519,58 @@ index is labelled partial — never imputed, never defaulted. Scoring a night th
 as though sleep were bad is the failure this design exists to prevent, and `HealthIndexTest` asserts
 it directly.
 
+### The rendering is settable, and the colours are checked on device
+
+Everything the plots used to hard-code — heights, mark weights, opacities, what gets drawn, the
+opening span, the line shape, and eleven series colours — lives in `ThemePrefs` and arrives at the
+renderers as one immutable `ChartStyle` carried on `PlotFrame`. The mark functions are `DrawScope`
+extensions and so cannot read a CompositionLocal; the plot composable reads it once and hands it down
+with the geometry.
+
+Two things this fixed or forced, worth not rediscovering:
+
+- **Mark weights are dp, not raw pixels.** `STROKE = 2f` was two *device* pixels, so on a 3× screen
+  the line was a third of the weight the method calls for and got thinner the better the display.
+- **A settable palette needs the validator on the phone.** `PaletteCheck` is a faithful Kotlin port of
+  the data-viz skill's script — same OKLab conversion, same Machado–Oliveira–Fernandes severity-1.0
+  CVD transforms, same thresholds — run live on whatever is picked, reported beside a one-tap restore.
+  It is advisory by design: a check that blocked is a check someone learns to work around. The
+  documented rejection is now executable — Hume's violet REM beside a blue stage measures ΔE 1.9 under
+  protanopia, and `PaletteCheckTest` fails if the port ever stops noticing.
+
+The preview on the customization page runs **the real renderers** over synthetic data. A second,
+simplified painter would eventually disagree with the thing it previews, and the disagreement would
+surface on the real screen — the one place a preview exists to avoid.
+
+### The crosshair is shared, and it refuses across a gap
+
+One long-press drag drives **every** card: each reads out its own value at the same instant, which is
+the only way to answer "heart rate spiked at 03:12 — was I in REM, and did my oxygen dip?" without
+opening three cards and lining up their axes by eye. That requires every chart on one `ChartViewport`,
+including 睡眠, which gave up its night-spanning viewport for it.
+
+`nearestSample` takes a tolerance and returns null beyond it. With the line parked inside a four-hour
+hole the honest answer is nothing — printing the value from either edge would state a reading for a
+time the band was not measuring, which is the exact claim the gap tint exists to deny.
+
+**Two ways in, because the two screens have different spare gestures.** On the dashboard a tap
+already means "open this metric", so the crosshair is long-press-and-drag and vanishes on lift. On the
+full-screen detail nothing else wants a tap, so one tap plants the line and it **stays** until tapped
+away — you put it on the spike, then pinch and pan around it. Requiring a long press there hid the
+feature behind a gesture nobody thinks to try, which is how `+018` shipped it and why 白い熊 found
+tapping a step bar did nothing.
+
+`ChartGestureInteropTest` drives both, in the same modifier order the screen uses: a tap plants it, a
+second tap in the same place clears it, a tap elsewhere moves it, and neither pan nor pinch is lost.
+
+### The day table is a table
+
+`DailySummary` answers a different question from the plots — "was Tuesday better than Monday" rather
+than "what happened today" — and comparison between days wants numbers side by side, not points to
+measure against an axis. A night is attributed to **the day it started**, matching the band's own
+noon-to-noon chunking; the longest session of a day wins, so a nap never displaces the night; and a
+day that would be all dashes gets no row.
+
 ## 5. Where 「健康」 lives
 
 **Its own fullscreen window**, `BandChartsActivity` — not a tab (白い熊, 2026-08-03). It was briefly a
@@ -621,13 +673,12 @@ started emitting one.
 
 ### Still open
 
-- **Hume's own views** are the model for the eventual "power views". Its `H` tab draws an **hourly
+- **Hume's own views** were the model for the power views, shipped in `+009`. Its `H` tab draws an **hourly
   min/max envelope** — one capsule per hour, not one measurement — with `D`/`W`/`M` above it. Its day
   range matches our *pooled* heart-rate population.
 - Hume drops single-sample dips that we keep: on 2026-08-03 our minimum was 52 bpm (one sample at
   11:39:30, neighbours 85 and 72) against Hume's 55. Our decode is faithful; the difference is their
   display filtering. **Do not "fix" our number to match theirs.**
-- The **crosshair** and the ~35 `ThemePrefs` knobs with a live preview are still unbuilt.
 - **A sleep stage `4`** would show as 不明 rather than being folded into a neighbour. It has never
   appeared; if it does, that is the signal to revisit §7.
 ### The gesture question, answered 2026-08-06

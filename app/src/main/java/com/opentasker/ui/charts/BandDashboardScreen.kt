@@ -62,6 +62,18 @@ fun BandDashboardScreen(
     val state by model.state.collectAsState()
     val progress by model.progress.collectAsState()
     val lang = LocalBandLanguage.current
+    val style = LocalChartStyle.current
+
+    // ONE viewport for every card, not one each. Cross-reading is the whole value of a stacked
+    // column of health charts, and it is impossible if each chart is on its own clock — so the
+    // crosshair's requirement and the viewport's own KDoc agree.
+    val viewport = remember(state.bounds, style.defaultSpanMs) {
+        ChartViewport(
+            initialEndMs = state.bounds.last.takeIf { it > 0 } ?: System.currentTimeMillis(),
+            initialSpanMs = style.defaultSpanMs,
+        )
+    }
+    val crosshair = rememberCrosshairState()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -71,7 +83,7 @@ fun BandDashboardScreen(
             top = contentPadding.calculateTopPadding() + 8.dp,
             bottom = contentPadding.calculateBottomPadding() + 24.dp,
         ),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(style.cardGap),
     ) {
         item("sync") { SyncHeader(state, progress, onSync = model::sync) }
 
@@ -88,15 +100,27 @@ fun BandDashboardScreen(
         }
 
         items(state.metrics, key = { it.spec.key }) { chart ->
-            MetricPreviewCard(chart, state.bounds) { onOpenMetric(chart.spec.key) }
+            MetricPreviewCard(chart, viewport, crosshair) { onOpenMetric(chart.spec.key) }
         }
 
         state.sleep?.takeIf { !it.isEmpty }?.let { sleep ->
-            item("sleep") { SleepPreviewCard(sleep) { onOpenMetric(MetricSpecs.KEY_SLEEP) } }
+            item("sleep") {
+                SleepPreviewCard(sleep, viewport, crosshair) { onOpenMetric(MetricSpecs.KEY_SLEEP) }
+            }
         }
 
         state.bloodPressure?.takeIf { !it.isEmpty }?.let { bp ->
-            item("bp") { BloodPressurePreviewCard(bp, state.bounds) { onOpenMetric(MetricSpecs.KEY_BLOOD_PRESSURE) } }
+            item("bp") {
+                BloodPressurePreviewCard(bp, viewport, crosshair) {
+                    onOpenMetric(MetricSpecs.KEY_BLOOD_PRESSURE)
+                }
+            }
+        }
+
+        // Last, deliberately: the charts answer "what happened today", and this answers "was today
+        // better than yesterday" — the question you reach for after looking, not before.
+        if (state.days.size > 1) {
+            item("days") { DailySummaryCard(state.days) }
         }
     }
 }
@@ -116,6 +140,7 @@ private fun SyncHeader(
     onSync: () -> Unit,
 ) {
     val lang = LocalBandLanguage.current
+    val axisInk = LocalChartStyle.current.axisText
     Card(
         Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -126,7 +151,7 @@ private fun SyncHeader(
                     Text(
                         BandText.lastSync[lang],
                         style = MaterialTheme.typography.labelMedium,
-                        color = ChartPalette.AXIS_TEXT,
+                        color = axisInk,
                     )
                     Text(
                         state.status?.lastSuccessAtMillis?.let(::formatMillis)
@@ -139,7 +164,7 @@ private fun SyncHeader(
                             BandText.headroom[lang]
                                 .format(h.depthSec / 3600.0, BandText.stream(h.stream, lang)),
                             style = MaterialTheme.typography.bodySmall,
-                            color = ChartPalette.AXIS_TEXT,
+                            color = axisInk,
                         )
                     }
                 }
@@ -197,6 +222,7 @@ private fun SyncButton(running: Boolean, onSync: () -> Unit) {
 @Composable
 private fun SyncProgressRow(progress: com.opentasker.core.band.BandSyncProgress) {
     val lang = LocalBandLanguage.current
+    val axisInk = LocalChartStyle.current.axisText
     // A seconds counter, because "connecting" for eight seconds with no movement looks stuck even
     // when it is working perfectly.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -220,7 +246,7 @@ private fun SyncProgressRow(progress: com.opentasker.core.band.BandSyncProgress)
                 }
             },
             style = MaterialTheme.typography.bodySmall,
-            color = ChartPalette.AXIS_TEXT,
+            color = axisInk,
         )
         if (progress.running) {
             LinearProgressIndicator(
@@ -228,7 +254,7 @@ private fun SyncProgressRow(progress: com.opentasker.core.band.BandSyncProgress)
                 modifier = Modifier.fillMaxWidth().height(3.dp).clip(CircleShape),
             )
         } else if (progress.message.isNotBlank()) {
-            Text(progress.message, style = MaterialTheme.typography.bodySmall, color = ChartPalette.AXIS_TEXT)
+            Text(progress.message, style = MaterialTheme.typography.bodySmall, color = axisInk)
         }
     }
 }
@@ -254,6 +280,7 @@ fun ChartCard(
     onClick: (() -> Unit)? = null,
     plot: @Composable () -> Unit,
 ) {
+    val style = LocalChartStyle.current
     Card(
         Modifier
             .fillMaxWidth()
@@ -275,7 +302,7 @@ fun ChartCard(
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     headline,
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.headlineMedium.copy(fontSize = style.headlineSize),
                     fontWeight = FontWeight.Bold,
                 )
                 if (unit.isNotBlank()) {
@@ -283,13 +310,13 @@ fun ChartCard(
                     Text(
                         unit,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = ChartPalette.AXIS_TEXT,
+                        color = style.axisText,
                         modifier = Modifier.padding(bottom = 4.dp),
                     )
                 }
             }
             plot()
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = ChartPalette.AXIS_TEXT)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = style.axisText)
         }
     }
 }

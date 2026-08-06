@@ -53,15 +53,19 @@ fun MetricDetailScreen(
 ) {
     BackHandler(onBack = onBack)
     val lang = LocalBandLanguage.current
+    val style = LocalChartStyle.current
 
     val bounds = state.bounds
-    val viewport = remember(bounds) {
+    val viewport = remember(bounds, style.defaultSpanMs) {
         ChartViewport(
             initialEndMs = bounds.last.takeIf { it > 0 } ?: System.currentTimeMillis(),
-            initialSpanMs = ChartViewport.DEFAULT_SPAN_MS,
+            initialSpanMs = style.defaultSpanMs,
         )
     }
     var showInfo by rememberSaveable(metricKey) { mutableStateOf(false) }
+    // Its own crosshair, not the dashboard's: this screen shows one metric, and a line left behind on
+    // the page underneath has nothing to do with where you want it here.
+    val crosshair = rememberCrosshairState()
 
     val spec = MetricSpecs.byKey(metricKey)
     val title = when (metricKey) {
@@ -105,31 +109,76 @@ fun MetricDetailScreen(
                     when (metricKey) {
                         MetricSpecs.KEY_BLOOD_PRESSURE -> state.bloodPressure?.let { bp ->
                             Headline(bp.headline, "mmHg", null)
-                            BloodPressurePlot(bp, viewport, Modifier.height(DETAIL_HEIGHT).then(gestures))
+                            BloodPressurePlot(
+                                bp, viewport,
+                                Modifier.height(style.detailHeight)
+                                    .crosshairTapInput(crosshair, viewport)
+                                    .then(gestures),
+                                crosshair = crosshair,
+                            )
+                            CrosshairHint(crosshair)
                             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                                 LegendEntry(
-                                    ChartPalette.SYSTOLIC,
+                                    style.systolic,
                                     "${BandText.systolic[lang]} ${bp.systolicRange}",
                                 )
                                 LegendEntry(
-                                    ChartPalette.DIASTOLIC,
+                                    style.diastolic,
                                     "${BandText.diastolic[lang]} ${bp.diastolicRange}",
                                 )
                             }
                         }
                         MetricSpecs.KEY_SLEEP -> state.sleep?.let { sleep ->
-                            Headline(sleep.headline[lang], "", null)
-                            SleepPlot(sleep, viewport, Modifier.height(DETAIL_HEIGHT).then(gestures))
+                            val runs = remember(sleep) { sleep.sessions.flatMap { it.runs } }
+                            val stage = crosshair.tMs?.let { stageAt(runs, it) }
+                            Headline(
+                                stage?.let { SleepShape.labelOf(it.code)[lang] } ?: sleep.headline[lang],
+                                "",
+                                null,
+                            )
+                            SleepPlot(
+                                sleep, viewport,
+                                Modifier.height(style.detailHeight)
+                                    .crosshairTapInput(crosshair, viewport)
+                                    .then(gestures),
+                                crosshair = crosshair,
+                            )
+                            CrosshairHint(
+                                crosshair,
+                                readout = crosshair.tMs?.let { t ->
+                                    if (stage != null) crosshairTimeLabel(t) else BandText.awakeAtCrosshair[lang]
+                                },
+                            )
                             SleepLegend()
                             sleep.latest?.let { SleepBreakdown(it) }
                         }
                         else -> state.metrics.firstOrNull { it.spec.key == metricKey }?.let { chart ->
-                            Headline(chart.headline, chart.spec.unit, chart.headlineBand)
-                            MetricPlot(chart, viewport, Modifier.height(DETAIL_HEIGHT).then(gestures))
+                            // With the crosshair planted the headline reads THAT instant. Leaving the
+                            // 24-hour median on screen beside a line sitting at 03:12 would answer a
+                            // question nobody asked.
+                            val at = crosshair.tMs?.let { chart.readoutAt(it) }
+                            Headline(
+                                at?.let { chart.spec.format(it.value) } ?: chart.headline,
+                                chart.spec.unit,
+                                if (at != null) null else chart.headlineBand,
+                            )
+                            MetricPlot(
+                                chart, viewport,
+                                Modifier.height(style.detailHeight)
+                                    .crosshairTapInput(crosshair, viewport)
+                                    .then(gestures),
+                                crosshair = crosshair,
+                            )
+                            CrosshairHint(
+                                crosshair,
+                                readout = crosshair.tMs?.let { t ->
+                                    at?.let { crosshairTimeLabel(it.tMs) } ?: BandText.nothingHere[lang]
+                                },
+                            )
                             Text(
                                 chart.subtitle[lang],
                                 style = MaterialTheme.typography.bodySmall,
-                                color = ChartPalette.AXIS_TEXT,
+                                color = style.axisText,
                             )
                         }
                     }
@@ -142,8 +191,6 @@ fun MetricDetailScreen(
         }
     }
 }
-
-private val DETAIL_HEIGHT = 320.dp
 
 @Composable
 private fun DetailHeader(title: String, hasInfo: Boolean, onBack: () -> Unit, onInfo: () -> Unit) {
@@ -161,6 +208,30 @@ private fun DetailHeader(title: String, hasInfo: Boolean, onBack: () -> Unit, on
         )
         if (hasInfo) InfoCircle(onClick = onInfo)
     }
+}
+
+/**
+ * The line under the plot that says the crosshair exists, then what it is reading.
+ *
+ * A gesture with no affordance is a gesture nobody finds. Before the first tap this says how to place
+ * the line; afterwards it is the readout, so the hint costs a row only until it has been used.
+ */
+@Composable
+private fun CrosshairHint(crosshair: CrosshairState, readout: String? = null) {
+    val lang = LocalBandLanguage.current
+    Text(
+        when {
+            !crosshair.active -> BandText.crosshairHint[lang]
+            readout != null -> readout
+            else -> crosshairTimeLabel(crosshair.tMs!!)
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = if (crosshair.active) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            LocalChartStyle.current.axisText
+        },
+    )
 }
 
 /**
@@ -190,7 +261,7 @@ private fun Headline(value: String, unit: String, band: BandRung?) {
             Text(
                 unit,
                 style = MaterialTheme.typography.bodyLarge,
-                color = ChartPalette.AXIS_TEXT,
+                color = LocalChartStyle.current.axisText,
                 modifier = Modifier.padding(bottom = 5.dp),
             )
         }
@@ -234,7 +305,7 @@ private fun BandLadder(bands: List<BandRung>) {
             Text(
                 BandText.guide[lang],
                 style = MaterialTheme.typography.labelMedium,
-                color = ChartPalette.AXIS_TEXT,
+                color = LocalChartStyle.current.axisText,
             )
             bands.forEachIndexed { i, rung ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -252,7 +323,7 @@ private fun BandLadder(bands: List<BandRung>) {
                             BandText.upTo[lang].format(rung.upTo.toInt())
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = ChartPalette.AXIS_TEXT,
+                        color = LocalChartStyle.current.axisText,
                     )
                 }
             }
@@ -263,11 +334,12 @@ private fun BandLadder(bands: List<BandRung>) {
 @Composable
 private fun SleepBreakdown(session: SleepSession) {
     val lang = LocalBandLanguage.current
+    val style = LocalChartStyle.current
     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         SleepShape.ROWS.forEach { code ->
             val minutes = session.minutesOf(code)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(8.dp).clip(CircleShape).background(ChartPalette.sleepStage(code)))
+                Box(Modifier.size(8.dp).clip(CircleShape).background(style.sleepStage(code)))
                 Spacer(Modifier.width(8.dp))
                 Text(
                     SleepShape.labelOf(code)[lang],
@@ -278,7 +350,7 @@ private fun SleepBreakdown(session: SleepSession) {
                 Text(
                     if (lang == BandLanguage.EN) "${minutes}m · $pct%" else "${minutes}分 · $pct%",
                     style = MaterialTheme.typography.bodySmall,
-                    color = ChartPalette.AXIS_TEXT,
+                    color = style.axisText,
                 )
             }
         }
@@ -310,6 +382,6 @@ private fun InfoBlock(heading: String, body: String, headingColor: androidx.comp
             fontWeight = FontWeight.Bold,
             color = headingColor ?: MaterialTheme.colorScheme.onSurface,
         )
-        Text(body, style = MaterialTheme.typography.bodySmall, color = ChartPalette.AXIS_TEXT)
+        Text(body, style = MaterialTheme.typography.bodySmall, color = LocalChartStyle.current.axisText)
     }
 }
