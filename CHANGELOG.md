@@ -3,6 +3,33 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.81.2026-08-02.g97059d7b+003 — 2026-08-06
+
+**Launching an app by intent action works again.**
+
+Upstream 0.2.81 rebuilt `intent.launch` behind a bounded dispatch policy. Its final rule refused any
+activity whose class name the task had not typed out by hand — even after the policy had already
+resolved the action against the named package, confirmed the result lived in that package, and
+confirmed it was exported. Naming an app and an action, which is how Android has always been asked to
+take a photo, became an error: *"target component was not found or is not exported."*
+
+That took out the 物理鍵 project's double-press camera the moment `+002` landed. `カメラ起動` asks
+`com.huawei.camera` for `android.media.action.STILL_IMAGE_CAMERA`; both the screen-on camera and the
+screen-off secure camera failed at the same line.
+
+The fork drops that last hurdle and nothing else. A dispatch now fails exactly when nothing in the
+named package handles the action — which is what the error message claimed all along. Everything the
+rule was standing in front of still stands: the resolved component must live in the package the task
+named, it must be exported, broadcasts and services still demand an explicit class, and every bound
+argument upstream added — allowlisted flags, allowlisted URI schemes, no `file://`, capped extras —
+is untouched.
+
+Pinning the class in the task would have worked too, and was rejected: on this firmware
+`STILL_IMAGE_CAMERA` resolves to `com.huawei.camera/.controller.VoiceAssistantActivity`, a
+vendor-internal name that a firmware update can rename out from under a saved task. Resolving at
+dispatch time follows the phone instead. The fork's own **Send Intent** (`intent.send`) never went
+through this policy and was never affected.
+
 ## 0.2.81.2026-08-02.g97059d7b+002 — 2026-08-03
 
 **Rebased onto upstream `97059d7b` (0.2.81)** — 62 upstream commits, the largest sync so far:
