@@ -51,6 +51,19 @@ data class MetricChart(
     val isEmpty: Boolean
         get() = (chunk?.segments?.isEmpty() != false) && buckets.isEmpty() && bars.isEmpty() &&
             secondary.isEmpty()
+
+    /**
+     * The one time-ordered series the crosshair reads, whichever renderer this metric uses.
+     *
+     * A capsule metric has no line to sample, so its hourly high stands in; a bar metric reads its
+     * bars directly. Defined here rather than in each caller because the preview card, the plot and
+     * the full-screen readout must agree about what the crosshair is pointing at — three copies of
+     * this expression is three chances for one of them to answer a different question.
+     */
+    val readoutPoints: List<ChartPoint> by lazy {
+        chunk?.segments?.flatMap { it.points }?.plus(secondary)?.sortedBy { it.tMs }
+            ?: bars.ifEmpty { buckets.map { ChartPoint(it.startMs, it.hi) } }
+    }
 }
 
 data class BloodPressureChart(
@@ -77,6 +90,8 @@ data class DashboardState(
     val metrics: List<MetricChart> = emptyList(),
     val bloodPressure: BloodPressureChart? = null,
     val sleep: SleepChart? = null,
+    /** One row per calendar day, newest first. */
+    val days: List<DaySummary> = emptyList(),
     /** The full extent of everything stored, so a viewport can pan across all of it. */
     val bounds: LongRange = 0L..0L,
     val message: Loc? = null,
@@ -177,6 +192,16 @@ class BandDashboardModel(
             metrics = metrics,
             bloodPressure = bp,
             sleep = sleep,
+            days = DailySummary.build(
+                hr = metrics.firstOrNull { it.spec.key == BandMetric.HEART_RATE }
+                    ?.let { it.chunk?.segments?.flatMap { s -> s.points } }.orEmpty(),
+                spo2 = metrics.firstOrNull { it.spec.key == BandMetric.SPO2 }
+                    ?.let { it.chunk?.segments?.flatMap { s -> s.points } }.orEmpty(),
+                steps = metrics.firstOrNull { it.spec.key == BandMetric.STEPS_MINUTE }?.bars.orEmpty(),
+                sleepSessions = sleep.sessions,
+                spo2Times = spo2Times,
+                zone = zone,
+            ),
             bounds = oldest..newest,
         )
     }

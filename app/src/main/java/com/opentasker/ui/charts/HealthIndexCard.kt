@@ -81,7 +81,7 @@ fun HealthIndexCard(index: HealthIndexResult, onClick: () -> Unit) {
                 Text(
                     BandText.indexOutOf[lang].format(index.band[lang]),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = ChartPalette.AXIS_TEXT,
+                    color = LocalChartStyle.current.axisText,
                     modifier = Modifier.padding(bottom = 6.dp),
                 )
             }
@@ -94,7 +94,7 @@ fun HealthIndexCard(index: HealthIndexResult, onClick: () -> Unit) {
                         index.missing.joinToString(if (lang == BandLanguage.EN) ", " else "・") { it[lang] },
                     ),
                     style = MaterialTheme.typography.bodySmall,
-                    color = ChartPalette.AXIS_TEXT,
+                    color = LocalChartStyle.current.axisText,
                 )
             }
         }
@@ -112,7 +112,7 @@ private fun ComponentRow(c: IndexComponent) {
             c.label[lang],
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.width(if (lang == BandLanguage.EN) 116.dp else 84.dp),
-            color = if (c.score == null) ChartPalette.AXIS_TEXT else MaterialTheme.colorScheme.onSurface,
+            color = if (c.score == null) LocalChartStyle.current.axisText else MaterialTheme.colorScheme.onSurface,
         )
         Box(Modifier.weight(1f)) {
             ScoreBar(c.score)
@@ -123,7 +123,7 @@ private fun ComponentRow(c: IndexComponent) {
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.width(28.dp),
-            color = if (c.score == null) ChartPalette.AXIS_TEXT else MaterialTheme.colorScheme.onSurface,
+            color = if (c.score == null) LocalChartStyle.current.axisText else MaterialTheme.colorScheme.onSurface,
         )
     }
 }
@@ -195,7 +195,7 @@ fun HealthIndexDetail(index: HealthIndexResult) {
                     "納得できなければ数字を変えられます。隠された式にはそれができません。",
             )[lang],
             style = MaterialTheme.typography.bodySmall,
-            color = ChartPalette.AXIS_TEXT,
+            color = LocalChartStyle.current.axisText,
         )
 
         Text(
@@ -224,7 +224,7 @@ fun HealthIndexDetail(index: HealthIndexResult) {
                     "85 以上でとても良い、70〜84 で良い、55〜69 で標準、40〜54 で低い。",
             )[lang],
             style = MaterialTheme.typography.bodySmall,
-            color = ChartPalette.AXIS_TEXT,
+            color = LocalChartStyle.current.axisText,
         )
 
         Text(
@@ -255,7 +255,7 @@ fun HealthIndexDetail(index: HealthIndexResult) {
                     "他機種の数値と比べないでください。",
             )[lang],
             style = MaterialTheme.typography.bodySmall,
-            color = ChartPalette.AXIS_TEXT,
+            color = LocalChartStyle.current.axisText,
         )
 
         index.components.forEach { c ->
@@ -274,10 +274,10 @@ fun HealthIndexDetail(index: HealthIndexResult) {
                     Text(
                         BandText.indexWeight[lang].format((c.weight * 100).toInt()),
                         style = MaterialTheme.typography.labelSmall,
-                        color = ChartPalette.AXIS_TEXT,
+                        color = LocalChartStyle.current.axisText,
                     )
                 }
-                Text(c.scale[lang], style = MaterialTheme.typography.bodySmall, color = ChartPalette.AXIS_TEXT)
+                Text(c.scale[lang], style = MaterialTheme.typography.bodySmall, color = LocalChartStyle.current.axisText)
                 Text(
                     if (c.score == null) {
                         BandText.indexMissing[lang].format(c.missingReason?.get(lang).orEmpty())

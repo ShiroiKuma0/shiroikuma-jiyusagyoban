@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
+import com.opentasker.ui.charts.ChartCurveMode
 import com.opentasker.ui.charts.ChartPoint
 import com.opentasker.ui.charts.DumbbellBucket
 import com.opentasker.ui.charts.HourBucket
@@ -23,8 +24,10 @@ import com.opentasker.ui.charts.SleepRun
  * markers no smaller than 8 px so they remain hit-able and visible.
  */
 
-private const val STROKE = 2f
-private const val END_RADIUS = 2f
+// The mark weights are no longer compiled in: they come off the frame's [ChartStyle], which reads
+// them from ThemePrefs. They are also now expressed in **dp rather than raw pixels**, which fixes a
+// quiet density bug — the old `STROKE = 2f` was two device pixels, so on a 3x screen the line was a
+// third of the weight the method calls for, and got thinner the better the display.
 
 /**
  * A PCHIP curve through the retained samples, with the samples drawn on top.
@@ -40,15 +43,27 @@ fun DrawScope.drawLineSeries(
     fillUnder: Boolean = true,
     showDots: Boolean = true,
 ) {
+    val style = frame.style
+    val stroke = style.lineWidth.toPx()
+    val dotRadius = style.dotSize.toPx() / 2f
     for (seg in segments) {
         if (seg.points.isEmpty()) continue
         val path = Path()
         var started = false
         if (seg.beziers.isEmpty()) {
+            // No Bézier control points means LINEAR or STEP. A step draws the value as held until the
+            // next sample, which is the honest rendering for something read at a fixed cadence and
+            // constant in between; a straight join claims a ramp nobody measured.
+            var lastY = 0f
             for (p in seg.points) {
                 val x = frame.x(p.tMs)
                 val y = frame.y(p.value)
-                if (!started) { path.moveTo(x, y); started = true } else path.lineTo(x, y)
+                when {
+                    !started -> { path.moveTo(x, y); started = true }
+                    style.curve == ChartCurveMode.STEP -> { path.lineTo(x, lastY); path.lineTo(x, y) }
+                    else -> path.lineTo(x, y)
+                }
+                lastY = y
             }
         } else {
             val first = seg.beziers.first()
@@ -73,21 +88,23 @@ fun DrawScope.drawLineSeries(
             fill.lineTo(lastX, frame.rect.bottom)
             fill.lineTo(firstX, frame.rect.bottom)
             fill.close()
-            drawPath(
-                fill,
-                brush = Brush.verticalGradient(
-                    colors = listOf(color.copy(alpha = 0.28f), color.copy(alpha = 0f)),
-                    startY = frame.rect.top,
-                    endY = frame.rect.bottom,
-                ),
-            )
+            if (style.fillAlpha > 0f) {
+                drawPath(
+                    fill,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(color.copy(alpha = style.fillAlpha), color.copy(alpha = 0f)),
+                        startY = frame.rect.top,
+                        endY = frame.rect.bottom,
+                    ),
+                )
+            }
         }
-        glowStroke(path, color, STROKE)
+        glowStroke(path, color, stroke, style.glowAlpha)
 
-        if (showDots) {
+        if (showDots && style.showDots && dotRadius > 0f) {
             for (p in seg.points) {
                 if (!frame.visible(p.tMs)) continue
-                drawCircle(color, radius = 2.6f, center = Offset(frame.x(p.tMs), frame.y(p.value)))
+                drawCircle(color, radius = dotRadius, center = Offset(frame.x(p.tMs), frame.y(p.value)))
             }
         }
     }
@@ -110,7 +127,7 @@ fun DrawScope.drawCapsules(
     if (buckets.isEmpty()) return
     val hourPx = HourlyEnvelope.HOUR_MS.toFloat() / frame.viewport.spanMs * frame.rect.width
     // A 2px surface gap keeps neighbouring hours countable instead of merging into a ribbon.
-    val w = (hourPx - 2f).coerceIn(3f, 22f)
+    val w = (hourPx - 2f).coerceIn(3f, frame.style.capsuleWidth.toPx())
     for (b in buckets) {
         val centre = b.startMs + HourlyEnvelope.HOUR_MS / 2
         if (!frame.visible(centre, HourlyEnvelope.HOUR_MS)) continue
@@ -141,7 +158,7 @@ fun DrawScope.drawDumbbells(
 ) {
     if (buckets.isEmpty()) return
     val hourPx = HourlyEnvelope.HOUR_MS.toFloat() / frame.viewport.spanMs * frame.rect.width
-    val w = (hourPx - 2f).coerceIn(3f, 14f)
+    val w = (hourPx - 2f).coerceIn(3f, frame.style.dumbbellWidth.toPx())
     for (d in buckets) {
         val centre = d.startMs + HourlyEnvelope.HOUR_MS / 2
         if (!frame.visible(centre, HourlyEnvelope.HOUR_MS)) continue
@@ -197,12 +214,13 @@ fun DrawScope.drawHypnogram(
         val x0 = frame.x(r.startMs)
         val x1 = frame.x(r.endMs)
         val cy = rowCentre(r.code)
-        val h = (rowH * 0.52f).coerceAtLeast(4f)
+        val h = (rowH * frame.style.hypnogramBand).coerceAtLeast(4f)
+        val radius = frame.style.cornerRadius.toPx()
         drawRoundRect(
             color = colorOf(r.code),
             topLeft = Offset(x0, cy - h / 2f),
             size = Size((x1 - x0).coerceAtLeast(1.5f), h),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(2f, 2f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius, radius),
             style = Fill,
         )
         previous?.let { p ->
@@ -234,7 +252,8 @@ fun DrawScope.drawBars(
 ) {
     if (points.isEmpty()) return
     val bucketPx = bucketMs.toFloat() / frame.viewport.spanMs * frame.rect.width
-    val w = (bucketPx - 2f).coerceIn(1.5f, 18f)
+    val w = (bucketPx - 2f).coerceIn(1.5f, frame.style.barWidth.toPx())
+    val radius = frame.style.cornerRadius.toPx()
     for (p in points) {
         if (!frame.visible(p.tMs, bucketMs)) continue
         val x = frame.x(p.tMs + bucketMs / 2)
@@ -246,7 +265,7 @@ fun DrawScope.drawBars(
             topLeft = Offset(x - w / 2f, frame.rect.bottom - h),
             size = Size(w, h),
             // Rounded at the data end, square at the baseline — the round end reads as the value.
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(END_RADIUS, END_RADIUS),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius, radius),
         )
     }
 }
