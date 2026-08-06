@@ -1,0 +1,315 @@
+package com.opentasker.ui.charts
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+
+/**
+ * One metric, full screen.
+ *
+ * Opens on the **last 24 hours** and pinch-zooms and pans across the whole stored history. The
+ * gesture arbitration is `rememberChartGestureModifier`, which refuses vertical drags so the page
+ * behind the chart keeps scrolling — proven on device by `ChartGestureInteropTest`, including a
+ * control that reproduces what a bare `transformable` does instead (it eats the scroll).
+ */
+@Composable
+fun MetricDetailScreen(
+    state: DashboardState,
+    metricKey: String,
+    contentPadding: PaddingValues,
+    onBack: () -> Unit,
+) {
+    BackHandler(onBack = onBack)
+    val lang = LocalBandLanguage.current
+
+    val bounds = state.bounds
+    val viewport = remember(bounds) {
+        ChartViewport(
+            initialEndMs = bounds.last.takeIf { it > 0 } ?: System.currentTimeMillis(),
+            initialSpanMs = ChartViewport.DEFAULT_SPAN_MS,
+        )
+    }
+    var showInfo by rememberSaveable(metricKey) { mutableStateOf(false) }
+
+    val spec = MetricSpecs.byKey(metricKey)
+    val title = when (metricKey) {
+        MetricSpecs.KEY_BLOOD_PRESSURE -> BandText.bloodPressure[lang]
+        MetricSpecs.KEY_SLEEP -> BandText.sleep[lang]
+        MetricSpecs.KEY_INDEX -> BandText.indexTitle[lang]
+        else -> spec?.label?.get(lang) ?: metricKey
+    }
+    val info = when (metricKey) {
+        MetricSpecs.KEY_BLOOD_PRESSURE -> MetricSpecs.BLOOD_PRESSURE_INFO
+        MetricSpecs.KEY_SLEEP -> MetricSpecs.SLEEP_INFO
+        else -> spec?.info
+    }
+
+    val gestures = rememberChartGestureModifier(
+        onZoom = { viewport.zoomAround(viewport.plotWidthPx / 2f, it, bounds) },
+        onPan = { viewport.panBy(it.x, bounds) },
+    )
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(
+                top = contentPadding.calculateTopPadding(),
+                bottom = contentPadding.calculateBottomPadding() + 24.dp,
+            ),
+    ) {
+        DetailHeader(title, hasInfo = info != null, onBack = onBack, onInfo = { showInfo = !showInfo })
+
+        if (metricKey == MetricSpecs.KEY_INDEX) {
+            state.index?.let { HealthIndexDetail(it) }
+            return@Column
+        }
+
+        Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SpanChips(viewport, bounds)
+
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    when (metricKey) {
+                        MetricSpecs.KEY_BLOOD_PRESSURE -> state.bloodPressure?.let { bp ->
+                            Headline(bp.headline, "mmHg", null)
+                            BloodPressurePlot(bp, viewport, Modifier.height(DETAIL_HEIGHT).then(gestures))
+                            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                LegendEntry(
+                                    ChartPalette.SYSTOLIC,
+                                    "${BandText.systolic[lang]} ${bp.systolicRange}",
+                                )
+                                LegendEntry(
+                                    ChartPalette.DIASTOLIC,
+                                    "${BandText.diastolic[lang]} ${bp.diastolicRange}",
+                                )
+                            }
+                        }
+                        MetricSpecs.KEY_SLEEP -> state.sleep?.let { sleep ->
+                            Headline(sleep.headline[lang], "", null)
+                            SleepPlot(sleep, viewport, Modifier.height(DETAIL_HEIGHT).then(gestures))
+                            SleepLegend()
+                            sleep.latest?.let { SleepBreakdown(it) }
+                        }
+                        else -> state.metrics.firstOrNull { it.spec.key == metricKey }?.let { chart ->
+                            Headline(chart.headline, chart.spec.unit, chart.headlineBand)
+                            MetricPlot(chart, viewport, Modifier.height(DETAIL_HEIGHT).then(gestures))
+                            Text(
+                                chart.subtitle[lang],
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ChartPalette.AXIS_TEXT,
+                            )
+                        }
+                    }
+                }
+            }
+
+            spec?.bands?.takeIf { it.isNotEmpty() }?.let { BandLadder(it) }
+
+            if (showInfo && info != null) InfoSheet(info)
+        }
+    }
+}
+
+private val DETAIL_HEIGHT = 320.dp
+
+@Composable
+private fun DetailHeader(title: String, hasInfo: Boolean, onBack: () -> Unit, onInfo: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CircleButton("←", onBack)
+        Spacer(Modifier.width(12.dp))
+        Text(
+            title,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f),
+        )
+        if (hasInfo) InfoCircle(onClick = onInfo)
+    }
+}
+
+/**
+ * The back arrow. Plain, unlike the ringed `i` beside it: back is a gesture everyone already knows,
+ * whereas the `i` is the only route to what a metric actually means and has to advertise itself.
+ */
+@Composable
+private fun CircleButton(label: String, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+@Composable
+private fun Headline(value: String, unit: String, band: BandRung?) {
+    Row(verticalAlignment = Alignment.Bottom) {
+        Text(value, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+        if (unit.isNotBlank()) {
+            Spacer(Modifier.width(5.dp))
+            Text(
+                unit,
+                style = MaterialTheme.typography.bodyLarge,
+                color = ChartPalette.AXIS_TEXT,
+                modifier = Modifier.padding(bottom = 5.dp),
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        band?.let { Box(Modifier.padding(bottom = 6.dp)) { BandChip(it) } }
+    }
+}
+
+/** Quick spans. Pinch does the same thing continuously; these are for getting there in one tap. */
+@Composable
+private fun SpanChips(viewport: ChartViewport, bounds: LongRange) {
+    val lang = LocalBandLanguage.current
+    val spans = listOf(
+        BandText.span1h[lang] to 3_600_000L,
+        BandText.span6h[lang] to 6 * 3_600_000L,
+        BandText.span24h[lang] to 24 * 3_600_000L,
+        BandText.span3d[lang] to 3 * 24 * 3_600_000L,
+        BandText.spanAll[lang] to (bounds.last - bounds.first).coerceAtLeast(3_600_000L),
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        spans.forEach { (label, span) ->
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable { viewport.setSpan(span, bounds) }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            ) {
+                Text(label, style = MaterialTheme.typography.labelMedium)
+            }
+        }
+    }
+}
+
+/** The qualitative ladder. Always labelled — a colour never carries the state on its own. */
+@Composable
+private fun BandLadder(bands: List<BandRung>) {
+    val lang = LocalBandLanguage.current
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                BandText.guide[lang],
+                style = MaterialTheme.typography.labelMedium,
+                color = ChartPalette.AXIS_TEXT,
+            )
+            bands.forEachIndexed { i, rung ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(rung.color))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        rung.label[lang],
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        if (rung.upTo == Double.MAX_VALUE) {
+                            BandText.andAbove[lang].format(bands.getOrNull(i - 1)?.upTo?.toInt() ?: 0)
+                        } else {
+                            BandText.upTo[lang].format(rung.upTo.toInt())
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ChartPalette.AXIS_TEXT,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SleepBreakdown(session: SleepSession) {
+    val lang = LocalBandLanguage.current
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        SleepShape.ROWS.forEach { code ->
+            val minutes = session.minutesOf(code)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).clip(CircleShape).background(ChartPalette.sleepStage(code)))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    SleepShape.labelOf(code)[lang],
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.width(56.dp),
+                )
+                val pct = if (session.totalMinutes > 0) minutes * 100 / session.totalMinutes else 0
+                Text(
+                    if (lang == BandLanguage.EN) "${minutes}m · $pct%" else "${minutes}分 · $pct%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ChartPalette.AXIS_TEXT,
+                )
+            }
+        }
+    }
+}
+
+/** The `i` sheet. Richer than Hume's, and explicit about what is not known. */
+@Composable
+private fun InfoSheet(info: MetricInfo) {
+    val lang = LocalBandLanguage.current
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            InfoBlock(BandText.infoWhat[lang], info.whatItIs[lang])
+            InfoBlock(BandText.infoHow[lang], info.howMeasured[lang])
+            InfoBlock(BandText.infoRead[lang], info.howToRead[lang])
+            if (info.caveat[lang].isNotBlank()) {
+                InfoBlock(BandText.infoCaveat[lang], info.caveat[lang], ChartPalette.BAND_WARN)
+            }
+        }
+    }
+}
+
+@Composable
+private fun InfoBlock(heading: String, body: String, headingColor: androidx.compose.ui.graphics.Color? = null) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            heading,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = headingColor ?: MaterialTheme.colorScheme.onSurface,
+        )
+        Text(body, style = MaterialTheme.typography.bodySmall, color = ChartPalette.AXIS_TEXT)
+    }
+}

@@ -18,6 +18,7 @@ object BandSettings {
     private const val KEY_STREAMS = "streams"
     private const val KEY_OVERLAP_MIN = "overlap_minutes"
     private const val KEY_TIMEOUT_SEC = "timeout_sec"
+    private const val KEY_LANGUAGE = "language"
 
     /**
      * 白い熊's band. A static random address, so it survives reboots — but it WOULD change if the
@@ -63,6 +64,22 @@ object BandSettings {
 
     fun setOverlapMinutes(context: Context, value: Int) =
         prefs(context).edit { putInt(KEY_OVERLAP_MIN, value.coerceIn(0, 24 * 60)) }
+
+    /**
+     * Which language 「健康」 displays in — an IETF tag, `en-US` or `ja-JP`.
+     *
+     * Persisted rather than passed per launch because the window can be resumed by the system long
+     * after the task that opened it finished, and it must come back up in the same language.
+     * `健康の設定 -- [727][01]` writes it through the `band.charts` action's `lang` argument.
+     */
+    fun language(context: Context): String =
+        prefs(context).getString(KEY_LANGUAGE, null)?.trim()?.ifEmpty { null } ?: DEFAULT_LANGUAGE
+
+    fun setLanguage(context: Context, value: String) =
+        prefs(context).edit { putString(KEY_LANGUAGE, value.trim()) }
+
+    /** 白い熊 asked for these tables in English (2026-08-06). */
+    const val DEFAULT_LANGUAGE = "en-US"
 
     fun timeoutSec(context: Context): Int =
         prefs(context).getInt(KEY_TIMEOUT_SEC, DEFAULT_TIMEOUT_SEC)
