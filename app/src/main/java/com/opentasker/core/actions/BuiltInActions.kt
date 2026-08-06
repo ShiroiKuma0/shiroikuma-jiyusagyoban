@@ -499,24 +499,22 @@ class LaunchIntentAction : Action {
             IntentDispatchMode.ACTIVITY -> intent.resolveActivity(packageManager)
             IntentDispatchMode.BROADCAST, IntentDispatchMode.SERVICE -> null
         }
-        if (plan.mode != IntentDispatchMode.ACTIVITY && component == null) return null
-        if (component != null) {
-            if (component.packageName != plan.packageName) return null
-            if (component.packageName != ctx.app.packageName && !isExported(packageManager, plan.mode, component)) {
-                return null
-            }
-            intent.component = component
+        // Every dispatch has to name one concrete component — an explicit class, a launcher
+        // entry, or (for an activity) whatever the target package's own manifest declares as
+        // the handler for this action. Upstream additionally refused a resolved, exported
+        // activity whenever the class was not typed out by hand; that turns the ordinary
+        // "package + action" launch — android.media.action.STILL_IMAGE_CAMERA and friends —
+        // into a hunt for a vendor-internal class name, so the fork drops that last hurdle.
+        // The guarantees it was standing in for are kept below: same package, exported.
+        if (component == null) return null
+        if (component.packageName != plan.packageName) return null
+        if (component.packageName != ctx.app.packageName && !isExported(packageManager, plan.mode, component)) {
+            return null
         }
+        intent.component = component
         if (plan.mode != IntentDispatchMode.ACTIVITY && plan.packageName != ctx.app.packageName) {
             // Broadcasts and services never use an external package-scoped implicit dispatch.
             if (explicitComponent == null) return null
-        }
-        if (plan.mode == IntentDispatchMode.ACTIVITY && plan.action != null &&
-            plan.packageName != ctx.app.packageName && explicitComponent == null
-        ) {
-            // A package plus arbitrary action is not an approval of a particular exported
-            // component; require the user to choose the class explicitly.
-            return null
         }
         return intent
     }
