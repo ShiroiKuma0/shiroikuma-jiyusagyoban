@@ -97,6 +97,43 @@ data class ThemePrefs(
     // ---- Panel bars (the oval volume/brightness capsule slider — style:fill) ---------------------
     val ovalBarBorderWidthDp: Int = 2,           // default oval-bar border width; 0 = no border [0, OVAL_BAR_BORDER_MAX]
     val ovalBarBorderColor: Int = BLACK,         // default oval-bar border colour
+
+    // ---- 「健康」 charts ---------------------------------------------------------------------
+    val chartPreviewHeightDp: Int = 132,                    // preview card plot height
+    val chartDetailHeightDp: Int = 320,                     // full-screen plot height
+    val chartCardGapDp: Int = 12,                           // gap between dashboard cards
+    val chartAxisTextSp: Int = 10,                          // axis label size
+    val chartHeadlineSp: Int = 28,                          // the big number on a card
+    val chartLineWidthDp: Int = 2,                          // line stroke width
+    val chartDotSizeDp: Int = 3,                            // sample dot diameter; 0 = no dots
+    val chartCapsuleWidthDp: Int = 8,                       // hourly capsule width
+    val chartBarWidthDp: Int = 6,                           // step bar width
+    val chartDumbbellWidthDp: Int = 5,                      // blood-pressure cap width
+    val chartHypnogramBandPct: Int = 52,                    // stage block height, % of its row
+    val chartCornerRadiusDp: Int = 2,                       // rounded data-end radius
+    val chartGridOpacityPct: Int = 10,                      // grid line opacity
+    val chartFillOpacityPct: Int = 28,                      // area fill under a line
+    val chartGlowOpacityPct: Int = 18,                      // glow behind a stroke
+    val chartGapTintPct: Int = 8,                           // tint over a stretch with no measurement
+    val chartAxisTextColor: Int = 0xFF8A8A85.toInt(),       // axis + footnote ink
+    val chartGridColor: Int = 0xFFFFFFFF.toInt(),           // grid line colour, before opacity
+    val chartShowGrid: Boolean = true,                      // draw the grid at all
+    val chartShowDots: Boolean = true,                      // draw the real samples over a line
+    val chartShowRejected: Boolean = true,                  // the ✕ marks at flagged samples
+    val chartShowGaps: Boolean = true,                      // tint stretches with no measurement
+    val chartDefaultSpanHours: Int = 24,                    // how much a chart opens on
+    val chartCurveMode: String = "PCHIP",                   // PCHIP / LINEAR / STEP
+    val chartColorHeartRate: Int = 0xFF3987E5.toInt(),      // 心拍
+    val chartColorBandState: Int = 0xFFD95926.toInt(),      // バンド状態指数
+    val chartColorSpo2: Int = 0xFF199E70.toInt(),           // 血中酸素
+    val chartColorTemperature: Int = 0xFFC98500.toInt(),    // 体温
+    val chartColorSteps: Int = 0xFFD55181.toInt(),          // 歩数
+    val chartColorSystolic: Int = 0xFF3987E5.toInt(),       // 収縮期
+    val chartColorDiastolic: Int = 0xFFD95926.toInt(),      // 拡張期
+    val chartColorSleepDeep: Int = 0xFF199E70.toInt(),      // 深い
+    val chartColorSleepLight: Int = 0xFFC98500.toInt(),     // 浅い
+    val chartColorSleepRem: Int = 0xFF3987E5.toInt(),       // REM
+    val chartColorSleepAwake: Int = 0xFFD95926.toInt(),     // 覚醒
 ) {
     companion object {
         const val BLACK = 0xFF000000.toInt()
@@ -150,6 +187,23 @@ data class ThemePrefs(
 
         const val OVAL_BAR_BORDER_MAX = 16
 
+        // ---- 「健康」 chart bounds ------------------------------------------------------------------
+        const val CHART_PREVIEW_H_MIN = 60
+        const val CHART_PREVIEW_H_MAX = 400
+        const val CHART_DETAIL_H_MIN = 140
+        const val CHART_DETAIL_H_MAX = 900
+        const val CHART_GAP_MAX = 40
+        const val CHART_AXIS_SP_MIN = 6
+        const val CHART_AXIS_SP_MAX = 20
+        const val CHART_HEADLINE_MIN = 14
+        const val CHART_HEADLINE_MAX = 60
+        const val CHART_LINE_MAX = 8
+        const val CHART_DOT_MAX = 14
+        const val CHART_MARK_W_MAX = 40
+        const val CHART_CORNER_MAX = 12
+        const val CHART_SPAN_MAX = 720
+        val CHART_CURVES = listOf("PCHIP", "LINEAR", "STEP")
+
         val DEFAULT = ThemePrefs()
     }
 }
@@ -167,6 +221,41 @@ object ThemeStore {
 
     private const val PREFS_NAME = "shiroikuma_ui_theme"
     private const val K_SEEDED = "theme_seeded"
+    private const val K_CHART_PREVIEW_H = "chart_preview_h"
+    private const val K_CHART_DETAIL_H = "chart_detail_h"
+    private const val K_CHART_CARD_GAP = "chart_card_gap"
+    private const val K_CHART_AXIS_SP = "chart_axis_sp"
+    private const val K_CHART_HEADLINE_SP = "chart_headline_sp"
+    private const val K_CHART_LINE_W = "chart_line_w"
+    private const val K_CHART_DOT = "chart_dot"
+    private const val K_CHART_CAPSULE_W = "chart_capsule_w"
+    private const val K_CHART_BAR_W = "chart_bar_w"
+    private const val K_CHART_DUMBBELL_W = "chart_dumbbell_w"
+    private const val K_CHART_HYPNO_PCT = "chart_hypno_pct"
+    private const val K_CHART_CORNER = "chart_corner"
+    private const val K_CHART_GRID_OP = "chart_grid_op"
+    private const val K_CHART_FILL_OP = "chart_fill_op"
+    private const val K_CHART_GLOW_OP = "chart_glow_op"
+    private const val K_CHART_GAP_OP = "chart_gap_op"
+    private const val K_CHART_AXIS_COLOR = "chart_axis_color"
+    private const val K_CHART_GRID_COLOR = "chart_grid_color"
+    private const val K_CHART_SHOW_GRID = "chart_show_grid"
+    private const val K_CHART_SHOW_DOTS = "chart_show_dots"
+    private const val K_CHART_SHOW_REJECTED = "chart_show_rejected"
+    private const val K_CHART_SHOW_GAPS = "chart_show_gaps"
+    private const val K_CHART_SPAN_H = "chart_span_h"
+    private const val K_CHART_CURVE = "chart_curve"
+    private const val K_CHART_C_HR = "chart_c_hr"
+    private const val K_CHART_C_STATE = "chart_c_state"
+    private const val K_CHART_C_SPO2 = "chart_c_spo2"
+    private const val K_CHART_C_TEMP = "chart_c_temp"
+    private const val K_CHART_C_STEPS = "chart_c_steps"
+    private const val K_CHART_C_SYS = "chart_c_sys"
+    private const val K_CHART_C_DIA = "chart_c_dia"
+    private const val K_CHART_C_DEEP = "chart_c_deep"
+    private const val K_CHART_C_LIGHT = "chart_c_light"
+    private const val K_CHART_C_REM = "chart_c_rem"
+    private const val K_CHART_C_AWAKE = "chart_c_awake"
     private const val K_BACKGROUND = "background"
     private const val K_TEXT = "text"
     private const val K_TEXT_SECONDARY = "text_secondary"
@@ -270,6 +359,54 @@ object ThemeStore {
 
     fun resetToDefault() = update { ThemePrefs.DEFAULT }
 
+    /**
+     * Put every 「健康」 chart knob back the way it shipped.
+     *
+     * Separate from [resetToDefault] on purpose: the chart colours were validated against
+     * colour-blindness and contrast gates, so "put the charts back" is a thing worth being able to do
+     * without also discarding a font, a border width, and everything else on the page.
+     */
+    fun resetChartsToDefault() = update { p ->
+        val d = ThemePrefs.DEFAULT
+        p.copy(
+        chartPreviewHeightDp = d.chartPreviewHeightDp,
+        chartDetailHeightDp = d.chartDetailHeightDp,
+        chartCardGapDp = d.chartCardGapDp,
+        chartAxisTextSp = d.chartAxisTextSp,
+        chartHeadlineSp = d.chartHeadlineSp,
+        chartLineWidthDp = d.chartLineWidthDp,
+        chartDotSizeDp = d.chartDotSizeDp,
+        chartCapsuleWidthDp = d.chartCapsuleWidthDp,
+        chartBarWidthDp = d.chartBarWidthDp,
+        chartDumbbellWidthDp = d.chartDumbbellWidthDp,
+        chartHypnogramBandPct = d.chartHypnogramBandPct,
+        chartCornerRadiusDp = d.chartCornerRadiusDp,
+        chartGridOpacityPct = d.chartGridOpacityPct,
+        chartFillOpacityPct = d.chartFillOpacityPct,
+        chartGlowOpacityPct = d.chartGlowOpacityPct,
+        chartGapTintPct = d.chartGapTintPct,
+        chartAxisTextColor = d.chartAxisTextColor,
+        chartGridColor = d.chartGridColor,
+        chartShowGrid = d.chartShowGrid,
+        chartShowDots = d.chartShowDots,
+        chartShowRejected = d.chartShowRejected,
+        chartShowGaps = d.chartShowGaps,
+        chartDefaultSpanHours = d.chartDefaultSpanHours,
+        chartCurveMode = d.chartCurveMode,
+        chartColorHeartRate = d.chartColorHeartRate,
+        chartColorBandState = d.chartColorBandState,
+        chartColorSpo2 = d.chartColorSpo2,
+        chartColorTemperature = d.chartColorTemperature,
+        chartColorSteps = d.chartColorSteps,
+        chartColorSystolic = d.chartColorSystolic,
+        chartColorDiastolic = d.chartColorDiastolic,
+        chartColorSleepDeep = d.chartColorSleepDeep,
+        chartColorSleepLight = d.chartColorSleepLight,
+        chartColorSleepRem = d.chartColorSleepRem,
+        chartColorSleepAwake = d.chartColorSleepAwake,
+        )
+    }
+
     private fun ThemePrefs.normalized(): ThemePrefs = copy(
         borderWidthDp = borderWidthDp.coerceIn(0, ThemePrefs.BORDER_WIDTH_MAX),
         fontScalePct = fontScalePct.coerceIn(ThemePrefs.SCALE_MIN, ThemePrefs.SCALE_MAX),
@@ -298,6 +435,24 @@ object ThemeStore {
         flashTapBehavior = flashTapBehavior.takeIf { it in ThemePrefs.FLASH_BEHAVIORS } ?: ThemePrefs.DEFAULT.flashTapBehavior,
         flashLongTapBehavior = flashLongTapBehavior.takeIf { it in ThemePrefs.FLASH_BEHAVIORS } ?: ThemePrefs.DEFAULT.flashLongTapBehavior,
         pickerFontSizeSp = pickerFontSizeSp.coerceIn(ThemePrefs.PICKER_FONT_MIN, ThemePrefs.PICKER_FONT_MAX),
+        chartPreviewHeightDp = chartPreviewHeightDp.coerceIn(ThemePrefs.CHART_PREVIEW_H_MIN, ThemePrefs.CHART_PREVIEW_H_MAX),
+        chartDetailHeightDp = chartDetailHeightDp.coerceIn(ThemePrefs.CHART_DETAIL_H_MIN, ThemePrefs.CHART_DETAIL_H_MAX),
+        chartCardGapDp = chartCardGapDp.coerceIn(0, ThemePrefs.CHART_GAP_MAX),
+        chartAxisTextSp = chartAxisTextSp.coerceIn(ThemePrefs.CHART_AXIS_SP_MIN, ThemePrefs.CHART_AXIS_SP_MAX),
+        chartHeadlineSp = chartHeadlineSp.coerceIn(ThemePrefs.CHART_HEADLINE_MIN, ThemePrefs.CHART_HEADLINE_MAX),
+        chartLineWidthDp = chartLineWidthDp.coerceIn(1, ThemePrefs.CHART_LINE_MAX),
+        chartDotSizeDp = chartDotSizeDp.coerceIn(0, ThemePrefs.CHART_DOT_MAX),
+        chartCapsuleWidthDp = chartCapsuleWidthDp.coerceIn(2, ThemePrefs.CHART_MARK_W_MAX),
+        chartBarWidthDp = chartBarWidthDp.coerceIn(1, ThemePrefs.CHART_MARK_W_MAX),
+        chartDumbbellWidthDp = chartDumbbellWidthDp.coerceIn(2, ThemePrefs.CHART_MARK_W_MAX),
+        chartHypnogramBandPct = chartHypnogramBandPct.coerceIn(10, 100),
+        chartCornerRadiusDp = chartCornerRadiusDp.coerceIn(0, ThemePrefs.CHART_CORNER_MAX),
+        chartGridOpacityPct = chartGridOpacityPct.coerceIn(0, 100),
+        chartFillOpacityPct = chartFillOpacityPct.coerceIn(0, 100),
+        chartGlowOpacityPct = chartGlowOpacityPct.coerceIn(0, 100),
+        chartGapTintPct = chartGapTintPct.coerceIn(0, 100),
+        chartDefaultSpanHours = chartDefaultSpanHours.coerceIn(1, ThemePrefs.CHART_SPAN_MAX),
+        chartCurveMode = chartCurveMode.takeIf { it in ThemePrefs.CHART_CURVES } ?: ThemePrefs.DEFAULT.chartCurveMode,
         pickerRowPadDp = pickerRowPadDp.coerceIn(0, ThemePrefs.PICKER_PAD_MAX),
         pickerIndentDp = pickerIndentDp.coerceIn(0, ThemePrefs.PICKER_INDENT_MAX),
         pickerGroupCornerDp = pickerGroupCornerDp.coerceIn(0, ThemePrefs.PICKER_CORNER_MAX),
@@ -366,6 +521,41 @@ object ThemeStore {
             flashKillTaskName = prefs.getString(K_FLASH_KILL_TASK, d.flashKillTaskName) ?: d.flashKillTaskName,
             flashKillAllTaskName = prefs.getString(K_FLASH_KILL_ALL_TASK, d.flashKillAllTaskName) ?: d.flashKillAllTaskName,
             pickerFontSizeSp = prefs.getInt(K_PICKER_FONT_SIZE, d.pickerFontSizeSp),
+            chartPreviewHeightDp = prefs.getInt(K_CHART_PREVIEW_H, d.chartPreviewHeightDp),
+            chartDetailHeightDp = prefs.getInt(K_CHART_DETAIL_H, d.chartDetailHeightDp),
+            chartCardGapDp = prefs.getInt(K_CHART_CARD_GAP, d.chartCardGapDp),
+            chartAxisTextSp = prefs.getInt(K_CHART_AXIS_SP, d.chartAxisTextSp),
+            chartHeadlineSp = prefs.getInt(K_CHART_HEADLINE_SP, d.chartHeadlineSp),
+            chartLineWidthDp = prefs.getInt(K_CHART_LINE_W, d.chartLineWidthDp),
+            chartDotSizeDp = prefs.getInt(K_CHART_DOT, d.chartDotSizeDp),
+            chartCapsuleWidthDp = prefs.getInt(K_CHART_CAPSULE_W, d.chartCapsuleWidthDp),
+            chartBarWidthDp = prefs.getInt(K_CHART_BAR_W, d.chartBarWidthDp),
+            chartDumbbellWidthDp = prefs.getInt(K_CHART_DUMBBELL_W, d.chartDumbbellWidthDp),
+            chartHypnogramBandPct = prefs.getInt(K_CHART_HYPNO_PCT, d.chartHypnogramBandPct),
+            chartCornerRadiusDp = prefs.getInt(K_CHART_CORNER, d.chartCornerRadiusDp),
+            chartGridOpacityPct = prefs.getInt(K_CHART_GRID_OP, d.chartGridOpacityPct),
+            chartFillOpacityPct = prefs.getInt(K_CHART_FILL_OP, d.chartFillOpacityPct),
+            chartGlowOpacityPct = prefs.getInt(K_CHART_GLOW_OP, d.chartGlowOpacityPct),
+            chartGapTintPct = prefs.getInt(K_CHART_GAP_OP, d.chartGapTintPct),
+            chartAxisTextColor = prefs.getInt(K_CHART_AXIS_COLOR, d.chartAxisTextColor),
+            chartGridColor = prefs.getInt(K_CHART_GRID_COLOR, d.chartGridColor),
+            chartShowGrid = prefs.getBoolean(K_CHART_SHOW_GRID, d.chartShowGrid),
+            chartShowDots = prefs.getBoolean(K_CHART_SHOW_DOTS, d.chartShowDots),
+            chartShowRejected = prefs.getBoolean(K_CHART_SHOW_REJECTED, d.chartShowRejected),
+            chartShowGaps = prefs.getBoolean(K_CHART_SHOW_GAPS, d.chartShowGaps),
+            chartDefaultSpanHours = prefs.getInt(K_CHART_SPAN_H, d.chartDefaultSpanHours),
+            chartCurveMode = prefs.getString(K_CHART_CURVE, d.chartCurveMode) ?: d.chartCurveMode,
+            chartColorHeartRate = prefs.getInt(K_CHART_C_HR, d.chartColorHeartRate),
+            chartColorBandState = prefs.getInt(K_CHART_C_STATE, d.chartColorBandState),
+            chartColorSpo2 = prefs.getInt(K_CHART_C_SPO2, d.chartColorSpo2),
+            chartColorTemperature = prefs.getInt(K_CHART_C_TEMP, d.chartColorTemperature),
+            chartColorSteps = prefs.getInt(K_CHART_C_STEPS, d.chartColorSteps),
+            chartColorSystolic = prefs.getInt(K_CHART_C_SYS, d.chartColorSystolic),
+            chartColorDiastolic = prefs.getInt(K_CHART_C_DIA, d.chartColorDiastolic),
+            chartColorSleepDeep = prefs.getInt(K_CHART_C_DEEP, d.chartColorSleepDeep),
+            chartColorSleepLight = prefs.getInt(K_CHART_C_LIGHT, d.chartColorSleepLight),
+            chartColorSleepRem = prefs.getInt(K_CHART_C_REM, d.chartColorSleepRem),
+            chartColorSleepAwake = prefs.getInt(K_CHART_C_AWAKE, d.chartColorSleepAwake),
             pickerRowPadDp = prefs.getInt(K_PICKER_ROW_PAD, d.pickerRowPadDp),
             pickerIndentDp = prefs.getInt(K_PICKER_INDENT, d.pickerIndentDp),
             pickerGroupCornerDp = prefs.getInt(K_PICKER_GROUP_CORNER, d.pickerGroupCornerDp),
@@ -435,6 +625,41 @@ object ThemeStore {
             putString(K_FLASH_KILL_TASK, p.flashKillTaskName)
             putString(K_FLASH_KILL_ALL_TASK, p.flashKillAllTaskName)
             putInt(K_PICKER_FONT_SIZE, p.pickerFontSizeSp)
+            putInt(K_CHART_PREVIEW_H, p.chartPreviewHeightDp)
+            putInt(K_CHART_DETAIL_H, p.chartDetailHeightDp)
+            putInt(K_CHART_CARD_GAP, p.chartCardGapDp)
+            putInt(K_CHART_AXIS_SP, p.chartAxisTextSp)
+            putInt(K_CHART_HEADLINE_SP, p.chartHeadlineSp)
+            putInt(K_CHART_LINE_W, p.chartLineWidthDp)
+            putInt(K_CHART_DOT, p.chartDotSizeDp)
+            putInt(K_CHART_CAPSULE_W, p.chartCapsuleWidthDp)
+            putInt(K_CHART_BAR_W, p.chartBarWidthDp)
+            putInt(K_CHART_DUMBBELL_W, p.chartDumbbellWidthDp)
+            putInt(K_CHART_HYPNO_PCT, p.chartHypnogramBandPct)
+            putInt(K_CHART_CORNER, p.chartCornerRadiusDp)
+            putInt(K_CHART_GRID_OP, p.chartGridOpacityPct)
+            putInt(K_CHART_FILL_OP, p.chartFillOpacityPct)
+            putInt(K_CHART_GLOW_OP, p.chartGlowOpacityPct)
+            putInt(K_CHART_GAP_OP, p.chartGapTintPct)
+            putInt(K_CHART_AXIS_COLOR, p.chartAxisTextColor)
+            putInt(K_CHART_GRID_COLOR, p.chartGridColor)
+            putBoolean(K_CHART_SHOW_GRID, p.chartShowGrid)
+            putBoolean(K_CHART_SHOW_DOTS, p.chartShowDots)
+            putBoolean(K_CHART_SHOW_REJECTED, p.chartShowRejected)
+            putBoolean(K_CHART_SHOW_GAPS, p.chartShowGaps)
+            putInt(K_CHART_SPAN_H, p.chartDefaultSpanHours)
+            putString(K_CHART_CURVE, p.chartCurveMode)
+            putInt(K_CHART_C_HR, p.chartColorHeartRate)
+            putInt(K_CHART_C_STATE, p.chartColorBandState)
+            putInt(K_CHART_C_SPO2, p.chartColorSpo2)
+            putInt(K_CHART_C_TEMP, p.chartColorTemperature)
+            putInt(K_CHART_C_STEPS, p.chartColorSteps)
+            putInt(K_CHART_C_SYS, p.chartColorSystolic)
+            putInt(K_CHART_C_DIA, p.chartColorDiastolic)
+            putInt(K_CHART_C_DEEP, p.chartColorSleepDeep)
+            putInt(K_CHART_C_LIGHT, p.chartColorSleepLight)
+            putInt(K_CHART_C_REM, p.chartColorSleepRem)
+            putInt(K_CHART_C_AWAKE, p.chartColorSleepAwake)
             putInt(K_PICKER_ROW_PAD, p.pickerRowPadDp)
             putInt(K_PICKER_INDENT, p.pickerIndentDp)
             putInt(K_PICKER_GROUP_CORNER, p.pickerGroupCornerDp)

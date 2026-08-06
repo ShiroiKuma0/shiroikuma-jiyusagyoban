@@ -136,6 +136,28 @@ object BandText {
         "深い %d分 ／ 浅い %d分 ／ REM %d分 ／ 覚醒 %d分",
     )
     val noSleepRecord = Loc("No record", "記録なし")
+    val awakeAtCrosshair = Loc("not asleep then", "その時は寝ていない")
+    val crosshairHint = Loc(
+        "Tap the chart to read a moment; tap it again to clear.",
+        "グラフをタップするとその時点の値。もう一度タップで解除。",
+    )
+    val nothingHere = Loc("no reading there", "その時点の測定なし")
+
+    // daily summary table
+    val byDay = Loc("Day by day", "日ごと")
+    val byDayNote = Loc(
+        "One row per calendar day. A night counts toward the day it started on. Resting heart rate " +
+            "and blood oxygen are 5th percentiles; a dash means that day had nothing to measure.",
+        "一日ごとに一行。夜は、寝はじめた日のぶんとして数えます。安静時心拍と血中酸素は" +
+            "第5パーセンタイル。ダッシュはその日に測れたものがなかったという意味です。",
+    )
+    val colDay = Loc("Day", "日")
+    val colIndex = Loc("Index", "指数")
+    val colResting = Loc("Rest HR", "安静心拍")
+    val colSleep = Loc("Sleep", "睡眠")
+    val colSteps = Loc("Steps", "歩数")
+    val colSpo2 = Loc("SpO₂", "血中酸素")
+    val deepRemShort = Loc("deep %d · REM %d", "深 %d ／ REM %d")
 
     /** Shown on a card whose numbers do not behave like measurements. Tap for the evidence. */
     val notAMeasurement = Loc("not a measurement", "測定値ではない")
