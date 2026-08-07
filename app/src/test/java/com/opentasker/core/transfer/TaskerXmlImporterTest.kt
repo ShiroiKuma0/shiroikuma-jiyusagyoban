@@ -216,6 +216,59 @@ class TaskerXmlImporterTest {
     }
 
     @Test
+    fun stripsBenignDoctypeDeclarationsAndImports() {
+        val report = TaskerXmlImporter.parse(
+            rawXml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE TaskerData>
+                <TaskerData>
+                    <Variable><nme>%FOO</nme><val>bar</val></Variable>
+                </TaskerData>
+            """.trimIndent(),
+            appVersion = "test",
+            importedAtEpochMs = 123L,
+        )
+
+        assertEquals("bar", report.bundle.variables.single { it.name == "%FOO" }.value)
+    }
+
+    @Test
+    fun stripsBenignDoctypeWithEmptyInternalSubset() {
+        val report = TaskerXmlImporter.parse(
+            rawXml = """
+                <!DOCTYPE TaskerData [
+                ]>
+                <TaskerData>
+                    <Variable><nme>%FOO</nme><val>bar</val></Variable>
+                </TaskerData>
+            """.trimIndent(),
+            appVersion = "test",
+            importedAtEpochMs = 123L,
+        )
+
+        assertEquals("bar", report.bundle.variables.single { it.name == "%FOO" }.value)
+    }
+
+    @Test
+    fun rejectsDoctypeWithExternalDtdReference() {
+        val error = runCatching {
+            TaskerXmlImporter.parse(
+                rawXml = """
+                    <!DOCTYPE TaskerData SYSTEM "http://example.com/tasker.dtd">
+                    <TaskerData>
+                        <Variable><nme>%FOO</nme><val>bar</val></Variable>
+                    </TaskerData>
+                """.trimIndent(),
+                appVersion = "test",
+                importedAtEpochMs = 123L,
+            )
+        }.exceptionOrNull()
+
+        assertTrue(error is IllegalArgumentException)
+        assertTrue(error!!.message.orEmpty().contains("DOCTYPE"))
+    }
+
+    @Test
     fun rejectsDoctypeDeclarationsBeforeParsing() {
         val error = runCatching {
             TaskerXmlImporter.parse(

@@ -51,8 +51,9 @@ object TaskerXmlImporter {
         importedAtEpochMs: Long,
         budget: ImportResourceBudget,
     ): TaskerXmlImportReport {
-        ImportResourceGuard.requireXmlPreflight(rawXml, budget)
-        val doc = parseDocument(rawXml)
+        val sanitizedXml = ImportResourceGuard.sanitizeTaskerXml(rawXml)
+        ImportResourceGuard.requireXmlPreflight(sanitizedXml, budget)
+        val doc = parseDocument(sanitizedXml)
         val warnings = mutableListOf<String>()
         val lossyWarnings = mutableListOf<String>()
         val mappedActions = mutableListOf<TaskerMappedAction>()
@@ -423,7 +424,11 @@ object TaskerXmlImporter {
         val factory = DocumentBuilderFactory.newInstance().apply {
             isNamespaceAware = false
             isExpandEntityReferences = false
-            setRequiredFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            // Best-effort only: Android's Harmony/Expat factories throw for the Apache feature
+            // URI, and making it fatal broke every device import (issue #5). Doctypes are
+            // stripped or rejected in text by ImportResourceGuard.sanitizeTaskerXml before
+            // this parser ever sees the input.
+            setFeatureSafely("http://apache.org/xml/features/disallow-doctype-decl", true)
             setFeatureSafely("http://xml.org/sax/features/external-general-entities", false)
             setFeatureSafely("http://xml.org/sax/features/external-parameter-entities", false)
             setFeatureSafely("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
@@ -506,14 +511,6 @@ object TaskerXmlImporter {
 
     private fun DocumentBuilderFactory.setFeatureSafely(name: String, value: Boolean) {
         runCatching { setFeature(name, value) }
-    }
-
-    private fun DocumentBuilderFactory.setRequiredFeature(name: String, value: Boolean) {
-        try {
-            setFeature(name, value)
-        } catch (error: Exception) {
-            throw IllegalStateException("XML parser does not support required secure feature: $name", error)
-        }
     }
 
     private data class ParsedTaskerAction(

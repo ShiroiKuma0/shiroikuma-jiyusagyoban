@@ -140,6 +140,27 @@ class ImportResourceBudgetTest {
     }
 
     @Test
+    fun sanitizeStripsBenignDoctypeAndRejectsUnsafeOnes() {
+        assertEquals("<root/>", ImportResourceGuard.sanitizeTaskerXml("<!DOCTYPE root>\n<root/>").trim())
+        assertEquals("<root/>", ImportResourceGuard.sanitizeTaskerXml("<root/>"))
+
+        val unterminated = runCatching {
+            ImportResourceGuard.sanitizeTaskerXml("<!DOCTYPE root [<!ELEMENT root EMPTY>")
+        }.exceptionOrNull()
+        assertEquals(true, unterminated is IllegalArgumentException)
+
+        val entity = runCatching {
+            ImportResourceGuard.sanitizeTaskerXml("<!DOCTYPE root [<!ENTITY x \"y\">]><root/>")
+        }.exceptionOrNull()
+        assertEquals(true, entity is IllegalArgumentException)
+
+        val doubled = runCatching {
+            ImportResourceGuard.sanitizeTaskerXml("<!DOCTYPE root><!DOCTYPE root><root/>")
+        }.exceptionOrNull()
+        assertEquals(true, doubled is IllegalArgumentException)
+    }
+
+    @Test
     fun xmlPreflightAcceptsExactNodeAndDepthLimitsThenRejectsOneOver() {
         val exact = "<root><child/></root>"
         ImportResourceGuard.requireXmlPreflight(

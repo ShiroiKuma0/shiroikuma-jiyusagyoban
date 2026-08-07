@@ -48,6 +48,42 @@ internal object ImportResourceGuard {
         JsonBudgetScanner(rawJson, budget).scan()
     }
 
+    /**
+     * Removes a benign DOCTYPE declaration from Tasker XML before parsing. Real Tasker exports can
+     * carry a plain doctype prolog, and Android's Expat-backed parsers do not recognise the Apache
+     * disallow-doctype-decl feature, so the doctype has to be handled here in text (issue #5).
+     * Declarations that define entities or reference external DTDs are rejected outright — that is
+     * the XXE surface — as is any input still containing a doctype after the strip.
+     */
+    fun sanitizeTaskerXml(rawXml: String): String {
+        val match = DOCTYPE_PATTERN.find(rawXml) ?: return rawXml
+        val start = match.range.first
+        var index = start
+        var inInternalSubset = false
+        var end = -1
+        while (index < rawXml.length) {
+            when (rawXml[index]) {
+                '[' -> inInternalSubset = true
+                ']' -> inInternalSubset = false
+                '>' -> if (!inInternalSubset) {
+                    end = index
+                    break
+                }
+            }
+            index++
+        }
+        require(end >= 0) { "Tasker XML DOCTYPE declaration is malformed" }
+        val declaration = rawXml.substring(start, end + 1)
+        require(!DOCTYPE_UNSAFE_PATTERN.containsMatchIn(declaration)) {
+            "Tasker XML with DOCTYPE entity or external DTD references is not supported"
+        }
+        val stripped = rawXml.removeRange(start, end + 1)
+        require(!DOCTYPE_PATTERN.containsMatchIn(stripped)) {
+            "Tasker XML with multiple DOCTYPE declarations is not supported"
+        }
+        return stripped
+    }
+
     fun requireXmlPreflight(rawXml: String, budget: ImportResourceBudget = ImportResourceBudget.Default) {
         requireWithin("XML characters", rawXml.length.toLong(), budget.maxXmlChars.toLong())
         require(!DOCTYPE_PATTERN.containsMatchIn(rawXml)) {
@@ -56,7 +92,10 @@ internal object ImportResourceGuard {
 
         val factory = SAXParserFactory.newInstance().apply {
             isNamespaceAware = false
-            setRequiredFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            // Best-effort only: Android's Harmony/Expat factories throw SAXNotRecognizedException
+            // for the Apache feature URI, and making it fatal broke every device import (issue #5).
+            // The DOCTYPE guarantee is enforced by the text checks above and sanitizeTaskerXml.
+            setFeatureSafely("http://apache.org/xml/features/disallow-doctype-decl", true)
             setFeatureSafely("http://xml.org/sax/features/external-general-entities", false)
             setFeatureSafely("http://xml.org/sax/features/external-parameter-entities", false)
             setFeatureSafely("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
@@ -369,14 +408,6 @@ private fun SAXParserFactory.setFeatureSafely(name: String, value: Boolean) {
     runCatching { setFeature(name, value) }
 }
 
-private fun SAXParserFactory.setRequiredFeature(name: String, value: Boolean) {
-    try {
-        setFeature(name, value)
-    } catch (error: Exception) {
-        throw IllegalStateException("XML parser does not support required secure feature: $name", error)
-    }
-}
-
 private fun Char.isJsonTokenBoundary(): Boolean =
     isWhitespace() || this == '"' || this == '{' || this == '}' || this == '[' || this == ']' ||
         this == ':' || this == ',' || this == '/'
@@ -431,3 +462,4 @@ private val HIGH_SURROGATE_RANGE = 0xd800..0xdbff
 private val LOW_SURROGATE_RANGE = 0xdc00..0xdfff
 private val TASKER_CONTEXT_TAGS = setOf("time", "day", "application", "app", "state", "event", "location")
 private val DOCTYPE_PATTERN = Regex("""<!\s*DOCTYPE\b""", RegexOption.IGNORE_CASE)
+private val DOCTYPE_UNSAFE_PATTERN = Regex("""<!\s*ENTITY\b|\bSYSTEM\b|\bPUBLIC\b""", RegexOption.IGNORE_CASE)
