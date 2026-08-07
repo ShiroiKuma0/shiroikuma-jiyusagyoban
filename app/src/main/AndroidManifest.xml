@@ -58,6 +58,15 @@
         would fail forever while claiming to be one grant away.
     -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+    <!--
+        Special access, granted only through Settings > Notifications > Do Not Disturb access
+        (renamed "Modes access" on Android 16). The system builds that list from apps that
+        declare this permission, so without it OpenTasker never appears on the page, the
+        isNotificationPolicyAccessGranted() checks behind dnd.set / zen.rule.set / zen.rule.clear
+        can never become true, and the Setup row sends the user to a screen that cannot grant
+        anything (issue #4).
+    -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
 
     <uses-feature
