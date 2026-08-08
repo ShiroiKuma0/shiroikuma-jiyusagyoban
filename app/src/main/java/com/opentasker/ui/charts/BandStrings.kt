@@ -71,6 +71,13 @@ object BandText {
         "⚠ %s の %.1f 時間が読む前に上書きされました",
     )
     val noData = Loc("No data yet — run a sync.", "まだデータがありません。同期してください。")
+    // --- the band's own charge, in the sync header ------------------------------------------------
+    val bandBattery = Loc("Band", "バンド")
+    val bandBatteryUnknown = Loc("Band charge unknown — sync to read it", "バンドの残量は未取得 — 同期すると読めます")
+    /** The charge always travels with its age; a bare percentage could be hours old. */
+    val bandBatteryFresh = Loc("just now", "たった今")
+    val bandBatteryAgeHours = Loc("%.0f h ago", "%.0f 時間前")
+    val bandBatteryAgeDays = Loc("%.0f d ago", "%.0f 日前")
     val noReadings = Loc("No readings", "測定なし")
     val guide = Loc("Guide", "目安")
     val andAbove = Loc("%d and above", "%d 以上")

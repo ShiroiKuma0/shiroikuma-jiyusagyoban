@@ -192,7 +192,10 @@ private fun SyncHeader(
                         )
                     }
                 }
-                SyncButton(progress.running, onSync)
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SyncButton(progress.running, onSync)
+                    BandBattery(state.status)
+                }
             }
 
             if (progress.running || progress.phase == "done") {
@@ -215,6 +218,78 @@ private fun SyncHeader(
         }
     }
 }
+
+/**
+ * The band's own charge, beside the sync button.
+ *
+ * It is read over BLE while a sync is connected and nowhere else, so it is only ever as fresh as the
+ * last sync — which is why the age is printed next to it rather than left to be assumed. "76 %" that
+ * turns out to be from yesterday is worse than no number, because it reads as current.
+ *
+ * The bar is coloured by the reserved status roles and always carries the figure, so the state never
+ * rests on hue alone.
+ */
+@Composable
+private fun BandBattery(status: com.opentasker.core.band.BandStatus?) {
+    val lang = LocalBandLanguage.current
+    val axisInk = LocalChartStyle.current.axisText
+    val pct = status?.batteryPct
+    if (pct == null) {
+        Text(
+            BandText.bandBatteryUnknown[lang],
+            style = MaterialTheme.typography.labelSmall,
+            color = axisInk,
+        )
+        return
+    }
+    val tint = when {
+        pct <= 15 -> ChartPalette.BAND_CRITICAL
+        pct <= 30 -> ChartPalette.BAND_WARN
+        else -> ChartPalette.BAND_GOOD
+    }
+    val ageHours = status.batteryAgeHours(System.currentTimeMillis())
+    val age = when {
+        ageHours == null || ageHours < 1.0 -> BandText.bandBatteryFresh[lang]
+        ageHours < 24.0 -> BandText.bandBatteryAgeHours[lang].format(ageHours)
+        else -> BandText.bandBatteryAgeDays[lang].format(ageHours / 24.0)
+    }
+    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                BandText.bandBattery[lang],
+                style = MaterialTheme.typography.labelSmall,
+                color = axisInk,
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                "$pct%",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = tint,
+            )
+        }
+        // A short bar rather than a battery glyph: the figure is already there, and the bar is for
+        // seeing at a glance that it is getting short.
+        Box(
+            Modifier
+                .width(BATTERY_BAR_WIDTH)
+                .height(4.dp)
+                .clip(CircleShape)
+                .background(axisInk.copy(alpha = 0.25f)),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth(pct / 100f)
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(tint),
+            )
+        }
+        Text(age, style = MaterialTheme.typography.labelSmall, color = axisInk)
+    }
+}
+
+private val BATTERY_BAR_WIDTH = 72.dp
 
 @Composable
 private fun SyncButton(running: Boolean, onSync: () -> Unit) {
