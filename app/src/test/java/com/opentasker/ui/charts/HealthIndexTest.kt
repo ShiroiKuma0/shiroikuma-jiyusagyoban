@@ -21,7 +21,8 @@ class HealthIndexTest {
         spo2: Double? = 96.0,
         sleepMinutes: Int? = 480,
         deepRem: Double? = 0.35,
-    ) = HealthIndexInputs(restingHr, iqr, spo2, sleepMinutes, deepRem)
+        steps: Double? = 6_000.0,
+    ) = HealthIndexInputs(restingHr, iqr, spo2, sleepMinutes, deepRem, steps)
 
     @Test
     fun `a ramp hits 100 at its best, 0 at its worst, and interpolates between`() {
@@ -50,7 +51,10 @@ class HealthIndexTest {
     @Test
     fun `every component at its best scores exactly 100`() {
         val r = HealthIndex.compute(
-            inputs(restingHr = 50.0, iqr = 4.0, spo2 = 97.0, sleepMinutes = 480, deepRem = 0.45),
+            inputs(
+                restingHr = 50.0, iqr = 4.0, spo2 = 97.0, sleepMinutes = 480, deepRem = 0.45,
+                steps = 7_500.0,
+            ),
         )
         assertEquals(100, r.value)
         assertFalse(r.partial)
@@ -62,19 +66,29 @@ class HealthIndexTest {
     fun `sleep architecture pulls a perfect night down, and the arithmetic is checkable`() {
         // Everything at its best EXCEPT a 35 % deep+REM share against the 45 % target.
         val r = HealthIndex.compute(
-            inputs(restingHr = 50.0, iqr = 4.0, spo2 = 97.0, sleepMinutes = 480, deepRem = 0.35),
+            inputs(
+                restingHr = 50.0, iqr = 4.0, spo2 = 97.0, sleepMinutes = 480, deepRem = 0.35,
+                steps = 7_500.0,
+            ),
         )
         // share = (0.35-0.10)/(0.45-0.10) = 71 ; sleep = 100×0.7 + 71×0.3 = 91
         assertEquals(91, r.components.single { it.key == "sleep" }.score)
-        // index = 100×(0.33+0.14+0.20) + 91×0.33 = 67 + 30.03 = 97.03 → 97
-        assertEquals(97, r.value)
+        // index = 100×(0.26+0.11+0.17+0.20) + 91×0.26 = 74 + 23.66 = 97.66 → 98
+        assertEquals(98, r.value)
     }
 
     @Test
     fun `the weights sum to one, so a perfect score is reachable`() {
         val total = HealthIndex.W_RESTING_HR + HealthIndex.W_STABILITY +
-            HealthIndex.W_SPO2 + HealthIndex.W_SLEEP
+            HealthIndex.W_SPO2 + HealthIndex.W_SLEEP + HealthIndex.W_STEPS
         assertEquals(1.0, total, 1e-9)
+        // The printed percentages must sum to 100 too — a panel that publishes its arithmetic and
+        // then shows weights adding to 99 undermines the one thing it is for.
+        val printed = listOf(
+            HealthIndex.W_RESTING_HR, HealthIndex.W_STABILITY, HealthIndex.W_SPO2,
+            HealthIndex.W_SLEEP, HealthIndex.W_STEPS,
+        ).sumOf { (it * 100).toInt() }
+        assertEquals(100, printed)
     }
 
     @Test
@@ -102,10 +116,10 @@ class HealthIndexTest {
 
     @Test
     fun `with nothing measured at all there is no index, rather than a flattering zero`() {
-        val r = HealthIndex.compute(HealthIndexInputs(null, null, null, null, null))
+        val r = HealthIndex.compute(HealthIndexInputs(null, null, null, null, null, null))
         assertNull(r.value)
         assertTrue(r.partial)
-        assertEquals(4, r.missing.size)
+        assertEquals(5, r.missing.size)
         assertEquals("—", r.band.en)
     }
 
@@ -122,7 +136,7 @@ class HealthIndexTest {
     @Test
     fun `every component carries its scale text, so the info panel can print the arithmetic`() {
         val r = HealthIndex.compute(inputs())
-        assertEquals(4, r.components.size)
+        assertEquals(5, r.components.size)
         r.components.forEach {
             assertTrue("${it.key} must publish its breakpoints", it.scale.en.isNotBlank())
             assertTrue("${it.key} must publish its weight", it.weight > 0.0)
@@ -153,6 +167,61 @@ class HealthIndexTest {
         assertEquals(listOf(45.0, 55.0, 75.0), edges(MetricSpecs.HEART_RATE))
         assertEquals(HealthIndex.HR_BEST, 50.0, 1e-9)
         assertEquals(HealthIndex.HR_WORST, 85.0, 1e-9)
+
+        // Steps: ladder 3 000 / 7 500 / 12 000. The component takes the first two, so "Low" is the
+        // zero and the start of "High" is full marks — a card reading Standard can never sit beside
+        // a component scoring 0 or 100.
+        assertEquals(listOf(3_000.0, 7_500.0, 12_000.0), edges(MetricSpecs.STEPS))
+        assertEquals(HealthIndex.STEPS_WORST, edges(MetricSpecs.STEPS)[0], 1e-9)
+        assertEquals(HealthIndex.STEPS_BEST, edges(MetricSpecs.STEPS)[1], 1e-9)
+    }
+
+    /**
+     * Steps, added 2026-08-07 at 白い熊's instruction.
+     *
+     * The one thing to get right is that **0 is a measurement**. Everywhere else in this index an
+     * absent value means the band did not measure and must be reported missing; a day of not walking
+     * is a real, and rather informative, reading. Confusing the two would either flatter a sedentary
+     * day or punish a day the band was on the charger.
+     */
+    @Test
+    fun `a day of no walking scores zero, and no step data at all is missing instead`() {
+        val sedentary = HealthIndex.compute(inputs(steps = 0.0))
+        val stepsComponent = sedentary.components.single { it.key == "steps" }
+        assertEquals(0, stepsComponent.score)
+        assertFalse("zero steps is a measurement, not an absence", sedentary.partial)
+
+        val noData = HealthIndex.compute(inputs(steps = null))
+        assertNull(noData.components.single { it.key == "steps" }.score)
+        assertTrue(noData.partial)
+        assertEquals(listOf("Steps"), noData.missing.map { it.en })
+    }
+
+    @Test
+    fun `steps ramp between the ladder edges and stop buying score above the plateau`() {
+        fun score(v: Double) = HealthIndex.compute(inputs(steps = v))
+            .components.single { it.key == "steps" }.score
+        assertEquals(0, score(3_000.0))
+        assertEquals(100, score(7_500.0))
+        assertEquals(50, score(5_250.0))
+        assertEquals("walking more than the plateau must not keep scoring", 100, score(25_000.0))
+    }
+
+    /**
+     * Steps are a BEHAVIOUR, and the other four are physiological state.
+     *
+     * That is the trade 白い熊 accepted when asking for this: a day of walking lifts the index
+     * without any of the body's own numbers moving. Worth asserting so nobody later "fixes" it as a
+     * bug.
+     */
+    @Test
+    fun `walking lifts the index with every other input unchanged`() {
+        val still = HealthIndex.compute(inputs(steps = 3_000.0))
+        val walked = HealthIndex.compute(inputs(steps = 7_500.0))
+        assertTrue(
+            "steps must be able to move the index (still=${still.value}, walked=${walked.value})",
+            walked.value!! > still.value!! + 15,
+        )
     }
 
     /**
@@ -167,13 +236,13 @@ class HealthIndexTest {
     @Test
     fun `there is no HRV component, and nothing was invented to replace it`() {
         val r = HealthIndex.compute(inputs())
-        assertEquals(4, r.components.size)
+        assertEquals(5, r.components.size)
         assertTrue(
             "no component may claim to measure variability",
             r.components.none { it.key == "hrv" || it.label.en.contains("HRV") },
         )
         assertEquals(
-            listOf("resting_hr", "stability", "spo2", "sleep"),
+            listOf("resting_hr", "stability", "spo2", "sleep", "steps"),
             r.components.map { it.key },
         )
     }

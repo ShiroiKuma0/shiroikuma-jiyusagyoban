@@ -160,15 +160,13 @@ private fun ScoreBar(score: Int?) {
 fun HealthIndexDetail(index: HealthIndexResult) {
     val lang = LocalBandLanguage.current
     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text(
+        InfoHeading(
             Loc(
                 "This index is not a reproduction of Hume's Health Score.",
                 "この指数は Hume の Health Score の再現ではありません。",
             )[lang],
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
         )
-        Text(
+        InfoBody(
             Loc(
                 "Hume's 0–900 is built from resting heart rate, HRV, heart-rate stability, blood " +
                     "oxygen and sleep — every ingredient is something this app measures. But the " +
@@ -193,17 +191,10 @@ fun HealthIndexDetail(index: HealthIndexResult) {
                     "検証できず、外れようもない数字は測定ではないので、作りませんでした。\n\n" +
                     "代わりにこれは、区切りも重みも全部この画面に書いてある指数です。" +
                     "納得できなければ数字を変えられます。隠された式にはそれができません。",
-            )[lang],
-            style = MaterialTheme.typography.bodySmall,
-            color = LocalChartStyle.current.axisText,
-        )
+            )[lang])
 
-        Text(
-            Loc("How to read it", "この数字の読み方")[lang],
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
+        InfoHeading(Loc("How to read it", "この数字の読み方")[lang])
+        InfoBody(
             Loc(
                 "Each component is scored 0–100 against the breakpoints printed below it, and the " +
                     "index is their weighted mean. The breakpoints are the SAME edges as each " +
@@ -222,62 +213,62 @@ fun HealthIndexDetail(index: HealthIndexResult) {
                     "「いちばん新しい一回の測定」ではありません。ばらつく数値の一回分は" +
                     "ほとんど何も語らないからです。\n\n" +
                     "85 以上でとても良い、70〜84 で良い、55〜69 で標準、40〜54 で低い。",
-            )[lang],
-            style = MaterialTheme.typography.bodySmall,
-            color = LocalChartStyle.current.axisText,
-        )
+            )[lang])
 
-        Text(
-            BandText.indexTargets[lang],
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
+        InfoHeading(BandText.indexTargets[lang])
+        InfoBody(
             Loc(
-                "Resting heart rate and sleep are the two you can actually move, and they carry a " +
-                    "quarter of the index each. Resting heart rate falls with aerobic fitness over " +
-                    "weeks — 50 bpm scores full marks, 85 scores nothing. Sleep wants 7–9 hours with " +
-                    "a healthy share of deep and REM; more than nine scores LOWER, not higher.\n\n" +
-                    "Heart-rate stability and blood oxygen are mostly not under your control day to " +
-                    "day — they are here because a sustained fall in either is worth noticing, not " +
-                    "because they are targets.\n\n" +
-                    "HRV is worth watching as a trend rather than aiming at. Note that this band " +
-                    "reports HRV LOWER during sleep than awake, which is backwards from how HRV is " +
-                    "normally described, so its numbers should not be compared with another device's.",
-                "動かせるのは実質「安静時心拍」と「睡眠」の二つで、どちらも指数の四分の一を占めます。" +
-                    "安静時心拍は数週間の有酸素運動で下がります — 50 bpm で満点、85 bpm で 0 点。" +
-                    "睡眠は 7〜9 時間、かつ深い睡眠と REM の割合が高いほど良い。" +
+                "Three of the five are things you can actually move, and together they are nearly " +
+                    "three quarters of the index.\n\n" +
+                    "Steps carry 20 %: 3 000 in a day scores nothing, 7 500 scores full marks, and " +
+                    "walking further than that does not keep buying score. Those are the same edges " +
+                    "as the steps card's own guide. Note that steps are the one BEHAVIOUR here — " +
+                    "the other four are what your body did, mostly not under your control on any " +
+                    "given day — so a long walk can lift this number while nothing physiological " +
+                    "has changed. That is deliberate, and worth remembering when reading a rise.\n\n" +
+                    "Resting heart rate carries 26 % and falls with aerobic fitness over weeks — " +
+                    "50 bpm scores full marks, 85 scores nothing. Sleep carries 26 % and wants 7–9 " +
+                    "hours with a healthy share of deep and REM; more than nine scores LOWER, not " +
+                    "higher.\n\n" +
+                    "Heart-rate stability (11 %) and blood oxygen (17 %) are mostly not under your " +
+                    "control day to day — they are here because a sustained fall in either is worth " +
+                    "noticing, not because they are targets.\n\n" +
+                    "There is no HRV component. The field this band labels HRV is not a variability " +
+                    "measurement — see the Band State Index card — and nothing was substituted for " +
+                    "it, because no other field in this protocol measures autonomic tone.",
+                "五つのうち三つは自分で動かせるもので、合わせて指数のおよそ四分の三を占めます。\n\n" +
+                    "歩数は 20 %。一日 3,000 歩で 0 点、7,500 歩で満点、それ以上歩いても加点はありません。" +
+                    "この区切りは歩数カードの「目安」とまったく同じ値です。" +
+                    "なお歩数だけが**行動**で、ほかの四つは身体の状態 — その日どうこうできるものではありません。" +
+                    "だから長く歩いた日は、身体側の数字が何も変わらなくてもこの数字が上がります。" +
+                    "それは意図したとおりで、上がった理由を読むときに覚えておく価値があります。\n\n" +
+                    "安静時心拍は 26 %。数週間の有酸素運動で下がります — 50 bpm で満点、85 bpm で 0 点。" +
+                    "睡眠も 26 % で、7〜9 時間かつ深い睡眠と REM の割合が高いほど良い。" +
                     "九時間を超えると点は**下がります**、上がりません。\n\n" +
-                    "心拍安定性と血中酸素は、日々どうこうできるものではありません。" +
+                    "心拍安定性（11 %）と血中酸素（17 %）は、日々どうこうできるものではありません。" +
                     "目標というより「続けて下がったら気づくため」に入れてあります。\n\n" +
-                    "心拍変動は狙う数字ではなく、傾向を見るもの。なおこのバンドは睡眠中の心拍変動を" +
-                    "起きているときより**低く**返します。一般的な心拍変動の説明とは逆なので、" +
-                    "他機種の数値と比べないでください。",
-            )[lang],
-            style = MaterialTheme.typography.bodySmall,
-            color = LocalChartStyle.current.axisText,
-        )
+                    "心拍変動の項目はありません。このバンドが心拍変動と称している値は変動の測定ではなく" +
+                    "（「バンド状態指数」のカードを参照）、代わりに何かを入れることもしませんでした。" +
+                    "この通信規約には自律神経の状態を測る項目が他にないからです。",
+            )[lang])
 
+        // Each component's own arithmetic, at the same weight as the prose above it — this is the
+        // part 白い熊 would actually check a number against, so it is not a footnote.
         index.components.forEach { c ->
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row {
-                    Box(Modifier.size(8.dp).clip(CircleShape).background(
+                    Box(Modifier.size(10.dp).clip(CircleShape).background(
                         if (c.score == null) ChartPalette.UNKNOWN else ChartPalette.sequential(c.score / 100f),
                     ).align(Alignment.CenterVertically))
                     Spacer(Modifier.width(8.dp))
-                    Text(
-                        c.label[lang],
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f),
-                    )
+                    InfoBody(c.label[lang], Modifier.weight(1f), bold = true)
                     Text(
                         BandText.indexWeight[lang].format((c.weight * 100).toInt()),
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = LocalChartStyle.current.axisText,
                     )
                 }
-                Text(c.scale[lang], style = MaterialTheme.typography.bodySmall, color = LocalChartStyle.current.axisText)
+                InfoBody(c.scale[lang])
                 Text(
                     if (c.score == null) {
                         BandText.indexMissing[lang].format(c.missingReason?.get(lang).orEmpty())
@@ -285,8 +276,10 @@ fun HealthIndexDetail(index: HealthIndexResult) {
                         BandText.indexContribution[lang]
                             .format(c.measured ?: 0.0, c.unit, c.score, c.contribution)
                     },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (c.score == null) ChartPalette.BAND_WARN else MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontSize = InfoType.BODY_SP,
+                    lineHeight = InfoType.BODY_LEADING,
+                    color = if (c.score == null) ChartPalette.BAND_WARN else MaterialTheme.colorScheme.primary,
                 )
             }
         }
