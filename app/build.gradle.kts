@@ -154,6 +154,19 @@ android {
                 keyAlias = releaseKeyAlias
                 keyPassword = releaseKeyPassword
             }
+        } else {
+            // Self-host signing identity, checked in deliberately. Distributed builds are
+            // unsigned-by-policy in the sense that no private code-signing certificate is
+            // acquired, but Android refuses to install an APK with no signature at all, so
+            // published artifacts carry this repo-owned key. It lives in the repo rather than
+            // in ~/.android/debug.keystore because that file is machine-global and gets
+            // regenerated — which is exactly how the key that signed v0.2.79 was lost.
+            create("selfhost") {
+                storeFile = file("dev_keystore.jks")
+                storePassword = "opentasker"
+                keyAlias = "opentasker"
+                keyPassword = "opentasker"
+            }
         }
     }
 
@@ -165,7 +178,8 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfigs.findByName("release")?.let { signingConfig = it }
+            signingConfig = signingConfigs.findByName("release")
+                ?: signingConfigs.getByName("selfhost")
         }
         create("benchmark") {
             initWith(getByName("release"))
