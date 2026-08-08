@@ -52,6 +52,14 @@ object SceneOverlayManager {
     private val shownNames = LinkedHashMap<Long, String>() // sceneId -> name, for the monitor view
     private var appContext: Context? = null
 
+    /**
+     * Window alpha for a pass-through overlay when no accessibility service is available to host it as a
+     * trusted overlay. Matches Android's `maximum_obscuring_opacity_for_touch` default: the system blocks
+     * a touch to the app underneath when an untrusted overlay obscures it at a HIGHER opacity than this,
+     * so sitting exactly at the limit is the brightest a plain app overlay can be and still let taps through.
+     */
+    private const val PASS_THROUGH_ALPHA = 0.8f
+
     /** Names of the scenes currently displayed as overlays — what's actually on screen right now. */
     fun shownSceneNames(): List<String> = ArrayList(shownNames.values)
 
@@ -140,11 +148,36 @@ object SceneOverlayManager {
         main.post {
             appContext = app
             if (active.containsKey(scene.id)) return@post
+            // A non-modal overlay with NO tappable elements (and no outside-dismiss) is a pure DISPLAY —
+            // e.g. the clock strip / battery line / the 通知明滅 frame — so it must pass ALL taps and
+            // swipes through to whatever's underneath. Edge strips (fraction) stay touchable on purpose:
+            // they catch swipe gestures. dismissOnOutside must stay touchable too (it needs ACTION_OUTSIDE).
+            val displayOnly = !dismissOnOutside && scene.elements.none { el ->
+                el.tapTaskId != null || el.tapTaskName.isNotBlank() ||
+                    el.longPressTaskId != null || el.longPressTaskName.isNotBlank()
+            }
+            // Exactly the windows that get FLAG_NOT_TOUCHABLE below — kept in one place because the
+            // window TYPE now depends on it too (see the trusted-overlay note on the a11y routing).
+            val passThrough = !modal && when {
+                fullscreen -> true
+                fullWidth -> displayOnly
+                heightFraction > 0f || widthFraction > 0f -> false
+                else -> displayOnly
+            }
             // The bottom edge bar (widthFraction) is routed through the accessibility service as a
             // TYPE_ACCESSIBILITY_OVERLAY when it's enabled: that captures the bottom system gesture the
             // OS otherwise pilfers WITHOUT taking key focus (so the app's keyboard keeps working). When
             // the service is off, it falls back to a focusable app overlay (captures, but holds focus).
-            val a11y = if (widthFraction > 0f) ShiroiKumaAccessibilityService.service else null
+            //
+            // Pass-through windows go the same way for a DIFFERENT reason (白い熊, 2026-08-08 — the 通知明滅
+            // frame killed every tap on the screen while lit). Since Android 12, FLAG_NOT_TOUCHABLE only
+            // stops a window RECEIVING touches; it does nothing about it OBSCURING them. An untrusted
+            // overlay covering the touched app blocks the touch outright when its window alpha exceeds
+            // `maximum_obscuring_opacity_for_touch` (0.8 by default) — and ours sat at 1.0, fullscreen,
+            // so the launcher below received nothing at all. A TYPE_ACCESSIBILITY_OVERLAY is a TRUSTED
+            // overlay and is exempt from that check entirely, so the frame keeps full opacity AND lets
+            // taps through. Without the service we fall back to capping the alpha (see [PASS_THROUGH_ALPHA]).
+            val a11y = if (widthFraction > 0f || passThrough) ShiroiKumaAccessibilityService.service else null
             val wm = (a11y ?: app).getSystemService(Context.WINDOW_SERVICE) as WindowManager
             val owner = OverlayLifecycleOwner().apply { onCreate() }
             val composeView = ComposeView(a11y ?: app).apply {
@@ -207,19 +240,11 @@ object SceneOverlayManager {
                 // placed by window gravity.
                 // fullscreen: cover the whole screen and pass ALL touches through (a purely visual
                 // edge-light); fullWidth: span the screen over the status bar; else wrap the card.
-                // A non-modal overlay with NO tappable elements (and no outside-dismiss) is a pure DISPLAY —
-                // e.g. the clock strip / battery line — so it must pass ALL taps and swipes through to
-                // whatever's underneath. Edge strips (fraction) stay touchable on purpose: they catch swipe
-                // gestures. dismissOnOutside must stay touchable too (it needs ACTION_OUTSIDE).
-                val displayOnly = !dismissOnOutside && scene.elements.none { el ->
-                    el.tapTaskId != null || el.tapTaskName.isNotBlank() ||
-                        el.longPressTaskId != null || el.longPressTaskName.isNotBlank()
-                }
-                val through = if (displayOnly) WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE else 0
+                // [passThrough] (computed above, where the window type needs it) decides this.
+                val through = if (passThrough) WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE else 0
                 val edgeFlags = when {
                     fullscreen -> WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or through
                     fullWidth -> WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                         WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or through
                     // Edge strips (fraction-height side / fraction-width bottom) extend to the TRUE
@@ -260,6 +285,12 @@ object SceneOverlayManager {
                         (if (keepScreenOn) WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON else 0),
                     PixelFormat.TRANSLUCENT,
                 ).apply {
+                    // Fallback for the same Android-12 obscured-touch rule the a11y routing above solves
+                    // properly: with no accessibility service to borrow a trusted overlay from, the only
+                    // other way to keep taps reaching the app below is to stay at or under the system's
+                    // maximum obscuring opacity. Dims the overlay slightly; still far better than a screen
+                    // that ignores every tap.
+                    if (passThrough && a11y == null) alpha = PASS_THROUGH_ALPHA
                     gravity = if (fullscreen) Gravity.TOP or Gravity.START else sceneGravity(position)
                     val pos = position?.trim()?.lowercase()
                     when {
