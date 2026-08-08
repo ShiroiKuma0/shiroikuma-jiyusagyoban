@@ -126,20 +126,81 @@ class ComposeEmailAction : Action {
     }
 }
 
-/** `Set Wallpaper` (Tasker 109) — set the home-screen wallpaper from an image in the sandbox. */
+/**
+ * `Set Wallpaper` (Tasker 109) — set the wallpaper from an image, on either screen or both.
+ *
+ * `where` exists because the lock screen is the interesting target and the API will not do it by
+ * accident: `setBitmap(bitmap)` with no flags sets the home screen and leaves the lock screen alone.
+ * Setting a one-pixel black PNG as the LOCK wallpaper is the whole point of 白い熊's Tasker original.
+ *
+ * `shared` follows `file.write`: off, the path is the app's own files; on, it resolves under /sdcard,
+ * which is where a wallpaper actually lives.
+ */
 class SetWallpaperAction : Action {
     override val id = "wallpaper.set"
     override val category = ActionCategory.SYSTEM
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
-        val file = safeUserFile(ctx, path, mustExist = true) ?: return ActionResult.Failure("path is outside 白い熊 自由作業盤 files")
+        val shared = args["shared"]?.trim()?.lowercase() in setOf("true", "1", "yes", "on")
+        val file = safeTarget(ctx, path, shared = shared)?.takeIf { it.isFile }
+            ?: return ActionResult.Failure("no readable image at \"$path\"")
         val bitmap = BitmapFactory.decodeFile(file.path) ?: return ActionResult.Failure("not a readable image")
+
+        val manager = android.app.WallpaperManager.getInstance(ctx.app)
+        val flags = when (args["where"]?.trim()?.lowercase()) {
+            "lock", "lockscreen" -> android.app.WallpaperManager.FLAG_LOCK
+            "home", "system" -> android.app.WallpaperManager.FLAG_SYSTEM
+            "both", "all" -> android.app.WallpaperManager.FLAG_SYSTEM or android.app.WallpaperManager.FLAG_LOCK
+            null, "" -> android.app.WallpaperManager.FLAG_SYSTEM
+            else -> return ActionResult.Failure("where must be home, lock or both")
+        }
         return try {
-            android.app.WallpaperManager.getInstance(ctx.app).setBitmap(bitmap)
-            ctx.logger("Wallpaper set from ${file.name}")
+            manager.setBitmap(bitmap, null, true, flags)
+            ctx.logger("Wallpaper set from ${file.name} (${args["where"] ?: "home"})")
             ActionResult.Success
         } catch (e: Exception) {
             ActionResult.Failure("set wallpaper failed: ${e.message}")
+        }
+    }
+}
+
+/**
+ * `Set Live Wallpaper` — switch the live wallpaper to a component, without the picker where possible.
+ *
+ * See [com.opentasker.core.wallpaper.LiveWallpaper]: with Shizuku this is silent, because `shell`
+ * holds the permission the framework reserves for privileged apps. Without it, the system preview
+ * opens and the wallpaper is applied by a confirming tap — which the action reports honestly rather
+ * than claiming success.
+ */
+class SetLiveWallpaperAction : Action {
+    override val id = "wallpaper.live"
+    override val category = ActionCategory.SYSTEM
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val pkg = args["package"]?.trim().orEmpty()
+        val cls = args["class"]?.trim().orEmpty()
+        if (pkg.isEmpty() || cls.isEmpty()) return ActionResult.Failure("package and class are both required")
+
+        val component = if (cls.startsWith(".")) "$pkg$cls" else cls
+        // %WALLPAPER_LIVE says WHICH path ran — "set" is silent and done, "confirm" means the picker
+        // is on screen waiting. Without it a task cannot tell the two apart, and neither could I.
+        return when (val outcome = com.opentasker.core.wallpaper.LiveWallpaper.set(ctx.app, pkg, component)) {
+            is com.opentasker.core.wallpaper.LiveWallpaper.Outcome.Set -> {
+                ctx.variables.set("WALLPAPER_LIVE", "set")
+                ctx.variables.set("WALLPAPER_LIVE_WHY", "")
+                ctx.logger("Live wallpaper set to $pkg/$component")
+                ActionResult.Success
+            }
+            is com.opentasker.core.wallpaper.LiveWallpaper.Outcome.NeedsConfirm -> {
+                ctx.variables.set("WALLPAPER_LIVE", "confirm")
+                ctx.variables.set("WALLPAPER_LIVE_WHY", outcome.reason)
+                ctx.logger("Live wallpaper picker opened (${outcome.reason}) — confirm on screen")
+                ActionResult.Success
+            }
+            is com.opentasker.core.wallpaper.LiveWallpaper.Outcome.Failed -> {
+                ctx.variables.set("WALLPAPER_LIVE", "failed")
+                ctx.variables.set("WALLPAPER_LIVE_WHY", outcome.reason)
+                ActionResult.Failure(outcome.reason)
+            }
         }
     }
 }

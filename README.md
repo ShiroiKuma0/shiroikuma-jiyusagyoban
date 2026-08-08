@@ -9,7 +9,7 @@
 
 **📥 Latest release: [`0.2.81.2026-08-02.g97059d7b+039`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
-[![version](https://img.shields.io/badge/version-0.2.81-blue.svg)](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)
+[![version](https://img.shields.io/badge/version-0.2.82-blue.svg)](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)
 [![license](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 
 > The version names the upstream commit the fork is rebased on:
@@ -232,9 +232,9 @@ A profile is active while **all** its contexts match. Seven families:
 
 ## Actions
 
-### Actions (168 registered + 10 engine-handled)
+### Actions (170 registered + 10 engine-handled)
 
-**168 built-in actions** in the registry, plus 10 the engine handles itself (the flow-control
+**170 built-in actions** in the registry, plus 10 the engine handles itself (the flow-control
 constructs — `flow.if`, `flow.foreach`, `flow.try` and friends — which the runner interprets rather
 than dispatching). Counted from `core/RuntimeRegistries.kt`, not by hand: `verifyReleaseTruth`
 recomputes both figures from source and fails the build if this line drifts.

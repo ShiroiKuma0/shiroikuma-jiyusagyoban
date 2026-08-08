@@ -7,7 +7,9 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.ocr.ModelSlot
 import com.opentasker.core.ocr.OcrEngine
+import com.opentasker.core.ocr.OcrModels
 import com.opentasker.core.ocr.OcrImage
 import com.opentasker.core.ocr.OcrScript
 import com.opentasker.core.ocr.OcrTuning
@@ -31,7 +33,15 @@ class OcrRecognizeAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["image"]?.trim().orEmpty()
-        if (path.isEmpty()) return ActionResult.Failure("missing image")
+        val show = args["show"]?.trim()?.lowercase() in SHOW_VALUES
+        // No image AND show=true is the "open 文字認識 so I can pick something" case — the task that
+        // puts the window on a launcher shortcut. Without show there is nothing to do.
+        if (path.isEmpty()) {
+            if (!show) return ActionResult.Failure("missing image")
+            OcrReviewActivity.open(ctx.app, null)
+            ctx.logger("Opened 文字認識 with no image")
+            return ActionResult.Success
+        }
 
         val output = VariableNamePolicy.normalize(args["var"] ?: args["result"] ?: "OCR")
             ?: return ActionResult.Failure("invalid output variable")
@@ -47,7 +57,7 @@ class OcrRecognizeAction : Action {
         val bitmap = load(ctx, path)
             ?: return ActionResult.Failure("could not read an image from \"$path\"")
 
-        if (args["show"]?.trim()?.lowercase() in SHOW_VALUES) {
+        if (show) {
             // The window needs a file it owns and may delete; hand it a copy rather than 白い熊's original.
             val copy = File(ctx.app.cacheDir, "ocr").apply { mkdirs() }
                 .resolve("task-${System.currentTimeMillis()}.png")
@@ -95,5 +105,43 @@ class OcrRecognizeAction : Action {
 
     private companion object {
         val SHOW_VALUES = setOf("true", "1", "yes", "on")
+    }
+}
+
+/**
+ * `Set OCR Models` — point 「文字認識」 at the folder holding its ONNX weights.
+ *
+ * The weights are not in the APK (they are ~100 MB and never change), so their location is a setting.
+ * This action exists so that setting can be DECLARED in a task — `文字認識の設定 -- [362][01]` — which
+ * is what puts it in the workspace mirror, under version control, and back in place after a re-flash.
+ * The value still lands in the app's own settings, because the native loader has to read it when the
+ * engine may not be running at all.
+ *
+ * With no `folder`, it re-runs discovery over the conventional locations, which is the useful thing to
+ * do after moving the files.
+ */
+class OcrModelsAction : Action {
+    override val id = "ocr.models"
+    override val category = ActionCategory.SETTINGS
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val folder = args["folder"]?.trim().orEmpty()
+        val directories = if (folder.isNotEmpty()) listOf(folder) else ModelSlot.SEARCH_DIRECTORIES
+
+        val adopted = LinkedHashSet<ModelSlot>()
+        directories.forEach { adopted += OcrModels.adoptFrom(it) }
+
+        val missing = ModelSlot.entries.filterNot { it in adopted }
+        ctx.variables.set("OCR_Models_Set", adopted.size.toString())
+        ctx.variables.set("OCR_Models_Missing", missing.joinToString(", ") { it.fileName })
+        ctx.logger("OCR models: ${adopted.size} set${if (missing.isEmpty()) "" else ", missing ${missing.size}"}")
+
+        return if (adopted.isEmpty()) {
+            ActionResult.Failure(
+                "no OCR models found in ${directories.joinToString(", ")} — expected e.g. ${ModelSlot.DETECTION.fileName}"
+            )
+        } else {
+            ActionResult.Success
+        }
     }
 }

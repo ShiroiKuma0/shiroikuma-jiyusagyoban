@@ -154,6 +154,7 @@ object AutomationSensitivityRegistry {
         "var.split",
         "volume.get",
         "wallpaper.set",
+        "wallpaper.live",
         "widget.refresh",
         "widget.set",
         "wifi.settings",
@@ -171,6 +172,7 @@ object AutomationSensitivityRegistry {
         "script.termux.run",
         // Turns an image into text on-device. It transmits nothing and needs no permission, but a
         // screenshot can hold a message, an address or a one-time code, so reading one is data access.
+        "ocr.models",
         "ocr.recognize",
         "screenshot.take",
         "file.read",

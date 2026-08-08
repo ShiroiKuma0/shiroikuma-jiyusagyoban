@@ -26,6 +26,16 @@
 }
 -keep class com.opentasker.core.input.IKeyGrabber* { *; }
 
+# Wallpaper bridge (Shizuku UserService) — same reason again. Missing this rule cost a debugging
+# round: bindUserService simply never connected, the bind timed out after 8s, and wallpaper.live fell
+# back to the picker while still reporting success. There is no error to read; the class is just gone.
+-keep class com.opentasker.core.wallpaper.WallpaperBridgeService {
+    <init>();
+    *;
+}
+-keep class com.opentasker.core.wallpaper.IWallpaperBridge { *; }
+-keep class com.opentasker.core.wallpaper.IWallpaperBridge$* { *; }
+
 # Telephony bridge (Shizuku UserService) — same reason: Shizuku instantiates it BY NAME inside the
 # privileged process, so R8 renaming or stripping it makes bindUserService fail with nothing but a
 # null binder. The AIDL stub must survive intact too.
