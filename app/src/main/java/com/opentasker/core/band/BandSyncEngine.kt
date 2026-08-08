@@ -443,11 +443,17 @@ object BandSyncEngine {
         }.toSet()
         val lastStats = last?.second.orEmpty()
         val lost = lastStats.filterValues { it.error == null && it.lostWindowSec > 0 }
+        // The freshest charge reading from ANY recent attempt, successful or not: the band is asked
+        // for it immediately after connecting, so a sync that later failed part-way through still
+        // read a perfectly good battery level, and discarding it would age the number for nothing.
+        val battery = rows.firstOrNull { it.battery != null }
         BandStatus(
             lastSuccessAtMillis = last?.first?.startedAt,
             headroom = BandCensus.tightest(lastStats, evicting),
             lostSec = lost.values.sumOf { it.lostWindowSec },
             lostStreams = lost.keys.sorted(),
+            batteryPct = battery?.battery,
+            batteryAtMillis = battery?.startedAt,
         )
     }
 
@@ -471,7 +477,21 @@ data class BandStatus(
     val headroom: BandHeadroom?,
     val lostSec: Long,
     val lostStreams: List<String>,
+    /** The band's own charge, as of [batteryAtMillis]. Null until a sync has read one. */
+    val batteryPct: Int? = null,
+    /**
+     * When that charge was read.
+     *
+     * It travels WITH the percentage on purpose. The band is only asked while a sync is connected,
+     * so a bare "76 %" on screen could be six hours old and reading as current — the number is
+     * meaningless without the moment it belongs to.
+     */
+    val batteryAtMillis: Long? = null,
 ) {
+    /** Hours since the charge was read, or null if none has been. */
+    fun batteryAgeHours(nowMillis: Long): Double? =
+        batteryAtMillis?.let { (nowMillis - it) / 3_600_000.0 }
+
     /** Hours since the last successful sync, or null if there has never been one. */
     fun ageHours(nowMillis: Long): Double? =
         lastSuccessAtMillis?.let { (nowMillis - it) / 3_600_000.0 }

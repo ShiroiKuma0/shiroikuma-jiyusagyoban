@@ -3,6 +3,27 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.81.2026-08-02.g97059d7b+024 — 2026-08-08
+
+**The band's own charge, at the top of 「健康」.**
+
+It was already being read — `readBattery` fires on every sync and `stampDevice` writes it to the
+`band_syncs` row — and then nothing ever showed it. It now sits beside the 同期 button: the
+percentage, a short bar coloured by the reserved status roles (good / warning / critical), and the
+figure always beside the colour so the state never rests on hue alone.
+
+**The age is printed with it, and that is the point.** The band only answers a battery query while a
+sync is connected, so this is a snapshot and never a live reading. "76 %" with no timestamp would let
+a figure from yesterday read as current, which is worse than showing nothing — so it says
+`just now` / `3 h ago` / `2 d ago` underneath. Before the first sync it says the charge is unknown
+rather than rendering an absent value as 0 %.
+
+`BandStatus.batteryPct` takes the freshest reading from **any** recent attempt, successful or not:
+the band is asked immediately after connecting, so a sync that later failed part-way through still
+read a perfectly good level, and discarding it would age the number for nothing.
+
+Verified against the on-device archive — the last five syncs recorded 52, 52, 51, 50, 50 %.
+
 ## 0.2.81.2026-08-02.g97059d7b+023 — 2026-08-08
 
 **The permission block told the truth about the wrong thing.**
