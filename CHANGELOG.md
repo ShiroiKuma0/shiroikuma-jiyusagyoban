@@ -3,6 +3,128 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.81.2026-08-02.g97059d7b+023 — 2026-08-08
+
+**The permission block told the truth about the wrong thing.**
+
+白い熊 kept being prompted that tasks need Accessibility while Accessibility was plainly enabled.
+Both halves were true. `dumpsys accessibility` on the Mate XT:
+
+```
+Bound services:   {Service[label=白い熊 考直, …]}
+Enabled services: {…kojiki…, shiroikuma.jiyusagyoban/…ShiroiKumaAccessibilityService}
+Crashed services: {shiroikuma.jiyusagyoban/…ShiroiKumaAccessibilityService}
+```
+
+Enabled, crashed, not bound. The toggle is the user's wish; the binding is whether Android is
+actually running it — and once a service lands in `Crashed services` the framework never re-binds it,
+so the toggle sits there reading "on" over a dead service. The app was right to block. Three things
+around that were wrong, and all three are fixed.
+
+### It said "enable it in System Settings" to somebody who already had
+
+`CapabilityState.blockedDetail` now recognises enabled-but-not-running and says what is actually
+happening, with what to do: turn it off and on again. The app already knew how to tell the two apart
+(`isEnabledInSettings` vs the live binding); the dialog simply never asked.
+
+### Tapping OK did not stop it coming back
+
+The quiet window only started if the user tapped "Open … settings". Now **showing** the dialog quiets
+its requirements, and going to settings *shortens* that window rather than lengthening it — somebody
+actively fixing a permission deserves an honest answer when they come back, somebody who tapped OK
+does not want to hear about it again for ten minutes. The direction is counter-intuitive enough to be
+worth a test.
+
+### Every blocked task hung for two minutes
+
+The pre-flight awaited the dialog with a 120 s timeout, on a task it had *already decided could not
+run*. Measured in the log: `相撲字時計⇨描画 -- [672][036][17]` failed at `120030ms` and `起床舞判定`
+at `120022ms`, both entirely spent sitting in that modal. The dialog is now fire-and-forget; the task
+fails immediately.
+
+### Also: no more paying 3 s per task to wait for a rebind that is not coming
+
+`awaitConnected` polls for the transient EMUI unbind→rebind gap, which is right — but a *crashed*
+service looks identical from inside the app and never comes back, so every blocked task paid the full
+timeout. It now pays that wait once and backs off for a minute; a real rebind clears the backoff
+through `onServiceConnected`, so the transient case still recovers within a second.
+
+## 0.2.81.2026-08-02.g97059d7b+022 — 2026-08-07
+
+**Steps join 健康指数 at 20 %.** Five components now, not four.
+
+The dose–response evidence for daily step count is among the better literatures in wearable health —
+all-cause mortality falls steeply from roughly 2 500 to 7 000 steps a day and flattens after — so it
+earns its place. The 20 % came out of the other four in proportion (each × 0.8), rounded to whole
+percent so the printed weights sum to exactly 100 rather than 99: resting heart rate 26, stability
+11, blood oxygen 17, sleep 26, steps 20.
+
+The ramp is **3 000 steps = 0, 7 500 = 100, no bonus above** — the steps card's own band-ladder
+edges, not the 2 500 / 8 000 the literature suggests in isolation. The invariant that index
+breakpoints ARE card breakpoints is what stops a card reading "Standard" beside a component scoring
+15, and it is worth more than 500 steps of precision.
+
+Two things this forced, both worth stating:
+
+- **Zero steps is a measurement.** Everywhere else in the index an absent value means the band did
+  not measure and is reported missing; a day of not walking is a real and rather informative
+  reading. An empty series is missing, a series of zeroes scores zero, and a test holds the two
+  apart.
+- **A day now needs half the index's weight before the table gives it a number.** Steps score on
+  their own, so a day where the band recorded nothing but a short walk would have landed a
+  renormalised 0 in a column beside days scored from all five — arithmetically correct and
+  unreadable. Below the line the row shows a dash and keeps its raw figures.
+
+Steps are also the one **behaviour** among five physiological measures, so a long walk lifts the
+index while nothing in the body's own numbers has moved. That is deliberate, it is now said plainly
+in the info panel, and a test asserts it so nobody later files it as a bug.
+
+## 0.2.81.2026-08-02.g97059d7b+021 — 2026-08-07
+
+**Four changes 白い熊 asked for after living with the charts for a day.**
+
+### The info panels are readable now
+
+The `i` sheets and the 健康指数 page are two screens of prose that were being drawn with the same
+recessive grey 12 sp the app uses for chart captions. Body text is now 16 sp in the theme accent, set
+solid — line height equal to font size — with headings at 22 sp, bold and underlined. It lives in one
+place (`InfoType`), used by the index page and all eight metric sheets, because typography spread
+across ten call sites reliably stops matching.
+
+### Card order
+
+歩数 → 睡眠 → 体温 → 心拍 → 血圧 → 血中酸素 → バンド状態指数, as one explicit list. It is not the
+order of `MetricSpecs.ALL` — that is a decoding table whose order is about record layouts, and sleep
+and blood pressure are not entries in it at all, so nothing else could interleave the three kinds of
+card.
+
+### One date format
+
+`2026-08-07`, everywhere: the day table, the crosshair readout, and the time axis, which used to say
+`8/7`. Three formats for one kind of thing is three chances to misread which day you are looking at,
+and the year stops being optional the moment the archive crosses one. A full ISO date is wide for an
+axis, so the tick ladder now offers at most five labels and the renderer still drops any that would
+collide — fewer date ticks, none ambiguous.
+
+### Day-by-day history under every chart
+
+The sleep screen printed one undated breakdown — the most recent night — and every other metric
+printed none, so "how did I sleep on Tuesday" could only be answered by zooming a hypnogram and
+reading an axis. Now every full-screen chart carries a table underneath.
+
+Sleep gets a row per night: the date, `22:41 → 08:33`, the duration, and all four stages with minutes
+and percentage. **Every recorded session**, not just the latest and not just the longest of each day
+— that rule belongs to the summary table, where one row shows one number; a history that hid a real
+nap would be the screen pretending it did not happen.
+
+The others get date, median, low–high, and the sample count. The count is not decoration: a median
+built from four readings and one from four hundred are different claims. Blood pressure gets no table
+— a dumbbell day is two series, and those numbers live inside a ±10 mmHg clamp, so tabulating them
+would dress up a non-measurement.
+
+Histories are built from the **raw** series, before the outlier filter. The table reports what the
+band recorded; the chart's ✕ marks are where the two disagree.
+
 ## 0.2.81.2026-08-02.g97059d7b+020 — 2026-08-06
 
 **The crosshair only existed on the dashboard.** 白い熊 opened 歩数 full-screen, tapped a bar, and

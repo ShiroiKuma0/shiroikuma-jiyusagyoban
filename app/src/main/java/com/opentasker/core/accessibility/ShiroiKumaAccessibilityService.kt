@@ -25,6 +25,7 @@ class ShiroiKumaAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         instance = this
+        rebindGaveUpAt = 0L
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
@@ -103,21 +104,54 @@ class ShiroiKumaAccessibilityService : AccessibilityService() {
         }
 
         /**
-         * Await the live binding, tolerating the transient unbind→rebind gap. Returns true at once when
-         * already bound; when the toggle is on but the service isn't bound yet (the EMUI config-change /
-         * reap window), polls up to [timeoutMs] for the rebind; returns false immediately when the toggle
-         * is off — genuinely not enabled, so the caller should block honestly rather than stall.
+         * Await the live binding, tolerating the transient unbind→rebind gap.
+         *
+         * Returns true at once when already bound, and false at once when the toggle is off — that is
+         * genuinely not enabled, and the caller should block honestly rather than stall.
+         *
+         * The interesting case is **toggle on, nothing bound**, which is two different situations that
+         * look identical from inside the app:
+         *
+         * 1. The transient unbind→rebind gap. EMUI drops the binding across a configuration change or a
+         *    memory-pressure reap and puts it back a second or two later. Waiting is exactly right.
+         * 2. The framework has marked the service **crashed**. `dumpsys accessibility` then shows it
+         *    under `Crashed services` and *not* under `Bound services`, and Android will never re-bind
+         *    it on its own — the user has to toggle it off and on. Waiting is futile, forever.
+         *
+         * Observed on 白い熊's Mate XT on 2026-08-08: state 2, ten minutes after a boot. Every blocked
+         * task paid the full [timeoutMs] before failing, on a workspace whose tasks fire by the second.
+         *
+         * Since the two cannot be told apart, this pays the wait **once** and then backs off for
+         * [REBIND_BACKOFF_MS]. A real rebind clears the backoff through [onServiceConnected], so case 1
+         * still recovers within a second of the service coming back.
          */
         suspend fun awaitConnected(context: Context, timeoutMs: Long = 3000L): Boolean {
             if (isConnected) return true
             if (!isEnabledInSettings(context)) return false
-            val deadline = SystemClock.elapsedRealtime() + timeoutMs
+            val now = SystemClock.elapsedRealtime()
+            if (rebindGaveUpAt != 0L && now - rebindGaveUpAt < REBIND_BACKOFF_MS) return false
+            val deadline = now + timeoutMs
             while (SystemClock.elapsedRealtime() < deadline) {
                 delay(POLL_INTERVAL_MS)
                 if (isConnected) return true
             }
-            return isConnected
+            rebindGaveUpAt = SystemClock.elapsedRealtime()
+            return false
         }
+
+        /**
+         * True when the user has switched the service ON but nothing is bound — the state that makes
+         * "enable it in Settings" the wrong thing to tell somebody, because they already have.
+         */
+        fun isEnabledButNotRunning(context: Context): Boolean =
+            !isConnected && isEnabledInSettings(context)
+
+        /** When the last rebind wait gave up, so the next caller does not pay for it again. */
+        @Volatile
+        private var rebindGaveUpAt = 0L
+
+        /** How long to believe "it is not coming back" before paying for another wait. */
+        private const val REBIND_BACKOFF_MS = 60_000L
 
         private const val POLL_INTERVAL_MS = 100L
 

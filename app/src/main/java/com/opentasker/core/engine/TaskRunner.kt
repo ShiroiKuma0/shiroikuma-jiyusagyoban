@@ -6,7 +6,6 @@ import com.opentasker.core.actions.ActionArgumentSensitivity
 import com.opentasker.core.capabilities.CapabilityPrompt
 import com.opentasker.core.capabilities.CapabilityState
 import com.opentasker.core.dialog.DialogActivity
-import com.opentasker.core.dialog.DialogBridge
 import com.opentasker.core.expressions.TemplateExpansionTrace
 import com.opentasker.core.expressions.TemplateExpressionEngine
 import com.opentasker.core.model.ActionSpec
@@ -15,7 +14,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
 
 /** Resolves a sub-task by id or name for the `task.run` action. */
 typealias SubTaskResolver = suspend (ref: String) -> Task?
@@ -570,8 +568,18 @@ class TaskRunner(
         return result to traceFor(index, spec, started, result, expansionReport)
     }
 
-    /** Modal OK dialog (via DialogActivity) naming the task, project, and each missing permission. */
-    private suspend fun showPermissionBlockDialog(
+    /**
+     * Modal OK dialog (via DialogActivity) naming the task, project, and each missing permission.
+     *
+     * **It does not wait for the answer.** The pre-flight has already decided the task cannot run, so
+     * there is nothing an answer could change about this run — and awaiting it held the engine for up
+     * to two minutes per blocked task. Measured on 白い熊's phone on 2026-08-08: two tasks failed at
+     * `120030ms` and `120022ms`, both of them entirely spent sitting in this dialog.
+     *
+     * Showing it also quiets the requirement immediately, so a workspace whose tasks fire by the
+     * second raises one dialog rather than a stack of them.
+     */
+    private fun showPermissionBlockDialog(
         project: String,
         taskName: String,
         missing: List<CapabilityState.MissingCapability>,
@@ -579,15 +587,17 @@ class TaskRunner(
         val lines = missing.joinToString("\n") { m ->
             "• ${CapabilityState.shortLabel(m.requirement)} — needed by: ${m.actionTypes.joinToString(", ")}"
         }
-        val text = "Can't run “$taskName” (project “$project”).\n\nMissing permission(s):\n$lines\n\n" +
-            "Grant it below, then run again."
+        // A permission whose ordinary "you have not granted it" story is wrong says so instead — see
+        // CapabilityState.blockedDetail.
+        val details = missing.distinctBy { it.requirement }
+            .mapNotNull { CapabilityState.blockedDetail(it.requirement, ctx.app) }
+        val advice = details.takeIf { it.isNotEmpty() }?.joinToString("\n\n")
+            ?: "Grant it below, then run again."
+        val text = "Can't run “$taskName” (project “$project”).\n\nMissing permission(s):\n$lines\n\n$advice"
         // Only offer a deep-link pill for a permission that actually has a System settings page to open.
         val grantable = missing.distinctBy { it.requirement }
             .filter { CapabilityState.settingsIntent(it.requirement, ctx.app) != null }
-        val id = java.util.UUID.randomUUID().toString()
-        val deferred = DialogBridge.register(id)
         val intent = android.content.Intent(ctx.app, DialogActivity::class.java).apply {
-            putExtra(DialogActivity.EXTRA_ID, id)
             putExtra(DialogActivity.EXTRA_TYPE, DialogActivity.TYPE_TEXT)
             putExtra(DialogActivity.EXTRA_TITLE, "Permission required")
             putExtra(DialogActivity.EXTRA_TEXT, text)
@@ -597,7 +607,9 @@ class TaskRunner(
             addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         val shown = runCatching { ctx.app.startActivity(intent); true }.getOrDefault(false)
-        if (shown) runCatching { withTimeoutOrNull(120_000L) { deferred.await() } } else DialogBridge.cancel(id)
+        // Quiet on SHOWING, not on the answer — the answer is never awaited. Tapping "Open … settings"
+        // shortens the window from inside DialogActivity, so an active fix is re-checked sooner.
+        if (shown) missing.forEach { CapabilityPrompt.markShown(it.requirement) }
     }
 
     private fun shouldRun(spec: ActionSpec): Boolean {
