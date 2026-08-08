@@ -4,16 +4,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Which line gets marked, and why. The point of the marker is that 白い熊 can stop re-reading whole
- * screenshots to find the 5 % of characters the Latin and Cyrillic models get wrong, so a line that
- * contains a mistake must not be able to hide behind three good ones next to it.
+ * Which line gets marked, and why. Measured on the Phase 0 corpus: the mean confidence over a line is
+ * near-useless as a discriminator (worst correct 0.918 vs worst wrong 0.932, one wrong line at 0.983),
+ * so the marker reads the least sure single CHARACTER instead, at a threshold picked for recall.
  */
 class OcrConfidenceTest {
 
-    private fun block(line: Int, confidence: Float, text: String = "x") =
+    private fun block(line: Int, lowest: Float, mean: Float = 0.99f, text: String = "x") =
         OcrBlock(
             text = text,
-            confidence = confidence,
+            confidence = mean,
+            lowestCharacter = lowest,
             quad = listOf(OcrPoint(0f, 0f), OcrPoint(1f, 0f), OcrPoint(1f, 1f), OcrPoint(0f, 1f)),
             lineIndex = line,
             start = 0,
@@ -24,56 +25,52 @@ class OcrConfidenceTest {
         OcrResult(blocks.toList(), "", OcrScript.JAPANESE, 0L)
 
     @Test
-    fun `a line takes its worst block, not its average`() {
-        // "Bluetooth、NFC、キス卜、印刷" — one bad word in four. The mean would read as solid and the
-        // marker would point at nothing, which is the whole failure this guards against.
+    fun `a line takes its weakest character, not its average`() {
+        // The real case: "Bluetooth、NFC、キス卜、印刷" scored 0.964 on the MEAN and was wrong. The bad
+        // word's weakest character is what gives it away.
         val line = result(
-            block(0, 0.99f), block(0, 0.99f), block(0, 0.62f), block(0, 0.99f),
+            block(0, lowest = 0.99f), block(0, lowest = 0.98f),
+            block(0, lowest = 0.70f), block(0, lowest = 0.99f),
         ).lineConfidences()
 
         assertEquals(1, line.size)
-        assertEquals(0.62f, line[0], 0.0001f)
-        assertEquals(OcrTrust.DOUBTFUL, OcrTrust.of(line[0]))
+        assertEquals(0.70f, line[0], 0.0001f)
+        assertEquals(OcrTrust.CHECK, OcrTrust.of(line[0]))
+    }
+
+    @Test
+    fun `the threshold sits above the worst wrong line seen`() {
+        // 0.702 was the weakest character of the worst-scoring wrong line; 0.72 catches it.
+        assertEquals(OcrTrust.CHECK, OcrTrust.of(0.702f))
+        assertEquals(OcrTrust.CHECK, OcrTrust.of(0.536f))
+        assertEquals(OcrTrust.SOLID, OcrTrust.of(OcrTrust.CHECK_BELOW))
+        assertEquals(OcrTrust.SOLID, OcrTrust.of(0.99f))
     }
 
     @Test
     fun `confidences come back in line order regardless of block order`() {
         val confidences = result(
-            block(2, 0.80f), block(0, 0.99f), block(1, 0.93f),
+            block(2, lowest = 0.60f), block(0, lowest = 0.99f), block(1, lowest = 0.80f),
         ).lineConfidences()
 
-        assertEquals(listOf(0.99f, 0.93f, 0.80f), confidences.map { "%.2f".format(it).toFloat() })
+        assertEquals(listOf(0.99f, 0.80f, 0.60f), confidences.map { "%.2f".format(it).toFloat() })
     }
 
     @Test
-    fun `the bands sit either side of where real mistakes landed`() {
-        // Measured on the Phase 0 corpus: clean lines above ~0.95, every line with an actual error
-        // below ~0.90.
-        assertEquals(OcrTrust.SOLID, OcrTrust.of(0.99f))
-        assertEquals(OcrTrust.SOLID, OcrTrust.of(OcrTrust.SOLID_ABOVE))
-        assertEquals(OcrTrust.UNSURE, OcrTrust.of(0.93f))
-        assertEquals(OcrTrust.UNSURE, OcrTrust.of(OcrTrust.UNSURE_ABOVE))
-        assertEquals(OcrTrust.DOUBTFUL, OcrTrust.of(0.89f))
-        assertEquals(OcrTrust.DOUBTFUL, OcrTrust.of(0f))
-    }
-
-    @Test
-    fun `the doubtful count is what the status line reports`() {
+    fun `the count is what the status line reports`() {
         val counted = result(
-            block(0, 0.99f),   // solid
-            block(1, 0.93f),   // unsure    -> counted
-            block(2, 0.40f),   // doubtful  -> counted
-            block(3, 0.97f),   // solid
-        ).doubtfulLineCount()
+            block(0, lowest = 0.99f),   // solid
+            block(1, lowest = 0.60f),   // check
+            block(2, lowest = 0.71f),   // check
+            block(3, lowest = 0.97f),   // solid
+        ).linesToCheck()
 
         assertEquals(2, counted)
     }
 
     @Test
     fun `a line the recogniser never claimed anything about is not marked`() {
-        // Only reachable through a caller-side edit. Marking a line we know nothing about would be
-        // pointing at noise.
-        val confidences = result(block(0, 0.99f), block(2, 0.20f)).lineConfidences()
+        val confidences = result(block(0, lowest = 0.99f), block(2, lowest = 0.20f)).lineConfidences()
 
         assertEquals(3, confidences.size)
         assertEquals(1f, confidences[1], 0.0001f)
@@ -83,6 +80,6 @@ class OcrConfidenceTest {
     @Test
     fun `no blocks means nothing to shade`() {
         assertEquals(emptyList<Float>(), result().lineConfidences())
-        assertEquals(0, result().doubtfulLineCount())
+        assertEquals(0, result().linesToCheck())
     }
 }

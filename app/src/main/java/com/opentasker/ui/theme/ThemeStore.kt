@@ -1,6 +1,7 @@
 package com.opentasker.ui.theme
 
 import android.content.Context
+import com.opentasker.core.ocr.OcrTuning
 import android.content.SharedPreferences
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -122,6 +123,20 @@ data class ThemePrefs(
     // server model's headroom is for photographed and handwritten text. Only affects Japanese and
     // English — PaddleOCR ships no server-sized Latin or Cyrillic recogniser.
     val ocrHighAccuracy: Boolean = true,
+    // 文字認識 detection knobs. Integers because the sliders are integer sliders; OcrTuning owns what
+    // each one means and clamps them. Every default is measured — see OcrTuning.
+    val ocrDetectionLongSide: Int = OcrTuning.DEFAULT_LONG_SIDE,
+    val ocrBinarisePercent: Int = OcrTuning.DEFAULT_BINARY_PERCENT,
+    val ocrBoxScorePercent: Int = OcrTuning.DEFAULT_BOX_SCORE_PERCENT,
+    val ocrUnclipTenths: Int = OcrTuning.DEFAULT_UNCLIP_TENTHS,
+    // Where each ONNX weight file lives — a plain path or a picked document URI, empty when unset.
+    // The weights are ~100 MB and no build is ever deleted from the phone, so they are supplied rather
+    // than shipped; the dictionaries that must match them DO ship. See ModelSlot.
+    val ocrModelDet: String = "",
+    val ocrModelJpnServer: String = "",
+    val ocrModelJpnMobile: String = "",
+    val ocrModelLatin: String = "",
+    val ocrModelEslav: String = "",
 
     val chartShowGrid: Boolean = true,                      // draw the grid at all
     val chartShowDots: Boolean = true,                      // draw the real samples over a line
@@ -246,6 +261,15 @@ object ThemeStore {
     private const val K_CHART_AXIS_COLOR = "chart_axis_color"
     private const val K_CHART_GRID_COLOR = "chart_grid_color"
     private const val K_OCR_HIGH_ACCURACY = "ocr_high_accuracy"
+    private const val K_OCR_LONG_SIDE = "ocr_detection_long_side"
+    private const val K_OCR_BINARISE = "ocr_binarise_percent"
+    private const val K_OCR_BOX_SCORE = "ocr_box_score_percent"
+    private const val K_OCR_UNCLIP = "ocr_unclip_tenths"
+    private const val K_OCR_MODEL_DET = "ocr_model_det"
+    private const val K_OCR_MODEL_JPN_SERVER = "ocr_model_jpn_server"
+    private const val K_OCR_MODEL_JPN_MOBILE = "ocr_model_jpn_mobile"
+    private const val K_OCR_MODEL_LATIN = "ocr_model_latin"
+    private const val K_OCR_MODEL_ESLAV = "ocr_model_eslav"
     private const val K_CHART_SHOW_GRID = "chart_show_grid"
     private const val K_CHART_SHOW_DOTS = "chart_show_dots"
     private const val K_CHART_SHOW_REJECTED = "chart_show_rejected"
@@ -395,6 +419,15 @@ object ThemeStore {
         chartAxisTextColor = d.chartAxisTextColor,
         chartGridColor = d.chartGridColor,
         ocrHighAccuracy = d.ocrHighAccuracy,
+        ocrDetectionLongSide = d.ocrDetectionLongSide,
+        ocrBinarisePercent = d.ocrBinarisePercent,
+        ocrBoxScorePercent = d.ocrBoxScorePercent,
+        ocrUnclipTenths = d.ocrUnclipTenths,
+        ocrModelDet = d.ocrModelDet,
+        ocrModelJpnServer = d.ocrModelJpnServer,
+        ocrModelJpnMobile = d.ocrModelJpnMobile,
+        ocrModelLatin = d.ocrModelLatin,
+        ocrModelEslav = d.ocrModelEslav,
         chartShowGrid = d.chartShowGrid,
         chartShowDots = d.chartShowDots,
         chartShowRejected = d.chartShowRejected,
@@ -548,6 +581,15 @@ object ThemeStore {
             chartAxisTextColor = prefs.getInt(K_CHART_AXIS_COLOR, d.chartAxisTextColor),
             chartGridColor = prefs.getInt(K_CHART_GRID_COLOR, d.chartGridColor),
             ocrHighAccuracy = prefs.getBoolean(K_OCR_HIGH_ACCURACY, d.ocrHighAccuracy),
+            ocrDetectionLongSide = prefs.getInt(K_OCR_LONG_SIDE, d.ocrDetectionLongSide),
+            ocrBinarisePercent = prefs.getInt(K_OCR_BINARISE, d.ocrBinarisePercent),
+            ocrBoxScorePercent = prefs.getInt(K_OCR_BOX_SCORE, d.ocrBoxScorePercent),
+            ocrUnclipTenths = prefs.getInt(K_OCR_UNCLIP, d.ocrUnclipTenths),
+            ocrModelDet = prefs.getString(K_OCR_MODEL_DET, d.ocrModelDet) ?: d.ocrModelDet,
+            ocrModelJpnServer = prefs.getString(K_OCR_MODEL_JPN_SERVER, d.ocrModelJpnServer) ?: d.ocrModelJpnServer,
+            ocrModelJpnMobile = prefs.getString(K_OCR_MODEL_JPN_MOBILE, d.ocrModelJpnMobile) ?: d.ocrModelJpnMobile,
+            ocrModelLatin = prefs.getString(K_OCR_MODEL_LATIN, d.ocrModelLatin) ?: d.ocrModelLatin,
+            ocrModelEslav = prefs.getString(K_OCR_MODEL_ESLAV, d.ocrModelEslav) ?: d.ocrModelEslav,
             chartShowGrid = prefs.getBoolean(K_CHART_SHOW_GRID, d.chartShowGrid),
             chartShowDots = prefs.getBoolean(K_CHART_SHOW_DOTS, d.chartShowDots),
             chartShowRejected = prefs.getBoolean(K_CHART_SHOW_REJECTED, d.chartShowRejected),
@@ -653,6 +695,15 @@ object ThemeStore {
             putInt(K_CHART_AXIS_COLOR, p.chartAxisTextColor)
             putInt(K_CHART_GRID_COLOR, p.chartGridColor)
             putBoolean(K_OCR_HIGH_ACCURACY, p.ocrHighAccuracy)
+            putInt(K_OCR_LONG_SIDE, p.ocrDetectionLongSide)
+            putInt(K_OCR_BINARISE, p.ocrBinarisePercent)
+            putInt(K_OCR_BOX_SCORE, p.ocrBoxScorePercent)
+            putInt(K_OCR_UNCLIP, p.ocrUnclipTenths)
+            putString(K_OCR_MODEL_DET, p.ocrModelDet)
+            putString(K_OCR_MODEL_JPN_SERVER, p.ocrModelJpnServer)
+            putString(K_OCR_MODEL_JPN_MOBILE, p.ocrModelJpnMobile)
+            putString(K_OCR_MODEL_LATIN, p.ocrModelLatin)
+            putString(K_OCR_MODEL_ESLAV, p.ocrModelEslav)
             putBoolean(K_CHART_SHOW_GRID, p.chartShowGrid)
             putBoolean(K_CHART_SHOW_DOTS, p.chartShowDots)
             putBoolean(K_CHART_SHOW_REJECTED, p.chartShowRejected)

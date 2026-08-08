@@ -25,6 +25,9 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -64,10 +67,14 @@ import com.opentasker.core.ocr.OcrBlock
 import com.opentasker.core.ocr.OcrEngine
 import com.opentasker.core.ocr.OcrImage
 import com.opentasker.core.ocr.OcrScript
+import com.opentasker.core.ocr.OcrModels
+import com.opentasker.core.ocr.OcrTuning
 import com.opentasker.core.ocr.OcrTrust
-import com.opentasker.core.ocr.doubtfulLineCount
+import com.opentasker.core.ocr.linesToCheck
 import com.opentasker.core.ocr.lineConfidences
 import com.opentasker.ui.charts.ChartPalette
+import com.opentasker.ui.screens.FOCUS_OCR
+import com.opentasker.ui.screens.UiCustomizationActivity
 import com.opentasker.ui.theme.ThemePrefs
 import com.opentasker.ui.theme.ThemeStore
 import kotlin.math.roundToInt
@@ -95,15 +102,30 @@ fun OcrReviewScreen(bitmap: Bitmap, onClose: () -> Unit) {
     var status by remember { mutableStateOf<String?>(null) }
     // Per output line, the confidence of its WORST block — what drives the shading below.
     var lineConfidence by remember { mutableStateOf<List<Float>>(emptyList()) }
+    // Bumped by 再認識. Detection is cached in `page`, so re-running needs both a new key here and
+    // that cache cleared — otherwise the button would only re-run the recogniser over old boxes.
+    var rerunToken by remember { mutableStateOf(0) }
 
     // Detection is script-independent and is the expensive half, so it runs once; changing the chip
     // re-runs only the recogniser over crops already in hand.
-    LaunchedEffect(script, prefs.ocrHighAccuracy) {
+    // A knob change re-detects, because these are DETECTION settings — re-running recognition alone
+    // over crops the old thresholds produced would show the old boxes with new confidence.
+    val tuning = remember(
+        prefs.ocrDetectionLongSide, prefs.ocrBinarisePercent,
+        prefs.ocrBoxScorePercent, prefs.ocrUnclipTenths,
+    ) {
+        OcrTuning.from(
+            prefs.ocrDetectionLongSide, prefs.ocrBinarisePercent,
+            prefs.ocrBoxScorePercent, prefs.ocrUnclipTenths,
+        )
+    }
+
+    LaunchedEffect(script, prefs.ocrHighAccuracy, tuning, rerunToken) {
         busy = true
         status = null
         runCatching {
             val detected = page ?: withContext(Dispatchers.Default) {
-                OcrEngine.detect(context, bitmap.toOcrImage())
+                OcrEngine.detect(context, bitmap.toOcrImage(), tuning)
             }.also { page = it }
             OcrEngine.recognise(context, detected, script, prefs.ocrHighAccuracy)
         }.onSuccess { result ->
@@ -114,15 +136,22 @@ fun OcrReviewScreen(bitmap: Bitmap, onClose: () -> Unit) {
             field = TextFieldValue(result.text, TextRange.Zero)
             // The count is the label the reserved status roles require: the shading must never be the
             // only way to know something needs checking.
-            val doubtful = result.doubtfulLineCount()
+            val toCheck = result.linesToCheck()
             status = when {
                 result.isEmpty -> "文字が見つかりませんでした"
-                doubtful > 0 -> "${result.blocks.size} 行 · ${result.elapsedMs} ms · 要確認 $doubtful 行"
-                else -> "${result.blocks.size} 行 · ${result.elapsedMs} ms · 全行あんしん"
+                toCheck > 0 -> "${result.blocks.size} 行 · ${result.elapsedMs} ms · 要確認 $toCheck 行"
+                else -> "${result.blocks.size} 行 · ${result.elapsedMs} ms"
             }
         }.onFailure { failure ->
             lineConfidence = emptyList()
-            status = "認識に失敗しました: ${failure.message ?: failure.javaClass.simpleName}"
+            blocks = emptyList()
+            // A missing weight file is the expected state on a fresh install, not a crash. Say which
+            // one and where to fix it, because "recognition failed" would send 白い熊 looking for a bug.
+            status = when (failure) {
+                is OcrModels.MissingModel ->
+                    "${failure.slot.label}のモデルが未設定です — 検出設定 → Models で ${failure.slot.fileName} を選んでください"
+                else -> "認識に失敗しました: ${failure.message ?: failure.javaClass.simpleName}"
+            }
         }
         busy = false
     }
@@ -184,6 +213,8 @@ fun OcrReviewScreen(bitmap: Bitmap, onClose: () -> Unit) {
             script = script,
             busy = busy,
             onScript = { script = it },
+            onAdjust = { UiCustomizationActivity.open(context, FOCUS_OCR) },
+            onRerun = { page = null; rerunToken++ },
             onCopy = {
                 copyToClipboard(context, field.text)
                 // The app's own flash, not a system Toast: a Toast renders in the OS palette, which on
@@ -264,15 +295,12 @@ private fun ImagePane(
                     // the image too, so the two halves of the window never disagree about what to check.
                     // Weight carries the state as well as hue — a heavier outline reads at a glance and
                     // survives being looked at by someone who does not separate amber from red.
-                    val trust = OcrTrust.of(block.confidence)
+                    val check = OcrTrust.of(block.lowestCharacter) == OcrTrust.CHECK
                     drawPath(
                         path,
-                        color = when (trust) {
-                            OcrTrust.SOLID -> outline.copy(alpha = 0.45f)
-                            OcrTrust.UNSURE -> ChartPalette.BAND_WARN.copy(alpha = 0.85f)
-                            OcrTrust.DOUBTFUL -> ChartPalette.BAND_CRITICAL.copy(alpha = 0.9f)
-                        },
-                        style = Stroke(width = if (trust == OcrTrust.SOLID) 2f else 4f),
+                        color = if (check) ChartPalette.BAND_WARN.copy(alpha = 0.85f)
+                        else outline.copy(alpha = 0.45f),
+                        style = Stroke(width = if (check) 4f else 2f),
                     )
                 }
             }
@@ -308,6 +336,8 @@ private fun BottomBar(
     script: OcrScript,
     busy: Boolean,
     onScript: (OcrScript) -> Unit,
+    onAdjust: () -> Unit,
+    onRerun: () -> Unit,
     onCopy: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
@@ -322,6 +352,22 @@ private fun BottomBar(
                     label = { Text(candidate.label) },
                     colors = FilterChipDefaults.filterChipColors(),
                 )
+            }
+        }
+        // 検出設定 and 再認識 are one loop: change a knob, come back, look again. Back from the
+        // settings lands here because they are a separate window on the stack, and the knobs are
+        // hoisted to the top of that screen so they are the first thing under the finger.
+        Row(
+            Modifier.fillMaxWidth().padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedButton(onClick = onAdjust, modifier = Modifier.weight(1f)) {
+                Icon(Icons.Filled.Tune, contentDescription = null)
+                Text("  検出設定")
+            }
+            OutlinedButton(onClick = onRerun, enabled = !busy, modifier = Modifier.weight(1f)) {
+                Icon(Icons.Filled.Refresh, contentDescription = null)
+                Text("  再認識")
             }
         }
         Button(
@@ -394,10 +440,8 @@ private class LineConfidenceShading(private val lineConfidence: List<Float>) : V
             val lineEnd = if (newline == -1) raw.length else newline
             val confidence = lineConfidence.getOrNull(lineIndex)
             if (confidence != null && lineEnd > lineStart) {
-                when (OcrTrust.of(confidence)) {
-                    OcrTrust.SOLID -> Unit
-                    OcrTrust.UNSURE -> shaded.addStyle(UNSURE_STYLE, lineStart, lineEnd)
-                    OcrTrust.DOUBTFUL -> shaded.addStyle(DOUBTFUL_STYLE, lineStart, lineEnd)
+                if (OcrTrust.of(confidence) == OcrTrust.CHECK) {
+                    shaded.addStyle(CHECK_STYLE, lineStart, lineEnd)
                 }
             }
             if (newline == -1) break
@@ -408,12 +452,10 @@ private class LineConfidenceShading(private val lineConfidence: List<Float>) : V
     }
 
     private companion object {
-        val UNSURE_STYLE = SpanStyle(
+        // Amber, not red: this is "worth a glance", and the measurement says roughly one in two of
+        // these is fine. Red would overstate what the number knows.
+        val CHECK_STYLE = SpanStyle(
             color = ChartPalette.BAND_WARN,
-            textDecoration = TextDecoration.Underline,
-        )
-        val DOUBTFUL_STYLE = SpanStyle(
-            color = ChartPalette.BAND_CRITICAL,
             textDecoration = TextDecoration.Underline,
         )
     }

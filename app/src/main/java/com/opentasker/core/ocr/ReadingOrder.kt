@@ -7,6 +7,8 @@ import kotlin.math.max
 data class OcrBlock(
     val text: String,
     val confidence: Float,
+    /** The least sure single character in this block — what the "worth checking" marker reads. */
+    val lowestCharacter: Float,
     val quad: OcrQuad,
     /** Which output line this block belongs to. */
     val lineIndex: Int,
@@ -41,7 +43,12 @@ data class OcrResult(
 object ReadingOrder {
 
     /** A recognised box before it has been placed in the reading order. */
-    data class Candidate(val text: String, val confidence: Float, val quad: OcrQuad)
+    data class Candidate(
+        val text: String,
+        val confidence: Float,
+        val lowestCharacter: Float,
+        val quad: OcrQuad,
+    )
 
     fun assemble(candidates: List<Candidate>, vertical: Boolean): Pair<List<OcrBlock>, String> {
         if (candidates.isEmpty()) return emptyList<OcrBlock>() to ""
@@ -85,6 +92,7 @@ object ReadingOrder {
                 blocks += OcrBlock(
                     text = entry.candidate.text,
                     confidence = entry.candidate.confidence,
+                    lowestCharacter = entry.candidate.lowestCharacter,
                     quad = entry.candidate.quad,
                     lineIndex = lineIndex,
                     start = start,

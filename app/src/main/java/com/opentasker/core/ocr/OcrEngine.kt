@@ -19,15 +19,6 @@ import kotlinx.coroutines.withContext
  */
 object OcrEngine {
 
-    /**
-     * How long the detector's longest side may be.
-     *
-     * NOT PaddleOCR's 960 default. Measured on a 2048 px full-width screenshot in Phase 0, 1600 px
-     * halved the character error rate (1.46% against 2.91%), the extra errors at 960 px being exactly
-     * the small text — which on a phone screenshot is most of it.
-     */
-    const val DETECTION_LIMIT_SIDE = 1600
-
     /** Lines per recognition batch. Larger batches pad more width for no gain. */
     private const val BATCH = 6
 
@@ -48,11 +39,11 @@ object OcrEngine {
     suspend fun detect(
         context: Context,
         image: OcrImage,
-        limitSideLength: Int = DETECTION_LIMIT_SIDE,
+        tuning: OcrTuning = OcrTuning.DEFAULT,
     ): Page = withContext(Dispatchers.Default) {
         val application = context.applicationContext
         val session = OcrModels.detection(application)
-        val (width, height) = image.detectionSize(limitSideLength)
+        val (width, height) = image.detectionSize(tuning.longSide)
 
         val tensor = OnnxTensor.createTensor(
             OcrModels.environment,
@@ -80,6 +71,9 @@ object OcrEngine {
             scaleY = image.height.toFloat() / mapHeight,
             originalWidth = image.width,
             originalHeight = image.height,
+            binaryThreshold = tuning.binaryThreshold,
+            boxScoreThreshold = tuning.boxScoreThreshold,
+            unclipRatio = tuning.unclipRatio,
         )
         Page(image, boxes, boxes.map { image.cropQuad(it.quad) })
     }
@@ -143,7 +137,9 @@ object OcrEngine {
         val candidates = page.boxes.indices.mapNotNull { index ->
             val line = decoded[index] ?: return@mapNotNull null
             if (line.text.isBlank()) null
-            else ReadingOrder.Candidate(line.text, line.confidence, page.boxes[index].quad)
+            else ReadingOrder.Candidate(
+                line.text, line.confidence, line.lowestCharacter, page.boxes[index].quad,
+            )
         }
         val (blocks, text) = ReadingOrder.assemble(candidates, page.vertical)
         OcrResult(blocks, text, script, SystemClock.elapsedRealtime() - started)
@@ -155,10 +151,10 @@ object OcrEngine {
         image: OcrImage,
         script: OcrScript = OcrScript.DEFAULT,
         highAccuracy: Boolean = true,
-        limitSideLength: Int = DETECTION_LIMIT_SIDE,
+        tuning: OcrTuning = OcrTuning.DEFAULT,
     ): OcrResult {
         val started = SystemClock.elapsedRealtime()
-        val page = detect(context, image, limitSideLength)
+        val page = detect(context, image, tuning)
         val result = recognise(context, page, script, highAccuracy)
         return result.copy(elapsedMs = max(result.elapsedMs, SystemClock.elapsedRealtime() - started))
     }

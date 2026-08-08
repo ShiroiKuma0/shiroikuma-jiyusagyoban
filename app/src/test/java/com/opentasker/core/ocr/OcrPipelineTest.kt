@@ -41,16 +41,25 @@ class OcrPipelineTest {
 
     // ---------------------------------------------------------------- CTC
 
-    private fun logits(vararg steps: Int, classes: Int): FloatArray {
+    /**
+     * One row per timestep, already a probability distribution — which is what the PP-OCRv5 recognition
+     * graphs emit (every row sums to 1.0). Feeding logits here would not catch the bug that mattered:
+     * softmaxing an already-softmaxed row pins every confidence at ~1/classes without touching the text.
+     */
+    private fun probabilities(vararg steps: Int, classes: Int, winner: Float = 0.97f): FloatArray {
         val out = FloatArray(steps.size * classes)
-        steps.forEachIndexed { step, winner -> out[step * classes + winner] = 10f }
+        val rest = (1f - winner) / (classes - 1)
+        steps.forEachIndexed { step, best ->
+            for (klass in 0 until classes) out[step * classes + klass] = rest
+            out[step * classes + best] = winner
+        }
         return out
     }
 
     @Test
     fun `decode collapses a character held across timesteps`() {
         val charset = OcrCharset.parse("a\nb\n")            // [blank, a, b, ' ']
-        val decoded = CtcDecoder.decode(logits(1, 1, 1, 2, 2, classes = 4), 5, 4, charset)
+        val decoded = CtcDecoder.decode(probabilities(1, 1, 1, 2, 2, classes = 4), 5, 4, charset)
 
         assertEquals("ab", decoded.text)
     }
@@ -60,7 +69,7 @@ class OcrPipelineTest {
         // 'aa' only survives because a blank sits between the two runs — this is the whole reason CTC
         // has a blank class, and dropping the rule silently turns "111" into "11".
         val charset = OcrCharset.parse("a\nb\n")
-        val decoded = CtcDecoder.decode(logits(1, 0, 1, classes = 4), 3, 4, charset)
+        val decoded = CtcDecoder.decode(probabilities(1, 0, 1, classes = 4), 3, 4, charset)
 
         assertEquals("aa", decoded.text)
     }
@@ -68,26 +77,29 @@ class OcrPipelineTest {
     @Test
     fun `decode drops blanks and reports a confidence`() {
         val charset = OcrCharset.parse("a\nb\n")
-        val decoded = CtcDecoder.decode(logits(0, 0, 1, 0, classes = 4), 4, 4, charset)
+        val decoded = CtcDecoder.decode(probabilities(0, 0, 1, 0, classes = 4), 4, 4, charset)
 
         assertEquals("a", decoded.text)
-        assertTrue("confidence ${decoded.confidence}", decoded.confidence > 0.9f)
+        // Read straight off the graph, not softmaxed a second time.
+        assertEquals(0.97f, decoded.confidence, 0.001f)
+        assertEquals(0.97f, decoded.lowestCharacter, 0.001f)
     }
 
     @Test
     fun `decode of pure blanks yields nothing rather than a stray character`() {
         val charset = OcrCharset.parse("a\nb\n")
-        val decoded = CtcDecoder.decode(logits(0, 0, 0, classes = 4), 3, 4, charset)
+        val decoded = CtcDecoder.decode(probabilities(0, 0, 0, classes = 4), 3, 4, charset)
 
         assertEquals("", decoded.text)
         assertEquals(0f, decoded.confidence, 0.0001f)
+        assertEquals(0f, decoded.lowestCharacter, 0.0001f)
     }
 
     // ---------------------------------------------------------------- reading order
 
     private fun box(left: Float, top: Float, width: Float, height: Float, text: String) =
         ReadingOrder.Candidate(
-            text, 1f,
+            text, 1f, 1f,
             listOf(
                 OcrPoint(left, top), OcrPoint(left + width, top),
                 OcrPoint(left + width, top + height), OcrPoint(left, top + height),
