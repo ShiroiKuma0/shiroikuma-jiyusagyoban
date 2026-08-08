@@ -47,6 +47,8 @@ data class MetricChart(
     val headline: String,
     val headlineBand: BandRung?,
     val subtitle: Loc,
+    /** One row per calendar day, newest first — printed under the full-screen chart. */
+    val history: List<MetricDay> = emptyList(),
 ) {
     val isEmpty: Boolean
         get() = (chunk?.segments?.isEmpty() != false) && buckets.isEmpty() && bars.isEmpty() &&
@@ -79,6 +81,8 @@ data class SleepChart(
     val sessions: List<SleepSession>,
     val latest: SleepSession?,
     val headline: Loc,
+    /** One row per night, newest first — every recorded session, not just the latest. */
+    val nights: List<SleepNight> = emptyList(),
 ) {
     val isEmpty: Boolean get() = sessions.isEmpty()
 }
@@ -179,7 +183,12 @@ class BandDashboardModel(
 
         val metrics = MetricSpecs.ALL.map { spec ->
             val rows = if (spec.key == BandMetric.SPO2) spo2Rows else dao.rangeAsc(spec.key, from, to)
-            buildMetric(spec, rows.map { ChartPoint(it.epochMs, it.value) }, spo2Times, readOkTimes)
+            val points = rows.map { ChartPoint(it.epochMs, it.value) }
+            // The day-by-day history is built from the RAW series, before the outlier filter: the
+            // table under a chart reports what the band recorded, and the chart's ✕ marks are where
+            // the two differ. Filtering here as well would hide the disagreement.
+            buildMetric(spec, points, spo2Times, readOkTimes)
+                .copy(history = MetricHistory.days(points, zone))
         }
 
         val sleep = loadSleep(zone)
@@ -367,6 +376,7 @@ class BandDashboardModel(
         return SleepChart(
             sessions = sessions,
             latest = latest,
+            nights = MetricHistory.nights(sessions, zone),
             headline = latest?.let {
                 Loc(
                     BandText.sleepDuration.en.format(it.totalMinutes / 60, it.totalMinutes % 60),

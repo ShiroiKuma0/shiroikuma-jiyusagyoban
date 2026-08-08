@@ -97,7 +97,15 @@ object ChartTicks {
     }
 
     private val HHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-    private val DAY_LABEL: DateTimeFormatter = DateTimeFormatter.ofPattern("M/d")
+    /**
+     * The one date format, everywhere (白い熊, 2026-08-07): `2026-08-07`, never `M/d`.
+     *
+     * It is wide for an axis, and [labelled] is what makes that affordable — it already thins labels
+     * to at most eight majors, and `drawTimeLabels` drops any that would still overlap rather than
+     * letting two dates collide. A dropped label is recoverable by zooming; a date misread because
+     * the year was missing is not.
+     */
+    private val DAY_LABEL: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
     private val MONTH_LABEL: DateTimeFormatter = DateTimeFormatter.ofPattern("M月")
 
     private fun labelFor(t: ZonedDateTime, scale: TickScale, spanMs: Long): String = when (scale) {
@@ -111,7 +119,7 @@ object ChartTicks {
     }
 
     /** Only major ticks carry a label at dense scales, so labels never collide. */
-    fun labelled(ticks: List<ChartTick>, maxLabels: Int = 8): List<ChartTick> {
+    fun labelled(ticks: List<ChartTick>, maxLabels: Int = 5): List<ChartTick> {
         val majors = ticks.filter { it.major }
         if (majors.isEmpty()) return ticks
         val everyNth = (majors.size + maxLabels - 1) / maxLabels
