@@ -149,6 +149,15 @@ object BandText {
         "グラフをタップするとその時点の値。もう一度タップで解除。",
     )
     val nothingHere = Loc("no reading there", "その時点の測定なし")
+    // --- a long-press-dragged stretch of time, and what it adds up to -----------------------------
+    val spanHint = Loc(
+        "Long-press and drag across the chart to total a stretch.",
+        "長押しして横になぞると、その区間を合計します。",
+    )
+    val spanTotal = Loc("total", "合計")
+    val spanMean = Loc("mean", "平均")
+    val spanEmpty = Loc("nothing measured in that stretch", "その区間の測定なし")
+    val spanSamples = Loc("%d samples", "%d 件")
     // --- the day-by-day history under each full-screen chart ------------------------------------
     val history = Loc("Day by day", "日ごとの記録")
     val historyNote = Loc(
