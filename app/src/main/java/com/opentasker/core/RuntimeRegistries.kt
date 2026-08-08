@@ -9,6 +9,7 @@ import com.opentasker.core.actions.BackupRunItemsAction
 import com.opentasker.core.actions.BandChartsAction
 import com.opentasker.core.actions.BandSyncAction
 import com.opentasker.core.actions.GetLocationAction
+import com.opentasker.core.actions.OcrModelsAction
 import com.opentasker.core.actions.OcrRecognizeAction
 import com.opentasker.core.actions.PruneBackupsAction
 import com.opentasker.core.actions.DataReadAction
@@ -122,6 +123,7 @@ import com.opentasker.core.actions.CommentAction
 import com.opentasker.core.actions.SetClipboardAction
 import com.opentasker.core.actions.GetClipboardAction
 import com.opentasker.core.actions.ComposeEmailAction
+import com.opentasker.core.actions.SetLiveWallpaperAction
 import com.opentasker.core.actions.SetWallpaperAction
 import com.opentasker.core.actions.WifiSettingsAction
 import com.opentasker.core.actions.ListAppsAction
@@ -290,6 +292,7 @@ private fun registerBuiltInActions() {
         GetClipboardAction(),
         ComposeEmailAction(),
         SetWallpaperAction(),
+        SetLiveWallpaperAction(),
         WifiSettingsAction(),
         ListAppsAction(),
         ImePickerAction(),
@@ -321,6 +324,7 @@ private fun registerBuiltInActions() {
         BandSyncAction(),
         BandChartsAction(),
         OcrRecognizeAction(),
+        OcrModelsAction(),
         ReadSimsAction(),
         LocationModeAction(),
         SetImeAction(),

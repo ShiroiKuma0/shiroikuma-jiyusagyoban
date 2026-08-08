@@ -654,10 +654,25 @@ fun registerActionMetadata() {
         ActionMetadata(
             id = "wallpaper.set",
             name = "Set Wallpaper",
-            description = "Set the wallpaper from an image in the app's files",
+            description = "Set the wallpaper from an image — home screen, lock screen, or both. The lock screen needs \"where\" set: the API leaves it alone otherwise",
             category = "System",
             fields = listOf(
-                ActionField("path", "Image path", required = true, hint = "path to a .png/.jpg in app files"),
+                ActionField("path", "Image path", required = true, hint = "a .png/.jpg — in app files, or anywhere under /sdcard with \"In shared storage\" on"),
+                ActionField("where", "Which screen", FieldType.TEXT, hint = "home (default), lock, or both"),
+                ActionField("shared", "In shared storage", FieldType.TEXT, hint = "true = resolve the path under /sdcard instead of the app's own files"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "wallpaper.live",
+            name = "Set Live Wallpaper",
+            description = "Switch the live wallpaper to a component. Silent with Shizuku, which can set it outright; without Shizuku the system preview opens and you confirm with a tap",
+            category = "System",
+            fields = listOf(
+                ActionField("package", "Package", required = true, hint = "e.g. com.screensavers_store.matrixtvlivewallpaper"),
+                ActionField("class", "Service class", required = true, hint = "the WallpaperService, e.g. .MatrixWallpaper (a leading dot is expanded)"),
             )
         )
     )
@@ -933,12 +948,24 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "ocr.models",
+            name = "Set OCR Models",
+            description = "Point 文字認識 at the folder holding its ONNX weight files. They are not in the APK — about 100 MB that never changes — so this is where that location is declared. Blank re-runs discovery over the usual folders",
+            category = "Text",
+            fields = listOf(
+                ActionField("folder", "Model folder", FieldType.TEXT, hint = "blank = look in the usual places. e.g. /sdcard/〇/[227] 日本語/[227][66] 辞書/[227][66][362] 文字認識モデル"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "ocr.recognize",
             name = "Recognise Text (OCR)",
             description = "Read the text in an image entirely on-device (PP-OCRv5) into a variable. The same engine as the 文字認識 share tile — share a screenshot cut-out to that, or point this at a saved image",
             category = "Text",
             fields = listOf(
-                ActionField("image", "Image", FieldType.TEXT, hint = "a file path, or a content:// / file:// URI"),
+                ActionField("image", "Image", FieldType.TEXT, hint = "a file path, or a content:// / file:// URI. Leave blank with \"Open the review window\" on to open 文字認識 and pick an image there"),
                 ActionField("script", "Script", FieldType.TEXT, hint = "blank = jpn (Japanese + English). Also: latin (German/Czech/Polish), eslav (Russian)"),
                 ActionField("var", "Output variable", FieldType.TEXT, hint = "blank = %OCR. Also sets %<var>_lines and %<var>_script"),
                 ActionField("model", "Model", FieldType.TEXT, hint = "blank = whatever the UI setting says. server = the accurate 81 MB model, mobile = the fast 16 MB one (Japanese/English only)"),

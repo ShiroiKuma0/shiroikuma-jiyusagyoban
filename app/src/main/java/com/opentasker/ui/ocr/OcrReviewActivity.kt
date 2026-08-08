@@ -36,16 +36,28 @@ class OcrReviewActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        renderFrom(intent)
+    }
 
-        val path = intent.getStringExtra(EXTRA_IMAGE_PATH)
+    /**
+     * `singleTask` delivers a second launch here rather than through [onCreate].
+     *
+     * Without this, opening 文字認識 from its task while the window already existed brought the old
+     * one forward still showing the previous screenshot — the launch looked like it had done nothing.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        renderFrom(intent)
+    }
+
+    private fun renderFrom(intent: Intent?) {
+
+        // No image is a legitimate way in now: a task can open the window empty so 白い熊 picks one
+        // from here, which is the same loop as sharing without having to go and find a share sheet.
+        val path = intent?.getStringExtra(EXTRA_IMAGE_PATH)
         val file = path?.let(::File)?.takeIf { it.isFile }
-        val bitmap = file?.let(::decode)
         cached = file
-
-        if (bitmap == null) {
-            finish()
-            return
-        }
 
         setContent {
             val prefs by ThemeStore.state.collectAsState()
@@ -55,7 +67,13 @@ class OcrReviewActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background,
                 ) {
                     OcrReviewScreen(
-                        bitmap = bitmap,
+                        initialImage = file,
+                        decode = ::decode,
+                        onImagePicked = { picked ->
+                            // The window owns whatever it is showing, so the old one goes when replaced.
+                            if (picked != cached) cached?.delete()
+                            cached = picked
+                        },
                         onClose = { finish() },
                     )
                 }
@@ -74,7 +92,7 @@ class OcrReviewActivity : ComponentActivity() {
      * detection already caps its own input at 1600 px, but the on-screen image is what 白い熊 zooms
      * into to check a character against, so it keeps meaningfully more detail than the recogniser sees.
      */
-    private fun decode(file: File): Bitmap? {
+    fun decode(file: File): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.absolutePath, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
@@ -97,10 +115,10 @@ class OcrReviewActivity : ComponentActivity() {
         private const val MAX_DIMENSION = 4096
 
         /** Opened from the share tile, which is finishing as it calls this — hence NEW_TASK. */
-        fun open(context: Context, image: File) {
+        fun open(context: Context, image: File?) {
             context.startActivity(
                 Intent(context.applicationContext, OcrReviewActivity::class.java).apply {
-                    putExtra(EXTRA_IMAGE_PATH, image.absolutePath)
+                    image?.let { putExtra(EXTRA_IMAGE_PATH, it.absolutePath) }
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 }
             )

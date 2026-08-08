@@ -80,10 +80,16 @@ object OcrModels {
             parsed
         }
 
-    /** Where a slot's weights are, or null when it has not been set. */
+    /**
+     * Where a slot's weights are, or null when they cannot be found at all.
+     *
+     * An unset slot is not a dead end: the files are normally already sitting in the conventional
+     * folder, so they are adopted from there rather than demanding five pickings before the feature
+     * will do anything. A hand-picked path always wins over discovery.
+     */
     fun pathFor(context: Context, slot: ModelSlot): String? {
         val stored = ThemeStore.state.value.ocrModelPath(slot).trim()
-        if (stored.isEmpty()) return null
+        if (stored.isEmpty()) return discover(slot)
         // A plain path when 白い熊 typed one, a document URI when picked. Only a real path can be handed
         // to ONNX Runtime, so a picked document is materialised into app storage once.
         if (!stored.startsWith("content://")) return stored.takeIf { File(it).isFile }
@@ -105,6 +111,26 @@ object OcrModels {
         val (volume, relative) = documentId.split(':', limit = 2).takeIf { it.size == 2 } ?: return null
         if (!volume.equals("primary", ignoreCase = true)) return null
         return File("/storage/emulated/0/$relative").takeIf { it.isFile }?.absolutePath
+    }
+
+    /**
+     * Looks for this slot's file in the conventional folders and remembers the first hit.
+     *
+     * Remembering matters: without it every recognition would stat five directories, and a file moved
+     * away later would silently start resolving somewhere else instead of saying it is missing.
+     */
+    private fun discover(slot: ModelSlot): String? {
+        for (directory in ModelSlot.SEARCH_DIRECTORIES) {
+            for (name in slot.discoveryNames) {
+                val candidate = File(directory, name)
+                if (candidate.isFile) {
+                    AppLogger.info(TAG, "adopted ${slot.id} from ${candidate.absolutePath}")
+                    ThemeStore.update { it.withOcrModelPath(slot, candidate.absolutePath) }
+                    return candidate.absolutePath
+                }
+            }
+        }
+        return null
     }
 
     /** True when everything 「文字認識」 needs for [script] is present. */
@@ -176,6 +202,29 @@ object OcrModels {
 
         extractedTo = target
         return target
+    }
+
+    /**
+     * Adopts every weight file found in [directory], and reports what it set.
+     *
+     * This is what lets the model locations live in a task — 「文字認識の設定 -- [362][01]」 — while the
+     * paths themselves stay app-side where the native loader can reach them without the engine running.
+     * The task is the declared, mirrored home; this is how that declaration is applied.
+     */
+    @Synchronized
+    fun adoptFrom(directory: String): List<ModelSlot> {
+        val base = File(directory)
+        if (!base.isDirectory) return emptyList()
+        val adopted = ModelSlot.entries.mapNotNull { slot ->
+            val hit = slot.discoveryNames.map { File(base, it) }.firstOrNull { it.isFile } ?: return@mapNotNull null
+            ThemeStore.update { it.withOcrModelPath(slot, hit.absolutePath) }
+            slot
+        }
+        if (adopted.isNotEmpty()) {
+            close()   // the open sessions still point at whatever was set before
+            AppLogger.info(TAG, "adopted ${adopted.size} models from $directory")
+        }
+        return adopted
     }
 
     /** Drops every open session — call after the model paths change. */

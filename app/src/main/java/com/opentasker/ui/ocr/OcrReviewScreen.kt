@@ -4,6 +4,10 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Bitmap
+import com.opentasker.core.ocr.OcrShareIntake
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
+import java.io.File
 import android.view.Gravity
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -25,6 +29,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.OutlinedButton
@@ -90,12 +95,32 @@ import kotlinx.coroutines.withContext
  * form of per-block editors, because fixing a wrong character is a text gesture.
  */
 @Composable
-fun OcrReviewScreen(bitmap: Bitmap, onClose: () -> Unit) {
+fun OcrReviewScreen(
+    initialImage: File?,
+    decode: (File) -> Bitmap?,
+    onImagePicked: (File) -> Unit,
+    onClose: () -> Unit,
+) {
     val context = LocalContext.current
+    // The image can arrive three ways: shared in, picked here, or absent because a task opened the
+    // window empty. All three are the same state once decoded.
+    var source by remember { mutableStateOf(initialImage) }
+    var page by remember { mutableStateOf<OcrEngine.Page?>(null) }
+    val bitmap = remember(source) { source?.let(decode) }
+
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        val copied = runCatching { OcrShareIntake.copyToCache(context, uri) }.getOrNull()
+        if (copied != null) {
+            onImagePicked(copied)
+            // A different image means the cached detection is about the old one.
+            page = null
+            source = copied
+        }
+    }
     val prefs by ThemeStore.state.collectAsState()
 
     var script by remember { mutableStateOf(OcrScript.DEFAULT) }
-    var page by remember { mutableStateOf<OcrEngine.Page?>(null) }
     var blocks by remember { mutableStateOf<List<OcrBlock>>(emptyList()) }
     var field by remember { mutableStateOf(TextFieldValue("")) }
     var busy by remember { mutableStateOf(true) }
@@ -105,6 +130,9 @@ fun OcrReviewScreen(bitmap: Bitmap, onClose: () -> Unit) {
     // Bumped by 再認識. Detection is cached in `page`, so re-running needs both a new key here and
     // that cache cleared — otherwise the button would only re-run the recogniser over old boxes.
     var rerunToken by remember { mutableStateOf(0) }
+    // Set when a weight file is missing. Its own state rather than a string, because this is a
+    // do-something condition and has to be shown as one.
+    var missingSlot by remember { mutableStateOf<com.opentasker.core.ocr.ModelSlot?>(null) }
 
     // Detection is script-independent and is the expensive half, so it runs once; changing the chip
     // re-runs only the recogniser over crops already in hand.
@@ -120,15 +148,25 @@ fun OcrReviewScreen(bitmap: Bitmap, onClose: () -> Unit) {
         )
     }
 
-    LaunchedEffect(script, prefs.ocrHighAccuracy, tuning, rerunToken) {
+    LaunchedEffect(source, script, prefs.ocrHighAccuracy, tuning, rerunToken) {
+        val image = bitmap
+        if (image == null) {
+            busy = false
+            blocks = emptyList()
+            lineConfidence = emptyList()
+            field = TextFieldValue("")
+            status = null
+            return@LaunchedEffect
+        }
         busy = true
         status = null
         runCatching {
             val detected = page ?: withContext(Dispatchers.Default) {
-                OcrEngine.detect(context, bitmap.toOcrImage(), tuning)
+                OcrEngine.detect(context, image.toOcrImage(), tuning)
             }.also { page = it }
             OcrEngine.recognise(context, detected, script, prefs.ocrHighAccuracy)
         }.onSuccess { result ->
+            missingSlot = null
             blocks = result.blocks
             lineConfidence = result.lineConfidences()
             // Caret at the START, not the end: the box is three lines tall now, so parking the
@@ -147,9 +185,9 @@ fun OcrReviewScreen(bitmap: Bitmap, onClose: () -> Unit) {
             blocks = emptyList()
             // A missing weight file is the expected state on a fresh install, not a crash. Say which
             // one and where to fix it, because "recognition failed" would send 白い熊 looking for a bug.
+            missingSlot = (failure as? OcrModels.MissingModel)?.slot
             status = when (failure) {
-                is OcrModels.MissingModel ->
-                    "${failure.slot.label}のモデルが未設定です — 検出設定 → Models で ${failure.slot.fileName} を選んでください"
+                is OcrModels.MissingModel -> null   // the panel below says it properly
                 else -> "認識に失敗しました: ${failure.message ?: failure.javaClass.simpleName}"
             }
         }
@@ -167,7 +205,14 @@ fun OcrReviewScreen(bitmap: Bitmap, onClose: () -> Unit) {
     ) {
         // The image takes everything the text box and the controls do not (白い熊, 2026-08-08): you are
         // here to read a screenshot, so the screenshot gets the screen. It shrinks as the keyboard opens.
-        ImagePane(
+        if (bitmap == null) {
+            // No image yet — a task opened the window empty, or a picked file would not decode.
+            EmptyPane(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                message = "画像がありません",
+                detail = "「画像を選ぶ」で認識する画像を選んでください。スクリーンショットを共有しても開きます。",
+            )
+        } else ImagePane(
             bitmap = bitmap,
             blocks = blocks,
             modifier = Modifier.fillMaxWidth().weight(1f),
@@ -178,7 +223,13 @@ fun OcrReviewScreen(bitmap: Bitmap, onClose: () -> Unit) {
             },
         )
 
-        Box(Modifier.fillMaxWidth()) {
+        val missing = missingSlot
+        if (missing != null) {
+            MissingModelPanel(
+                slot = missing,
+                onAdjust = { UiCustomizationActivity.open(context, FOCUS_OCR) },
+            )
+        } else Box(Modifier.fillMaxWidth()) {
             OutlinedTextField(
                 value = field,
                 onValueChange = { field = it },
@@ -213,6 +264,7 @@ fun OcrReviewScreen(bitmap: Bitmap, onClose: () -> Unit) {
             script = script,
             busy = busy,
             onScript = { script = it },
+            onPickImage = { imagePicker.launch(arrayOf("image/*")) },
             onAdjust = { UiCustomizationActivity.open(context, FOCUS_OCR) },
             onRerun = { page = null; rerunToken++ },
             onCopy = {
@@ -311,6 +363,66 @@ private fun ImagePane(
 /** Height of the recognised-text box, in lines. */
 private const val TEXT_BOX_LINES = 3
 
+/**
+ * The models are not set — said where it cannot be missed, with the way to fix it attached.
+ *
+ * This replaced a one-line status message under an empty text box, which 白い熊 read as "nothing was
+ * recognised" rather than "the models have never been chosen" — a reasonable reading of a blank box
+ * and a footnote, and the wrong conclusion entirely.
+ */
+@Composable
+private fun MissingModelPanel(slot: com.opentasker.core.ocr.ModelSlot, onAdjust: () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            "${slot.label}のモデルが未設定です",
+            style = MaterialTheme.typography.titleMedium,
+            color = ChartPalette.BAND_WARN,
+        )
+        Text(
+            "認識には ${slot.fileName} が要ります。通常は 〇/[227] 日本語/[227][66] 辞書/[227][66][362] " +
+                "文字認識モデル/ に置けば自動で見つかります。",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedButton(onClick = onAdjust) {
+            Icon(Icons.Filled.Tune, contentDescription = null)
+            Text("  モデルを設定する")
+        }
+    }
+}
+
+/**
+ * What fills the image half when there is nothing to show.
+ *
+ * It exists because the alternative failed in practice: with the models unset, the window showed an
+ * empty text box and a one-line status underneath, and that reads as "nothing was recognised" rather
+ * than "you have something to do" (白い熊, 2026-08-08). A blank panel is not an answer.
+ */
+@Composable
+private fun EmptyPane(modifier: Modifier, message: String, detail: String, action: (@Composable () -> Unit)? = null) {
+    Box(
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier.padding(28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(message, style = MaterialTheme.typography.titleMedium, color = ChartPalette.BAND_WARN)
+            Text(
+                detail,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            action?.invoke()
+        }
+    }
+}
+
 /** Where the image lands inside the pane, after fit-to-box plus the user's zoom and pan. */
 private data class Displayed(val left: Float, val top: Float, val scale: Float)
 
@@ -336,6 +448,7 @@ private fun BottomBar(
     script: OcrScript,
     busy: Boolean,
     onScript: (OcrScript) -> Unit,
+    onPickImage: () -> Unit,
     onAdjust: () -> Unit,
     onRerun: () -> Unit,
     onCopy: () -> Unit,
@@ -361,6 +474,10 @@ private fun BottomBar(
             Modifier.fillMaxWidth().padding(top = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            OutlinedButton(onClick = onPickImage, modifier = Modifier.weight(1f)) {
+                Icon(Icons.Filled.Image, contentDescription = null)
+                Text("  画像を選ぶ")
+            }
             OutlinedButton(onClick = onAdjust, modifier = Modifier.weight(1f)) {
                 Icon(Icons.Filled.Tune, contentDescription = null)
                 Text("  検出設定")

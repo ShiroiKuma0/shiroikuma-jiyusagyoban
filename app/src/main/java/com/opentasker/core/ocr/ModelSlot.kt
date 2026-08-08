@@ -43,7 +43,29 @@ enum class ModelSlot(
     ),
     ;
 
+    /** File names this slot will adopt from a conventional folder, newest convention first. */
+    val discoveryNames: List<String>
+        get() = when (this) {
+            DETECTION -> listOf("ppocrv5-mobile-det.onnx", "det.onnx")
+            JPN_SERVER -> listOf("ppocrv5-server-rec.onnx", "rec_jpn.onnx")
+            JPN_MOBILE -> listOf("ppocrv5-mobile-rec.onnx", "rec_jpn_mobile.onnx")
+            LATIN -> listOf("latin_rec.onnx", "rec_latin.onnx")
+            ESLAV -> listOf("eslav_rec.onnx", "rec_eslav.onnx")
+        }
+
     companion object {
+        /**
+         * Where the weights are looked for when a slot has not been set by hand.
+         *
+         * 白い熊 keeps them with the other dictionaries, under 日本語 → 辞書 — so the ordinary case is
+         * that the files are already in the right place and 「文字認識」 should simply work rather than
+         * demand five pickings first. /sdcard/tmp is second because that is where a fresh adb push lands.
+         */
+        val SEARCH_DIRECTORIES = listOf(
+            "/storage/emulated/0/〇/[227] 日本語/[227][66] 辞書/[227][66][362] 文字認識モデル",
+            "/storage/emulated/0/tmp",
+        )
+
         /** Where all five come from. Opened by the button in 「文字認識」 settings. */
         const val DOWNLOAD_PAGE = "https://huggingface.co/bukuroo/PPOCRv5-ONNX/tree/main"
 
