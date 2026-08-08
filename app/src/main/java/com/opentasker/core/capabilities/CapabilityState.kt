@@ -171,6 +171,27 @@ object CapabilityState {
         CapabilityRequirement.Bluetooth -> "Bluetooth"
     }
 
+    /**
+     * The extra sentence a block dialog needs when "you have not granted it" is simply untrue.
+     *
+     * Accessibility is the case that forced this (白い熊, 2026-08-08). The service was ON in system
+     * settings and the framework had it under `Crashed services` with nothing bound, so the app was
+     * right to block — and the dialog told 白い熊 to go and enable a thing they had already enabled,
+     * which sent them looking for a fault that was not there. Null when the ordinary story is correct.
+     */
+    fun blockedDetail(req: CapabilityRequirement, context: Context): String? = when (req) {
+        CapabilityRequirement.Accessibility ->
+            if (ShiroiKumaAccessibilityService.isEnabledButNotRunning(context)) {
+                "It IS switched on in System Settings — but Android is not running it. That happens " +
+                    "when the service is killed and the system marks it crashed; it will not start " +
+                    "again on its own.\n\nFix: open Accessibility settings below, turn 白い熊 自由作業盤 " +
+                    "OFF and then ON again."
+            } else {
+                null
+            }
+        else -> null
+    }
+
     /** A missing, blocking permission and the action types in the task that need it. */
     data class MissingCapability(val requirement: CapabilityRequirement, val actionTypes: List<String>)
 
