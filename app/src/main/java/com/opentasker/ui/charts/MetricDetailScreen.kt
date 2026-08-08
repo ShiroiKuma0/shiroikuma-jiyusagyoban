@@ -185,6 +185,16 @@ fun MetricDetailScreen(
                 }
             }
 
+            // The numbers, under the shape. A chart shows how a day went; only a table lets you read
+            // Tuesday's figure without zooming and squinting at an axis.
+            when (metricKey) {
+                MetricSpecs.KEY_SLEEP -> state.sleep?.let { SleepHistoryCard(it.nights) }
+                MetricSpecs.KEY_BLOOD_PRESSURE -> Unit  // a dumbbell day is two series; the ladder says more
+                else -> state.metrics.firstOrNull { it.spec.key == metricKey }?.let {
+                    MetricHistoryCard(it.history, it.spec)
+                }
+            }
+
             spec?.bands?.takeIf { it.isNotEmpty() }?.let { BandLadder(it) }
 
             if (showInfo && info != null) InfoSheet(info)
@@ -357,31 +367,31 @@ private fun SleepBreakdown(session: SleepSession) {
     }
 }
 
-/** The `i` sheet. Richer than Hume's, and explicit about what is not known. */
+/**
+ * The `i` sheet. Richer than Hume's, and explicit about what is not known.
+ *
+ * Typography comes from [InfoType] — the same sizing, colour and solid leading the 健康指数 page uses,
+ * so the two long-form screens in this window read as one thing rather than two.
+ */
 @Composable
 private fun InfoSheet(info: MetricInfo) {
     val lang = LocalBandLanguage.current
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             InfoBlock(BandText.infoWhat[lang], info.whatItIs[lang])
             InfoBlock(BandText.infoHow[lang], info.howMeasured[lang])
             InfoBlock(BandText.infoRead[lang], info.howToRead[lang])
             if (info.caveat[lang].isNotBlank()) {
-                InfoBlock(BandText.infoCaveat[lang], info.caveat[lang], ChartPalette.BAND_WARN)
+                InfoBlock(BandText.infoCaveat[lang], info.caveat[lang])
             }
         }
     }
 }
 
 @Composable
-private fun InfoBlock(heading: String, body: String, headingColor: androidx.compose.ui.graphics.Color? = null) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            heading,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-            color = headingColor ?: MaterialTheme.colorScheme.onSurface,
-        )
-        Text(body, style = MaterialTheme.typography.bodySmall, color = LocalChartStyle.current.axisText)
+private fun InfoBlock(heading: String, body: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        InfoHeading(heading)
+        InfoBody(body)
     }
 }

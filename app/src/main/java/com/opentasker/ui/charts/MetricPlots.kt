@@ -363,11 +363,8 @@ fun SleepPreviewCard(
 fun MetricChart.readoutAt(tMs: Long): ChartPoint? =
     nearestSample(readoutPoints, tMs, spec.cadenceSec * 4000L)
 
-/** `08-06 03:12` — the crosshair's instant, in the device's own zone. */
-fun crosshairTimeLabel(tMs: Long): String = java.time.format.DateTimeFormatter
-    .ofPattern("MM-dd HH:mm")
-    .withZone(ZoneId.systemDefault())
-    .format(java.time.Instant.ofEpochMilli(tMs))
+/** `2026-08-07 03:12` — the crosshair's instant, in the device's own zone and the one date format. */
+fun crosshairTimeLabel(tMs: Long): String = BandDates.dateTime(tMs)
 
 @Composable
 private fun EmptyPlot() {
