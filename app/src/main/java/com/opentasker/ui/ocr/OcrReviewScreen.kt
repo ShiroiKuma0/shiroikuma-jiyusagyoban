@@ -50,7 +50,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.actions.FlashOverlay
@@ -58,6 +64,10 @@ import com.opentasker.core.ocr.OcrBlock
 import com.opentasker.core.ocr.OcrEngine
 import com.opentasker.core.ocr.OcrImage
 import com.opentasker.core.ocr.OcrScript
+import com.opentasker.core.ocr.OcrTrust
+import com.opentasker.core.ocr.doubtfulLineCount
+import com.opentasker.core.ocr.lineConfidences
+import com.opentasker.ui.charts.ChartPalette
 import com.opentasker.ui.theme.ThemePrefs
 import com.opentasker.ui.theme.ThemeStore
 import kotlin.math.roundToInt
@@ -83,6 +93,8 @@ fun OcrReviewScreen(bitmap: Bitmap, onClose: () -> Unit) {
     var field by remember { mutableStateOf(TextFieldValue("")) }
     var busy by remember { mutableStateOf(true) }
     var status by remember { mutableStateOf<String?>(null) }
+    // Per output line, the confidence of its WORST block — what drives the shading below.
+    var lineConfidence by remember { mutableStateOf<List<Float>>(emptyList()) }
 
     // Detection is script-independent and is the expensive half, so it runs once; changing the chip
     // re-runs only the recogniser over crops already in hand.
@@ -96,12 +108,20 @@ fun OcrReviewScreen(bitmap: Bitmap, onClose: () -> Unit) {
             OcrEngine.recognise(context, detected, script, prefs.ocrHighAccuracy)
         }.onSuccess { result ->
             blocks = result.blocks
+            lineConfidence = result.lineConfidences()
             // Caret at the START, not the end: the box is three lines tall now, so parking the
             // caret at the end opens it scrolled to the last three lines of the text.
             field = TextFieldValue(result.text, TextRange.Zero)
-            status = if (result.isEmpty) "文字が見つかりませんでした" else
-                "${result.blocks.size} 行 · ${result.elapsedMs} ms"
+            // The count is the label the reserved status roles require: the shading must never be the
+            // only way to know something needs checking.
+            val doubtful = result.doubtfulLineCount()
+            status = when {
+                result.isEmpty -> "文字が見つかりませんでした"
+                doubtful > 0 -> "${result.blocks.size} 行 · ${result.elapsedMs} ms · 要確認 $doubtful 行"
+                else -> "${result.blocks.size} 行 · ${result.elapsedMs} ms · 全行あんしん"
+            }
         }.onFailure { failure ->
+            lineConfidence = emptyList()
             status = "認識に失敗しました: ${failure.message ?: failure.javaClass.simpleName}"
         }
         busy = false
@@ -142,6 +162,9 @@ fun OcrReviewScreen(bitmap: Bitmap, onClose: () -> Unit) {
                 // the image. minLines pins the height so the layout does not jump as the text changes.
                 minLines = TEXT_BOX_LINES,
                 maxLines = TEXT_BOX_LINES,
+                // Shading only, never a change of text: the mapping is the identity, so editing,
+                // selection and the tap-a-box-to-move-the-caret offsets all behave exactly as before.
+                visualTransformation = remember(lineConfidence) { LineConfidenceShading(lineConfidence) },
             )
             if (busy) {
                 CircularProgressIndicator(Modifier.align(Alignment.Center))
@@ -237,7 +260,20 @@ private fun ImagePane(
                         }
                         close()
                     }
-                    drawPath(path, color = outline.copy(alpha = 0.45f), style = Stroke(width = 2f))
+                    // The box agrees with the text: a line the recogniser was unsure of is marked on
+                    // the image too, so the two halves of the window never disagree about what to check.
+                    // Weight carries the state as well as hue — a heavier outline reads at a glance and
+                    // survives being looked at by someone who does not separate amber from red.
+                    val trust = OcrTrust.of(block.confidence)
+                    drawPath(
+                        path,
+                        color = when (trust) {
+                            OcrTrust.SOLID -> outline.copy(alpha = 0.45f)
+                            OcrTrust.UNSURE -> ChartPalette.BAND_WARN.copy(alpha = 0.85f)
+                            OcrTrust.DOUBTFUL -> ChartPalette.BAND_CRITICAL.copy(alpha = 0.9f)
+                        },
+                        style = Stroke(width = if (trust == OcrTrust.SOLID) 2f else 4f),
+                    )
                 }
             }
         }
@@ -328,4 +364,57 @@ private fun Bitmap.toOcrImage(): OcrImage {
     val pixels = IntArray(width * height)
     getPixels(pixels, 0, width, 0, 0, width, height)
     return OcrImage(pixels, width, height)
+}
+
+/**
+ * Tints each line of the recognised text by how sure the recogniser was of it.
+ *
+ * Keyed by **line index**, deliberately, not by the character offsets the blocks carry. Offsets go
+ * stale the moment 白い熊 corrects a character — which is exactly when the shading is most wanted — so
+ * the ranges are recomputed from the text in front of us on every pass. Editing inside a line keeps
+ * that line's marking; adding or removing lines degrades to unmarked rather than to wrong.
+ *
+ * Two channels, never hue alone: an underline says "this needs a look" and the colour says how badly,
+ * using the reserved status roles from [ChartPalette]. The status line under the field carries the
+ * count in words, which is the label those roles are documented as always shipping beside.
+ *
+ * [OffsetMapping.Identity] is safe because not one character is added, removed or reordered.
+ */
+private class LineConfidenceShading(private val lineConfidence: List<Float>) : VisualTransformation {
+
+    override fun filter(text: AnnotatedString): TransformedText {
+        if (lineConfidence.isEmpty()) return TransformedText(text, OffsetMapping.Identity)
+
+        val shaded = AnnotatedString.Builder(text.text)
+        var lineStart = 0
+        var lineIndex = 0
+        val raw = text.text
+        while (lineStart <= raw.length) {
+            val newline = raw.indexOf('\n', lineStart)
+            val lineEnd = if (newline == -1) raw.length else newline
+            val confidence = lineConfidence.getOrNull(lineIndex)
+            if (confidence != null && lineEnd > lineStart) {
+                when (OcrTrust.of(confidence)) {
+                    OcrTrust.SOLID -> Unit
+                    OcrTrust.UNSURE -> shaded.addStyle(UNSURE_STYLE, lineStart, lineEnd)
+                    OcrTrust.DOUBTFUL -> shaded.addStyle(DOUBTFUL_STYLE, lineStart, lineEnd)
+                }
+            }
+            if (newline == -1) break
+            lineStart = newline + 1
+            lineIndex++
+        }
+        return TransformedText(shaded.toAnnotatedString(), OffsetMapping.Identity)
+    }
+
+    private companion object {
+        val UNSURE_STYLE = SpanStyle(
+            color = ChartPalette.BAND_WARN,
+            textDecoration = TextDecoration.Underline,
+        )
+        val DOUBTFUL_STYLE = SpanStyle(
+            color = ChartPalette.BAND_CRITICAL,
+            textDecoration = TextDecoration.Underline,
+        )
+    }
 }
