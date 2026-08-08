@@ -59,8 +59,23 @@ object HealthIndexSource {
                 spo2Low = percentile(spo2Points.takeLast(SPO2_WINDOW).map { it.value }, 0.05),
                 sleepMinutes = latestSleep?.totalMinutes,
                 deepRemShare = latestSleep?.deepRemShare,
+                steps = stepsLastDay(metrics),
             ),
         )
+    }
+
+    /**
+     * The last day's step total, or null when the band has no step data at all.
+     *
+     * The null/zero distinction is the whole subtlety. Everywhere else in this file an absent
+     * measurement means the band did not measure; for steps, **zero is a measurement** — a day of
+     * sitting still is a real and rather informative reading. So an empty series is null and a series
+     * of zeroes is 0.0, and only the first is reported as missing.
+     */
+    fun stepsLastDay(metrics: List<MetricChart>): Double? {
+        val points = pointsOf(metrics, BandMetric.STEPS_MINUTE)
+        if (points.isEmpty()) return null
+        return lastDay(points).sumOf { it.value }
     }
 
     private fun pointsOf(metrics: List<MetricChart>, key: String): List<ChartPoint> {
