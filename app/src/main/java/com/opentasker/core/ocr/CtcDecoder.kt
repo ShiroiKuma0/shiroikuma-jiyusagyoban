@@ -11,31 +11,46 @@ import kotlin.math.exp
  */
 object CtcDecoder {
 
-    /** A decoded line and how sure the model was, averaged over the characters it actually emitted. */
-    data class Decoded(val text: String, val confidence: Float)
+    /**
+     * A decoded line, with both summaries of how sure the model was.
+     *
+     * [confidence] is the mean over emitted characters. [lowestCharacter] is the least sure single
+     * character in the line, which is the one worth surfacing: measured on the Phase 0 corpus the mean
+     * barely separates a correct line from a wrong one (worst correct 0.918 against worst wrong 0.932,
+     * and one wrong line scored 0.983), while the weakest character does far better at the median.
+     */
+    data class Decoded(val text: String, val confidence: Float, val lowestCharacter: Float)
 
     /**
-     * @param logits one row of the batch, `[timesteps, classes]` flattened row-major
+     * @param probabilities one row of the batch, `[timesteps, classes]` flattened row-major. The
+     *   PP-OCRv5 recognition graphs end in a softmax — measured: every timestep's row sums to 1.0 —
+     *   so these are probabilities already and must NOT be softmaxed again.
      * @param charset from [OcrCharset.parse] — index 0 is the blank
      */
-    fun decode(logits: FloatArray, timesteps: Int, classes: Int, charset: List<String>): Decoded {
-        require(logits.size >= timesteps * classes) {
-            "logits ${logits.size} < ${timesteps}x$classes"
+    fun decode(
+        probabilities: FloatArray,
+        timesteps: Int,
+        classes: Int,
+        charset: List<String>,
+    ): Decoded {
+        require(probabilities.size >= timesteps * classes) {
+            "probabilities ${probabilities.size} < ${timesteps}x$classes"
         }
 
         val builder = StringBuilder()
         var confidenceSum = 0f
+        var lowest = 1f
         var emitted = 0
         var previous = -1
 
         for (step in 0 until timesteps) {
             val base = step * classes
             var bestIndex = 0
-            var bestLogit = Float.NEGATIVE_INFINITY
+            var bestProbability = Float.NEGATIVE_INFINITY
             for (klass in 0 until classes) {
-                val value = logits[base + klass]
-                if (value > bestLogit) {
-                    bestLogit = value
+                val value = probabilities[base + klass]
+                if (value > bestProbability) {
+                    bestProbability = value
                     bestIndex = klass
                 }
             }
@@ -44,7 +59,14 @@ object CtcDecoder {
             // the blank is the separator that lets a genuine double letter through.
             if (bestIndex != previous && bestIndex != 0) {
                 builder.append(charset.getOrElse(bestIndex) { "" })
-                confidenceSum += softmaxAt(logits, base, classes, bestIndex, bestLogit)
+                // Taken straight from the graph. Applying softmax here as well — which this did until
+                // 2026-08-08 — spreads a row that already sums to 1 across 18 385 classes and pins every
+                // confidence at about 1/18385. It never touched the TEXT, because argmax survives any
+                // monotonic transform, so it stayed invisible until the confidence was put on screen and
+                // every single line came back marked as doubtful.
+                val probability = bestProbability.coerceIn(0f, 1f)
+                confidenceSum += probability
+                if (probability < lowest) lowest = probability
                 emitted++
             }
             previous = bestIndex
@@ -53,13 +75,7 @@ object CtcDecoder {
         return Decoded(
             text = builder.toString(),
             confidence = if (emitted == 0) 0f else confidenceSum / emitted,
+            lowestCharacter = if (emitted == 0) 0f else lowest,
         )
-    }
-
-    /** Softmax of one class, computed with the max subtracted so a large logit cannot overflow. */
-    private fun softmaxAt(logits: FloatArray, base: Int, classes: Int, index: Int, maxLogit: Float): Float {
-        var total = 0f
-        for (klass in 0 until classes) total += exp(logits[base + klass] - maxLogit)
-        return if (total <= 0f) 0f else (exp(logits[base + index] - maxLogit) / total)
     }
 }

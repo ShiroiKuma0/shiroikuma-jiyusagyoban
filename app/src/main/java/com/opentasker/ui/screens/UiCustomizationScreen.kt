@@ -10,6 +10,13 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import android.net.Uri
+import com.opentasker.core.ocr.ModelSlot
+import com.opentasker.ui.charts.ChartPalette
+import com.opentasker.core.ocr.OcrModels
+import com.opentasker.core.ocr.ocrModelPath
+import com.opentasker.core.ocr.withOcrModelPath
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +32,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -96,6 +104,7 @@ import com.opentasker.ui.theme.FontOption
 import com.opentasker.ui.charts.ChartPaletteVerdict
 import com.opentasker.ui.charts.ChartStylePreview
 import com.opentasker.ui.theme.ThemePrefs
+import com.opentasker.core.ocr.OcrTuning
 import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -111,11 +120,197 @@ private val EximWarnColor = Color(0xFFFF5252)
  * logically sectioned, with individual items indented under their section headers, exposing the
  * colours, borders, and fonts that make up the default black-yellow look (all settable).
  */
+
+/**
+ * The 「文字認識」 settings, as their own block so they can be shown at the TOP when the review window
+ * sends 白い熊 here to adjust a knob.
+ *
+ * That path matters more than it looks: the point of these knobs is to change one, go back, and
+ * re-recognise the same screenshot. Making 白い熊 scroll past nine hundred rows of chart settings to
+ * find them each time would kill the loop the feature exists for.
+ */
+
+/**
+ * Where to get the weights. Two repositories, because the Latin and Cyrillic recognisers live apart
+ * from the Chinese/Japanese ones — sending 白い熊 to one page and letting them hunt would be worse than
+ * two honest buttons.
+ */
+@Composable
+private fun ModelDownloadRow() {
+    val context = LocalContext.current
+    fun open(url: String) {
+        runCatching {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
+    }
+    Row(
+        Modifier.fillMaxWidth().padding(start = rowStartPadding(1), end = 16.dp, bottom = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedButton(onClick = { open(ModelSlot.DOWNLOAD_PAGE) }, modifier = Modifier.weight(1f)) {
+            Text("日本語・検出器")
+        }
+        OutlinedButton(
+            onClick = { open(ModelSlot.DOWNLOAD_PAGE_MULTILINGUAL) },
+            modifier = Modifier.weight(1f),
+        ) {
+            Text("Latin・Кириллица")
+        }
+    }
+}
+
+/**
+ * One weight file: what it is, whether it is set, and a picker.
+ *
+ * Each row owns its own launcher so there is no "which slot am I picking for" state to get wrong. The
+ * read permission is taken persistably, because a URI that works today and not after a reboot would
+ * look exactly like a broken model.
+ */
+@Composable
+private fun ModelRow(slot: ModelSlot) {
+    val context = LocalContext.current
+    val prefs by ThemeStore.state.collectAsState()
+    val current = prefs.ocrModelPath(slot)
+
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.takePersistableUriPermission(
+                uri, Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
+        }
+        ThemeStore.update { it.withOcrModelPath(slot, uri.toString()) }
+        // The old session still points at the old weights until it is dropped.
+        OcrModels.close()
+    }
+
+    Column(Modifier.fillMaxWidth().padding(start = rowStartPadding(1), end = 16.dp, bottom = 10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(slot.label, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    if (current.isBlank()) "未設定 — ${slot.fileName}" else "設定済み",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (current.isBlank()) ChartPalette.BAND_WARN
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            OutlinedButton(onClick = { picker.launch(arrayOf("*/*")) }) {
+                Text(if (current.isBlank()) "選ぶ" else "変更")
+            }
+        }
+        Text(
+            slot.about,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** Focus key for [UiCustomizationScreen] — the 文字認識 detection rows. */
+const val FOCUS_OCR = "ocr"
+
+private fun LazyListScope.ocrSectionRows(prefs: ThemePrefs) {
+    item { SectionHeader("「文字認識」 OCR") }
+    item {
+                SwitchRow(
+                    level = 1, label = "High-accuracy model",
+                    description = "On: PP-OCRv5 server (81 MB). Off: mobile (16 MB), about 2.5x faster — " +
+                        "roughly 2 s instead of 5 s on a full-width screenshot. Measured on clean screenshot " +
+                        "text the two are equivalent; the server model's headroom is for photographed and " +
+                        "handwritten text. Japanese and English only — there is no server-sized Latin or " +
+                        "Cyrillic recogniser, so those chips are unaffected.",
+                    checked = prefs.ocrHighAccuracy,
+                    onCheckedChange = { v -> ThemeStore.update { it.copy(ocrHighAccuracy = v) } },
+                )
+            }
+
+    item { SubHeader(1, "Models") }
+    item {
+        SettingNote(
+            "The recognition weights are about 100 MB and never change, so they are NOT in the APK — " +
+                "every kept build would have carried another copy. Fetch them once, point each row at " +
+                "the file, and they stay. The character dictionaries do ship, because each one has to " +
+                "match its model exactly."
+        )
+    }
+    item { ModelDownloadRow() }
+    items(ModelSlot.entries.toList(), key = { "ocr-model-${it.id}" }) { slot -> ModelRow(slot) }
+
+    item { SubHeader(1, "Detection") }
+    item {
+                SliderRow(
+                    level = 1, label = "Detection long side",
+                    value = prefs.ocrDetectionLongSide, valueText = "${prefs.ocrDetectionLongSide} px",
+                    range = OcrTuning.LONG_SIDE_MIN.toFloat()..OcrTuning.LONG_SIDE_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(ocrDetectionLongSide = v) } },
+                )
+            }
+    item {
+                SettingNote(
+                    "The size the detector actually sees. 1600 px is measured, not inherited — against " +
+                        "PP-OCR's own 960 default it halved the character error on a full-width screenshot, " +
+                        "and the errors it removed were exactly the small text. Higher costs time with the area."
+                )
+            }
+    item {
+                SliderRow(
+                    level = 1, label = "Binarisation threshold",
+                    value = prefs.ocrBinarisePercent, valueText = "0.${prefs.ocrBinarisePercent}",
+                    range = OcrTuning.BINARY_PERCENT_MIN.toFloat()..OcrTuning.BINARY_PERCENT_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(ocrBinarisePercent = v) } },
+                )
+            }
+    item {
+                SettingNote(
+                    "Where the probability map becomes text. Lower finds fainter text and starts joining " +
+                        "neighbouring lines into one box; higher splits words off the ends of lines."
+                )
+            }
+    item {
+                SliderRow(
+                    level = 1, label = "Box score threshold",
+                    value = prefs.ocrBoxScorePercent, valueText = "0.${prefs.ocrBoxScorePercent}",
+                    range = OcrTuning.BOX_SCORE_PERCENT_MIN.toFloat()..OcrTuning.BOX_SCORE_PERCENT_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(ocrBoxScorePercent = v) } },
+                )
+            }
+    item {
+                SettingNote(
+                    "The confidence a detected region needs to survive. Raising it drops marginal boxes — " +
+                        "useful on a noisy photograph, and a good way to lose real faint lines on a clean screenshot."
+                )
+            }
+    item {
+                SliderRow(
+                    level = 1, label = "Unclip ratio",
+                    value = prefs.ocrUnclipTenths, valueText = "%.1f".format(prefs.ocrUnclipTenths / 10f),
+                    range = OcrTuning.UNCLIP_TENTHS_MIN.toFloat()..OcrTuning.UNCLIP_TENTHS_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(ocrUnclipTenths = v) } },
+                )
+            }
+    item {
+                SettingNote(
+                    "How far each detected box is grown before the crop is taken — the one to leave alone " +
+                        "without a test image in front of you. Detection predicts a SHRUNK region, and this is " +
+                        "what puts the ascenders and diacritics back inside it: too low silently decapitates " +
+                        "every line and 'ä' starts reading as 'a'. Too high swallows the line above. 1.5 is " +
+                        "PaddleOCR's own value and measured correct here."
+                )
+            }
+
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UiCustomizationScreen(
     onBack: () -> Unit,
+    /** When [FOCUS_OCR], the 文字認識 rows are hoisted to the top — see [ocrSectionRows]. */
+    focusSection: String? = null,
 ) {
+    val focusOcr = focusSection == FOCUS_OCR
     BackHandler(onBack = onBack)
     val context = LocalContext.current
     val prefs by ThemeStore.state.collectAsState()
@@ -188,7 +383,9 @@ fun UiCustomizationScreen(
             contentPadding = PaddingValues(bottom = 28.dp),
         ) {
             // --- Export / Import — first separated section (Kōjiki UI-page flow) ---
-            item { SectionHeader("Export / Import", first = true) }
+            if (focusOcr) ocrSectionRows(prefs)
+
+            item { SectionHeader("Export / Import", first = !focusOcr) }
             item {
                 RowScaffold(1, onClick = { eximDirPicker.launch(SettingsBackup.dirUri(context)) }) {
                     Column(Modifier.weight(1f)) {
@@ -668,20 +865,7 @@ fun UiCustomizationScreen(
 
 
             // --- 「健康」 charts — the numbers the band screens draw with ---------------------
-            item { SectionHeader("「文字認識」 OCR") }
-            item {
-                SwitchRow(
-                    level = 1, label = "High-accuracy model",
-                    description = "On: PP-OCRv5 server (81 MB). Off: mobile (16 MB), about 2.5x faster — " +
-                        "roughly 2 s instead of 5 s on a full-width screenshot. Measured on clean screenshot " +
-                        "text the two are equivalent; the server model's headroom is for photographed and " +
-                        "handwritten text. Japanese and English only — there is no server-sized Latin or " +
-                        "Cyrillic recogniser, so those chips are unaffected.",
-                    checked = prefs.ocrHighAccuracy,
-                    onCheckedChange = { v -> ThemeStore.update { it.copy(ocrHighAccuracy = v) } },
-                )
-            }
-
+            if (!focusOcr) ocrSectionRows(prefs)
             item { SectionHeader("「健康」 charts") }
             item { ChartLivePreview(level = 1, prefs = prefs) }
 
@@ -1011,7 +1195,12 @@ private fun SectionHeader(title: String, first: Boolean = false) {
         Column(
             Modifier
                 .padding(start = 16.dp, top = if (first) 8.dp else 20.dp, end = 16.dp, bottom = 4.dp)
-                .width(IntrinsicSize.Min),
+                // Max, not Min. The rule under a heading should be exactly as wide as the heading, and
+                // for a Latin title Min happens to give that. For a CJK title it does not: every
+                // character is a legal break point, so the MINIMUM intrinsic width is about one glyph —
+                // and with softWrap off the title is then clipped to 「文 rather than wrapped. It hit
+                // 「健康」 charts too, quietly, until a second Japanese section made it obvious.
+                .width(IntrinsicSize.Max),
         ) {
             Text(
                 title,
@@ -1575,6 +1764,23 @@ private fun FontPickerDialog(
 }
 
 // ---- model helpers ------------------------------------------------------------------------------
+
+/**
+ * A paragraph under a slider, for a knob whose effect is not guessable from its name.
+ *
+ * The 文字認識 detection knobs each have a failure mode that looks like a bad model rather than a bad
+ * setting — a decapitated crop reads as "the OCR can't do diacritics" — so each one says what it does
+ * and which way it goes wrong.
+ */
+@Composable
+private fun SettingNote(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = rowStartPadding(1), end = 16.dp, bottom = 6.dp),
+    )
+}
 
 /**
  * A sub-heading inside a section.

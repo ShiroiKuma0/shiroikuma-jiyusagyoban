@@ -10,6 +10,7 @@ import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.ocr.OcrEngine
 import com.opentasker.core.ocr.OcrImage
 import com.opentasker.core.ocr.OcrScript
+import com.opentasker.core.ocr.OcrTuning
 import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.ui.ocr.OcrReviewActivity
 import com.opentasker.ui.theme.ThemeStore
@@ -57,7 +58,14 @@ class OcrRecognizeAction : Action {
         }
 
         val result = runCatching {
-            OcrEngine.run(ctx.app, bitmap.toOcrImage(), script, highAccuracy)
+            val prefs = ThemeStore.state.value
+            OcrEngine.run(
+                ctx.app, bitmap.toOcrImage(), script, highAccuracy,
+                OcrTuning.from(
+                    prefs.ocrDetectionLongSide, prefs.ocrBinarisePercent,
+                    prefs.ocrBoxScorePercent, prefs.ocrUnclipTenths,
+                ),
+            )
         }.getOrElse { return ActionResult.Failure("recognition failed: ${it.message ?: it.javaClass.simpleName}") }
 
         // A screenshot can hold anything — a message, a code, an address — so the text goes in as

@@ -1,64 +1,71 @@
 package com.opentasker.core.ocr
 
 /**
- * How sure the recogniser was, turned into something you can act on.
+ * Which lines are worth checking against the image — a hint, and honest about being one.
  *
- * The CTC decoder already reports a per-line confidence — the mean softmax over the characters it
- * actually emitted. On its own that number sits in a data class and helps nobody. What 白い熊 needs is
- * the answer to "which line should I check?", because the Latin and Cyrillic models are right about
- * 93–95 % of characters and finding the other 5 % by eye means re-reading everything.
+ * ## What was measured, on the Phase 0 corpus (48 lines, 5 of them containing a real error)
+ *
+ * The **mean** confidence over a line barely separates right from wrong at all: the worst correct line
+ * scored 0.918 against the worst wrong line's 0.932, and one wrong line came in at 0.983. A marker
+ * built on the mean is close to noise.
+ *
+ * The **least sure single character** in the line does better, but the tails still overlap — correct
+ * lines routinely contain one character at 0.54. At a 0.72 cut it catches **all five** wrong lines and
+ * also flags about six correct ones.
+ *
+ * So this is deliberately a *recall* instrument with one threshold, not a three-level verdict: it turns
+ * "re-read all 48 lines" into "look at these 11, all five mistakes are in there". Roughly one false
+ * alarm per real error is the price, and calling it anything more confident than a hint would be a lie
+ * about what the numbers support.
+ *
+ * The reason a confident-and-wrong reading is possible at all: CTC confidence says how sure the model
+ * was of the class it picked, not whether that class was right. 「キス卜」 for 「キャスト」 scored 0.964
+ * on the mean — it was sure, and wrong.
  */
 enum class OcrTrust {
-    /** Read it and move on. */
+    /** Nothing stood out. Not a guarantee it is right. */
     SOLID,
 
-    /** Worth a glance against the image. */
-    UNSURE,
-
-    /** Probably wrong somewhere. */
-    DOUBTFUL,
+    /** Contains at least one character the model was unsure of — worth a glance at the image. */
+    CHECK,
     ;
 
     companion object {
         /**
-         * Thresholds, from the Phase 0 corpus rather than from taste: on the samples that scored 0.00 %
-         * character error the per-line confidence sat above ~0.95, and every line that actually
-         * contained a mistake — `キス卜` for `キャスト`, the stripped Czech and Polish diacritics — came
-         * in under ~0.90. Two bands either side of that give a marker that means something.
+         * Below this, the line contains a character the model hesitated on.
+         *
+         * 0.72 because it sits just above the highest weakest-character seen in a wrong line (0.702,
+         * the 「キス卜」 line) — chosen for recall, since a missed error costs more than a second look.
          */
-        const val SOLID_ABOVE = 0.95f
-        const val UNSURE_ABOVE = 0.90f
+        const val CHECK_BELOW = 0.72f
 
-        fun of(confidence: Float): OcrTrust = when {
-            confidence >= SOLID_ABOVE -> SOLID
-            confidence >= UNSURE_ABOVE -> UNSURE
-            else -> DOUBTFUL
-        }
+        fun of(lowestCharacter: Float): OcrTrust =
+            if (lowestCharacter < CHECK_BELOW) CHECK else SOLID
     }
 }
 
 /**
- * The confidence of each output line, in line order.
+ * Per output line, the least sure character anywhere on it.
  *
- * A line is the **worst** block on it, not the average. A line reading "Bluetooth、NFC、キス卜、印刷" is
- * one bad word in four; averaging hides exactly the thing the marker exists to point at, and there is
- * no cost to being pessimistic here — the marker only ever says "look at this".
+ * The worst block on the line, and within that block the worst character — a line is only as trustworthy
+ * as its weakest point. Averaging hides exactly what the marker exists to point at: 「Bluetooth、NFC、
+ * キス卜、印刷」 is one bad word in four, and its mean reads as solid.
  *
- * Indexed by [OcrBlock.lineIndex], so the result lines up with splitting [OcrResult.text] on newlines.
+ * Indexed by [OcrBlock.lineIndex], so it lines up with splitting [OcrResult.text] on newlines.
  */
 fun OcrResult.lineConfidences(): List<Float> {
     if (blocks.isEmpty()) return emptyList()
     val worst = HashMap<Int, Float>(blocks.size)
     for (block in blocks) {
         val current = worst[block.lineIndex]
-        if (current == null || block.confidence < current) worst[block.lineIndex] = block.confidence
+        if (current == null || block.lowestCharacter < current) worst[block.lineIndex] = block.lowestCharacter
     }
     val lastLine = worst.keys.max()
-    // Any line with no block at all could only come from a caller-side edit; treat it as solid rather
-    // than marking a line the recogniser never claimed anything about.
+    // A line with no block at all could only come from a caller-side edit; treat it as solid rather
+    // than marking something the recogniser never claimed anything about.
     return (0..lastLine).map { worst[it] ?: 1f }
 }
 
-/** How many output lines are worth checking — the count the status line reports. */
-fun OcrResult.doubtfulLineCount(): Int =
-    lineConfidences().count { OcrTrust.of(it) != OcrTrust.SOLID }
+/** How many output lines are worth a look — the count the status line reports. */
+fun OcrResult.linesToCheck(): Int =
+    lineConfidences().count { OcrTrust.of(it) == OcrTrust.CHECK }

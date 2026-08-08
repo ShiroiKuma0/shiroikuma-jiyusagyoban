@@ -197,6 +197,15 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
             android:theme="@style/Theme.OpenTasker" />
 
+        <!-- The appearance settings as their own window, so 「文字認識」 can send 白い熊 to its knobs
+             and the system back stack brings them back to the screenshot. Not exported. -->
+        <activity
+            android:name="com.opentasker.ui.screens.UiCustomizationActivity"
+            android:exported="false"
+            android:label="白い熊 自由作業盤 UI"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
         <!-- 文字認識: the OCR review window. Opened by the share tile below, never exported — the only
              way in is a screenshot we have already copied into our own cache. -->
         <activity
