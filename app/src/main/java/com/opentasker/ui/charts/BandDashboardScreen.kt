@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import com.opentasker.core.band.BandMetric
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -43,6 +43,24 @@ import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+
+/**
+ * The order the cards appear in, top to bottom — 白い熊's, 2026-08-07.
+ *
+ * Steps and sleep first because they are the two you can act on; the band state index last because it
+ * is the one that is not a measurement. Anything named here but absent from the data is skipped, and
+ * anything present but not named never appears — so a metric added to the decoding table has to be
+ * placed here deliberately rather than turning up at whatever position its record layout implies.
+ */
+private val CARD_ORDER = listOf(
+    BandMetric.STEPS_MINUTE,
+    MetricSpecs.KEY_SLEEP,
+    BandMetric.TEMPERATURE,
+    BandMetric.HEART_RATE,
+    MetricSpecs.KEY_BLOOD_PRESSURE,
+    BandMetric.SPO2,
+    BandMetric.HRV,
+)
 
 /**
  * The 「健康」 main page.
@@ -99,20 +117,26 @@ fun BandDashboardScreen(
             }
         }
 
-        items(state.metrics, key = { it.spec.key }) { chart ->
-            MetricPreviewCard(chart, viewport, crosshair) { onOpenMetric(chart.spec.key) }
-        }
-
-        state.sleep?.takeIf { !it.isEmpty }?.let { sleep ->
-            item("sleep") {
-                SleepPreviewCard(sleep, viewport, crosshair) { onOpenMetric(MetricSpecs.KEY_SLEEP) }
-            }
-        }
-
-        state.bloodPressure?.takeIf { !it.isEmpty }?.let { bp ->
-            item("bp") {
-                BloodPressurePreviewCard(bp, viewport, crosshair) {
-                    onOpenMetric(MetricSpecs.KEY_BLOOD_PRESSURE)
+        // The card order is 白い熊's, stated card by card (2026-08-07), and it is NOT the order of
+        // MetricSpecs.ALL — that list is a decoding table and its order is about record layouts. Sleep
+        // and blood pressure are not entries in it at all, so a single explicit sequence is the only
+        // way the three kinds of card can be interleaved as asked.
+        for (key in CARD_ORDER) {
+            when (key) {
+                MetricSpecs.KEY_SLEEP -> state.sleep?.takeIf { !it.isEmpty }?.let { sleep ->
+                    item(key) {
+                        SleepPreviewCard(sleep, viewport, crosshair) { onOpenMetric(key) }
+                    }
+                }
+                MetricSpecs.KEY_BLOOD_PRESSURE -> state.bloodPressure?.takeIf { !it.isEmpty }?.let { bp ->
+                    item(key) {
+                        BloodPressurePreviewCard(bp, viewport, crosshair) { onOpenMetric(key) }
+                    }
+                }
+                else -> state.metrics.firstOrNull { it.spec.key == key }?.let { chart ->
+                    item(key) {
+                        MetricPreviewCard(chart, viewport, crosshair) { onOpenMetric(key) }
+                    }
                 }
             }
         }

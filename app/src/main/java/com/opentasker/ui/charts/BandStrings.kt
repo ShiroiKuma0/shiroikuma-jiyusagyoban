@@ -142,6 +142,24 @@ object BandText {
         "グラフをタップするとその時点の値。もう一度タップで解除。",
     )
     val nothingHere = Loc("no reading there", "その時点の測定なし")
+    // --- the day-by-day history under each full-screen chart ------------------------------------
+    val history = Loc("Day by day", "日ごとの記録")
+    val historyNote = Loc(
+        "Every calendar day the archive holds, newest first. The sample count is part of the reading: a median built from four readings is not the same claim as one built from four hundred.",
+        "書庫にある日をすべて、新しい順に。測定数も読みの一部です — 四回の中央値と四百回の中央値は同じ主張ではありません。",
+    )
+    val nightsNote = Loc(
+        "Every night the band recorded, newest first, with when it began and ended as well as how long it lasted.",
+        "バンドが記録した夜をすべて、新しい順に。長さだけでなく、いつ始まりいつ終わったかも。",
+    )
+    val colDate = Loc("Date", "日付")
+    val colRange = Loc("Low–high", "最小〜最大")
+    val colMedian = Loc("Median", "中央値")
+    val colTotal = Loc("Total", "合計")
+    val colSamples = Loc("n", "測定数")
+    val colWhen = Loc("From → to", "就寝〜起床")
+    val colDuration = Loc("Slept", "睡眠")
+    val noHistory = Loc("Nothing recorded yet.", "まだ記録がありません。")
 
     // daily summary table
     val byDay = Loc("Day by day", "日ごと")

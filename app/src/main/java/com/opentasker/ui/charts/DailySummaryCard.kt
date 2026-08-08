@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -79,7 +78,7 @@ private fun DayRow(d: DaySummary, lang: BandLanguage) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.width(DATE_W.dp)) {
             Text(
-                d.date.format(DAY_FORMAT),
+                d.date.format(BandDates.DATE),
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Bold,
             )
@@ -136,8 +135,7 @@ private fun Cell(text: String, width: Int, header: Boolean = false, sub: String?
     }
 }
 
-private const val DATE_W = 58
+private const val DATE_W = 92
 private const val NUM_W = 52
 private const val SLEEP_W = 74
 private const val STEP_W = 62
-private val DAY_FORMAT = DateTimeFormatter.ofPattern("MM-dd")
