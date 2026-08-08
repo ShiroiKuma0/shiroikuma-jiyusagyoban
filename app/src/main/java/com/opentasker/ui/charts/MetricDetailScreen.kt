@@ -66,6 +66,9 @@ fun MetricDetailScreen(
     // Its own crosshair, not the dashboard's: this screen shows one metric, and a line left behind on
     // the page underneath has nothing to do with where you want it here.
     val crosshair = rememberCrosshairState()
+    // A marked stretch of time, on the same screen and the one spare gesture: long-press and drag.
+    // The crosshair answers "what was it at 03:12"; this answers "what did that walk come to".
+    val span = rememberSpanSelectionState()
 
     val spec = MetricSpecs.byKey(metricKey)
     val title = when (metricKey) {
@@ -166,8 +169,10 @@ fun MetricDetailScreen(
                                 chart, viewport,
                                 Modifier.height(style.detailHeight)
                                     .crosshairTapInput(crosshair, viewport)
+                                    .spanSelectInput(span, viewport)
                                     .then(gestures),
                                 crosshair = crosshair,
+                                selection = span,
                             )
                             CrosshairHint(
                                 crosshair,
@@ -175,6 +180,7 @@ fun MetricDetailScreen(
                                     at?.let { crosshairTimeLabel(it.tMs) } ?: BandText.nothingHere[lang]
                                 },
                             )
+                            SpanReadout(span, chart, lang)
                             Text(
                                 chart.subtitle[lang],
                                 style = MaterialTheme.typography.bodySmall,

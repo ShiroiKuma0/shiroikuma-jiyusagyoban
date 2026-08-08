@@ -209,3 +209,33 @@ fun DrawScope.glowStroke(
     }
     drawPath(path, color = color, style = Stroke(width = width))
 }
+
+/**
+ * The shaded stretch behind a long-press-marked span, with an edge at each end.
+ *
+ * Low alpha on purpose: it has to be unmistakable against black while leaving the samples inside it
+ * fully readable — the point of marking a span is to look at what is in it.
+ */
+fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSpanBand(
+    frame: PlotFrame,
+    startMs: Long,
+    endMs: Long,
+    color: androidx.compose.ui.graphics.Color,
+) {
+    val left = frame.x(startMs).coerceIn(frame.rect.left, frame.rect.right)
+    val right = frame.x(endMs).coerceIn(frame.rect.left, frame.rect.right)
+    if (right <= left) return
+    drawRect(
+        color = color.copy(alpha = 0.16f),
+        topLeft = androidx.compose.ui.geometry.Offset(left, frame.rect.top),
+        size = androidx.compose.ui.geometry.Size(right - left, frame.rect.height),
+    )
+    listOf(left, right).forEach { x ->
+        drawLine(
+            color = color.copy(alpha = 0.85f),
+            start = androidx.compose.ui.geometry.Offset(x, frame.rect.top),
+            end = androidx.compose.ui.geometry.Offset(x, frame.rect.bottom),
+            strokeWidth = 2f,
+        )
+    }
+}
