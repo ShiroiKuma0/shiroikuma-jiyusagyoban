@@ -857,6 +857,20 @@ val verifyPerformanceEvidence = tasks.register("verifyPerformanceEvidence") {
     }
 }
 
+// The capability counts, derived from source exactly as verifyReleaseTruth derives them.
+//
+// verifyDocumentationTruth used to carry `actionCount.set(74)` as a literal while verifyReleaseTruth
+// recomputed 168 from the registry, so the two gates demanded contradictory README text and no README
+// could satisfy both — which is why the documentation gate had been red for a long time. One source now.
+val registeredActionCount = Regex("(?m)^\\s+[A-Za-z0-9]+Action\\(\\),")
+    .findAll(rootProject.file("app/src/main/java/com/opentasker/core/RuntimeRegistries.kt").readText())
+    .count()
+val contextFamilyCountFromSource = Regex("(?s)enum class ContextType\\s*\\{(.*?)\\}")
+    .find(rootProject.file("app/src/main/java/com/opentasker/core/model/ContextSpec.kt").readText())
+    ?.groupValues?.get(1)
+    ?.let { body -> Regex("(?m)^\\s+[A-Z][A-Z_]+\\s*(,|//)").findAll(body).count() }
+    ?: error("could not count the ContextType families")
+
 val verifyDocumentationTruth = tasks.register<VerifyDocumentationTruthTask>("verifyDocumentationTruth") {
     group = "verification"
     description = "Checks current release claims and reports stale local historical documentation claims."
@@ -877,8 +891,8 @@ val verifyDocumentationTruth = tasks.register<VerifyDocumentationTruthTask>("ver
     currentDocumentation.from(currentDocumentationPaths)
     historicalDocumentation.from(historicalDocumentationPaths)
     versionName.set(appVersionName)
-    actionCount.set(74)
-    contextFamilyCount.set(7)
+    actionCount.set(registeredActionCount)
+    contextFamilyCount.set(contextFamilyCountFromSource)
     schemaVersion.set(10)
     repositoryRoot.set(repositoryRootPath)
 }
@@ -898,6 +912,13 @@ tasks.register("verifyFdroidReadiness") {
     group = "verification"
     description = "Checks the F-Droid distribution profile for known proprietary dependency families."
 
+    // Read at CONFIGURATION time. Touching a script-level val (or declaring a local `fun`) inside
+    // doLast makes the task capture the script object, which the configuration cache cannot serialize —
+    // the checks all passed while the build failed on that alone.
+    val coordinates = releaseRuntimeCoordinates
+    val distribution = selectedDistribution
+    val distributions = allowedDistributions
+
     doLast {
         val forbiddenGroups = setOf(
             "com.google.android.gms",
@@ -913,7 +934,7 @@ tasks.register("verifyFdroidReadiness") {
             "crashlytics",
             "appsflyer",
         )
-        val forbidden = releaseRuntimeCoordinates.get()
+        val forbidden = coordinates.get()
             .mapNotNull { coordinate ->
                 val (group, name) = coordinate.split(':', limit = 3)
                 val blockedGroup = forbiddenGroups.any { forbiddenGroup ->
@@ -928,8 +949,8 @@ tasks.register("verifyFdroidReadiness") {
         check(forbidden.isEmpty()) {
             "F-Droid profile includes dependencies that need policy review: ${forbidden.joinToString()}"
         }
-        check(selectedDistribution in allowedDistributions)
-        println("F-Droid readiness check passed for distribution=$selectedDistribution")
+        check(distribution in distributions)
+        println("F-Droid readiness check passed for distribution=$distribution")
     }
 }
 
@@ -938,32 +959,40 @@ tasks.register("verifyFdroidMetadata") {
     description = "Checks that draft fdroiddata metadata matches the current release contract."
     dependsOn("verifyReleaseTruth")
 
+    // Resolved at CONFIGURATION time and closed over as plain values. Reaching for `rootProject`
+    // (or any script reference) inside doLast serializes a Project into the configuration cache,
+    // which Gradle refuses — every check here passed while the build still failed on that alone.
     val metadataFile = rootProject.file("fdroid/metadata/com.opentasker.app.yml")
+    val metadataLabel = metadataFile.relativeTo(rootProject.projectDir).path
+    val expectedVersionName = appVersionName
+    val expectedVersionCode = appVersionCode.toString()
+    val repositoryDir = rootProject.projectDir
+    val gitDir = rootProject.file(".git")
     inputs.file(metadataFile)
 
     doLast {
-        check(metadataFile.isFile) {
-            "Missing F-Droid metadata at ${metadataFile.relativeTo(rootProject.projectDir)}"
-        }
+        check(metadataFile.isFile) { "Missing F-Droid metadata at $metadataLabel" }
 
         val metadata = metadataFile.readText()
-        fun valuesFor(key: String): List<String> =
+        // Lambdas, not local `fun`s: a local function inside doLast compiles to a method on the build
+        // script and drags the whole script into the configuration cache.
+        val valuesFor: (String) -> List<String> = { key ->
             Regex("""(?m)^\s*(?:-\s*)?$key:\s*(.+?)\s*$""")
                 .findAll(metadata)
                 .map { match -> match.groupValues[1].trim().trim('"', '\'') }
                 .toList()
-
-        fun requireValue(key: String, expected: String) {
+        }
+        val requireValue: (String, String) -> Unit = { key, expected ->
             val values = valuesFor(key)
             check(expected in values) {
                 "F-Droid metadata key '$key' expected '$expected' but found ${values.ifEmpty { listOf("<missing>") }}"
             }
         }
 
-        requireValue("versionName", appVersionName)
-        requireValue("versionCode", appVersionCode.toString())
-        requireValue("CurrentVersion", appVersionName)
-        requireValue("CurrentVersionCode", appVersionCode.toString())
+        requireValue("versionName", expectedVersionName)
+        requireValue("versionCode", expectedVersionCode)
+        requireValue("CurrentVersion", expectedVersionName)
+        requireValue("CurrentVersionCode", expectedVersionCode)
         requireValue("Changelog", "https://github.com/SysAdminDoc/OpenTasker/releases")
 
         val commits = valuesFor("commit")
@@ -984,9 +1013,11 @@ tasks.register("verifyFdroidMetadata") {
             "F-Droid metadata must point to the unsigned release APK output"
         }
 
-        if (rootProject.file(".git").exists()) {
+        // ProcessBuilder is fine HERE — this is execution time, not configuration time. What is not
+        // fine is reaching for `rootProject` to find the directory; both paths are captured above.
+        if (gitDir.exists()) {
             val process = ProcessBuilder("git", "cat-file", "-e", "$releaseCommit^{commit}")
-                .directory(rootProject.projectDir)
+                .directory(repositoryDir)
                 .redirectErrorStream(true)
                 .start()
             val output = process.inputStream.bufferedReader().readText().trim()
@@ -996,7 +1027,7 @@ tasks.register("verifyFdroidMetadata") {
             }
         }
 
-        println("F-Droid metadata check passed for v$appVersionName ($appVersionCode)")
+        println("F-Droid metadata check passed for v$expectedVersionName ($expectedVersionCode)")
     }
 }
 
