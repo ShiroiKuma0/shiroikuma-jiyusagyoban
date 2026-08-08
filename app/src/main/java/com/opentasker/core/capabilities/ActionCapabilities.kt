@@ -95,6 +95,7 @@ object ActionCapabilityRegistry {
         "flash" to ActionCapability(CapabilityLevel.RequiresSetup, "Custom colours, border and position need \"display over other apps\"; without it the flash falls back to a plain toast.", CapabilityRequirement.Overlay),
         "bubble.flash_add" to ActionCapability(CapabilityLevel.RequiresSetup, "The flash bubbles render only with \"display over other apps\" and only while the Desktop launcher is foreground.", CapabilityRequirement.Overlay),
         "bubble.flashkill_show" to ActionCapability(CapabilityLevel.RequiresSetup, "The kill-all icon renders only with \"display over other apps\" and only while the Desktop launcher is foreground.", CapabilityRequirement.Overlay),
+        "ocr.recognize" to ActionCapability(CapabilityLevel.Supported, "Reads the text in an image entirely on-device (PP-OCRv5); no permissions and no network. The image must be somewhere this app can read."),
         "state.get" to ActionCapability(CapabilityLevel.Supported, "Reads battery / charging / WiFi / airplane into variables; no permissions needed."),
         "clipboard.get" to ActionCapability(CapabilityLevel.RequiresSetup, "Android 10+ blocks clipboard reads unless the app is focused; may return empty from the background."),
         "apps.list" to ActionCapability(CapabilityLevel.RequiresSetup, "Android 11+ package visibility limits the result to apps this app can see."),

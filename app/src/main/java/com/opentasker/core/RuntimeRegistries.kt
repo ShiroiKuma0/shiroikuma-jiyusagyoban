@@ -9,6 +9,7 @@ import com.opentasker.core.actions.BackupRunItemsAction
 import com.opentasker.core.actions.BandChartsAction
 import com.opentasker.core.actions.BandSyncAction
 import com.opentasker.core.actions.GetLocationAction
+import com.opentasker.core.actions.OcrRecognizeAction
 import com.opentasker.core.actions.PruneBackupsAction
 import com.opentasker.core.actions.DataReadAction
 import com.opentasker.core.actions.FinishProgressPanelAction
@@ -319,6 +320,7 @@ private fun registerBuiltInActions() {
         GetLocationAction(),
         BandSyncAction(),
         BandChartsAction(),
+        OcrRecognizeAction(),
         ReadSimsAction(),
         LocationModeAction(),
         SetImeAction(),

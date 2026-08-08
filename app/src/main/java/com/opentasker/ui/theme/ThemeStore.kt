@@ -117,6 +117,12 @@ data class ThemePrefs(
     val chartGapTintPct: Int = 8,                           // tint over a stretch with no measurement
     val chartAxisTextColor: Int = 0xFF8A8A85.toInt(),       // axis + footnote ink
     val chartGridColor: Int = 0xFFFFFFFF.toInt(),           // grid line colour, before opacity
+    // 文字認識 (OCR): which Japanese/English recogniser runs. On = PP-OCRv5 server (~81 MB), off =
+    // mobile (~16 MB, ~2.5x faster). Measured on clean screenshot text the two are equivalent; the
+    // server model's headroom is for photographed and handwritten text. Only affects Japanese and
+    // English — PaddleOCR ships no server-sized Latin or Cyrillic recogniser.
+    val ocrHighAccuracy: Boolean = true,
+
     val chartShowGrid: Boolean = true,                      // draw the grid at all
     val chartShowDots: Boolean = true,                      // draw the real samples over a line
     val chartShowRejected: Boolean = true,                  // the ✕ marks at flagged samples
@@ -239,6 +245,7 @@ object ThemeStore {
     private const val K_CHART_GAP_OP = "chart_gap_op"
     private const val K_CHART_AXIS_COLOR = "chart_axis_color"
     private const val K_CHART_GRID_COLOR = "chart_grid_color"
+    private const val K_OCR_HIGH_ACCURACY = "ocr_high_accuracy"
     private const val K_CHART_SHOW_GRID = "chart_show_grid"
     private const val K_CHART_SHOW_DOTS = "chart_show_dots"
     private const val K_CHART_SHOW_REJECTED = "chart_show_rejected"
@@ -387,6 +394,7 @@ object ThemeStore {
         chartGapTintPct = d.chartGapTintPct,
         chartAxisTextColor = d.chartAxisTextColor,
         chartGridColor = d.chartGridColor,
+        ocrHighAccuracy = d.ocrHighAccuracy,
         chartShowGrid = d.chartShowGrid,
         chartShowDots = d.chartShowDots,
         chartShowRejected = d.chartShowRejected,
@@ -539,6 +547,7 @@ object ThemeStore {
             chartGapTintPct = prefs.getInt(K_CHART_GAP_OP, d.chartGapTintPct),
             chartAxisTextColor = prefs.getInt(K_CHART_AXIS_COLOR, d.chartAxisTextColor),
             chartGridColor = prefs.getInt(K_CHART_GRID_COLOR, d.chartGridColor),
+            ocrHighAccuracy = prefs.getBoolean(K_OCR_HIGH_ACCURACY, d.ocrHighAccuracy),
             chartShowGrid = prefs.getBoolean(K_CHART_SHOW_GRID, d.chartShowGrid),
             chartShowDots = prefs.getBoolean(K_CHART_SHOW_DOTS, d.chartShowDots),
             chartShowRejected = prefs.getBoolean(K_CHART_SHOW_REJECTED, d.chartShowRejected),
@@ -643,6 +652,7 @@ object ThemeStore {
             putInt(K_CHART_GAP_OP, p.chartGapTintPct)
             putInt(K_CHART_AXIS_COLOR, p.chartAxisTextColor)
             putInt(K_CHART_GRID_COLOR, p.chartGridColor)
+            putBoolean(K_OCR_HIGH_ACCURACY, p.ocrHighAccuracy)
             putBoolean(K_CHART_SHOW_GRID, p.chartShowGrid)
             putBoolean(K_CHART_SHOW_DOTS, p.chartShowDots)
             putBoolean(K_CHART_SHOW_REJECTED, p.chartShowRejected)
