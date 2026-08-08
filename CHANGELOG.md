@@ -3,6 +3,71 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.81.2026-08-02.g97059d7b+039 — 2026-08-08
+
+**「文字認識」 — share a screenshot, get its text back, entirely on the device.**
+
+PP-OCRv5 detection and recognition on ONNX Runtime, no network at any point. Japanese and English
+come from one model, so the everyday case never picks a language; German, Czech and Polish ride a
+Latin recogniser and Russian an East Slavic one, each a chip that re-reads the cached crops without
+re-detecting. The review window pairs the screenshot — every detected line boxed — with a three-line
+text field and one button that copies and closes; tapping a box on the image moves the caret to that
+line. Vertical Japanese is handled as vertical: tall crops are rotated upright and columns emitted
+right-to-left. Both recognition tiers ship, the accurate 81 MB model by default and a ~2.5× faster
+16 MB one behind a switch in the appearance settings, with a per-action `model` override. Tasks reach
+the same engine through the new `ocr.recognize` action.
+
+Measured on a corpus with hand-written ground truth: 0.00 % character error on Japanese, English,
+German and Russian, 5.6 % Czech, 6.9 % Polish. Detection runs at a 1600 px long side rather than
+PP-OCR's 960 default, which halves the error on a full-width phone screenshot; the errors that
+disappear are exactly the small text. On the Mate XT a small cut-out takes ~2 s and a full-width
+screenshot ~5 s on the accurate model.
+
+Three things had to be got right and were wrong first, each of which fails silently rather than
+loudly. Box dilation must expand along the box's own axes — a text line is extremely elongated, so
+pushing corners out from the centre barely raises the height and crops the line to its x-height band,
+which decapitates every ascender and diacritic ('ä' reads as 'a', thin Latin lines as nothing at
+all). Recognition must not cap crop width at the 320 px in the training-time shape, which compresses
+a full-width line four- to six-fold; CJK survives that and Latin and Cyrillic do not. And vertical
+columns read right-to-left — the vertical sample recognised perfectly and still scored 67 % error on
+order alone. Together those took the corpus from 32.11 % to 1.32 %.
+
+The ~100 MB of ONNX weights are not in git: a Gradle task fetches them once per machine, pinned to
+immutable revisions and verified by SHA-256, into a gitignored assets directory. ONNX Runtime needs
+R8 keep rules — its native layer resolves Java classes by name, so minification does not fail at
+build or link time, it aborts the process on the first inference.
+
+**A pass-through overlay no longer swallows every tap.**
+
+`FLAG_NOT_TOUCHABLE` stops a window receiving touches and says nothing about it obscuring them. Since
+Android 12 the system drops a touch to the app underneath when an untrusted overlay covers it above
+`maximum_obscuring_opacity_for_touch` — 0.8 by default. The 通知明滅 frame is fullscreen at window
+alpha 1.0, so while any notification was lit, every tap anywhere on the screen was discarded before
+it reached the app. Pass-through overlays now borrow the accessibility service's trusted overlay type,
+which is exempt, so they keep full opacity and still let taps through; without the service they fall
+back to sitting exactly at the opacity limit. This also fixes the 音楽 fullscreen edge-light, and the
+kanji clock strip and 電池線, which silently killed taps within their own band across the top.
+
+**Mark a stretch of a 健康 chart and total it.**
+
+Long-press and drag on a full-screen chart shades a span and reports it underneath. Steps are summed;
+every other metric reports mean and range, since summing a heart rate is not a quantity. Totals come
+from the samples, never the drawn curve — the curve is an interpolation and summing it would invent
+steps nobody took — and a span that catches nothing says so rather than showing a confident zero. The
+span persists after the finger lifts so it survives a pinch and a pan; a long-press that never moves
+clears it.
+
+**The 健康 day tables are legible.**
+
+Both day-by-day tables were sized as if space were scarce, on a screen where they occupy about a
+third of the width. The per-metric table broke `2026-08-08` across two lines at a 104 dp date column;
+the dashboard table was set in the smallest type on the page and its 52 dp column rendered `Rest HR`
+and `Sleep` as `Rest HRSleep`. Columns are now wide enough for their own headings, dashboard rows are
+19 sp, and every cell is a single line by construction.
+
+Also: the release-truth contract records the capability counts it actually checks (it claimed 74
+registered actions against an actual 168, and bundle schema 2 against 5).
+
 ## 0.2.81.2026-08-02.g97059d7b+024 — 2026-08-08
 
 **The band's own charge, at the top of 「健康」.**
