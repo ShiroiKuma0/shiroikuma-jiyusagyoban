@@ -21,10 +21,10 @@
                          "work":  "2.11.2"
                      },
     "capabilities":  {
-                         "registeredActions":  74,
+                         "registeredActions":  168,
                          "engineHandledActions":  10,
                          "contextFamilies":  7,
-                         "bundleSchemaVersion":  2,
+                         "bundleSchemaVersion":  5,
                          "roomSchemaVersion":  10
                      }
 }
