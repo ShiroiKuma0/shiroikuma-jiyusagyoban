@@ -933,6 +933,22 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "ocr.recognize",
+            name = "Recognise Text (OCR)",
+            description = "Read the text in an image entirely on-device (PP-OCRv5) into a variable. The same engine as the 文字認識 share tile — share a screenshot cut-out to that, or point this at a saved image",
+            category = "Text",
+            fields = listOf(
+                ActionField("image", "Image", FieldType.TEXT, hint = "a file path, or a content:// / file:// URI"),
+                ActionField("script", "Script", FieldType.TEXT, hint = "blank = jpn (Japanese + English). Also: latin (German/Czech/Polish), eslav (Russian)"),
+                ActionField("var", "Output variable", FieldType.TEXT, hint = "blank = %OCR. Also sets %<var>_lines and %<var>_script"),
+                ActionField("model", "Model", FieldType.TEXT, hint = "blank = whatever the UI setting says. server = the accurate 81 MB model, mobile = the fast 16 MB one (Japanese/English only)"),
+                ActionField("show", "Open the review window", FieldType.TEXT, hint = "true = show the image and text for checking instead of returning the text silently"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "band.charts",
             name = "Show Band Charts",
             description = "Open 健康 in its own fullscreen window — the band's heart rate, HRV, SpO2, temperature and stress as smooth charts. Put a launcher shortcut on the task that runs this and the icon opens straight onto the data",

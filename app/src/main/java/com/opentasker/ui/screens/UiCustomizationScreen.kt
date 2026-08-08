@@ -668,6 +668,20 @@ fun UiCustomizationScreen(
 
 
             // --- 「健康」 charts — the numbers the band screens draw with ---------------------
+            item { SectionHeader("「文字認識」 OCR") }
+            item {
+                SwitchRow(
+                    level = 1, label = "High-accuracy model",
+                    description = "On: PP-OCRv5 server (81 MB). Off: mobile (16 MB), about 2.5x faster — " +
+                        "roughly 2 s instead of 5 s on a full-width screenshot. Measured on clean screenshot " +
+                        "text the two are equivalent; the server model's headroom is for photographed and " +
+                        "handwritten text. Japanese and English only — there is no server-sized Latin or " +
+                        "Cyrillic recogniser, so those chips are unaffected.",
+                    checked = prefs.ocrHighAccuracy,
+                    onCheckedChange = { v -> ThemeStore.update { it.copy(ocrHighAccuracy = v) } },
+                )
+            }
+
             item { SectionHeader("「健康」 charts") }
             item { ChartLivePreview(level = 1, prefs = prefs) }
 

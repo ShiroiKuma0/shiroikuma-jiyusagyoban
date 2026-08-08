@@ -169,6 +169,9 @@ object AutomationSensitivityRegistry {
         "contacts.lookup",
         "plugin.locale.query",
         "script.termux.run",
+        // Turns an image into text on-device. It transmits nothing and needs no permission, but a
+        // screenshot can hold a message, an address or a one-time code, so reading one is data access.
+        "ocr.recognize",
         "screenshot.take",
         "file.read",
         "file.list",
