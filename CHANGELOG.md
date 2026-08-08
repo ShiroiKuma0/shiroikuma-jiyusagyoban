@@ -3,6 +3,59 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.82.2026-08-07.g37770efc+008 — 2026-08-08
+
+**Rebased onto upstream 0.2.82.** Two upstream fixes, both for things that could never have worked:
+`ACCESS_NOTIFICATION_POLICY` was never declared, so the app never appeared on the Do Not Disturb access
+page and `dnd.set` / `zen.rule.set` / `zen.rule.clear` were dead on every device; and Tasker XML import
+failed on-device for everyone, because Android's Expat parser rejects the Apache secure-parsing feature
+URI the importer treated as mandatory. Doctypes carrying entities or external DTD references are still
+refused, so the XXE protection survives.
+
+**「文字認識」 no longer ships its models, and no longer needs setting up.**
+
+The ~100 MB of ONNX weights left the APK, taking it from 129.3 MB to 13.8 MB — they never change, and no
+build is ever deleted from the phone, so twenty builds was 2.5 GB of identical weights. The floor now is
+ONNX Runtime's own native library, not the models. The character dictionaries still ship, all 93 KB:
+each has to match its model exactly, so bundling them removes a whole class of mismatch.
+
+That left a setup step, and the first attempt at it failed in the most ordinary way — the window opened,
+recognised nothing, and explained itself in a status line under an empty box, which reads as "nothing
+was found" rather than "you have something to do". So: the weights are now **discovered**, by expected
+filename under the conventional folder and then /sdcard/tmp, with a hand-picked path always winning; and
+a missing model gets a panel that names the file, the folder and a button to the settings. A picked
+document is normally read in place rather than copied, since the app can resolve the URI back to a real
+path.
+
+The window gains 画像を選ぶ and can open with no image at all, which is what lets a task put 文字認識 on
+a launcher shortcut — new project **文字認識 [362]**, with `文字認識 -- [362]` to open it and
+`文字認識の設定 -- [362][01]` declaring where the weights live, so that decision rides the workspace
+export and survives a re-flash while the value still lands app-side for the native loader.
+
+**Per-line confidence, measured rather than assumed.** The recognition graphs already end in a softmax
+and the decoder was applying a second one, pinning every confidence at about 1/18385 — invisible in the
+text, because argmax survives any monotonic transform, and only exposed once the number was displayed.
+With that fixed, the honest finding is that a line's MEAN confidence barely discriminates (worst correct
+0.918 against worst wrong 0.932); the marker reads the least sure single character instead, one band, at
+a threshold picked for recall.
+
+**Detection knobs** — long side, binarisation, box score, unclip — are settings now, each with a note
+saying which way it goes wrong, reachable from the review window: 検出設定 lands on those rows, Back
+returns to the screenshot, 再認識 re-detects.
+
+**Two wallpaper actions**, ported from Tasker. `wallpaper.set` gains `where` (the lock screen is
+unreachable otherwise — `setBitmap` with no flags touches only the home screen) and `shared`.
+`wallpaper.live` is new and turns 26 AutoInput actions into one: shell holds SET_WALLPAPER_COMPONENT, so
+a Shizuku UserService sets the live wallpaper outright in under half a second, with the system preview
+as the fallback when Shizuku is absent.
+
+**Fixes.** A pass-through overlay no longer swallows every tap — since Android 12 an untrusted overlay
+above 0.8 opacity blocks touches to the app underneath regardless of FLAG_NOT_TOUCHABLE, which killed
+every tap on screen while 通知明滅 was lit. CJK section headings no longer clip to a single glyph
+(`IntrinsicSize.Min` treats every CJK character as a break point). The 「健康」 day tables are legible,
+and a chart span can be long-pressed and totalled. The release-truth gates were unsatisfiable — two of
+them demanded contradictory README text — and now pass.
+
 ## 0.2.81.2026-08-02.g97059d7b+039 — 2026-08-08
 
 **「文字認識」 — share a screenshot, get its text back, entirely on the device.**
