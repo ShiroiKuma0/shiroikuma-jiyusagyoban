@@ -36,6 +36,7 @@ import com.opentasker.ui.charts.render.drawGrid
 import com.opentasker.ui.charts.render.drawHypnogram
 import com.opentasker.ui.charts.render.drawLineSeries
 import com.opentasker.ui.charts.render.drawRejected
+import com.opentasker.ui.charts.render.drawSpanBand
 import com.opentasker.ui.charts.render.drawTimeLabels
 import com.opentasker.ui.charts.render.drawValueLabels
 import java.time.ZoneId
@@ -67,6 +68,8 @@ fun MetricPlot(
      */
     showRejected: Boolean = showAxes,
     crosshair: CrosshairState? = null,
+    /** A long-press-dragged stretch of time, shaded so the readout under the chart has a referent. */
+    selection: SpanSelectionState? = null,
 ) {
     val measurer = rememberTextMeasurer()
     val zone = remember { ZoneId.systemDefault() }
@@ -101,6 +104,12 @@ fun MetricPlot(
         val ticks = ChartTicks.labelled(ChartTicks.forSpan(viewport.startMs, viewport.endMs, zone))
         drawGrid(frame, ticks)
         chart.chunk?.let { drawGaps(frame, it.gaps) }
+        // The marked span goes down BEFORE the data: it is ground the samples sit on, not ink over them.
+        selection?.let { span ->
+            val from = span.startMs
+            val to = span.endMs
+            if (from != null && to != null) drawSpanBand(frame, from, to, accent)
+        }
 
         when (spec.render) {
             RenderKind.CAPSULE -> drawCapsules(frame, chart.buckets, color)
