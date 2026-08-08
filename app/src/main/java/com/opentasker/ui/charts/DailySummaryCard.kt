@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -79,16 +80,24 @@ private fun DayRow(d: DaySummary, lang: BandLanguage) {
         Column(Modifier.width(DATE_W.dp)) {
             Text(
                 d.date.format(BandDates.DATE),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyLarge,
+                fontSize = ROW_SP,
+                lineHeight = ROW_SP,
                 fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                softWrap = false,
             )
             Text(
                 d.date.dayOfWeek.getDisplayName(
                     TextStyle.SHORT,
                     if (lang == BandLanguage.JA) Locale.JAPAN else Locale.ENGLISH,
                 ),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
+                fontSize = SUB_SP,
+                lineHeight = SUB_SP,
                 color = LocalChartStyle.current.axisText,
+                maxLines = 1,
+                softWrap = false,
             )
         }
         // The index gets a colour swatch, because a column of bare numbers is exactly the thing a
@@ -103,8 +112,12 @@ private fun DayRow(d: DaySummary, lang: BandLanguage) {
             }
             Text(
                 v?.toString() ?: "—",
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyLarge,
+                fontSize = ROW_SP,
+                lineHeight = ROW_SP,
                 fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                softWrap = false,
             )
         }
         Cell(d.restingHr?.let { "%.0f".format(it) } ?: "—", NUM_W)
@@ -125,17 +138,35 @@ private fun Cell(text: String, width: Int, header: Boolean = false, sub: String?
     Column(Modifier.width(width.dp)) {
         Text(
             text,
-            style = if (header) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall,
+            style = if (header) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodyLarge,
+            fontSize = if (header) HEAD_SP else ROW_SP,
+            lineHeight = if (header) HEAD_SP else ROW_SP,
             color = if (header) LocalChartStyle.current.axisText else MaterialTheme.colorScheme.onSurface,
             fontWeight = if (header) FontWeight.Normal else FontWeight.Bold,
+            maxLines = 1,
+            softWrap = false,
         )
         sub?.let {
-            Text(it, style = MaterialTheme.typography.labelSmall, color = LocalChartStyle.current.axisText)
+            Text(
+                it,
+                style = MaterialTheme.typography.labelMedium,
+                fontSize = SUB_SP,
+                lineHeight = SUB_SP,
+                color = LocalChartStyle.current.axisText,
+                maxLines = 1,
+                softWrap = false,
+            )
         }
     }
 }
 
-private const val DATE_W = 92
-private const val NUM_W = 52
-private const val SLEEP_W = 74
-private const val STEP_W = 62
+// 白い熊, 2026-08-08: the daily records were set in the smallest type on the page while more than half
+// the row sat empty, and NUM_W was too narrow for the "Rest HR" header — which is why it ran into
+// "Sleep". Bigger type, and every column wide enough for its own heading.
+private val ROW_SP = 19.sp
+private val HEAD_SP = 14.sp
+private val SUB_SP = 14.sp
+private const val DATE_W = 148
+private const val NUM_W = 92
+private const val SLEEP_W = 208
+private const val STEP_W = 116

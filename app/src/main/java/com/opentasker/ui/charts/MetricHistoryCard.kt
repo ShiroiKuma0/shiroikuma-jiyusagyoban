@@ -183,6 +183,8 @@ private fun HeadCell(text: String, width: Int) {
         fontSize = SUB_SP,
         lineHeight = SUB_SP,
         color = LocalChartStyle.current.axisText,
+        maxLines = 1,
+        softWrap = false,
     )
 }
 
@@ -196,12 +198,16 @@ private fun Cell(text: String, width: Int, bold: Boolean = false, dim: Boolean =
         lineHeight = ROW_SP,
         fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
         color = if (dim) LocalChartStyle.current.axisText else MaterialTheme.colorScheme.primary,
+        // A cell is one line, always. `2026-08-08` wrapping to `2026-08-` / `08` was the visible bug,
+        // and it happened with two thirds of the row empty — a cramped column, not a full one.
+        maxLines = 1,
+        softWrap = false,
     )
 }
 
 private val ROW_SP = 15.sp
 private val SUB_SP = 12.sp
-private const val DATE_W = 104
-private const val VALUE_W = 74
-private const val RANGE_W = 104
+private const val DATE_W = 148
+private const val VALUE_W = 92
+private const val RANGE_W = 124
 private const val N_W = 48
