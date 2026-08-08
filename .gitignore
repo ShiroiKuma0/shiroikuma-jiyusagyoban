@@ -53,3 +53,8 @@ AGENTS.md
 .ai/
 PROJECT_CONTEXT.md
 CONTINUATION_PROMPT.md
+
+# The self-host signing identity is deliberately tracked: it is not a private
+# code-signing certificate, and keeping it in the repo is what stops the signing
+# identity from being lost when a machine-global debug keystore is regenerated.
+!app/dev_keystore.jks
