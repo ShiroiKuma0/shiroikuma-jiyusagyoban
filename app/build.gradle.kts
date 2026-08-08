@@ -1,4 +1,6 @@
 import java.io.File
+import java.net.URI
+import java.security.MessageDigest
 import java.util.Properties
 import java.net.URLEncoder
 import java.util.zip.ZipEntry
@@ -282,6 +284,12 @@ android {
         jniLibs.useLegacyPackaging = true
     }
 
+    androidResources {
+        // float32 ONNX weights barely compress, so deflating them costs build time and first-run CPU
+        // for nothing. Stored entries also keep the asset extraction in OcrModels a straight copy.
+        noCompress += "onnx"
+    }
+
     sourceSets {
         getByName("androidTest").assets.directories.add("$projectDir/schemas")
     }
@@ -329,6 +337,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.okhttp)
+    // On-device OCR (文字認識): PP-OCRv5 detection + recognition. Only the arm64 native library ships,
+    // because defaultConfig.ndk.abiFilters already excludes the rest.
+    implementation(libs.onnxruntime.android)
     implementation(libs.re2j)
     implementation(libs.jsoup)
     implementation(libs.shizuku.api)
@@ -1063,3 +1074,125 @@ tasks.register("buildFork") {
         println("\u001b[1;36m>>> BUILD_NUMBER bumped to $nextBuildNumber\u001b[0m")
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// 文字認識 (OCR) models — PP-OCRv5, Apache-2.0.
+//
+// Kept OUT of git (see .gitignore): ~100 MB of ONNX weights would bloat every clone forever, and the
+// recognition model sits close enough to GitHub's 100 MB hard per-file limit to be fragile. Instead
+// they are fetched once per machine and verified by SHA-256, so a tampered or truncated download
+// fails the build rather than silently producing garbage text.
+//
+// The URLs are pinned to immutable commit revisions. BEFORE THE FIRST GITHUB RELEASE, re-upload these
+// exact blobs as assets on a tag of our own repo and point `url` there — an upstream deletion must not
+// be able to break our builds.
+// ---------------------------------------------------------------------------------------------
+val ocrAssetsDir = layout.projectDirectory.dir("src/main/assets/ocr")
+
+data class OcrModelAsset(val name: String, val url: String, val sha256: String)
+
+val ocrModelAssets = listOf(
+    // PP-OCRv5_mobile_det — shared by every script. The server detector is 18x the size and buys
+    // nothing on the high-contrast text a screenshot is made of.
+    OcrModelAsset(
+        "det.onnx",
+        "https://huggingface.co/bukuroo/PPOCRv5-ONNX/resolve/47b3e1b4e90c79737cb71f562a6c85809067c7a5/ppocrv5-mobile-det.onnx",
+        "d7fe3ea74652890722c0f4d02458b7261d9f5ae6c92904d05707c9eb155c7924",
+    ),
+    // PP-OCRv5_server_rec — Chinese + Japanese + English in one model, so the default script needs no
+    // switching. 白い熊 chose the server tier over mobile on 2026-08-08.
+    OcrModelAsset(
+        "rec_jpn.onnx",
+        "https://huggingface.co/bukuroo/PPOCRv5-ONNX/resolve/47b3e1b4e90c79737cb71f562a6c85809067c7a5/ppocrv5-server-rec.onnx",
+        "bcdc8836fe5fb70f18c768f2b99cc37f5d45705a9dc78e65f6dc3af869cb2e40",
+    ),
+    // PP-OCRv5_mobile_rec — the same three languages, a fifth of the size and ~2.5x faster. Measured on
+    // the Phase 0 corpus it was not worse on clean screenshot text (1.24% CER against the server model's
+    // 1.35%); the server model's headroom is for photographed and handwritten text. Both ship so the
+    // choice is a setting rather than a build (白い熊, 2026-08-08). Shares the dictionary above.
+    OcrModelAsset(
+        "rec_jpn_mobile.onnx",
+        "https://huggingface.co/bukuroo/PPOCRv5-ONNX/resolve/47b3e1b4e90c79737cb71f562a6c85809067c7a5/ppocrv5-mobile-rec.onnx",
+        "bf66820f48fa99f779974c4df78e5274a9d8e0458c4137e8c5357e40e2c3faf2",
+    ),
+    // NOTE: this dictionary is CRLF. OcrCharset strips the trailing '\r'; without that every
+    // recognised character carries one.
+    OcrModelAsset(
+        "dict_jpn.txt",
+        "https://huggingface.co/bukuroo/PPOCRv5-ONNX/resolve/47b3e1b4e90c79737cb71f562a6c85809067c7a5/ppocrv5_dict.txt",
+        "1ea29636956177e400af712d9782e7693f3fb25f98617bed10479d2965a836fd",
+    ),
+    // latin_PP-OCRv5_mobile_rec — German, Czech, Polish (44 Latin-script languages).
+    OcrModelAsset(
+        "rec_latin.onnx",
+        "https://huggingface.co/monkt/paddleocr-onnx/resolve/7b02d0a30a07ba2b92ad1ff5a8941ae2c633de65/languages/latin/rec.onnx",
+        "614ffc2d6d3902d360fad7f1b0dd455ee45e877069d14c4e51a99dc4ef144409",
+    ),
+    OcrModelAsset(
+        "dict_latin.txt",
+        "https://huggingface.co/monkt/paddleocr-onnx/resolve/7b02d0a30a07ba2b92ad1ff5a8941ae2c633de65/languages/latin/dict.txt",
+        "3c0a8a79b612653c25f765271714f71281e4e955962c153e272b7b8c1d2b13ff",
+    ),
+    // eslav_PP-OCRv5_mobile_rec — Russian specifically (East Slavic), tuned tighter than the generic
+    // 34-language Cyrillic model.
+    OcrModelAsset(
+        "rec_eslav.onnx",
+        "https://huggingface.co/monkt/paddleocr-onnx/resolve/7b02d0a30a07ba2b92ad1ff5a8941ae2c633de65/languages/eslav/rec.onnx",
+        "dc6bf0e855247decce214ba6dae5bc135fa0ad725a5918a7fcfb59fad6c9cdee",
+    ),
+    OcrModelAsset(
+        "dict_eslav.txt",
+        "https://huggingface.co/monkt/paddleocr-onnx/resolve/7b02d0a30a07ba2b92ad1ff5a8941ae2c633de65/languages/eslav/dict.txt",
+        "3e95f1581557162870cacdba5af91a4c6be2890710d395b0c3c7578e7ee5e6eb",
+    ),
+)
+
+val downloadOcrModels = tasks.register("downloadOcrModels") {
+    group = "build setup"
+    description = "Fetch the pinned PP-OCRv5 ONNX models into src/main/assets/ocr (SHA-256 verified)."
+
+    // Captured at configuration time so the task action closes over nothing but serializable values —
+    // the configuration cache stays valid.
+    val targetDir = ocrAssetsDir.asFile
+    val assets = ocrModelAssets
+    outputs.files(assets.map { File(targetDir, it.name) })
+    outputs.upToDateWhen { assets.all { File(targetDir, it.name).isFile } }
+
+    doLast {
+        fun digestOf(file: File): String {
+            val digest = MessageDigest.getInstance("SHA-256")
+            file.inputStream().use { stream ->
+                val buffer = ByteArray(1 shl 16)
+                while (true) {
+                    val read = stream.read(buffer)
+                    if (read <= 0) break
+                    digest.update(buffer, 0, read)
+                }
+            }
+            return digest.digest().joinToString("") { "%02x".format(it) }
+        }
+
+        targetDir.mkdirs()
+        assets.forEach { asset ->
+            val file = File(targetDir, asset.name)
+            if (file.isFile && digestOf(file) == asset.sha256) return@forEach
+
+            println(">>> OCR model: fetching ${asset.name}")
+            val temporary = File(targetDir, "${asset.name}.part")
+            URI(asset.url).toURL().openStream().use { input ->
+                temporary.outputStream().use { output -> input.copyTo(output) }
+            }
+            val actual = digestOf(temporary)
+            if (actual != asset.sha256) {
+                temporary.delete()
+                throw GradleException(
+                    "OCR model ${asset.name} failed verification.\n" +
+                        "  expected ${asset.sha256}\n  actual   $actual"
+                )
+            }
+            temporary.renameTo(file)
+        }
+    }
+}
+
+tasks.named("preBuild") { dependsOn(downloadOcrModels) }

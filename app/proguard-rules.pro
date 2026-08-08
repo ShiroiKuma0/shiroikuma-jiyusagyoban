@@ -57,3 +57,13 @@
 -keepclassmembers class <1>$Companion {
     kotlinx.serialization.KSerializer serializer(...);
 }
+
+# ONNX Runtime (文字認識 / OCR).
+# Its native layer looks Java classes, fields and constructors up BY NAME through JNI — TensorInfo,
+# OnnxTensor, the value types it instantiates when converting a result back. R8 renaming them does not
+# fail at build or link time: the session is created fine and the process aborts inside
+# convertToTensorInfo on the first run() with a SIGABRT, which reads like a native bug rather than a
+# minification one. Keep the whole package.
+-keep class ai.onnxruntime.** { *; }
+-keepclassmembers class ai.onnxruntime.** { *; }
+-dontwarn ai.onnxruntime.**

@@ -188,6 +188,39 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
             android:theme="@style/Theme.OpenTasker" />
 
+        <!-- 文字認識: the OCR review window. Opened by the share tile below, never exported — the only
+             way in is a screenshot we have already copied into our own cache. -->
+        <activity
+            android:name="com.opentasker.ui.ocr.OcrReviewActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".ocr"
+            android:label="文字認識"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
+        <!-- 文字認識: its own Sharesheet tile, images ONLY. Kept separate from ShareReceiverActivity
+             (which accepts every MIME type and feeds the automation engine) so sharing a screenshot
+             here means "read the text in this", not "run a task". It copies the bytes and finishes —
+             see the URI-grant note in OcrShareActivity. -->
+        <activity
+            android:name="com.opentasker.core.ocr.OcrShareActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:grantUriPermissions="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:label="文字認識"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+        </activity>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
