@@ -9,6 +9,9 @@
 
 **📥 Latest release: [`0.2.81.2026-08-02.g97059d7b+039`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
+[![version](https://img.shields.io/badge/version-0.2.81-blue.svg)](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)
+[![license](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
+
 > The version names the upstream commit the fork is rebased on:
 > `<upstream version>.<base commit date>.g<8-char upstream sha>+<build>`. Upstream's own version
 > string stands still for months between releases, so the sha is what says how current this fork is.
@@ -208,6 +211,9 @@ A **Monitor** tab aggregates engine task-activity and widget pulls. A styled-bit
 
 ## Triggers (contexts)
 
+- **7 context families** — application, time, day, location, state, event and plugin
+  (`core/model/ContextSpec.kt`). Counted from the enum by `verifyReleaseTruth`, not by hand.
+
 A profile is active while **all** its contexts match. Seven families:
 
 | Family | Fires on |
@@ -224,7 +230,14 @@ A profile is active while **all** its contexts match. Seven families:
 
 ---
 
-## Actions — **176 built-in** (＋ engine flow control)
+## Actions
+
+### Actions (168 registered + 10 engine-handled)
+
+**168 built-in actions** in the registry, plus 10 the engine handles itself (the flow-control
+constructs — `flow.if`, `flow.foreach`, `flow.try` and friends — which the runner interprets rather
+than dispatching). Counted from `core/RuntimeRegistries.kt`, not by hand: `verifyReleaseTruth`
+recomputes both figures from source and fails the build if this line drifts.
 
 > Bold = added or materially extended in this fork.
 
