@@ -514,6 +514,25 @@ age estimation*. None of it is reproduced.
 file and printed in the info panel beside each component's actual contribution. It is falsifiable,
 which is the entire difference.
 
+The five are **resting heart rate 26 %, heart-rate stability 11 %, blood oxygen 17 %, sleep 26 %,
+steps 20 %**. Steps joined on 2026-08-07 at 白い熊's instruction; the 20 % came out of the other four
+in proportion. Two consequences are load-bearing rather than incidental:
+
+- **Steps are a behaviour; the other four are physiological state.** A long walk lifts the index with
+  nothing in the body's own numbers moving. That is what was asked for, it is said plainly in the
+  info panel, and a test asserts it so it is never "fixed" as a bug.
+- **Zero steps is a measurement, not an absence** — the one place in this index where 0 and null are
+  genuinely different. An empty series is missing; a series of zeroes scores zero.
+
+Every component's breakpoints ARE its card's band-ladder edges — steps take 3 000 and 7 500 from the
+steps ladder rather than the 2 500 / 8 000 the mortality literature suggests on its own, because a
+card reading "Standard" beside a component scoring 15 is the failure that invariant exists to stop,
+and it is worth more than 500 steps of precision. `HealthIndexTest` asserts the tie for every metric.
+
+A day earns a number in the day table only once **half the index's weight** is present. Steps score
+on their own, so without that gate a day where the band recorded nothing but a short walk would land
+a renormalised 0 in a column beside days scored from all five: correct arithmetic, unreadable table.
+
 **It refuses rather than guesses.** A component with no data is reported missing and named, and the
 index is labelled partial — never imputed, never defaulted. Scoring a night the band did not record
 as though sleep were bad is the failure this design exists to prevent, and `HealthIndexTest` asserts
@@ -562,6 +581,24 @@ tapping a step bar did nothing.
 
 `ChartGestureInteropTest` drives both, in the same modifier order the screen uses: a tap plants it, a
 second tap in the same place clears it, a tap elsewhere moves it, and neither pan nor pinch is lost.
+
+### One date format, and a history under every chart
+
+Dates are **`2026-08-07`** everywhere (白い熊, 2026-08-07) — `BandDates` is the only place they are
+formatted. Three formats had grown up (`MM-dd`, `MM-dd HH:mm`, `M/d`), which is three chances to
+misread which day is on screen, and the year stops being optional the moment the archive crosses one.
+A full ISO date is wide for an axis, so `ChartTicks.labelled` offers at most five labels now and
+`drawTimeLabels` still drops any that would collide.
+
+Every full-screen chart carries a day-by-day table underneath (`MetricHistory`), because a chart shows
+a shape and does not let you read Tuesday's number. Sleep lists **every recorded session** with its
+extent (`22:41 → 08:33`) as well as its duration — not just the latest, and not just the longest of
+each day, which is [DailySummary]'s rule and belongs to a summary rather than a history. Other metrics
+get median, low–high and the **sample count**, which is part of the reading: a median from four
+readings is a different claim from one built from four hundred.
+
+Histories come from the **raw** series, before the outlier filter — the table is what the band
+recorded, and the chart's ✕ marks are where the two disagree.
 
 ### The day table is a table
 

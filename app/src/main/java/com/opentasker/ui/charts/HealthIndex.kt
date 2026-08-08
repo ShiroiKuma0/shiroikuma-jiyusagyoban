@@ -69,6 +69,17 @@ data class HealthIndexResult(
     val partial: Boolean,
     val missing: List<Loc>,
 ) {
+    /**
+     * How much of the index was actually measured, 0..1.
+     *
+     * [value] alone cannot say whether an index is comparable with another: renormalising means a
+     * score built from one component and one built from five both come back on 0–100. On a screen
+     * that can print "partial" beside the number that is fine; in a **column of days** it is not,
+     * because the column exists to be compared down. So the day table gates on this.
+     */
+    val availableWeight: Double
+        get() = components.filter { it.score != null }.sumOf { it.weight }
+
     val band: Loc
         get() = when (value) {
             null -> Loc("—", "—")
@@ -92,6 +103,14 @@ data class HealthIndexInputs(
     val sleepMinutes: Int?,
     /** Deep + REM as a fraction of that session, 0..1. */
     val deepRemShare: Double?,
+    /**
+     * The day's step total.
+     *
+     * Null only when the band recorded no step data at all. **Zero is a real value** — a day of not
+     * walking is a measurement, not an absence — so this is the one input where 0 must not be
+     * confused with missing.
+     */
+    val steps: Double? = null,
 )
 
 object HealthIndex {
@@ -125,12 +144,36 @@ object HealthIndex {
     const val IQR_WORST = 25.0
     const val IQR_BEST = 4.0
 
+    /**
+     * Steps. Added 2026-08-07 at 白い熊's instruction, at 20 %.
+     *
+     * The dose–response evidence for daily step count is among the better literatures in wearable
+     * health — all-cause mortality falls steeply from roughly 2 500 to 7 000 steps a day and flattens
+     * after — so the ramp is a real one and the clamp above [STEPS_BEST] is deliberate: walking more
+     * than the plateau does not keep buying score.
+     *
+     * The edges are **the steps card's own band ladder** (3 000 Low→Standard, 7 500 Standard→High),
+     * not the 2 500 / 8 000 the literature suggests on its own. That invariant — index breakpoints
+     * ARE card breakpoints — is what stops a card reading "Standard" beside a component scoring 15,
+     * and it is worth more than 500 steps of precision. The two happen to agree closely anyway.
+     *
+     * **It is a different KIND of input from the other four.** They are physiological state over a
+     * window, mostly not under daily control; this is a behaviour total that is entirely under it. A
+     * day of walking can therefore lift the index while the body's own numbers are unchanged, which
+     * is what 白い熊 asked for and is worth knowing when reading a rise.
+     */
+    const val STEPS_WORST = 3_000.0
+    const val STEPS_BEST = 7_500.0
+
     // --- weights, summing to 1.0 -------------------------------------------------------------
-    // The old HRV quarter, shared out in proportion: 0.25/0.75, 0.10/0.75, 0.15/0.75, 0.25/0.75.
-    const val W_RESTING_HR = 0.33
-    const val W_STABILITY = 0.14
-    const val W_SPO2 = 0.20
-    const val W_SLEEP = 0.33
+    // Steps took 20 % on 2026-08-07, out of the other four in proportion (each × 0.8: 26.4, 11.2,
+    // 16.0, 26.4). Rounded to whole percent so the printed weights sum to exactly 100 rather than
+    // 99 — the single point went to blood oxygen, the component furthest from a round number.
+    const val W_RESTING_HR = 0.26
+    const val W_STABILITY = 0.11
+    const val W_SPO2 = 0.17
+    const val W_SLEEP = 0.26
+    const val W_STEPS = 0.20
 
     /**
      * A piecewise-linear map from a measurement to 0–100.
@@ -175,6 +218,14 @@ object HealthIndex {
                 Loc("no blood-oxygen readings", "血中酸素の測定がありません"),
             ) { ramp(it, best = SPO2_BEST, worst = SPO2_WORST) },
             sleepComponent(inputs),
+            component(
+                "steps", Loc("Steps", "歩数"), inputs.steps, "歩", W_STEPS,
+                Loc(
+                    "7 500 steps or above = 100 · 3 000 = 0 (no bonus above 7 500)",
+                    "7,500 歩以上 = 100 ／ 3,000 歩 = 0（7,500 歩を超えても加点なし）",
+                ),
+                Loc("no step records", "歩数の記録がありません"),
+            ) { ramp(it, best = STEPS_BEST, worst = STEPS_WORST) },
         )
 
         val available = components.filter { it.score != null }

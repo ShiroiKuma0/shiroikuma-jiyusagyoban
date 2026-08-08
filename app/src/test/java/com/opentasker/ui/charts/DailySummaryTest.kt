@@ -88,7 +88,38 @@ class DailySummaryTest {
         assertEquals(900, day.steps)
         assertNull(day.restingHr)
         assertNull(day.sleepMinutes)
-        assertNull("nothing scoreable, so no index", day.index)
+        assertNull(
+            "steps alone are 20 % of the index — too little to put a comparable number in the column",
+            day.index,
+        )
+    }
+
+    /**
+     * The gate the steps component made necessary (2026-08-07).
+     *
+     * Steps score on their own, so a day with nothing but a short walk would otherwise land a
+     * renormalised 0 in a column beside days scored from all five components. Arithmetically right,
+     * and unreadable. Half the index's weight has to be present before a day gets a number.
+     */
+    @Test
+    fun `a day scored from too little of the index shows no number at all`() {
+        val start = at(2026, 8, 4, 23)
+        val asleep = (0 until 400).map { ChartPoint(start + it * 60_000L, 54.0 + it % 4) }
+        // Sleep + resting HR + stability = 0.63 of the weight: enough.
+        val rich = DailySummary.build(
+            hr = asleep, spo2 = emptyList(), steps = emptyList(),
+            sleepSessions = listOf(night(2026, 8, 4, 23, 7)), spo2Times = emptySet(), zone = zone,
+        ).first { it.date == LocalDate.of(2026, 8, 4) }
+        assertTrue("expected a score, got ${rich.index}", rich.index?.value != null)
+
+        // Steps alone = 0.20: not enough.
+        val thin = DailySummary.build(
+            hr = emptyList(), spo2 = emptyList(),
+            steps = listOf(ChartPoint(at(2026, 8, 9, 12), 9_000.0)),
+            sleepSessions = emptyList(), spo2Times = emptySet(), zone = zone,
+        ).first { it.date == LocalDate.of(2026, 8, 9) }
+        assertEquals(9_000, thin.steps)
+        assertNull(thin.index)
     }
 
     /**

@@ -46,6 +46,17 @@ object DailySummary {
      * and ordinary usage — "Tuesday's sleep" is the night you went to bed on Tuesday, even though
      * most of it happened on Wednesday.
      */
+    /**
+     * How much of the index has to be measured before a day earns a score in the table.
+     *
+     * A day where the band recorded nothing but a few hundred steps would otherwise score 0 out of
+     * 100 — arithmetically correct, renormalised over the one component present, and completely
+     * misleading sitting in a column beside days scored from all five. Half the weight is the line:
+     * above it the number is comparable, below it the day shows a dash and the row still carries its
+     * raw figures.
+     */
+    const val MIN_WEIGHT_FOR_A_ROW = 0.5
+
     fun build(
         hr: List<ChartPoint>,
         spo2: List<ChartPoint>,
@@ -75,6 +86,7 @@ object DailySummary {
             val hrAsleep = window?.let { w -> hr.filter { it.tMs in w } }.orEmpty()
             val periodicAsleep = hrAsleep.filter { it.tMs !in spo2Times }
             val spo2Day = spo2ByDay[day].orEmpty()
+            val dayStepPoints = stepsByDay[day].orEmpty()
 
             val restingHr = HealthIndexSource.percentile(hrAsleep.map { it.value }, 0.05)
             val spo2Low = HealthIndexSource.percentile(spo2Day.map { it.value }, 0.05)
@@ -85,7 +97,7 @@ object DailySummary {
                 sleepMinutes = night?.totalMinutes,
                 deepMinutes = night?.deep,
                 remMinutes = night?.rem,
-                steps = stepsByDay[day].orEmpty().sumOf { it.value }.toInt(),
+                steps = dayStepPoints.sumOf { it.value }.toInt(),
                 spo2Low = spo2Low,
                 index = HealthIndex.compute(
                     HealthIndexInputs(
@@ -94,8 +106,11 @@ object DailySummary {
                         spo2Low = spo2Low,
                         sleepMinutes = night?.totalMinutes,
                         deepRemShare = night?.deepRemShare,
+                        // That day's OWN total, not the rolling window the dashboard index uses —
+                        // a per-day row must be scoreable from that day alone.
+                        steps = dayStepPoints.takeIf { it.isNotEmpty() }?.sumOf { p -> p.value },
                     ),
-                ).takeIf { it.value != null },
+                ).takeIf { it.value != null && it.availableWeight >= MIN_WEIGHT_FOR_A_ROW },
             )
         }.filter { it.hasAnything }
     }
