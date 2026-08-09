@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Undo/redo now validates every Task, Profile, and Scene snapshot before the Room write; malformed or wrong-entity history fails closed and leaves the current record untouched.
+- Record the current evaluation decisions to wait on Glance and Navigation3 stability, and to keep unrestricted accessibility automation out of the product.
+
 ## v0.2.82
 
 - Declare `ACCESS_NOTIFICATION_POLICY` so OpenTasker appears on the Do Not Disturb / Modes access settings page and DND access can actually be granted; `dnd.set`, `zen.rule.set`, and `zen.rule.clear` were dead on every device without it. Adds a manifest contract test. (#4)

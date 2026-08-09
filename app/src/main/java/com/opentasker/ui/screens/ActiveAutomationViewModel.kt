@@ -54,6 +54,7 @@ import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.RestoreCandidate
 import com.opentasker.core.storage.EditHistoryDao
 import com.opentasker.core.storage.EditHistoryEntity
+import com.opentasker.core.storage.EditHistorySnapshotDecoder
 import com.opentasker.core.storage.RunLogRetentionPolicy
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.RunLogQuery
@@ -1344,12 +1345,7 @@ class ActiveAutomationViewModel(
                 } else {
                     current.actionsJson
                 }
-                val restored = runCatching {
-                    StorageJson.decodeFromString<Task>(targetJson)
-                        .takeIf { it.id == entityId }
-                        ?.toEntity()
-                }.getOrNull() ?: current.copy(actionsJson = targetJson)
-                db.taskDao().update(restored)
+                db.taskDao().update(EditHistorySnapshotDecoder.task(targetJson, entityId).toEntity())
                 if (redo) history.markRedone(snapshot.id) else history.markUndone(snapshot.id, currentJson)
             }
 
@@ -1361,12 +1357,7 @@ class ActiveAutomationViewModel(
                 } else {
                     current.contextsJson
                 }
-                val restored = runCatching {
-                    StorageJson.decodeFromString<Profile>(targetJson)
-                        .takeIf { it.id == entityId }
-                        ?.toEntity()
-                }.getOrNull() ?: current.copy(contextsJson = targetJson)
-                db.profileDao().upsert(restored)
+                db.profileDao().upsert(EditHistorySnapshotDecoder.profile(targetJson, entityId).toEntity())
                 locationDwellStateStore.clearProfile(entityId)
                 if (redo) history.markRedone(snapshot.id) else history.markUndone(snapshot.id, currentJson)
             }
@@ -1379,12 +1370,7 @@ class ActiveAutomationViewModel(
                 } else {
                     current.elementsJson
                 }
-                val restored = runCatching {
-                    StorageJson.decodeFromString<Scene>(targetJson)
-                        .takeIf { it.id == entityId }
-                        ?.toEntity()
-                }.getOrNull() ?: current.copy(elementsJson = targetJson)
-                db.sceneDao().update(restored)
+                db.sceneDao().update(EditHistorySnapshotDecoder.scene(targetJson, entityId).toEntity())
                 if (redo) history.markRedone(snapshot.id) else history.markUndone(snapshot.id, currentJson)
             }
 
