@@ -2,6 +2,7 @@ package com.opentasker.core
 
 import com.opentasker.core.actions.AirplaneModeAction
 import com.opentasker.core.actions.AppFrozenAction
+import com.opentasker.core.actions.ArticleToHtmlAction
 import com.opentasker.core.actions.BackupCategoriesAction
 import com.opentasker.core.actions.BackupEditItemsAction
 import com.opentasker.core.actions.BackupPlanAction
@@ -325,6 +326,7 @@ private fun registerBuiltInActions() {
         BandChartsAction(),
         OcrRecognizeAction(),
         OcrModelsAction(),
+        ArticleToHtmlAction(),
         ReadSimsAction(),
         LocationModeAction(),
         SetImeAction(),

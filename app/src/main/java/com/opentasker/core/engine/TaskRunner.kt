@@ -724,12 +724,17 @@ private fun actionTimeoutMs(actionType: String): Long = when {
     // Interactive dialogs suspend on the user; a picker pondered for over a minute must not
     // be killed under them (their own `timeout` arg still applies when set).
     actionType.startsWith("dialog.") || actionType == "app.pickmulti" -> MEDIA_ACTION_TIMEOUT_MS
+    // A scrolling screenshot is read in slices, each a full detect + recognise pass: 25 of them on
+    // the sample article's first page and 19 on its second. This is minutes of honest work, not a
+    // hung action — measured, it was 64 s into the first page when the default budget killed it.
+    actionType == "ocr.article" -> ARTICLE_ACTION_TIMEOUT_MS
     else -> DEFAULT_ACTION_TIMEOUT_MS
 }
 
 private const val DEFAULT_ACTION_TIMEOUT_MS = 60_000L
 private const val MEDIA_ACTION_TIMEOUT_MS = 600_000L // 10 minutes
 private const val INTENT_SEND_TIMEOUT_MS = 660_000L // result_timeout max (600 s) + 60 s margin
+private const val ARTICLE_ACTION_TIMEOUT_MS = 1_800_000L // 30 minutes — a long article, many pages
 
 // The engine budget must exceed WaitAction.MAX_WAIT_MS (30 min): the timeout clock starts
 // before the action parses its arguments, so an equal budget deterministically failed a

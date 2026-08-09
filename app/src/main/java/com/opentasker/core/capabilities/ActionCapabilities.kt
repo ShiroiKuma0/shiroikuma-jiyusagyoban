@@ -98,6 +98,7 @@ object ActionCapabilityRegistry {
         "wallpaper.live" to ActionCapability(CapabilityLevel.RequiresSetup, "Silent only with Shizuku — shell holds the privileged permission the framework reserves for setting a live wallpaper. Without it the system preview opens for a confirming tap.", CapabilityRequirement.Shizuku),
         "ocr.models" to ActionCapability(CapabilityLevel.Supported, "Records where the OCR weight files are. Needs no permission beyond being able to read the folder."),
         "ocr.recognize" to ActionCapability(CapabilityLevel.Supported, "Reads the text in an image entirely on-device (PP-OCRv5); no permissions and no network. The image must be somewhere this app can read."),
+        "ocr.article" to ActionCapability(CapabilityLevel.Supported, "Reads a scrolling screenshot into an HTML article, entirely on-device. No network. Needs to read the screenshots and write into the output folder."),
         "state.get" to ActionCapability(CapabilityLevel.Supported, "Reads battery / charging / WiFi / airplane into variables; no permissions needed."),
         "clipboard.get" to ActionCapability(CapabilityLevel.RequiresSetup, "Android 10+ blocks clipboard reads unless the app is focused; may return empty from the background."),
         "apps.list" to ActionCapability(CapabilityLevel.RequiresSetup, "Android 11+ package visibility limits the result to apps this app can see."),

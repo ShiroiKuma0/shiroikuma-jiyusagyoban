@@ -976,6 +976,31 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "ocr.article",
+            name = "Article to HTML (OCR)",
+            description = "Read a scrolling screenshot into a formatted HTML file — headings, paragraphs, bold and italic, the photographs cropped out and inlined, every block sized against the body text. Handles pages far too tall for Recognise Text, and joins several screenshots of one article into a single file",
+            category = "Text",
+            fields = listOf(
+                ActionField("images", "Screenshots", FieldType.TEXT, hint = "one path per line (or separated by |), in reading order. A repeated passage where two screenshots overlap is dropped automatically"),
+                ActionField("out", "Output folder", FieldType.TEXT, hint = "blank = /sdcard/tmp. The file is named <yyyy-MM-dd_HH-mm-ss>-<headline>.html"),
+                ActionField("title", "Title", FieldType.TEXT, hint = "blank = the biggest type on the page. Also the filename"),
+                ActionField("script", "Script", FieldType.TEXT, hint = "blank = jpn (Japanese + English). Also: latin (German/Czech/Polish), eslav (Russian)"),
+                ActionField("model", "Model", FieldType.TEXT, hint = "blank = mobile, the fast 16 MB model — an article is dozens of recognition passes, and the text is corrected by hand afterwards. server = the accurate 81 MB one. settings = follow the app-wide toggle"),
+                ActionField("figures", "Figures", FieldType.TEXT, hint = "blank = embed the photographs as data URIs, so the file stands alone. none = leave a placeholder instead"),
+                ActionField("figure_width", "Figure width (px)", FieldType.NUMBER, hint = "default 1600 — wider figures are scaled down before they are inlined"),
+                ActionField("figure_quality", "Figure quality", FieldType.NUMBER, hint = "default 82, coerced 40..100. JPEG quality for the inlined photographs"),
+                ActionField("crop_top", "Ignore at the top (px)", FieldType.NUMBER, hint = "default 0. The status bar is detected and dropped on its own; this is for anything else"),
+                ActionField("crop_bottom", "Ignore at the bottom (px)", FieldType.NUMBER, hint = "default 0 — useful for an app's own \"read next\" cards at the end of the last page"),
+                ActionField("var", "Variable prefix", FieldType.TEXT, hint = "default ART — writes <prefix>_File, _Title, _Blocks, _Figures, _Chars, _Pages, _Ms, and _Phase/_Pct while it runs"),
+                ActionField("show", "Open the 記事変換 window", FieldType.TEXT, hint = "true = open the window instead of converting silently: add pages with +, reorder them, pick the model, watch the three progress bars and stop it with 中止. Any screenshots above are queued in it. What it reads goes to 記事編集 to be checked, and is written only when 保存 is pressed there"),
+                ActionField("edit", "Open the 記事編集 window", FieldType.TEXT, hint = "true = open the editor on its own: the article above its screenshots, tap a line on the image to put the caret in it, correct it, drop what you do not want, then 保存. Its menu opens an HTML and the images"),
+                ActionField("html", "Article to edit", FieldType.TEXT, hint = "with \"Open the 記事編集 window\" on: the .html to load. Blank opens it empty, to be filled from its own menu"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "band.charts",
             name = "Show Band Charts",
             description = "Open 健康 in its own fullscreen window — the band's heart rate, HRV, SpO2, temperature and stress as smooth charts. Put a launcher shortcut on the task that runs this and the icon opens straight onto the data",

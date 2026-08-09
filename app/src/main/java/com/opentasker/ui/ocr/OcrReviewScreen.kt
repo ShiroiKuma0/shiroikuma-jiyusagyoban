@@ -34,8 +34,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -78,6 +76,7 @@ import com.opentasker.core.ocr.OcrTrust
 import com.opentasker.core.ocr.linesToCheck
 import com.opentasker.core.ocr.lineConfidences
 import com.opentasker.ui.charts.ChartPalette
+import com.opentasker.ui.components.SelectionChip
 import com.opentasker.ui.screens.FOCUS_OCR
 import com.opentasker.ui.screens.UiCustomizationActivity
 import com.opentasker.ui.theme.ThemePrefs
@@ -459,11 +458,11 @@ private fun BottomBar(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             OcrScript.entries.forEach { candidate ->
-                FilterChip(
+                SelectionChip(
+                    label = candidate.label,
                     selected = candidate == script,
-                    onClick = { if (!busy && candidate != script) onScript(candidate) },
-                    label = { Text(candidate.label) },
-                    colors = FilterChipDefaults.filterChipColors(),
+                    enabled = !busy,
+                    onSelect = { onScript(candidate) },
                 )
             }
         }

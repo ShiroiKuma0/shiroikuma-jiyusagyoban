@@ -174,6 +174,9 @@ object AutomationSensitivityRegistry {
         // screenshot can hold a message, an address or a one-time code, so reading one is data access.
         "ocr.models",
         "ocr.recognize",
+        // Reads a whole article out of a screenshot. Same reasoning as ocr.recognize and rather more
+        // of it: what comes out is not a phrase but the entire page, photographs included.
+        "ocr.article",
         "screenshot.take",
         "file.read",
         "file.list",
@@ -239,6 +242,9 @@ object AutomationSensitivityRegistry {
         "file.write",
         "file.append",
         "file.delete",
+        // Writes the HTML it produced into a folder of 白い熊's choosing. Not classed destructive: the
+        // filename leads with a to-the-second stamp, so a run cannot land on an earlier run's file.
+        "ocr.article",
         "download",
         "wol",
         "sound.play",

@@ -84,6 +84,13 @@ object OcrEngine {
         page: Page,
         script: OcrScript = OcrScript.DEFAULT,
         highAccuracy: Boolean = true,
+        /**
+         * Called after each batch, with how many are done and how many there are.
+         *
+         * Only 「記事変換」 passes one: recognition is the longest step of a slice it can subdivide,
+         * and without it the top progress bar stands still for seconds at a time.
+         */
+        onBatch: (done: Int, total: Int) -> Unit = { _, _ -> },
     ): OcrResult = withContext(Dispatchers.Default) {
         val started = SystemClock.elapsedRealtime()
         if (page.lines.isEmpty()) return@withContext OcrResult.empty(script, 0L)
@@ -98,6 +105,8 @@ object OcrEngine {
         val order = page.lines.indices.sortedBy { page.lines[it].image.run { width.toFloat() / height } }
         val decoded = arrayOfNulls<CtcDecoder.Decoded>(page.lines.size)
 
+        val batches = (order.size + BATCH - 1) / BATCH
+        var batch = 0
         for (start in order.indices step BATCH) {
             val chunk = order.subList(start, min(start + BATCH, order.size))
             val widest = chunk.maxOf { page.lines[it].image.run { width.toFloat() / height } }
@@ -132,6 +141,7 @@ object OcrEngine {
                     }
                 }
             }
+            onBatch(++batch, batches)
         }
 
         val candidates = page.boxes.indices.mapNotNull { index ->
