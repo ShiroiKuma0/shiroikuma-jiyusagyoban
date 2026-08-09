@@ -20,13 +20,18 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
@@ -86,7 +91,10 @@ fun HealthIndexCard(index: HealthIndexResult, onClick: () -> Unit) {
                 )
             }
 
-            index.components.forEach { ComponentRow(it) }
+            // One label column, wide enough for the LONGEST label there actually is — measured, not
+            // guessed. See [labelColumnWidth].
+            val labelWidth = labelColumnWidth(index.components.map { it.label[lang] })
+            index.components.forEach { ComponentRow(it, labelWidth) }
 
             if (index.partial) {
                 Text(
@@ -101,19 +109,48 @@ fun HealthIndexCard(index: HealthIndexResult, onClick: () -> Unit) {
     }
 }
 
+/**
+ * The width the widest component label actually needs, in dp.
+ *
+ * It used to be a per-language constant — 116 dp for English, 84 for Japanese — chosen by eye. Two
+ * of the five English labels ("Resting heart rate", "Heart-rate stability") did not fit, so they
+ * wrapped to two lines; those rows then stood taller than the other three and the bars stopped being
+ * evenly spaced down the card (白い熊, 2026-08-09).
+ *
+ * A wider constant would only move the problem: the labels are localised, the type scale is a
+ * setting, and the system font size is the user's. So the column asks the text measurer how wide
+ * these particular strings are at this particular style and takes the largest — always exactly
+ * enough, in any language, at any font scale. Five short strings, measured once per composition.
+ *
+ * The rows also stop wrapping outright (`maxLines = 1`, `softWrap = false`), so a label can never
+ * break even if a font substitution lands a pixel over the measurement — it would ellipsise
+ * instead, which is visible and harmless where a broken row is neither.
+ */
 @Composable
-private fun ComponentRow(c: IndexComponent) {
+private fun labelColumnWidth(labels: List<String>): Dp {
+    val measurer = rememberTextMeasurer()
+    val style = MaterialTheme.typography.bodySmall
+    val density = LocalDensity.current
+    return remember(labels, style, density, measurer) {
+        val widest = labels.maxOfOrNull { measurer.measure(it, style, softWrap = false).size.width } ?: 0
+        with(density) { widest.toDp() }
+    }
+}
+
+@Composable
+private fun ComponentRow(c: IndexComponent, labelWidth: Dp) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        // English component names are markedly longer than the Japanese ones ("Heart-rate
-        // stability" against 心拍安定性), so the column is sized per language rather than to the
-        // shorter of the two and left to wrap.
         val lang = LocalBandLanguage.current
         Text(
             c.label[lang],
             style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.width(if (lang == BandLanguage.EN) 116.dp else 84.dp),
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.width(labelWidth),
             color = if (c.score == null) LocalChartStyle.current.axisText else MaterialTheme.colorScheme.onSurface,
         )
+        Spacer(Modifier.width(10.dp))
         Box(Modifier.weight(1f)) {
             ScoreBar(c.score)
         }

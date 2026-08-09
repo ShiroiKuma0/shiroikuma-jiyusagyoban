@@ -106,6 +106,143 @@ object BandText {
     val infoCaveat = Loc("What is not known", "わかっていないこと")
 
     // footer
+    // ---- 回復 --------------------------------------------------------------------------------
+    val recoveryTitle = Loc("Recovery", "回復")
+    val recoveryAllUsual = Loc("Nothing unusual", "すべて平常")
+    val recoveryOneOff = Loc("One marker is outside your usual range", "1つが平常の範囲外")
+    val recoveryTwoOff = Loc("%d markers are outside your usual range", "%d つが平常の範囲外")
+    val recoveryCollecting = Loc(
+        "Collecting — %d of 5 nights needed before there is anything to compare against",
+        "収集中 — 比較できるようになるまで、あと %d／5 夜",
+    )
+    val recoveryProvisional = Loc(
+        "Provisional: %d nights. Compared on absolute differences until 14.",
+        "暫定値：%d 夜。14 夜になるまでは差の絶対値で比べている。",
+    )
+    val markerNocturnalHr = Loc("Nocturnal heart rate", "夜間心拍")
+    val markerSleep = Loc("Sleep", "睡眠")
+    val markerFelt = Loc("How you felt", "体感")
+    val markerTemperature = Loc("Skin temperature", "皮膚温")
+    val bandUsual = Loc("usual", "平常")
+    val bandHigh = Loc("high", "高い")
+    val bandLow = Loc("low", "低い")
+    val bandUnknown = Loc("—", "—")
+    val usualRange = Loc("usual %s–%s", "平常 %s〜%s")
+    val recoveryLateEffort = Loc(
+        "You were still moving %d min before you fell asleep — that raises nocturnal heart rate on its own, and it costs nothing once there are 4 h in between.",
+        "寝つく %d 分前まで動いていた。それだけで夜間心拍は上がる。間が4時間あれば影響は出ない。",
+    )
+    val recoveryIllness = Loc(
+        "Heart rate up and sleep short together — the pattern that tracks illness. Worth watching, not a diagnosis.",
+        "心拍が上がり睡眠が短い — 体調不良と相関するパターン。診断ではないが、注意する価値はある。",
+    )
+    val recoveryAsk = Loc("How do you feel today?", "今日の体感は？")
+    val recoveryAskDone = Loc("Today: %s", "今日：%s")
+    val feltScale1 = Loc("Wrecked", "最悪")
+    val feltScale2 = Loc("Below par", "いまひとつ")
+    val feltScale3 = Loc("Normal", "普通")
+    val feltScale4 = Loc("Good", "良い")
+    val feltScale5 = Loc("Great", "絶好調")
+    val loadTitle = Loc("Load, 7 d vs 28 d", "負荷 7日/28日")
+    val loadWeekly = Loc("%d MET-min this week", "今週 %d MET分")
+    val loadDetraining = Loc("below your usual", "いつもより少ない")
+    val loadMaintaining = Loc("maintaining", "維持")
+    val loadProductive = Loc("building", "積み上げ中")
+    val loadOverreaching = Loc("a sharp step up", "急な増加")
+    val loadSessions = Loc("%d marked session(s)", "記録した運動 %d 件")
+    val loadSessionOpen = Loc("a session is open — mark its end", "運動が開始のまま — 終了を記録して")
+    val loadFromSessions = Loc("of which %d from sessions", "うち %d は運動から")
+    // ---- 運動と回復（記録簿）------------------------------------------------------------------
+    val registerTitle = Loc("Training and recovery", "運動と回復")
+    val registerOpen = Loc("See every session ▸", "記録した運動をすべて見る ▸")
+    val registerEmpty = Loc(
+        "No sessions marked yet. Mark one with 運動記録, and the night that follows it will appear here beside it.",
+        "まだ運動が記録されていない。運動記録で記録すれば、その次の夜がここに並んで出る。",
+    )
+    val registerLegend = Loc(
+        "Bar = session load that day. Dots = markers outside your usual range on the night that started that day.",
+        "棒はその日の運動量。点はその日の夜に平常の範囲外だった指標の数。",
+    )
+    val registerSession = Loc("%s · %d min · %d MET-min", "%s ・ %d 分 ・ %d MET分")
+    val registerPeak = Loc("peak %d bpm", "最高 %d bpm")
+    val registerNoNight = Loc("→ no night recorded after it yet", "→ その後の夜はまだ記録されていない")
+    val registerContrast = Loc(
+        "Nocturnal heart rate: %d after a session (%d nights) against %d after none (%d nights)",
+        "夜間心拍：運動した日の夜は %d（%d 晩）、しなかった日の夜は %d（%d 晩）",
+    )
+    val registerContrastNote = Loc(
+        "A within-person comparison of medians, nothing more. No correlation is computed and none should be read into it.",
+        "同一人物内での中央値の比較にすぎない。相関は計算していないし、読み取るべきでもない。",
+    )
+    val registerContrastWaiting = Loc(
+        "The comparison of nights after a session against nights after none appears once there are %d of each.",
+        "運動した夜としなかった夜の比較は、両方が %d 晩たまってから出る。",
+    )
+
+    // ---- あとから運動を記録 ----------------------------------------------------------------------
+    val markSessionTitle = Loc("Mark a past session", "あとから運動を記録")
+    val markSessionHint = Loc(
+        "Long-press and drag across the chart to mark when you trained. Nothing is recorded until you press the button — adjust the ends first.",
+        "グラフを長押ししてなぞり、運動していた時間帯を囲む。ボタンを押すまで何も記録されない。先に端を調整すること。",
+    )
+    val markSessionSpan = Loc("%s → %s · %d min", "%s → %s ・ %d 分")
+    val markSessionNothing = Loc("Nothing marked yet", "まだ選んでいない")
+    val markSessionStart = Loc("Start", "開始")
+    val markSessionEnd = Loc("End", "終了")
+    val markSessionSubmit = Loc("Record session", "この区間を記録")
+    val markSessionClear = Loc("Clear", "取消")
+    val markSessionDone = Loc("Recorded. It is in 回復 after the next sync.", "記録した。次の同期のあと 回復 に出る。")
+    val markSessionRejected = Loc(
+        "Not recorded — a session must be 5 to 240 minutes.",
+        "記録しなかった — 運動は 5〜240 分でなければならない。",
+    )
+
+    val sleepScoreTitle = Loc("Sleep score", "睡眠スコア")
+    val sleepScoreParts = Loc(
+        "duration %d/50 · consistency %d/30 · interruptions %d/20",
+        "長さ %d/50 ・ 規則性 %d/30 ・ 中断 %d/20",
+    )
+    val sleepScoreNote = Loc(
+        "Apple's published weights, stages deliberately excluded. The point split is theirs; the curve inside each part is ours.",
+        "Apple が公表している配点で、睡眠段階は意図的に除外。配点は向こうのもの、各項目の曲線はこちらのもの。",
+    )
+    val scoreVeryLow = Loc("very low", "とても低い")
+    val scoreLow = Loc("low", "低い")
+    val scoreOk = Loc("OK", "まずまず")
+    val scoreHigh = Loc("high", "高い")
+    val scoreVeryHigh = Loc("very high", "とても高い")
+    val onsetDrift = Loc("%d min from your usual bedtime", "いつもの就寝時刻から %d 分ずれ")
+    val peakCadence = Loc("Peak 30-min cadence", "最も速い30分の歩調")
+    val peakCadenceNote = Loc(
+        "%d steps/min, against a population norm of 71. The one intensity measure that predicts outcomes independently of how much you walked.",
+        "毎分 %d 歩（一般的な目安は 71）。総歩数とは独立に結果を予測できる、数少ない強度の指標。",
+    )
+    val regimeTravel = Loc(
+        "You changed time zone %d day(s) ago. Sleep duration re-converges in about two days but timing takes over two weeks, so the comparisons above are still catching up.",
+        "%d 日前に時間帯が変わっている。睡眠時間は二日ほどで戻るが、時刻のずれは二週間以上残る。上の比較はまだ追いついていない。",
+    )
+    val regimeAltitude = Loc(
+        "Blood oxygen has sat %.1f points low for %d nights — the altitude signature. A raised heart rate at altitude is adaptation, not poor recovery.",
+        "血中酸素が %.1f ポイント低い状態が %d 晩続いている — 高地の兆候。高地で心拍が上がるのは適応であって、回復不良ではない。",
+    )
+    val sriTitle = Loc("Sleep regularity", "睡眠の規則性")
+    val sriIrregular = Loc("irregular", "不規則")
+    val sriMiddling = Loc("middling", "ふつう")
+    val sriRegular = Loc("regular", "規則的")
+    val sriVeryRegular = Loc("very regular", "とても規則的")
+    val sriNote = Loc(
+        "How closely you sleep and wake at the same clock times, 0–100. In 60 977 people this predicted mortality more strongly than how long they slept.",
+        "毎日ほぼ同じ時刻に寝て起きているか、0〜100 で。60 977 人の調査では、睡眠時間より強く死亡率を予測した指標。",
+    )
+    val loadFloorNote = Loc(
+        "Walking cadence, plus the heart rate inside sessions you marked. Anything unmarked and stepless — cycling, carrying, lifting — is invisible, and marked strength work still reads about 18 % low because heart rate falls between sets. A floor, not a total.",
+        "歩行ケイデンスと、記録した運動の中の心拍から。記録していない歩行なしの活動 — 自転車・荷物運び・筋トレ — は見えない。記録した筋トレでもセット間で心拍が下がるぶん約 18 % 低めに出る。合計ではなく下限。",
+    )
+
+    // scatter legend — which dot is the periodic series and which came with an SpO₂ reading
+    val markPeriodic = Loc("periodic", "定期測定")
+    val markCoincident = Loc("with blood oxygen", "血中酸素と同時")
+
     val samples = Loc("%d samples", "%d 件")
     val rejected = Loc("%d rejected", "%d 件除外")
     val gaps = Loc("%d gaps", "%d 箇所の欠測")

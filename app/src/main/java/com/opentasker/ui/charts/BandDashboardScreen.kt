@@ -109,6 +109,25 @@ fun BandDashboardScreen(
             item("index") { HealthIndexCard(index) { onOpenMetric(MetricSpecs.KEY_INDEX) } }
         }
 
+        // Second, immediately under the index and above every chart, because 白い熊 asked to see
+        // these pointers first (2026-08-09): the index says how things have been, this says what
+        // last night cost and whether anything is outside normal today.
+        item("recovery") {
+            RecoveryCard(
+                recovery = state.recovery,
+                load = state.load,
+                sri = state.sri,
+                sleepScore = state.sleepScore,
+                peak30Cadence = state.peak30Cadence,
+                regime = state.regime,
+                feltToday = state.feltToday,
+                feltEnabled = state.feltEnabled,
+                onFelt = model::setFeltToday,
+                onOpenRegister = { onOpenMetric(MetricSpecs.KEY_REGISTER) },
+                onClick = { onOpenMetric(MetricSpecs.KEY_RECOVERY) },
+            )
+        }
+
         state.message?.let { m ->
             item("message") {
                 Card(Modifier.fillMaxWidth()) {

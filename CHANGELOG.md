@@ -3,6 +3,271 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.82.2026-08-08.gbd01eebb+027 — 2026-08-09
+
+**`運動と回復` — the session register: a five-week grid and a paired list.** Reached from
+`See every session ▸` under the load block.
+
+The **grid** is five weeks ending today, Monday first. Each day carries a bar whose height is that
+day's session load and a row of three dots showing how many markers were outside your usual range on
+the night that *started* that day. Reading down a column answers the question the 回復 card cannot:
+whether the bad nights follow the training.
+
+The **list** pairs every marked session with the night after it — duration, MET-minutes, peak heart
+rate inside the window, then that night's nocturnal heart rate with its delta, sleep, and how you
+felt. The pairing runs **forward** because that is the direction the measured effect runs: training
+raises the *following* night's heart rate, by up to 15 % when it ends near bedtime and by nothing once
+four hours separate them.
+
+Each night is banded against **only the nights before it**, never a baseline that contains it or the
+months that came after — so the register shows what a night looked like at the time rather than
+against today's numbers.
+
+**One aggregate, and no more.** Median nocturnal heart rate on nights after a session against nights
+after none, with both sample sizes printed, and it stays hidden until there are four of each. No
+correlation coefficient, no trend line, no verdict about whether the training is working: with a
+handful of sessions those are noise wearing the clothes of insight, and that is the failure mode of
+every training app there is.
+
+It will look almost empty for a fortnight. That is the honest state of a register with one session in
+it.
+
+## 0.2.82.2026-08-08.gbd01eebb+026 — 2026-08-09
+
+**`運動記録（後から） -- [727]` — mark a session you forgot to bookend, by drawing it on the chart.**
+
+A new screen reached by `band.session mode=pick`: the heart-rate chart, a long-press-and-drag to mark
+when you trained, ±5-minute arrows on each end, and a **Record session** button. **Nothing reaches the
+store until that button is pressed** (白い熊's instruction) — the drag proposes and the arrows correct.
+A finger on a six-hour chart resolves to about a minute per pixel at best, and a workout's edges are
+exactly where that matters: the score is `(METs − 1) × minutes`, so ten minutes of slop is a fifth of
+a fifty-minute session.
+
+The chart is the same one the detail screen draws — the curve over the SpO₂-coincident spot readings,
+the periodic series as hollow dots — which is deliberate here: a lift shows in the curve and is absent
+from the dots, so the shape you are hunting for is the gap between them. On 2026-08-09 that gap sits
+at 16:10.
+
+The 5-to-240-minute rule is enforced twice: the button is disabled outside it, and the model refuses
+it anyway, because the store is the thing that must never take a one-minute "workout".
+
+`SpanSelectionState` gains `set(start, end)` for the arrows, and `DetailHeader`/`SpanChips` stop being
+file-private now that two screens share them.
+
+## 0.2.82.2026-08-08.gbd01eebb+025 — 2026-08-09
+
+**A sleep score with published weights, peak cadence, regime detection, and a self-rating you can
+withdraw.**
+
+**Sleep score on Apple's 50/30/20.** Duration 50 points, bedtime consistency over the last 13 nights
+30, interruptions 20 — the only sleep-score composition any manufacturer actually publishes. Stages
+are excluded, which is Apple's own choice despite having the best-validated staging in the
+independent literature (κ 0.68 against 0.20–0.53 for everyone else). What Apple does *not* publish is
+the curve inside each term; ours are stated on the card rather than hidden. 白い熊's first reading is
+**71 · OK — duration 50/50, consistency 7/30, interruptions 14/20, 140 min from the usual bedtime**,
+which corroborates the regularity index of 57 exactly: the same finding at a different time scale.
+
+The clock is treated as **circular**, so 23:50 and 00:10 are twenty minutes apart rather than
+twenty-three hours and forty. On a linear clock every night that straddles midnight would have scored
+zero for consistency.
+
+**Peak 30-minute cadence.** The mean of the day's thirty highest step-count minutes — not the best
+consecutive half hour, which is a different and unvalidated quantity. It is one of very few intensity
+measures that survived adjustment for total volume (mortality HR 0.67, 0.56–0.83 in 47 471 adults),
+where "minutes above 100 steps/min" did not (HR 0.86, ns). 白い熊 reads **113 against a population
+norm of 71**.
+
+**Travel and altitude are detected and said out loud, never silently corrected.** A rolling baseline
+has one characteristic way of lying: it absorbs a step change and then reports the return to normal as
+the anomaly. After long-haul travel, sleep duration re-converges in about two days while timing has
+not returned within fifteen (1.5 M nights, 64 847 trips) — so the algorithm declares recovery while
+the person is still displaced. At altitude, resting heart rate rises and oxygen falls, which reads as
+overtraining indefinitely although it is adaptation. Both now produce an amber note qualifying the
+card. Freezing or re-basing the baseline would be inventing an adjustment nobody has published.
+
+**The self-rating can now be withdrawn.** Tapping the value already selected removes it. Previously a
+stray tap became permanent data 白い熊 had not authored — found exactly that way, by a stray tap
+during testing.
+
+## 0.2.82.2026-08-08.gbd01eebb+024 — 2026-08-09
+
+**Sleep regularity, and a way to record training the band cannot see.**
+
+**回復 gains the Sleep Regularity Index.** In 60 977 UK Biobank participants, sleep regularity
+predicted mortality *more strongly than sleep duration did* — 20–48 % lower all-cause risk across the
+four more regular quintiles, surviving adjustment for duration. It is computed the published way
+(compare every minute's sleep/wake state with the same minute 24 h later; `SRI = 200 × agreement −
+100`), not by the cheaper bedtime-variance approximation most apps use, and it needs nothing but the
+sleep/wake distinction — which consumer wearables get right at 91–96 % sensitivity, unlike the stage
+labels. 白い熊's first reading is **57, irregular**: onsets ranging 20:51 to 23:42 across the recorded
+nights. It sits beside the markers rather than in the counting rule, because it is a property of the
+fortnight, not of last night.
+
+**New `Mark Training Session` action, and a `運動記録 -- [727]` task to run it.** Strength work is
+close to invisible to this hardware, and the evidence is 白い熊's own 20-minute lifting session on
+2026-08-09: spot heart rate read **82, 93, 90 bpm** — the 71st, 95th and 91st percentile of an
+ordinary waking day — while the periodic series read **62 and 70**, at or below resting. Steps ran
+17–36/min, so "no steps" is the wrong test, and skin temperature did not move at all (36.0 °C either
+side). Automatic detection was attempted and abandoned: a threshold tight enough to exclude ordinary
+life catches one of those three readings, and a loose one found **76 "sessions" in ten days**, one of
+them three hours long. Three samples is not enough information.
+
+So the window is marked by hand — one tap to start, one to end, toggling — and inside it the
+heart-rate channel becomes legitimate. The over-crediting that disqualified it as an all-day metric
+was purely an artefact of integrating across 144 buckets of ordinary life; across a bounded workout
+there are no transients to mistake. Marked-session load is reported separately from the walking
+figure so the part that needed a tap is visible, and the card now states that marked strength work
+still reads about **18 % low**, because heart rate falls between sets and the ten-minute grid samples
+that trough as often as the effort.
+
+A session under 5 minutes or over 4 hours is discarded rather than recorded — the first found the
+honest way, by a test double-tap logging a one-second "workout".
+
+## 0.2.82.2026-08-08.gbd01eebb+022 — 2026-08-09
+
+**New 回復 section, second on the dashboard, under 健康指数.** Four literature-research agents were
+dispatched at 白い熊's instruction and came back converging hard, including on things that cut against
+the feature as first framed. What shipped is what the evidence supports, with 白い熊 choosing the
+framing knowing what it cost.
+
+**Three markers, counted — not scored.** Nocturnal heart rate over the Sleep4h window, time asleep,
+and a one-tap daily self-rating; the headline says how many are outside your usual range and names
+them. That shape is deliberate: **no commercial readiness score has ever been validated against an
+outcome** — not Garmin Body Battery, not Polar Nightly Recharge, not Fitbit Daily Readiness, and the
+one positive study of WHOOP Recovery was written by six WHOOP employees. The only composite shape
+with published support is a **count** (≥2 of 3 elevated → 92 % PPV for overreaching, against ≥85 %
+for each criterion alone). A weighted score would need coefficients no study has produced and would
+hide which marker fired.
+
+**Every threshold is a conjunction**: a marker fires only when the change is both unusual for you
+(beyond 1.5 robust SD of your last 28 nights) *and* large enough that the literature calls it
+meaningful — 5 bpm, 30 minutes, one step of five. Either test alone misbehaves, and 白い熊's own
+nights prove it: eight nights at a 3.4 % coefficient of variation, which is the published
+same-condition *noise floor*, so a z-score alone would fire on the sensor.
+
+**The self-rating is in because it beats the sensors.** Across 56 studies subjective measures tracked
+training load with "superior sensitivity and consistency" to objective ones; in a 3-arm RCT a daily
+questionnaire beat HRV-guided training on both outcomes; through a two-week overload block perceived
+strain rose sharply while every nightly sensor metric stayed flat. One tap, and it is the third leg
+of the published counting rule.
+
+**Deliberately excluded, each on its own evidence:** deep/REM percentages (consumer staging agrees
+with sleep labs at κ 0.20–0.53, and no study links stage proportions to next-day readiness — Apple,
+with the best staging in the field, excludes stages from its own sleep score); SpO₂ (measurement
+error about twice the whole day–night swing); nadir timing; ACWR (its own field has called for its
+dismissal, and for a recreational wearer it is a flat line at 0.99). Skin temperature is shown but
+never counted, only ever upward, and only when sustained two nights — a wrist sensor at night
+correlates with the bedroom at r = 0.961.
+
+**Load is measured from walking cadence, not heart rate.** The recommended metric made a heart-rate
+channel primary; run against 白い熊's ten days it produced 13 240 MET-min/week against a 500–1 000
+public-health band, because holding one 10-minute spot reading across the bucket turns every
+transient into ten minutes of exercise, 144 times a day. The cadence channel lands at 567 with no
+tuning. The card states the cost on screen: cycling, carrying and strength work leave no step
+signature, so the figure is a floor, not a total.
+
+**And it says what it cannot see**, on the detail screen: no HRV, no way to tell alcohol from a hard
+late session from illness (all three raise nocturnal heart rate by the same 3–9 bpm), and a
+short-history ladder that shows absolute differences until 14 nights rather than pretending to a
+dispersion estimate it does not have.
+
+## 0.2.82.2026-08-08.gbd01eebb+021 — 2026-08-09
+
+**The heart-rate curve swaps to the spot readings.** `+019`/`+020` gave the bold curve to the
+periodic series and the hollow dots to the ten-minute readings taken with blood oxygen. That was the
+wrong way round: the curve should carry the series that can be believed, and during any activity
+that is the spot reading. Now the **spot readings carry the curve** and the periodic series is drawn
+as hollow dots around and under it. At rest the dots sit on the line, because there both are right;
+when they fall away below it, that is the periodic series losing the pulse to wrist motion.
+
+The cost is a sparser curve — six samples an hour rather than twenty-four, breaking wherever the spot
+series pauses for more than half an hour. The threshold needs no new constant: it is already the
+larger of the nominal cadence and the observed median, so a ten-minutely series gets a ten-minutely
+threshold on its own. Every reading is still drawn; the info sheet, the caveat and the legend swap
+with it.
+
+**The health-index labels stop wrapping.** The label column was a per-language constant — 116 dp for
+English — and two of the five labels did not fit, so "Resting heart rate" and "Heart-rate stability"
+broke to two lines, those rows stood taller than the other three, and the bars were unevenly spaced
+down the card. The column now measures the actual labels at the actual type style and takes the
+widest, so it is exactly wide enough in any language at any font scale, and the rows refuse to wrap
+at all.
+
+## 0.2.82.2026-08-08.gbd01eebb+020 — 2026-08-09
+
+**Corrects what the `i` sheet says about the two heart-rate series.** `+019` described the periodic
+series as "a slow baseline", which was still the wrong picture. Measured against each reading's own
+quiet baseline — the median of the still periodic readings in the previous half hour — for readings
+taken with 60 or more steps in the surrounding minute:
+
+| | n | median | vs own quiet baseline |
+| --- | --- | --- | --- |
+| periodic, walking | 41 | 64 bpm | **−4.0 bpm, 59 % below resting** |
+| spot, walking | 29 | 86 bpm | **+18.0 bpm, 97 % above** |
+
+It does not hold a baseline while you walk — it drifts slightly *down*, and a heart rate cannot fall
+during brisk walking. Nor is it frozen or derived: consecutive periodic samples repeat exactly only
+6 % of the time while walking (13 % at rest), so it is live and varying. It is a genuine low-power
+measurement that loses the pulse under wrist motion, and its failure mode is to read a little low
+rather than to report nothing.
+
+Both series are real measurements, and at rest they agree to 1 bpm — so the line is your heart rate
+while you are still, and under-reads once you move. The info sheet and the caveat now say exactly
+that, in both languages: **at rest, believe the line; once moving, believe the dots.** No behaviour
+change.
+
+## 0.2.82.2026-08-08.gbd01eebb+019 — 2026-08-09
+
+**The two heart-rate populations are not one measurement with an offset.** They were written up as
+the same thing read with a "+7.46 bpm bias". Comparing each SpO₂-coincident reading against the
+periodic readings either side of it, across ten days, says otherwise:
+
+| when | median gap | over +15 bpm |
+| --- | --- | --- |
+| asleep and still | **+1.0 bpm** | **0 %** |
+| awake, not moving | +3.5 bpm | 7.8 % |
+| 21–100 steps nearby | +10.5 bpm | 27.5 % |
+| over 100 steps nearby | **+22.0 bpm** | 72.5 % |
+
+A calibration offset would survive sleep; this one vanishes. What is left is exertion — and the
+periodic series is the one that fails to show it. Walking at 130 steps/min it reads a median of
+**58 bpm**, below its own resting median of 66, while the spot reading reads 89 (and is not a
+cadence-lock artefact: it sits 42 bpm *below* the step rate, where an artefact locks on to it). The
+spot readings own the day's maximum on 9 days in 10.
+
+**So heart rate is now a curve over the periodic series with the spot readings hollow on top.** The
+line is drawn exactly as body temperature is — PCHIP with a gradient fill, in the heart-rate blue —
+and every spot reading sits on it as a hollow dot at the value and moment it was taken. Both marks on
+the dashboard card and the full-screen detail; nothing aggregated, averaged or decimated. **The peaks
+are on the dots, not on the line**, and the `i` sheet and the legend now say so.
+
+Two chunks behind it, because a tint and a break mean different things: the pooled series still owns
+the footer counts, the rejections and the gap shading — a shaded stretch means the band recorded
+*nothing* — while the curve gets its own series, built from the pooled chunk's retained points and
+re-segmented at the periodic cadence. So the line breaks where the periodic series really stops, a
+stretch carrying only spot readings gets a break and no shading, and a rejected reading can return as
+neither a dot nor a knot in the curve.
+
+This replaces the scatter shipped in `+018` earlier the same day, which replaced the hourly capsule:
+an hour of heart rate is 12 to 30 readings, and a capsule showed two of them and hid the rest, so the
+chart read as though the band measures once an hour. The `53–105 bpm` headline, the slew gate, the ✕
+marks, the footer counts and the day table are unchanged throughout.
+
+## 0.2.82.2026-08-08.gbd01eebb+018 — 2026-08-09
+
+**The band archive was silently losing rows; now it cannot.** Rows are committed to the database as
+each stream lands, but the JSONL flush sat on the success path alone — so a sync that landed rows and
+then threw took its lines with it, and the banked lines were dropped and leaked. On 白い熊's archive,
+syncs 28 and 41 were missing entirely, taking **27 heart-rate rows** of 2026-08-08: the day table read
+452 where the file held 425, with no warning anywhere.
+
+Two fixes. The flush is now **unconditional** — success, timeout, exception, failed connect — with a
+`finally` that clears the bank, and a failed sync writes a census with `ok:false` instead of leaving
+nothing but a hole in the id sequence. And every sync now runs `BandArchiveRepair`: any sync id in the
+database with no census line in the monthly files gets its rows re-emitted, closed by a `repair`
+marker written last. It is bounded by the oldest archive file present, costs a `startsWith` scan, and
+finds nothing to do in the normal case.
+
 ## 0.2.82.2026-08-08.gbd01eebb+001 — 2026-08-09
 
 **Rebased onto upstream `bd01eebb`.** Upstream did not bump its own version — still 0.2.82 — so this

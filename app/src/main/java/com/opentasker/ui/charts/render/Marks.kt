@@ -5,8 +5,11 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PointMode
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.Stroke
 import com.opentasker.ui.charts.ChartCurveMode
 import com.opentasker.ui.charts.ChartPoint
 import com.opentasker.ui.charts.DumbbellBucket
@@ -107,6 +110,53 @@ fun DrawScope.drawLineSeries(
                 drawCircle(color, radius = dotRadius, center = Offset(frame.x(p.tMs), frame.y(p.value)))
             }
         }
+    }
+}
+
+/**
+ * Individual readings as dots — one measurement, one mark, nothing aggregated or decimated.
+ *
+ * Used for a **second measurement population** that must not join the curve. Heart rate is the only
+ * one: the readings taken alongside SpO₂ track exertion where the periodic series does not (asleep
+ * and still the two agree to 1 bpm; with a hundred steps nearby the spot reading runs 22 bpm
+ * higher), so joining them into one line would draw a sawtooth that is an artefact of the
+ * interleaving. Drawn [hollow] they read as what they are — separate records, sitting above the
+ * baseline curve where the moment was busier than the baseline knows.
+ *
+ * LTTB is deliberately not in this path. These dots ARE the measurements; decimating them would
+ * defeat the purpose, and it is not needed — a day carries ~140 of them, and `drawPoints` batches
+ * the filled case into one call with round caps.
+ */
+fun DrawScope.drawPoints(
+    frame: PlotFrame,
+    points: List<ChartPoint>,
+    color: Color,
+    hollow: Boolean = false,
+) {
+    if (points.isEmpty()) return
+    val style = frame.style
+    // Half the line's dot size again: these are readings in their own right, not punctuation on a
+    // curve, and at the size used for the latter they read as dust.
+    val radius = (style.dotSize.toPx() / 2f * 1.5f).coerceAtLeast(1.5f)
+    val visible = ArrayList<Offset>(points.size)
+    for (p in points) {
+        if (!frame.visible(p.tMs)) continue
+        visible += Offset(frame.x(p.tMs), frame.y(p.value))
+    }
+    if (visible.isEmpty()) return
+    if (hollow) {
+        // One at a time: there is no batched stroked-circle primitive. They are a fifth of the
+        // stream at most — six an hour against the periodic series' twenty-four.
+        val ring = (radius * 0.5f).coerceAtLeast(1f)
+        for (at in visible) drawCircle(color, radius = radius, center = at, style = Stroke(width = ring))
+    } else {
+        drawPoints(
+            points = visible,
+            pointMode = PointMode.Points,
+            color = color,
+            strokeWidth = radius * 2f,
+            cap = StrokeCap.Round,
+        )
     }
 }
 

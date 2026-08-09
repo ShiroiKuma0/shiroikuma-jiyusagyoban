@@ -1,6 +1,7 @@
 package com.opentasker.core
 
 import com.opentasker.core.actions.AirplaneModeAction
+import com.opentasker.core.actions.BandSessionAction
 import com.opentasker.core.actions.AppFrozenAction
 import com.opentasker.core.actions.ArticleToHtmlAction
 import com.opentasker.core.actions.BackupCategoriesAction
@@ -323,6 +324,7 @@ private fun registerBuiltInActions() {
         SetDataSimAction(),
         GetLocationAction(),
         BandSyncAction(),
+        BandSessionAction(),
         BandChartsAction(),
         OcrRecognizeAction(),
         OcrModelsAction(),

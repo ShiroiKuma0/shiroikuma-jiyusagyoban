@@ -45,6 +45,48 @@ object ChartQualify {
     }
 
     /**
+     * The curve's own series, for a mark that draws a line over ONE population of a pooled chunk.
+     *
+     * [curveTimes] names the timestamps that belong to the curve; everything else in the chunk is
+     * the other population, drawn as dots. Heart rate hands it the **SpO₂-coincident** times: those
+     * are the readings that follow exertion, and the periodic series — which does not, and which
+     * sags below its own resting level under wrist motion — is the one relegated to dots
+     * (白い熊, 2026-08-09).
+     *
+     * Built from [chunk]'s **retained** points, so a reading the filter rejected cannot return as a
+     * knot in the curve, and re-segmented at the surviving series' own cadence with `mixedCadence`
+     * off — it is no longer a mixture. The threshold takes care of itself: `gapThresholdMs` uses the
+     * larger of the nominal cadence and the observed median, so a ten-minutely series gets a
+     * ten-minutely threshold without being told.
+     *
+     * The gaps it computes are deliberately DISCARDED by the caller. A tint has to mean "the band
+     * recorded nothing here", and that is only true of the pooled series: either population goes
+     * quiet in stretches the other one covers, and shading those would report an absence the dots on
+     * top visibly contradict. So the segments break the LINE, and the pooled chunk keeps the tint.
+     */
+    fun curveSeries(
+        chunk: QualifiedChunk,
+        curveTimes: Set<Long>,
+        spec: MetricSpec,
+    ): QualifiedChunk {
+        val primary = chunk.segments.flatMap { it.points }.filter { it.tMs in curveTimes }
+        val threshold = ChartPipeline.gapThresholdMs(
+            primary, spec, ChartPipeline.DEFAULT_GAP_MULTIPLIER, mixedCadence = false,
+        )
+        val (segments, _) = ChartSegments.split(
+            QualifiedSeries(primary, List(primary.size) { false }, noReading = 0, outOfRange = 0),
+            threshold,
+        )
+        return QualifiedChunk(
+            segments = segments,
+            gaps = emptyList(),
+            rejectedPoints = emptyList(),
+            noReading = 0,
+            retainedCount = primary.size,
+        )
+    }
+
+    /**
      * Range gate, then slew gate, then Hampel.
      *
      * The range gate is non-statistical on purpose: sentinels and physiological impossibilities are

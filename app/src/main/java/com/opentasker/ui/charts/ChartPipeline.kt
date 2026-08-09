@@ -21,13 +21,20 @@ package com.opentasker.ui.charts
 object ChartPipeline {
 
     /**
+     * How many cadences of silence make a gap. Named because a second caller now derives its own
+     * threshold — heart rate's curve re-segments the periodic series alone — and the two must not
+     * drift apart by one of them hard-coding a different number.
+     */
+    const val DEFAULT_GAP_MULTIPLIER = 3
+
+    /**
      * Everything up to segmentation. Cache this per (metric, day, filterParamsVersion) — it does not
      * change when the viewport moves.
      */
     fun qualifyAndSegment(
         raw: List<ChartPoint>,
         spec: MetricSpec,
-        gapMultiplier: Int = 3,
+        gapMultiplier: Int = DEFAULT_GAP_MULTIPLIER,
         mixedCadence: Boolean = false,
     ): QualifiedChunk {
         val qualified = ChartQualify.qualify(raw, spec)

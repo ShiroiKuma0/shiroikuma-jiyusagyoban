@@ -166,6 +166,9 @@ object AutomationSensitivityRegistry {
         // Puts that same health history on screen. It transmits nothing, but it displays a body's
         // worth of it, which is the thing worth declaring.
         "band.charts",
+        // Records that 白い熊 trained, and when. It reads nothing and transmits nothing, but a log of
+        // when someone exercises is personal history and belongs in the same declaration.
+        "band.session",
         "clipboard.get",
         "contacts.lookup",
         "plugin.locale.query",

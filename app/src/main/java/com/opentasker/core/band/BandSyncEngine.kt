@@ -106,10 +106,38 @@ object BandSyncEngine {
         var firmware: String? = null
         var battery: Int? = null
 
+        // The archive write, on EVERY exit path — success, timeout, exception, failed connect.
+        //
+        // It used to sit on the success path alone, and that was the defect: `persist()` commits
+        // each stream's rows to the database as that stream lands and banks the matching JSONL
+        // lines, so a sync that banked rows and then threw left the database holding rows the file
+        // had never heard of. The banked lines were dropped on the floor — and leaked, since only
+        // the success path ever cleared the map. Not theoretical: syncs 28 and 41 vanished from
+        // 白い熊's archive exactly this way, taking 27 heart-rate rows of 2026-08-08 with them, and
+        // the file stayed 27 rows short of the DB until the two were audited against each other by
+        // hand.
+        //
+        // A failed sync now writes its header and a census with `ok:false`. That is worth having on
+        // its own account: a hole in the id sequence was the only trace such a sync left behind.
+        suspend fun writeArchiveAndRepair(ok: Boolean, error: String?): String? {
+            if (!request.backup) return null
+            val wrote = writeArchive(
+                syncId, request, stats, startedAt, zone, firmware, battery, client.grantedMtu, ok, error,
+            )
+            // AFTER the write, so this sync's own census is on disk and its rows are not re-emitted
+            // — and so that a write which just failed is itself repaired, in the same run.
+            val repaired = repairArchive(db, request, zone)
+            return listOfNotNull(wrote, repaired).joinToString(" · ").ifEmpty { null }
+        }
+
         try {
             when (val opened = client.open(request.address)) {
                 is BandConnectResult.Failed -> {
-                    finish(db, syncId, startedAt, false, stats, opened.reason)
+                    val note = writeArchiveAndRepair(ok = false, error = opened.reason)
+                    finish(
+                        db, syncId, startedAt, false, stats,
+                        listOfNotNull(opened.reason, note).joinToString(" · "),
+                    )
                     BandSyncState.finish(opened.reason)
                     return@withContext BandSyncOutcome.Failed(opened.reason)
                 }
@@ -162,26 +190,30 @@ object BandSyncEngine {
             val records = stats.values.sumOf { it.records }
             val erroredStreams = stats.values.count { it.error != null }
 
-            var backupNote: String? = null
-            if (request.backup) {
-                backupNote = writeArchive(db, syncId, request, stats, startedAt, zone, firmware, battery, client.grantedMtu)
-            }
-
-            val summary = "$inserted new of $records read across ${stats.size} streams"
             val warning = when {
                 timedOut -> "the session timed out after ${request.timeoutSec}s — later streams were skipped"
                 erroredStreams > 0 -> "$erroredStreams stream(s) did not complete"
                 else -> null
             }
+            val backupNote = writeArchiveAndRepair(ok = warning == null, error = warning)
+
+            val summary = "$inserted new of $records read across ${stats.size} streams"
             finish(db, syncId, startedAt, true, stats, listOfNotNull(summary, warning, backupNote).joinToString(" · "))
             BandSyncState.finish(summary)
             BandSyncOutcome.Ok(syncId, summary, warning)
         } catch (e: Exception) {
             val reason = e.message ?: e.javaClass.simpleName
-            finish(db, syncId, startedAt, false, stats, reason)
+            // The rows this sync already committed must reach the file even though it is ending
+            // badly. Guarded, because a second throw here would replace the real reason with a
+            // misleading one — the archive is the backup, not the point of the sync.
+            val note = runCatching { writeArchiveAndRepair(ok = false, error = reason) }.getOrNull()
+            finish(db, syncId, startedAt, false, stats, listOfNotNull(reason, note).joinToString(" · "))
             BandSyncState.finish(reason)
             BandSyncOutcome.Failed(reason)
         } finally {
+            // Nothing banked may outlive the sync that banked it, on any path. The old code removed
+            // the entry only after a successful write, so every failure leaked its lines forever.
+            archiveLines.remove(syncId)
             // Unconditionally, on every path — a leaked BluetoothGatt causes status 133 next time.
             client.close()
         }
@@ -324,8 +356,13 @@ object BandSyncEngine {
         return Written(inserted, stamps.minOrNull(), stamps.maxOrNull(), lines)
     }
 
-    private suspend fun writeArchive(
-        db: AppDatabase,
+    /**
+     * Header, this sync's banked record lines, census — in that order, census LAST.
+     *
+     * The order is the guarantee: a census line in the file means every record line before it
+     * landed, which is what lets [BandArchiveRepair] treat "has a census" as "is archived".
+     */
+    private fun writeArchive(
         syncId: Long,
         request: BandSyncRequest,
         stats: Map<String, BandStreamStat>,
@@ -334,6 +371,8 @@ object BandSyncEngine {
         firmware: String?,
         battery: Int?,
         mtu: Int,
+        ok: Boolean,
+        error: String?,
     ): String? = runCatching {
         val writer = BandJsonlWriter(request.backupDir)
         val header = BandJsonlCodec.encode(
@@ -354,9 +393,10 @@ object BandSyncEngine {
         val census = BandJsonlCodec.encode(
             BandJsonlCensus(
                 id = syncId,
-                ok = true,
+                ok = ok,
                 ms = System.currentTimeMillis() - startedAt,
                 streams = stats,
+                backup = error,
             ),
         )
         // The record lines were collected as each stream landed; header and census bracket them.
@@ -364,6 +404,52 @@ object BandSyncEngine {
         archiveLines.remove(syncId)
         null
     }.getOrElse { "backup:failed:${it.message}" }
+
+    /**
+     * Re-emit the rows of any sync whose lines never reached the file — see [BandArchiveRepair].
+     *
+     * Runs on every sync, not on demand, because the failure it repairs is silent: the database and
+     * the archive drift apart with nothing to show for it, and the drift is only visible to someone
+     * counting both. It is cheap — a `startsWith` scan for the few dozen bracket lines in the month
+     * file, then a query that returns nothing at all in the normal case.
+     *
+     * Note that it heals across the `backup=false` switch too: a sync run with the archive off still
+     * commits its rows, and a later sync with it on will write them. That is the right way round —
+     * the invariant is "every row in the DB has a line in the file", and `backup` says whether this
+     * run writes the file, not whether its readings deserve to be in it.
+     */
+    private suspend fun repairArchive(
+        db: AppDatabase,
+        request: BandSyncRequest,
+        zone: ZoneId,
+    ): String? = runCatching {
+        val files = BandArchiveRepair.monthlyFiles(request.backupDir)
+        val oldestMonth = BandArchiveRepair.oldestMonth(files) ?: return@runCatching null
+        val archived = BandArchiveRepair.archivedSyncIds(files)
+        val recent = db.bandSyncDao().recent(BandArchiveRepair.LOOKBACK_SYNCS).map { it.id to it.startedAt }
+        val missing = BandArchiveRepair.missingSyncIds(recent, archived, oldestMonth) { startedAt ->
+            val date = java.time.Instant.ofEpochMilli(startedAt).atZone(zone).toLocalDate()
+            date.year * 100 + date.monthValue
+        }
+        if (missing.isEmpty()) return@runCatching null
+
+        val lines = mutableListOf<String>()
+        for (ids in missing.chunked(BandArchiveRepair.ID_CHUNK)) {
+            lines += db.bandSampleDao().forSyncs(ids).map(BandJsonlCodec::encode)
+            lines += db.bandDailyDao().forSyncs(ids).map(BandJsonlCodec::encode)
+            lines += db.bandSleepDao().forSyncs(ids).map(BandJsonlCodec::encode)
+        }
+        // Records first, marker last — the same rule the census follows, for the same reason.
+        val marker = BandJsonlCodec.encode(
+            BandJsonlRepair(
+                at = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(java.time.ZonedDateTime.now(zone)),
+                ids = missing.sorted(),
+                n = lines.size,
+            ),
+        )
+        BandJsonlWriter(request.backupDir).appendAll(lines + marker, LocalDate.now())
+        "repaired:${lines.size} row(s) from ${missing.size} sync(s)"
+    }.getOrElse { "repair:failed:${it.message}" }
 
     /** Lines banked per sync as streams land, flushed once at the end. */
     private val archiveLines = mutableMapOf<Long, MutableList<String>>()

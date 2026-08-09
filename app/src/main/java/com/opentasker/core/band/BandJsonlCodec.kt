@@ -19,12 +19,13 @@ import kotlinx.serialization.json.jsonPrimitive
  * Decoding goes through [StorageJson], the tolerant instance, so a line written by a newer build with
  * an extra field never breaks an older reader. That is exactly why that instance exists.
  *
- * Four line shapes. A sync writes one header, N records, one census line:
+ * Six line shapes. A sync writes one header, N records, one census line:
  *   {"t":"sync",   …}   what this sync was, and against which firmware
  *   {"t":"s",      …}   one sample
  *   {"t":"d",      …}   one day's totals
  *   {"t":"z",      …}   one sleep segment
  *   {"t":"census", …}   what each stream did
+ *   {"t":"repair", …}   rows re-emitted from the DB for syncs that never reached the file
  */
 
 /**
@@ -102,6 +103,24 @@ data class BandJsonlCensus(
     val backup: String? = null,
 )
 
+/**
+ * The closing marker of a repair block — see [BandArchiveRepair].
+ *
+ * Written **after** the rows it covers, for the same reason the census is written after a sync's
+ * records: a marker that is present is a marker whose rows landed. [ids] are the syncs the block
+ * accounted for, whether or not any of them still had rows to re-emit (retention may have pruned
+ * them) — recording them either way is what stops the next sync re-examining the same ids forever.
+ */
+@Serializable
+data class BandJsonlRepair(
+    val t: String = "repair",
+    val at: String,
+    val ids: List<Long>,
+    /** How many record lines this block wrote. Zero is a legitimate, informative outcome. */
+    val n: Int,
+    val v: Int = 1,
+)
+
 object BandJsonlCodec {
 
     fun encode(row: BandSampleEntity): String = BandArchiveJson.encodeToString(
@@ -137,6 +156,8 @@ object BandJsonlCodec {
     fun encode(header: BandJsonlHeader): String = BandArchiveJson.encodeToString(header)
 
     fun encode(census: BandJsonlCensus): String = BandArchiveJson.encodeToString(census)
+
+    fun encode(repair: BandJsonlRepair): String = BandArchiveJson.encodeToString(repair)
 
     /**
      * What kind of line this is, or null if it is not readable.

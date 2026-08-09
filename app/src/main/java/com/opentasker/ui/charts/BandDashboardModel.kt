@@ -11,6 +11,8 @@ import com.opentasker.core.band.BandSyncEngine
 import com.opentasker.core.band.BandSyncRequest
 import com.opentasker.core.band.BandSyncState
 import com.opentasker.core.band.BandLocalTime
+import com.opentasker.core.band.RecoveryLog
+import com.opentasker.core.band.TrainingSessions
 import com.opentasker.core.storage.AppDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 
@@ -44,6 +47,26 @@ data class MetricChart(
      * Empty for every other metric.
      */
     val secondary: List<ChartPoint> = emptyList(),
+    /**
+     * The second measurement population, drawn as hollow spot dots and kept out of the curve.
+     *
+     * Heart rate only: the readings taken alongside SpO₂, which track exertion where the periodic
+     * series does not. Derived from [chunk]'s retained points, so a reading the filter rejected can
+     * never reappear here as a dot.
+     */
+    val spots: List<ChartPoint> = emptyList(),
+    /**
+     * The curve's own series, when the mark is a line over a SUBSET of [chunk].
+     *
+     * Two chunks rather than one, because the two answer different questions and the difference is
+     * visible on screen. [chunk] stays **pooled** — it owns the footer counts, the rejections and
+     * the gap tint, and a tint must mean "the band recorded nothing here", which is only true of the
+     * pooled series (the periodic one goes quiet for ten minutes at a time in stretches that plainly
+     * have spot readings in them). This one carries only the periodic samples, re-segmented at their
+     * own cadence, so the curve breaks where the periodic series really stops rather than being
+     * drawn through a hole.
+     */
+    val lineChunk: QualifiedChunk? = null,
     val headline: String,
     val headlineBand: BandRung?,
     val subtitle: Loc,
@@ -96,6 +119,22 @@ data class DashboardState(
     val sleep: SleepChart? = null,
     /** One row per calendar day, newest first. */
     val days: List<DaySummary> = emptyList(),
+    /** Last night's markers against 白い熊's own normal, and the week's load. See [Recovery]. */
+    val recovery: RecoveryResult? = null,
+    val load: RecoveryBuild.LoadReading? = null,
+    /** Sleep Regularity Index — predicted mortality more strongly than duration. See [SleepRegularity]. */
+    val sri: Double? = null,
+    /** Last night on Apple's published 50/30/20 weights. */
+    val sleepScore: SleepScore.Breakdown? = null,
+    /** Mean of the day's 30 highest step-count minutes — NHANES norm 71.1. */
+    val peak30Cadence: Double? = null,
+    /** Travel / altitude, annotated rather than silently corrected. */
+    val regime: RecoveryRegime.Regime? = null,
+    /** Every marked session paired with the night after it — see [SessionRegister]. */
+    val register: SessionRegister.Register? = null,
+    /** Today's self-rating, if given — the third counted marker. Null means not asked yet today. */
+    val feltToday: Int? = null,
+    val feltEnabled: Boolean = true,
     /** The full extent of everything stored, so a viewport can pan across all of it. */
     val bounds: LongRange = 0L..0L,
     val message: Loc? = null,
@@ -194,6 +233,25 @@ class BandDashboardModel(
         val sleep = loadSleep(zone)
         val bp = loadBloodPressure(dao, from, to)
 
+        val today = LocalDate.now(zone)
+        val zoneOffsetMs = zone.rules.getOffset(java.time.Instant.now()).totalSeconds * 1000L
+        val assembled = RecoveryBuild.build(
+            metrics = metrics,
+            sessions = sleep.sessions,
+            ratings = RecoveryLog.all(appContext),
+            sessions_ = TrainingSessions.all(appContext),
+            sessionOpen = TrainingSessions.openStart(appContext) != null,
+            localDateOf = { ms -> localDateKey(java.time.Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()) },
+            zoneOffsetMs = zoneOffsetMs,
+            todayEpochDay = (System.currentTimeMillis() + zoneOffsetMs) / 86_400_000L,
+            nowMs = System.currentTimeMillis(),
+            offsetsByDay = offsetsByDay(sleep.sessions, zone),
+            minuteOfDayOf = { ms ->
+                val t = java.time.Instant.ofEpochMilli(ms).atZone(zone).toLocalTime()
+                (t.hour * 60 + t.minute).toDouble()
+            },
+        )
+
         DashboardState(
             loading = false,
             status = BandSyncEngine.status(db),
@@ -212,7 +270,71 @@ class BandDashboardModel(
                 zone = zone,
             ),
             bounds = oldest..newest,
+            recovery = assembled.recovery,
+            load = assembled.load,
+            sri = assembled.sri,
+            sleepScore = assembled.sleepScore,
+            peak30Cadence = assembled.peak30Cadence,
+            regime = assembled.regime,
+            register = assembled.register,
+            feltToday = RecoveryLog.rating(appContext, localDateKey(today)),
+            feltEnabled = RecoveryLog.enabled(appContext),
         )
+    }
+
+    /**
+     * Record a session 白い熊 marked on the chart after the fact.
+     *
+     * The same store the live toggle writes to, so a retroactive mark and a bookended one are the
+     * same kind of thing downstream — and the same length guards apply, checked here rather than in
+     * the screen so the rule lives in one place.
+     */
+    fun markSession(startMs: Long, endMs: Long): Boolean {
+        val minutes = (endMs - startMs) / 60_000L
+        if (minutes < TrainingSessions.MIN_SESSION_MINUTES || minutes > TrainingSessions.MAX_OPEN_MINUTES) {
+            return false
+        }
+        TrainingSessions.log(appContext, TrainingSessions.Session(startMs, endMs, "後から"))
+        refresh()
+        return true
+    }
+
+    /**
+     * The device's UTC offset on each recorded day, for the travel check.
+     *
+     * Derived from the sleep sessions rather than stored per day: a session's own instant resolved in
+     * the current zone gives the offset that applied then, so a flight shows up as a step between two
+     * consecutive nights without any new persistence.
+     */
+    private fun offsetsByDay(sessions: List<SleepSession>, zone: ZoneId): Map<Long, Int> =
+        sessions.associate { s ->
+            val instant = java.time.Instant.ofEpochMilli(s.startMs)
+            val offsetMin = zone.rules.getOffset(instant).totalSeconds / 60
+            (s.startMs / 86_400_000L) to offsetMin
+        }
+
+    /** `yyyyMMdd`, the local-date key shape the band's own daily records use. */
+    private fun localDateKey(date: LocalDate): Long =
+        date.year * 10_000L + date.monthValue * 100L + date.dayOfMonth
+
+    /**
+     * Record how 白い熊 feels today, then reload so the counting rule picks it up at once.
+     *
+     * Filed under today's date; [RecoveryBuild] attributes it to the night that STARTED on the
+     * previous evening, which is the night it describes.
+     */
+    fun setFeltToday(rating: Int) {
+        val zone = ZoneId.systemDefault()
+        val key = localDateKey(LocalDate.now(zone))
+        // Tapping the value already selected REMOVES it. A rating you can change but never withdraw
+        // is a trap: a stray tap becomes permanent data 白い熊 did not author, and the marker would
+        // then be counted against a number nobody meant. (Found exactly that way, 2026-08-09.)
+        if (RecoveryLog.rating(appContext, key) == rating) {
+            RecoveryLog.clear(appContext, key)
+        } else {
+            RecoveryLog.setRating(appContext, key, rating)
+        }
+        refresh()
     }
 
     private fun buildMetric(
@@ -231,12 +353,17 @@ class BandDashboardModel(
             return buildStateIndex(spec, points, readOkTimes)
         }
         // Heart rate carries two populations — a periodic series and an extra reading taken at each
-        // SpO₂ measurement, +7.46 bpm higher. A LINE has to split them or it draws a sawtooth. A
+        // SpO₂ measurement, ~6 bpm higher. A LINE has to split them or it draws a sawtooth. A
         // CAPSULE must not: the envelope is the hour's real extent, and dropping the coincident
         // readings would clip the top off every capsule (Hume's own day range matches the pooled
-        // population). So the choice follows the mark, and the gap analysis has to follow the same
-        // series it is drawn over — tinting pooled capsules with the periodic series' gaps would
-        // report an absence in stretches that plainly have data.
+        // population). LINE_WITH_SPOTS keeps the series POOLED in the chunk — so the footer, the
+        // rejections and above all the gap TINT describe every reading — and splits only the MARK:
+        // the curve is drawn over the periodic samples alone, the rest as spot dots.
+        //
+        // That split matters because the two populations do not measure the same thing. Asleep and
+        // still they agree to 1 bpm; with a hundred steps nearby the spot reading runs 22 bpm higher
+        // and the periodic series does not move at all. One curve through both would be a sawtooth
+        // that is an artefact of the interleaving.
         val forChart = if (spec.key == BandMetric.HEART_RATE && spec.render == RenderKind.LINE) {
             ChartQualify.splitHeartRate(points, spo2Times).first
         } else {
@@ -244,17 +371,34 @@ class BandDashboardModel(
         }
 
         // The Hampel filter is an instrument for smoothing a LINE, and it assumes one population.
-        // Pointed at the pooled heart-rate series it flags the interleaving itself — the +7.46 bpm
+        // Pointed at the pooled heart-rate series it flags the interleaving itself — the higher
         // second population looks like a sawtooth of outliers, and it burns the whole rejection
-        // budget on readings that are perfectly real (102 of them, on 白い熊's own data). An hourly
-        // envelope needs no such filter anyway: its ends are two real readings, not a curve through
-        // them. So capsules keep the range and sentinel gates and skip Hampel entirely.
-        val chartSpec = if (spec.render == RenderKind.CAPSULE) spec.copy(hampelHalfWindow = 0) else spec
+        // budget on readings that are perfectly real (102 of them, on 白い熊's own data). Neither an
+        // hourly envelope nor a pooled chunk feeding a split mark needs it: what is fitted through
+        // the samples is fitted through ONE population, which was never the noisy part. So only a
+        // plain LINE keeps Hampel; everything else keeps the range and sentinel gates alone.
+        val chartSpec = if (spec.render == RenderKind.LINE) spec else spec.copy(hampelHalfWindow = 0)
         val chunk = if (spec.render == RenderKind.BARS) null else {
             ChartPipeline.qualifyAndSegment(forChart, chartSpec, mixedCadence = spec.mixedCadence)
         }
         val buckets = if (spec.render == RenderKind.CAPSULE) HourlyEnvelope.bucket(points) else emptyList()
         val bars = if (spec.render == RenderKind.BARS) points else emptyList()
+
+        // The two marks of a split rendering, both drawn off the chunk's RETAINED points so that a
+        // reading the filter rejected can come back as neither a dot nor a knot in the curve.
+        //
+        // The CURVE goes to the SpO₂-coincident readings and the dots to the periodic series, which
+        // is the way round it is because of which one is trustworthy — the spot readings follow
+        // exertion (+18 bpm over baseline while walking, 97 % of the time), and the periodic series
+        // does not (−4 bpm, i.e. below its own resting level, which no heart does while walking).
+        // The prominent mark belongs to the readings you can believe (白い熊, 2026-08-09).
+        val retained = chunk?.segments?.flatMap { it.points }.orEmpty()
+        val spots = if (spec.splitPopulations) retained.filter { it.tMs !in spo2Times } else emptyList()
+        val lineChunk = if (spec.render == RenderKind.LINE_WITH_SPOTS && chunk != null) {
+            ChartQualify.curveSeries(chunk, spo2Times, spec)
+        } else {
+            null
+        }
 
         // The headline summarises the SAME window the health index scores — the last 24 hours — and
         // for a line metric it is the MEDIAN rather than the latest reading. A single latest sample of
@@ -268,21 +412,22 @@ class BandDashboardModel(
         // "38 505 歩 · とても高い" for a week's walking and mean nothing.
         val todayFrom = points.last().tMs - 24 * 3_600_000L
         val today = points.filter { it.tMs >= todayFrom }.sumOf { it.value }
-        val headline = when (spec.render) {
-            RenderKind.CAPSULE -> "${spec.format(lo)}–${spec.format(hi)}"
-            RenderKind.BARS -> spec.format(today)
+        // A range or a typical value is a property of the METRIC, not of the mark it is drawn with —
+        // `headlineIsRange` says which, so heart rate keeps its `53–105 bpm` now that its capsules
+        // have become dots. Steps stay on the daily total.
+        val headline = when {
+            spec.render == RenderKind.BARS -> spec.format(today)
+            spec.headlineIsRange -> "${spec.format(lo)}–${spec.format(hi)}"
             else -> spec.format(typical)
         }
-        val forBand = when (spec.render) {
-            RenderKind.BARS -> today
-            RenderKind.CAPSULE -> typical
-            else -> typical
-        }
+        val forBand = if (spec.render == RenderKind.BARS) today else typical
         return MetricChart(
             spec = spec,
             chunk = chunk,
             buckets = buckets,
             bars = bars,
+            spots = spots,
+            lineChunk = lineChunk,
             headline = headline,
             headlineBand = spec.bandFor(forBand),
             // The footer is a feature, not debug output: 白い熊 cares that the chart stays close to

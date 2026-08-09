@@ -98,6 +98,19 @@ class BandChartsActivity : ComponentActivity() {
                                 contentPadding = insets,
                                 onOpenMetric = { selected = it },
                             )
+                        } else if (selected == MetricSpecs.KEY_REGISTER) {
+                            SessionRegisterScreen(
+                                register = state.register,
+                                contentPadding = insets,
+                                onBack = { selected = null },
+                            )
+                        } else if (selected == MetricSpecs.KEY_MARK_SESSION) {
+                            MarkSessionScreen(
+                                state = state,
+                                contentPadding = insets,
+                                onSubmit = { start, end -> model.markSession(start, end) },
+                                onBack = { selected = null },
+                            )
                         } else {
                             MetricDetailScreen(
                                 state = state,

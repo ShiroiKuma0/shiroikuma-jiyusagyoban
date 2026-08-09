@@ -250,10 +250,65 @@ A **+7.46 bpm** bias, and a median step of 5.0 bpm across a series boundary agai
 Merged, that is a systematic sawtooth every fifth slot which consumes the outlier filter's entire
 rejection budget.
 
-**Split them for the line; pool them for envelopes and summaries.** Hume's own day range matches the
-*pooled* population, not the periodic series alone — confirmed twice over: 55–103 on 2026-08-03, and on
-2026-08-04 Hume's H-tab headline of **58–91 bpm** against our pooled 08:00–15:00 range of **58–91 bpm**,
-exact, with our hourly min/max matching all seven of its capsules.
+**Split them for the line; pool them for envelopes and for summaries.** Hume's own day range matches
+the *pooled* population, not the periodic series alone — confirmed twice over: 55–103 on 2026-08-03,
+and on 2026-08-04 Hume's H-tab headline of **58–91 bpm** against our pooled 08:00–15:00 range of
+**58–91 bpm**, exact, with our hourly min/max matching all seven of its capsules.
+
+#### It is not a bias. They are not measuring the same thing.
+
+Corrected 2026-08-09, when 白い熊 asked why the two differ "on a massive scale" and the answer turned
+out to overturn the framing above. Each spot reading was compared against the periodic readings
+either side of it (within 5 min), over ten days:
+
+| when | median gap | > +15 bpm |
+|---|---|---|
+| **asleep and still** (n=69) | **+1.0 bpm** | **0 %** |
+| awake, no steps within ±5 min (n=374) | +3.5 bpm | 7.8 % |
+| 1–20 steps (n=46) | +8.5 bpm | 26.1 % |
+| 21–100 steps (n=102) | +10.5 bpm | 27.5 % |
+| **over 100 steps** (n=40) | **+22.0 bpm** | 72.5 % |
+
+**A calibration offset would survive sleep. This one vanishes.** What is left is exertion — and the
+striking half is which series fails to show it:
+
+- Walking at **130 steps/min the periodic series reads a median of 58 bpm**, *below* its own resting
+  median of 66. Its 95th percentile is ~76 whether 白い熊 is still or walking. It is not tracking
+  activity at all.
+- The spot reading at the same cadence reads **89**, with an interquartile range of 85–94 while
+  walking — ordinary walking heart rates.
+- It is **not** the classic cadence-lock artefact either: an artefact locks HR onto the step rate,
+  and at 130 steps/min this sits **42 bpm below** it.
+- It owns the day's maximum on **9 of 10 days** (98–119 bpm; the periodic series' own maxima are
+  76–87 on those days).
+
+#### Both are real measurements. One of them fails under motion.
+
+Sharpened the same evening, because "a slowly-updated resting baseline" was still the wrong picture.
+Against each reading's OWN quiet baseline — the median of the still periodic readings in the previous
+30 minutes — for readings taken with ≥60 steps in the surrounding minute:
+
+| | n | median value | vs own quiet baseline |
+|---|---|---|---|
+| periodic, walking | 41 | 64 bpm (50–77) | **−4.0 bpm, 59 % BELOW resting** |
+| spot, walking | 29 | 86 bpm (59–112) | **+18.0 bpm, 97 % above** |
+
+So the periodic series does not *hold* a baseline while you walk — it drifts slightly **down**, and a
+heart rate cannot fall during brisk walking. Nor is it a frozen or derived number: consecutive
+periodic samples repeat exactly only 6 % of the time while walking (13 % at rest), so it is live and
+varying. It is a genuine low-power measurement that loses the pulse under wrist motion, and its
+failure mode is to read a little low rather than to report nothing.
+
+That distinction matters for what may be built on it: the periodic series is trustworthy at rest —
+where it agrees with the spot reading to 1 bpm, and where resting-HR and the health index read it —
+and untrustworthy during activity. It is not a separate "resting HR" metric to be used as such.
+
+The pooled figures above still hold, and the reason Hume's day range matches the *pooled* population
+is now obvious: the top of that range is the spot readings, which are the only ones that see
+exertion.
+
+The old "+7.46 bpm bias" is the same number seen through the wrong frame: it is the mean of a
+movement-dependent gap, not a constant offset. Do not re-derive a "correction" from it.
 
 ### The heart-rate gaps are the band, not us
 
@@ -276,7 +331,43 @@ honest rendering**, so nothing here needs fixing.
 
 ---
 
-## 3. The census, and the buffer-drop detector
+## 3. The census, the archive, and the buffer-drop detector
+
+### The archive is written on every path, and repairs itself
+
+Fixed 2026-08-09. **The JSONL archive is only worth having if it is complete, and it was silently
+not.**
+
+`persist()` commits each stream's rows to the database as that stream lands, and banks the matching
+JSONL lines; the flush that turned banked lines into a file write sat *after* the stream loop, inside
+the same `try`, on the success path alone. So any sync that landed rows and then threw left the
+database holding rows the file had never heard of — and the banked lines were dropped on the floor,
+and leaked, since only the success path ever cleared the map.
+
+Measured on 白い熊's own archive: syncs **28** (2026-08-08) and **41** (2026-08-09) are absent
+entirely — no header, no records, no census — while their **27 heart-rate rows** of 2026-08-08 sit in
+the database and show up in the day table (452 there against 425 in the file). Nothing warned. The
+only reason it was ever noticed is that the two were counted against each other by hand.
+
+Two changes, because one is not enough:
+
+1. **The flush is unconditional.** Success, timeout, exception, failed connect — every exit path
+   writes, and a `finally` clears the bank so nothing can outlive the sync that banked it. A failed
+   sync now writes its header and a census with `ok:false`, which is worth having anyway: a hole in
+   the id sequence was the only trace such a sync used to leave.
+2. **Every sync repairs the archive** (`BandArchiveRepair`). A sync is known to be archived by its
+   census line — written LAST, so its presence means every record line before it landed. Any sync id
+   in `band_syncs` with no census in the monthly files gets its rows re-emitted from the database,
+   closed by a `{"t":"repair","ids":[…],"n":…}` marker, itself written last for the same reason. The
+   scan is a `startsWith` pass for the few dozen bracket lines, so it costs nothing in the normal
+   case, where it finds nothing to do.
+
+The window is bounded by the files themselves: only syncs at or after the **oldest monthly file
+present** are candidates. Anything older has its census in a file that is not here — pruned, moved to
+the backup archive — and with no monthly file at all the repair does nothing, because an empty
+directory is not evidence that thousands of rows need writing.
+
+### The band's own buffer
 
 The band's buffers are ring buffers and overwrite silently. Nothing on our side deletes anything — the
 Hume app never sends the destructive mode either, and a factory reset is the only thing that empties
@@ -380,14 +471,65 @@ the real dashboard it tinted the heart-rate card with **52 gaps** where there ar
 `mixedCadence = true` switches to the 90th percentile, which sits above the slower mode instead of
 between the two. Only the pooled series sets it.
 
-### The Hampel filter does not belong on a capsule chart
+### Heart rate is a curve over the periodic series, with the spot readings on top
+
+Changed 2026-08-09, at 白い熊's instruction, on both the dashboard card and the full-screen detail.
+
+It was an hourly capsule: one mark per clock hour spanning that hour's real min and max. The mark was
+honest, but it answered a question nobody was asking. An hour of heart rate is **12 to 30 readings**
+(6 SpO₂-coincident on the ten-minute grid, plus whatever the periodic series manages of its 120 s
+slots — it fills 37–48 % of them). A capsule showed two of those readings and hid the rest, and the
+chart therefore read as though the band measures once an hour. It does not.
+
+It went through three marks in one day, and the last one is the point. First a scatter of every
+reading. Then, once §2's measurement showed the two populations are not the same measurement,
+`RenderKind.LINE_WITH_SPOTS` — a PCHIP curve with a gradient fill, exactly as body temperature is,
+with the other population as **hollow dots** on top. The curve went to the periodic series, on the
+reasoning that a curve suits a slow-moving quantity sampled often.
+
+**That was the wrong way round, and 白い熊 had it swapped the same evening.** The curve belongs to
+the series that can be believed, and during any activity that is the ten-minutely spot reading. So:
+the **spot readings carry the curve**; the periodic series is drawn as hollow dots around and under
+it. At rest the dots sit on the line, because there both are right; when the dots fall away below it,
+that is the periodic series losing the pulse to wrist motion, not the line being wrong.
+
+The cost is a sparser curve — six samples an hour rather than twenty-four, breaking wherever the spot
+series pauses for more than half an hour. The benefit is that the shape on screen is the shape of the
+heart rate. Every reading is still drawn; nothing is aggregated, averaged or decimated.
+
+#### Two chunks, because a tint and a break mean different things
+
+The pooled chunk stays authoritative for the footer counts, the rejections and above all the **gap
+tint** — a tint has to mean "the band recorded nothing here", which is only true of the pooled
+series. The curve gets its own chunk (`ChartQualify.curveSeries`), built from the pooled chunk's
+*retained* points so a rejected reading cannot return as a knot in the curve, and re-segmented at the
+spot cadence with `mixedCadence` **off** — it is no longer a mixture, and `gapThresholdMs` takes the
+larger of the nominal cadence and the observed median, so a ten-minutely series gets a ten-minutely
+threshold without being told. So:
+
+- the **line breaks** where the spot series really stops;
+- the **shading** appears only where nothing at all was recorded;
+- and a stretch carrying only periodic samples gets a break in the line and no shading, which is
+  exactly what happened there.
+
+Hampel stays off, as it was for the capsule: the chunk is pooled, and pointed at a pooled series the
+filter flags the interleaving itself (102 real readings on 白い熊's data, against 2 with it off).
+What the curve is fitted through is a single population, which was never the noisy part.
+
+What did NOT change: the pooled gap threshold and its tint, the slew gate, the ✕ marks, the footer
+counts, the day table, and the `53–105 bpm` headline. That last one was previously inferred from the
+mark — `CAPSULE` meant a range — so it moved to its own `headlineIsRange` flag rather than silently
+becoming a median when the mark changed.
+
+### The Hampel filter does not belong on a capsule or a pooled chunk
 
 It is an instrument for smoothing a *line*, and it assumes one population. Pointed at pooled heart
 rate it flags the interleaving itself — the +7.46 bpm second population reads as a sawtooth of
 outliers and burns the entire rejection budget on real readings: **102 of them** on 白い熊's data,
-against 2 once it is switched off. An hourly envelope needs no such filter anyway, since its ends are
-two real readings rather than a curve fitted through them. Capsules keep the range and sentinel gates
-and skip Hampel.
+against 2 once it is switched off. Neither an hourly envelope nor a scatter needs such a filter
+anyway: a capsule's ends are readings, and heart rate's curve is fitted through ONE population,
+which was never the noisy part. Both keep the range and sentinel gates and skip Hampel; only a plain
+`LINE` gets it.
 
 ### Filter before decimate — the order is not negotiable
 
@@ -708,11 +850,27 @@ vendor plugin's re-coding would yield REM 8 % and awake 20 %, which is not. The 
 `BandSleepSegment` stays: it costs nothing and it is how we would find out if a firmware update
 started emitting one.
 
+### Settled on 2026-08-09
+
+**Heart rate is a curve over the periodic series with the spot readings hollow on top**, on both the
+dashboard card and the detail screen — no capsule anywhere. Written up in §4, with
+`HeartRateScatterTest` asserting the split, the break-over-a-hole rule and that Hampel stays off.
+
+**The two heart-rate populations are not one measurement with an offset.** They agree to 1 bpm asleep
+and still, and diverge by 22 bpm with movement, because only the spot reading tracks exertion. §2.
+
+**The archive is written on every exit path, and repairs itself.** Syncs 28 and 41 had gone missing
+with 27 heart-rate rows; the flush is now unconditional and `BandArchiveRepair` re-emits anything the
+file is missing on every sync. Written up in §3, with `BandArchiveRepairTest`.
+
 ### Still open
 
 - **Hume's own views** were the model for the power views, shipped in `+009`. Its `H` tab draws an **hourly
   min/max envelope** — one capsule per hour, not one measurement — with `D`/`W`/`M` above it. Its day
-  range matches our *pooled* heart-rate population.
+  range matches our *pooled* heart-rate population. Ours no longer imitates that: since 2026-08-09 our
+  heart rate draws every reading (§4), and the capsule remains only where the data is genuinely
+  ten-minutely, on SpO₂. Their envelope also pools two populations that measure different things,
+  which is worth remembering before treating their number as a reference.
 - Hume drops single-sample dips that we keep: on 2026-08-03 our minimum was 52 bpm (one sample at
   11:39:30, neighbours 85 and 72) against Hume's 55. Our decode is faithful; the difference is their
   display filtering. **Do not "fix" our number to match theirs.**

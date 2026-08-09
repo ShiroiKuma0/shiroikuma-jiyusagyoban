@@ -45,11 +45,18 @@ object HealthIndexSource {
 
         // Resting HEART RATE is taken from the last sleep session, which is what "resting" means.
         // Taking a daytime minimum instead would reward sitting still, not cardiovascular fitness.
+        //
+        // It also makes the component immune to exercise, which is the right answer twice over: a
+        // walk cannot cost score for raising the heart rate it is supposed to raise, and the effect
+        // exercise DOES have on this number — a hard day showing up as a higher resting rate the
+        // following night — is real physiology and belongs in the score.
         val window = latestSleep?.let { it.startMs..it.endMs }
         val hrAsleep = within(hrPoints, window)
 
-        // Stability uses the PERIODIC heart-rate population only. The SpO₂-coincident readings run
-        // +7.46 bpm high, so leaving them in would measure the interleaving rather than the variation.
+        // Stability uses the PERIODIC population only — one measurement mode, so the spread measures
+        // the heart rather than the interleaving. (The older reason given here, that the coincident
+        // readings "run +7.46 bpm high", was wrong: asleep the two agree to 1 bpm. They diverge with
+        // MOVEMENT, of which there is none in this window. See docs/hume-band-protocol.md §2.)
         val periodicAsleep = hrAsleep.filter { it.tMs !in spo2Times }
 
         return HealthIndex.compute(

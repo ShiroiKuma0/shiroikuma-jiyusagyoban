@@ -18,6 +18,20 @@ enum class RenderKind {
     /** One capsule per hour spanning that hour's real min–max. For sparse or bursty series. */
     CAPSULE,
 
+    /**
+     * A [LINE] through the primary population, with the second population as hollow spot dots.
+     *
+     * For a stream that carries two kinds of record which must not be merged into one curve. Heart
+     * rate is the only one: a periodic series that moves slowly, and a spot reading taken at each
+     * SpO₂ measurement that tracks exertion (see [MetricSpecs.HEART_RATE]). A line through both
+     * draws a sawtooth that is an artefact of the interleaving; a line through the periodic series
+     * alone, with the spot readings drawn on top, shows each for what it is.
+     *
+     * Every reading still appears. The curve is the periodic series, the dots are the rest, and
+     * nothing is aggregated or averaged away.
+     */
+    LINE_WITH_SPOTS,
+
     /** Two series sharing one axis, drawn as a bar between them. Blood pressure only. */
     DUMBBELL,
 
@@ -86,6 +100,23 @@ data class MetricSpec(
      * a median. Only the POOLED heart-rate series does.
      */
     val mixedCadence: Boolean = false,
+    /**
+     * Headline the window's low–high rather than its typical value.
+     *
+     * Tied to the metric, not to the mark. It used to be inferred from [RenderKind] — CAPSULE meant
+     * a range, everything else a median — so changing heart rate's mark from a capsule to
+     * [RenderKind.POINTS] would silently have turned its `53–105 bpm` headline into `68 bpm`. The
+     * question "is a range or a typical value the more useful summary of this metric" has nothing to
+     * do with how the samples happen to be drawn, so it is asked here instead.
+     */
+    val headlineIsRange: Boolean = false,
+    /**
+     * This metric's stream carries two measurement populations: one takes the curve, the other is
+     * drawn as hollow dots and kept out of it.
+     *
+     * Only heart rate does. See [MetricSpecs.HEART_RATE].
+     */
+    val splitPopulations: Boolean = false,
 ) {
     fun format(value: Double): String = when (decimals) {
         0 -> value.toInt().toString()
@@ -102,19 +133,64 @@ data class MetricSpec(
 object MetricSpecs {
 
     /**
-     * Heart rate.
+     * Heart rate — **a curve through the periodic series, with the spot readings on top**.
      *
-     * The `hr` stream carries TWO populations: a periodic series and an extra reading taken at each
-     * SpO₂ measurement, running +7.46 bpm higher. The line splits them (`ChartQualify.splitHeartRate`)
-     * because merged they draw a sawtooth; the hourly capsules POOL them, because Hume's own day range
-     * matches the pooled population and dropping the coincident readings would clip every capsule.
+     * ## Why it is not a capsule any more
+     *
+     * It was an hourly capsule: one mark per clock hour spanning that hour's real min and max. The
+     * mark was honest — both ends were readings that occurred — but it answered a question 白い熊 was
+     * not asking. An hour of heart rate is 12 to 30 readings, and a capsule showed two of them and
+     * hid the rest, so the chart read as though the band measures once an hour. It does not
+     * (白い熊, 2026-08-09).
+     *
+     * ## What the two populations actually are — measured, and not what we first said
+     *
+     * The `hr` stream interleaves a periodic series with an extra reading taken at each SpO₂
+     * measurement. That second population was written up as "the same thing measured with a +7.46
+     * bpm bias". **It is not a bias, and they are not measuring the same thing.** Over ten days of
+     * 白い熊's data, with each spot reading compared against the periodic readings either side of it:
+     *
+     * | when | median gap | readings > +15 bpm |
+     * |---|---|---|
+     * | asleep and still | **+1.0 bpm** | **0 %** |
+     * | awake, no steps | +3.5 bpm | 7.8 % |
+     * | 21–100 steps nearby | +10.5 bpm | 27.5 % |
+     * | over 100 steps nearby | **+22.0 bpm** | 72.5 % |
+     *
+     * A calibration offset would survive sleep. This one vanishes. What is left is that **the spot
+     * reading tracks exertion and the periodic series does not**: walking at 130 steps/min the
+     * periodic series reads a median of 58 bpm — below its own resting median of 66 — while the spot
+     * reading reads 89. Nor is the spot reading the classic cadence-lock artefact: at 130 steps/min
+     * it sits 42 bpm BELOW the cadence, where an artefact locks on to it. It owns the day's maximum
+     * on 9 of 10 days.
+     *
+     * So the periodic series behaves like a slowly-updated resting baseline, and the spot reading
+     * like a real measurement of the moment. Both are kept, and neither is allowed to stand for the
+     * other.
+     *
+     * ## Which is why the mark is [RenderKind.LINE_WITH_SPOTS]
+     *
+     * **The spot readings get the curve**, and the periodic series is relegated to hollow dots. That
+     * is the way round it is because of which one can be believed: the curve should carry the series
+     * that tracks the heart, and during any activity that is the ten-minutely spot reading. It was
+     * built the other way round first, for a day, on the reasoning that a curve suits a slow-moving
+     * quantity — but that gave the prominent mark to the readings that are wrong exactly when they
+     * matter, so 白い熊 had it swapped.
+     *
+     * The cost is a sparser curve: six samples an hour rather than twenty-four, and a line that
+     * breaks wherever the spot series pauses for more than half an hour. The benefit is that the
+     * shape on screen is the shape of the heart rate.
+     *
+     * Every reading is still drawn. Pooling them into one line would draw a sawtooth that is an
+     * artefact of the interleaving; pooling them into one hourly capsule hid both. The headline range
+     * and the day table stay pooled, which is why they still match Hume's.
      */
     val HEART_RATE = MetricSpec(
         key = BandMetric.HEART_RATE,
         label = Loc("Heart Rate", "心拍"),
         unit = "bpm",
         color = ChartPalette.HEART_RATE,
-        render = RenderKind.CAPSULE,
+        render = RenderKind.LINE_WITH_SPOTS,
         cadenceSec = 120,
         validMin = 25.0,
         validMax = 250.0,
@@ -127,6 +203,10 @@ object MetricSpecs {
         yMax = 180.0,
         decimals = 0,
         mixedCadence = true,
+        // The low–high the card has always headlined. Stated rather than inherited from the mark,
+        // so changing the mark could not quietly change it.
+        headlineIsRange = true,
+        splitPopulations = true,
         bands = listOf(
             BandRung(Loc("Very low", "とても低い"), 45.0, ChartPalette.BAND_CRITICAL),
             BandRung(Loc("Low", "低い"), 55.0, ChartPalette.BAND_WARN),
@@ -141,26 +221,49 @@ object MetricSpecs {
                     "一般に心臓の効率が良い。",
             ),
             howMeasured = Loc(
-                "Optical sensor at the wrist (PPG), roughly every two minutes — plus one extra " +
-                    "reading taken under a different measurement mode each time blood oxygen is " +
-                    "sampled. That second population measures +7.46 bpm higher, so the line splits " +
-                    "them and the hourly ranges pool them.",
-                "手首の光学式センサー（PPG）で、およそ二分ごと。加えて血中酸素を測るたびに" +
-                    "もう一回、別の測定モードで取られる。この二つ目は実測で +7.46 bpm 高いので、" +
-                    "折れ線では分けて描き、時間ごとの範囲では合わせて使う。",
+                "Optical sensor at the wrist (PPG), in two interleaved series. Both are real " +
+                    "measurements: asleep and still they agree to within 1 bpm. They part company " +
+                    "as soon as you move. The periodic series — every two minutes, of which the " +
+                    "band fills about 40 % — stops following your heart under wrist motion: walking " +
+                    "it reads a median of 64, which is 4 bpm BELOW your own resting level over the " +
+                    "previous half hour, and a heart rate cannot fall while you walk. The ten-minute " +
+                    "reading taken alongside blood oxygen does follow it: walking it reads 86, some " +
+                    "18 bpm above the same baseline, and it owns the day's maximum on 9 days in 10.",
+                "手首の光学式センサー（PPG）。二つの系列が交互に入る。どちらも実測であって、" +
+                    "眠っていて動かないときは 1 bpm 以内で一致する。離れるのは動いた瞬間から。" +
+                    "定期測定（二分ごと、実際に埋まるのは四割ほど）は手首が動くと心拍を追えなくなる。" +
+                    "歩行中の中央値は 64 で、直前三十分の自分の安静値より 4 bpm 低い。" +
+                    "歩いていて心拍が下がることはない。血中酸素と同時に取られる十分ごとの測定は" +
+                    "きちんと追う。歩行中は 86、同じ基準より 18 bpm 高く、" +
+                    "十日のうち九日はその日の最高値を出している。",
             ),
             howToRead = Loc(
-                "Each capsule is the lowest and highest reading actually taken in that hour — not " +
-                    "an average. Short capsules are settled hours; long ones mean you were moving, " +
-                    "or tense.",
-                "縦棒は「その一時間に実際に測れた最小値と最大値」。平均ではない。" +
-                    "棒が短い時間は落ち着いていて、長い時間は動いていたか、緊張していた。",
+                "The line is the ten-minute reading taken with blood oxygen — the one that follows " +
+                    "your heart whatever you are doing, so it is the one drawn boldly. The hollow " +
+                    "dots are the two-minute periodic series. At rest the dots sit on the line, " +
+                    "because there both are right. **When the dots fall well below the line you " +
+                    "were moving**, and it is the dots that are under-reading, not the line that is " +
+                    "wrong. Nothing is averaged or summarised; shaded stretches are where the band " +
+                    "recorded nothing at all.",
+                "折れ線は血中酸素と同時に取られる十分ごとの測定 — 何をしていても心拍を追える" +
+                    "ほうなので、こちらを太く描く。白抜きの点は二分ごとの定期測定。" +
+                    "安静時は点が線の上に乗る。そこではどちらも正しいから。" +
+                    "**点が線よりはっきり下に落ちていたら動いていた合図**で、" +
+                    "低く出ているのは点のほうであって、線が誤っているのではない。" +
+                    "平均も要約もしない。影の部分はバンドが何も記録していない区間。",
             ),
             caveat = Loc(
                 "The band edges (45 / 55 / 75 bpm) are ordinary resting-rate guidance, not a " +
-                    "diagnostic threshold for any individual.",
+                    "diagnostic threshold for any individual. And the dots must not be read as your " +
+                    "heart rate during activity: the periodic series is a genuine measurement that " +
+                    "loses the pulse under wrist motion, and its failure mode is to read slightly " +
+                    "low rather than to report nothing. Only six readings an hour carry the line, " +
+                    "so it says nothing about what happened between two of them.",
                 "帯の区切り（45 / 55 / 75 bpm）は一般的な安静時心拍の目安であって、" +
-                    "個人の診断基準ではない。",
+                    "個人の診断基準ではない。また、運動中の心拍として点を読んではいけない。" +
+                    "定期測定も実測ではあるが、手首が動くと脈を見失う。しかも「測れない」とは言わず、" +
+                    "少し低い値を出してくるのが厄介なところ。線を支えるのは一時間に六点だけなので、" +
+                    "点と点のあいだに何があったかは分からない。",
             ),
         ),
     )
@@ -490,6 +593,9 @@ object MetricSpecs {
     const val KEY_BLOOD_PRESSURE = "bp"
     const val KEY_SLEEP = "sleep"
     const val KEY_INDEX = "index"
+    const val KEY_RECOVERY = "recovery"
+    const val KEY_MARK_SESSION = "mark_session"
+    const val KEY_REGISTER = "register"
 
     val BLOOD_PRESSURE_INFO = MetricInfo(
         whatItIs = Loc(

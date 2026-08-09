@@ -49,6 +49,15 @@ class SpanSelectionState {
     fun begin(t: Long) { anchorMs = t; cursorMs = t }
     fun dragTo(t: Long) { if (anchorMs != null) cursorMs = t }
     fun clear() { anchorMs = null; cursorMs = null }
+
+    /**
+     * Set both ends outright — for nudging a span rather than drawing one.
+     *
+     * A finger on a six-hour chart resolves to roughly a minute per pixel at best, which is fine for
+     * reading a total and useless for saying when a workout began. The mark-a-session screen needs
+     * the drag for the rough shape and arrows for the edges, and both write here.
+     */
+    fun set(start: Long, end: Long) { anchorMs = minOf(start, end); cursorMs = maxOf(start, end) }
 }
 
 @Composable

@@ -138,6 +138,16 @@ interface BandSampleDao {
     )
     suspend fun rangeAsc(metric: String, fromEpochMs: Long, toEpochMs: Long): List<BandSampleEntity>
 
+    /**
+     * Every row a given set of syncs inserted — the archive repair's source.
+     *
+     * `syncId` is stamped at insert and never rewritten, and `insertIgnoringDuplicates` means only
+     * the sync that FIRST saw a reading owns it. So this returns exactly the rows those syncs
+     * contributed, which is exactly the set of JSONL lines that should have been written for them.
+     */
+    @Query("SELECT * FROM band_samples WHERE syncId IN (:syncIds) ORDER BY localTs")
+    suspend fun forSyncs(syncIds: List<Long>): List<BandSampleEntity>
+
     @Query("SELECT MIN(epochMs) FROM band_samples")
     suspend fun oldestEpochMs(): Long?
 
@@ -166,6 +176,10 @@ interface BandDailyDao {
 
     @Query("SELECT * FROM band_daily WHERE localDate = :localDate")
     suspend fun forDate(localDate: Long): BandDailyEntity?
+
+    /** For the archive repair. A day's row is REPLACED all day, so it carries its latest sync's id. */
+    @Query("SELECT * FROM band_daily WHERE syncId IN (:syncIds) ORDER BY localDate")
+    suspend fun forSyncs(syncIds: List<Long>): List<BandDailyEntity>
 
     @Query("DELETE FROM band_daily WHERE localDate < :cutoffDate")
     suspend fun deleteOlderThan(cutoffDate: Long): Int
@@ -202,6 +216,10 @@ interface BandSleepDao {
 
     @Query("SELECT * FROM band_sleep ORDER BY startLocalTs DESC LIMIT :limit")
     suspend fun recent(limit: Int): List<BandSleepEntity>
+
+    /** For the archive repair. A segment carries the id of the sync that last extended it. */
+    @Query("SELECT * FROM band_sleep WHERE syncId IN (:syncIds) ORDER BY startLocalTs")
+    suspend fun forSyncs(syncIds: List<Long>): List<BandSleepEntity>
 
     @Query("SELECT COUNT(*) FROM band_sleep")
     suspend fun count(): Int

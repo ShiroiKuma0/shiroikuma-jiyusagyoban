@@ -2,6 +2,7 @@ package com.opentasker.ui.charts
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +36,7 @@ import com.opentasker.ui.charts.render.drawGaps
 import com.opentasker.ui.charts.render.drawGrid
 import com.opentasker.ui.charts.render.drawHypnogram
 import com.opentasker.ui.charts.render.drawLineSeries
+import com.opentasker.ui.charts.render.drawPoints
 import com.opentasker.ui.charts.render.drawRejected
 import com.opentasker.ui.charts.render.drawSpanBand
 import com.opentasker.ui.charts.render.drawTimeLabels
@@ -114,6 +116,16 @@ fun MetricPlot(
         when (spec.render) {
             RenderKind.CAPSULE -> drawCapsules(frame, chart.buckets, color)
             RenderKind.BARS -> drawBars(frame, chart.bars, 60_000L, color)
+            // The curve comes from lineChunk — the PRIMARY population only — while the tint and the
+            // counts above came from the pooled chunk. The spot readings go on top as hollow dots,
+            // deliberately after the fill so they are never buried under it.
+            RenderKind.LINE_WITH_SPOTS -> {
+                chart.lineChunk?.let {
+                    val segments = ChartPipeline.render(it, viewport.spanMs, rect.width, style.curve).segments
+                    drawLineSeries(frame, segments, color, showDots = viewport.spanMs < 12 * 3_600_000L)
+                }
+                drawPoints(frame, chart.spots, color, hollow = true)
+            }
             else -> chart.chunk?.let {
                 val segments = ChartPipeline.render(it, viewport.spanMs, rect.width, style.curve).segments
                 drawLineSeries(frame, segments, color, showDots = viewport.spanMs < 12 * 3_600_000L)
@@ -238,11 +250,37 @@ fun SleepLegend(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun LegendEntry(color: Color, label: String) {
+fun LegendEntry(color: Color, label: String, shape: LegendMark = LegendMark.DOT) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+        // The swatch is the mark, not a colour chip: a legend that shows a dot for a line teaches
+        // the wrong thing about which of two series a reading came from.
+        when (shape) {
+            LegendMark.DOT -> Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+            LegendMark.RING -> Box(Modifier.size(8.dp).clip(CircleShape).border(1.5.dp, color, CircleShape))
+            LegendMark.LINE -> Box(Modifier.width(14.dp).height(3.dp).clip(CircleShape).background(color))
+        }
         Spacer(Modifier.width(5.dp))
         Text(label, style = MaterialTheme.typography.labelSmall, color = LocalChartStyle.current.axisText)
+    }
+}
+
+/** The three marks a legend has to be able to stand for. */
+enum class LegendMark { DOT, RING, LINE }
+
+/**
+ * Which mark is which, for a metric drawn as two populations.
+ *
+ * Heart rate's curve is one series and its hollow dots are another — and they do not measure the
+ * same thing, so mistaking one for the other is not cosmetic. The curve is listed first because it
+ * is the one to believe. The `i` sheet explains it at length; this is the one line that means you do
+ * not have to open it.
+ */
+@Composable
+fun SecondPopulationLegend(color: Color) {
+    val lang = LocalBandLanguage.current
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        LegendEntry(color, BandText.markCoincident[lang], LegendMark.LINE)
+        LegendEntry(color, BandText.markPeriodic[lang], LegendMark.RING)
     }
 }
 

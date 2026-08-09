@@ -948,6 +948,21 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "band.session",
+            name = "Mark Training Session",
+            description = "Bookend a workout the band cannot see \u2014 strength work leaves almost no trace in a wrist sensor. Bind it to a shortcut or widget and tap at the start and end; 回復 then counts the session's real heart-rate load instead of missing it",
+            category = "Health",
+            fields = listOf(
+                ActionField("mode", "Mode", FieldType.DROPDOWN, hint = "toggle (default) starts or ends whichever applies \u2014 the one to put on a button. pick opens the chart to draw a past session on. Or start / end / log", options = listOf("toggle", "start", "end", "log", "pick", "clear")),
+                ActionField("minutes", "Minutes (log only)", FieldType.NUMBER, hint = "for mode=log: a session of this many minutes that ended just now, 5..240"),
+                ActionField("label", "Label", FieldType.TEXT, hint = "optional, e.g. lifting \u2014 shown beside the session"),
+                ActionField("store", "Store result in", FieldType.TEXT, hint = "variable to receive the one-line result"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "ocr.models",
             name = "Set OCR Models",
             description = "Point 文字認識 at the folder holding its ONNX weight files. They are not in the APK — about 100 MB that never changes — so this is where that location is declared. Blank re-runs discovery over the usual folders",

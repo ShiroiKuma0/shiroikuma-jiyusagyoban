@@ -75,6 +75,7 @@ fun MetricDetailScreen(
         MetricSpecs.KEY_BLOOD_PRESSURE -> BandText.bloodPressure[lang]
         MetricSpecs.KEY_SLEEP -> BandText.sleep[lang]
         MetricSpecs.KEY_INDEX -> BandText.indexTitle[lang]
+        MetricSpecs.KEY_RECOVERY -> BandText.recoveryTitle[lang]
         else -> spec?.label?.get(lang) ?: metricKey
     }
     val info = when (metricKey) {
@@ -101,6 +102,10 @@ fun MetricDetailScreen(
 
         if (metricKey == MetricSpecs.KEY_INDEX) {
             state.index?.let { HealthIndexDetail(it) }
+            return@Column
+        }
+        if (metricKey == MetricSpecs.KEY_RECOVERY) {
+            RecoveryDetail(state.recovery, state.load, state.sri)
             return@Column
         }
 
@@ -174,6 +179,9 @@ fun MetricDetailScreen(
                                 crosshair = crosshair,
                                 selection = span,
                             )
+                            if (chart.spec.splitPopulations) {
+                                SecondPopulationLegend(style.colorFor(chart.spec.key))
+                            }
                             CrosshairHint(
                                 crosshair,
                                 readout = crosshair.tMs?.let { t ->
@@ -209,7 +217,7 @@ fun MetricDetailScreen(
 }
 
 @Composable
-private fun DetailHeader(title: String, hasInfo: Boolean, onBack: () -> Unit, onInfo: () -> Unit) {
+fun DetailHeader(title: String, hasInfo: Boolean, onBack: () -> Unit, onInfo: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -288,7 +296,7 @@ private fun Headline(value: String, unit: String, band: BandRung?) {
 
 /** Quick spans. Pinch does the same thing continuously; these are for getting there in one tap. */
 @Composable
-private fun SpanChips(viewport: ChartViewport, bounds: LongRange) {
+fun SpanChips(viewport: ChartViewport, bounds: LongRange) {
     val lang = LocalBandLanguage.current
     val spans = listOf(
         BandText.span1h[lang] to 3_600_000L,

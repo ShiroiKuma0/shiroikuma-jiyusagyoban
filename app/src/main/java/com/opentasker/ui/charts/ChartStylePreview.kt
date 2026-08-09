@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.opentasker.ui.charts.render.PlotFrame
 import com.opentasker.ui.charts.render.drawBars
 import com.opentasker.ui.charts.render.drawCapsules
+import com.opentasker.ui.charts.render.drawPoints
 import com.opentasker.ui.charts.render.drawCrosshair
 import com.opentasker.ui.charts.render.drawDumbbells
 import com.opentasker.ui.charts.render.drawGaps
@@ -71,6 +72,9 @@ fun ChartStylePreview(prefs: ThemePrefs, modifier: Modifier = Modifier) {
                 ChartPipeline.render(sample.chunk, viewport.spanMs, rect.width, style.curve).segments,
                 style.heartRate,
             )
+            // Heart rate's mark in full: the curve over the periodic series, the spot readings
+            // hollow on top. Drawn here rather than in its own canvas because the two ARE one mark.
+            drawPoints(frame, sample.spots, style.heartRate, hollow = true)
             drawRejected(frame, sample.chunk.rejectedPoints)
             drawTimeLabels(frame, ticks, measurer)
             drawValueLabels(frame, measurer, format = { v -> v.toInt().toString() })
@@ -189,6 +193,8 @@ private object SampleSeries {
     class Sample(
         val chunk: QualifiedChunk,
         val gaps: List<LongRange>,
+        /** Heart rate's second population: the spot readings, drawn hollow above the curve. */
+        val spots: List<ChartPoint>,
         val capsules: List<HourBucket>,
         val dumbbells: List<DumbbellBucket>,
         val bars: List<ChartPoint>,
@@ -210,6 +216,12 @@ private object SampleSeries {
         val kept = all.filter { it.tMs < gapFrom || it.tMs > gapTo }
         val (before, after) = kept.partition { it.tMs <= gapFrom }
         val rejected = listOf(ChartPoint(START_MS + step * 70, 104.0))
+
+        // Heart rate's hollow dots: the periodic series, which sits ON the curve at rest and sags
+        // below it once the wrist is moving. Drawn from every tenth sample so the preview shows the
+        // real density relationship — a sparse bold curve, dots scattered around and under it.
+        val spots = kept.filterIndexed { i, _ -> i % 4 == 1 }
+            .mapIndexed { i, p -> ChartPoint(p.tMs, p.value - if (i % 3 == 0) 14.0 else 1.0) }
 
         val capsules = (0 until 6).map { h ->
             val start = START_MS + h * 2 * 3_600_000L
@@ -243,6 +255,7 @@ private object SampleSeries {
                 retainedCount = kept.size,
             ),
             gaps = listOf(gapFrom..gapTo),
+            spots = spots,
             capsules = capsules,
             dumbbells = dumbbells,
             bars = bars,
