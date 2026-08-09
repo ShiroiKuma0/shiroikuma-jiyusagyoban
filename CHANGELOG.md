@@ -3,6 +3,26 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.82.2026-08-08.gbd01eebb+001 — 2026-08-09
+
+**Rebased onto upstream `bd01eebb`.** Upstream did not bump its own version — still 0.2.82 — so this
+sync moves the base pin and nothing else. Two upstream commits, neither of which changes what the app
+does here.
+
+Upstream gave the Tasker XML importer the instrumentation coverage it never had: six tests running the
+real importer on Android's own parser. The point is sharper than the count. The JVM suite could not
+observe the doctype defect at all — desktop Xerces accepts the Apache secure-parsing feature URI that
+Android's Expat-backed factories throw for — so the fix in 0.2.82 shipped with every unit test green
+and every on-device import still broken. Reverting the fix fails four of the six, including the plain
+export carrying no doctype at all.
+
+Upstream also moved release signing off the machine-global `~/.android/debug.keystore`, which the SDK
+regenerated on 2026-08-01 and destroyed the key that signed v0.2.79 in the process. A repo-owned
+`app/dev_keystore.jks` takes over, reached through a new `selfhost` signing config, and upstream's
+users have to uninstall once. **This fork is unaffected.** Our releases are signed from the gitignored
+`keystore.properties`, so the `release` config still wins and `selfhost` is dead code in our tree — no
+signature break, no uninstall, a normal in-place update.
+
 ## 0.2.82.2026-08-07.g37770efc+008 — 2026-08-08
 
 **Rebased onto upstream 0.2.82.** Two upstream fixes, both for things that could never have worked:
