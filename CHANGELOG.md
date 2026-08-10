@@ -8,6 +8,39 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.82.2026-08-10.ga481b77a+035 — 2026-08-10
+
+**Recovery tasks and held-run replay — the last two things the 0.2.82 sync left stored but inert.**
+
+**A failed task can now hand off to a recovery task.** The missing link started further back than
+expected: the fork's `TaskRunner` produced no structured error at all, so there was nothing to hand
+anyone. It now records the *first* unhandled failure — task, action id, index, type, message —
+because a later failure from a `continueOnError` action further down would misname the cause.
+
+On a failed run carrying such an error, the engine tries the profile's own recovery task, then the
+global one. It runs **once**, cannot trigger its own recovery, and never falls back to the task that
+just failed — that would re-run the failure with its own error as input. The failure arrives as
+ordinary task-local variables, so the recovery task can branch on what broke instead of parsing a log
+line. The admission lease is released first: a profile capped at one active run would otherwise
+refuse the very task meant to diagnose it. What the recovery did is folded into the failed run's own
+log entry. The profile editor gains a **Recovery task** picker now that it is enforced.
+
+**A refused run is now a held run you can replay.** Under `overflowPolicy = LOG`, an admission
+refusal writes a HELD row carrying a redacted, size-capped snapshot of what would have run, and the
+Run Log offers **Replay** beside it. Replaying consumes the row first, and only a consume that
+actually changed a row proceeds — the update is `WHERE id = :id AND held = 1`, so two taps cannot
+both win and run the work twice. A row whose payload failed to encode is never marked held: a Replay
+button that cannot work is worse than none.
+
+**Tests: 1332.** The fallback selection order is extracted into a pure `fallbackCandidateIds` so the
+decision is testable without a database — profile beats global, the same id is not tried twice under
+two names, a task is never its own recovery. Three more pin the structured error itself: an unhandled
+failure names the action that ended the run and the action after it does not execute; a failure
+caught by `flow.catch` leaves nothing to recover from; a succeeding run carries no error.
+
+Nothing here activates until a recovery task or a concurrency cap is set — with neither, the fallback
+branch is skipped and no row is ever marked held.
+
 ## 0.2.82.2026-08-10.ga481b77a+034 — 2026-08-10
 
 **Profile arbitration is enforced, and settable.** The 0.2.82 sync brought upstream's profile policy
