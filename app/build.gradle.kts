@@ -145,6 +145,17 @@ val selectedDistribution = providers.gradleProperty("openTaskerDistribution")
 require(selectedDistribution in allowedDistributions) {
     "Unsupported OpenTasker distribution '$selectedDistribution'. Expected one of: ${allowedDistributions.joinToString()}."
 }
+/**
+ * F-Droid signs the APKs it builds, so that distribution ships unsigned. This also decides the
+ * artifact filename AGP produces, which the build recipe and reproducibility harness both name -
+ * so the release signing config and the expected output path are derived from this one value.
+ */
+val releaseBuildIsUnsigned = selectedDistribution == "fdroid"
+val expectedReleaseApkPath = if (releaseBuildIsUnsigned) {
+    "app/build/outputs/apk/release/app-release-unsigned.apk"
+} else {
+    "app/build/outputs/apk/release/app-release.apk"
+}
 val smsActionAvailable = selectedDistribution != "play"
 val smsReceiveAvailable = selectedDistribution != "play"
 val hasReleaseSigning = listOf(
@@ -215,8 +226,15 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.findByName("release")
-                ?: signingConfigs.getByName("selfhost")
+            // F-Droid builds from source and applies its own signature, so that distribution must
+            // stay unsigned — it is also what makes AGP name the artifact
+            // `app-release-unsigned.apk`, the path the build recipe and the reproducibility
+            // harness both expect. Every other distribution falls back to the repo-owned key.
+            signingConfig = if (releaseBuildIsUnsigned) {
+                null
+            } else {
+                signingConfigs.findByName("release") ?: signingConfigs.getByName("selfhost")
+            }
         }
         create("benchmark") {
             initWith(getByName("release"))
@@ -931,6 +949,14 @@ tasks.register("verifyFdroidMetadata") {
             "Missing F-Droid metadata at ${metadataFile.relativeTo(rootProject.projectDir)}"
         }
 
+        // This task describes the artifact the F-Droid distribution produces, so running it against
+        // any other distribution previously printed "F-Droid metadata check passed" for a build
+        // whose output does not match the recipe at all.
+        check(selectedDistribution == "fdroid") {
+            "verifyFdroidMetadata checks the F-Droid build recipe; run it with " +
+                "-PopenTaskerDistribution=fdroid (current distribution: $selectedDistribution)"
+        }
+
         val metadata = metadataFile.readText()
         fun valuesFor(key: String): List<String> =
             Regex("""(?m)^\s*(?:-\s*)?$key:\s*(.+?)\s*$""")
@@ -965,8 +991,13 @@ tasks.register("verifyFdroidMetadata") {
         check(":app:verifyFdroidReadiness" in metadata) {
             "F-Droid metadata must run :app:verifyFdroidReadiness before assembly"
         }
-        check("app/build/outputs/apk/release/app-release-unsigned.apk" in metadata) {
-            "F-Droid metadata must point to the unsigned release APK output"
+        // Derived from the release signing decision rather than hard-coded, so re-signing the
+        // F-Droid build fails this check instead of silently renaming the artifact out from under
+        // the recipe. AGP only emits the "-unsigned" name when the build type has no signing
+        // config at all.
+        check(expectedReleaseApkPath in metadata) {
+            "F-Droid metadata must point to $expectedReleaseApkPath, the artifact this build " +
+                "configuration actually produces for distribution=$selectedDistribution"
         }
 
         if (rootProject.file(".git").exists()) {
