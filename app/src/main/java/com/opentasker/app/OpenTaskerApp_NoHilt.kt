@@ -18,6 +18,7 @@ import com.opentasker.core.diagnostics.CrashLogHandler
 import com.opentasker.core.diagnostics.AdvancedProtectionReader
 import com.opentasker.core.engine.RunLogPruneWorker
 import com.opentasker.core.engine.EngineWatchdogWorker
+import com.opentasker.core.engine.reconcileExecutionJournal
 import com.opentasker.core.engine.DirectBootTriggerStore
 import com.opentasker.core.platform.AppVisibilityTracker
 import com.opentasker.core.power.ShizukuPowerBackend
@@ -89,6 +90,18 @@ class OpenTaskerApp_NoHilt : Application() {
             }
 
             applicationScope.launch {
+                runCatching {
+                    val recovery = reconcileExecutionJournal(db)
+                    if (recovery.interrupted > 0 || recovery.logsWritten > 0) {
+                        AppLogger.warn(
+                            "OpenTasker",
+                            "Recovered ${recovery.interrupted} interrupted execution(s); " +
+                                "wrote ${recovery.logsWritten} durable run-log record(s)",
+                        )
+                    }
+                }.onFailure { error ->
+                    AppLogger.error("OpenTasker", "Execution journal recovery failed", error)
+                }
                 runCatching {
                     VariableRepository(db.variableDao()).migrateLegacySensitiveVariables()
                 }.onFailure { error ->

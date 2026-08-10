@@ -174,6 +174,37 @@ object DatabaseMigrations {
         }
     }
 
+    val MIGRATION_14_15 = object : Migration(14, 15) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `execution_journal` (
+                    `executionId` TEXT NOT NULL,
+                    `taskId` INTEGER NOT NULL,
+                    `taskName` TEXT NOT NULL,
+                    `source` TEXT NOT NULL,
+                    `sourceLabel` TEXT,
+                    `profileId` INTEGER,
+                    `replayOf` TEXT,
+                    `parentExecutionId` TEXT,
+                    `producer` TEXT NOT NULL,
+                    `startedAtMs` INTEGER NOT NULL,
+                    `updatedAtMs` INTEGER NOT NULL,
+                    `lastStepIndex` INTEGER,
+                    `lastStepLabel` TEXT,
+                    `state` TEXT NOT NULL,
+                    `terminalReason` TEXT,
+                    `terminalAtMs` INTEGER,
+                    `runLogWritten` INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY(`executionId`)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_execution_journal_state` ON `execution_journal` (`state`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_execution_journal_updatedAtMs` ON `execution_journal` (`updatedAtMs`)")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -189,6 +220,7 @@ object DatabaseMigrations {
             MIGRATION_11_12,
             MIGRATION_12_13,
             MIGRATION_13_14,
+            MIGRATION_14_15,
         )
     }
 
@@ -204,6 +236,7 @@ object DatabaseMigrations {
             MIGRATION_5_6,
             MIGRATION_6_7,
             MIGRATION_8_9,
+            MIGRATION_14_15,
         )
     }
 }
@@ -258,6 +291,13 @@ object DatabaseMigrations {
  *
  * Version 13:
  *   - profiles: adds optional active/burst admission overrides and LOG/SILENT overflow policy
+ *
+ * Version 14:
+ *   - profiles: adds an optional fallback task id
+ *
+ * Version 15:
+ *   - execution_journal: persists admitted execution identity, source/lineage, last known step,
+ *     terminal state, and whether the corresponding run-log row was written
  *
  * To add a migration:
  * 1. Increment database version in @Database annotation

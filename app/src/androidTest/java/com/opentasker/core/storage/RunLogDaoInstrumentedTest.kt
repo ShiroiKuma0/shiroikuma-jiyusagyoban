@@ -108,6 +108,7 @@ class RunLogDaoInstrumentedTest {
             dao.insert(run(4, 4_000, taskName = "Ordinary", success = false, message = "Failure"))
             dao.insert(run(4, 5_000, taskName = "Ordinary", success = true, message = "Later success"))
             dao.insert(run(5, 6_000, taskName = "Held", success = false, message = "Decision: Held", held = true))
+            dao.insert(run(6, 7_000, taskName = "Interrupted", success = false, message = "Decision: Interrupted"))
 
             val literalPercent = dao.openSnapshot(
                 RunLogQuery(escapedSearch = escapeRunLogLikeQuery("%")),
@@ -118,11 +119,13 @@ class RunLogDaoInstrumentedTest {
             val cancelled = dao.openSnapshot(RunLogQuery(status = RunLogStatusQuery.CANCELLED))
             val failed = dao.openSnapshot(RunLogQuery(status = RunLogStatusQuery.FAILED))
             val held = dao.openSnapshot(RunLogQuery(status = RunLogStatusQuery.HELD))
+            val interrupted = dao.openSnapshot(RunLogQuery(status = RunLogStatusQuery.INTERRUPTED))
             val taskAndDate = dao.openSnapshot(RunLogQuery(taskId = 4, minimumTimestamp = 4_500))
             assertEquals(listOf(2L), dao.loadPage(skipped).entries.map { it.taskId })
             assertEquals(listOf(3L), dao.loadPage(cancelled).entries.map { it.taskId })
             assertEquals(listOf(4L), dao.loadPage(failed).entries.map { it.taskId })
             assertEquals(listOf(5L), dao.loadPage(held).entries.map { it.taskId })
+            assertEquals(listOf(6L), dao.loadPage(interrupted).entries.map { it.taskId })
             assertEquals(listOf(5_000L), dao.loadPage(taskAndDate).entries.map { it.timestamp })
         } finally {
             db.close()

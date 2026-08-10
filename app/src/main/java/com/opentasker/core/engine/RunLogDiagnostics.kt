@@ -10,6 +10,9 @@ enum class RunLogOutcome(val label: String) {
 
     /** The run started and was stopped on purpose; distinct from a run that never started. */
     Cancelled("Cancelled"),
+
+    /** The process ended before the admitted execution could write a terminal record. */
+    Interrupted("Interrupted"),
 }
 
 data class RunLogDiagnostics(
@@ -34,6 +37,9 @@ data class RunLogDiagnostics(
 
     val isCancelled: Boolean
         get() = decision.equals(CANCELLED_DECISION, ignoreCase = true)
+
+    val isInterrupted: Boolean
+        get() = decision.equals(INTERRUPTED_DECISION, ignoreCase = true)
 }
 
 data class RunLogActionDiagnostic(
@@ -68,6 +74,7 @@ data class RunLogTemplateDiagnostic(
 fun RunLogEntry.outcome(): RunLogOutcome {
     val diagnostics = message.toRunLogDiagnostics()
     return when {
+        diagnostics.isInterrupted -> RunLogOutcome.Interrupted
         diagnostics.isCancelled -> RunLogOutcome.Cancelled
         held || diagnostics.isHeld -> RunLogOutcome.Held
         diagnostics.isSkipped -> RunLogOutcome.Skipped
@@ -337,4 +344,5 @@ private const val TEMPLATE_TRACE_SPLIT_LIMIT = 6
 private const val SKIPPED_DECISION = "Skipped"
 private const val HELD_DECISION = "Held"
 private const val CANCELLED_DECISION = "Cancelled"
+private const val INTERRUPTED_DECISION = "Interrupted"
 private const val LEGACY_EXTERNAL_SOURCE = "External intent"

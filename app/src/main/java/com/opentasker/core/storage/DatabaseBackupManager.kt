@@ -570,6 +570,30 @@ class DatabaseBackupManager(
                 if (schemaVersion >= 3) {
                     put("edit_history", setOf("id", "entityType", "entityId", "previousJson", "timestamp"))
                 }
+                if (schemaVersion >= 15) {
+                    put(
+                        "execution_journal",
+                        setOf(
+                            "executionId",
+                            "taskId",
+                            "taskName",
+                            "source",
+                            "sourceLabel",
+                            "profileId",
+                            "replayOf",
+                            "parentExecutionId",
+                            "producer",
+                            "startedAtMs",
+                            "updatedAtMs",
+                            "lastStepIndex",
+                            "lastStepLabel",
+                            "state",
+                            "terminalReason",
+                            "terminalAtMs",
+                            "runLogWritten",
+                        ),
+                    )
+                }
             }
         }
 

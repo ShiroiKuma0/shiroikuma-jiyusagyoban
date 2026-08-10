@@ -325,6 +325,43 @@ class DatabaseMigrationInstrumentedTest {
     }
 
     @Test
+    fun appDatabaseMigratesFrom14To15WithDurableExecutionJournal() {
+        appDatabaseHelper.createDatabase(APP_DATABASE_NAME, 14).apply {
+            close()
+        }
+
+        val migrated = appDatabaseHelper.runMigrationsAndValidate(
+            APP_DATABASE_NAME,
+            15,
+            true,
+            DatabaseMigrations.MIGRATION_14_15,
+        )
+
+        migrated.execSQL(
+            """
+            INSERT INTO execution_journal (
+                executionId, taskId, taskName, source, sourceLabel, profileId, replayOf,
+                parentExecutionId, producer, startedAtMs, updatedAtMs, lastStepIndex,
+                lastStepLabel, state, terminalReason, terminalAtMs
+            ) VALUES (
+                'migration-execution', 7, 'Migrated task', 'Profile: Night', 'Night', 42,
+                'held-1', 'parent-1', 'profile', 1000, 1000, NULL, NULL, 'ACTIVE', NULL, NULL
+            )
+            """.trimIndent(),
+        )
+        migrated.query(
+            "SELECT taskName, producer, state, runLogWritten FROM execution_journal " +
+                "WHERE executionId = 'migration-execution'",
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("Migrated task", cursor.getString(0))
+            assertEquals("profile", cursor.getString(1))
+            assertEquals("ACTIVE", cursor.getString(2))
+            assertEquals(0, cursor.getInt(3))
+        }
+    }
+
+    @Test
     fun appDatabaseMigratesFullPathFrom1ToCurrent() {
         appDatabaseHelper.createDatabase(APP_DATABASE_NAME, 1).apply {
             execSQL(
@@ -341,7 +378,7 @@ class DatabaseMigrationInstrumentedTest {
 
         val migrated = appDatabaseHelper.runMigrationsAndValidate(
             APP_DATABASE_NAME,
-            11,
+            15,
             true,
             *DatabaseMigrations.getAllMigrations(),
         )

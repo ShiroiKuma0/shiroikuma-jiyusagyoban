@@ -118,6 +118,9 @@ suspend fun executeAndLogTask(
     ExecutionCausality.remember(execution)
     try {
     ExecutionCommandLedger.transition(execution.executionId, ExecutionLedgerState.RUNNING)
+    // Journal admission before hydrating variables or invoking any action. If the process dies
+    // after this point, startup can prove that the command began and must not be retried blindly.
+    ExecutionJournal.start(db, execution)
     // Run the whole task off the caller's thread. Manual runs (ViewModel), widget/shortcut, and
     // notification-action paths call this from the main thread; without this hop, blocking actions
     // (HTTP, file, ping) would throw NetworkOnMainThreadException and fail silently.
@@ -178,7 +181,13 @@ suspend fun executeAndLogTask(
                 TaskRunner(
                     ctx,
                     resolveTask = dbSubTaskResolver(db),
-                    onStep = { index, label -> ActiveExecutionRegistry.reportStep(admittedExecutionId, index, label) },
+                    onStep = {
+                        index, label ->
+                        ActiveExecutionRegistry.reportStep(admittedExecutionId, index, label)
+                    },
+                    onStepCompleted = { index, label ->
+                        ExecutionJournal.recordStep(db, execution.executionId, index, label)
+                    },
                     collisionCoordinator = collisionCoordinator,
                     executionChain = setOf(task.id).filterTo(linkedSetOf()) { it > 0L },
                     originatingProfileId = profileId,
@@ -202,29 +211,83 @@ suspend fun executeAndLogTask(
                 ExecutionLedgerState.CANCELLED,
                 terminalReason,
             )
-            insertRunLog(
-                db,
-                RunLogEntry(
-                    taskId = task.id,
-                    taskName = task.name,
-                    timestamp = System.currentTimeMillis(),
-                    durationMs = 0,
-                    success = false,
-                    message = cancelledRunLogMessage(
-                        source = execution.source,
-                        reason = cancellation.message ?: ActiveExecutionRegistry.CANCELLED_BY_USER,
-                        execution = execution,
-                        terminalReason = terminalReason,
-                        metadata = metadata,
-                    ),
-                    source = RunLogSource.classify(execution.source).key,
-                    sourceLabel = RunLogSource.classify(execution.source).label,
-                    executionId = execution.executionId,
-                    replayOf = execution.replayOf,
-                ),
+            val marked = ExecutionJournal.markTerminal(
+                db = db,
+                executionId = execution.executionId,
+                state = ExecutionJournalState.CANCELLED,
+                reason = terminalReason,
             )
+            if (marked) {
+                val inserted = insertRunLog(
+                    db,
+                    RunLogEntry(
+                        taskId = task.id,
+                        taskName = task.name,
+                        timestamp = System.currentTimeMillis(),
+                        durationMs = 0,
+                        success = false,
+                        message = cancelledRunLogMessage(
+                            source = execution.source,
+                            reason = cancellation.message ?: ActiveExecutionRegistry.CANCELLED_BY_USER,
+                            execution = execution,
+                            terminalReason = terminalReason,
+                            metadata = metadata,
+                        ),
+                        source = RunLogSource.classify(execution.source).key,
+                        sourceLabel = RunLogSource.classify(execution.source).label,
+                        executionId = execution.executionId,
+                        replayOf = execution.replayOf,
+                    ),
+                )
+                if (inserted) ExecutionJournal.markRunLogWritten(db, execution.executionId)
+            }
         }
         throw cancellation
+    } catch (error: Exception) {
+        withContext(NonCancellable) {
+            executionId?.let(ActiveExecutionRegistry::unregister)
+            val terminalReason = ExecutionTerminalReason(
+                ExecutionTerminalReasonCode.TASK_FAILED,
+                error.message ?: "Execution failed before a task report was produced.",
+            )
+            ExecutionCommandLedger.transition(
+                execution.executionId,
+                ExecutionLedgerState.FAILED,
+                terminalReason,
+            )
+            val marked = ExecutionJournal.markTerminal(
+                db = db,
+                executionId = execution.executionId,
+                state = ExecutionJournalState.FAILED,
+                reason = terminalReason,
+            )
+            if (marked) {
+                val inserted = insertRunLog(
+                    db,
+                    RunLogEntry(
+                        taskId = task.id,
+                        taskName = task.name,
+                        timestamp = System.currentTimeMillis(),
+                        durationMs = 0,
+                        success = false,
+                        message = runLogMessage(
+                            source = execution.source,
+                            execution = execution,
+                            terminalReason = terminalReason,
+                            metadata = listOf(
+                                "Failure message: ${(error.message ?: "unknown error").take(256)}",
+                            ) + metadata,
+                        ),
+                        source = RunLogSource.classify(execution.source).key,
+                        sourceLabel = RunLogSource.classify(execution.source).label,
+                        executionId = execution.executionId,
+                        replayOf = execution.replayOf,
+                    ),
+                )
+                if (inserted) ExecutionJournal.markRunLogWritten(db, execution.executionId)
+            }
+        }
+        throw error
     }
     val report = when (collisionOutcome) {
         is TaskCollisionOutcome.Executed -> collisionOutcome.value
@@ -238,6 +301,12 @@ suspend fun executeAndLogTask(
                 ExecutionLedgerState.SKIPPED,
                 terminalReason,
             )
+            ExecutionJournal.markTerminal(
+                db = db,
+                executionId = execution.executionId,
+                state = ExecutionJournalState.SKIPPED,
+                reason = terminalReason,
+            )
             val inserted = logSkippedRun(
                 db = db,
                 task = task,
@@ -247,6 +316,7 @@ suspend fun executeAndLogTask(
                 execution = execution,
                 terminalReason = terminalReason,
             )
+            if (inserted) ExecutionJournal.markRunLogWritten(db, execution.executionId)
             return@withContext TaskExecutionResult(
                 report = collisionSkippedReport(task, collisionOutcome.reason),
                 logInserted = inserted,
@@ -310,6 +380,13 @@ suspend fun executeAndLogTask(
         if (report.success) ExecutionLedgerState.SUCCEEDED else ExecutionLedgerState.FAILED,
         terminalReason,
     )
+    val journalState = if (report.success) ExecutionJournalState.SUCCEEDED else ExecutionJournalState.FAILED
+    val journalTerminal = ExecutionJournal.markTerminal(
+        db = db,
+        executionId = execution.executionId,
+        state = journalState,
+        reason = terminalReason,
+    )
     val classified = RunLogSource.classify(execution.source)
     val riskMetadata = taskPowerRunLogMetadata(task)
     val logEntry = RunLogEntry(
@@ -331,6 +408,7 @@ suspend fun executeAndLogTask(
         replayOf = execution.replayOf,
     )
     val inserted = insertRunLog(db, logEntry)
+    if (journalTerminal && inserted) ExecutionJournal.markRunLogWritten(db, execution.executionId)
     TaskExecutionResult(report, inserted, execution = execution, fallback = fallback)
     } finally {
         admissionLease.release()

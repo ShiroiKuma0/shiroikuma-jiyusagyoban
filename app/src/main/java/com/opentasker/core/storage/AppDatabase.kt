@@ -4,10 +4,10 @@ import androidx.room.Database
 import androidx.room.AutoMigration
 import androidx.room.RoomDatabase
 
-const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 14
+const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 15
 
 @Database(
-    entities = [ProjectEntity::class, ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class, EditHistoryEntity::class],
+    entities = [ProjectEntity::class, ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class, EditHistoryEntity::class, ExecutionJournalEntity::class],
     version = OPEN_TASKER_DATABASE_SCHEMA_VERSION,
     exportSchema = true,
     autoMigrations = [
@@ -30,4 +30,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun variableDao(): VariableDao
     abstract fun runLogDao(): RunLogDao
     abstract fun editHistoryDao(): EditHistoryDao
+    abstract fun executionJournalDao(): ExecutionJournalDao
 }

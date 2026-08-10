@@ -102,6 +102,7 @@
     <string name="status_skipped">Skipped</string>
     <string name="status_held">Held</string>
     <string name="status_cancelled">Cancelled</string>
+    <string name="status_interrupted">Interrupted</string>
     <string name="status_timeout">Timed out</string>
     <string name="run_log_active_execution_detail">%1$s · step %2$d: %3$s · %4$ds elapsed</string>
     <string name="run_log_active_execution_starting">starting</string>
@@ -1144,6 +1145,7 @@
     <string name="run_log_filter_skipped">Skipped</string>
     <string name="run_log_filter_held">Held</string>
     <string name="run_log_filter_cancelled">Cancelled</string>
+    <string name="run_log_filter_interrupted">Interrupted</string>
     <string name="run_log_date_any">Any date</string>
     <string name="run_log_date_day">24 hours</string>
     <string name="run_log_date_week">7 days</string>

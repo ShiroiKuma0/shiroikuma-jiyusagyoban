@@ -13,6 +13,7 @@ enum class RunLogStatusFilter(@StringRes val labelRes: Int) {
     Skipped(R.string.run_log_filter_skipped),
     Held(R.string.run_log_filter_held),
     Cancelled(R.string.run_log_filter_cancelled),
+    Interrupted(R.string.run_log_filter_interrupted),
 }
 
 enum class RunLogDateFilter(@StringRes val labelRes: Int, val ageMillis: Long?) {
@@ -37,6 +38,7 @@ fun RunLogFilterState.toStorageQuery(nowMillis: Long = System.currentTimeMillis(
         RunLogStatusFilter.Skipped -> RunLogStatusQuery.SKIPPED
         RunLogStatusFilter.Held -> RunLogStatusQuery.HELD
         RunLogStatusFilter.Cancelled -> RunLogStatusQuery.CANCELLED
+        RunLogStatusFilter.Interrupted -> RunLogStatusQuery.INTERRUPTED
     },
     taskId = taskId,
     minimumTimestamp = date.ageMillis?.let { nowMillis - it },
