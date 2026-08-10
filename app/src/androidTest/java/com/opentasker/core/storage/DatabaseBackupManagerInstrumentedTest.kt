@@ -242,6 +242,48 @@ class DatabaseBackupManagerInstrumentedTest {
         }
     }
 
+    /**
+     * Validation opens each copy, so SQLite writes `-wal`/`-shm` beside it and the staging file's
+     * sidecars are orphaned by the rename. Nothing removed them, so every backup left four stray
+     * files that retention never counted and never pruned.
+     */
+    @Test
+    fun backupsLeaveNoOrphanedSidecarsAndPruningRemovesTheirs() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        cleanup(context)
+
+        val db = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DATABASE)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val manager = DatabaseBackupManager(context, db, TEST_DATABASE)
+            db.profileDao().insert(Profile(name = "Snapshot me", enterTaskId = 1).toEntity())
+
+            val backup = manager.backup().getOrThrow()
+
+            val strays = backupFiles(context).filterNot { it.name.endsWith(".db") }
+            assertTrue("unexpected sidecars left behind: ${strays.map { it.name }}", strays.isEmpty())
+            assertTrue(backup.exists())
+
+            // Retention must take the whole set with it, not just the .db file.
+            val pruned = manager.pruneSnapshots(
+                ConfigurationSnapshotPolicy(enabled = true, maxSnapshots = 2, maxAgeDays = 1),
+                nowMs = System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000,
+            )
+            assertEquals(0, pruned)
+            assertTrue("the newest snapshot is never pruned", backup.exists())
+        } finally {
+            db.close()
+            cleanup(context)
+        }
+    }
+
+    private fun backupFiles(context: android.content.Context): List<java.io.File> =
+        context.filesDir.resolve("backups")
+            .listFiles { file -> file.name.startsWith(TEST_DATABASE.removeSuffix(".db")) }
+            ?.toList()
+            .orEmpty()
+
     private fun encryptedDatabase(context: android.content.Context, key: ByteArray): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, ENCRYPTED_TEST_DATABASE)
             .addMigrations(*DatabaseMigrations.getManualMigrations())

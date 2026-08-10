@@ -103,6 +103,41 @@ class TaskCollisionCoordinatorTest {
     private fun task(mode: CollisionMode) = Task(id = 42, name = "Collision", collisionMode = mode)
 
     @Suppress("UNCHECKED_CAST")
+    /**
+     * Two WAIT-mode tasks that sub-run each other acquire their mutexes in opposite orders. Without
+     * a bound on acquisition this is a classic AB-BA deadlock, and each stuck run held an admission
+     * lease until the engine's global cap wedged.
+     */
+    @Test
+    fun crossRecursiveWaitTasksDoNotDeadlock() = runBlocking {
+        val coordinator = TaskCollisionCoordinator(waitAcquisitionTimeoutMs = 250L)
+        val outer = task(CollisionMode.WAIT).copy(id = 1)
+        val inner = task(CollisionMode.WAIT).copy(id = 2)
+        val bothHoldTheirFirstLock = CompletableDeferred<Unit>()
+        val holders = java.util.concurrent.atomic.AtomicInteger()
+
+        suspend fun chain(first: Task, second: Task): String =
+            executedValue(
+                coordinator.execute(first) {
+                    if (holders.incrementAndGet() == 2) bothHoldTheirFirstLock.complete(Unit)
+                    bothHoldTheirFirstLock.await()
+                    when (val nested = coordinator.execute(second) { "nested" }) {
+                        is TaskCollisionOutcome.Executed -> nested.value
+                        is TaskCollisionOutcome.Skipped -> "skipped"
+                    }
+                },
+            )
+
+        // The whole interleave must finish well inside this bound; before the fix it never returned.
+        val results = withTimeout(10_000L) {
+            val a = async { chain(outer, inner) }
+            val b = async { chain(inner, outer) }
+            listOf(a.await(), b.await())
+        }
+
+        assertTrue("at least one side must give up rather than block forever", results.contains("skipped"))
+    }
+
     private fun <T> executedValue(outcome: TaskCollisionOutcome<T>): T {
         assertTrue(outcome is TaskCollisionOutcome.Executed<*>)
         return (outcome as TaskCollisionOutcome.Executed<T>).value

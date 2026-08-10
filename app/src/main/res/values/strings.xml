@@ -294,6 +294,14 @@
     <string name="setup_backup_restore_summary">%1$s · schema v%2$d · %3$d profiles, %4$d tasks, %5$d scenes. Restart OpenTasker to apply it.</string>
     <string name="setup_backup_restore_unreadable">The staged restore can no longer be read (%1$s). Cancel it so the next start is not blocked.</string>
     <string name="setup_backup_restore_cancel">Cancel staged restore</string>
+    <string name="setup_snapshots_label">Automatic local snapshots</string>
+    <string name="setup_snapshots_helper">Take a local database snapshot on a schedule. Snapshots stay on this device, are never uploaded, and are only restored after you review them.</string>
+    <string name="setup_snapshots_retention">Keeping up to %1$d snapshots for %2$d days.</string>
+    <string name="setup_snapshots_choice">%1$d / %2$dd</string>
+    <string name="setup_snapshots_status_ok">Last snapshot %1$s · %2$d stored · %3$s</string>
+    <string name="setup_snapshots_status_failed">Last snapshot failed %1$s: %2$s</string>
+    <string name="setup_snapshots_status_pending">No snapshot taken yet; the first one runs on the next scheduled check.</string>
+    <string name="setup_snapshots_status_unknown_error">the reason was not recorded</string>
     <string name="setup_global_fallback_title">Global failure fallback</string>
     <string name="setup_global_fallback_body">When a task fails without a flow.catch or profile fallback, run this task once with the structured FLOW_ERROR_JSON payload.</string>
     <string name="setup_global_fallback_label">Global fallback task</string>
@@ -1162,6 +1170,8 @@
     <string name="ui_message_shortcut_failed">Failed to pin shortcut</string>
     <string name="ui_message_backup_created">Backup created: %1$s</string>
     <string name="ui_message_backup_exported">Backup exported: %1$s</string>
+    <string name="ui_message_snapshots_enabled">Automatic snapshots on: up to %1$d kept for %2$d days</string>
+    <string name="ui_message_snapshots_disabled">Automatic snapshots off</string>
     <string name="ui_message_tasker_xml_exported">Tasker XML exported: %1$d profiles, %2$d tasks, %3$d actions skipped</string>
     <string name="ui_message_restore_staged">Restore staged. Restart OpenTasker to apply it.</string>
     <string name="ui_message_restore_cancelled">Staged restore cancelled</string>
