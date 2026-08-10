@@ -154,6 +154,7 @@ suspend fun executeAndLogTask(
     val ctx = ActionContext(
         app = appContext,
         variables = variables,
+        eventVariables = initialVariables,
         audioEligibility = audioEligibility,
     ) { msg -> AppLogger.info(logTag, msg) }
     val collisionCoordinator = TaskCollisionCoordinator.Default

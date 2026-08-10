@@ -1,8 +1,11 @@
 package com.opentasker.core.flow
 
 import com.opentasker.core.actions.ActionArgumentSensitivity
+import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.capabilities.AutomationLint
 import com.opentasker.core.capabilities.AutomationLintFinding
+import com.opentasker.core.actions.ResolvedActionOutput
+import com.opentasker.core.actions.resolveOutputs
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.Profile
@@ -62,6 +65,7 @@ data class AutomationFlowNode(
     /** Structural flag so the UI can badge sub-task nodes without parsing the localized detail. */
     val isSubTask: Boolean = false,
     val strings: AutomationFlowStrings = AutomationFlowStrings.English,
+    val outputs: List<ResolvedActionOutput> = emptyList(),
 ) {
     fun accessibilityLabel(): String {
         val kindName = kind.name.lowercase().replace('_', ' ')
@@ -266,6 +270,7 @@ private fun ActionSpec.toNode(id: String, taskId: Long, index: Int, strings: Aut
         condition = condition?.trim()?.takeUnless { it.isBlank() },
         isSubTask = subTaskRef != null,
         strings = strings,
+        outputs = ActionMetadataRegistry.get(type)?.resolveOutputs(this@toNode, actionIndex = index).orEmpty(),
     )
 }
 

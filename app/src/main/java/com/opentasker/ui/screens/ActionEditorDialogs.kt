@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +25,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -55,17 +57,24 @@ import com.opentasker.core.actions.ActionFieldPolicy
 import com.opentasker.core.actions.ActionFileScope
 import com.opentasker.core.actions.ActionMetadata
 import com.opentasker.core.actions.ActionMetadataRegistry
+import com.opentasker.core.actions.DEFAULT_EDITOR_EVENT_VARIABLES
+import com.opentasker.core.actions.EditorEventVariable
 import com.opentasker.core.actions.FieldType
 import com.opentasker.core.actions.NotificationTaskBindings
 import com.opentasker.core.actions.NotificationTaskCandidate
 import com.opentasker.core.actions.NotificationTaskReference
 import com.opentasker.core.actions.NotificationTaskResolution
+import com.opentasker.core.actions.VariableChipOption
+import com.opentasker.core.actions.acceptsVariableType
+import com.opentasker.core.actions.insertVariableChip
 import com.opentasker.core.actions.mergeActionArguments
+import com.opentasker.core.actions.typedVariableOptions
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.engine.FlowControl
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
+import com.opentasker.core.model.Variable
 import com.opentasker.core.engine.tryRetryPlan
 import com.opentasker.ui.theme.DesignSystem
 
@@ -77,6 +86,7 @@ private data class LocalizedActionMetadata(
 )
 
 internal const val ACTION_CONTINUE_ON_ERROR_TAG = "action_continue_on_error"
+internal const val ACTION_VARIABLE_PICKER_TAG = "action_variable_picker"
 
 @Composable
 internal fun ActionPickerDialog(
@@ -221,6 +231,8 @@ internal fun ActionConfigDialog(
     state: ActionEditState,
     tasks: List<Task> = emptyList(),
     enclosingActions: List<ActionSpec> = emptyList(),
+    globalVariables: List<Variable> = emptyList(),
+    eventVariables: List<EditorEventVariable> = DEFAULT_EDITOR_EVENT_VARIABLES,
     onDismiss: () -> Unit,
     onSave: (ActionSpec) -> Unit,
 ) {
@@ -261,6 +273,14 @@ internal fun ActionConfigDialog(
     val capability = remember(state.metadata.id) { ActionCapabilityRegistry.get(state.metadata.id) }
     val availableTaskIds = remember(tasks) { tasks.mapTo(mutableSetOf()) { it.id } }
     val validationIssues = ActionFieldPolicy.validateForm(state.metadata, values, availableTaskIds)
+    val variableOptions = remember(enclosingActions, state.index, globalVariables, eventVariables) {
+        typedVariableOptions(
+            actions = enclosingActions,
+            editingIndex = state.index,
+            globalNames = globalVariables.map(Variable::name),
+            eventVariables = eventVariables,
+        )
+    }
     val retryPlan = remember(enclosingActions, state.index, state.metadata.id) {
         if (state.metadata.id == FlowControl.TRY && state.index != null) {
             tryRetryPlan(enclosingActions, state.index)
@@ -348,6 +368,10 @@ internal fun ActionConfigDialog(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    VariableChipPicker(
+                        options = variableOptions.filter { it.type != com.opentasker.core.actions.ActionValueType.ARRAY },
+                        onSelect = { option -> condition = insertVariableChip(condition, option) },
+                    )
                     Spacer(Modifier.height(12.dp))
                     val continueStateDescription = stringResource(
                         if (continueOnError) R.string.label_on else R.string.label_off,
@@ -393,6 +417,7 @@ internal fun ActionConfigDialog(
                         },
                         tasks = tasks,
                         issue = validationIssues[field.key],
+                        variableOptions = variableOptions.filter { option -> field.acceptsVariableType(option.type) },
                     )
                     taskBindingIssues[field.key]?.let { issue ->
                         Text(
@@ -439,6 +464,7 @@ internal fun ActionFieldInput(
     tasks: List<Task> = emptyList(),
     suggestedPackage: String? = null,
     issue: ActionFieldPolicy.Issue? = null,
+    variableOptions: List<VariableChipOption> = emptyList(),
 ) {
     val label = stringResource(field.labelRes) + if (field.required) " *" else ""
     val hint = field.hintRes?.let { stringResource(it) }
@@ -476,29 +502,29 @@ internal fun ActionFieldInput(
         }
         }
 
-        FieldType.MULTILINE -> OutlinedTextField(
+        FieldType.MULTILINE -> VariableTextField(
             value = value,
             onValueChange = onChange,
-            label = { Text(label) },
-            placeholder = hint?.let { { Text(it) } },
+            label = label,
+            hint = hint,
             supportingText = actionFieldSupportingText(field, issue),
             isError = issue != null,
             minLines = 3,
-            modifier = Modifier.fillMaxWidth(),
+            variableOptions = variableOptions,
         )
 
-        FieldType.NUMBER -> OutlinedTextField(
+        FieldType.NUMBER -> VariableTextField(
             value = value,
             onValueChange = onChange,
-            label = { Text(label) },
-            placeholder = hint?.let { { Text(it) } },
+            label = label,
+            hint = hint,
             supportingText = actionFieldSupportingText(field, issue),
             isError = issue != null,
             keyboardOptions = KeyboardOptions(
                 keyboardType = if (field.numberRule?.allowedLiterals.isNullOrEmpty()) KeyboardType.Decimal else KeyboardType.Text,
             ),
             singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+            variableOptions = variableOptions,
         )
 
         FieldType.TASK -> TaskActionFieldInput(
@@ -536,21 +562,108 @@ internal fun ActionFieldInput(
             onChange = onChange,
         )
 
-        FieldType.TEXT -> OutlinedTextField(
+        FieldType.TEXT -> VariableTextField(
             value = value,
             onValueChange = onChange,
-            label = { Text(label) },
-            placeholder = hint?.let { { Text(it) } },
+            label = label,
+            hint = hint,
             supportingText = actionFieldSupportingText(field, issue),
             isError = issue != null,
             singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+            variableOptions = variableOptions,
         )
     }
 
     if (issue != null && field.fieldType in setOf(FieldType.TASK, FieldType.APP, FieldType.CHECKBOX)) {
         ActionFieldErrorText(issue)
     }
+}
+
+@Composable
+private fun VariableTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    hint: String?,
+    supportingText: (@Composable () -> Unit)?,
+    isError: Boolean,
+    variableOptions: List<VariableChipOption>,
+    singleLine: Boolean = false,
+    minLines: Int = 1,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text(label) },
+            placeholder = hint?.let { { Text(it) } },
+            supportingText = supportingText,
+            isError = isError,
+            keyboardOptions = keyboardOptions,
+            singleLine = singleLine,
+            minLines = minLines,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        VariableChipPicker(
+            options = variableOptions,
+            onSelect = { option -> onValueChange(insertVariableChip(value, option)) },
+        )
+    }
+}
+
+@Composable
+private fun VariableChipPicker(
+    options: List<VariableChipOption>,
+    onSelect: (VariableChipOption) -> Unit,
+) {
+    if (options.isEmpty()) return
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(ACTION_VARIABLE_PICKER_TAG),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            stringResource(R.string.action_variable_picker_label),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            items(
+                options,
+                key = { option ->
+                    "${option.scope}:${option.actionIndex}:${option.name}:${option.reference}:${option.type}"
+                },
+            ) { option ->
+                FilterChip(
+                    selected = false,
+                    onClick = { onSelect(option) },
+                    label = {
+                        Text(
+                            variableChipLabel(option),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun variableChipLabel(option: VariableChipOption): String = when (option.scope) {
+    com.opentasker.core.actions.VariableChipScope.STEP -> stringResource(
+        R.string.action_variable_chip_step,
+        (option.actionIndex ?: 0) + 1,
+        option.name,
+    )
+    com.opentasker.core.actions.VariableChipScope.EVENT -> stringResource(R.string.action_variable_chip_event, option.name)
+    com.opentasker.core.actions.VariableChipScope.GLOBAL -> stringResource(R.string.action_variable_chip_global, option.name)
 }
 
 @Composable

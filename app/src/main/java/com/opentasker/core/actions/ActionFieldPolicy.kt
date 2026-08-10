@@ -114,7 +114,7 @@ object ActionFieldPolicy {
         requireNotNull(rule)
         val value = rawValue.trim()
         if (rule.allowedLiterals.any { it.equals(value, ignoreCase = true) }) return null
-        if (VARIABLE_REFERENCE.matches(value)) return null
+        if (VARIABLE_REFERENCE.matches(value) || TEMPLATE_REFERENCE.matches(value)) return null
         val parsed = when (rule.kind) {
             ActionNumberKind.INTEGER -> value.toLongOrNull()?.toDouble()
             ActionNumberKind.DECIMAL -> value.toDoubleOrNull()?.takeIf(Double::isFinite)
@@ -159,6 +159,7 @@ object ActionFieldPolicy {
     }
 
     private val VARIABLE_REFERENCE = Regex("%[A-Za-z][A-Za-z0-9_-]*")
+    private val TEMPLATE_REFERENCE = Regex("\\{\\{\\s*(?:%?(?:task|event|global|array)\\.)?%?[A-Za-z][A-Za-z0-9_-]*(?:\\s*\\|[^{}]+)?\\s*}}")
     private val URI_SCHEME = Regex("[A-Za-z][A-Za-z0-9+.-]*")
     private fun String?.isPresent(): Boolean = !this.isNullOrBlank()
     private const val MAX_VARIABLE_RESPONSE_BYTES = 1_048_576L

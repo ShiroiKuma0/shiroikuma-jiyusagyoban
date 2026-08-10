@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Action metadata now declares typed outputs; action-editor text fields offer compatible outputs from earlier steps, event data, and globals as variable chips that persist as ordinary `{{ }}` templates, with array references preserved for loop/join inputs and flow nodes showing produced names.
 - Unhandled task failures can now run a per-profile or global fallback task with bounded structured error variables, terminal diagnostics, and non-recursive recovery; retry state is cleared when an action eventually succeeds.
 - Profiles can now override active and burst execution admission limits within bounded ranges, choose logged/held or silent overflow behavior, and surface structured rejection counts plus circuit-breaker trip state in Diagnostics and shared reports.
 - Profiles now support deterministic priority arbitration, symmetric activation/deactivation grace periods, and never/date/once lifetimes with expiry and one-shot persistence; the editor, profile cards, Inspector, bundle codec, and Tasker mapping expose the policy and explain suppressions.

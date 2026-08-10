@@ -203,6 +203,10 @@
     <string name="action_label_hint">Shown in task steps and run log entries.</string>
     <string name="action_condition_label">Run only if</string>
     <string name="action_condition_helper">Optional variable condition, for example %%armed == true. A false or invalid condition skips this action.</string>
+    <string name="action_variable_picker_label">Insert a variable</string>
+    <string name="action_variable_chip_step">Step %1$d: %2$s</string>
+    <string name="action_variable_chip_event">Event: %1$s</string>
+    <string name="action_variable_chip_global">Global: %1$s</string>
     <string name="action_continue_on_error_label">Continue after failure</string>
     <string name="action_continue_on_error_helper">Run the next action even if this one reports a failure.</string>
     <string name="action_condition_summary">If %1$s</string>
@@ -807,6 +811,7 @@
     <string name="flow_action_title">Step %1$d: %2$s</string>
     <string name="flow_action_subtask_detail">sub-task -&gt; %1$s</string>
     <string name="flow_continues_after_error">continues after error</string>
+    <string name="flow_output_variables">Outputs: %1$s</string>
 
     <string name="ui_error_content_description">Error</string>
     <string name="ui_info_content_description">Info</string>
