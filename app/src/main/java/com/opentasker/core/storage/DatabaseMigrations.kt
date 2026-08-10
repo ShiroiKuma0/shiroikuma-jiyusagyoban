@@ -8,6 +8,18 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * Add new migrations here as the schema evolves.
  */
 object DatabaseMigrations {
+    /**
+     * Seeds the workspace every entity defaults to.
+     *
+     * Shared with the fresh-install callback: a new database is created by Room's generated
+     * `createAllTables` and never runs a migration, so seeding this only from MIGRATION_8_9 left
+     * fresh installs with no project row at all. `projects.id` is AUTOINCREMENT, so the first
+     * project the user created then took id 1 - silently becoming the undeletable Default that
+     * owns every existing task and profile.
+     */
+    const val SEED_DEFAULT_PROJECT =
+        "INSERT OR IGNORE INTO `projects` (`id`, `name`, `position`) VALUES (1, 'Default', 0)"
+
 
     val MIGRATION_1_2 = object : Migration(1, 2) {
         override fun migrate(db: SupportSQLiteDatabase) {
@@ -98,7 +110,7 @@ object DatabaseMigrations {
             )
             db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_projects_name` ON `projects` (`name`)")
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_projects_position` ON `projects` (`position`)")
-            db.execSQL("INSERT OR IGNORE INTO `projects` (`id`, `name`, `position`) VALUES (1, 'Default', 0)")
+            db.execSQL(SEED_DEFAULT_PROJECT)
 
             db.execSQL("ALTER TABLE `tasks` ADD COLUMN `projectId` INTEGER NOT NULL DEFAULT 1")
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_tasks_projectId` ON `tasks` (`projectId`)")
