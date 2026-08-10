@@ -55,6 +55,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
@@ -642,7 +644,15 @@ internal fun SelectableOption(
 ) {
     OutlinedButton(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        // These groups are radio pickers (overflow policy, lifetime, retrigger). Without the role
+        // and selected state a screen reader announced them as plain buttons, so an unselected
+        // option said nothing about being unselected and gave no group context.
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                this.role = Role.RadioButton
+                this.selected = selected
+            },
         shape = RoundedCornerShape(DesignSystem.Radii.lg),
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = if (selected) selectedContainerColor() else Color.Transparent,

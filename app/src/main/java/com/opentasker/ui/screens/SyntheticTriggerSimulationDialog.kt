@@ -41,14 +41,23 @@ internal fun SyntheticTriggerSimulationDialog(
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current.applicationContext
+    val resources = LocalContext.current.resources
+    val cooldownClear = stringResource(R.string.synthetic_trigger_cooldown_clear)
+    val admissionRejected = stringResource(R.string.synthetic_trigger_admission_rejected)
     val simulation = remember(profile) {
         val nowMs = System.currentTimeMillis()
         val remainingCooldownMs = CooldownStore(context).remaining(profile.id, nowMs)
         val cooldown = if (profile.cooldownSec <= 0 || remainingCooldownMs == 0L) {
-            SyntheticGateResult.pass("No cooldown is currently blocking this profile.")
+            SyntheticGateResult.pass(cooldownClear)
         } else {
             val seconds = ((remainingCooldownMs + 999L) / 1_000L).coerceAtLeast(1L)
-            SyntheticGateResult.block("Cooldown has $seconds second(s) remaining.")
+            SyntheticGateResult.block(
+                resources.getQuantityString(
+                    R.plurals.synthetic_trigger_cooldown_remaining,
+                    seconds.toInt(),
+                    seconds.toInt(),
+                ),
+            )
         }
         val admissionDecision = ExecutionAdmissionRegistry.preview(
             context = context,
@@ -57,7 +66,7 @@ internal fun SyntheticTriggerSimulationDialog(
         )
         val admission = SyntheticGateResult(
             accepted = admissionDecision.accepted,
-            reason = admissionDecision.reason ?: "Admission rejected this run.",
+            reason = admissionDecision.reason ?: admissionRejected,
         )
         SyntheticTriggerSimulator.simulate(
             profile = profile,

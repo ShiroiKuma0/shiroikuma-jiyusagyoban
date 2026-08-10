@@ -52,7 +52,24 @@ class LocalizationSourceTest {
             "values argument literal" to Regex("""\bvalues\s*=\s*""" + "\""),
         )
 
-        val offenders = localizedFiles.flatMap { relativePath ->
+        // Every presentation file under ui/screens is scanned, not just a hand-written list:
+        // a list-scoped gate silently certifies whatever is not on it, which is how
+        // SyntheticTriggerSimulationDialog.kt shipped with hardcoded copy and how
+        // RunLogRetentionPreviewDialog.kt lost coverage when it moved out of a covered file.
+        val screensDir = sourceRoot.resolve("com/opentasker/ui/screens")
+        val screenFiles = Files.list(screensDir).use { stream ->
+            stream.filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".kt") }
+                .map { "com/opentasker/ui/screens/" + it.fileName }
+                .toList()
+        }
+        val scannedFiles = (localizedFiles + screenFiles).distinct().sorted()
+
+        assertTrue(
+            "Expected the screens package to be discovered on disk",
+            screenFiles.isNotEmpty(),
+        )
+
+        val offenders = scannedFiles.flatMap { relativePath ->
             val source = sourceRoot.resolve(relativePath).readText()
             forbiddenPatterns.mapNotNull { (name, pattern) ->
                 if (pattern.containsMatchIn(source)) "$relativePath: $name" else null

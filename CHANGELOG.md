@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- The pre-unlock time trigger setting is now a single toggleable row, so a screen reader announces its name along with its state instead of an unnamed on/off switch.
+- Trigger lint findings name their severity in text, and the profile editor's option groups expose radio-button selection state, so neither depends on colour alone.
+- The trigger simulation dialog's cooldown and admission copy comes from string resources, with a proper plural for the countdown.
+- The localization gate scans every file in the screens package instead of a hand-written list, which had let new dialogs ship uncovered.
+- Run now and Replay ignore repeat taps while a run is in flight.
 - Cleartext MQTT now requires every address a host resolves to be private, and connects to the address it vetted. Accepting a host because any one record was private, then letting the socket re-resolve the name, could send the connect packet and its credentials to a public address.
 - `url.open` rejects a URI with no scheme instead of passing it through the scheme allowlist unchecked.
 - Pasting something that is not an OpenTasker bundle now explains that in plain language instead of showing the JSON parser's own message and echoing the pasted text back.

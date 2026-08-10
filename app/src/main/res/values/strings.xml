@@ -1080,6 +1080,12 @@
     <string name="ui_error_run_logs_load">Run logs could not be loaded</string>
     <string name="ui_error_run_logs_more">More run logs could not be loaded</string>
     <string name="ui_error_run_log_export">Run log export failed</string>
+    <string name="synthetic_trigger_cooldown_clear">No cooldown is currently blocking this profile.</string>
+    <plurals name="synthetic_trigger_cooldown_remaining">
+        <item quantity="one">Cooldown has %1$d second remaining.</item>
+        <item quantity="other">Cooldown has %1$d seconds remaining.</item>
+    </plurals>
+    <string name="synthetic_trigger_admission_rejected">Admission rejected this run.</string>
     <string name="ui_error_bundle_not_recognized">That does not look like an OpenTasker bundle. Paste the JSON exported from OpenTasker, or scan its QR code.</string>
     <string name="ui_error_run_task">Task could not be run</string>
     <string name="ui_error_run_log_replay">Held run could not be replayed</string>
