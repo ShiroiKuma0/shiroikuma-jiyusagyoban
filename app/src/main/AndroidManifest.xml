@@ -16,16 +16,36 @@
     <uses-permission
         android:name="android.permission.REQUEST_INSTALL_PACKAGES"
         tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- system.set_locale: dev-flagged, so adb-grantable once (pm grant, survives reboots). -->
+    <uses-permission
+        android:name="android.permission.CHANGE_CONFIGURATION"
+        tools:ignore="ProtectedPermissions" />
+    <!-- system.set_locale: updatePersistentConfiguration also enforces the WRITE_SETTINGS appop
+         (adb: appops set … WRITE_SETTINGS allow, or the "modify system settings" toggle). -->
+    <uses-permission
+        android:name="android.permission.WRITE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission
         android:name="android.permission.SCHEDULE_EXACT_ALARM"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Speed test: pins its own cellular/WiFi network with requestNetwork so a mobile leg can run
+         while WiFi stays connected. It never changes the system default route. -->
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <!-- Reading the SIM slots (carrier name + subscription id) for the 接続 speed tests. -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
@@ -72,6 +92,12 @@
     -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
 
     <uses-feature
         android:name="android.hardware.telephony"
@@ -87,7 +113,29 @@
         android:protectionLevel="signature" />
 
     <queries>
+        <!-- Sister apps: token-gated automation intents driven by the Send Intent action. -->
+        <package android:name="shiroikuma.jami" />
+        <package android:name="shiroikuma.renrakusaki" />
+        <!-- 白い熊 地図 (OsmAnd fork): a speed-test history row opens its fix with
+             VIEW geo:<lat>,<lon>, handled by net.osmand.plus.activities.search.GeoIntentActivity. -->
+        <package android:name="shiroikuma.chizu" />
+        <!--
+          Broad visibility for the generic Send Intent action. Package visibility is
+          all-or-nothing per package, so matching any launchable app's MAIN/LAUNCHER
+          entry exposes every component of that package — letting Send Intent dispatch
+          to any normal app's activities/services/receivers on Android 11+. Targets
+          with no launcher entry, or reachable only by a custom action string, still
+          need their own <package> pin (e.g. shiroikuma.jami above).
+        -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
         <package android:name="com.termux" />
+        <!-- Both Shizuku managers: 白い熊's fork is the one actually installed; upstream's id is kept
+             so a stock install still resolves. Without these pins getLaunchIntentForPackage answers
+             null on Android 11+ and "Open Shizuku settings" falls through to the setup web page. -->
+        <package android:name="shiroikuma.shizuku" />
         <package android:name="moe.shizuku.privileged.api" />
         <!-- Scoped visibility for the shared installed-app picker; QUERY_ALL_PACKAGES is forbidden. -->
         <intent>
@@ -114,6 +162,7 @@
     <application
         android:name=".OpenTaskerApp_NoHilt"
         android:label="@string/app_name"
+        android:extractNativeLibs="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/Theme.OpenTasker"
@@ -137,9 +186,102 @@
             the user could no longer see.
         -->
         <activity
+            android:name="com.opentasker.progress.ProgressPanelActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".progress"
+            android:label="@string/app_name"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
+        <!--
+            健康 — the band charts, in their own window rather than a tab (白い熊, 2026-08-03).
+            Its own taskAffinity so it is a separate entry in recents from the automation editor:
+            opening the charts from a launcher shortcut must not drag 自由作業盤's back stack along.
+        -->
+        <activity
+            android:name="com.opentasker.ui.charts.BandChartsActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".band"
+            android:label="健康"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
+        <!-- The appearance settings as their own window, so 「文字認識」 can send 白い熊 to its knobs
+             and the system back stack brings them back to the screenshot. Not exported. -->
+        <activity
+            android:name="com.opentasker.ui.screens.UiCustomizationActivity"
+            android:exported="false"
+            android:label="白い熊 自由作業盤 UI"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
+        <!-- 文字認識: the OCR review window. Opened by the share tile below, never exported — the only
+             way in is a screenshot we have already copied into our own cache. -->
+        <activity
+            android:name="com.opentasker.ui.ocr.OcrReviewActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".ocr"
+            android:label="文字認識"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
+        <!-- 記事変換: the article window — the page list, the model choice, the two progress bars and
+             the cancel. Not exported; the way in is the ocr.article action with "Open the window" on.
+             Deliberately NOT given a Sharesheet tile: EMUI collapses the share grid to one tile per
+             package, so a second one would compete with 文字認識 rather than sit beside it. -->
+        <activity
+            android:name="com.opentasker.ui.article.ArticleBuildActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".article"
+            android:label="記事変換"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
+        <!-- 記事編集: the article against the screenshots it was read from. windowSoftInputMode is
+             adjustResize so the ime inset is REPORTED, but the window draws edge to edge and is never
+             actually resized by it — the screen translates itself instead, so the page strip keeps its
+             scroll position while typing. Not exported. -->
+        <activity
+            android:name="com.opentasker.ui.article.ArticleEditActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".article"
+            android:label="記事編集"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
+        <!-- 文字認識: its own Sharesheet tile, images ONLY. Kept separate from ShareReceiverActivity
+             (which accepts every MIME type and feeds the automation engine) so sharing a screenshot
+             here means "read the text in this", not "run a task". It copies the bytes and finishes —
+             see the URI-grant note in OcrShareActivity. -->
+        <activity
+            android:name="com.opentasker.core.ocr.OcrShareActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:grantUriPermissions="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:label="文字認識"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+        </activity>
+
+        <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
             android:theme="@style/Theme.OpenTasker">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -184,14 +326,34 @@
             android:exported="false"
             android:noHistory="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <!-- Per-app share targets: the internal handler each generated relay APK forwards into. It
+             unfreezes the picked frozen app (Shizuku) and forwards the shared content to it, then
+             drops a re-freeze bubble. Exported (no permission) so an external relay can call it by
+             explicit component; it deliberately has NO SEND intent-filter, so the main app itself is
+             not a share-sheet tile — only the per-target relays are. -->
+        <activity
+            android:name="com.opentasker.core.share.ShareForwardActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity="" />
+
+        <!-- The "Share apps" screen (relay generator), opened by the share.relays action. -->
+        <activity
+            android:name="com.opentasker.core.share.ShareAppsActivity"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:excludeFromRecents="true"
+            android:taskAffinity="" />
 
         <service
             android:name="com.opentasker.core.engine.AutomationService"
             android:exported="false"
-            android:foregroundServiceType="specialUse|location">
+            android:foregroundServiceType="specialUse|location|microphone">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="OpenTasker automation engine — runs user-defined profiles when their contexts match" />
+                android:value="白い熊 自由作業盤 automation engine — runs user-defined profiles when their contexts match" />
         </service>
 
         <service
@@ -243,6 +405,18 @@
             <intent-filter>
                 <action android:name="android.provider.Telephony.WAP_PUSH_RECEIVED" />
                 <data android:mimeType="application/vnd.wap.mms-message" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.opentasker.core.admin.DeviceAdmin"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:exported="true">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
             </intent-filter>
         </receiver>
 
@@ -342,12 +516,40 @@
             </intent-filter>
         </activity>
 
+        <!-- exported: a third-party launcher (e.g. 白い熊 雷起動盤) fires the raw shortcut intent itself,
+             so the run-task trampoline must be startable from another app. -->
         <activity
             android:name="com.opentasker.widget.TaskRunActivity"
-            android:exported="false"
+            android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:excludeFromRecents="true"
             android:noHistory="true"
+            android:taskAffinity="" />
+
+        <!-- Launcher "add a shortcut" entry: picks a task, returns a home-screen shortcut that runs it. -->
+        <activity
+            android:name="com.opentasker.widget.CreateTaskShortcutActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.CREATE_SHORTCUT" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name="com.opentasker.scenes.SceneActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:taskAffinity="" />
+
+        <activity
+            android:name="com.opentasker.scenes.WakedanceActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+            android:excludeFromRecents="true"
             android:taskAffinity="" />
 
         <activity
@@ -361,13 +563,96 @@
 
         <receiver
             android:name="com.opentasker.widget.TaskWidgetProvider"
-            android:exported="false">
+            android:exported="false"
+            android:label="@string/widget_task_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_task_info" />
+        </receiver>
+
+        <receiver
+            android:name="com.opentasker.widget.StyledWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_styled_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/styled_widget_info" />
+        </receiver>
+
+        <activity
+            android:name="com.opentasker.widget.StyledWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.OpenTasker">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <!-- External "name this widget" bridge for sister apps (e.g. the raikidoban launcher). Explicit
+             ordered broadcast, no permission: senders may use a different signing key. -->
+        <receiver
+            android:name="com.opentasker.widget.SetWidgetNameReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="shiroikuma.jiyusagyoban.action.SET_WIDGET_NAME" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.opentasker.widget.GetWidgetBindingReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="shiroikuma.jiyusagyoban.action.GET_WIDGET_BINDING" />
+            </intent-filter>
+        </receiver>
+
+        <!-- External "which app does this task open?" bridge — lets a sister launcher point its
+             "app info"/"uninstall" entries for our run-task shortcuts at the task's target app. -->
+        <receiver
+            android:name="com.opentasker.widget.GetTaskTargetPackageReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="shiroikuma.jiyusagyoban.action.GET_TASK_TARGET_PACKAGE" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.opentasker.core.transfer.WorkspaceTransferReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="shiroikuma.jiyusagyoban.action.EXPORT_WORKSPACE" />
+                <action android:name="shiroikuma.jiyusagyoban.action.IMPORT_BUNDLE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Sister-app state-export automation contract (保存復元): headless category-ZIP export +
+             category listing, gated by the automation token (AutomationAuth); replies ride a fresh
+             broadcast back to the caller's reply receiver (renrakusaki shape). -->
+        <receiver
+            android:name="com.opentasker.core.transfer.StateExportReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="shiroikuma.jiyusagyoban.action.EXPORT_STATE" />
+                <action android:name="shiroikuma.jiyusagyoban.action.LIST_CATEGORIES" />
+                <action android:name="shiroikuma.jiyusagyoban.action.CANCEL_EXPORT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Reply channel for Send Intent's "receiver" mode: a sister app broadcasts the result back
+             here (binder-free). Exported so the sister app can reach it; a fake reply would need the
+             random per-call reply id, which is never disclosed to other apps. -->
+        <receiver
+            android:name="com.opentasker.core.actions.IntentReplyReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="shiroikuma.jiyusagyoban.action.INTENT_REPLY" />
+            </intent-filter>
         </receiver>
 
         <receiver
@@ -477,5 +762,43 @@
                 <action android:name="com.twofortyfouram.locale.intent.action.QUERY_CONDITION" />
             </intent-filter>
         </receiver>
+        <activity
+            android:name="com.opentasker.core.dialog.DialogActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:enabled="true"
+            android:exported="true"
+            android:multiprocess="false"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
+        <service
+            android:name="com.opentasker.core.accessibility.ShiroiKumaAccessibilityService"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
     </application>
 </manifest>

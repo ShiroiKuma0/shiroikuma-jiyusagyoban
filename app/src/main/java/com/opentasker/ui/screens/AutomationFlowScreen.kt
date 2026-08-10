@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
@@ -28,6 +29,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.CallSplit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.SubdirectoryArrowRight
 import androidx.compose.material3.Card
@@ -43,6 +46,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -59,7 +63,6 @@ import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.capabilities.AutomationLintSeverity
-import com.opentasker.core.capabilities.AutomationLint
 import com.opentasker.core.capabilities.AutomationLintStrings
 import com.opentasker.core.flow.AutomationFlowGraph
 import com.opentasker.core.flow.AutomationFlowGraphBuilder
@@ -68,33 +71,23 @@ import com.opentasker.core.flow.AutomationFlowNodeKind
 import com.opentasker.core.flow.AutomationFlowTarget
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
-import com.opentasker.core.model.AutomationInvariant
 
 @Composable
 fun AutomationFlowScreen(
     profiles: List<Profile>,
     tasks: List<Task>,
     contentPadding: PaddingValues,
+    expandedFlows: SnapshotStateMap<Long, Boolean>,
     onNodeTargetSelected: (AutomationFlowTarget) -> Unit = {},
     onAddContext: (Long) -> Unit = {},
     onAddAction: (Long) -> Unit = {},
     changedNodeKeys: Set<String> = emptySet(),
-    invariants: List<AutomationInvariant> = emptyList(),
-    onUpdateInvariants: (List<AutomationInvariant>) -> Unit = {},
 ) {
     val resources = LocalContext.current.resources
-    val lintStrings = AutomationLintStrings.from(resources)
-    val lintReport = remember(profiles, tasks, invariants, resources) {
-        AutomationLint.analyze(
-            profiles = profiles,
-            tasks = tasks,
-            strings = lintStrings,
-            invariants = invariants,
-        )
-    }
-    val graphs = remember(profiles, tasks, resources, changedNodeKeys, invariants) {
+    val graphs = remember(profiles, tasks, resources, changedNodeKeys) {
         val tasksById = tasks.associateBy { it.id }
         val strings = com.opentasker.core.flow.AutomationFlowStrings.from(resources)
+        val lintStrings = AutomationLintStrings.from(resources)
         profiles.map {
             profile -> AutomationFlowGraphBuilder.build(
                 profile = profile,
@@ -102,7 +95,6 @@ fun AutomationFlowScreen(
                 strings = strings,
                 changedNodeKeys = changedNodeKeys,
                 lintStrings = lintStrings,
-                invariants = invariants,
             )
         }
     }
@@ -119,23 +111,12 @@ fun AutomationFlowScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            FlowOverviewCard(
-                profiles = profiles,
-                tasks = tasks,
-                graphs = graphs,
-            )
-        }
-        item {
-            AutomationInvariantPanel(
-                invariants = invariants,
-                report = lintReport,
-                onUpdate = onUpdateInvariants,
-            )
-        }
+        // Fork: the "Flow overview" summary card is not shown at the top of the Flow tab (de9f47a had none).
         items(graphs, key = { it.profileId }) { graph ->
             FlowGraphCard(
                 graph = graph,
+                expanded = expandedFlows[graph.profileId] == true,
+                onToggleExpanded = { expandedFlows[graph.profileId] = expandedFlows[graph.profileId] != true },
                 onNodeTargetSelected = onNodeTargetSelected,
                 onAddContext = onAddContext,
                 onAddAction = onAddAction,
@@ -229,6 +210,8 @@ private fun FlowOverviewCard(
 @Composable
 private fun FlowGraphCard(
     graph: AutomationFlowGraph,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
     onNodeTargetSelected: (AutomationFlowTarget) -> Unit,
     onAddContext: (Long) -> Unit,
     onAddAction: (Long) -> Unit,
@@ -239,13 +222,20 @@ private fun FlowGraphCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .animateContentSize()
             .semantics { contentDescription = graph.accessibilitySummary() },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)),
         shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Collapsed: profile name + a one-line context/action summary + a chevron; tap to expand into
+            // the full graph. Mirrors the per-card folding on the Tasks / Profiles / Scenes tabs.
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable(onClick = onToggleExpanded),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 Column(Modifier.weight(1f)) {
                     Text(graph.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
@@ -256,53 +246,62 @@ private fun FlowGraphCard(
                         ),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 FlowStatusPill(
                     label = if (profileNode.muted) stringResource(R.string.status_disabled) else stringResource(R.string.label_enabled),
                     color = if (profileNode.muted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
                 )
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Collapse flow" else "Expand flow",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
-            FlowCanvasOverview(
-                graph = graph,
-                profileNode = profileNode,
-                onNodeTargetSelected = onNodeTargetSelected,
-            )
+            if (expanded) {
+                FlowCanvasOverview(
+                    graph = graph,
+                    profileNode = profileNode,
+                    onNodeTargetSelected = onNodeTargetSelected,
+                )
 
-            if (graph.contextNodes.isNotEmpty()) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    items(graph.contextNodes, key = { it.id }) { node ->
-                        FlowNodeView(
-                            node = node,
-                            onNodeTargetSelected = onNodeTargetSelected,
-                            modifier = Modifier.widthIn(min = 220.dp, max = 280.dp),
-                        )
+                if (graph.contextNodes.isNotEmpty()) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        items(graph.contextNodes, key = { it.id }) { node ->
+                            FlowNodeView(
+                                node = node,
+                                onNodeTargetSelected = onNodeTargetSelected,
+                                modifier = Modifier.widthIn(min = 220.dp, max = 280.dp),
+                            )
+                        }
                     }
+                    FlowEdgeLabel(stringResource(R.string.flow_all_context_rules))
                 }
-                FlowEdgeLabel(stringResource(R.string.flow_all_context_rules))
-            }
-            FlowInlineCommand(label = stringResource(R.string.profile_add_context), onClick = { onAddContext(graph.profileId) })
+                FlowInlineCommand(label = stringResource(R.string.profile_add_context), onClick = { onAddContext(graph.profileId) })
 
-            FlowNodeView(profileNode, onNodeTargetSelected)
-            FlowTaskLane(graph, graph.enterTaskNode, stringResource(R.string.flow_enter), onNodeTargetSelected, onAddAction)
-            FlowTaskLane(graph, graph.exitTaskNode, stringResource(R.string.flow_exit), onNodeTargetSelected, onAddAction)
+                FlowNodeView(profileNode, onNodeTargetSelected)
+                FlowTaskLane(graph, graph.enterTaskNode, stringResource(R.string.flow_enter), onNodeTargetSelected, onAddAction)
+                FlowTaskLane(graph, graph.exitTaskNode, stringResource(R.string.flow_exit), onNodeTargetSelected, onAddAction)
 
-            val missingNodes = graph.nodes.filter { it.kind == AutomationFlowNodeKind.MISSING }
-            missingNodes.forEach { missingNode ->
-                FlowEdgeLabel(stringResource(R.string.flow_missing_reference))
-                FlowNodeView(missingNode, onNodeTargetSelected)
-            }
+                val missingNodes = graph.nodes.filter { it.kind == AutomationFlowNodeKind.MISSING }
+                missingNodes.forEach { missingNode ->
+                    FlowEdgeLabel(stringResource(R.string.flow_missing_reference))
+                    FlowNodeView(missingNode, onNodeTargetSelected)
+                }
 
-            if (graph.warnings.isNotEmpty()) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    graph.warnings.forEach { warning ->
-                        Text(
-                            warning,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
+                if (graph.warnings.isNotEmpty()) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        graph.warnings.forEach { warning ->
+                            Text(
+                                warning,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
                     }
                 }
             }
@@ -589,18 +588,6 @@ private fun FlowNodeView(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            node.outputs.takeIf { it.isNotEmpty() }?.let { outputs ->
-                Text(
-                    stringResource(
-                        R.string.flow_output_variables,
-                        outputs.joinToString(", ") { output -> output.name },
-                    ),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
             if (node.isSubTask) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -714,7 +701,7 @@ private fun displayTitle(node: AutomationFlowNode): String {
     if (node.kind != AutomationFlowNodeKind.ACTION) return node.title
     val actionType = node.detail?.substringBefore(" - ") ?: return node.title
     val metadata = ActionMetadataRegistry.get(actionType) ?: return node.title
-    return node.title.replace(actionType, stringResource(metadata.nameRes))
+    return node.title.replace(actionType, metadata.name)
 }
 
 private fun plural(count: Int): String = if (count == 1) "" else "s"
