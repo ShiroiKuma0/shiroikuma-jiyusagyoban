@@ -321,41 +321,28 @@ fun ActiveAutomationUi(
     val openTaskerBundleReview by viewModel.openTaskerBundleReview.collectAsState(); val openTaskerBundleBusy by viewModel.openTaskerBundleBusy.collectAsState(); val semanticDiffReview by viewModel.semanticDiffReview.collectAsState(); val highlightedFlowNodeKeys by viewModel.highlightedFlowNodeKeys.collectAsState(); val simulationProfile by viewModel.simulationProfile.collectAsState()
     val profileShareReview by viewModel.profileShareReview.collectAsState(); val preflightReview by viewModel.preflightReview.collectAsState()
     val preflightBusy by viewModel.preflightBusy.collectAsState()
-    val taskerXmlLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let { viewModel.previewTaskerXml(it, BuildConfig.VERSION_NAME) }
+    val taskerXmlLauncher = rememberOpenDocumentLauncher { viewModel.previewTaskerXml(it, BuildConfig.VERSION_NAME) }
+    val openTaskerBundleExportLauncher = rememberCreateDocumentLauncher("application/json") {
+        viewModel.exportOpenTaskerBundle(it, BuildConfig.VERSION_NAME)
     }
-    val openTaskerBundleExportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
-    ) { uri ->
-        uri?.let { viewModel.exportOpenTaskerBundle(it, BuildConfig.VERSION_NAME) }
-    }
-    val openTaskerBundleImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let { viewModel.previewOpenTaskerBundle(it) }
-    }
+    val openTaskerBundleImportLauncher = rememberOpenDocumentLauncher { viewModel.previewOpenTaskerBundle(it) }
+    val taskerXmlExportLauncher = rememberCreateDocumentLauncher("text/xml") { viewModel.exportTaskerXml(it) }
     val profileShareScreenshotLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments(),
     ) { uris ->
         viewModel.addProfileShareScreenshots(uris)
     }
-    val databaseBackupExportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/octet-stream")
-    ) { uri ->
-        uri?.let { viewModel.exportDatabaseBackup(it) }
+    val databaseBackupExportLauncher = rememberCreateDocumentLauncher("application/octet-stream") {
+        viewModel.exportDatabaseBackup(it)
     }
-    val databaseBackupImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let { viewModel.importDatabaseBackup(it) }
-    }
+    val databaseBackupImportLauncher = rememberOpenDocumentLauncher { viewModel.importDatabaseBackup(it) }
     var exportAllRunLogs by rememberSaveable { mutableStateOf(false) }
-    val runLogJsonExportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
-    ) { uri ->
-        uri?.let { viewModel.exportRunLogs(it, RunLogExportFormat.JSON, exportAllRunLogs) }
+    val runLogJsonExportLauncher = rememberCreateDocumentLauncher("application/json") {
+        viewModel.exportRunLogs(it, RunLogExportFormat.JSON, exportAllRunLogs)
         exportAllRunLogs = false
     }
-    val runLogCsvExportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("text/csv")
-    ) { uri ->
-        uri?.let { viewModel.exportRunLogs(it, RunLogExportFormat.CSV, exportAllRunLogs) }
+    val runLogCsvExportLauncher = rememberCreateDocumentLauncher("text/csv") {
+        viewModel.exportRunLogs(it, RunLogExportFormat.CSV, exportAllRunLogs)
         exportAllRunLogs = false
     }
     val taskDialog = taskDialogId.takeIf { it != NO_DIALOG_ENTITY_ID }
@@ -751,6 +738,7 @@ fun ActiveAutomationUi(
                 },
                 openTaskerBundleBusy = openTaskerBundleBusy,
                 onImportTaskerXml = { taskerXmlLauncher.launch(TASKER_XML_MIME_TYPES) },
+                onExportTaskerXml = { taskerXmlExportLauncher.launch("opentasker-tasker-export.xml") },
                 taskerImportBusy = taskerImportBusy,
                 onEditProfile = { openProfileDialog(it) },
                 onUndoProfileEdit = { viewModel.undoLastProfileEdit(it.id) },

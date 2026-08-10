@@ -205,8 +205,16 @@ object OpenTaskerBundleCodec {
     fun sanitizeForExport(
         bundle: OpenTaskerBundle,
         secretVariableNames: Set<String> = emptySet(),
+        secretVariableValues: Set<String> = emptySet(),
     ): OpenTaskerBundle {
-        val context = ExportRedactionPolicy.Context(secretNames = secretVariableNames)
+        // Passing the plaintext values, not just the names, is what lets the policy catch an
+        // argument holding a literal copy of a secret. Without them the JSON export could only
+        // redact arguments that referenced a secret by name or matched a generic token pattern,
+        // while the Tasker XML exporter - the same policy - already redacted the literal.
+        val context = ExportRedactionPolicy.Context(
+            secretNames = secretVariableNames,
+            secretValues = secretVariableValues,
+        )
         var redactedFieldCount = 0
         val tasks = bundle.tasks.map { task ->
             task.copy(
@@ -628,6 +636,9 @@ class OpenTaskerBundleRepository(
                 description = description,
             ),
             secretVariableNames = variableExport.omittedSecretNames,
+            secretVariableValues = variableRepository.decodedForExportRedaction()
+                .filter { it.isSecret && it.value.isNotEmpty() }
+                .mapTo(linkedSetOf()) { it.value },
         )
     }
 

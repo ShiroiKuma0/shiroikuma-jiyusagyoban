@@ -1,11 +1,19 @@
 package com.opentasker.core.scripting
 
 import com.opentasker.core.external.AutomationTargetContract
+import android.content.Intent
+import com.opentasker.core.contexts.ShareContextEvents
+import com.opentasker.core.contexts.ShareInput
+import com.opentasker.core.plugins.locale.LocaleConditionEvaluator
+import com.opentasker.core.plugins.locale.LocaleConditionKind
 import com.opentasker.core.plugins.locale.LocaleConditionOperator
+import com.opentasker.core.plugins.locale.LocaleConditionSnapshot
+import com.opentasker.core.plugins.locale.LocalePluginConditionState
 import com.opentasker.core.plugins.locale.LocaleConditionTarget
 import com.opentasker.core.plugins.locale.LocalePluginBundleCodec
 import com.opentasker.core.plugins.locale.LocalePluginContract
 import com.opentasker.core.transfer.ImportResourceBudget
+import com.opentasker.core.transfer.ImportResourceGuard
 import com.opentasker.core.transfer.OpenTaskerBundle
 import com.opentasker.core.transfer.OpenTaskerBundleCodec
 import com.opentasker.core.transfer.TaskerXmlImporter
@@ -14,6 +22,7 @@ import com.opentasker.core.model.Task
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Random
@@ -22,6 +31,8 @@ import java.util.Random
  * A small deterministic corpus for every external-data boundary. It intentionally uses only the
  * JUnit/runtime APIs already in the app: new parser behavior must stay in the normal JVM gate.
  */
+private val CONTROL_CHAR_TEXT = "a" + 0.toChar() + "b"
+
 class ImportBoundaryCorpusTest {
     @Test
     fun openTaskerJsonCorpusIsBoundedAndCompatibilityAware() {
@@ -76,8 +87,21 @@ class ImportBoundaryCorpusTest {
             "truncated" to valid.dropLast(10),
             "broken entity" to valid.replace("Notify", "&broken;"),
             "external entity" to "<!DOCTYPE TaskerData SYSTEM \"file:///etc/passwd\">$valid",
+            // An internal subset is the branch the bracket scanner in
+            // ImportResourceGuard.sanitizeTaskerXml exists for: the '>' that closes the ENTITY sits
+            // inside '[' ... ']', so a naive scan ends the DOCTYPE early and lets the rest through.
+            // The external-SYSTEM case above is caught earlier by the preflight, so it never
+            // reaches that code.
+            "internal subset entity" to
+                "<!DOCTYPE TaskerData [ <!ENTITY xxe \"expanded\"> ]>$valid",
+            "internal subset with nested markup" to
+                "<!DOCTYPE TaskerData [ <!ELEMENT Task ANY> <!ENTITY xxe SYSTEM \"file:///etc/passwd\"> ]>$valid",
+            "doctype with no terminator" to "<!DOCTYPE TaskerData [ <!ENTITY xxe \"x\"> $valid",
         ).forEach { (label, raw) ->
             assertBoundedFailure(label) { TaskerXmlImporter.parse(raw, "test", 0L) }
+        }
+        assertBoundedFailure("sanitizer sees the internal subset directly") {
+            ImportResourceGuard.sanitizeTaskerXml("<!DOCTYPE TaskerData [ <!ENTITY xxe \"expanded\"> ]>$valid")
         }
 
         val manyTasks = "<Task><id>1</id><nme>Repeated</nme></Task>".repeat(32)
@@ -265,4 +289,68 @@ class ImportBoundaryCorpusTest {
         assertNotNull("$label should fail", error)
         assertBoundedFailure(label, requireNotNull(error))
     }
+    /**
+     * The share intent boundary: everything here arrives from another app, so a Parcelable payload,
+     * a control character, or an oversized URI list must be refused rather than published as a
+     * context event.
+     */
+    @Test
+    fun shareIntentCorpusRejectsUntrustedPayloadShapes() {
+        val rejected = listOf(
+            "wrong action" to ShareInput(action = Intent.ACTION_VIEW, textValue = "hello"),
+            "parcelable text" to ShareInput(action = Intent.ACTION_SEND, textValue = Any()),
+            "parcelable stream" to ShareInput(action = Intent.ACTION_SEND, streamValue = Any()),
+            "control characters" to ShareInput(action = Intent.ACTION_SEND, textValue = CONTROL_CHAR_TEXT),
+            "oversized text" to ShareInput(
+                action = Intent.ACTION_SEND,
+                textValue = "x".repeat(ShareContextEvents.MAX_TOTAL_CHARS + 1),
+            ),
+            "too many uris" to ShareInput(
+                action = Intent.ACTION_SEND_MULTIPLE,
+                streamValue = ArrayList<Any>((0..ShareContextEvents.MAX_URIS).map { "content://x/$it" }),
+            ),
+            "non-uri stream entry" to ShareInput(
+                action = Intent.ACTION_SEND_MULTIPLE,
+                streamValue = arrayListOf<Any>(Any()),
+            ),
+        )
+        rejected.forEach { (label, input) ->
+            assertNull("$label must not publish a share event", ShareContextEvents.parseInput(input, nowMs = 0L))
+        }
+
+        assertNotNull(
+            "a plain text share is still accepted",
+            ShareContextEvents.parseInput(
+                ShareInput(action = Intent.ACTION_SEND, mime = "text/plain", textValue = "hello"),
+                nowMs = 0L,
+            ),
+        )
+    }
+
+    /**
+     * The exported Locale condition receiver must never answer for a secret variable, whatever the
+     * caller's bundle says.
+     */
+    @Test
+    fun localeConditionRefusesSecretVariablesWhateverTheComparison() {
+        LocaleConditionOperator.entries.forEach { operator ->
+            val spec = LocaleConditionTarget.parse(
+                LocaleConditionTarget.variableCompare("ApiToken", 1, operator, "sk-", "grant-token"),
+            )
+            assertEquals(LocaleConditionKind.VARIABLE_COMPARE, spec.kind)
+            assertEquals(
+                "operator $operator must not leak a secret",
+                LocalePluginConditionState.Unknown,
+                LocaleConditionEvaluator.evaluate(
+                    spec,
+                    LocaleConditionSnapshot(
+                        variableExists = true,
+                        variableSecret = true,
+                        variableValue = "sk-live-value",
+                    ),
+                ),
+            )
+        }
+    }
+
 }

@@ -484,4 +484,47 @@ class OpenTaskerBundleCodecTest {
             ),
         )
     }
+    /**
+     * A user who pasted a secret's plaintext into an ordinary-looking argument used to get it
+     * exported in the clear: the JSON export built its redaction context from secret *names* only,
+     * so nothing could match the literal value.
+     */
+    @Test
+    fun jsonExportRedactsALiteralCopyOfASecretValue() {
+        val bundle = OpenTaskerBundleCodec.build(
+            appVersion = "0.0.0",
+            exportedAtEpochMs = 0L,
+            profiles = emptyList(),
+            tasks = listOf(
+                Task(
+                    id = 1,
+                    name = "Publish",
+                    actions = listOf(
+                        ActionSpec(type = "log", args = mapOf("message" to "token is sk-live-abc123")),
+                    ),
+                ),
+            ),
+            variables = emptyList(),
+            scenes = emptyList(),
+            projects = emptyList(),
+        )
+
+        val withNamesOnly = OpenTaskerBundleCodec.sanitizeForExport(
+            bundle,
+            secretVariableNames = setOf("ApiToken"),
+        )
+        val withValues = OpenTaskerBundleCodec.sanitizeForExport(
+            bundle,
+            secretVariableNames = setOf("ApiToken"),
+            secretVariableValues = setOf("sk-live-abc123"),
+        )
+
+        val exported = withValues.tasks.single().actions.single().args.getValue("message")
+        assertFalse("the secret's plaintext must not survive export", exported.contains("sk-live-abc123"))
+        assertTrue(
+            "redaction must be visible rather than silent",
+            exported != withNamesOnly.tasks.single().actions.single().args.getValue("message"),
+        )
+    }
+
 }

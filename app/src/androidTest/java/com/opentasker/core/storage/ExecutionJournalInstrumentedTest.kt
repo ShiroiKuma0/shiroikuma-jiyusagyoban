@@ -3,6 +3,7 @@ package com.opentasker.core.storage
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.opentasker.core.engine.ExecutionJournal
 import com.opentasker.core.engine.ExecutionJournalState
 import com.opentasker.core.engine.RunLogOutcome
 import com.opentasker.core.engine.reconcileExecutionJournal
@@ -123,6 +124,42 @@ class ExecutionJournalInstrumentedTest {
                 ),
             )
         } finally {
+            db.close()
+        }
+    }
+
+    /** A long flow used to issue one row UPDATE per action, up to 100k of them in a single run. */
+    @Test
+    fun stepJournalingIsRateBoundedNotOncePerAction() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            db.executionJournalDao().insert(journalRow("long-run", startedAtMs = 0L))
+
+            var writes = 0
+            // 500 actions completing 1 ms apart.
+            repeat(500) { step ->
+                if (ExecutionJournal.recordStep(db, "long-run", step, "Step $step", nowMs = step.toLong())) {
+                    writes++
+                }
+            }
+
+            assertEquals("the first step always writes, then at most one per second", 1, writes)
+
+            // A later action past the window writes again, so the recovery record stays useful.
+            assertTrue(ExecutionJournal.recordStep(db, "long-run", 500, "Step 500", nowMs = 2_000L))
+            val row = requireNotNull(db.executionJournalDao().getByExecutionId("long-run"))
+            assertEquals(500, row.lastStepIndex)
+        } finally {
+            ExecutionJournal.markTerminal(
+                db,
+                "long-run",
+                ExecutionJournalState.SUCCEEDED,
+                null,
+                nowMs = 3_000L,
+            )
             db.close()
         }
     }

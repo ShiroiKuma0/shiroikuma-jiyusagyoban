@@ -95,6 +95,7 @@ import com.opentasker.core.transfer.OpenTaskerBundleCodec
 import com.opentasker.core.transfer.OpenTaskerBundleRepository
 import com.opentasker.core.transfer.OpenTaskerBundleTextImport
 import com.opentasker.core.transfer.TaskerImportPlanner
+import com.opentasker.core.transfer.TaskerXmlExporter
 import com.opentasker.core.transfer.TaskerImportPreview
 import com.opentasker.core.transfer.TaskerXmlImportReport
 import com.opentasker.core.transfer.TaskerXmlImporter
@@ -1064,6 +1065,45 @@ class ActiveAutomationViewModel(
                 }
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_bundle_export)) }
             _openTaskerBundleBusy.value = false
+        }
+    }
+
+    /**
+     * Writes the workspace as Tasker XML.
+     *
+     * The exporter shipped unreachable: nothing in the app called it, so the changelog claimed a
+     * feature users could not run and its redaction path - the only export path that can match a
+     * secret's literal plaintext - was never exercised outside tests.
+     */
+    fun exportTaskerXml(uri: Uri) {
+        viewModelScope.launch {
+            if (_taskerImportBusy.value) return@launch
+            _taskerImportBusy.value = true
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val report = TaskerXmlExporter.export(
+                        profiles = db.profileDao().getAll().map { it.toDomain() },
+                        tasks = db.taskDao().getAll().map { it.toDomain() },
+                        variables = variableRepository.decodedForExportRedaction(),
+                    )
+                    val stream = appContext.contentResolver.openOutputStream(uri)
+                        ?: error("Unable to open export destination")
+                    stream.bufferedWriter(Charsets.UTF_8).use { writer -> writer.write(report.xml) }
+                    report
+                }
+            }
+                .onSuccess { report ->
+                    events.send(
+                        message(
+                            R.string.ui_message_tasker_xml_exported,
+                            report.exportedProfileCount,
+                            report.exportedTaskCount,
+                            report.skippedActions.size,
+                        ),
+                    )
+                }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_tasker_xml_export)) }
+            _taskerImportBusy.value = false
         }
     }
 
