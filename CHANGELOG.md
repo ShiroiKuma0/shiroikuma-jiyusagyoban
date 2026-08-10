@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The F-Droid distribution builds unsigned again, restoring the `app-release-unsigned.apk` artifact its build recipe and the reproducibility harness both name; adding the repo-owned signing fallback had silently renamed it to `app-release.apk`. The metadata gate now derives the expected artifact path from the signing decision and refuses to run against a non-F-Droid distribution instead of reporting a pass.
 - Device orientation now follows the Android sensor convention: a normally held phone reports `portrait` rather than `portrait_upside_down`, and the landscape sub-values are no longer swapped.
 - Tethering state now reports the union of Wi-Fi hotspot and interface tethering and publishes an initial value on registration. Any delivery of the legacy tethering broadcast previously latched the state to on, so it stayed on after tethering stopped, and a `tethering=false` predicate could never match.
 - A state context whose predicate cannot be parsed no longer starts GPS, telephony receivers, and every sensor for a context that can never match.
