@@ -51,6 +51,26 @@ class MqttPublishProtocolTest {
         )
     }
 
+    /**
+     * A host resolving to both a private and a public record must not pass the cleartext gate: the
+     * socket would otherwise re-resolve the name and could send the CONNECT - username and password
+     * included - to the public address. Mirrors the HTTP action's private-only DNS policy.
+     */
+    @Test
+    fun cleartextRequiresEveryResolvedAddressToBePrivate() {
+        val mixed = { _: String ->
+            arrayOf(InetAddress.getByName("192.168.1.10"), InetAddress.getByName("203.0.113.10"))
+        }
+
+        assertFalse(MqttNetworkPolicy.isPrivateOrLocalHost("broker", mixed))
+        assertEquals(null, MqttNetworkPolicy.resolvePrivateOnly("broker", mixed))
+        assertEquals(null, MqttNetworkPolicy.resolvePrivateOnly("broker") { emptyArray() })
+        assertEquals(
+            InetAddress.getByName("10.0.0.5"),
+            MqttNetworkPolicy.resolvePrivateOnly("broker") { arrayOf(InetAddress.getByName("10.0.0.5")) },
+        )
+    }
+
     @Test
     fun wirePacketsCarryConnectPublishQosAndRetainFlags() {
         val connect = MqttWireCodec.connectPacket("ot-fixture", "user", "pass")

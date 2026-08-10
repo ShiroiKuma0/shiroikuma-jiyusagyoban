@@ -75,12 +75,27 @@ object MqttPublishProtocol {
 }
 
 object MqttNetworkPolicy {
+    /**
+     * Resolves [host] only when every address it maps to is private, mirroring the HTTP action's
+     * cleartext DNS policy.
+     *
+     * Accepting a host because *any* address was private, then letting the socket re-resolve the
+     * name at connect time, let a hostname with both a private and a public record pass the
+     * "local only" gate and send the cleartext CONNECT - credentials included - to the public one.
+     * Callers connect to the address returned here rather than to the name.
+     */
+    fun resolvePrivateOnly(
+        host: String,
+        resolver: (String) -> Array<InetAddress> = InetAddress::getAllByName,
+    ): InetAddress? = runCatching {
+        val addresses = resolver(host)
+        addresses.firstOrNull().takeIf { addresses.isNotEmpty() && addresses.all(::isPrivateOrLocalAddress) }
+    }.getOrNull()
+
     fun isPrivateOrLocalHost(
         host: String,
         resolver: (String) -> Array<InetAddress> = InetAddress::getAllByName,
-    ): Boolean = runCatching {
-        resolver(host).any(::isPrivateOrLocalAddress)
-    }.getOrDefault(false)
+    ): Boolean = resolvePrivateOnly(host, resolver) != null
 
     private fun isPrivateOrLocalAddress(address: InetAddress): Boolean {
         if (address.isLoopbackAddress || address.isLinkLocalAddress || address.isSiteLocalAddress) return true
@@ -93,18 +108,26 @@ object MqttNetworkPolicy {
 }
 
 fun interface MqttPublishTransport {
-    suspend fun publish(config: MqttPublishConfig)
+    /**
+     * [pinnedAddress] is the address the cleartext gate vetted. Connecting to it rather than
+     * re-resolving the hostname is what stops a mixed private/public record from being
+     * approved as local and then reached over the public one.
+     */
+    suspend fun publish(config: MqttPublishConfig, pinnedAddress: InetAddress?)
 }
 
 class SocketMqttPublishTransport : MqttPublishTransport {
-    override suspend fun publish(config: MqttPublishConfig) = withContext(Dispatchers.IO) {
+    override suspend fun publish(config: MqttPublishConfig, pinnedAddress: InetAddress?) = withContext(Dispatchers.IO) {
         val socket = if (config.tls) {
             SSLSocketFactory.getDefault().createSocket()
         } else {
             Socket()
         }
         socket.use { connection ->
-            connection.connect(InetSocketAddress(config.host, config.port), config.timeoutSeconds * 1_000)
+            val endpoint = pinnedAddress
+                ?.let { InetSocketAddress(it, config.port) }
+                ?: InetSocketAddress(config.host, config.port)
+            connection.connect(endpoint, config.timeoutSeconds * 1_000)
             connection.soTimeout = config.timeoutSeconds * 1_000
             (connection as? SSLSocket)?.startHandshake()
             val clientId = "ot-${UUID.randomUUID().toString().replace("-", "").take(16)}"
@@ -221,15 +244,17 @@ class MqttPublishAction(
         val config = MqttPublishProtocol.parse(args).getOrElse { error ->
             return ActionResult.Failure(error.message ?: "Invalid MQTT publish")
         }
-        val localHost = MqttNetworkPolicy.isPrivateOrLocalHost(config.host)
-        if (!config.tls && !localHost) {
+        // Pin the vetted address so the socket cannot re-resolve the name to a public record
+        // between this check and the connect.
+        val privateAddress = MqttNetworkPolicy.resolvePrivateOnly(config.host)
+        if (!config.tls && privateAddress == null) {
             return ActionResult.Failure("MQTT without TLS is limited to private or local hosts")
         }
-        if (localHost) {
+        if (privateAddress != null) {
             checkLocalNetworkPermission(ctx)?.let { return it }
         }
         return runCatching {
-            transport.publish(config)
+            transport.publish(config, privateAddress.takeIf { !config.tls })
             ctx.logger("MQTT publish succeeded for ${config.host}:${config.port} qos=${config.qos} retain=${config.retain}")
             ActionResult.Success
         }.getOrElse { error ->
