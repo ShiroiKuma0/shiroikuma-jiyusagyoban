@@ -1,265 +1,8 @@
 # OpenTasker Roadmap
 
-**Current app version:** 0.2.82
-**Last updated:** 2026-08-02
+Actionable work only. Historical and completed roadmap material is archived in CHANGELOG.md; blocked work is kept in Roadmap_Blocked.md.
 
-Only open work belongs here; git history and `CHANGELOG.md` are the release record.
-Blocked items live in `Roadmap_Blocked.md`.
-
-## Evaluations
-
-- [ ] P3 — Evaluate Glance widget migration
-  Why: As of 2026-07-29, widgets use RemoteViews XML; Glance could reduce widget/UI divergence but may add dependency and capability tradeoffs.
-  Evidence: `app/src/main/java/com/opentasker/widget/TaskWidgetProvider.kt`; `app/src/main/res/layout/widget_task.xml`; https://developer.android.com/jetpack/androidx/releases/glance
-  Touches: widget package, Gradle dependencies, widget tests.
-  Acceptance: Recommendation records APK-size impact, missing Glance features, testability gains, and migration steps; no production rewrite happens before the decision is accepted.
-  Complexity: S
-  **2026-08-02 research note — the answer is "wait", and recording that closes this item.** Glance stable is still 1.1.1 (2024-10-16); 1.2.0 has sat at rc01 since 2025-12-03 with no stable release in eight months, and `glance-wear-tiles` is deprecated in favour of an unshipped `glance-wear-widgets`. Re-open when 1.2.0 is stable.
-
-- [ ] P3 — Evaluate Navigation3 timing
-  Why: The app uses Navigation Compose 2.9.8, while Navigation3 is still an alpha-track migration target and the UI split is a higher-priority risk.
-  Evidence: `gradle/libs.versions.toml`; https://developer.android.com/jetpack/androidx/releases/navigation3
-  Touches: navigation setup, route/state ownership, deep-link/editor-state handling.
-  Acceptance: Recommendation states wait/migrate criteria, minimum stable version, expected code movement, and risks to editor state and deep links.
-  Complexity: S
-  **2026-08-02 research note — the minimum stable version is Navigation3 1.2.0.** Core has been stable since 1.0.0 (2025-11-19, now 1.1.5), but deep links only arrived in 1.2.0-alpha03 (`DeepLinkRequest`, `UriDeepLinkMatcher`) and those factory functions already broke at alpha05; result passing (`ResultEventBus`) is alpha-only. Both are hard requirements for this app's editor-state and deep-link behaviour.
-
-- [ ] P3 — Evaluate bounded accessibility automation as an opt-in advanced module
-  Why: Tasker/AutoInput, MacroDroid, and AutoJs6 show demand for tap/read automation, but unbounded accessibility scripting is a high policy and trust risk.
-  Evidence: https://github.com/SuperMonster003/AutoJs6; https://support.google.com/googleplay/android-developer/answer/10964491; no `AccessibilityService` entry in `app/src/main/AndroidManifest.xml`
-  Touches: manifest/service design, action metadata, setup disclosure, permission UX, policy documentation.
-  Acceptance: Threat model and policy review define whether bounded tap/swipe/read actions can ship, what data is never collected, and why arbitrary scripting is excluded.
-  Complexity: M
-  **2026-08-02 research note — new maintenance-cost evidence for the "no" side, to record in the threat model.** Klick'r issue #599 (Android 15 gesture execution stops randomly) has been labeled `blocked` since 2025-01-16; Key Mapper's Shizuku-backed System Bridge breaks on every wireless-debugging re-prompt (#2026, #2071); AutoJs6 issue #372 is a 7 GB RAM blowup and #407 is the maintainer's indefinite project-suspension notice (2025-05-30).
-
-## Research-Driven Additions (2026-08-02)
-
-Reconciled against the current tree, `Roadmap_Blocked.md`, and all prior passes. Items already tracked elsewhere — execution envelope, API 37 device evidence, background audio, BAL `IntentSender`, `RangingManager` proximity, Health Connect, Weblate, F-Droid reproducibility, TalkBack sweep, Shizuku device evidence, Developer Verification posture — are intentionally not repeated.
-
-### P0 — Data integrity and gate truth
-
-- [ ] P0 — Fail closed when an undo/redo snapshot will not decode
-  Why: The restore path writes an undecodable or wrong-entity JSON blob straight into the entity's payload column and reports success, contradicting the fail-closed doctrine every other stored-payload path follows (`e2f8786`).
-  Evidence: `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationViewModel.kt:1346-1351,1364-1368,1381-1386` — `decodeFromString<Task>(targetJson).takeIf { it.id == entityId }?.toEntity()` falls back to `current.copy(actionsJson = targetJson)`; `app/src/main/java/com/opentasker/core/storage/TaskDao.kt:43` requires that column to decode as `List<ActionSpec>`, so the ID-mismatch branch writes a whole-Task object into it.
-  Touches: `ActiveAutomationViewModel` undo/redo transaction, `EditHistoryDao`, storage decode-result helpers, a new JVM test per entity type.
-  Acceptance: An undo/redo whose snapshot fails to decode, or whose decoded id differs from the target, aborts the transaction, leaves the entity untouched, surfaces an error, and is covered by a test for Task, Profile, and Scene; no path writes an unvalidated payload string.
-  Complexity: S
-
-- [ ] P0 — Verify every field of `release-truth.json`, and stop the generator regressing it
-  Why: The `dependencies` block is generated but never asserted and is already stale, and the generator hardcodes a value the verifier and README disagree with — a release contract with unenforced fields is worse than no contract.
-  Evidence: `VerifyReleaseTruthTask.verify()` in `app/build.gradle.kts:633-667` asserts only `application`/`android`/`capabilities` keys; `tools/release-truth.json` claims `kotlin 2.3.21`, `ksp 2.3.7`, `composeBom 2026.05.00` against `gradle/libs.versions.toml`'s `2.4.10`/`2.3.10`/`2026.06.00`; `tools/generate-release-truth.ps1` hardcodes `engineHandledActions = 7` while the truth file and README say 10.
-  Touches: `app/build.gradle.kts` (`VerifyReleaseTruthTask`), `tools/generate-release-truth.ps1`, `tools/release-truth.json`, `ReleaseTruthContractTest`.
-  Acceptance: Every key in the truth manifest is asserted against a derived source value; `engineHandledActions` is derived from `FlowControl` plus `SUB_TASK_ACTION_ID` rather than hardcoded; regenerating the manifest on a clean tree produces a byte-identical file and the gate passes; mutating any single value fails the gate.
-  Complexity: S
-
-### P1 — Honest capabilities, supply chain, and self-diagnosis
-
-- [ ] P1 — Make `flow.try` retry honest across all 74 actions
-  Why: The editor offers `max_attempts` (1-5) and `backoff_ms` on every try block, but retry is gated on `retrySafety == IDEMPOTENT` and only 1 of 74 actions declares it — a user who sets 3 attempts around `ping`, `download`, `mqtt.publish`, `wol`, or `data.read` gets one attempt and no explanation.
-  Evidence: `app/src/main/java/com/opentasker/core/engine/TaskRunner.kt:358-360`; `app/src/main/java/com/opentasker/core/engine/Action.kt:51` (`NEVER` default); `app/src/main/java/com/opentasker/core/actions/HttpRequestAction.kt:184` is the only override.
-  Touches: every action file, `Action.kt`, `ActionMetadata.kt` (try-block field copy), `TaskRunner`, action capability tests.
-  Acceptance: Each of the 74 actions carries a reviewed `retrySafety`; the try-block editor states which enclosed actions will actually retry; a non-retryable failure inside a try records that reason in the run log rather than silently skipping the retry branch; a source guard fails when a new action omits the classification.
-  Complexity: M
-
-- [ ] P1 — Replace trust-on-first-fetch dependency verification with independent verification
-  Why: All 1396 checksums carry `origin="Generated by Gradle"` and `<verify-signatures>false</verify-signatures>`, so the metadata pins whatever was downloaded rather than what upstream published — a first-fetch compromise would be recorded as trusted forever.
-  Evidence: `gradle/verification-metadata.xml:3-5` and every `<sha256 … origin="Generated by Gradle"/>` entry across 824 components; https://docs.gradle.org/current/userguide/dependency_verification.html
-  Touches: `gradle/verification-metadata.xml`, `tools/verify-local-release.ps1`, release documentation.
-  Acceptance: `verify-signatures` is `true` with an explicit `<trusted-keys>` set for the signed subset; checksum-only entries are cross-checked against upstream-published `.sha256`/`.asc` files and their `origin` records that provenance; the gate fails if any entry reverts to a Gradle-generated origin; no blanket `trusted-artifacts` entry is introduced.
-  Complexity: M
-
-- [ ] P1 — Detect and name inter-profile causal loops
-  Why: `MAX_SUBTASK_DEPTH` only guards nested `task.run`; a profile whose action satisfies another profile's context starts a fresh depth-0 run, so an A→B→A cycle appears only as an unexplained admission-controller storm with no named cause. CHI 2019 classifies this as the Infinite Loop bug; Node-RED solves it with a hard, uncatchable loop counter.
-  Evidence: `app/src/main/java/com/opentasker/core/engine/TaskRunner.kt:475`; `app/src/main/java/com/opentasker/core/engine/ExecutionAdmissionController.kt:29-35`; https://dl.acm.org/doi/10.1145/3290605.3300782; https://nodered.org/docs/user-guide/handling-errors
-  Touches: `ExecutionEnvelope` (causal parent and depth), `ProfileMatcher`, `AutomationService` dispatch, run-log terminal reasons, `ContextInspector` explanation, engine tests.
-  Acceptance: An execution carries a causal parent and depth; exceeding a fixed depth aborts with a terminal reason naming the participating profiles; the Run Log and Diagnostics show the cycle rather than a generic rate-limit skip; a test drives a two-profile cycle and asserts it is named and stopped.
-  Complexity: M
-
-- [ ] P1 — Correlate engine downtime with `ApplicationExitInfo`
-  Why: `EngineHeartbeatStore` records *that* the engine stopped but nothing records *why*; OEM process killing is the most-cited failure in the category and is endorsed as such by Tasker's own author. There are zero occurrences of `ApplicationExitInfo` in the tree.
-  Evidence: `app/src/main/java/com/opentasker/core/diagnostics/EngineHealthReader.kt`; https://developer.android.com/reference/android/app/ApplicationExitInfo; https://dontkillmyapp.com/; Android 17 adds a `"MemoryLimiter:AnonSwap"` description (https://developer.android.com/about/versions/17/behavior-changes-all)
-  Touches: `EngineHealthReader`, `EngineHeartbeatStore`, `DiagnosticsScreen`, diagnostic export, JVM tests with a fake exit-reason source.
-  Acceptance: On startup the engine pairs each heartbeat gap with a historical exit record (API 30+ guarded) and Diagnostics shows a first-class row naming the reason, timestamp, and gap duration; below API 30 the row states the platform cannot report it rather than implying health.
-  Complexity: M
-
-- [ ] P1 — Reconcile missed triggers against expected fire times
-  Why: `EngineWatchdogWorker` checks liveness but nothing compares expected next-fire times against actual fires, so a Doze or OEM-kill gap leaves no evidence and the user learns nothing. This is the observable half of the OEM problem no FOSS competitor answers.
-  Evidence: `app/src/main/java/com/opentasker/core/engine/EngineWatchdogWorker.kt`; `app/src/main/java/com/opentasker/automation/scheduler/TimeEventScheduler.kt`; https://developer.android.com/topic/performance/power/power-details
-  Touches: a persisted expected-fire ledger, `TimeEventScheduler`, `EngineWatchdogWorker`, Run Log, Setup remediation copy, scheduler tests.
-  Acceptance: Every scheduled trigger persists its expected next fire; the watchdog records each overdue trigger as a first-class missed-trigger entry with the elapsed delay and the standby bucket at the time, then points at the specific setting that would have prevented it; a test simulates a gap and asserts the miss is recorded exactly once.
-  Complexity: M
-
-- [ ] P1 — Extend reference safety to variables
-  Why: `AutomationReferenceIndex.OwnerKind` covers `PROFILE, TASK, SCENE` but not `VARIABLE`, so renaming or deleting a variable silently breaks every `%var` and `{{ }}` reference to it. This is the fourth-most-requested Tasker feature (41 supporters) and the machinery already exists.
-  Evidence: `app/src/main/java/com/opentasker/core/references/AutomationReferenceIndex.kt:24`; `app/src/main/java/com/opentasker/core/references/AutomationReferenceRewriter.kt`; https://tasker.helprace.com/s1-general/ideas/top
-  Touches: `AutomationReferenceIndex`, `AutomationReferenceRewriter`, `VariablesScreen`, `VariableNamePolicy`, template and legacy expansion scanning, reference tests.
-  Acceptance: Renaming a variable rewrites every reference in action arguments, conditions, scene bindings, and templates atomically; deleting one that is still referenced is blocked with the referencing sites listed; local/global scope normalisation is preserved; tests cover both expansion syntaxes.
-  Complexity: M
-
-- [ ] P1 — Publish `docs/`, unpublish the raw research transcript
-  Why: `.gitignore`'s blanket `*.md` leaves the entire `docs/` tree untracked, so README's `docs/EXTERNAL_INTENTS.md` link 404s on GitHub and fifteen useful docs are invisible to contributors and F-Droid reviewers — while `docs/research/raw-research-output.txt` (60,688 bytes) *is* committed and opens with a raw agent transcript header, violating the no-AI-references-in-committed-content rule.
-  Evidence: `git ls-files docs` returns only `docs/archive/ui-snapshots/README.md` and `docs/research/raw-research-output.txt`; `README.md:112`; `.gitignore` `*.md` / `!README.md`; `app/build.gradle.kts:755` names `CLAUDE.md` in committed source.
-  Touches: `.gitignore` (a `!docs/**/*.md` negation), `git rm --cached docs/research/raw-research-output.txt`, `docs/research/iter-1-roadmap-recommendations.md`, `app/build.gradle.kts` `verifyDocumentationTruth` inputs, `docs/IMPROVEMENT_PLAN.md` (a 9-line stub).
-  Acceptance: Every `docs/*.md` referenced by README resolves on GitHub; no tracked file contains an AI-tool reference or agent transcript; a link check over README's relative paths runs in the gate; the historical-doc scan no longer depends on gitignored inputs that are absent on a clean checkout.
-  Complexity: S
-
-- [ ] P1 — Single-source the capability, schema, and version literals
-  Why: The same four facts are hardcoded in four places that must be edited in lockstep, and the Room schema claim is scraped from a build-script literal rather than the source constant — so a `@Database` bump with a stale literal passes every gate.
-  Evidence: `app/build.gradle.kts:641` (`val currentVersion` regex), `:691` (`val currentVersion = 10`), `:763-765` (`actionCount.set(74)`, `contextFamilyCount.set(7)`, `schemaVersion.set(10)`), against `app/src/main/java/com/opentasker/core/storage/AppDatabase.kt:7` (`OPEN_TASKER_DATABASE_SCHEMA_VERSION = 10`).
-  Touches: `app/build.gradle.kts` or an extracted `buildSrc` convention plugin, `verifyRoomSchema`, `verifyDocumentationTruth`, `verifyReleaseTruth`, `tools/generate-release-truth.ps1`.
-  Acceptance: Action count, context-family count, and Room schema version are each derived from exactly one source location and consumed by every gate; changing `OPEN_TASKER_DATABASE_SCHEMA_VERSION` without exporting the schema fails the build; no verification task contains a hardcoded capability literal.
-  Complexity: S
-
-- [ ] P1 — Ratchet the test floor and add coverage measurement
-  Why: `verifyJvmTestCount` enforces 522 against 979 actual `@Test` methods, so nearly half the suite could be deleted without tripping the gate, and nothing measures which code those tests reach. Four packages have zero tests.
-  Evidence: `app/build.gradle.kts:567-573` (`minimumTests.set(522)`); no test package for `core/scheduling`, `core/resilience`, `automation/receiver`, or `ui/utils`; no Kover or JaCoCo anywhere in the build.
-  Touches: `app/build.gradle.kts`, `gradle/libs.versions.toml`, `tools/verify-local-release.ps1`, new tests for the four uncovered packages.
-  Acceptance: The floor tracks the current count with a documented ratchet step; a coverage report is produced by the gate with a per-area floor that fails on regression; `ExactAlarmSupport`, `GracefulDegradation`, and `TimeEventReceiver` have tests.
-  Complexity: S
-
-- [ ] P1 — Stop shipping empty locale resources and enable per-app language selection
-  Why: Twelve of thirteen locale directories contain only an empty `<resources/>`, `values-es` covers 34 of 1,789 strings (1.9%), and with no `localeConfig` the Android 13+ per-app language picker is unavailable — so the APK advertises thirteen languages and delivers one.
-  Evidence: `app/src/main/res/values-{ar,de,fr,hi,it,ja,ko,pl,pt-rBR,ru,tr,zh-rCN}/strings.xml` are empty; `app/src/main/res/values-es/strings.xml` has 34 strings; `app/src/main/res/values/{strings,action_catalog_strings,dynamic_surface_strings}.xml` total 1,789; no `android:localeConfig` in `app/src/main/AndroidManifest.xml`.
-  Touches: `AndroidManifest.xml`, `app/build.gradle.kts` (`androidResources { generateLocaleConfig = true }`), locale resource directories, the README translation section, a source guard.
-  Acceptance: Only locales above a stated completion threshold ship and appear in the system per-app language picker; empty locale directories are removed or excluded from the release APK; a gate fails when a locale directory exists below the threshold; README's translation instructions match the enforced rule.
-  Complexity: S
-
-### P2 — Debuggability, execution semantics, and authoring depth
-
-- [ ] P2 — Park rejected executions as HELD and allow manual replay
-  Why: An admission-capacity rejection or circuit trip discards the triggering event entirely, so the app's best safety feature is also silent data loss. Zapier's rule is the right one: retry automatically where safe, but never auto-replay held work.
-  Evidence: `app/src/main/java/com/opentasker/core/engine/ExecutionAdmissionController.kt`; https://zapier.com/help/autoreplay/; https://docs.n8n.io/hosting/scaling/execution-data/
-  Touches: `ExecutionEnvelope`, `ExecutionAdmissionController`, run-log schema (new terminal state plus stored redacted trigger payload), `RunLogPruneWorker` carve-outs, Run Log UI, Room migration.
-  Acceptance: A rejected execution is recorded as `HELD` with its redacted trigger payload and the rejecting policy; the user can replay it, producing a new execution with a `replayOf` link; `RunLogPruneWorker` never prunes held or user-starred runs; replay is covered by a test.
-  Complexity: M
-
-- [ ] P2 — Simulate a trigger with a pinned synthetic event
-  Why: Manual run and `PreflightRunner` exercise the task, but nothing exercises the *matcher* — context predicates, group logic, cooldown, dwell, and admission — which is where the trigger-misfire bug class actually lives (five separate fixes in history).
-  Evidence: `app/src/main/java/com/opentasker/core/engine/PreflightRunner.kt`; `app/src/main/java/com/opentasker/core/engine/ProfileMatcherImpl.kt`; https://docs.n8n.io/data/data-pinning/
-  Touches: an editor-only execution mode flag on the envelope, `ProfileMatcher` synthetic-event injection, context editors, `ContextInspectorScreen`, matcher tests.
-  Acceptance: From a profile editor the user can inject a fabricated event of the right shape and see which predicates passed, which blocked, and whether admission would have accepted the run; simulated runs never write production run-log state or fire side effects; every context family supplies a synthetic-event template.
-  Complexity: M
-
-- [ ] P2 — Add a per-task debug mode with breakpoints, stepping, and a variable watch panel
-  Why: 129 of 190 analysed automation forum threads are debugging and existing tools fix none of them; Tasker has 38 votes and no developer response, Apple Shortcuts has no debugger, Node-RED has none in core. Nobody has shipped one on a phone, and OpenTasker already has per-step traces and a live in-flight view.
-  Evidence: https://arxiv.org/abs/2408.04755; https://tasker.helprace.com/i22-improved-debugging; https://www.macstories.net/reviews/logger-for-shortcuts/; the existing per-step inspector in `RunLogScreenContent.kt` and live-execution view in `ActiveAutomationViewModel.kt`
-  Touches: `TaskRunner` (pause/step/resume), `ExecutionEnvelope` (debug flag), a debug surface in `ui/screens`, `VariableStore` snapshot exposure, redaction policy, tests.
-  Acceptance: Debug mode is opt-in per task, visibly indicated while active, and expires; the user can set a breakpoint on an action, step, and read task/event/global variable values with their source scope and setting step; unredacted values appear only in this elevated state and are never persisted to the run log or diagnostic export; leaving debug mode clears the capture. Resolve the debug-capture boundary question in `RESEARCH.md` before building.
-  Complexity: L
-
-- [ ] P2 — Lint automations against the trigger-action bug taxonomy
-  Why: CHI 2019 measured ten TAP bug classes, eight of which impaired user prediction; four are statically decidable against structures already in the tree, and no automation product ships this.
-  Evidence: https://dl.acm.org/doi/10.1145/3290605.3300782; `app/src/main/java/com/opentasker/core/flow/AutomationFlowGraph.kt`; `app/src/main/java/com/opentasker/core/contexts/ContextInspector.kt`
-  Touches: a pure lint module, `AutomationFlowGraph`, profile save validation, `ContextInspectorScreen`, import review, lint tests.
-  Acceptance: Saving or importing a profile reports Missing Reversal (a persistent-setting enter task with no exit task), Repeated Triggering (a state trigger with no cooldown, dwell, or idempotency guard), Priority Conflict (simultaneously-satisfiable profiles writing the same setting), and inter-profile Infinite Loop; each finding explains the risk and offers the concrete fix; findings are warnings except Priority Conflict at equal priority, which blocks.
-  Complexity: M
-
-- [ ] P2 — Add profile priority, activation grace, and automation lifetime
-  Why: Three small entity fields close three separately-evidenced gaps: no priority means simultaneous matches resolve nondeterministically (the worst-accuracy TAP bug class), no grace period means state contexts flap (27 supporters on Tasker, marked Planned), and no expiry means "run this until Friday" is impossible (Samsung shipped it in One UI 8.5).
-  Evidence: `app/src/main/java/com/opentasker/core/model/Profile.kt:11-24` has none of the three; https://github.com/henrichg/PhoneProfilesPlus/blob/master/docs/ppp_features.md; https://tasker.helprace.com/s1-general/ideas/top; https://www.androidauthority.com/one-ui-8-5-routine-scheduling-3648715/
-  Touches: `Profile` entity, Room migration and schema export, `ProfileMatcher`, profile editor, bundle schema and Tasker import mapping, `ContextInspector` copy, tests.
-  Acceptance: A profile can declare a priority, a symmetric activate/deactivate grace period, and an expiry (never / on a date / once); the matcher honours all three; the Inspector explains a suppression caused by any of them; bundle export and import round-trip the fields and older bundles migrate to safe defaults.
-  Complexity: M
-
-- [ ] P2 — Expose per-profile concurrency limits and make overflow visible
-  Why: Admission limits are module constants with no per-profile override and no user-facing surface, so a user hitting the 2-active or 8-burst cap sees a skip they will report as a bug. Home Assistant solves exactly this with per-automation `max` plus `max_exceeded`.
-  Evidence: `app/src/main/java/com/opentasker/core/engine/ExecutionAdmissionController.kt:10-16,29-35`; https://www.home-assistant.io/docs/automation/modes/
-  Touches: `Profile` entity, Room migration, `ExecutionAdmissionController` wiring, profile editor, run-log terminal reasons, Diagnostics.
-  Acceptance: A profile can override its active and burst limits within bounded ranges and choose whether overflow is logged or silent; every rejection records which limit fired and the counts at the time; Diagnostics shows circuit-breaker state with the trip reason and remaining open time.
-  Complexity: S
-
-- [ ] P2 — Add a fallback failure task and a structured error object
-  Why: `flow.catch` is lexical only, so a failure outside a try block ends the task with nothing else running, and catch handlers receive flat `FLOW_ERROR_*` strings that are hard to compose or test. Node-RED and n8n both prove the scoped-catch plus global-error-handler shape.
-  Evidence: `app/src/main/java/com/opentasker/core/engine/FlowStructure.kt`; `app/src/main/java/com/opentasker/core/engine/TaskRunner.kt:345-375`; https://nodered.org/docs/user-guide/handling-errors; https://docs.n8n.io/flow-logic/error-handling/
-  Touches: `Profile` and global settings (a fallback task reference), `TaskRunner`, `VariableStore` error scope, run-log terminal reasons, the reference index (a fallback task must be delete-safe), tests.
-  Acceptance: An unhandled task failure runs an optional per-profile then global fallback task, receiving a structured error with failing action id, index, type, message, attempt count, and originating profile; a successful retry reports success and clears the retrying flag (do not reproduce n8n issue #10763); fallback failures cannot recurse.
-  Complexity: M
-
-- [ ] P2 — Offer typed step outputs as inline variable chips in the action editor
-  Why: Chaining currently requires the user to know and hand-type a variable name on a phone keyboard — the single largest authoring-UX gap in the survey. vFlow's typed `OutputDefinition`→`InputDefinition` picker and Apple's Magic Variables both solve it, and the change is editor-only: the chip serialises to the existing `{{ }}` text.
-  Evidence: `app/src/main/java/com/opentasker/core/actions/ActionMetadata.kt`; `app/src/main/java/com/opentasker/core/expressions/TemplateExpressionEngine.kt`; https://github.com/ChaoMixian/vFlow; https://support.apple.com/guide/shortcuts/use-variables-apdd02c2780c/ios
-  Touches: `ActionMetadata` (declared outputs with types), `ActionEditorDialogs`, template serialisation, `AutomationFlowScreen` node rendering, metadata tests.
-  Acceptance: Each action declares its output variables and their types; a text field offers only type-compatible outputs from earlier steps plus event and global scopes; selecting one inserts a chip that serialises to existing template text and round-trips through storage and bundle export unchanged; hand-typed templates keep working.
-  Complexity: L
-
-- [ ] P2 — Render each action as a one-line parameter summary
-  Why: An action row currently shows a type and a form preview; Apple treats a grammatical summary sentence as mandatory for every intent because it is what makes multi-step authoring legible on a small screen. The copy is resource-backed already, so it localises for free.
-  Evidence: `app/src/main/java/com/opentasker/core/actions/ActionMetadata.kt`; `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationLists.kt`; https://developer.apple.com/videos/play/wwdc2024/10210/
-  Touches: `ActionMetadata` (a summary string resource with field placeholders), action list rows, `AutomationFlowScreen` nodes, `PreflightReviewDialog`, the localisation source guard, redaction policy for summarised arguments.
-  Acceptance: Every action declares a summary template that stays grammatical for any parameter value including empty; task rows, flow nodes, and preflight all render it; sensitive arguments remain masked inside the summary; a source guard fails when an action ships without one.
-  Complexity: M
-
-- [ ] P2 — Show a running task as a promoted ongoing notification
-  Why: The app already builds `Notification.ProgressStyle` but never requests promotion, so a running automation has no status-bar presence. This is an API-36 platform capability with no FOSS competitor using it.
-  Evidence: `app/src/main/java/com/opentasker/core/actions/BuiltInActions.kt:151-155` uses `ProgressStyle` but no `setRequestPromotedOngoing`; no `POST_PROMOTED_NOTIFICATIONS` in `app/src/main/AndroidManifest.xml`; https://developer.android.com/develop/ui/views/notifications/live-update
-  Touches: `AndroidManifest.xml`, the `AutomationService` foreground notification, `notify.progress`, capability metadata, a Setup row for `ACTION_MANAGE_APP_PROMOTED_NOTIFICATIONS`.
-  Acceptance: On API 36+ a running task can appear as a promoted ongoing chip with short critical text once the user has granted it; eligibility rules (ongoing, content title set, no custom RemoteViews, channel importance) are enforced in code; ineligibility and denial degrade to the current notification with an honest capability state, and below API 36 nothing changes.
-  Complexity: S
-
-- [ ] P2 — Deepen scheduling self-diagnosis with API 36/37 signals
-  Why: `EngineHealthReader` uses the API 34 singular `getPendingJobReason`; API 36/37 add history and aggregate stats, and API 37 adds profiling triggers for OOM, ANR, and excessive-CPU kills. This is the cheapest available upgrade to "why didn't my profile fire".
-  Evidence: `app/src/main/java/com/opentasker/core/diagnostics/EngineHealthReader.kt:166-175`; https://developer.android.com/about/versions/17/features; https://developer.android.com/about/versions/16/behavior-changes-16
-  Touches: `EngineHealthReader`, `DiagnosticsScreen`, diagnostic export, the health-signal model, tests with a fake scheduler.
-  Acceptance: Where available, Diagnostics reports pending-job reason history and aggregate stats, `WorkInfo.getStopReason()` values including `STOP_REASON_TIMEOUT_ABANDONED`, and the standby bucket expressed as a consequence ("RARE — time triggers may be delayed") rather than an enum; every reader is API-guarded and states unavailability rather than implying health.
-  Complexity: M
-
-- [ ] P2 — Arm triggers before first unlock using Direct Boot storage
-  Why: Nothing in the tree uses device-protected storage, so after a reboot no automation can arm until the user unlocks — the widely-reported post-reboot dead zone. DataStore has supported this since 1.2.0 stable.
-  Evidence: no `createInDeviceProtectedStorage`, `createDeviceProtectedStorageContext`, or `directBootAware` anywhere in `app/src/main`; https://developer.android.com/jetpack/androidx/releases/datastore
-  Touches: a device-protected DataStore for a minimal armed-trigger set, `BootReceiver` (`directBootAware`), `AutomationService` startup, `AndroidManifest.xml`, Setup disclosure, tests.
-  Acceptance: A bounded, explicitly opt-in set of non-secret triggers arms in the direct-boot phase and fires or queues before first unlock; nothing secret, encrypted, or Room-backed is read before user unlock; Setup states exactly which triggers gain pre-unlock behaviour and which cannot.
-  Complexity: M
-
-- [ ] P2 — Duplicate a profile, task, or scene
-  Why: Every surveyed competitor has it and it is the fastest way to author a variant; today the only path is export, edit, and re-import.
-  Evidence: no clone or duplicate entry point in `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationLists.kt` or `ActiveAutomationViewModel.kt`; present in PhoneProfilesPlus and MacroDroid.
-  Touches: `ActiveAutomationViewModel`, list row overflow menus, name-collision handling, the reference index, `EditHistoryDao`, tests.
-  Acceptance: Duplicating produces a disabled copy with a distinct name, fresh ids, and no shared mutable references; scene element and task bindings are remapped to the copy; the operation is undoable.
-  Complexity: S
-
-- [ ] P2 — Show a semantic diff when an edit is undone, restored, or re-imported
-  Why: `EditHistoryEntity` already stores `previousJson` and `nextJson`, so the data for a review UI exists and is unused; re-importing an updated bundle currently overwrites without showing what changes in the user's own profiles, which is Home Assistant's known blueprint defect.
-  Evidence: `app/src/main/java/com/opentasker/core/storage/EditHistoryDao.kt:16-18` (`previousJson`, `nextJson`, `isUndone`); https://dl.acm.org/doi/10.1145/3411764.3445567; https://github.com/home-assistant/core/issues/123025
-  Touches: a pure diff module over decoded entities, the edit-history UI, `ImportReviewDialogs`, `AutomationFlowGraph` changed-node highlighting, diff tests.
-  Acceptance: Undo/redo and bundle re-import present a structured diff of added, removed, and changed contexts and actions with sensitive values masked; the flow graph marks nodes whose reachability changed; the diff is derived from decoded entities, never raw JSON text.
-  Complexity: M
-
-- [ ] P2 — Become a Locale/Tasker *condition* plugin, not just a setting plugin
-  Why: `LocaleSettingEditActivity` and `LocaleSettingFireReceiver` are exported so other hosts can already run OpenTasker tasks, but there is no `EDIT_CONDITION`/`QUERY_CONDITION` component, so Tasker and MacroDroid cannot use OpenTasker's contexts, variables, or profile states as conditions. It is the missing half of an interop surface already half-built.
-  Evidence: `app/src/main/AndroidManifest.xml:384-401` (setting plugin present); `EDIT_CONDITION` and `QUERY_CONDITION` appear only inside `<queries>`; https://github.com/twofortyfouram/android-plugin-api-for-locale
-  Touches: a new exported edit activity and query receiver under `core/plugins/locale`, `AndroidManifest.xml` (`enforceIntentFilter`), bundle validation and redaction, `docs/LOCALE_PLUGIN_HOST.md`, contract tests.
-  Acceptance: A third-party host can configure and query an OpenTasker condition (profile active, variable comparison, context satisfied) and receives satisfied/unsatisfied/unknown correctly; bundles are validated and bounded on the way in; secret variables are never exposed; malformed or oversized bundles fail closed. Note that Android 16 no longer guarantees cross-app ordered-broadcast priority — do not depend on it.
-  Complexity: M
-
-- [ ] P2 — Detect implicit URI permission grants before Android 18 enforces them
-  Why: StrictMode already catches unsafe intent launches but not the new implicit-URI-grant detector, and the app both receives `ACTION_SEND`/`SEND_MULTIPLE` content URIs and dispatches intents with `GRANT_READ_URI`. Android 17 ships the detector; Android 18 enforces.
-  Evidence: `app/src/main/java/com/opentasker/app/OpenTaskerApp_NoHilt.kt:102-114`; the `ShareReceiverActivity` filters in `app/src/main/AndroidManifest.xml`; `app/src/main/java/com/opentasker/core/actions/BuiltInActions.kt:516`; https://developer.android.com/about/versions/17/behavior-changes-all
-  Touches: `OpenTaskerApp_NoHilt` StrictMode VmPolicy, `IntentDispatch`, share-receiver handling, a source guard.
-  Acceptance: Debug builds enable `detectImplicitUriPermissionGrant()` on API 37+; every outbound intent carrying a URI sets the grant flag explicitly; a source guard fails on a URI-bearing intent built without one; the share receiver states in-app when an incoming URI is not readable rather than failing opaquely.
-  Complexity: S
-
-- [ ] P2 — Collapse action registration to one declaration site
-  Why: Adding one action touches nine files across two unlinked registries, which the commit history shows is the dominant change shape in the repo; metadata key drift between them is a documented past bug class.
-  Evidence: `app/src/main/java/com/opentasker/core/RuntimeRegistries.kt` (74 hand-maintained entries) versus `app/src/main/java/com/opentasker/core/actions/ActionMetadata.kt` (1267 lines, same string keys, no compile-time link); the v0.2.62 CHANGELOG entry on metadata key drift.
-  Touches: the `Action` interface, `ActionRegistry`, `ActionMetadata`, `ActionCapabilities`, `ActionArgumentSensitivity`, `RuntimeRegistries`, the release-truth action-count derivation, all action files.
-  Acceptance: An action declares its id, category, fields, capability, retry safety, argument sensitivity, and summary in one place; the runtime registry, editor metadata, and capability contract are derived from it; the action count is computed from that single source; a missing declaration is a compile error rather than a drift bug.
-  Complexity: L
-
-- [ ] P2 — Toolchain hygiene and the Kotlin build-cache advisory
-  Why: Kotlin 2.4.10 is affected by CVE-2026-53914 (unsafe deserialization in build-cache metadata, fixed in 2.4.20, currently Beta2), and Gradle, AGP, and the Compose BOM are each behind with no blocking constraint recorded. `CLAUDE.md` gotcha #9 still documents an AGP 8.9.1 / Compose BOM 2025.07.00 ceiling that predates two upgrades and names Hilt, which is no longer in the tree.
-  Evidence: `gradle/libs.versions.toml`; https://github.com/advisories/GHSA-r937-wjx7-w2jp; Gradle 9.6.1 and AGP 9.3.1 are current as of 2026-08-02; Netty 4.1.93/4.1.110 appear in `gradle/verification-metadata.xml` with 2026 high-severity advisories, confirmed absent from the shipped APK.
-  Touches: `gradle/libs.versions.toml`, `gradle/wrapper/gradle-wrapper.properties` plus both pinned hashes and `ReleaseTruthContractTest`, `gradle/verification-metadata.xml`, `docs/DEPENDENCY_MODERNIZATION.md`, `CLAUDE.md` gotcha #9.
-  Acceptance: The advisory is recorded with its mitigation (no untrusted remote build caches) and an upgrade trigger on Kotlin 2.4.20 stable; Gradle, AGP, and the Compose BOM are current or carry a recorded blocking reason; Netty is excluded or pinned out of the build classpath so OSV output stays clean; gotcha #9 is corrected or deleted.
-  Complexity: S
-
-### P3 — Breadth, ecosystem, and distribution
-
-- [ ] P3 — Add the six low-privilege sensor triggers the actively-released FOSS competitor has
-  Why: `com.jens.automation2` 1.8.7 ships `deviceOrientation`, `proximity`, `activityDetection`, `speed`, `roaming`, and `tethering`, plus phone-call state; these are the entire trigger-breadth gap against it and none needs a privileged or always-on-microphone grant.
-  Evidence: https://f-droid.org/en/packages/com.jens.automation2/; `app/src/main/java/com/opentasker/core/contexts/StateContextSourceImpl.kt` covers none of them. The ambient-noise trigger from that same project is deliberately excluded — see Rejected Ideas in `RESEARCH.md`.
-  Touches: `StateContextSourceImpl` or new event sources, `ContextSpec` config, context editors, capability and setup gating, `AndroidManifest.xml` (`ACTIVITY_RECOGNITION`, `READ_PHONE_STATE`), Inspector copy, tests.
-  Acceptance: Each trigger is registered with a real runtime source, declares its permission and setup requirement, fails closed with a Setup pointer when ungranted, and appears in the Inspector with live values; each ships with JVM coverage for its matching predicate.
-  Complexity: M
+## Actionable Items
 
 - [ ] P3 — Convert guided templates into data-driven blueprints with typed selectors
   Why: Templates are Kotlin code today, so each new one needs code and no user can author one. Home Assistant's blueprint model (metadata plus typed `input` entries whose `selector` both constrains the value and *is* the widget, grouped into collapsible sections) gives an ecosystem shape with no server, and CHI 2016 showed users overwhelmingly duplicate each other's automations rather than author from scratch.
@@ -309,3 +52,597 @@ Reconciled against the current tree, `Roadmap_Blocked.md`, and all prior passes.
   Touches: an opt-in setting, a bounded release-feed check reusing the existing HTTP policy, Setup disclosure, `BuildConfig.DISTRIBUTION` gating, tests.
   Acceptance: The check is off by default, absent entirely from the F-Droid build, performs one bounded HTTPS request on an explicit schedule, sends no identifying data, and reports only that a newer version exists with a link — never downloading or installing anything.
   Complexity: S
+
+- [ ] P1 — Add opt-in local rolling configuration snapshots with bounded restore
+  Why: `DatabaseBackupManager` provides manual WAL-safe backups and reviewed restores, but the UI only creates them from an explicit Setup action; community requests and comparable tools show value in automatic on-save/periodic recovery, while OpenTasker can implement it locally without a sync service.
+  Evidence: `app/src/main/java/com/opentasker/core/storage/DatabaseBackupManager.kt`; `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationViewModel.kt`; `gradle/libs.versions.toml` (`work = "2.11.2"`); https://www.reddit.com/r/tasker/comments/p5gwgp; https://github.com/Waboodoo/HTTP-Shortcuts/blob/develop/CHANGELOG.md; https://github.com/SuperMonster003/AutoJs6
+  Touches: `DatabaseBackupManager.kt` or a validated OpenTasker configuration snapshot layer, a WorkManager worker, DataStore settings, Setup UI, retention/status strings, and backup/restore tests.
+  Acceptance: Users can opt in to local-only snapshots, choose a bounded count/age policy, see the last successful/failed snapshot and storage use, and preview/cancel restore; snapshots are atomic, validated, redacted or secret-omitting by design, never upload, survive process restart, and never overwrite a pending restore or live database without the existing review gate.
+  Complexity: M
+
+- [ ] P2 — Add a JVM scenario harness for trigger-to-recovery execution semantics
+  Why: The repository has extensive unit/contract coverage and a small Android-test surface, but no declarative suite that runs a complete trigger → admission → action → variable commit → run-log → restart scenario with deterministic time and platform outcomes; this is the layer needed to catch cross-module regressions without physical-device evidence.
+  Evidence: `app/src/test` and `app/src/androidTest`; `core/engine/TaskExecutionHelper.kt`; `core/contexts`; `core/storage`; https://github.com/google-research/android_world; https://par.nsf.gov/biblio/10387467-helping-users-debug-trigger-action-programs; https://doi.org/10.1145/3411764.3445567
+  Touches: reusable fake clock/platform/action adapters, scenario fixtures under `app/src/test`, engine/context/storage seams, coverage reporting, and the Gradle quality gate.
+  Acceptance: Seeded scenarios cover time/state/event delivery, duplicate delivery, admission overflow, retry-safe versus non-retry-safe failure, secret redaction, cancellation, interrupted-run reconciliation, and Room migration; each asserts final state, run-log/journal entries, and side-effect ledger; scenarios run headlessly in the normal JVM gate with no real network or display.
+  Complexity: L
+
+- [ ] P2 — Gate OpenTasker bundle compatibility and migration fixtures in release truth
+  Why: Runtime code and `tools/release-truth.json` use OpenTasker bundle schema v2 with an explicit v1→v2 migration, while `docs/OPEN_JSON_BUNDLE.md` still says v1; the current release contract checks the numeric constant but not migration behavior or supported-version semantics.
+  Evidence: `app/src/main/java/com/opentasker/core/transfer/OpenTaskerBundle.kt`; `app/src/test/java/com/opentasker/core/transfer`; `tools/generate-release-truth.ps1`; `buildSrc/src/main/kotlin/com/opentasker/build/VerifyReleaseTruthTask.kt`; `docs/OPEN_JSON_BUNDLE.md`; https://www.home-assistant.io/docs/blueprint/schema/; https://github.com/Waboodoo/HTTP-Shortcuts/blob/develop/CHANGELOG.md
+  Touches: bundle codec fixtures, v1/v2 migration tests, future-version rejection tests, `VerifyReleaseTruthTask`, `ReleaseTruthContractTest`, `tools/release-truth.json`, and the tracked README export contract.
+  Acceptance: A checked-in fixture proves v1 imports to the documented v2 semantics, v2 round-trips deterministically, future versions are rejected before mutation, unknown keys/oversized values follow the stated policy, and the release gate fails when the supported-version set, generated truth, or tracked README claim disagrees with the codec.
+  Complexity: M
+
+- [ ] P2 — Refresh the pinned Gradle, KSP, and Compose tooling tuple under the release gate
+  Why: Official release pages list Gradle 9.7.0, KSP 2.3.11, and Compose BOM 2026.06.01 as concrete candidates while the repository pins Gradle 9.6.1, KSP 2.3.10, and BOM 2026.06.00; AGP 9.3.1 already supports the API-37 target, so this should be a compatibility refresh rather than an AGP migration.
+  Evidence: `gradle/wrapper/gradle-wrapper.properties`; `gradle/libs.versions.toml`; `app/build.gradle.kts`; `tools/verify-local-release.ps1`; `app/src/test/java/com/opentasker/docs/ReleaseTruthContractTest.kt`; https://docs.gradle.org/current/release-notes.html; https://developer.android.com/build/releases/gradle-plugin; https://github.com/google/ksp/releases; https://developer.android.com/develop/ui/compose/bom
+  Touches: wrapper distribution URL/SHA and JAR, `libs.versions.toml`, dependency-verification metadata, expected bootstrap hashes and release-truth contract, Compose regression tests, and local-gate documentation if the observed tool tuple changes.
+  Acceptance: The candidate versions are pinned only after the normal bootstrap, dependency-verification, JVM/Android test, lint, coverage, release-assembly, and F-Droid/Play policy gates pass; wrapper hashes and release truth agree; configuration-cache behavior is measured; no incubating `org.gradle.isolated-projects` setting is enabled; and the previous tuple remains an explicit rollback target.
+  Complexity: M
+
+- [ ] P3 — Prototype a capability-gated Android AppFunctions invocation surface
+  Why: Android AppFunctions is an experimental API for exposing structured app capabilities to trusted callers, and OpenTasker has no AppFunctions implementation despite already having signature-gated external intents and launcher shortcuts; it may provide a safer future assistant/launcher surface without cloud execution.
+  Evidence: `app/src/main/AndroidManifest.xml`; `app/src/main/java/com/opentasker/core/external`; `app/src/main/java/com/opentasker/widget/TaskShortcutHelper.kt`; no `AppFunctionService` or `appfunctions` source found; https://developer.android.com/ai/appfunctions; https://developer.android.com/ai/appfunctions/add-appfunctions; https://developer.android.com/jetpack/androidx/releases/appfunctions
+  Touches: a small app-functions adapter/service, manifest and caller permission policy, safe-task capability metadata, `core/external` invocation mapping, API-level fallback, and contract tests; do not put it in the core engine.
+  Acceptance: A disabled-by-default prototype exposes only explicitly approved, side-effect-classified tasks through a versioned schema; `EXECUTE_APP_FUNCTIONS`/trusted-caller checks are enforced, secrets never appear in schema or arguments without a user-mediated path, API < 36 has an honest unsupported result, and the feature adds no cloud, telemetry, or release-critical dependency.
+  Complexity: L
+
+## Audit Findings — 2026-08-10
+
+Deep multi-pass audit (8 parallel code auditors + on-device run on API-36 emulator, both themes). Baseline recorded first: `:app:testDebugUnitTest` = **1126/1126 green**, `assembleDebug` + `lintDebug` clean — no pre-existing failures. Focus was the 34 commits since v0.2.82 (unreleased). Each item below is self-contained. IDs continue as A-NN.
+
+### P1 — correctness / data-safety
+
+- [ ] A-07 — Exported backups (including passphrase-protected `.otbackup`) are unrestorable after reinstall or on any other device
+  Category: reliability
+  Where: `app/src/main/java/com/opentasker/core/storage/DatabaseBackupManager.kt:51-55` (backup = raw copy of the SQLCipher-encrypted DB), `:98-120` (`exportEncryptedBackup` layers passphrase AES-GCM over the same ciphertext); key at `DatabaseKeyStore.kt:24-37` (random per-install, wrapped by a non-exportable AndroidKeyStore key in `database_security` prefs); restore validation `DatabaseSecurity.kt:32-61`; `res/xml/data_extraction_rules.xml` excludes the DB and prefs from cloud backup AND D2D transfer.
+  Problem: Every backup artifact is SQLCipher ciphertext keyed to a key that dies with the install (Keystore master key + wrapped-key prefs are destroyed on uninstall and never migrate via D2D). After reinstall or on a new device, restore regenerates a fresh key, SQLCipher open fails, and restore fails closed — exactly the device-loss/reinstall/migration scenarios backups exist for. The passphrase protects bytes the user can never decrypt where it matters. (The restore side is already portable-ready: `DatabaseSecurity.isPlaintext` accepts plaintext SQLite and re-encrypts on next open — only the export side produces device-locked bytes.)
+  Evidence: Verified (design trace).
+  Fix: For exports, `sqlcipher_export` to a plaintext temp copy (or re-key to a passphrase-derived key) before the `.otbackup` AEAD layer; shred the temp.
+  Acceptance: An `.otbackup` exported on one install restores on a fresh install of the same app with the correct passphrase; a test round-trips export→(new key)→restore and asserts the data opens.
+  Confidence: Verified — Effort: M
+
+- [ ] A-08 — F-Droid recipe & reproducibility harness expect `app-release-unsigned.apk`, which the release build can no longer produce
+  Category: reliability
+  Where: `app/build.gradle.kts:187-219` (absent env vars → `selfhost` signing fallback, so `release.signingConfig` is always set); `fdroid/metadata/com.opentasker.app.yml:34` (`output: …/app-release-unsigned.apk`); `tools/verify-fdroid-release.ps1:18,248-251` (hard-codes the unsigned path, throws "missing" even after `-BuildRelease`); guard `app/build.gradle.kts:968-970` (`verifyFdroidMetadata` only checks the yml TEXT contains the path string, never that the artifact exists).
+  Problem: AGP names the output `app-release-unsigned.apk` only when the build type has no signing config. Since commit 03670e2 added the always-present selfhost fallback, the output is `app-release.apk` (verified on disk: only `app-release.apk`, 10.9M, exists). The F-Droid `output:` path fails on fdroidserver and the README-advertised reproducibility harness can never find its input.
+  Evidence: Verified.
+  Fix: Either drop the signing config for the fdroid distribution (`-PopenTaskerDistribution=fdroid` → no `signingConfig`) so the unsigned artifact returns, or update the yml + verifier to the signed name and F-Droid's expected flow; make `verifyFdroidMetadata` assert against the actual assembled output filename.
+  Acceptance: `-BuildRelease` produces the artifact the yml `output:` names, and `verify-fdroid-release.ps1` passes without manual path edits; the metadata guard fails if the assembled filename and the yml disagree.
+  Confidence: Verified — Effort: S
+
+### P2 — reliability / security / UX blockers
+
+- [ ] A-09 — Held run-log rows are exempt from all pruning and are never deleted (unbounded DB growth)
+  Category: reliability
+  Where: `app/src/main/java/com/opentasker/core/storage/RunLogDao.kt:113-127` (`pruneRetention … WHERE held = 0` — the only DELETE on run_logs); written on every admission rejection under the DEFAULT `overflowPolicy = LOG` at `app/src/main/java/com/opentasker/core/engine/TaskExecutionHelper.kt:87-106,683` (each held row carries up to 16 KB `heldPayload`); replay (`:690`) never clears `held`/`heldPayload`.
+  Problem: The exact scenario that produces held rows (burst storm / open circuit on a misfiring profile) produces them continuously — while a circuit is open every delivery is rejected → one unprunable 16 KB row each. A once-a-minute misconfigured trigger accumulates ~1,440 permanent rows/day forever, with no un-hold/dismiss/delete path anywhere.
+  Evidence: Found by two auditors; verified against `pruneRetention` and the rejection path.
+  Fix: Age-/count-bound held rows in `pruneRetention` (prune held rows older than the retention window unless starred) and clear `held`/`heldPayload` on the original row after a successful replay.
+  Acceptance: Held rows are pruned by the retention policy; a test inserts held rows past the window and asserts they are deleted (unless starred), and that replaying a held row clears its held state.
+  Confidence: Verified — Effort: S
+
+- [ ] A-10 — `execution_journal` is pruned only at process start (unbounded growth under a long-lived service)
+  Category: reliability
+  Where: `app/src/main/java/com/opentasker/core/engine/ExecutionJournal.kt:129` (`pruneTerminal(256)` called only from `reconcileExecutionJournal`); sole caller `OpenTaskerApp_NoHilt.kt:94` (app start); `RunLogPruneWorker.kt` prunes only `run_logs`.
+  Problem: `AutomationService` is START_STICKY and designed to run for weeks. Every execution inserts a journal row (`TaskExecutionHelper.kt:123`); terminal rows are trimmed to 256 only at the next process start. A once-a-minute profile produces ~10k rows/week between restarts, and the `state`/`updatedAtMs` indexes grow with it.
+  Evidence: Found by two auditors; verified.
+  Fix: Call `pruneTerminal` from the existing 6-hour `RunLogPruneWorker` (or after every N terminal writes).
+  Acceptance: Journal size stays bounded without a process restart; a test drives the prune worker and asserts terminal rows are trimmed to the cap.
+  Confidence: Verified — Effort: S
+
+- [ ] A-11 — `flow.try` retry replays the whole body but safety-checks only the failing action — NEVER-safe actions get re-executed
+  Category: correctness
+  Where: `app/src/main/java/com/opentasker/core/engine/TaskRunner.kt:415-427` (`retrySafetyFor(spec…)` checks only the failing spec; `nextPc = frame.tryIndex + 1` restarts the entire body).
+  Problem: For a try body `[sms.send (NEVER, succeeds), http.get (IDEMPOTENT, fails)]` with `max_attempts=3`, the retry re-runs `sms.send` up to 2 extra times because only the failing action's classification is consulted. `TaskRunnerFailureRecoveryTest` uses only single-action bodies, so this passes untested.
+  Evidence: Verified.
+  Fix: Gate retry on the classification of every non-control action in the try body (or restart from the failing index for an idempotent-only prefix).
+  Acceptance: A retry does not re-execute a preceding NEVER-classified action; a test with a mixed-safety body asserts the NEVER action runs exactly once.
+  Confidence: Verified — Effort: M
+
+- [ ] A-12 — Held-execution replay and manual "Run now" bypass the live admission controller and persisted circuit breaker
+  Category: correctness
+  Where: `app/src/main/java/com/opentasker/core/engine/TaskExecutionHelper.kt:696` (default `admissionController = ExecutionAdmissionController.Default`); callers pass none — `ActiveAutomationViewModel.kt:1409` (`runTaskNow`), `:1429-1433` (`replayHeldRun`); the service uses a distinct `ExecutionAdmissionController.persisted(this)` (`AutomationService.kt:173`); `ExecutionAdmissionRegistry.attach` exists to share the live controller but is not used here.
+  Problem: A run held because its profile saturated the live controller replays against `Default` — a separate in-memory controller with zero counts and an in-memory circuit store — so it admits even while the profile is still saturated or its circuit is open. Check wired to the wrong data source.
+  Evidence: Verified.
+  Fix: Route replay/manual runs through `ExecutionAdmissionRegistry` (live controller, falling back to `persisted(context)`).
+  Acceptance: Replaying/running a task while the profile is saturated is rejected by the same controller the engine uses; a test asserts replay respects a saturated live controller.
+  Confidence: Verified — Effort: S
+
+- [ ] A-13 — Held entries can be replayed repeatedly (no consumed marker → duplicate executions)
+  Category: correctness
+  Where: `app/src/main/java/com/opentasker/core/engine/TaskExecutionHelper.kt:690-735` (no state change on the held row); button shown whenever `entry.held` at `app/src/main/java/com/opentasker/ui/screens/RunLogScreenContent.kt:607-609`.
+  Problem: Each replay mints a fresh `executionId` (`replayOf` = original), so the command ledger cannot dedupe; the row stays `held=1` forever and every tap (or double-tap) runs the task again with real side effects. `HeldExecutionInstrumentedTest` never replays twice.
+  Evidence: Verified.
+  Fix: Mark the original row consumed (clear `held`) inside the replay and/or dedupe by `replayOf` lookup; disable the button while a replay is in flight (see A-48).
+  Acceptance: A held row can be replayed at most once; a test replays twice and asserts the second is a no-op.
+  Confidence: Verified — Effort: S
+
+- [ ] A-14 — Startup journal reconcile races live executions — a just-started run can be marked INTERRUPTED and double-logged
+  Category: reliability
+  Where: `app/src/main/java/com/opentasker/core/engine/ExecutionJournal.kt:100-127` (`dao.active()` with no `startedAtMs < processStart` filter); fire-and-forget launch at `OpenTaskerApp_NoHilt.kt:92-104`; unconditional success insert at `TaskExecutionHelper.kt:410`.
+  Problem: Reconcile runs concurrently with service startup. A boot-triggered profile that reaches `ExecutionJournal.start` before `dao.active()` executes has its ACTIVE row flipped to INTERRUPTED; reconcile inserts an "Interrupted" recovery run-log (the real run hasn't logged yet, so the `getByExecutionId` guard passes), then the real run inserts its own success row — two contradictory rows for one execution, and the real terminal state is lost (`markTerminal` returns 0). The boot path is exactly the concurrent case.
+  Evidence: Likely (both orderings possible; window small but boot-path realistic).
+  Fix: Restrict reconcile to rows with `startedAtMs` before process start, or add a startup barrier so reconcile completes before the service may dispatch.
+  Acceptance: A boot-triggered execution that starts during reconcile is not marked INTERRUPTED and produces exactly one run-log row; a test simulates the interleave.
+  Confidence: Needs-repro — Effort: S
+
+- [ ] A-15 — Hyphen is now a legacy variable-name character — `%var-suffix` text silently expands to empty string
+  Category: correctness
+  Where: `app/src/main/java/com/opentasker/core/engine/variables/VariableExpander.kt:393` (`|| c == '-'` added by commit 7a9c93e), unknown names expand to `""` at `:131`.
+  Problem: Previously `%count-1` expanded `%count` then kept `-1`; now the token is `count-1`, almost certainly undefined → the whole token becomes empty. Affects action args and conditions (`%battery-20 > 0` → `" > 0"`). Tasker itself disallows `-` in names, so imported Tasker text using `%Var-…` changes meaning. `VariableStoreTest:54` covers the new behavior; nothing covers the compatibility break.
+  Evidence: Verified (behavior change); user impact Likely.
+  Fix: Longest-match fallback — if the hyphenated name is undefined, retry the longest defined prefix ending before `-`.
+  Acceptance: `%count-1` with `count=5` expands to `5-1`; a test covers hyphen-suffix compatibility.
+  Confidence: Verified — Effort: S
+
+- [ ] A-17 — Restore application and plaintext→SQLCipher migration run on the main thread (ANR risk at startup/boot)
+  Category: reliability
+  Where: `app/src/main/java/com/opentasker/app/OpenTaskerApp_NoHilt.kt:52-53,70-89` (`initializeAfterUnlock()` runs synchronously in `Application.onCreate` and from `BootReceiver.onReceive` — 10 s broadcast ANR budget); `DatabaseBackupManager.kt:398-425` → `validateDatabaseFile:485-530` (full `PRAGMA integrity_check`); `DatabaseSecurity.kt:100-143` (full `sqlcipher_export` re-encryption of legacy plaintext DB).
+  Problem: On a multi-MB database, applying a pending restore (copy live → rollback, copy pending ≤100 MB, integrity_check) plus a possible plaintext re-encryption is seconds of main-thread I/O + crypto at startup; the app's own debug StrictMode flags this. Room init depends on it, so it can't move to a plain coroutine, but it can run on a background thread with the UI gated on completion.
+  Evidence: Verified (code path; ANR magnitude needs a large DB to repro).
+  Fix: Run the restore/migration on a background thread and gate first-frame/engine start on its completion.
+  Acceptance: No main-thread disk/crypto during restore application; StrictMode does not flag startup on a large DB.
+  Confidence: Needs-repro — Effort: M
+
+- [ ] A-18 — MQTT cleartext gate is weaker than the HTTP gate (any-private + re-resolve → cleartext credentials to a public host)
+  Category: security
+  Where: `app/src/main/java/com/opentasker/core/actions/MqttPublishAction.kt:77-96` (`isPrivateOrLocalHost` uses `resolver(host).any(::isPrivateOrLocalAddress)`), `:224-227` (gate), `:107` (connect re-resolves via `InetSocketAddress(config.host, config.port)`). Compare `HttpRequestAction.kt:171-177` (`PRIVATE_ONLY_DNS` requires ALL addresses private and pins the resolved address). `mqtt.publish` is registered (`ActionCatalog.kt:101`) and capability `Supported` (`ActionCapabilities.kt:89`) — reachable.
+  Problem: A hostname resolving to both a private and a public address (or an attacker-controlled DNS answer between check and connect) passes the "local only" gate, then the socket re-resolves and typically connects to the first A record — sending the cleartext CONNECT (username/password) and payload to the public address.
+  Evidence: Verified against source; also confirms Roadmap_Blocked's "MQTT (RD34)" is stale — the action shipped (see A-65).
+  Fix: Require ALL resolved addresses to be private and connect to the vetted `InetAddress`, mirroring `PRIVATE_ONLY_DNS`.
+  Acceptance: A non-TLS MQTT publish to a hostname with any public A record fails closed; a test with a mixed-resolution resolver asserts rejection and address pinning.
+  Confidence: Likely — Effort: M
+
+- [ ] A-19 — Exported Locale condition receiver is an unauthenticated oracle for non-secret variable values
+  Category: security
+  Where: `app/src/main/AndroidManifest.xml:439-446` (`LocaleConditionQueryReceiver`, `exported="true"`, no `android:permission`); `app/src/main/java/com/opentasker/core/plugins/locale/LocaleConditionQueryReceiver.kt:75-88`; `LocaleConditionTarget.kt:169-186`.
+  Problem: The `QUERY_CONDITION` receiver is exported without permission (Locale/Tasker contract). Its bundle is attacker-controlled: for `VARIABLE_COMPARE` it names an arbitrary variable and expected value and replies Satisfied/Unsatisfied via ordered-broadcast result code. Any zero-permission app can probe non-secret variable content and, with `STARTS_WITH`/`CONTAINS`/`EQUALS`, extract full values across repeated broadcasts. Secret variables are correctly refused (`snapshot.variableSecret -> Unknown`), so it is bounded to non-secret data — which routinely includes location strings, device names, and tokens the user didn't classify as secret. No rate limiting.
+  Evidence: Likely (path fully reachable; severity threat-model-dependent; the secret refusal is a real mitigation).
+  Fix: Gate variable-compare queries to variables the user explicitly exposed as a plugin condition (allowlist bound at configure time), or require a configure-time grant token like `LocaleGrantStore` already does for the fire receiver.
+  Acceptance: A query for a variable the user never exposed as a condition returns Unknown/refused; a test asserts arbitrary-variable probing is blocked.
+  Confidence: Likely — Effort: M
+
+- [ ] A-20 — Tethering state sticks at `true` after tethering stops (pre-API-36 path)
+  Category: correctness
+  Where: `app/src/main/java/com/opentasker/core/contexts/StateSensorEvents.kt:543-547` (uncommitted/untracked file).
+  Problem: The pre-36 path treats any delivery of `TETHER_STATE_CHANGED` as `tethering=true`. That broadcast fires on tethering STOP as well as start and is sticky (registration replays the last transition). Stopping USB/BT tethering emits `tethering=true` with nothing to reset it; turning Wi-Fi hotspot off can leave the final state `true`; a stale sticky broadcast on subscription flips state to `true` while tethering is off. A `tethering=true` profile then stays active forever.
+  Evidence: Verified (source in the uncommitted context work).
+  Fix: On both broadcasts, read the actual state (`WIFI_AP_STATE_CHANGED` extra for AP; `tetherArray`/`activeArray` extras or interface enumeration for the generic broadcast) instead of emitting a constant.
+  Acceptance: Stopping tethering emits `tethering=false`; a test drives stop and asserts the value.
+  Confidence: Verified — Effort: S
+
+- [ ] A-21 — Device orientation classifier is inverted vs. Android sensor convention (exact sub-values swapped)
+  Category: correctness
+  Where: `app/src/main/java/com/opentasker/core/contexts/StateSensorEvents.kt:668-678` (uncommitted); test `app/src/test/java/com/opentasker/core/contexts/StateSensorEventsTest.kt:12-15` encodes the same wrong sign.
+  Problem: `classify` maps `y <= 0 → "portrait"`, `y > 0 → "portrait_upside_down"`, but Android reports y = +9.81 when held upright — so a normally-held phone classifies as `portrait_upside_down` (and x-axis landscape_left/right are inverted the same way). Broad predicates (`orientation=portrait`) are masked because `orientationMatches` (`StateContextSourceImpl.kt:290-294`) accepts both sub-values, but exact predicates (`portrait_upside_down`, `landscape_left/right`) match the opposite physical orientation, and the Inspector shows the wrong live value on every device. The new JVM test asserts the inverted physics, so the suite is green.
+  Evidence: Verified against the sensor coordinate convention (1-minute device repro with `adb emu rotate` closes it).
+  Fix: Flip the y and x sign mappings (`y >= 0 → portrait`), correct the test to match physics, and verify once on a device/emulator.
+  Acceptance: An upright device reports `portrait`; a landscape-left device reports `landscape_left`; the corrected test and an on-device check agree.
+  Confidence: Verified — Effort: S
+
+- [ ] A-22 — An unparseable STATE context spins up GPS, telephony, and all sensors (fail-open demand narrowing)
+  Category: correctness
+  Where: `app/src/main/java/com/opentasker/core/engine/ProfileMatcherImpl.kt:75-76` (uncommitted); `app/src/main/java/com/opentasker/core/contexts/StateContextSourceImpl.kt:154-158` (`stateContextKey` returns null on no parseable predicate and no `key`); `StateSensorEvents.kt:67-98` (`requested == null` ⇒ every physical key wanted).
+  Problem: `null` means both "Inspector wants everything" and "couldn't determine the key". A STATE spec with a malformed predicate (reachable via JSON/Tasker import) yields `stateContextKey == null`, and the matcher subscription then starts continuous GPS (15 s / 5 m), phone-state receivers, and three sensor listeners for the profile's lifetime — even though `stateMatches` fails closed and the context can never match. Before this uncommitted change the same spec started nothing. Battery/privacy fail-open on exactly the input that should do the least.
+  Evidence: Verified.
+  Fix: In the matcher path, treat an unresolvable key as "no physical sensors" (a sentinel non-physical key); reserve `null` for the Inspector's explicit everything-mode.
+  Acceptance: A malformed STATE spec starts no location/sensor/telephony listeners; a test asserts the subscription set is empty for an unparseable predicate.
+  Confidence: Verified — Effort: S
+
+- [ ] A-23 — Play distribution: roaming/call-state contexts point to a Setup step that cannot exist (issue-#4 class)
+  Category: correctness
+  Where: `app/build.gradle.kts:141,148,177` (`play` distribution swaps `READ_PHONE_STATE` for `ACCESS_NETWORK_STATE` — phone-state undeclared); new phone-state Setup row gated on `BuildConfig.SMS_ACTION_AVAILABLE` (false on play) at `PermissionOnboardingScreen.kt` (~:1287, uncommitted); `ContextEditorDialogs.kt` `StateContextPresets` offers "Roaming"/"Incoming call" unconditionally (uncommitted); emit copy `StateSensorEvents.kt:407-409,465-467` ("Open Setup and grant Phone permission…"); `SetupRequirementResolver` still emits `PHONE_STATE` on play with no row.
+  Problem: On a play build a user can one-tap create a roaming/call-state context; the engine fails closed and the Inspector says "Open Setup and grant Phone permission" — but there is no such row and the permission is undeclared, so it can never be granted. This is the exact trap documented in the repo Learned notes for DND access (issue #4), reintroduced in the uncommitted work.
+  Evidence: Verified.
+  Fix: Gate the roaming/call presets and normalizations on the same build flag (or declare `READ_PHONE_STATE` on all distributions), and add the SetupRequirement→declared-permission contract test the Learned note prescribes (extend `DndAccessManifestContractTest` to all rows).
+  Acceptance: On a play build the roaming/call presets are absent (or the permission is declared and a Setup row exists); a contract test asserts every SetupRequirement maps to a declared permission per distribution.
+  Confidence: Verified — Effort: S
+
+- [ ] A-24 — "Simulate" buttons destroy unsaved editor state; profile-editor simulation shows stale data
+  Category: ux
+  Where: profile path `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationUi.kt:1203-1206` + `EditorDialogs.kt:619` (`onSimulate(profile)` passes the original saved object); context path `ActiveAutomationUi.kt:1259-1276` + `ContextEditorDialogs.kt:242-256`.
+  Problem: Two contradictory lossy behaviors. (a) Profile editor: "Simulate trigger" calls `clearProfileDialog()` then simulates the ORIGINAL saved profile — pending edits (cooldown, priority, limits) are discarded and the simulation reports values that don't match the screen. (b) Context dialog: "Test synthetic event" builds a profile copy including the pending context edit, then closes the editor; dismissing the simulation does not reopen it and the fully configured context (e.g. location lat/lon/radius/dwell) is lost — while the simulation just showed it as applied.
+  Evidence: Found by two auditors; verified.
+  Fix: Keep the editor open behind the simulation dialog (both are just state); the profile path should simulate a `profile.copy(...)` built from the current field state (the same values passed to `onSave`).
+  Acceptance: Editing a profile/context and tapping Simulate simulates the edited values and preserves the edits after the simulation closes.
+  Confidence: Verified — Effort: M
+
+- [ ] A-25 — Out-of-range profile Priority / Grace-period silently disables Save with no error shown
+  Category: ux
+  Where: `app/src/main/java/com/opentasker/ui/screens/EditorDialogs.kt:456-490` (fields accept 3–4 digits; `isError`/supportingText check only `parsed == null`) vs `:701-724` (`profileEditorCanSave` enforces `-100..100` and `0..3600`).
+  Problem: Entering priority `500` or grace `5000` parses fine and shows normal helper text, but `canSave` fails the range check, so Save goes dead with no visible or announced reason. Clearing either field entirely also blocks Save silently (unlike cooldown, which allows blank). The sibling `maxActiveExecutions`/`burstLimit` fields DO range-check in `isError` — an inconsistency within the same dialog.
+  Evidence: Found by two auditors; verified.
+  Fix: Add the range (and blank) checks to the priority/grace `isError`/supportingText, using the existing `profile_priority_invalid`/`profile_grace_period_invalid` strings.
+  Acceptance: Out-of-range priority/grace shows an error state naming the valid range; a test asserts `isError` for `500`/`5000`.
+  Confidence: Verified — Effort: S
+
+- [ ] A-26 — Semantic-diff "highlighted in Flow" feature is unreachable; the dialog copy promises something the user can never see
+  Category: ux
+  Where: `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationUi.kt:819,1210`; `SemanticDiffDialogs.kt:76-81`; `strings.xml:851` (`semantic_diff_flow_note` = "%1$d flow node(s) are highlighted in Flow."); source `ActiveAutomationViewModel.kt:1672,1686-1688`.
+  Problem: `changedNodeKeys` fed to `AutomationFlowScreen` comes from `semanticDiffReview`, which is non-null only while the modal SemanticDiffDialog is open (set at :1672, cleared on both dismiss paths). The dialog's scrim covers the Flow tab, and closing it — the only way to reach Flow — clears the keys. The changed-node border/pill rendering in `AutomationFlowScreen.kt` (`node.changed`, `flow_changed_node`) can never be observed.
+  Evidence: Verified (grep-confirmed single writer).
+  Fix: Decouple highlight lifetime from the dialog (clear on next edit, or a timed/`viewed` flag), or drop the note.
+  Acceptance: After reviewing a diff, the changed nodes are visibly highlighted when the user opens the Flow tab — or the misleading note is removed.
+  Confidence: Verified — Effort: S
+
+- [ ] A-27 — Localization & accessibility source gates exclude the new dialog files (and one ships hardcoded English)
+  Category: testing
+  Where: `app/src/test/java/com/opentasker/ui/LocalizationSourceTest.kt:20-44` (hand-written `localizedFiles`) and `app/src/test/java/com/opentasker/ui/AccessibilitySourceTest.kt:110-171` (hand-written critical-flow map); uncovered new files: `SemanticDiffDialogs.kt`, `SyntheticTriggerSimulationDialog.kt`, `RunLogRetentionPreviewDialog.kt` (the last MOVED out of the covered `ActiveAutomationUi.kt`), plus `DiagnosticsScreen.kt`, `ContextInspectorScreen.kt`, `VariablesScreen.kt`, `ImportReviewDialogs.kt` for a11y. Hardcoded strings already present: `SyntheticTriggerSimulationDialog.kt:48,51,60` ("No cooldown is currently blocking this profile.", "Cooldown has $seconds second(s) remaining.", "Admission rejected this run.").
+  Problem: A gate scoped by a hand-written list certifies whatever is not in it (the a11y toggle-row rule scans only `ActiveAutomationUi.kt`, which is how A-29 shipped). New surfaces are unguarded and one already contains the exact hardcoded copy the gate exists to forbid.
+  Evidence: Found by two auditors; verified.
+  Fix: Enumerate `ui/screens/*.kt` programmatically (or assert list completeness against the directory), move the three reason strings to resources (plural for the cooldown one), and add rule classes for touch-target height and severity-not-color-only.
+  Acceptance: The gates fail when a new `ui/screens` file is added without coverage; the three simulation strings resolve from resources.
+  Confidence: Verified — Effort: S
+
+- [ ] A-28 — AlertDialogs and DropdownMenus render on M3 baseline (purple-tinted) surfaces instead of the app palette
+  Category: visual
+  Where: `app/src/main/java/com/opentasker/ui/theme/Theme.kt:34-100` (Amoled/Light/HighContrast schemes never override the `surfaceContainer*` family); `grep surfaceContainer|AlertDialogDefaults|MenuDefaults` → zero matches.
+  Problem: M3 `AlertDialog` defaults to `surfaceContainerHigh` and `DropdownMenu` to `surfaceContainer`; unoverridden, they fall back to M3 baseline tokens. In light theme every editor dialog and the new duplicate/simulation/semantic-diff dialogs sit on a lavender surface against the cream palette; in dark they are purple-gray instead of graphite; in HighContrast they are `#2B2930` instead of black. Confirmed on-device this audit: the "Manage projects" dialog renders visibly purple-graphite over the AMOLED-black app. The app is dialog-heavy, so this affects most surfaces.
+  Evidence: Verified (code + M3 token defaults + on-device screenshot).
+  Fix: Set `surfaceContainerLowest/Low/…/Highest` (and `surfaceBright/surfaceDim`) in all three schemes.
+  Acceptance: Dialogs and dropdown menus use the app's graphite/cream surfaces in all three themes; a screenshot check shows no purple tint.
+  Confidence: Verified — Effort: S
+
+- [ ] A-29 — New Setup toggles have no accessible name for TalkBack
+  Category: a11y
+  Where: `app/src/main/java/com/opentasker/ui/screens/PermissionOnboardingScreen.kt` ~:659-706 (`DirectBootSetupCard`, new since v0.2.82) — `Switch(... modifier = Modifier.semantics { stateDescription = … })` with the title/body as sibling non-merged Texts.
+  Problem: TalkBack focuses the bare switch and announces only "On/Off" + state, never "Direct boot". Every other toggle uses the `toggleable(role = Role.Switch)` + merged-label pattern the a11y gate enforces — but that test scans only `ActiveAutomationUi.kt`, so this new file's deviation passes (see A-27).
+  Evidence: Verified.
+  Fix: Make the card Row `toggleable(role = Role.Switch)` with merged semantics, or give the Switch a contentDescription of the card title.
+  Acceptance: TalkBack announces the toggle's name + state; the a11y gate (once broadened) covers this file.
+  Confidence: Verified — Effort: S
+
+- [ ] A-30 — Bundle import surfaces a raw `kotlinx.serialization` exception string to the user
+  Category: ux
+  Where: "Paste / scan JSON" flow → import review; error rendered from the caught decode exception message.
+  Problem: Observed on-device this audit: pasting invalid text into the "Paste or scan an OpenTasker bundle" dialog and tapping "Review bundle" shows an inline error reading "Error: Unexpected JSON token at offset 0: Expected start of the object '{', but had 'n' instead at path: $  JSON input: not-valid-json" — a raw serializer exception that also echoes the user's raw input back. Robotic, technical, and inconsistent with the app's otherwise calm microcopy.
+  Evidence: Verified on-device (screenshot captured).
+  Fix: Catch the decode failure at the import boundary and present a friendly message ("This doesn't look like an OpenTasker bundle. Paste the JSON exported from OpenTasker, or scan its QR code."), logging the technical detail rather than showing it; do not echo raw input.
+  Acceptance: Invalid paste input shows a plain-language error with no serializer internals or echoed input.
+  Confidence: Verified — Effort: S
+
+- [ ] A-31 — Re-delivered external execution ids evicted from the ledger report FAILED instead of an idempotent ack
+  Category: correctness
+  Where: `app/src/main/java/com/opentasker/core/external/AutomationTargetReceiver.kt:211-229` (dedupe only via `ExternalExecutions.get`; ledger cap 64 at `ExternalExecutionLedger.kt:135`); journal insert `check(inserted != -1L)` at `ExecutionJournal.kt:56` / `TaskExecutionHelper.kt:123`; failure caught at `AutomationService.kt:878`.
+  Problem: A caller re-sending `EXTRA_EXECUTION_ID` used >64 external commands ago is treated as new → `runExternalTask` → journal insert conflicts on the PK → `IllegalStateException` → the external record is set FAILED ("was already journaled") and the in-process ledger record is stuck RUNNING. The contract says "re-delivery of a command with the same id is an acknowledgement, not a second run."
+  Evidence: Verified path.
+  Fix: In `executeAndLogTask`, treat a journal insert conflict as DUPLICATE_DELIVERY (return skipped/ack) instead of `check`-throwing.
+  Acceptance: Re-delivering an old execution id returns an idempotent ack, not FAILED; a test drives a conflicting id and asserts skipped.
+  Confidence: Verified — Effort: S
+
+- [ ] A-32 — `%FLOW_ERROR_CAUGHT` is never "true"; the documented flow.catch variable always reads "false"
+  Category: correctness
+  Where: `app/src/main/java/com/opentasker/core/engine/TaskRunner.kt:375` (unreachable `phase == CATCH` branch), `:442` (sets "false" before entering the handler), `:445` (`nextPc = catchIndex + 1` skips the CATCH marker); documented at `TaskFailure.kt:42`.
+  Problem: `recoverFailure` jumps past the CATCH marker, so the only way pc lands on it is sequential fall-through from a successful body (phase == BODY). The `phase == CATCH` assignment can never run, and inside every `flow.catch` handler the documented `%FLOW_ERROR_CAUGHT` reads "false". No test references it.
+  Evidence: Verified (grep: zero test references).
+  Fix: Set CAUGHT="true" in `recoverFailure`'s catch branch (or jump to `catchIndex` so the marker executes); add a test.
+  Acceptance: Inside a `flow.catch` handler, `%FLOW_ERROR_CAUGHT` is "true"; a test asserts it.
+  Confidence: Verified — Effort: S
+
+- [ ] A-33 — `verify-fdroid-release.ps1` tag-vs-metadata check can never pass under the documented release flow
+  Category: reliability
+  Where: `tools/verify-fdroid-release.ps1:207-214` (requires `git rev-list -n1 v<version>` == yml `commit:`).
+  Problem: The documented bump flow points the yml `commit:` at the BUILD commit, then adds a follow-up "sync release artifact metadata" commit, and the tag is placed on the SYNC commit. Verified: v0.2.82 tag → `bd01eeb`, yml → `03670e2` (its parent); v0.2.79 tag → `a9a82c3`, yml → `a802265`. The script throws for every release unless `-SkipTagCheck` is passed, so the tag gate is de-facto permanently bypassed.
+  Evidence: Verified.
+  Fix: Tag the build commit, or make the check accept `tag == a descendant of the metadata commit that only touches yml/truth`; then wire the tag check into a gate that actually runs.
+  Acceptance: The tag check passes on a normal release without `-SkipTagCheck`.
+  Confidence: Verified — Effort: S
+
+- [ ] A-34 — README signing claims are stale after the selfhost-keystore change
+  Category: docs
+  Where: `README.md:149` ("Environment-driven release signing"), `README.md:192` ("Release build (unsigned without keystore env vars)"); actual behavior `app/build.gradle.kts:201-206`.
+  Problem: Since the selfhost fallback, a release build WITHOUT env vars is signed with the checked-in `dev_keystore.jks` (the actual published identity), not unsigned. Both README lines say the opposite and neither mentions the repo-owned fallback key.
+  Evidence: Verified.
+  Fix: Update both lines to describe env-var signing with the repo-owned fallback identity; optionally add the phrase to a `DocumentTruthRule` forbidden list to force future sync.
+  Acceptance: README accurately describes the signing fallback; the doc-truth gate covers the claim.
+  Confidence: Verified — Effort: S
+
+- [ ] A-35 — ROADMAP.md / RESEARCH.md are tracked and public, contradicting the "local-only" protocol
+  Category: docs
+  Where: `.gitignore:47-48` (`*.md` / `!README.md`); protocol text in repo CLAUDE.md ("Both files are gitignored (only README.md is committed)"); `git ls-tree origin/master` shows `ROADMAP.md`, `RESEARCH.md`, `CHANGELOG.md` tracked while `Roadmap_Blocked.md` is untracked.
+  Problem: `.gitignore` cannot untrack already-tracked files, so half the roadmap protocol is public and half local; the currently-modified `ROADMAP.md` will be pushed on the next commit sweep, contrary to the stated protocol. `CHANGELOG.md` is tracked with no `!CHANGELOG.md` negation, so a delete/re-add would be silently ignored.
+  Evidence: Verified.
+  Fix: Decide the intended state — either `git rm --cached ROADMAP.md RESEARCH.md` (if local-only is intended) or correct the protocol text and add explicit `!CHANGELOG.md` (and `!ROADMAP.md`/`!RESEARCH.md`) negations. (Note: this session makes NO commits; this is a finding for the implementer.)
+  Acceptance: The tracked/ignored state of the four docs matches the documented protocol.
+  Confidence: Verified — Effort: S
+
+### P3 — perf / a11y / maintainability / polish
+
+- [ ] A-36 — New-feature copy generated in `core` is untranslatable English on primary surfaces
+  Category: maintainability
+  Where: `core/capabilities/AutomationLint.kt` (finding title/detail/suggestedFix literals, ~:75-131) shown in `ContextInspectorScreen.kt:545-548`, `AutomationFlowScreen.kt`, `ImportedProfileRiskDialog.kt:52-59`, and VM snackbars; `core/diff/AutomationSemanticDiff.kt:77-128` field labels and raw enum values ("UNTIL_DATE", "SILENT") shown in `SemanticDiffDialogs.kt:119`; `ProfileLifecyclePolicy.kt:5-41` suppression reasons; `ExecutionAdmissionController.kt` reason strings; `AutomationDuplicator.kt:13,17` ("Untitled", " (copy)"); status words interpolated into `ui_message_run_status`.
+  Problem: These are user-visible in localized screens but can never be translated; the app already solved this class with `AutomationFlowStrings.from(resources)` (gate-enforced), so the new features regress the pattern. Mitigating: all 13 `values-*` dirs are currently empty, so the app is English-only today and the locale-completeness test passes vacuously.
+  Evidence: Found by two auditors; verified.
+  Fix: Move copy to resource IDs resolved at the collector (`UiMessage.resolve(context)` pattern) or structured enums mapped via `stringResource`.
+  Acceptance: Lint/diff/suppression/status copy resolves from resources; a translation would localize them.
+  Confidence: Verified — Effort: M
+
+- [ ] A-37 — Starred run-log rows show the action verb "Unkeep" as a non-interactive status pill
+  Category: ux
+  Where: `app/src/main/java/com/opentasker/ui/screens/RunLogScreenContent.kt:591-594` (`StatusPill(stringResource(R.string.run_log_unstar))`); `strings.xml:475-476` (`run_log_unstar` = "Unkeep").
+  Problem: A kept entry shows a state pill labeled "Unkeep" (the toggle's action verb, and not a word) directly above the real "Unkeep" TextButton — duplicated text, one inert. Screen readers encounter both.
+  Evidence: Found by two auditors; verified.
+  Fix: Add a `run_log_kept` state string ("Kept") for the pill.
+  Acceptance: A kept entry's pill reads "Kept"; the action button still reads "Unkeep".
+  Confidence: Verified — Effort: S
+
+- [ ] A-38 — Simulation dialog reads SharedPreferences on the main thread during composition
+  Category: perf
+  Where: `app/src/main/java/com/opentasker/ui/screens/SyntheticTriggerSimulationDialog.kt:44-68` — `remember(profile) { CooldownStore(context).remaining(...); ExecutionAdmissionRegistry.preview(...) }` constructs SharedPreferences-backed stores and reads them synchronously on first composition; `preview` can fall back to `ExecutionAdmissionController.persisted(context)` + circuit-store load.
+  Problem: First-load of each prefs file blocks the UI thread at dialog open. The VM's own `snapshot()` correctly uses `Dispatchers.IO`.
+  Evidence: Found by two auditors; verified (jank magnitude needs repro).
+  Fix: Hoist into a `LaunchedEffect`/ViewModel with a loading state.
+  Acceptance: No main-thread prefs I/O when opening the simulation dialog.
+  Confidence: Verified — Effort: M
+
+- [ ] A-39 — Raw epoch milliseconds shown to users in expiry suppression text
+  Category: ux
+  Where: `app/src/main/java/com/opentasker/core/model/ProfileLifecyclePolicy.kt:11` ("This profile expired at ${profile.expiresAtMs}.") → rendered via `ContextInspectorScreen.kt` `InspectorNotice`.
+  Problem: An expired UNTIL_DATE profile shows "This profile expired at 1770693599999." in the Inspector.
+  Evidence: Verified (source read this audit).
+  Fix: Format via the existing `formatProfileExpiryDate()` (in EditorDialogs.kt) or pass structured data to the UI layer for formatting.
+  Acceptance: The message shows a human-readable date.
+  Confidence: Verified — Effort: S
+
+- [ ] A-40 — Trigger-lint severity is conveyed by color alone in two of three surfaces
+  Category: a11y
+  Where: `ContextInspectorScreen.kt:545-556` and `AutomationFlowScreen.kt:~276-297` (BLOCKING vs advisory expressed only as `error` vs `secondary` color; body text carries no severity word). `ImportedProfileRiskDialog.kt:52-59` does it correctly with `automation_lint_blocked_prefix`/`warning_prefix`.
+  Problem: Color-blind users cannot distinguish blocking from advisory; mixed-severity Inspector lists collapse to one color.
+  Evidence: Verified.
+  Fix: Reuse the blocked/warning prefix strings in both surfaces.
+  Acceptance: Each lint finding names its severity in text.
+  Confidence: Verified — Effort: S
+
+- [ ] A-41 — Flow-canvas "changed" node indicator is border-color-only and near-invisible in dark; a11y label omits changed/outputs
+  Category: a11y
+  Where: `AutomationFlowScreen.kt:449-452` (`FlowCanvasNode` marks changed nodes only with a 2dp `tertiary` border vs 1dp default) and `:442,512` (clickable nodes set `contentDescription = node.accessibilityLabel()`, superseding merged child text); `AutomationFlowGraph.kt:71-74` (`accessibilityLabel()` omits `changed` and `outputs`).
+  Problem: Dark-theme tertiary (#9CB7B0) vs sage (#B7C7B0) are almost indistinguishable; the list variant got a text pill (`flow_changed_node`) but the canvas did not; screen readers never hear "changed" or the output-variable list on tappable nodes.
+  Evidence: Verified (code; color claim from hex values).
+  Fix: Add the pill/icon to `FlowCanvasNode`; extend `nodeAccessibility` with changed/outputs.
+  Acceptance: Changed canvas nodes are distinguishable without color and announce "changed"/outputs.
+  Confidence: Verified — Effort: S
+
+- [ ] A-42 — Profile editor's radio-style option groups lack selection semantics
+  Category: a11y
+  Where: `EditorDialogs.kt:540-557` (overflow-policy, lifetime, retrigger groups) via `SelectableOption` (`:630-664`), a plain `OutlinedButton` with no `Role.RadioButton`/`selected()`/`stateDescription`.
+  Problem: Selection is announced only if TalkBack reads the "Selected" pill; unselected options carry no "not selected" state and no radio-group context. The Setup theme selector does this correctly (gate-enforced); these three groups do not, and the v0.2.82+ lifecycle work doubled their usage.
+  Evidence: Verified.
+  Fix: Add `Modifier.semantics { role = Role.RadioButton; selected = … }` (or `selectable`) to `SelectableOption`.
+  Acceptance: TalkBack announces each option's selected/not-selected state and radio-group membership.
+  Confidence: Verified — Effort: S
+
+- [ ] A-43 — Semantic-diff and import-review render all entries eagerly (no virtualization)
+  Category: perf
+  Where: `SemanticDiffDialogs.kt:36-58` (`SemanticDiffDetails` is a plain Column inside a single LazyColumn `item`, `entries.forEach`); same pattern in `ImportReviewDialogs.kt:139+`.
+  Problem: A large bundle import (hundreds of changes) composes every entry inside an AlertDialog with no recycling.
+  Evidence: Verified structure (impact needs a large diff to repro).
+  Fix: Use `items(document.entries)` directly in the LazyColumn.
+  Acceptance: A large diff composes only visible rows.
+  Confidence: Verified — Effort: S
+
+- [ ] A-44 — Home-screen widget uses the retired Catppuccin Mocha palette, disconnected from the app theme
+  Category: visual
+  Where: `app/src/main/res/values/colors.xml:3-8` (`widget_primary #CBA6F7`, `widget_background #11111B`, …) used by `res/layout/widget_task.xml`; no `values-night` variant.
+  Problem: The app shell was rebranded to sage/graphite, but the widget still ships Mocha lavender-on-navy and is permanently dark regardless of theme/wallpaper — the one surface users see without opening the app.
+  Evidence: Verified colors ("unintentional" is Likely — may be a deliberate static-dark exception).
+  Fix: Align widget colors with the graphite/sage palette (or use DayNight resources).
+  Acceptance: The widget matches the app brand in light and dark.
+  Confidence: Likely — Effort: S
+
+- [ ] A-45 — Diagnostics admission card exposes raw Room profile IDs instead of names
+  Category: ux
+  Where: `app/src/main/java/com/opentasker/ui/screens/DiagnosticsScreen.kt:347,381`; `strings.xml` `diagnostics_admission_profile_active` ("Profile %1$d active executions").
+  Problem: Numeric IDs on a user-visible surface where every other new surface (inspector, run log) resolves names.
+  Evidence: Verified.
+  Fix: Resolve and show profile names (fall back to id only when the profile is gone).
+  Acceptance: The admission card shows profile names.
+  Confidence: Verified — Effort: S
+
+- [ ] A-46 — Terminology drift in new strings
+  Category: docs
+  Where: `strings.xml:201` "Simulate trigger" vs `:202` "Test synthetic event" (two names for the same dialog); `profile_lifetime_label` = "Automation lifetime" among "Profile priority/fallback/grace" in the same dialog; widespread "(s)" pluralization (`semantic_diff_summary`, `ui_profile_lint_warnings`, `diagnostics_admission_open`, `synthetic_trigger_*`) while the gate mandates `plurals`.
+  Problem: Inconsistent naming (profile vs automation, two labels for one feature) and manual "(s)" pluralization that won't localize.
+  Evidence: Verified.
+  Fix: Pick one name for the simulation feature; align "profile"/"automation" usage within a dialog; convert "(s)" strings to `plurals`.
+  Acceptance: Consistent terminology; pluralized strings use `plurals`.
+  Confidence: Verified — Effort: S
+
+- [ ] A-47 — Global fallback-task rewrite persisted outside the delete transaction
+  Category: correctness
+  Where: `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationViewModel.kt:640-644` (in `deleteTask`, `fallbackTaskSettings.saveTaskId(...)` runs after `db.withTransaction` commits; `loadTaskId` has no existence check).
+  Problem: Process death between the transaction commit and the settings write leaves `FallbackTaskSettings` pointing at a deleted task id.
+  Evidence: Verified (crash-window edge case).
+  Fix: Move the fallback-settings update inside the transaction, or validate existence on load.
+  Acceptance: Deleting the global fallback task never leaves a dangling fallback id after a crash.
+  Confidence: Verified — Effort: S
+
+- [ ] A-48 — Replay / duplicate / run-now buttons have no busy or debounce state
+  Category: ux
+  Where: `RunLogScreenContent.kt:607-612` (Replay), `ActiveAutomationViewModel.kt:1426-1443` (`replayHeldRun`), `:755` (`duplicateProfile`).
+  Problem: Buttons stay enabled during the async launch; a double-tap replays a held execution twice (real side effects — see A-13) or creates two copies. Admission limits bound but don't prevent it.
+  Evidence: Verified.
+  Fix: Disable the control / show a busy state until the operation completes (or debounce).
+  Acceptance: Double-tapping Replay/Duplicate performs the action once.
+  Confidence: Verified — Effort: S
+
+- [ ] A-49 — Simulation dialog state uses plain `remember` and is lost on rotation
+  Category: correctness
+  Where: `ActiveAutomationUi.kt:294` and `ContextInspectorScreen.kt:245` (`var simulationProfile by remember { mutableStateOf<Profile?>(null) }`); sibling dialog IDs use `rememberSaveable`.
+  Problem: A configuration change dismisses the simulation dialog (and, with A-24, loses the already-discarded edit). Profile isn't Parcelable, so the fix is holding it in the ViewModel like `semanticDiffReview`.
+  Evidence: Verified.
+  Fix: Hoist the simulation target into the ViewModel.
+  Acceptance: Rotating during a simulation keeps the dialog open.
+  Confidence: Verified — Effort: S
+
+- [ ] A-50 — New broadcast receivers registered `RECEIVER_EXPORTED` against codebase convention
+  Category: security
+  Where: `app/src/main/java/com/opentasker/core/contexts/StateSensorEvents.kt:428,497,559` (uncommitted) — roaming, call-state, tethering receivers use `RECEIVER_EXPORTED`.
+  Problem: All three actions are protected broadcasts (spoofing blocked at send time), but every other dynamic receiver in the codebase uses `RECEIVER_NOT_EXPORTED` (which still receives system broadcasts on API 33+). The exported flag is an unnecessary widening and an unexplained convention break in unreviewed code.
+  Evidence: Verified.
+  Fix: Switch all three to `RECEIVER_NOT_EXPORTED`.
+  Acceptance: The three receivers register NOT_EXPORTED and still receive their system broadcasts.
+  Confidence: Verified — Effort: S
+
+- [ ] A-51 — Pre-API-36 tethering "ready" marker claims readiness with no value, so `tethering=false` never matches
+  Category: correctness
+  Where: `app/src/main/java/com/opentasker/core/contexts/StateSensorEvents.kt:561-563` (`emitReady(emit, "tethering")` with no `tethering` value; roaming/call/speed all perform an initial read).
+  Problem: Until the first tethering transition, a `tethering=false` predicate silently never matches (absent key → fail-closed) while the Inspector reports the source ready with no explanation. Combined with A-20, the pre-36 tethering key is effectively unusable.
+  Evidence: Verified.
+  Fix: Perform an initial tethering-state read on registration and emit the value (see A-20's state-read fix).
+  Acceptance: A `tethering=false` predicate matches immediately when tethering is off.
+  Confidence: Verified — Effort: S
+
+- [ ] A-52 — Step-detector path emits a context event and full profile re-evaluation on every step
+  Category: perf
+  Where: `app/src/main/java/com/opentasker/core/contexts/StateSensorEvents.kt:219-231,267-271` — with a step detector, `emitActivity` always passes non-null `stepsPerMinute`, bypassing the `activity == lastActivity` dedupe; `activity_steps_per_minute` changes almost every step.
+  Problem: Each step yields a state patch, a merged ContextEvent (value changed, so the dedupe can't help), and a `combine`+expression re-evaluation of the whole profile — ~2 evaluations/second while walking.
+  Evidence: Verified.
+  Fix: Emit only when the classified activity or a bucketed rate changes (rate-limit the cadence metadata).
+  Acceptance: Walking does not trigger per-step profile re-evaluation; a test asserts events are throttled.
+  Confidence: Verified — Effort: S
+
+- [ ] A-53 — `url.open` accepts scheme-less URIs (allowlist not fail-closed for the null case)
+  Category: security
+  Where: `app/src/main/java/com/opentasker/core/actions/AppActions.kt:99-102` — `if (scheme != null && scheme !in ALLOWED_SCHEMES)`; a scheme-less URI (`scheme == null`, e.g. `//host/path`) bypasses the allowlist and is dispatched via `ACTION_VIEW`.
+  Problem: Low impact (Android usually finds no handler), but the scheme allowlist is not fail-closed for null.
+  Evidence: Verified.
+  Fix: Reject or normalize scheme-less input before dispatch.
+  Acceptance: A scheme-less `url.open` argument is rejected; a test asserts it.
+  Confidence: Verified — Effort: S
+
+- [ ] A-54 — `ActionRegistry` category/retry-safety drift guards became tautological after the centralization refactor
+  Category: maintainability
+  Where: `app/src/main/java/com/opentasker/core/engine/Action.kt:88-95` (`register` asserts `declaration.category == action.category` and `declaration.retrySafety == action.retrySafety`), but `DeclaredAction` (`:113-122`) sources both sides from the same `ActionDefinition` after commit b3a704b.
+  Problem: The asserts compare the definition's fields to themselves and can no longer detect the drift they were written to catch (a check in the same trust domain). The pre-refactor actions hardcoded these per class, so the comparison used to be meaningful.
+  Evidence: Verified.
+  Fix: Drop the now-tautological asserts, or move the invariant to where category/retry-safety are declared independently (metadata vs. catalog).
+  Acceptance: The guard either verifies an independent source of truth or is removed; a comment explains the invariant.
+  Confidence: Verified — Effort: S
+
+- [ ] A-55 — Secret-variable AEAD binds the variable name but not the project (same-name ciphertexts swappable across projects)
+  Category: security
+  Where: `app/src/main/java/com/opentasker/core/storage/VariableSecretStorage.kt:50,73` (`cipher.updateAAD(variableName…)` only) vs the v9 composite key `(projectId, name)` (`VariableDao.kt:16`).
+  Problem: The codec's stated guarantee ("ciphertext cannot be copied to a different variable and still decrypt") no longer holds across projects: two secrets named `apikey` in projects A and B share identical AAD, so an envelope moved between rows decrypts cleanly. Requires DB write access (SQLCipher-protected), so impact is low, but the projectId should join the AAD (with a versioned envelope, e.g. `otsec:v2`).
+  Evidence: Verified.
+  Fix: Include projectId in the AAD and version the envelope.
+  Acceptance: An envelope moved between same-named secrets in different projects fails to decrypt; a test asserts it.
+  Confidence: Verified — Effort: S
+
+- [ ] A-56 — `TaskerXmlExporter` is unreachable dead code while CHANGELOG claims it shipped
+  Category: maintainability
+  Where: `app/src/main/java/com/opentasker/core/transfer/TaskerXmlExport.kt:29,59` (`object TaskerXmlExporter.export` — no production caller; every reference is in tests); CHANGELOG.md:306 states "Tasker XML export … Exports Time, Day, Application, State, and Event contexts" as shipped.
+  Problem: The feature is inaccessible to users despite the changelog, and the redaction-unification work for this file (commit 458a3b2, the `secretValues`-aware `ExportRedactionPolicy.Context`) is never exercised in production, so a regression there ships silently.
+  Evidence: Verified (exhaustive symbol search).
+  Fix: Wire the exporter into the UI/ViewModel export flow, or remove it and correct the changelog.
+  Acceptance: Either a user can export Tasker XML (with the redaction path exercised by a test), or the dead code and the changelog claim are removed.
+  Confidence: Verified — Effort: S
+
+- [ ] A-57 — Import boundary corpus does not cover several reachable paths (including the internal-subset XXE branch)
+  Category: testing
+  Where: `app/src/test/java/com/opentasker/core/scripting/ImportBoundaryCorpusTest.kt`; the untested logic is the internal-subset bracket scanner in `ImportResourceGuard.sanitizeTaskerXml` (`ImportResourceBudget.kt:58-85`).
+  Problem: The corpus covers JSON/XML/external-intent/Locale/Termux boundaries but not: (a) DOCTYPE with an internal-subset ENTITY declaration (`<!DOCTYPE x [ <!ENTITY xxe "…"> ]>`) — the actual XXE-defense bracket-matching branch, only an external SYSTEM DTD is tested (caught earlier by the preflight); (b) `ShareContextEvents.parseInput` (Parcelable/CharSequence rejection, `MAX_URIS`, control chars); (c) the `LocaleConditionQueryReceiver` secret-variable refusal (A-19's mitigation).
+  Evidence: Verified.
+  Fix: Add corpus cases for the internal-subset ENTITY DOCTYPE, the share-intent boundary, and the secret-refusal path.
+  Acceptance: The corpus fails if the internal-subset DOCTYPE scanner is reverted; all three paths are covered.
+  Confidence: Verified — Effort: S
+
+- [ ] A-58 — Journal `recordStep` issues one DB UPDATE per executed action (up to 100k writes/run)
+  Category: perf
+  Where: `app/src/main/java/com/opentasker/core/engine/TaskExecutionHelper.kt:188-190` (`onStepCompleted` → `ExecutionJournal.recordStep`); `MAX_FLOW_STEPS = 100_000` (`TaskRunner.kt:795`); sub-task steps report their own indices, making `lastStepIndex` ambiguous across nesting.
+  Problem: A long flow run generates one row UPDATE per action.
+  Evidence: Verified.
+  Fix: Throttle step journaling (time- or count-based).
+  Acceptance: A long flow run performs far fewer journal writes than actions; a test asserts throttling.
+  Confidence: Verified — Effort: S
+
+- [ ] A-59 — `runTaskNow` lacks the `runCatching` its sibling `replayHeldRun` has (crash path)
+  Category: reliability
+  Where: `app/src/main/java/com/opentasker/ui/screens/ActiveAutomationViewModel.kt:1407-1424`.
+  Problem: `executeAndLogTask` rethrows non-action exceptions (`TaskExecutionHelper.kt:290`, e.g. a Room I/O failure in `ExecutionJournal.start`, which is not `runCatching`-wrapped) → uncaught in `viewModelScope.launch` → app crash instead of the toast the sibling produces.
+  Evidence: Verified path (rare trigger).
+  Fix: Wrap `runTaskNow` in `runCatching` with a user-facing error, matching `replayHeldRun`.
+  Acceptance: A DB failure during "Run now" shows an error toast, not a crash.
+  Confidence: Verified — Effort: S
+
+- [ ] A-60 — WAIT-mode cross-recursive `task.run` can deadlock and bypasses the per-action timeout
+  Category: correctness
+  Where: `app/src/main/java/com/opentasker/core/engine/TaskRunner.kt:534` (task.run returns before the `withTimeout` wrapper), `:626` + `TaskCollisionCoordinator.kt:37` (`waitMutex.withLock` around the whole run).
+  Problem: Task A (WAIT) sub-runs B (WAIT) while a concurrent execution of B sub-runs A → AB-BA mutex deadlock; `executionChain` only guards one chain. No timeout applies (task.run short-circuits before `withTimeout`), and each hung run holds an admission lease until the global cap (8) wedges the engine (user can still cancel via the active-executions UI). Mostly pre-existing, but new admission leases raise the blast radius.
+  Evidence: Likely (needs two concurrent cross-recursive WAIT tasks).
+  Fix: Ordered lock acquisition, or a bounded `withTimeout` around WAIT acquisition.
+  Acceptance: Two cross-recursive WAIT tasks do not deadlock; a test drives the interleave with a timeout.
+  Confidence: Needs-repro — Effort: M
+
+- [ ] A-61 — `VerifyDocumentationTruthTask` declares CHANGELOG/release-truth as inputs but never checks them; `verifyFdroidReadiness` has an always-pass check
+  Category: maintainability
+  Where: `app/build.gradle.kts:54-56,846-850` (`currentDocumentation` includes `CHANGELOG.md` + `tools/release-truth.json`) vs `:77-117` (action reads only `readmeFile` + `historicalDocumentation`); `:916` (`check(selectedDistribution in allowedDistributions)` — the same predicate is already `require`d at configuration time on `:145`).
+  Problem: The "currentDocumentation" inputs invalidate caching but are never verified — CHANGELOG claims are unguarded despite the task description ("Checks current release claims"). The fdroid-readiness `check` can never fail.
+  Evidence: Verified.
+  Fix: Verify something in those files (e.g. CHANGELOG contains a `## v$appVersionName` heading) or drop them from the input list; delete the tautological `check`.
+  Acceptance: The task fails when CHANGELOG lacks the current version heading; the always-pass check is gone.
+  Confidence: Verified — Effort: S
+
+- [ ] A-62 — Stale early-scheme tags v0.3.0 / v0.4.1 / v0.4.2 are also published GitHub Releases and sort above v0.2.82
+  Category: docs
+  Where: git tags + `gh release list --repo SysAdminDoc/OpenTasker` (releases dated 2026-05-04).
+  Problem: The tags sort above v0.2.82 in semver order. Mitigations verified: GitHub marks v0.2.82 "Latest", and F-Droid `UpdateCheckMode: Tags` reads versionCode from the build files (at those tags `versionCode = 1`/`versionName "0.1.0"`, so 84 wins). Residual risk: "highest semver tag" tooling (`git describe`, third-party update checkers) resolves to v0.4.2, and the `/releases` page linked from the yml/README shows v0.4.x above the 0.2.x entries.
+  Evidence: Verified.
+  Fix: Delete the three tags and their GitHub releases (or retag as `archive/…`); they carry no artifacts.
+  Acceptance: `git tag` and the GitHub releases list show no v0.3.x/v0.4.x entries above v0.2.82. (Blocked-item note: deleting published GitHub releases is a remote mutation — implementer/owner decision; this audit makes no changes.)
+  Confidence: Verified — Effort: S
+
+- [ ] A-63 — PowerShell `-match` lowercase-SHA validations are case-insensitive, contradicting their error text
+  Category: maintainability
+  Where: `tools/generate-release-truth.ps1:33` and `tools/verify-fdroid-release.ps1:195` — `-notmatch "^[0-9a-f]{40}$"` with message "must be a full lowercase SHA".
+  Problem: `-match` is case-insensitive, so an uppercase SHA passes the "lowercase" validation (the Kotlin gate later catches it case-sensitively, so impact is a confusing delayed failure).
+  Evidence: Verified.
+  Fix: Use `-cnotmatch`.
+  Acceptance: An uppercase SHA fails the PowerShell validation immediately.
+  Confidence: Verified — Effort: S
+
+- [ ] A-64 — Dead trust entries left in dependency-verification metadata
+  Category: maintainability
+  Where: `gradle/verification-metadata.xml:17` (`trusted-key … group="io.netty"`) and `:132` (`org.jsoup version="1.22.2"` alongside the current 1.23.1).
+  Problem: Commit 0275a57 removed all netty/grpc-netty components (matching the "Netty absent" policy) and bumped jsoup to 1.23.1 but left the netty signing key and the jsoup 1.22.2 version-scoped trust behind, so the trust set over-approximates the graph. Related honesty nit: `tools/verify-dependency-verification.ps1:122-128` (`Test-PgpSignatureFile`) only checks the `.asc` looks like a signature — the origin label "published .asc + artifact SHA-256" records signature presence, not verification (Gradle does the real PGP check via `verify-signatures`).
+  Evidence: Verified.
+  Fix: Remove the netty trusted-key and the jsoup 1.22.2 trust; relabel the PS origin string to reflect presence-not-verification.
+  Acceptance: The trust set contains no netty/1.22.2-jsoup entries; the origin label is accurate.
+  Confidence: Verified — Effort: S
+
+- [ ] A-65 — Roadmap_Blocked entries are stale: MQTT (RD34) has shipped
+  Category: docs
+  Where: `Roadmap_Blocked.md` "P3 - MQTT publish action (RD34) … Blocked on client library decision"; actual: `mqtt.publish` is registered (`ActionCatalog.kt:101`), capability `Supported` (`ActionCapabilities.kt:89`), implemented in `MqttPublishAction.kt` (10.5K).
+  Problem: The blocked-roadmap item describes MQTT as a not-yet-decided spike, but the action is built, registered, and user-reachable (see A-18). Blocked/roadmap docs disagree with the code. (Also re-check the other Roadmap_Blocked items — e.g. UnifiedPush RD32 — against the current tree for the same drift.)
+  Evidence: Verified for MQTT.
+  Fix: Remove the shipped MQTT item from Roadmap_Blocked (git/CHANGELOG are the record); audit the rest of Roadmap_Blocked for shipped features.
+  Acceptance: Roadmap_Blocked contains no items that are already implemented in the tree.
+  Confidence: Verified — Effort: S
+
+- [ ] A-66 — Local repo CLAUDE.md carries several provably false machine facts
+  Category: docs
+  Where: repo `CLAUDE.md` — header "Room schema: v10" (actual `AppDatabase.kt` = 15, release-truth = 15); Key Files lists `.github/workflows/build-release.yml` (no `.github/` directory exists — correct per the no-CI policy, but the reference is dead); architecture diagram "43 registered definitions" (actual 74); gotcha #6 "requires `abortOnError = false`" (build sets `abortOnError = true`, `app/build.gradle.kts:229`).
+  Problem: The living working-notes file misstates schema version, action count, lint config, and a nonexistent CI workflow. Low priority (gitignored, warn-only), but it misleads future sessions.
+  Evidence: Verified.
+  Fix: One doc sweep to correct schema (15), action count (74), lint (`abortOnError = true`), and remove the dead CI reference.
+  Acceptance: CLAUDE.md matches the current tree.
+  Confidence: Verified — Effort: S
+
+- [ ] A-67 — JSON bundle export cannot redact literal (inline) secret values, unlike the (unreachable) XML exporter
+  Category: security
+  Where: `app/src/main/java/com/opentasker/core/transfer/OpenTaskerBundle.kt:605-632` (`exportBundle` builds `ExportRedactionPolicy.Context(secretNames = …)` with empty `secretValues`, `:209`) vs `TaskerXmlExport.kt:68-71` (passes both).
+  Problem: The live JSON export redacts args that reference a secret by name and applies generic URL/token patterns, but cannot redact an arg containing a literal copy of a secret's plaintext (`ordinaryExport()` never exposes secret plaintext). A user who pasted a secret's plaintext into a non-sensitively-named arg gets it exported in cleartext unless a generic pattern catches it. Largely inherent to crypto-at-rest (the JSON path has no plaintext to match), so this is a documentation/known-limitation item rather than a resurrection bug — omitted secret variables are filtered on export with a warning (`:159`).
+  Evidence: Needs-repro (requires the user to have hand-entered secret plaintext into an action arg).
+  Fix: Document the limitation in `docs/OPEN_JSON_BUNDLE.md` and warn on export when an arg literally contains a known secret name's value; a true fix requires plumbing decrypted secrets into export, which contradicts the storage model — decide explicitly.
+  Acceptance: The export limitation is documented and the user is warned; or a deliberate decision is recorded.
+  Confidence: Needs-repro — Effort: S
+
+### Unaudited — needs a future pass
+- [ ] A-68 — Areas not covered this pass (log so a later audit closes them)
+  Category: docs
+  Where: N/A (coverage note).
+  Problem: Not audited in depth this pass: Scene editor/canvas/overlay (`SceneEditor*.kt`, `SceneOverlayControls.kt`, scene runtime), the pre-existing Location/Calendar/Sun/NFC/Boot context sources (no fresh commits, several prior audits), `GlobalSearchDialog`/`ContextGroupingDialog`/`ProfileShareReviewDialog`, the widget/quick-settings-tile config activities beyond theming, and any behavior requiring physical-device/API-37 evidence (already tracked in Roadmap_Blocked). On-device UI driving covered the primary + secondary screens and the import-error path in both themes, but did not exercise every editor field or destructive-confirmation flow.
+  Fix: Schedule a follow-up pass over Scenes and the share/search dialogs; treat the Roadmap_Blocked device-evidence items as the on-device checklist.
+  Acceptance: A later audit records findings or an explicit clean result for each area above.
+  Confidence: Verified — Effort: M
