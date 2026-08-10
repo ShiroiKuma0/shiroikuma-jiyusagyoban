@@ -24,22 +24,24 @@ object ProfileLifecyclePolicy {
         fallbackTaskId = profile.fallbackTaskId?.takeIf { it > 0L },
     )
 
-    /** Returns the deterministic winner; lower IDs break equal-priority ties. */
-    fun winner(profiles: Collection<Profile>): Profile? = profiles
+    /**
+     * Returns the enabled profile that outranks [profile], or null when nothing does.
+     *
+     * Priority expresses an explicit user preference, so only a *strictly* higher priority
+     * suppresses. Profiles left at the default priority are independent and run concurrently:
+     * arbitrating equal priorities by profile ID would make every automation mutually exclusive
+     * with every other one by default.
+     */
+    fun suppressor(profile: Profile, candidates: Collection<Profile>): Profile? = candidates
         .asSequence()
         .filter(Profile::enabled)
+        .filter { it.id != profile.id }
+        .filter { it.priority > profile.priority }
         .sortedWith(compareByDescending<Profile> { it.priority }.thenBy { it.id })
         .firstOrNull()
 
-    fun suppressionByPriority(profile: Profile, candidates: Collection<Profile>): String? {
-        val winner = winner(candidates) ?: return null
-        if (winner.id == profile.id) return null
-        return if (winner.priority > profile.priority) {
-            "Suppressed by higher-priority profile '${winner.name}'."
-        } else {
-            "Suppressed by equal-priority profile '${winner.name}' using the lower profile ID tie-break."
-        }
-    }
+    fun suppressionByPriority(profile: Profile, candidates: Collection<Profile>): String? =
+        suppressor(profile, candidates)?.let { "Suppressed by higher-priority profile '${it.name}'." }
 
     const val MIN_PRIORITY = -100
     const val MAX_PRIORITY = 100
