@@ -4,9 +4,6 @@ import com.opentasker.core.actions.ActionArgumentSensitivity
 import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.capabilities.AutomationLint
 import com.opentasker.core.capabilities.AutomationLintFinding
-import com.opentasker.core.actions.ResolvedActionOutput
-import com.opentasker.core.actions.resolveOutputs
-import com.opentasker.core.capabilities.AutomationLintStrings
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.Profile
@@ -67,7 +64,6 @@ data class AutomationFlowNode(
     /** Structural flag so the UI can badge sub-task nodes without parsing the localized detail. */
     val isSubTask: Boolean = false,
     val strings: AutomationFlowStrings = AutomationFlowStrings.English,
-    val outputs: List<ResolvedActionOutput> = emptyList(),
 ) {
     fun accessibilityLabel(): String {
         val kindName = kind.name.lowercase().replace('_', ' ')
@@ -111,21 +107,13 @@ object AutomationFlowGraphBuilder {
         tasks: List<Task>,
         strings: AutomationFlowStrings = AutomationFlowStrings.English,
         changedNodeKeys: Set<String> = emptySet(),
-        lintStrings: AutomationLintStrings = AutomationLintStrings.English,
-    ): AutomationFlowGraph = build(
-        profile = profile,
-        tasksById = tasks.associateBy { it.id },
-        strings = strings,
-        changedNodeKeys = changedNodeKeys,
-        lintStrings = lintStrings,
-    )
+    ): AutomationFlowGraph = build(profile, tasks.associateBy { it.id }, strings, changedNodeKeys)
 
     fun build(
         profile: Profile,
         tasksById: Map<Long, Task>,
         strings: AutomationFlowStrings = AutomationFlowStrings.English,
         changedNodeKeys: Set<String> = emptySet(),
-        lintStrings: AutomationLintStrings = AutomationLintStrings.English,
     ): AutomationFlowGraph {
         val nodes = mutableListOf<AutomationFlowNode>()
         val edges = mutableListOf<AutomationFlowEdge>()
@@ -205,11 +193,7 @@ object AutomationFlowGraphBuilder {
             edges = edges,
             warnings = warnings.distinct(),
             strings = strings,
-            lintFindings = AutomationLint.analyze(
-                profile,
-                tasksById.values.toList(),
-                strings = lintStrings,
-            ).forProfile(profile.id),
+            lintFindings = AutomationLint.analyze(profile, tasksById.values.toList()).forProfile(profile.id),
         )
     }
 
@@ -314,7 +298,6 @@ private fun ActionSpec.toNode(
         condition = condition?.trim()?.takeUnless { it.isBlank() },
         isSubTask = subTaskRef != null,
         strings = strings,
-        outputs = ActionMetadataRegistry.get(type)?.resolveOutputs(this@toNode, actionIndex = index).orEmpty(),
     )
 }
 

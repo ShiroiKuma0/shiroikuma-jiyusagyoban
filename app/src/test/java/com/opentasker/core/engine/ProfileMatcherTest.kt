@@ -1,10 +1,7 @@
 package com.opentasker.core.engine
 
-import com.opentasker.core.contexts.ContextEvent
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
-import com.opentasker.core.model.ContextBooleanOperator
-import com.opentasker.core.model.ContextExpressionNode
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
@@ -27,24 +24,9 @@ class ProfileMatcherTest {
         ).toList()
 
         assertEquals(
-            listOf(ProfileStateChange.Activated(null), ProfileStateChange.Activated(null)),
+            listOf(ProfileStateChange.Activated(), ProfileStateChange.Activated()),
             changes,
         )
-    }
-
-    @Test
-    fun inheritedPulseBaselineDoesNotRefireThePulseThatStartedDuringReconcile() = runBlocking {
-        val changes = profileStateChangesFromSnapshots(
-            snapshots = flowOf(
-                ProfileMatchSnapshot(allMatched = true, pulseSequence = 7),
-                ProfileMatchSnapshot(allMatched = true, pulseSequence = 8),
-            ),
-            hasPulseContexts = true,
-            initialPulseSequence = 7,
-        ).toList()
-
-        assertEquals(1, changes.size)
-        assertTrue(changes.single() is ProfileStateChange.Activated)
     }
 
     @Test
@@ -59,25 +41,7 @@ class ProfileMatcherTest {
             hasPulseContexts = true,
         ).toList()
 
-        assertEquals(listOf(ProfileStateChange.Activated(null)), changes)
-    }
-
-    @Test
-    fun matchingPulseCarriesSourceEventForTaskVariables() = runBlocking {
-        val event = ContextEvent(
-            type = "event",
-            matched = true,
-            metadata = mapOf("event" to "share", "text" to "hello"),
-        )
-        val changes = profileStateChangesFromSnapshots(
-            snapshots = flowOf(
-                ProfileMatchSnapshot(allMatched = false, pulseSequence = 0),
-                ProfileMatchSnapshot(allMatched = true, pulseSequence = 1, event = event),
-            ),
-            hasPulseContexts = true,
-        ).toList()
-
-        assertEquals(event, (changes.single() as ProfileStateChange.Activated).event)
+        assertEquals(listOf(ProfileStateChange.Activated()), changes)
     }
 
     @Test
@@ -93,7 +57,7 @@ class ProfileMatcherTest {
         ).toList()
 
         assertEquals(
-            listOf(ProfileStateChange.Activated(null), ProfileStateChange.Deactivated),
+            listOf(ProfileStateChange.Activated(), ProfileStateChange.Deactivated),
             changes,
         )
     }
@@ -196,29 +160,5 @@ class ProfileMatcherTest {
     @Test
     fun emptyContextMatchesReturnsFalse() {
         assertFalse(evaluateWithOrGroups(emptyArray(), emptyList()))
-    }
-
-    @Test
-    fun nestedExpressionSupportsAndOrAndNotWithoutChangingLegacyEvaluation() {
-        val expression = ContextExpressionNode.group(
-            ContextBooleanOperator.OR,
-            listOf(
-                ContextExpressionNode.group(
-                    ContextBooleanOperator.AND,
-                    listOf(ContextExpressionNode.leaf(0), ContextExpressionNode.leaf(1)),
-                ),
-                ContextExpressionNode(contextIndex = 2, invert = true),
-            ),
-        )
-        val specs = listOf(
-            ContextSpec(ContextType.STATE),
-            ContextSpec(ContextType.STATE),
-            ContextSpec(ContextType.STATE),
-        )
-
-        assertTrue(evaluateContextExpression(arrayOf(match(true), match(true), match(true)), specs, expression))
-        assertTrue(evaluateContextExpression(arrayOf(match(false), match(false), match(false)), specs, expression))
-        assertFalse(evaluateContextExpression(arrayOf(match(false), match(false), match(true)), specs, expression))
-        assertFalse(evaluateWithOrGroups(arrayOf(match(true), match(false)), specs.take(2)))
     }
 }

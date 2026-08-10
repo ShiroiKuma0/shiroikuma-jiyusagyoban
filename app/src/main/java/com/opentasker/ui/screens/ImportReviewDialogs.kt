@@ -1,7 +1,6 @@
 package com.opentasker.ui.screens
 
-import android.content.ClipboardManager
-import android.content.Context
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,340 +8,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
-import com.opentasker.core.capabilities.ActionCapabilityRegistry
-import com.opentasker.core.capabilities.AutomationPower
-import com.opentasker.core.transfer.RecipePowerRequest
-import com.opentasker.core.transfer.VariableConflictAction
-import com.opentasker.core.transfer.VariableConflictResolution
-import com.opentasker.core.transfer.VariableImportConflict
 import com.opentasker.ui.theme.DesignSystem
-
-internal fun readClipboardText(context: Context): String {
-    val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return ""
-    return clipboard.primaryClip
-        ?.takeIf { it.itemCount > 0 }
-        ?.getItemAt(0)
-        ?.coerceToText(context)
-        ?.toString()
-        .orEmpty()
-}
-
-@Composable
-internal fun OpenTaskerBundleTextImportDialog(
-    text: String,
-    busy: Boolean,
-    onTextChanged: (String) -> Unit,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.import_paste_json_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
-                Text(
-                    stringResource(R.string.import_paste_json_body),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = onTextChanged,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 180.dp, max = 360.dp),
-                    placeholder = { Text(stringResource(R.string.import_paste_json_hint)) },
-                    minLines = 8,
-                    maxLines = 16,
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                enabled = text.isNotBlank() && !busy,
-                onClick = onConfirm,
-            ) {
-                Text(
-                    if (busy) stringResource(R.string.import_reading_bundle)
-                    else stringResource(R.string.import_paste_json_review),
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(enabled = !busy, onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
-    )
-}
-
-@Composable
-internal fun OpenTaskerBundleReviewDialog(
-    state: OpenTaskerBundleReviewState,
-    busy: Boolean,
-    onDismiss: () -> Unit,
-    onVariableConflictResolution: (String, VariableConflictResolution) -> Unit = { _, _ -> },
-    onConfirm: () -> Unit,
-) {
-    val bundle = state.bundle
-    val plan = state.plan
-    val reviewWarnings = (bundle.metadata.warnings + plan.warnings + plan.lossyWarnings).distinct()
-    val capabilityRequirements = plan.capabilityRequirements
-    val powerRequests = plan.powerRequests
-    val allConflictsResolved = plan.variableConflicts.all { it.name in state.variableResolutions }
-    AlertDialog(
-        onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text(stringResource(R.string.dialog_review_bundle)) },
-        text = {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 460.dp),
-            ) {
-                item {
-                    Text(
-                        stringResource(R.string.import_disabled_notice),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                item {
-                    InlineNotice(
-                        title = bundle.metadata.name.ifBlank { stringResource(R.string.import_opentasker_bundle) },
-                        body = stringResource(R.string.import_schema_app, bundle.schemaVersion, bundle.appVersion),
-                        color = if (plan.canImport) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
-                    )
-                }
-                item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                        SummaryMetric("${bundle.tasks.size}", stringResource(R.string.import_count_tasks), Modifier.weight(1f))
-                        SummaryMetric("${bundle.profiles.size}", stringResource(R.string.import_count_profiles), Modifier.weight(1f))
-                        SummaryMetric("${bundle.variables.size}", stringResource(R.string.import_count_variables), Modifier.weight(1f))
-                    }
-                }
-                item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                        SummaryMetric("${bundle.scenes.size}", stringResource(R.string.import_count_scenes), Modifier.weight(1f))
-                        SummaryMetric("${capabilityRequirements.size}", stringResource(R.string.import_count_setup_notes), Modifier.weight(1f))
-                        SummaryMetric("${reviewWarnings.size}", stringResource(R.string.import_count_warnings), Modifier.weight(1f))
-                    }
-                }
-                if (bundle.blueprints.isNotEmpty()) {
-                    item {
-                        SummaryMetric(
-                            "${bundle.blueprints.size}",
-                            stringResource(R.string.import_count_blueprints),
-                            Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-                if (!plan.semanticDiff.isEmpty) {
-                    item {
-                        SemanticDiffSummary(plan.semanticDiff)
-                    }
-                    SemanticDiffDetails(plan.semanticDiff)
-                }
-                if (plan.blueprintUpdates.isNotEmpty()) {
-                    item {
-                        InlineNotice(
-                            title = stringResource(R.string.blueprint_update_changes),
-                            body = stringResource(R.string.blueprint_update_review),
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    plan.blueprintUpdates.forEach { update ->
-                        item(key = "blueprint-update-${update.blueprintId}-${update.profileId}") {
-                            val body = update.error?.let {
-                                stringResource(R.string.blueprint_update_unavailable, it)
-                            } ?: stringResource(
-                                R.string.blueprint_update_versions,
-                                update.blueprintTitle,
-                                update.installedVersion,
-                                update.incomingVersion,
-                            )
-                            InlineNotice(
-                                title = if (update.error == null && !update.hasChanges) {
-                                    stringResource(R.string.blueprint_update_no_changes)
-                                } else {
-                                    stringResource(R.string.blueprint_update_changes)
-                                },
-                                body = body,
-                                color = if (update.error == null) {
-                                    MaterialTheme.colorScheme.tertiary
-                                } else {
-                                    MaterialTheme.colorScheme.error
-                                },
-                            )
-                        }
-                        if (update.error == null && update.hasChanges) {
-                            SemanticDiffDetails(update.document)
-                        }
-                    }
-                }
-                if (!plan.canImport) {
-                    item {
-                        TaskerImportListSection(
-                            title = stringResource(R.string.import_incompatible),
-                            values = plan.warnings.ifEmpty { listOf(stringResource(R.string.import_incompatible_body)) },
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
-                if (plan.variableConflicts.isNotEmpty()) {
-                    item {
-                        Text(
-                            stringResource(R.string.import_variable_conflicts),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                    }
-                    plan.variableConflicts.forEach { conflict ->
-                        item(key = conflict.name) {
-                            VariableConflictReview(
-                                conflict = conflict,
-                                resolution = state.variableResolutions[conflict.name],
-                                enabled = !busy,
-                                onResolution = { resolution ->
-                                    onVariableConflictResolution(conflict.name, resolution)
-                                },
-                            )
-                        }
-                    }
-                }
-                if (capabilityRequirements.isNotEmpty()) {
-                    item {
-                        TaskerImportListSection(
-                            title = stringResource(R.string.import_capability_review),
-                            values = capabilityRequirements.map { requirement ->
-                                val capability = ActionCapabilityRegistry.get(requirement.actionId)
-                                stringResource(
-                                    R.string.import_capability_item,
-                                    actionDisplayName(requirement.actionId),
-                                    stringResource(capabilityLevelLabelRes(requirement.level)),
-                                    stringResource(capability.reasonRes),
-                                )
-                            },
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-                if (powerRequests.isNotEmpty()) {
-                    item {
-                        TaskerImportListSection(
-                            title = stringResource(R.string.import_power_review),
-                            values = powerRequests.map { request -> powerRequestSummary(request) },
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
-                if (reviewWarnings.isNotEmpty()) {
-                    item {
-                        TaskerImportListSection(
-                            title = stringResource(R.string.import_warnings),
-                            values = reviewWarnings,
-                            color = if (plan.canImport) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                enabled = plan.canImport && allConflictsResolved && !busy,
-                onClick = onConfirm,
-            ) {
-                Text(
-                    when {
-                        busy -> stringResource(R.string.status_importing)
-                        plan.canImport && allConflictsResolved -> stringResource(R.string.import_for_review)
-                        else -> stringResource(R.string.import_disabled)
-                    },
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(enabled = !busy, onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
-    )
-}
-
-@Composable
-private fun VariableConflictReview(
-    conflict: VariableImportConflict,
-    resolution: VariableConflictResolution?,
-    enabled: Boolean,
-    onResolution: (VariableConflictResolution) -> Unit,
-) {
-    val detail = if (conflict.existingIsSecret) {
-        stringResource(R.string.import_variable_conflict_secret, conflict.name)
-    } else {
-        stringResource(R.string.import_variable_conflict, conflict.name)
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs)) {
-        Text(detail, style = MaterialTheme.typography.bodyMedium)
-        Column(modifier = Modifier.fillMaxWidth()) {
-            VariableConflictChoice(
-                label = stringResource(R.string.import_variable_preserve),
-                selected = resolution?.action == VariableConflictAction.PRESERVE_EXISTING,
-                enabled = enabled,
-                onClick = {
-                    onResolution(VariableConflictResolution(VariableConflictAction.PRESERVE_EXISTING))
-                },
-            )
-            VariableConflictChoice(
-                label = stringResource(R.string.import_variable_rename, conflict.suggestedRename),
-                selected = resolution?.action == VariableConflictAction.RENAME_IMPORTED,
-                enabled = enabled,
-                onClick = {
-                    onResolution(
-                        VariableConflictResolution(
-                            action = VariableConflictAction.RENAME_IMPORTED,
-                            renamedTo = conflict.suggestedRename,
-                        ),
-                    )
-                },
-            )
-            VariableConflictChoice(
-                label = if (conflict.existingIsSecret) {
-                    stringResource(R.string.import_variable_replace_secret)
-                } else {
-                    stringResource(R.string.import_variable_replace)
-                },
-                selected = resolution?.action == VariableConflictAction.REPLACE_EXISTING,
-                enabled = enabled,
-                onClick = {
-                    onResolution(VariableConflictResolution(VariableConflictAction.REPLACE_EXISTING))
-                },
-            )
-        }
-    }
-}
-
-@Composable
-private fun VariableConflictChoice(
-    label: String,
-    selected: Boolean,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    TextButton(enabled = enabled, onClick = onClick) {
-        Text(if (selected) stringResource(R.string.import_variable_selected, label) else label)
-    }
-}
 
 @Composable
 internal fun TaskerImportReviewDialog(
@@ -354,64 +34,54 @@ internal fun TaskerImportReviewDialog(
     val preview = state.preview
     val migrationWarnings = (preview.warnings + preview.lossyWarnings).distinct()
     AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text(stringResource(R.string.dialog_review_tasker)) },
+        title = { Text("Review Tasker import") },
         text = {
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 460.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 item {
                     Text(
-                        stringResource(R.string.import_disabled_notice),
+                        "Imported profiles will be created disabled so actions, contexts, and permissions can be reviewed before use.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                        SummaryMetric("${preview.importTaskCount}", stringResource(R.string.import_count_tasks), Modifier.weight(1f))
-                        SummaryMetric("${preview.importProfileCount}", stringResource(R.string.import_count_profiles), Modifier.weight(1f))
-                        SummaryMetric("${preview.importVariableCount}", stringResource(R.string.import_count_variables), Modifier.weight(1f))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        SummaryMetric("${preview.importTaskCount}", "Tasks", Modifier.weight(1f))
+                        SummaryMetric("${preview.importProfileCount}", "Profiles", Modifier.weight(1f))
+                        SummaryMetric("${preview.importVariableCount}", "Variables", Modifier.weight(1f))
                     }
                 }
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                        SummaryMetric("${preview.sourceTaskCount}", stringResource(R.string.import_count_src_tasks), Modifier.weight(1f))
-                        SummaryMetric("${preview.sourceProfileCount}", stringResource(R.string.import_count_src_profiles), Modifier.weight(1f))
-                        SummaryMetric("${preview.sourceSceneCount}", stringResource(R.string.import_count_scenes), Modifier.weight(1f))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        SummaryMetric("${preview.sourceTaskCount}", "Src tasks", Modifier.weight(1f))
+                        SummaryMetric("${preview.sourceProfileCount}", "Src profiles", Modifier.weight(1f))
+                        SummaryMetric("${preview.sourceSceneCount}", "Scenes", Modifier.weight(1f))
                     }
                 }
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
-                        StatusPill("${preview.mappedActionCount} ${stringResource(R.string.import_mapped)}", MaterialTheme.colorScheme.tertiary)
-                        StatusPill("${preview.unsupportedActionCount} ${stringResource(R.string.import_unsupported)}", MaterialTheme.colorScheme.error)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        StatusPill("${preview.mappedActionCount} mapped", MaterialTheme.colorScheme.tertiary)
+                        StatusPill("${preview.unsupportedActionCount} unsupported", MaterialTheme.colorScheme.error)
                     }
                 }
                 if (preview.capabilityWarnings.isNotEmpty()) {
                     item {
                         TaskerImportListSection(
-                            title = stringResource(R.string.import_capability_review),
+                            title = "Capability review",
                             values = preview.capabilityWarnings,
                             color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-                if (preview.powerRequests.isNotEmpty()) {
-                    item {
-                        TaskerImportListSection(
-                            title = stringResource(R.string.import_power_review),
-                            values = preview.powerRequests.map { request -> powerRequestSummary(request) },
-                            color = MaterialTheme.colorScheme.error,
                         )
                     }
                 }
                 if (migrationWarnings.isNotEmpty()) {
                     item {
                         TaskerImportListSection(
-                            title = stringResource(R.string.import_migration_warnings),
+                            title = "Migration warnings",
                             values = migrationWarnings,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -420,7 +90,7 @@ internal fun TaskerImportReviewDialog(
                 if (state.report.unsupportedActions.isNotEmpty()) {
                     item {
                         TaskerImportListSection(
-                            title = stringResource(R.string.import_unsupported_actions),
+                            title = "Unsupported Tasker actions",
                             values = state.report.unsupportedActions.map {
                                 "${it.taskName} step ${it.actionIndex + 1}: code ${it.taskerCode}"
                             },
@@ -431,7 +101,7 @@ internal fun TaskerImportReviewDialog(
                 if (state.report.mappedActions.isNotEmpty()) {
                     item {
                         TaskerImportListSection(
-                            title = stringResource(R.string.import_mapped_actions),
+                            title = "Mapped actions",
                             values = state.report.mappedActions.map {
                                 "${it.taskName}: ${it.taskerCode} -> ${it.openTaskerActionId}"
                             },
@@ -442,54 +112,20 @@ internal fun TaskerImportReviewDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 enabled = preview.canImport && !busy,
                 onClick = onConfirm,
             ) {
-                Text(if (busy) stringResource(R.string.status_importing) else stringResource(R.string.import_for_review))
+                Text(if (busy) "Importing..." else "Import for Review")
             }
         },
         dismissButton = {
             TextButton(enabled = !busy, onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
+                Text("Cancel")
             }
         },
     )
 }
-
-@Composable
-private fun powerRequestSummary(request: RecipePowerRequest): String {
-    val powers = request.powers.map { power -> automationPowerLabel(power) }.joinToString()
-    val profiles = request.profileNames.takeIf { it.isNotEmpty() }
-        ?.joinToString()
-        ?: stringResource(R.string.import_power_no_profile)
-    val chain = request.dataToExternalChains.firstOrNull()?.let { value ->
-        stringResource(
-            R.string.import_power_chain,
-            actionDisplayName(value.sourceActionId),
-            actionDisplayName(value.sinkActionId),
-        )
-    }
-    return buildString {
-        append(stringResource(R.string.import_power_task, request.taskName, powers))
-        append('\n')
-        append(stringResource(R.string.import_power_profiles, profiles))
-        if (chain != null) {
-            append('\n')
-            append(chain)
-        }
-    }
-}
-
-@Composable
-internal fun automationPowerLabel(power: AutomationPower): String = stringResource(
-    when (power) {
-        AutomationPower.DATA_ACCESS -> R.string.automation_power_data_access
-        AutomationPower.EXTERNAL_TRANSMISSION -> R.string.automation_power_external_transmission
-        AutomationPower.DEVICE_CONTROL -> R.string.automation_power_device_control
-        AutomationPower.DESTRUCTIVE -> R.string.automation_power_destructive
-    },
-)
 
 @Composable
 private fun TaskerImportListSection(

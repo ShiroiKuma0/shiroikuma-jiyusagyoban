@@ -12,7 +12,6 @@ import androidx.activity.compose.setContent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
@@ -22,11 +21,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.core.content.ContextCompat
 import com.opentasker.core.contexts.NfcContextEvents
 import com.opentasker.core.contexts.NfcTagWriteSession
+import com.opentasker.core.contexts.NotificationTriggerService
 import com.opentasker.core.engine.AutomationService
+import com.opentasker.core.engine.EngineShutdown
 import com.opentasker.ui.screens.ActiveAutomationUi
 import com.opentasker.ui.theme.OpenTaskerTheme
-import com.opentasker.ui.theme.ThemeMode
-import com.opentasker.ui.theme.ThemePreference
+import com.opentasker.ui.theme.ThemeStore
 
 class MainActivity : ComponentActivity() {
     private val rootBackCallback = object : OnBackPressedCallback(true) {
@@ -46,14 +46,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         
         setContent {
-            val themeMode by ThemePreference.observe(this).collectAsState(initial = ThemeMode.System)
-            val darkTheme = when (themeMode) {
-                ThemeMode.Dark -> true
-                ThemeMode.Light -> false
-                ThemeMode.HighContrast -> true
-                ThemeMode.System -> isSystemInDarkTheme()
-            }
-            OpenTaskerTheme(darkTheme = darkTheme, highContrast = themeMode == ThemeMode.HighContrast) {
+            val themePrefs by ThemeStore.state.collectAsState()
+            OpenTaskerTheme(prefs = themePrefs) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -97,6 +91,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startAutomationService() {
+        // Opening the app by hand is the unambiguous "I want it back" signal, so it lifts an
+        // "Exit app fully" and re-binds the notification listener the shutdown had unbound. To look at
+        // the stopped state without ending it, poke the app over adb rather than opening it.
+        EngineShutdown.clear(this)
+        NotificationTriggerService.requestRebindIfEnabled(this)
         runCatching {
             ContextCompat.startForegroundService(
                 this,

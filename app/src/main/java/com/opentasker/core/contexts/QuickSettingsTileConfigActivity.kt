@@ -81,7 +81,7 @@ class QuickSettingsTileConfigActivity : ComponentActivity() {
                 ThemeMode.System -> androidx.compose.foundation.isSystemInDarkTheme()
             }
             val tasks by tasksFlow.collectAsState(initial = emptyList())
-            OpenTaskerTheme(darkTheme = darkTheme, highContrast = themeMode == ThemeMode.HighContrast) {
+            OpenTaskerTheme {
                 TileConfigScreen(
                     slot = slot,
                     initial = initial,

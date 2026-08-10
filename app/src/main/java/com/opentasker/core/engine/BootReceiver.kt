@@ -6,6 +6,7 @@ import android.content.Intent
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import androidx.core.content.ContextCompat
 import com.opentasker.core.logging.AppLogger
+import com.opentasker.core.storage.BootStartSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -22,6 +23,15 @@ class BootReceiver : BroadcastReceiver() {
             }
             Intent.ACTION_BOOT_COMPLETED -> {
                 DirectBootTimeScheduler(context).cancel()
+                // "Start engine on boot" (on by default — the long-standing behaviour). When it is off,
+                // a reboot leaves the app down; when it is on, boot also lifts an "Exit app fully", since
+                // coming back up with the device is the whole point of the setting. The gate sits after
+                // the direct-boot alarm is cancelled so a disabled engine cannot leave one armed.
+                if (!BootStartSettings.isEnabled(context)) {
+                    AppLogger.info("OpenTasker", "Boot ignored — “Start engine on boot” is off")
+                    return
+                }
+                EngineShutdown.clear(context)
                 if (initializeAfterUnlock(context)) {
                     runCatching {
                         ContextCompat.startForegroundService(
