@@ -97,6 +97,9 @@ internal object IntentDispatchPolicy {
         if (mime is MimeResult.Invalid) return invalid(mime.message)
         val flags = parseFlags(args["flags"])
         if (flags is FlagsResult.Invalid) return invalid(flags.message)
+        val uriValue = (uri as UriResult.Valid).value
+        val flagsValue = (flags as FlagsResult.Valid).value
+        IntentUriGrantPolicy.violation(uriValue, flagsValue)?.let { return invalid(it) }
         val extras = parseExtras(args)
         if (extras is ExtrasResult.Invalid) return invalid(extras.message)
         val resultVariable = args["result_variable"]?.trim()?.takeIf(String::isNotBlank)
@@ -123,9 +126,9 @@ internal object IntentDispatchPolicy {
                 componentClassName = component,
                 action = action,
                 category = category,
-                uri = (uri as UriResult.Valid).value,
+                uri = uriValue,
                 mimeType = (mime as MimeResult.Valid).value,
-                flags = (flags as FlagsResult.Valid).value,
+                flags = flagsValue,
                 extras = (extras as ExtrasResult.Valid).value,
                 resultVariable = resultVariable,
             ),
@@ -233,5 +236,19 @@ internal object IntentDispatchPolicy {
     private sealed interface ExtrasResult {
         data class Valid(val value: List<IntentDispatchExtra>) : ExtrasResult
         data class Invalid(val message: String) : ExtrasResult
+    }
+}
+
+/**
+ * Every URI in the configurable outbound-intent surface must carry an explicit permission
+ * decision. This keeps the action fail-closed when Android 18 removes implicit URI grants.
+ */
+internal object IntentUriGrantPolicy {
+    fun violation(uri: String?, flags: Set<IntentDispatchFlag>): String? {
+        if (uri == null) return null
+        if (flags.any { it == IntentDispatchFlag.GRANT_READ_URI || it == IntentDispatchFlag.GRANT_WRITE_URI }) {
+            return null
+        }
+        return "URI-bearing intent requires explicit grant_read_uri or grant_write_uri"
     }
 }

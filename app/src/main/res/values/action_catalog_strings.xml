@@ -207,7 +207,7 @@
     <string name="catalog_action_intent_launch_field_mime_label" formatted="false">MIME type</string>
     <string name="catalog_action_intent_launch_field_mime_hint" formatted="false">text/plain or */*</string>
     <string name="catalog_action_intent_launch_field_flags_label" formatted="false">Intent flags</string>
-    <string name="catalog_action_intent_launch_field_flags_hint" formatted="false">activity_clear_top, grant_read_uri</string>
+    <string name="catalog_action_intent_launch_field_flags_hint" formatted="false">activity_clear_top, grant_read_uri (required with a data URI)</string>
     <string name="catalog_action_intent_launch_field_extras_label" formatted="false">Primitive extras</string>
     <string name="catalog_action_intent_launch_field_extras_hint" formatted="false">key=string:value, key=int:1, or key=bool:true</string>
     <string name="catalog_action_intent_launch_field_result_variable_label" formatted="false">Ordered result variable</string>

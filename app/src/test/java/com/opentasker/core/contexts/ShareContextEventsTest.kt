@@ -3,6 +3,7 @@ package com.opentasker.core.contexts
 import android.content.Intent
 import android.os.Bundle
 import org.junit.After
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -103,6 +104,23 @@ class ShareContextEventsTest {
         assertNull(ShareContextEvents.parseInput(arbitraryText))
         assertNull(ShareContextEvents.parseInput(arbitraryStream))
         assertNull(ShareContextEvents.parseInput(oversizedTextWithUri))
+    }
+
+    @Test
+    fun unreadableContentUrisAreClassifiedBeforePublishing() {
+        val event = requireNotNull(
+            ShareContextEvents.parseInput(
+                ShareInput(
+                    action = Intent.ACTION_SEND,
+                    streamValue = "content://com.example.files/document/99",
+                ),
+            ),
+        )
+
+        with(ShareContextEvents) {
+            assertFalse(event.containsUnreadableContentUri { _: String -> true })
+            assertTrue(event.containsUnreadableContentUri { _: String -> false })
+        }
     }
 
     @Test

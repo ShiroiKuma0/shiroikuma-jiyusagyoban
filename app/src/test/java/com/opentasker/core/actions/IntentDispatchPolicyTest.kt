@@ -56,4 +56,27 @@ class IntentDispatchPolicyTest {
         assertTrue(parcelableLike is IntentDispatchParseResult.Invalid)
         assertTrue(oversized is IntentDispatchParseResult.Invalid)
     }
+
+    @Test
+    fun rejectsUriBearingDispatchWithoutAnExplicitGrant() {
+        val missingGrant = IntentDispatchPolicy.parse(
+            mapOf(
+                "package" to "com.example.target",
+                "component" to ".MainActivity",
+                "uri" to "content://com.example.files/document/42",
+            ),
+        )
+        val explicitRead = IntentDispatchPolicy.parse(
+            mapOf(
+                "package" to "com.example.target",
+                "component" to ".MainActivity",
+                "uri" to "content://com.example.files/document/42",
+                "flags" to "grant_read_uri",
+            ),
+        )
+
+        assertTrue(missingGrant is IntentDispatchParseResult.Invalid)
+        assertTrue((missingGrant as IntentDispatchParseResult.Invalid).message.contains("explicit"))
+        assertTrue(explicitRead is IntentDispatchParseResult.Valid)
+    }
 }

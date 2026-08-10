@@ -1,6 +1,7 @@
 package com.opentasker.app
 
 import android.app.Application
+import android.os.Build
 import android.os.StrictMode
 import androidx.room.Room
 import com.opentasker.core.registerCoreRuntime
@@ -106,6 +107,7 @@ class OpenTaskerApp_NoHilt : Application() {
      * receivers/services to logcat (never crashes the app). Helps keep the automation engine's
      * work off the UI thread as the codebase evolves.
      */
+    @Suppress("NewApi")
     private fun installStrictModeInDebug() {
         if (!BuildConfig.DEBUG) return
         StrictMode.setThreadPolicy(
@@ -123,8 +125,14 @@ class OpenTaskerApp_NoHilt : Application() {
                 .apply {
                     // Flags unsafe intent launches (the classic intent-redirection sink) in debug;
                     // available from Android 12 (API 31).
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         detectUnsafeIntentLaunch()
+                    }
+                    // Android 17 (API 37) still supplies implicit URI grants for a few
+                    // Sharesheet/camera intents. Surface those call sites in debug before
+                    // Android 18 removes the compatibility grant.
+                    if (Build.VERSION.SDK_INT >= 37) {
+                        detectImplicitUriPermissionGrant()
                     }
                 }
                 .penaltyLog()
