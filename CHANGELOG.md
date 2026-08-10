@@ -7,6 +7,7 @@
 - `flow.try` now classifies all built-in actions for retry safety, previews retryable and non-retryable actions in the editor, and records skipped-retry reasons in the run log.
 - Dependency verification now requires signatures, explicit trusted keys, and independently checked upstream provenance for every checksum; Gradle-generated origins and blanket trust are rejected by the local release gate.
 - Profile-triggered executions now carry causal parent/depth metadata; repeated profile chains stop with named CAUSAL_LOOP terminal reasons in Run Log, Diagnostics, and the Context Inspector.
+- Diagnostics now pairs stale engine heartbeats with Android 11+ historical process-exit reasons, timestamps, and downtime gaps, with an explicit unsupported-platform state below API 30.
 - Record the current evaluation decisions to wait on Glance and Navigation3 stability, and to keep unrestricted accessibility automation out of the product.
 
 ## v0.2.82

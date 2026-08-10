@@ -41,6 +41,7 @@ import com.opentasker.core.contexts.PluginConditionSubscriptions
 import com.opentasker.core.contexts.ScreenRecordingContextEvents
 import com.opentasker.core.contexts.TimeContextEvents
 import com.opentasker.core.contexts.UsbDeviceContextEvents
+import com.opentasker.core.diagnostics.EngineHealthReader
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
@@ -180,6 +181,9 @@ class AutomationService : Service() {
         // A recreated service starts a new causal attribution lifetime; do not connect a fresh
         // Android process callback to a profile execution from a prior service instance.
         ExecutionCausality.reset()
+        // Read the previous heartbeat before recordAlive() replaces it, so Diagnostics can explain
+        // an OEM kill or crash using ApplicationExitInfo on Android 11+.
+        EngineHealthReader.captureStartupProcessExitCorrelation(this)
         startForegroundCompat()
         timeEventScheduler.scheduleNextMinute()
         engineHeartbeatStore.recordAlive()
