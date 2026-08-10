@@ -105,9 +105,14 @@ internal object ExecutionJournal {
 suspend fun reconcileExecutionJournal(
     db: AppDatabase,
     nowMs: Long = System.currentTimeMillis(),
+    processStartedAtMs: Long = nowMs,
 ): ExecutionJournalRecoverySummary {
     val dao = db.executionJournalDao()
-    val stale = dao.active()
+    // Only rows a previous process left ACTIVE are stale. Recovery is launched alongside engine
+    // startup, so an execution that begins during recovery must not be swept up: it would be
+    // marked INTERRUPTED, get a recovery run-log row written before its own, and then lose its
+    // real terminal state because markTerminal only accepts an ACTIVE row.
+    val stale = dao.activeStartedBefore(processStartedAtMs)
     var interrupted = 0
     stale.forEach { row ->
         val marked = dao.markTerminal(

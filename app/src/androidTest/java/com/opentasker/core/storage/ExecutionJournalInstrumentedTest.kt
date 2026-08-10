@@ -84,4 +84,65 @@ class ExecutionJournalInstrumentedTest {
             db.close()
         }
     }
+
+    /**
+     * Recovery is launched alongside engine startup, so a boot-triggered execution can journal
+     * itself before recovery queries. It must survive: marking it INTERRUPTED writes a recovery
+     * run-log row for a run that is still going, and then blocks its real terminal state.
+     */
+    @Test
+    fun recoveryLeavesExecutionsStartedByThisProcessRunning() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val processStart = 50_000L
+            db.executionJournalDao().insert(journalRow("stale-execution", startedAtMs = processStart - 1))
+            db.executionJournalDao().insert(journalRow("boot-execution", startedAtMs = processStart + 5))
+
+            val recovered = reconcileExecutionJournal(
+                db,
+                nowMs = processStart + 10,
+                processStartedAtMs = processStart,
+            )
+
+            assertEquals(1, recovered.inspected)
+            assertEquals(1, recovered.interrupted)
+            assertEquals(listOf("boot-execution"), db.executionJournalDao().active().map { it.executionId })
+            assertEquals(null, db.runLogDao().getByExecutionId("boot-execution"))
+
+            // The live execution still owns its terminal transition.
+            assertEquals(
+                1,
+                db.executionJournalDao().markTerminal(
+                    "boot-execution",
+                    ExecutionJournalState.SUCCEEDED.wireValue,
+                    null,
+                    processStart + 20,
+                ),
+            )
+        } finally {
+            db.close()
+        }
+    }
+
+    private fun journalRow(executionId: String, startedAtMs: Long) = ExecutionJournalEntity(
+        executionId = executionId,
+        taskId = 1,
+        taskName = "Task",
+        source = "Profile: Boot",
+        sourceLabel = "Boot",
+        profileId = 1L,
+        replayOf = null,
+        parentExecutionId = null,
+        producer = "profile",
+        startedAtMs = startedAtMs,
+        updatedAtMs = startedAtMs,
+        lastStepIndex = null,
+        lastStepLabel = null,
+        state = ExecutionJournalState.ACTIVE.wireValue,
+        terminalReason = null,
+        terminalAtMs = null,
+    )
 }

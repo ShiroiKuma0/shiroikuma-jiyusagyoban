@@ -8,6 +8,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.io.RandomAccessFile
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -100,16 +101,18 @@ class DatabaseBackupManager(
             runCatching {
                 val managedBackup = requireManagedBackupFile(backupFile)
                 val operationContext = currentCoroutineContext()
-                val output = context.contentResolver.openOutputStream(destination)
-                    ?: throw IOException("Could not open export destination")
-                managedBackup.inputStream().use { input ->
-                    output.use { stream ->
-                        BackupEncryption.encrypt(
-                            input,
-                            stream,
-                            passphrase,
-                            cancellationCheck = { operationContext.ensureActive() },
-                        )
+                withPortableCopy(managedBackup) { portable ->
+                    val output = context.contentResolver.openOutputStream(destination)
+                        ?: throw IOException("Could not open export destination")
+                    portable.inputStream().use { input ->
+                        output.use { stream ->
+                            BackupEncryption.encrypt(
+                                input,
+                                stream,
+                                passphrase,
+                                cancellationCheck = { operationContext.ensureActive() },
+                            )
+                        }
                     }
                 }
                 AppLogger.info(tag, "Encrypted backup exported to $destination")
@@ -159,11 +162,13 @@ class DatabaseBackupManager(
     suspend fun exportBackup(backupFile: File, destination: Uri): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             val managedBackup = requireManagedBackupFile(backupFile)
-            val output = context.contentResolver.openOutputStream(destination)
-                ?: throw IOException("Could not open export destination")
-            managedBackup.inputStream().use { input ->
-                output.use { stream ->
-                    input.copyTo(stream)
+            withPortableCopy(managedBackup) { portable ->
+                val output = context.contentResolver.openOutputStream(destination)
+                    ?: throw IOException("Could not open export destination")
+                portable.inputStream().use { input ->
+                    output.use { stream ->
+                        input.copyTo(stream)
+                    }
                 }
             }
             AppLogger.info(tag, "Database backup exported to $destination")
@@ -361,6 +366,25 @@ class DatabaseBackupManager(
         }
         AppLogger.warn(tag, "Restore staged at ${pending.absolutePath}; restart OpenTasker to apply it")
         return pending
+    }
+
+    /**
+     * Runs [block] over a plaintext, device-independent copy of [managedBackup], then shreds it.
+     *
+     * Managed backups are SQLCipher ciphertext under a key that dies with the install, so
+     * exporting them verbatim produced artifacts that could never be restored anywhere. The
+     * portable copy is validated before it leaves the app and only ever exists inside app-private
+     * storage.
+     */
+    private fun <T> withPortableCopy(managedBackup: File, block: (File) -> T): T {
+        val portable = File(backupDir, "${managedBackup.name}.portable.tmp")
+        try {
+            DatabaseSecurity.writePortableCopy(managedBackup, portable, context)
+            validateDatabaseFile(portable)
+            return block(portable)
+        } finally {
+            shredFile(portable)
+        }
     }
 
     private fun requireManagedBackupFile(backupFile: File): File {
@@ -628,6 +652,30 @@ class DatabaseBackupManager(
             }
         }
     }
+}
+
+/**
+ * Overwrites [file] with zeroes before deleting it.
+ *
+ * Wear levelling means this cannot guarantee the old blocks are gone, but it does stop the
+ * plaintext staging copy from being readable through the file system after an export finishes.
+ */
+internal fun shredFile(file: File) {
+    if (!file.exists()) return
+    runCatching {
+        val length = file.length()
+        RandomAccessFile(file, "rws").use { handle ->
+            val zeroes = ByteArray(DEFAULT_BUFFER_SIZE)
+            var written = 0L
+            while (written < length) {
+                val count = minOf(zeroes.size.toLong(), length - written).toInt()
+                handle.write(zeroes, 0, count)
+                written += count
+            }
+            handle.fd.sync()
+        }
+    }
+    file.delete()
 }
 
 /** Same-directory atomic publication or no publication; never delete the existing target first. */

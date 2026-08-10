@@ -24,6 +24,8 @@ import com.opentasker.core.engine.reconcileExecutionJournal
 import com.opentasker.core.engine.DirectBootTriggerStore
 import com.opentasker.core.platform.AppVisibilityTracker
 import com.opentasker.core.power.ShizukuPowerBackend
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,16 +36,34 @@ class OpenTaskerApp_NoHilt : Application() {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     companion object {
+        @Volatile
         private var _db: AppDatabase? = null
-        
+        private val databaseReady = CountDownLatch(1)
+
+        /**
+         * Wall clock at process start, used to tell journal rows this process wrote apart from
+         * rows an earlier process left behind.
+         */
+        internal val processStartedAtMs: Long = System.currentTimeMillis()
+
+        /**
+         * Blocks until startup finishes preparing the database.
+         *
+         * Preparation (applying a staged restore, then a possible plaintext→SQLCipher migration)
+         * is seconds of disk I/O and crypto on a large database, so it runs off the main thread —
+         * `Application.onCreate` and the 10 s boot-broadcast budget must not pay for it. Callers
+         * that genuinely need the database wait here instead; Room already forbids main-thread
+         * queries, so that wait belongs on a worker.
+         */
         val db: AppDatabase
             get() {
-                if (_db == null) {
-                    throw IllegalStateException("Database not initialized.")
-                }
-                return requireNotNull(_db)
+                _db?.let { return it }
+                databaseReady.await(DATABASE_READY_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                return _db ?: throw IllegalStateException("Database not initialized.")
             }
-        }
+
+        private const val DATABASE_READY_TIMEOUT_SECONDS = 30L
+    }
 
     @Volatile
     private var unlockedInitialized = false
@@ -69,38 +89,15 @@ class OpenTaskerApp_NoHilt : Application() {
             registerActionMetadata()
             registerCoreRuntime()
 
-            if (_db == null) {
-                when (val restoreResult = DatabaseBackupManager.applyPendingRestoreIfPresent(this)) {
-                    is PendingRestoreApplyResult.Applied -> {
-                        AppLogger.info("OpenTasker", "Applied pending database restore from ${restoreResult.databaseFile.name}")
-                    }
-                    is PendingRestoreApplyResult.Failed -> {
-                        AppLogger.error("OpenTasker", "Pending database restore failed", restoreResult.exception)
-                    }
-                    PendingRestoreApplyResult.NoPending -> Unit
+            applicationScope.launch {
+                try {
+                    if (_db == null) prepareDatabase()
+                } finally {
+                    databaseReady.countDown()
                 }
 
-                val databaseKey = DatabaseSecurity.prepareEncryptedDatabase(this, DatabaseBackupManager.DATABASE_NAME)
-                _db = Room.databaseBuilder(
-                    this,
-                    AppDatabase::class.java,
-                    DatabaseBackupManager.DATABASE_NAME,
-                )
-                    .addMigrations(*DatabaseMigrations.getManualMigrations())
-                    .addCallback(object : RoomDatabase.Callback() {
-                        override fun onCreate(db: SupportSQLiteDatabase) {
-                            // Fresh installs skip every migration, so the default workspace has to
-                            // be seeded here as well as in MIGRATION_8_9.
-                            db.execSQL(DatabaseMigrations.SEED_DEFAULT_PROJECT)
-                        }
-                    })
-                    .openHelperFactory(SupportOpenHelperFactory(databaseKey.copyOf()))
-                    .build()
-            }
-
-            applicationScope.launch {
                 runCatching {
-                    val recovery = reconcileExecutionJournal(db)
+                    val recovery = reconcileExecutionJournal(db, processStartedAtMs = processStartedAtMs)
                     if (recovery.interrupted > 0 || recovery.logsWritten > 0) {
                         AppLogger.warn(
                             "OpenTasker",
@@ -122,6 +119,36 @@ class OpenTaskerApp_NoHilt : Application() {
             EngineWatchdogWorker.enqueue(this)
             unlockedInitialized = true
         }
+    }
+
+    /** Applies any staged restore, migrates a legacy plaintext file, then publishes the database. */
+    private fun prepareDatabase() {
+        when (val restoreResult = DatabaseBackupManager.applyPendingRestoreIfPresent(this)) {
+            is PendingRestoreApplyResult.Applied -> {
+                AppLogger.info("OpenTasker", "Applied pending database restore from ${restoreResult.databaseFile.name}")
+            }
+            is PendingRestoreApplyResult.Failed -> {
+                AppLogger.error("OpenTasker", "Pending database restore failed", restoreResult.exception)
+            }
+            PendingRestoreApplyResult.NoPending -> Unit
+        }
+
+        val databaseKey = DatabaseSecurity.prepareEncryptedDatabase(this, DatabaseBackupManager.DATABASE_NAME)
+        _db = Room.databaseBuilder(
+            this,
+            AppDatabase::class.java,
+            DatabaseBackupManager.DATABASE_NAME,
+        )
+            .addMigrations(*DatabaseMigrations.getManualMigrations())
+            .addCallback(object : RoomDatabase.Callback() {
+                override fun onCreate(db: SupportSQLiteDatabase) {
+                    // Fresh installs skip every migration, so the default workspace has to
+                    // be seeded here as well as in MIGRATION_8_9.
+                    db.execSQL(DatabaseMigrations.SEED_DEFAULT_PROJECT)
+                }
+            })
+            .openHelperFactory(SupportOpenHelperFactory(databaseKey.copyOf()))
+            .build()
     }
 
     /**
