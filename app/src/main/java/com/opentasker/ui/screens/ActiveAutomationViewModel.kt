@@ -450,6 +450,29 @@ class ActiveAutomationViewModel(
     private val _semanticDiffReview = MutableStateFlow<SemanticDiffReviewState?>(null)
     internal val semanticDiffReview: StateFlow<SemanticDiffReviewState?> = _semanticDiffReview.asStateFlow()
 
+    /**
+     * Nodes the last reviewed undo/redo touched, highlighted on the Flow tab.
+     *
+     * This deliberately outlives [semanticDiffReview]: the diff dialog's scrim covers Flow and
+     * closing it is the only way to reach the tab, so keys tied to the dialog's lifetime made the
+     * highlight - and the dialog's own "highlighted in Flow" note - unreachable. The next edit
+     * replaces them.
+     */
+    private val _highlightedFlowNodeKeys = MutableStateFlow<Set<String>>(emptySet())
+    internal val highlightedFlowNodeKeys: StateFlow<Set<String>> = _highlightedFlowNodeKeys.asStateFlow()
+
+    /** The profile a synthetic-trigger simulation is running against; survives rotation. */
+    private val _simulationProfile = MutableStateFlow<Profile?>(null)
+    internal val simulationProfile: StateFlow<Profile?> = _simulationProfile.asStateFlow()
+
+    fun openSimulation(profile: Profile) {
+        _simulationProfile.value = profile
+    }
+
+    fun clearSimulation() {
+        _simulationProfile.value = null
+    }
+
     private val _profileShareReview = MutableStateFlow<ProfileShareReviewState?>(null)
     internal val profileShareReview: StateFlow<ProfileShareReviewState?> = _profileShareReview.asStateFlow()
 
@@ -1717,12 +1740,14 @@ class ActiveAutomationViewModel(
     }
 
     private fun transitionEditAsync(entityType: String, entityId: Long, redo: Boolean) {
+        _highlightedFlowNodeKeys.value = emptySet()
         viewModelScope.launch {
             runCatching { transitionEdit(entityType, entityId, redo) }
                 .onSuccess { diff ->
                     val changed = diff != null
                     if (diff != null && !diff.isEmpty) {
                         _semanticDiffReview.value = SemanticDiffReviewState(diff)
+                        _highlightedFlowNodeKeys.value = diff.flowNodeKeys
                     }
                     val messageRes = when {
                         changed && redo -> R.string.ui_message_edit_redone

@@ -291,7 +291,6 @@ fun ActiveAutomationUi(
     var showCreateTaskDialog by rememberSaveable { mutableStateOf(false) }
     var profileDialogId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var showCreateProfileDialog by rememberSaveable { mutableStateOf(false) }
-    var simulationProfile by remember { mutableStateOf<Profile?>(null) }
     var showTemplateDialog by rememberSaveable { mutableStateOf(false) }
     var showBundleTextImportDialog by rememberSaveable { mutableStateOf(false) }
     var bundleTextImportDraft by rememberSaveable { mutableStateOf("") }
@@ -319,7 +318,7 @@ fun ActiveAutomationUi(
     var importedProfileReviewId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     val taskerImportReview by viewModel.taskerImportReview.collectAsState()
     val taskerImportBusy by viewModel.taskerImportBusy.collectAsState()
-    val openTaskerBundleReview by viewModel.openTaskerBundleReview.collectAsState(); val openTaskerBundleBusy by viewModel.openTaskerBundleBusy.collectAsState(); val semanticDiffReview by viewModel.semanticDiffReview.collectAsState()
+    val openTaskerBundleReview by viewModel.openTaskerBundleReview.collectAsState(); val openTaskerBundleBusy by viewModel.openTaskerBundleBusy.collectAsState(); val semanticDiffReview by viewModel.semanticDiffReview.collectAsState(); val highlightedFlowNodeKeys by viewModel.highlightedFlowNodeKeys.collectAsState(); val simulationProfile by viewModel.simulationProfile.collectAsState()
     val profileShareReview by viewModel.profileShareReview.collectAsState(); val preflightReview by viewModel.preflightReview.collectAsState()
     val preflightBusy by viewModel.preflightBusy.collectAsState()
     val taskerXmlLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -438,9 +437,9 @@ fun ActiveAutomationUi(
     fun clearProfileDialog() {
         profileDialogId = NO_DIALOG_ENTITY_ID
     }
-    fun openSimulation(profile: Profile) { simulationProfile = profile }
+    fun openSimulation(profile: Profile) { viewModel.openSimulation(profile) }
     fun clearSimulation() {
-        simulationProfile = null
+        viewModel.clearSimulation()
     }
     fun openActionPicker(task: Task) {
         actionPickerTaskId = task.id
@@ -816,7 +815,7 @@ fun ActiveAutomationUi(
             OpenTaskerScreen.Flow -> AutomationFlowScreen(
                 profiles = projectProfiles,
                 tasks = projectTasks,
-                contentPadding = innerPadding, changedNodeKeys = semanticDiffReview?.document?.flowNodeKeys.orEmpty(),
+                contentPadding = innerPadding, changedNodeKeys = highlightedFlowNodeKeys,
                 onNodeTargetSelected = openFlowTarget,
                 onAddContext = { profileId ->
                     val profile = profiles.firstOrNull { it.id == profileId }
@@ -1200,21 +1199,11 @@ fun ActiveAutomationUi(
                     ))
                 clearProfileDialog()
             },
-            onSimulate = { selectedProfile ->
-                clearProfileDialog()
-                openSimulation(selectedProfile)
-            },
+            onSimulate = { editedProfile -> openSimulation(editedProfile) },
         )
     }
 
     semanticDiffReview?.let { SemanticDiffDialog(it.document, viewModel::clearSemanticDiffReview) }
-
-    simulationProfile?.let { profile ->
-        SyntheticTriggerSimulationDialog(
-            profile = profile,
-            onDismiss = { clearSimulation() },
-        )
-    }
 
     actionPickerTask?.let { task ->
         ActionPickerDialog(
@@ -1265,7 +1254,6 @@ fun ActiveAutomationUi(
                 } else {
                     state.profile.contextExpression
                 }
-                clearContextEdit()
                 openSimulation(
                     state.profile.copy(
                         contexts = updatedContexts,
@@ -1302,6 +1290,15 @@ fun ActiveAutomationUi(
                 )
                 clearContextLogic()
             },
+        )
+    }
+
+    // Declared last so the simulation sits above whichever editor launched it: the editor stays
+    // open behind it, and dismissing the simulation returns the user to their unsaved edits.
+    simulationProfile?.let { profile ->
+        SyntheticTriggerSimulationDialog(
+            profile = profile,
+            onDismiss = { clearSimulation() },
         )
     }
 }

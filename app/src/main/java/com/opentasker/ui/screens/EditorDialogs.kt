@@ -625,7 +625,32 @@ internal fun ProfileEditorDialog(
         dismissButton = {
             Row {
                 if (profile != null && onSimulate != null) {
-                    TextButton(onClick = { onSimulate(profile) }) {
+                    // Simulate what is on screen, not what was last saved: passing the stored
+                    // profile reported cooldown, priority, and limits that contradicted the
+                    // fields the user was looking at.
+                    TextButton(
+                        onClick = {
+                            onSimulate(
+                                profile.copy(
+                                    name = name.trim(),
+                                    enabled = enabled,
+                                    enterTaskId = enterTaskId,
+                                    exitTaskId = exitTaskId,
+                                    cooldownSec = (parsedCooldown ?: 0).coerceAtLeast(0),
+                                    automationMode = automationMode,
+                                    group = group.trim().ifBlank { null },
+                                    priority = parsedPriority ?: 0,
+                                    gracePeriodSec = parsedGracePeriod ?: 0,
+                                    lifetime = lifetime,
+                                    expiresAtMs = parsedExpiryDate.takeIf { lifetime == ProfileLifetime.UNTIL_DATE },
+                                    maxActiveExecutions = parsedMaxActiveExecutions,
+                                    burstLimit = parsedBurstLimit,
+                                    overflowPolicy = overflowPolicy,
+                                    fallbackTaskId = fallbackTaskId,
+                                ),
+                            )
+                        },
+                    ) {
                         Text(stringResource(R.string.profile_simulate_trigger))
                     }
                 }

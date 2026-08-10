@@ -7,6 +7,10 @@
 - Startup recovery no longer marks a just-started execution as interrupted. Recovery runs alongside engine startup, so a boot-triggered run that reached the journal first was reported as interrupted, written to the run log twice, and then blocked from recording its real result.
 - Applying a staged restore and converting a legacy database now happen off the main thread, so a large database cannot stall app start or exhaust the boot broadcast's time budget.
 - The exported Locale condition receiver answers a variable comparison only for a variable the user explicitly exposed. It is exported without a permission by contract, and its bundle is supplied by the caller, so any app could previously name any non-secret variable and read its contents a comparison at a time from the result code. Choosing a variable in the condition editor now mints a read grant bound to that variable. Conditions configured before this change report unknown until the variable is re-selected.
+- Simulating a trigger from the profile editor now simulates what is on screen and leaves the editor open behind it. It previously closed the editor, discarded the pending edits, and reported the values from the last save.
+- Testing a synthetic event from the context editor keeps the editor open, so a fully configured context is no longer lost the moment its simulation is dismissed.
+- A simulation dialog survives rotation instead of vanishing.
+- Nodes changed by an undo or redo stay highlighted on the Flow tab after the review dialog closes. The highlight was tied to the dialog that covered Flow, so the dialog's own "highlighted in Flow" note pointed at something no one could ever see.
 
 ## v0.2.83
 
