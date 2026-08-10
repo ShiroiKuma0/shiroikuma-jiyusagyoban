@@ -146,6 +146,18 @@
     <string name="profile_grace_period_label">Activation grace seconds</string>
     <string name="profile_grace_period_helper">Require the contexts to stay matched or unmatched for this long before changing state. Default is 0.</string>
     <string name="profile_grace_period_invalid">Enter a whole number from 0 to 3600.</string>
+    <string name="profile_max_active_label">Active execution limit</string>
+    <string name="profile_max_active_helper">Optional per-profile cap from 1 to 8. Leave blank to inherit the engine default.</string>
+    <string name="profile_max_active_invalid">Enter a whole number from 1 to 8, or leave blank.</string>
+    <string name="profile_burst_limit_label">Burst start limit</string>
+    <string name="profile_burst_limit_helper">Optional starts allowed during the burst window, from 1 to 32. Leave blank to inherit.</string>
+    <string name="profile_burst_limit_invalid">Enter a whole number from 1 to 32, or leave blank.</string>
+    <string name="profile_concurrency_inherit_hint">Inherited default</string>
+    <string name="profile_overflow_policy_label">Admission overflow</string>
+    <string name="profile_overflow_log_title">Log and hold</string>
+    <string name="profile_overflow_log_body">Record rejected runs in the Run Log so they can be replayed after capacity returns.</string>
+    <string name="profile_overflow_silent_title">Skip silently</string>
+    <string name="profile_overflow_silent_body">Skip rejected runs without creating a Run Log entry.</string>
     <string name="profile_lifetime_label">Automation lifetime</string>
     <string name="profile_lifetime_never_title">Always available</string>
     <string name="profile_lifetime_never_body">The profile remains eligible until you disable or edit it.</string>
@@ -488,6 +500,8 @@
     <string name="inspector_simulate_trigger">Simulate trigger</string>
     <string name="inspector_lint_title">Automation lint findings</string>
     <string name="inspector_profile_policy">Priority %1$d · Grace %2$ds · Lifetime: %3$s</string>
+    <string name="inspector_profile_concurrency">Active %1$s · Burst %2$s · Overflow: %3$s</string>
+    <string name="profile_concurrency_default">default</string>
     <string name="inspector_profile_expiry">Expires after %1$s</string>
     <string name="inspector_profile_suppressed_title">Profile suppressed</string>
 
@@ -674,6 +688,9 @@
     <string name="label_priority_short">Priority %1$d</string>
     <string name="label_profile_priority">Profile priority %1$d</string>
     <string name="label_profile_grace_seconds">%1$ds grace</string>
+    <string name="label_profile_active_limit">Active ≤ %1$d</string>
+    <string name="label_profile_burst_limit">Burst ≤ %1$d</string>
+    <string name="label_profile_overflow_silent">Overflow silent</string>
     <string name="label_profile_expiry_date">Until %1$s</string>
     <string name="label_more_count">%1$d more</string>
 
@@ -857,6 +874,19 @@
     <string name="diagnostics_refresh">Refresh diagnostics</string>
     <string name="diagnostics_share">Share redacted report</string>
     <string name="diagnostics_engine_health">Engine health</string>
+    <string name="diagnostics_admission_title">Execution admission</string>
+    <string name="diagnostics_admission_status">Admission controller</string>
+    <string name="diagnostics_admission_active">Global active executions</string>
+    <string name="diagnostics_admission_burst">Global burst starts</string>
+    <string name="diagnostics_admission_count">%1$d / %2$d</string>
+    <string name="diagnostics_admission_profile_active">Profile %1$d active executions</string>
+    <string name="diagnostics_admission_circuits">Circuit breakers</string>
+    <string name="diagnostics_admission_no_circuits">No tripped circuit state recorded.</string>
+    <string name="diagnostics_admission_global">Global circuit</string>
+    <string name="diagnostics_admission_profile">Profile %1$d circuit</string>
+    <string name="diagnostics_admission_open">Open for about %1$d more seconds (%2$d strike(s))</string>
+    <string name="diagnostics_admission_closed">Closed; %1$d recorded strike(s)</string>
+    <string name="diagnostics_admission_trip_reason">Trip reason: %1$s</string>
     <string name="diagnostics_service">Automation service</string>
     <string name="diagnostics_service_running">Running</string>
     <string name="diagnostics_service_stopped">Stopped or heartbeat stale</string>

@@ -495,6 +495,15 @@ private fun ProfileCard(
                 if (profile.gracePeriodSec > 0) {
                     item { StatusPill(stringResource(R.string.label_profile_grace_seconds, profile.gracePeriodSec), MaterialTheme.colorScheme.secondary) }
                 }
+                profile.maxActiveExecutions?.let { maxActive ->
+                    item { StatusPill(stringResource(R.string.label_profile_active_limit, maxActive), MaterialTheme.colorScheme.primary) }
+                }
+                profile.burstLimit?.let { burstLimit ->
+                    item { StatusPill(stringResource(R.string.label_profile_burst_limit, burstLimit), MaterialTheme.colorScheme.secondary) }
+                }
+                if (profile.overflowPolicy == com.opentasker.core.model.ProfileOverflowPolicy.SILENT) {
+                    item { StatusPill(stringResource(R.string.label_profile_overflow_silent), MaterialTheme.colorScheme.error) }
+                }
                 item { StatusPill(profileLifetimeTitle(profile.lifetime), MaterialTheme.colorScheme.onSurfaceVariant) }
                 if (profile.lifetime == com.opentasker.core.model.ProfileLifetime.UNTIL_DATE && profile.expiresAtMs != null) {
                     item {

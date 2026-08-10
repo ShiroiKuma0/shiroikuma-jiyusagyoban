@@ -30,6 +30,12 @@ data class Profile(
     val expiresAtMs: Long? = null,
     /** Internal persisted state for one-shot profiles; it is never user-authored directly. */
     val lifetimeConsumed: Boolean = false,
+    /** Optional override for the number of active executions admitted for this profile. */
+    val maxActiveExecutions: Int? = null,
+    /** Optional override for starts admitted during the engine burst window. */
+    val burstLimit: Int? = null,
+    /** Whether admission overflow should leave a replayable run-log entry. */
+    val overflowPolicy: ProfileOverflowPolicy = ProfileOverflowPolicy.LOG,
 )
 
 @Serializable
@@ -37,6 +43,12 @@ enum class ProfileLifetime {
     NEVER,
     UNTIL_DATE,
     ONCE,
+}
+
+@Serializable
+enum class ProfileOverflowPolicy {
+    LOG,
+    SILENT,
 }
 
 @Serializable

@@ -70,6 +70,7 @@ import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ProfileLifetime
+import com.opentasker.core.model.ProfileOverflowPolicy
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
@@ -280,7 +281,7 @@ internal fun ProfileEditorDialog(
     profile: Profile?,
     tasks: List<Task>,
     onDismiss: () -> Unit,
-    onSave: (String, Boolean, Long, Long?, Int, Int, Int, AutomationMode, String?, ProfileLifetime, Long?) -> Unit,
+    onSave: (String, Boolean, Long, Long?, Int, Int, Int, AutomationMode, String?, ProfileLifetime, Long?, Int?, Int?, ProfileOverflowPolicy) -> Unit,
     onSimulate: ((Profile) -> Unit)? = null,
 ) {
     val initialTaskId = profile?.enterTaskId ?: tasks.firstOrNull()?.id ?: 0L
@@ -304,11 +305,23 @@ internal fun ProfileEditorDialog(
     var expiryDate by rememberSaveable(profile?.id) {
         mutableStateOf(formatProfileExpiryDate(profile?.expiresAtMs))
     }
+    var maxActiveExecutions by rememberSaveable(profile?.id) {
+        mutableStateOf(profile?.maxActiveExecutions?.toString().orEmpty())
+    }
+    var burstLimit by rememberSaveable(profile?.id) {
+        mutableStateOf(profile?.burstLimit?.toString().orEmpty())
+    }
+    var overflowPolicyName by rememberSaveable(profile?.id) {
+        mutableStateOf((profile?.overflowPolicy ?: ProfileOverflowPolicy.LOG).name)
+    }
     val parsedCooldown = cooldown.toIntOrNull()
     val parsedPriority = priority.toIntOrNull()
     val parsedGracePeriod = gracePeriod.toIntOrNull()
     val lifetime = profileLifetimeFromName(lifetimeName)
     val parsedExpiryDate = parseProfileExpiryDate(expiryDate)
+    val parsedMaxActiveExecutions = maxActiveExecutions.toIntOrNull()
+    val parsedBurstLimit = burstLimit.toIntOrNull()
+    val overflowPolicy = profileOverflowPolicyFromName(overflowPolicyName)
     val selectedTaskExists = tasks.any { it.id == enterTaskId }
     val selectedExitTaskExists = exitTaskId == null || tasks.any { it.id == exitTaskId }
     val canSave = profileEditorCanSave(
@@ -322,6 +335,10 @@ internal fun ProfileEditorDialog(
         parsedGracePeriod = parsedGracePeriod,
         lifetime = lifetime,
         parsedExpiryDate = parsedExpiryDate,
+        maxActiveExecutions = maxActiveExecutions,
+        parsedMaxActiveExecutions = parsedMaxActiveExecutions,
+        burstLimit = burstLimit,
+        parsedBurstLimit = parsedBurstLimit,
     )
     val importedReviewRequired = profile?.requiresRiskAcknowledgement == true
     val onLabel = stringResource(R.string.label_on)
@@ -462,6 +479,63 @@ internal fun ProfileEditorDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                OutlinedTextField(
+                    value = maxActiveExecutions,
+                    onValueChange = { maxActiveExecutions = it.filter(Char::isDigit).take(2) },
+                    label = { Text(stringResource(R.string.profile_max_active_label)) },
+                    placeholder = { Text(stringResource(R.string.profile_concurrency_inherit_hint)) },
+                    supportingText = {
+                        Text(
+                            if (maxActiveExecutions.isNotBlank() &&
+                                (parsedMaxActiveExecutions == null ||
+                                    parsedMaxActiveExecutions !in InputValidation.MIN_PROFILE_MAX_ACTIVE..InputValidation.MAX_PROFILE_MAX_ACTIVE)
+                            ) {
+                                stringResource(R.string.profile_max_active_invalid)
+                            } else {
+                                stringResource(R.string.profile_max_active_helper)
+                            },
+                        )
+                    },
+                    isError = maxActiveExecutions.isNotBlank() &&
+                        (parsedMaxActiveExecutions == null ||
+                            parsedMaxActiveExecutions !in InputValidation.MIN_PROFILE_MAX_ACTIVE..InputValidation.MAX_PROFILE_MAX_ACTIVE),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = burstLimit,
+                    onValueChange = { burstLimit = it.filter(Char::isDigit).take(2) },
+                    label = { Text(stringResource(R.string.profile_burst_limit_label)) },
+                    placeholder = { Text(stringResource(R.string.profile_concurrency_inherit_hint)) },
+                    supportingText = {
+                        Text(
+                            if (burstLimit.isNotBlank() &&
+                                (parsedBurstLimit == null ||
+                                    parsedBurstLimit !in InputValidation.MIN_PROFILE_BURST_LIMIT..InputValidation.MAX_PROFILE_BURST_LIMIT)
+                            ) {
+                                stringResource(R.string.profile_burst_limit_invalid)
+                            } else {
+                                stringResource(R.string.profile_burst_limit_helper)
+                            },
+                        )
+                    },
+                    isError = burstLimit.isNotBlank() &&
+                        (parsedBurstLimit == null ||
+                            parsedBurstLimit !in InputValidation.MIN_PROFILE_BURST_LIMIT..InputValidation.MAX_PROFILE_BURST_LIMIT),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(stringResource(R.string.profile_overflow_policy_label), style = MaterialTheme.typography.labelLarge)
+                ProfileOverflowPolicy.entries.forEach { option ->
+                    SelectableOption(
+                        title = profileOverflowPolicyTitle(option),
+                        body = profileOverflowPolicyDescription(option),
+                        selected = option == overflowPolicy,
+                        onClick = { overflowPolicyName = option.name },
+                    )
+                }
                 Text(stringResource(R.string.profile_lifetime_label), style = MaterialTheme.typography.labelLarge)
                 ProfileLifetime.entries.forEach { option ->
                     SelectableOption(
@@ -519,6 +593,9 @@ internal fun ProfileEditorDialog(
                         group.trim().ifBlank { null },
                         lifetime,
                         parsedExpiryDate.takeIf { lifetime == ProfileLifetime.UNTIL_DATE },
+                        parsedMaxActiveExecutions,
+                        parsedBurstLimit,
+                        overflowPolicy,
                     )
                 },
             ) {
@@ -617,15 +694,28 @@ internal fun profileEditorCanSave(
     parsedGracePeriod: Int? = 0,
     lifetime: ProfileLifetime = ProfileLifetime.NEVER,
     parsedExpiryDate: Long? = null,
+    maxActiveExecutions: String = "",
+    parsedMaxActiveExecutions: Int? = null,
+    burstLimit: String = "",
+    parsedBurstLimit: Int? = null,
 ): Boolean =
     name.isNotBlank() && enterTaskId > 0 && selectedTaskExists &&
         selectedExitTaskExists && (cooldown.isBlank() || parsedCooldown != null) &&
         parsedPriority != null && parsedPriority in InputValidation.MIN_PROFILE_PRIORITY..InputValidation.MAX_PROFILE_PRIORITY &&
         parsedGracePeriod != null && parsedGracePeriod in 0..InputValidation.MAX_GRACE_PERIOD_SEC &&
-        (lifetime != ProfileLifetime.UNTIL_DATE || parsedExpiryDate != null)
+        (lifetime != ProfileLifetime.UNTIL_DATE || parsedExpiryDate != null) &&
+        (maxActiveExecutions.isBlank() ||
+            parsedMaxActiveExecutions != null &&
+            parsedMaxActiveExecutions in InputValidation.MIN_PROFILE_MAX_ACTIVE..InputValidation.MAX_PROFILE_MAX_ACTIVE) &&
+        (burstLimit.isBlank() ||
+            parsedBurstLimit != null &&
+            parsedBurstLimit in InputValidation.MIN_PROFILE_BURST_LIMIT..InputValidation.MAX_PROFILE_BURST_LIMIT)
 
 internal fun profileLifetimeFromName(name: String): ProfileLifetime =
     runCatching { ProfileLifetime.valueOf(name) }.getOrDefault(ProfileLifetime.NEVER)
+
+internal fun profileOverflowPolicyFromName(name: String): ProfileOverflowPolicy =
+    runCatching { ProfileOverflowPolicy.valueOf(name) }.getOrDefault(ProfileOverflowPolicy.LOG)
 
 internal fun signedIntegerInput(value: String, maxDigits: Int): String {
     val negative = value.trimStart().startsWith('-')
@@ -665,6 +755,22 @@ internal fun profileLifetimeDescription(lifetime: ProfileLifetime): String = str
         ProfileLifetime.NEVER -> R.string.profile_lifetime_never_body
         ProfileLifetime.UNTIL_DATE -> R.string.profile_lifetime_date_body
         ProfileLifetime.ONCE -> R.string.profile_lifetime_once_body
+    },
+)
+
+@Composable
+internal fun profileOverflowPolicyTitle(policy: ProfileOverflowPolicy): String = stringResource(
+    when (policy) {
+        ProfileOverflowPolicy.LOG -> R.string.profile_overflow_log_title
+        ProfileOverflowPolicy.SILENT -> R.string.profile_overflow_silent_title
+    },
+)
+
+@Composable
+internal fun profileOverflowPolicyDescription(policy: ProfileOverflowPolicy): String = stringResource(
+    when (policy) {
+        ProfileOverflowPolicy.LOG -> R.string.profile_overflow_log_body
+        ProfileOverflowPolicy.SILENT -> R.string.profile_overflow_silent_body
     },
 )
 

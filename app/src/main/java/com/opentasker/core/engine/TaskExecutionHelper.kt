@@ -4,6 +4,7 @@ import android.content.Context
 import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.RunLogEntry
+import com.opentasker.core.model.ProfileOverflowPolicy
 import com.opentasker.core.model.Task
 import com.opentasker.core.platform.AudioForegroundServiceEligibility
 import com.opentasker.core.platform.AudioRuntimeEligibility
@@ -40,6 +41,8 @@ suspend fun executeAndLogTask(
     logTag: String = TAG,
     admissionController: ExecutionAdmissionController = ExecutionAdmissionController.Default,
     profileId: Long? = null,
+    profileLimits: ExecutionAdmissionProfileLimits? = null,
+    overflowPolicy: ProfileOverflowPolicy = ProfileOverflowPolicy.LOG,
     execution: ExecutionEnvelope = ExecutionEnvelope.create(task, source, profileId = profileId),
 ): TaskExecutionResult = withContext(Dispatchers.IO) {
     if (execution.mode == ExecutionMode.SIMULATION) {
@@ -64,30 +67,35 @@ suspend fun executeAndLogTask(
             execution = execution,
         )
     }
-    val admission = admissionController.tryAcquire(profileId)
+    val admission = admissionController.tryAcquire(profileId, profileLimits)
     if (!admission.accepted) {
         val reason = admission.reason ?: "Execution admission rejected this run."
         val terminalReason = ExecutionTerminalReason(ExecutionTerminalReasonCode.ADMISSION_REJECTED, reason)
+        val held = overflowPolicy == ProfileOverflowPolicy.LOG
         ExecutionCommandLedger.transition(
             execution.executionId,
-            ExecutionLedgerState.HELD,
+            if (held) ExecutionLedgerState.HELD else ExecutionLedgerState.SKIPPED,
             terminalReason,
         )
-        val inserted = logHeldRun(
-            db = db,
-            task = task,
-            source = execution.source,
-            reason = reason,
-            metadata = metadata,
-            initialVariables = initialVariables,
-            execution = execution,
-            terminalReason = terminalReason,
-        )
+        val inserted = if (held) {
+            logHeldRun(
+                db = db,
+                task = task,
+                source = execution.source,
+                reason = reason,
+                metadata = metadata,
+                initialVariables = initialVariables,
+                execution = execution,
+                terminalReason = terminalReason,
+            )
+        } else {
+            false
+        }
         return@withContext TaskExecutionResult(
             report = collisionSkippedReport(task, reason),
             logInserted = inserted,
             skippedReason = reason,
-            held = true,
+            held = held,
             execution = execution,
         )
     }
@@ -458,6 +466,9 @@ suspend fun replayHeldExecution(
         ?.takeIf { it.issue == null }
         ?.value
         ?: error("The task for this held execution no longer exists or is corrupt.")
+    val profile = payload.profileId?.let { profileId ->
+        db.profileDao().getById(profileId)?.toDomainDecodeResult()?.takeIf { it.issue == null }?.value
+    }
     val replayEnvelope = ExecutionEnvelope.create(
         task = task,
         source = payload.source,
@@ -475,6 +486,8 @@ suspend fun replayHeldExecution(
         audioForegroundService = audioForegroundService,
         admissionController = admissionController,
         profileId = payload.profileId,
+        profileLimits = profile?.toExecutionAdmissionProfileLimits(),
+        overflowPolicy = profile?.overflowPolicy ?: ProfileOverflowPolicy.LOG,
         execution = replayEnvelope,
     )
 }

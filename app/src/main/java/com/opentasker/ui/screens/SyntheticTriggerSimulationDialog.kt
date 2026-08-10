@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.engine.CooldownStore
 import com.opentasker.core.engine.ExecutionAdmissionRegistry
+import com.opentasker.core.engine.toExecutionAdmissionProfileLimits
 import com.opentasker.core.engine.SyntheticContextResult
 import com.opentasker.core.engine.SyntheticContextStatus
 import com.opentasker.core.engine.SyntheticGateResult
@@ -49,7 +50,11 @@ internal fun SyntheticTriggerSimulationDialog(
             val seconds = ((remainingCooldownMs + 999L) / 1_000L).coerceAtLeast(1L)
             SyntheticGateResult.block("Cooldown has $seconds second(s) remaining.")
         }
-        val admissionDecision = ExecutionAdmissionRegistry.preview(context, profile.id)
+        val admissionDecision = ExecutionAdmissionRegistry.preview(
+            context = context,
+            profileId = profile.id,
+            profileLimits = profile.toExecutionAdmissionProfileLimits(),
+        )
         val admission = SyntheticGateResult(
             accepted = admissionDecision.accepted,
             reason = admissionDecision.reason ?: "Admission rejected this run.",

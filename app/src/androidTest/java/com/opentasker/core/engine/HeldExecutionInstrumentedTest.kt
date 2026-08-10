@@ -5,6 +5,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
+import com.opentasker.core.model.ProfileOverflowPolicy
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.toEntity
 import kotlinx.coroutines.runBlocking
@@ -76,6 +77,48 @@ class HeldExecutionInstrumentedTest {
             assertEquals("held-run-1", logs.last().executionId)
             assertEquals("held-run-1", logs.first().replayOf)
             assertFalse(logs.first().held)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun silentOverflowSkipsWithoutCreatingRunLogEntry() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val task = Task(
+                id = 91,
+                name = "Silent task",
+                actions = listOf(ActionSpec(type = "log", args = mapOf("message" to "never runs"))),
+            )
+            val admission = ExecutionAdmissionController(
+                ExecutionAdmissionLimits(
+                    globalMaxActive = 1,
+                    perProfileMaxActive = 1,
+                    globalBurstLimit = 2,
+                    perProfileBurstLimit = 1,
+                ),
+            )
+            val occupied = requireNotNull(admission.tryAcquire().lease)
+            val result = executeAndLogTask(
+                appContext = context,
+                db = db,
+                task = task,
+                source = "Profile: Silent",
+                admissionController = admission,
+                profileId = 91L,
+                overflowPolicy = ProfileOverflowPolicy.SILENT,
+                execution = ExecutionEnvelope.create(task, "Profile: Silent", profileId = 91L),
+            )
+            occupied.release()
+
+            assertFalse(result.held)
+            assertFalse(result.logInserted)
+            assertTrue(result.skippedReason.orEmpty().contains("Counts:"))
+            assertTrue(db.runLogDao().getRecent().isEmpty())
         } finally {
             db.close()
         }

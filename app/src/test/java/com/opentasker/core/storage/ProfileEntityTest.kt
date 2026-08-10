@@ -7,6 +7,7 @@ import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ProfileLifetime
+import com.opentasker.core.model.ProfileOverflowPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertThrows
@@ -26,6 +27,9 @@ class ProfileEntityTest {
             gracePeriodSec = 30,
             lifetime = ProfileLifetime.UNTIL_DATE,
             expiresAtMs = 1_700_000_000_000L,
+            maxActiveExecutions = 3,
+            burstLimit = 12,
+            overflowPolicy = ProfileOverflowPolicy.SILENT,
         )
 
         assertEquals(profile, profile.toEntity().toDomain())

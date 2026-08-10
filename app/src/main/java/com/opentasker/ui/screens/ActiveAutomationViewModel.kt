@@ -25,6 +25,8 @@ import com.opentasker.core.diagnostics.RunLogExporter
 import com.opentasker.core.engine.ActiveExecution
 import com.opentasker.core.engine.ActiveExecutionRegistry
 import com.opentasker.core.engine.ExecutionEnvelope
+import com.opentasker.core.engine.ExecutionAdmissionRegistry
+import com.opentasker.core.engine.ExecutionAdmissionSnapshot
 import com.opentasker.core.engine.PreflightInputs
 import com.opentasker.core.engine.PreflightReport
 import com.opentasker.core.engine.PreflightRunner
@@ -37,6 +39,7 @@ import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ProfileLifetime
 import com.opentasker.core.model.ProfileLifecyclePolicy
+import com.opentasker.core.model.ProfileOverflowPolicy
 import com.opentasker.core.model.Project
 import com.opentasker.core.model.DEFAULT_PROJECT_ID
 import com.opentasker.core.validation.InputValidation
@@ -194,6 +197,7 @@ data class RestoreReviewState(
 
 data class DiagnosticsUiState(
     val health: EngineHealthStatus? = null,
+    val admission: ExecutionAdmissionSnapshot? = null,
     val crashLogs: List<CrashLogRecord> = emptyList(),
     val appLogs: List<AppLogEntry> = emptyList(),
     val loadedAtMillis: Long = 0L,
@@ -443,6 +447,7 @@ class ActiveAutomationViewModel(
                 withContext(Dispatchers.IO) {
                     DiagnosticsUiState(
                         health = EngineHealthReader.read(appContext),
+                        admission = ExecutionAdmissionRegistry.snapshot(appContext),
                         crashLogs = CrashLogHandler.listCrashLogs(appContext),
                         appLogs = AppLogger.snapshot().takeLast(100).map { entry ->
                             entry.copy(message = DiagnosticExport.redactSensitive(entry.message))
@@ -633,6 +638,9 @@ class ActiveAutomationViewModel(
         gracePeriodSec: Int = 0,
         lifetime: ProfileLifetime = ProfileLifetime.NEVER,
         expiresAtMs: Long? = null,
+        maxActiveExecutions: Int? = null,
+        burstLimit: Int? = null,
+        overflowPolicy: ProfileOverflowPolicy = ProfileOverflowPolicy.LOG,
     ) =
         launchWithMessage("Profile created") {
             val profile = ProfileLifecyclePolicy.normalize(
@@ -649,6 +657,9 @@ class ActiveAutomationViewModel(
                 gracePeriodSec = gracePeriodSec,
                 lifetime = lifetime,
                 expiresAtMs = expiresAtMs,
+                maxActiveExecutions = maxActiveExecutions,
+                burstLimit = burstLimit,
+                overflowPolicy = overflowPolicy,
                 ),
             )
             requireValidProfileFieldLimits(profile)
@@ -1611,7 +1622,9 @@ class ActiveAutomationViewModel(
                     it.field == "cooldownSec" ||
                     it.field == "priority" ||
                     it.field == "gracePeriodSec" ||
-                    it.field == "expiresAtMs"
+                    it.field == "expiresAtMs" ||
+                    it.field == "maxActiveExecutions" ||
+                    it.field == "burstLimit"
             }
         if (violation != null) {
             throw IllegalArgumentException(violation.message)

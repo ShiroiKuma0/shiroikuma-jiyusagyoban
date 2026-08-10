@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import com.opentasker.app.BuildConfig
 import com.opentasker.core.logging.AppLogger
+import com.opentasker.core.engine.ExecutionAdmissionRegistry
 import com.opentasker.core.storage.AppDatabase
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -56,6 +57,28 @@ object DiagnosticExport {
             }
         } catch (e: Exception) {
             sb.appendLine("  (failed to read engine health: ${redactSensitive(e.message.orEmpty())})")
+        }
+        sb.appendLine()
+
+        sb.appendLine("--- Execution Admission ---")
+        try {
+            val admission = ExecutionAdmissionRegistry.snapshot(context)
+            sb.appendLine("Active global: ${admission.activeGlobal}/${admission.limits.globalMaxActive}")
+            sb.appendLine("Burst global: ${admission.globalBurstCount}/${admission.limits.globalBurstLimit}")
+            admission.activeByProfile.toSortedMap().forEach { (profileId, active) ->
+                sb.appendLine("Profile $profileId active: $active")
+            }
+            admission.circuits.forEach { (profileId, state) ->
+                if (state.openUntilMs > now || state.strikeCount > 0 || state.lastReason != null) {
+                    val owner = profileId?.toString() ?: "global"
+                    sb.appendLine(
+                        "Circuit $owner: openUntil=${formatTimestamp(state.openUntilMs, dateFormat)}, " +
+                            "strikes=${state.strikeCount}, reason=${redactSensitive(state.lastReason ?: "none")}",
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            sb.appendLine("  (failed to read execution admission: ${redactSensitive(e.message.orEmpty())})")
         }
         sb.appendLine()
 

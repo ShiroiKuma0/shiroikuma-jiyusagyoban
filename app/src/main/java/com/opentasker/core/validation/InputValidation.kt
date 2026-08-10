@@ -2,6 +2,7 @@ package com.opentasker.core.validation
 
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProfileConcurrencyPolicy
 import com.opentasker.core.model.ProfileLifetime
 import com.opentasker.core.model.ProfileLifecyclePolicy
 import com.opentasker.core.model.Task
@@ -16,6 +17,10 @@ object InputValidation {
     const val MIN_PROFILE_PRIORITY = ProfileLifecyclePolicy.MIN_PRIORITY
     const val MAX_PROFILE_PRIORITY = ProfileLifecyclePolicy.MAX_PRIORITY
     const val MAX_GRACE_PERIOD_SEC = ProfileLifecyclePolicy.MAX_GRACE_PERIOD_SEC
+    const val MIN_PROFILE_MAX_ACTIVE = ProfileConcurrencyPolicy.MIN_MAX_ACTIVE
+    const val MAX_PROFILE_MAX_ACTIVE = ProfileConcurrencyPolicy.MAX_MAX_ACTIVE
+    const val MIN_PROFILE_BURST_LIMIT = ProfileConcurrencyPolicy.MIN_BURST_LIMIT
+    const val MAX_PROFILE_BURST_LIMIT = ProfileConcurrencyPolicy.MAX_BURST_LIMIT
     
     data class ValidationError(val field: String, val message: String)
     
@@ -47,6 +52,26 @@ object InputValidation {
                 ValidationError(
                     "gracePeriodSec",
                     "Grace period must be between 0 and $MAX_GRACE_PERIOD_SEC seconds",
+                ),
+            )
+        }
+        if (profile.maxActiveExecutions != null &&
+            profile.maxActiveExecutions !in MIN_PROFILE_MAX_ACTIVE..MAX_PROFILE_MAX_ACTIVE
+        ) {
+            errors.add(
+                ValidationError(
+                    "maxActiveExecutions",
+                    "Profile active limit must be between $MIN_PROFILE_MAX_ACTIVE and $MAX_PROFILE_MAX_ACTIVE",
+                ),
+            )
+        }
+        if (profile.burstLimit != null &&
+            profile.burstLimit !in MIN_PROFILE_BURST_LIMIT..MAX_PROFILE_BURST_LIMIT
+        ) {
+            errors.add(
+                ValidationError(
+                    "burstLimit",
+                    "Profile burst limit must be between $MIN_PROFILE_BURST_LIMIT and $MAX_PROFILE_BURST_LIMIT",
                 ),
             )
         }

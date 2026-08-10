@@ -160,6 +160,14 @@ object DatabaseMigrations {
         }
     }
 
+    val MIGRATION_12_13 = object : Migration(12, 13) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE profiles ADD COLUMN maxActiveExecutions INTEGER")
+            db.execSQL("ALTER TABLE profiles ADD COLUMN burstLimit INTEGER")
+            db.execSQL("ALTER TABLE profiles ADD COLUMN overflowPolicy TEXT NOT NULL DEFAULT 'LOG'")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -173,6 +181,7 @@ object DatabaseMigrations {
             MIGRATION_9_10,
             MIGRATION_10_11,
             MIGRATION_11_12,
+            MIGRATION_12_13,
         )
     }
 
@@ -239,6 +248,9 @@ object DatabaseMigrations {
  * Version 12:
  *   - profiles: adds priority, symmetric grace period, lifetime/expiry policy, and persisted
  *     one-shot consumption state
+ *
+ * Version 13:
+ *   - profiles: adds optional active/burst admission overrides and LOG/SILENT overflow policy
  *
  * To add a migration:
  * 1. Increment database version in @Database annotation

@@ -414,7 +414,9 @@ object OpenTaskerBundleCodec {
                         it.field == "cooldownSec" ||
                         it.field == "priority" ||
                         it.field == "gracePeriodSec" ||
-                        it.field == "expiresAtMs"
+                        it.field == "expiresAtMs" ||
+                        it.field == "maxActiveExecutions" ||
+                        it.field == "burstLimit"
                 }
                 .forEach { error ->
                     warnings += "Invalid profile '${profile.name}' (${error.field}): ${error.message}."

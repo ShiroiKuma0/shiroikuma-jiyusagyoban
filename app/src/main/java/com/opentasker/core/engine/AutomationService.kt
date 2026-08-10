@@ -717,6 +717,8 @@ class AutomationService : Service() {
             audioForegroundService = audioForegroundServiceEligibility,
             admissionController = executionAdmission,
             profileId = profile.id,
+            profileLimits = profile.toExecutionAdmissionProfileLimits(),
+            overflowPolicy = profile.overflowPolicy,
             execution = ExecutionEnvelope.create(
                 task = task,
                 source = source,
@@ -1023,6 +1025,11 @@ class AutomationService : Service() {
         if (profile.cooldownSec > 0) add("Cooldown: ${profile.cooldownSec}s")
         if (profile.priority != 0) add("Profile priority: ${profile.priority}")
         if (profile.gracePeriodSec > 0) add("Grace period: ${profile.gracePeriodSec}s")
+        profile.maxActiveExecutions?.let { add("Profile active limit: $it") }
+        profile.burstLimit?.let { add("Profile burst limit: $it") }
+        if (profile.overflowPolicy == com.opentasker.core.model.ProfileOverflowPolicy.SILENT) {
+            add("Overflow logging: silent")
+        }
         when (profile.lifetime) {
             ProfileLifetime.NEVER -> Unit
             ProfileLifetime.UNTIL_DATE -> add("Lifetime: until ${profile.expiresAtMs}")
@@ -1132,6 +1139,9 @@ internal fun profileRegistrySignature(profiles: List<ProfileEntity>): List<Strin
                 p.lifetime,
                 p.expiresAtMs,
                 p.lifetimeConsumed,
+                p.maxActiveExecutions,
+                p.burstLimit,
+                p.overflowPolicy,
             ).joinToString("|")
         }
         .toList()
