@@ -39,6 +39,9 @@ class TimeDeliveryRecoveryContractTest {
         assertTrue(source.contains("EngineWatchdogWorker.enqueue(this)"))
         assertTrue(worker.contains("PeriodicWorkRequestBuilder<EngineWatchdogWorker>"))
         assertTrue(worker.contains("ExistingPeriodicWorkPolicy.UPDATE"))
+        assertTrue(worker.contains("consumeMissed"))
+        assertTrue(worker.contains("Standby bucket:"))
+        assertTrue(worker.contains("Remediation:"))
     }
 
     private fun source(relative: String): String = sourceRoot.resolve(relative).readText()

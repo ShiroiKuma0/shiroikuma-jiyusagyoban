@@ -38,6 +38,15 @@ class RunLogSourceTest {
     }
 
     @Test
+    fun scheduledTriggersHaveAStableSource() {
+        val c = RunLogSource.classify("Scheduled trigger")
+
+        assertEquals(RunLogSource.SCHEDULER, c.key)
+        assertEquals("Missed trigger", c.label)
+        assertEquals("Scheduler", RunLogSource.displayName(RunLogSource.SCHEDULER))
+    }
+
+    @Test
     fun blankSourceIsOtherWithoutLabel() {
         val c = RunLogSource.classify("   ")
         assertEquals(RunLogSource.OTHER, c.key)

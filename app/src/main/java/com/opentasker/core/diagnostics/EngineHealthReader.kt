@@ -375,7 +375,7 @@ object EngineHealthReader {
         else -> "Reason $reason"
     }
 
-    private fun standbyBucketLabel(context: Context): String {
+    internal fun standbyBucketLabel(context: Context): String {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return "Unavailable before Android 9"
         val manager = context.getSystemService(UsageStatsManager::class.java) ?: return "Unavailable"
         return when (manager.appStandbyBucket) {

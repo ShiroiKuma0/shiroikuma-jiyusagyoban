@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
 import com.opentasker.automation.scheduler.TimeEventScheduler
+import com.opentasker.core.scheduling.ExpectedTriggerLedger
 import com.opentasker.core.engine.AutomationService
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.scheduling.ExactAlarmSupport
@@ -19,6 +20,7 @@ class TimeEventReceiver : BroadcastReceiver() {
         when (intent.action) {
             TimeEventScheduler.ACTION_TIME_TICK,
             Intent.ACTION_TIME_TICK -> {
+                ExpectedTriggerLedger(context).markDelivered(System.currentTimeMillis())
                 val scheduler = TimeEventScheduler(context)
                 runCatching { scheduler.scheduleNextMinute() }
                     .onFailure { AppLogger.error(TAG, "Could not re-arm the next time tick", it) }

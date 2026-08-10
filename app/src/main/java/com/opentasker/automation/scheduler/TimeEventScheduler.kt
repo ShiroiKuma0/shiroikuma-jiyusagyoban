@@ -8,20 +8,27 @@ import com.opentasker.automation.receiver.TimeEventReceiver
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.scheduling.AlarmSchedulePrecision
 import com.opentasker.core.scheduling.ExactAlarmSupport
+import com.opentasker.core.scheduling.ExpectedTriggerKind
+import com.opentasker.core.scheduling.ExpectedTriggerLedger
 
 class TimeEventScheduler(context: Context) {
     private val appContext = context.applicationContext
     private val alarmManager = appContext.getSystemService(AlarmManager::class.java)
+    private val expectedTriggers = ExpectedTriggerLedger(appContext)
 
     fun scheduleNextMinute(nowMillis: Long = System.currentTimeMillis()) {
-        scheduleAt(nextMinuteBoundaryMillis(nowMillis))
+        scheduleAt(nextMinuteBoundaryMillis(nowMillis), ExpectedTriggerKind.MINUTE_TICK, nowMillis)
     }
 
     fun scheduleRecovery(nowMillis: Long = System.currentTimeMillis()) {
-        scheduleAt(recoveryTriggerAtMillis(nowMillis))
+        scheduleAt(recoveryTriggerAtMillis(nowMillis), ExpectedTriggerKind.RECOVERY, nowMillis)
     }
 
-    private fun scheduleAt(triggerAtMillis: Long) {
+    private fun scheduleAt(
+        triggerAtMillis: Long,
+        kind: ExpectedTriggerKind,
+        scheduledFromMillis: Long,
+    ) {
         val pendingIntent = tickPendingIntent()
 
         alarmManager.cancel(pendingIntent)
@@ -40,6 +47,7 @@ class TimeEventScheduler(context: Context) {
                 AppLogger.warn(TAG, "Exact alarms unavailable; scheduled Doze-capable inexact time tick for $triggerAtMillis")
             }
         }
+        expectedTriggers.recordExpected(kind, triggerAtMillis, scheduledFromMillis)
     }
 
     private fun scheduleInexactWhileIdle(triggerAtMillis: Long, pendingIntent: PendingIntent) {
