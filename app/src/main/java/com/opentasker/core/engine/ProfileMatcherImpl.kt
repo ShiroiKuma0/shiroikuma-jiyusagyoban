@@ -135,6 +135,29 @@ internal class ProfileMatcher(
         }
     }
 
+    /** Evaluates editor-provided events through the same profile boolean logic as live matching. */
+    internal fun evaluateSyntheticEvents(events: Map<Int, ContextEvent>): ProfileMatchSnapshot {
+        val updates = profile.contexts.mapIndexed { index, spec ->
+            val event = events[index]
+            val rawMatched = event?.let { ContextMatchEvaluator.matches(spec, it) } == true
+            ContextMatchUpdate(
+                matched = if (spec.invert) !rawMatched else rawMatched,
+                pulseContext = spec.type == ContextType.EVENT,
+                pulseSequence = if (spec.type == ContextType.EVENT && rawMatched) 1L else 0L,
+                event = event?.takeIf { rawMatched },
+            )
+        }
+        return ProfileMatchSnapshot(
+            allMatched = evaluateContextExpression(
+                updates.toTypedArray(),
+                profile.contexts,
+                profile.contextExpression,
+            ),
+            pulseSequence = updates.maxOfOrNull { it.pulseSequence } ?: 0L,
+            event = updates.lastOrNull { it.event != null }?.event,
+        )
+    }
+
     private fun evaluateSnapshot(
         contextMatches: Array<ContextMatchUpdate>,
     ): ProfileMatchSnapshot {

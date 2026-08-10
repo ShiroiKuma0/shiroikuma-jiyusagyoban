@@ -71,6 +71,7 @@ data class ProfileInspection(
     val summary: String,
     val contexts: List<ContextCheck>,
     val logicExplanation: String = "",
+    val profile: Profile? = null,
 )
 
 data class ContextCheck(
@@ -122,6 +123,7 @@ fun inspectProfile(
         summary = summary,
         contexts = checks,
         logicExplanation = profile.contextExpression?.let { explainContextExpression(it, checks) }.orEmpty(),
+        profile = profile,
     )
 }
 

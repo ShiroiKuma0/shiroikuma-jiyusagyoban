@@ -145,6 +145,8 @@
     <string name="profile_delete">Delete Profile</string>
     <string name="profile_add_context">Add Context</string>
     <string name="profile_edit_context_logic">Edit context logic</string>
+    <string name="profile_simulate_trigger">Simulate trigger</string>
+    <string name="context_simulate_trigger">Test synthetic event</string>
 
     <!-- Task editor -->
     <string name="task_name_label">Task name</string>
@@ -462,6 +464,7 @@
     <string name="inspector_no_value">No value observed yet</string>
     <string name="inspector_no_contexts">No contexts</string>
     <string name="inspector_no_contexts_body">This profile cannot match because it has no context entries configured.</string>
+    <string name="inspector_simulate_trigger">Simulate trigger</string>
 
     <!-- Import -->
     <string name="import_disabled_notice">Imported profiles will be created disabled for review.</string>
@@ -1136,6 +1139,23 @@
     <string name="preflight_branch">Branch: %1$s</string>
     <string name="preflight_warning_item">Warning: %1$s</string>
     <string name="preflight_no_values">none</string>
+    <string name="synthetic_trigger_title">Trigger simulation</string>
+    <string name="synthetic_trigger_notice">Preview only: pinned events are matched in memory. No task, side effect, or production run-log row will be created.</string>
+    <string name="synthetic_trigger_profile_match">Profile predicate</string>
+    <string name="synthetic_trigger_passed">Would match</string>
+    <string name="synthetic_trigger_blocked">Blocked</string>
+    <string name="synthetic_trigger_cooldown">Cooldown</string>
+    <string name="synthetic_trigger_admission">Admission</string>
+    <string name="synthetic_trigger_available">Available</string>
+    <string name="synthetic_trigger_contexts">Contexts (%1$d)</string>
+    <string name="synthetic_trigger_pinned_event">Pinned synthetic event</string>
+    <string name="synthetic_trigger_context_number">Context %1$d — %2$s</string>
+    <string name="synthetic_trigger_source_event">Source event: %1$s</string>
+    <string name="synthetic_trigger_template">Template: %1$s</string>
+    <string name="synthetic_trigger_metadata">%1$s=%2$s</string>
+    <string name="synthetic_trigger_would_trigger">All predicates and gates pass; a live trigger would be admitted.</string>
+    <string name="synthetic_trigger_would_not_trigger">This simulation would not trigger the task.</string>
+    <string name="synthetic_trigger_no_contexts">No contexts are configured to simulate.</string>
     <string name="ui_error_preflight">Unable to create the preflight report.</string>
     <string name="projects_scope_label">Project scope</string>
     <string name="projects_all">All projects</string>

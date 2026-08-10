@@ -97,6 +97,7 @@ internal fun ContextConfigDialog(
     state: ContextEditState,
     onDismiss: () -> Unit,
     onSave: (ContextSpec) -> Unit,
+    onSimulate: ((ContextSpec) -> Unit)? = null,
 ) {
     var invert by rememberSaveable(state.profile.id, state.index, state.type) { mutableStateOf(state.existing?.invert ?: false) }
     var config by rememberSaveable(state.profile.id, state.index, state.type) {
@@ -241,7 +242,19 @@ internal fun ContextConfigDialog(
                 Text(stringResource(R.string.action_save))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        dismissButton = {
+            Row {
+                if (onSimulate != null) {
+                    TextButton(
+                        enabled = !missingRequired && !hasInvalidValues,
+                        onClick = { onSimulate(ContextSpec(state.type, saveConfig, invert)) },
+                    ) {
+                        Text(stringResource(R.string.context_simulate_trigger))
+                    }
+                }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+            }
+        },
     )
 }
 

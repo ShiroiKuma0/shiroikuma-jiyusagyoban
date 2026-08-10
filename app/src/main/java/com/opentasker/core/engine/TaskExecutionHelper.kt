@@ -42,6 +42,15 @@ suspend fun executeAndLogTask(
     profileId: Long? = null,
     execution: ExecutionEnvelope = ExecutionEnvelope.create(task, source, profileId = profileId),
 ): TaskExecutionResult = withContext(Dispatchers.IO) {
+    if (execution.mode == ExecutionMode.SIMULATION) {
+        val reason = "Simulation mode is diagnostic only; no task or side effect was run."
+        return@withContext TaskExecutionResult(
+            report = collisionSkippedReport(task, reason),
+            logInserted = false,
+            skippedReason = reason,
+            execution = execution,
+        )
+    }
     val accepted = ExecutionCommandLedger.accept(execution)
     if (!accepted.isNew) {
         val reason = ExecutionTerminalReason(

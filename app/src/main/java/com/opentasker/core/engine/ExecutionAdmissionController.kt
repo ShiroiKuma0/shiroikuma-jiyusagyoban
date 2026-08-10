@@ -200,6 +200,44 @@ class ExecutionAdmissionController(
         )
     }
 
+    /**
+     * Checks the current admission budget without reserving a lease, recording a burst, opening a
+     * circuit, or persisting anything. This is used by editor diagnostics that must be honest
+     * about the next run while remaining side-effect free.
+     */
+    fun preview(profileId: Long? = null): ExecutionAdmissionDecision = synchronized(lock) {
+        val current = now()
+        val snapshot = snapshotLocked(current)
+        val circuit = circuitStates[profileId] ?: circuitStore.load(profileId)
+        if (circuit.openUntilMs > current) {
+            return@synchronized rejected(
+                "Execution circuit is open for ${remainingSeconds(circuit.openUntilMs - current)} more seconds.",
+            )
+        }
+        if (snapshot.activeGlobal >= limits.globalMaxActive) {
+            return@synchronized rejected("Global execution limit reached (${limits.globalMaxActive} active).")
+        }
+        if (profileId != null &&
+            (snapshot.activeByProfile[profileId] ?: 0) >= limits.perProfileMaxActive
+        ) {
+            return@synchronized rejected(
+                "Profile execution limit reached (${limits.perProfileMaxActive} active).",
+            )
+        }
+        val globalBurst = snapshot.globalBurstCount >= limits.globalBurstLimit
+        val profileBurst = profileId != null &&
+            (snapshot.burstByProfile[profileId] ?: 0) >= limits.perProfileBurstLimit
+        if (globalBurst || profileBurst) {
+            return@synchronized rejected(
+                "Burst limit exceeded (${burstLimitLabel(globalBurst, profileBurst)}).",
+            )
+        }
+        ExecutionAdmissionDecision(
+            accepted = true,
+            reason = "Admission budget is available (preview only).",
+        )
+    }
+
     internal fun reset() = synchronized(lock) {
         activeGlobal = 0
         activeByProfile.clear()
@@ -214,6 +252,19 @@ class ExecutionAdmissionController(
             val remaining = (activeByProfile[profileId] ?: 1) - 1
             if (remaining <= 0) activeByProfile.remove(profileId) else activeByProfile[profileId] = remaining
         }
+    }
+
+    private fun snapshotLocked(current: Long): ExecutionAdmissionSnapshot {
+        val cutoff = current - limits.burstWindowMs
+        return ExecutionAdmissionSnapshot(
+            activeGlobal = activeGlobal,
+            activeByProfile = activeByProfile.toMap(),
+            globalBurstCount = globalStarts.count { it > cutoff },
+            burstByProfile = startsByProfile.mapValues { (_, starts) -> starts.count { it > cutoff } },
+            openCircuits = circuitStates
+                .mapValues { it.value.openUntilMs }
+                .filterValues { it > current },
+        )
     }
 
     private fun circuitState(key: Long?): ExecutionCircuitState =
@@ -263,4 +314,22 @@ class ExecutionAdmissionLease internal constructor(
     }
 
     override fun close() = release()
+}
+
+/** Shares the live service controller with editor diagnostics when the engine is running. */
+object ExecutionAdmissionRegistry {
+    @Volatile
+    private var activeController: ExecutionAdmissionController? = null
+
+    fun attach(controller: ExecutionAdmissionController) {
+        activeController = controller
+    }
+
+    fun detach(controller: ExecutionAdmissionController) {
+        if (activeController === controller) activeController = null
+    }
+
+    fun preview(context: Context, profileId: Long): ExecutionAdmissionDecision =
+        activeController?.preview(profileId)
+            ?: ExecutionAdmissionController.persisted(context.applicationContext).preview(profileId)
 }

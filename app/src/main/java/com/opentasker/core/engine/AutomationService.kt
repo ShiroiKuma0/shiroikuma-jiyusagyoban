@@ -194,6 +194,7 @@ class AutomationService : Service() {
             }
         }
         cooldowns.seed(cooldownStore.loadAll())
+        ExecutionAdmissionRegistry.attach(executionAdmission)
         // Executions that were accepted or in flight when the process died can never finish; a
         // caller polling them would otherwise wait forever on a non-terminal state.
         ExternalExecutions.failInterrupted(this)
@@ -315,6 +316,7 @@ class AutomationService : Service() {
         matcherJobs.clear()
         matchers.clear()
         cooldowns.clear()
+        ExecutionAdmissionRegistry.detach(executionAdmission)
         profileTaskJobs.clear()
         queuedProfileTasks.clear()
         pulseContinuities.clear()

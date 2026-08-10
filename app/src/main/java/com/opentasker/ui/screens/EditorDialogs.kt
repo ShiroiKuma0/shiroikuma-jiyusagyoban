@@ -273,6 +273,7 @@ internal fun ProfileEditorDialog(
     tasks: List<Task>,
     onDismiss: () -> Unit,
     onSave: (String, Boolean, Long, Long?, Int, AutomationMode, String?) -> Unit,
+    onSimulate: ((Profile) -> Unit)? = null,
 ) {
     val initialTaskId = profile?.enterTaskId ?: tasks.firstOrNull()?.id ?: 0L
     var name by rememberSaveable(profile?.id) { mutableStateOf(profile?.name.orEmpty()) }
@@ -418,7 +419,16 @@ internal fun ProfileEditorDialog(
                 Text(stringResource(R.string.action_save))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        dismissButton = {
+            Row {
+                if (profile != null && onSimulate != null) {
+                    TextButton(onClick = { onSimulate(profile) }) {
+                        Text(stringResource(R.string.profile_simulate_trigger))
+                    }
+                }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+            }
+        },
     )
 }
 
