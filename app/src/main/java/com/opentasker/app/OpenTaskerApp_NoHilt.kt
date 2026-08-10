@@ -4,6 +4,8 @@ import android.app.Application
 import android.os.Build
 import android.os.StrictMode
 import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.opentasker.core.registerCoreRuntime
 import com.opentasker.core.actions.registerActionMetadata
 import com.opentasker.core.logging.AppLogger
@@ -85,6 +87,13 @@ class OpenTaskerApp_NoHilt : Application() {
                     DatabaseBackupManager.DATABASE_NAME,
                 )
                     .addMigrations(*DatabaseMigrations.getManualMigrations())
+                    .addCallback(object : RoomDatabase.Callback() {
+                        override fun onCreate(db: SupportSQLiteDatabase) {
+                            // Fresh installs skip every migration, so the default workspace has to
+                            // be seeded here as well as in MIGRATION_8_9.
+                            db.execSQL(DatabaseMigrations.SEED_DEFAULT_PROJECT)
+                        }
+                    })
                     .openHelperFactory(SupportOpenHelperFactory(databaseKey.copyOf()))
                     .build()
             }

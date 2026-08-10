@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fresh installs now start with the Default project. It was only ever created by the schema 8 to 9 migration, so a new install had no project row and the first project the user created silently took the reserved default id, becoming an undeletable workspace that owned every existing task and profile.
 - Missed-trigger detection no longer reports healthy minute ticks as missed. The ledger's persisted state is now the single state of record shared by the service scheduler, the tick receiver, and the watchdog, and a tick is only counted as dropped once the following tick is also overdue.
 - Profiles now only yield to a *strictly* higher-priority profile. Equal-priority profiles run concurrently, so a long-lived matched profile no longer suppresses every other matching profile through a profile-ID tie-break; when a higher-priority profile deactivates, every profile it was outranking is released.
 - Causal loop protection now ends when the parent execution finishes and no longer treats a profile's own exit task as a loop back into itself, so exit tasks and ordinary re-triggers within 30 seconds are no longer skipped as "Causal profile cycle stopped".
