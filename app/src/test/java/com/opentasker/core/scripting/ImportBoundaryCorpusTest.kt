@@ -142,6 +142,7 @@ class ImportBoundaryCorpusTest {
                 1,
                 LocaleConditionOperator.EQUALS,
                 "x".repeat(LocaleConditionTarget.MAX_EXPECTED_VALUE_BYTES + 1),
+                "grant-token",
             )
         }
 

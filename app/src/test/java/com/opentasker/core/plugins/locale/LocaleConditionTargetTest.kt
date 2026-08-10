@@ -28,6 +28,7 @@ class LocaleConditionTargetTest {
             projectId = 1,
             operator = LocaleConditionOperator.EQUALS,
             expectedValue = "private-value",
+            grantToken = "grant-token",
         )
         val spec = LocaleConditionTarget.parse(values)
 
@@ -53,6 +54,7 @@ class LocaleConditionTargetTest {
                 1,
                 LocaleConditionOperator.EQUALS,
                 "x".repeat(LocaleConditionTarget.MAX_EXPECTED_VALUE_BYTES + 1),
+                "grant-token",
             )
         }.exceptionOrNull()
 
@@ -65,7 +67,7 @@ class LocaleConditionTargetTest {
         val profileSpec = LocaleConditionTarget.parse(LocaleConditionTarget.profileActive(7, "Home"))
         val contextSpec = LocaleConditionTarget.parse(LocaleConditionTarget.contextSatisfied(7, "Home", 0, "State"))
         val variableSpec = LocaleConditionTarget.parse(
-            LocaleConditionTarget.variableCompare("Mode", 1, LocaleConditionOperator.CONTAINS, "work"),
+            LocaleConditionTarget.variableCompare("Mode", 1, LocaleConditionOperator.CONTAINS, "work", "grant-token"),
         )
 
         assertEquals(
@@ -88,5 +90,41 @@ class LocaleConditionTargetTest {
             LocalePluginConditionState.Unknown,
             LocaleConditionEvaluator.evaluate(variableSpec, LocaleConditionSnapshot(variableExists = true, variableSecret = true, variableValue = "work-hours")),
         )
+    }
+
+    /**
+     * The query receiver is exported without a permission, so a bundle naming a variable the user
+     * never exposed must not parse into a readable spec at all.
+     */
+    @Test
+    fun variableComparisonWithoutAReadGrantIsRefused() {
+        val grantless = runCatching {
+            LocaleConditionTarget.parse(
+                mapOf(
+                    LocaleConditionTarget.BUNDLE_KEY_SCHEMA to LocaleConditionTarget.SCHEMA_VERSION,
+                    LocaleConditionTarget.BUNDLE_KEY_KIND to LocaleConditionKind.VARIABLE_COMPARE.wireName,
+                    LocaleConditionTarget.BUNDLE_KEY_VARIABLE_NAME to "ApiToken",
+                    LocaleConditionTarget.BUNDLE_KEY_VARIABLE_PROJECT_ID to "1",
+                    LocaleConditionTarget.BUNDLE_KEY_OPERATOR to LocaleConditionOperator.STARTS_WITH.wireName,
+                    LocaleConditionTarget.BUNDLE_KEY_EXPECTED_VALUE to "sk-",
+                ),
+            )
+        }.exceptionOrNull()
+
+        assertTrue(grantless is IllegalArgumentException)
+    }
+
+    @Test
+    fun aGrantAuthorizesOnlyTheVariableItWasIssuedFor() {
+        val issued = LocaleConditionGrantStore.variableKey(1, "Mode")
+        val other = LocaleConditionGrantStore.variableKey(1, "ApiToken")
+        val crossProject = LocaleConditionGrantStore.variableKey(2, "Mode")
+
+        assertTrue(isConditionGrantValid(issued, "token", issued))
+        assertFalse(isConditionGrantValid(issued, "token", other))
+        assertFalse(isConditionGrantValid(issued, "token", crossProject))
+        assertFalse("a forged or revoked token has no stored binding", isConditionGrantValid(null, "token", issued))
+        assertFalse("a bundle with no token is never authorized", isConditionGrantValid(issued, null, issued))
+        assertFalse(isConditionGrantValid(issued, "  ", issued))
     }
 }

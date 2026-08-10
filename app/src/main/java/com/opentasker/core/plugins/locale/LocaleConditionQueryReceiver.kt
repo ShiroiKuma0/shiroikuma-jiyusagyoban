@@ -74,6 +74,14 @@ class LocaleConditionQueryReceiver : BroadcastReceiver() {
             }
             LocaleConditionKind.VARIABLE_COMPARE -> {
                 val variableName = spec.variableName ?: return LocalePluginConditionState.Unknown
+                // The receiver is exported without a permission, so the only thing separating a
+                // legitimate host from an app probing variables one comparison at a time is the
+                // grant the user minted when they chose this variable.
+                val authorized = LocaleConditionGrantStore(context).isValid(
+                    spec.grantToken,
+                    LocaleConditionGrantStore.variableKey(spec.variableProjectId, variableName),
+                )
+                if (!authorized) return LocalePluginConditionState.Unknown
                 val entity = db.variableDao().getInProject(variableName, spec.variableProjectId)
                     ?: return LocalePluginConditionState.Unknown
                 LocaleConditionEvaluator.evaluate(

@@ -100,6 +100,7 @@ class LocaleConditionEditActivity : ComponentActivity() {
                 LocaleConditionEditor(
                     profiles = profiles,
                     variables = variables,
+                    onIssueGrant = { variableKey -> LocaleConditionGrantStore(this).issue(variableKey) },
                     onConfigured = { values, blurb ->
                         val resultIntent = Intent().apply {
                             putExtra(LocalePluginContract.EXTRA_BUNDLE, LocalePluginBundleCodec.toBundle(values))
@@ -137,6 +138,7 @@ private data class LocaleConditionVariableItem(
 private fun LocaleConditionEditor(
     profiles: List<LocaleConditionProfileItem>,
     variables: List<LocaleConditionVariableItem>,
+    onIssueGrant: (String) -> String,
     onConfigured: (Map<String, String>, String) -> Unit,
 ) {
     var selectedVariable by remember { mutableStateOf<LocaleConditionVariableItem?>(null) }
@@ -232,6 +234,14 @@ private fun LocaleConditionEditor(
                                     variable.projectId,
                                     selectedOperator,
                                     expectedValue,
+                                    // Choosing the variable here is the only place the user
+                                    // authorizes the exported receiver to report on it.
+                                    onIssueGrant(
+                                        LocaleConditionGrantStore.variableKey(
+                                            variable.projectId,
+                                            variable.name,
+                                        ),
+                                    ),
                                 )
                             }.onSuccess { values ->
                                 onConfigured(
