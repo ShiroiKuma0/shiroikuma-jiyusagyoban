@@ -13,6 +13,10 @@
 - Nodes changed by an undo or redo stay highlighted on the Flow tab after the review dialog closes. The highlight was tied to the dialog that covered Flow, so the dialog's own "highlighted in Flow" note pointed at something no one could ever see.
 - `verifyDocumentationTruth` now checks the CHANGELOG and release-truth files it already declared as inputs, so a release with no matching changelog section fails instead of passing silently.
 - The F-Droid release verifier's tag check accepts the repository's documented two-commit release flow, so it no longer has to be skipped on every release. An always-true assertion in the F-Droid readiness check is gone.
+- Changed nodes on the flow canvas carry the same "Changed" pill as the list, and a screen reader now hears that a node changed along with the variables it produces. The canvas previously marked a change with border colour alone.
+- The home-screen widget follows the app's palette and the light/dark setting instead of shipping the retired purple-on-navy colours in permanent dark.
+- One name for the simulation feature, "Profile lifetime" instead of "Automation lifetime" beside the other profile settings, and real plurals in place of "(s)" in the diff, lint, and admission summaries.
+- The locale completeness gate no longer counts non-locale resource folders such as values-night as untranslated languages.
 
 ## v0.2.83
 

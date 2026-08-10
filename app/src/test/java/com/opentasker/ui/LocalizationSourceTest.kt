@@ -194,9 +194,12 @@ class LocalizationSourceTest {
         }
         assertTrue("Default value resources are missing", defaultValueFiles.isNotEmpty())
 
+        // `values-*` also covers non-locale qualifiers such as values-night, values-land, and
+        // values-v31. Treating those as locales made any resource override in one of them read as
+        // a 0%-translated language.
         val localeDirectories = Files.list(resRoot).use { paths ->
             paths
-                .filter { Files.isDirectory(it) && it.fileName.toString().startsWith("values-") }
+                .filter { Files.isDirectory(it) && isLocaleValuesDirectory(it.fileName.toString()) }
                 .toList()
         }
         val defaultStrings = defaultValueFiles.flatMap { stringResourceValues(it).entries }.associate { it.toPair() }
@@ -233,6 +236,15 @@ class LocalizationSourceTest {
         assertTrue("Locale completeness failures: $failures", failures.isEmpty())
     }
 
+    /**
+     * True only for a `values-<locale>` directory: a two- or three-letter language, optionally with
+     * an `-rXX` region, or a BCP-47 `b+` qualifier.
+     */
+    private fun isLocaleValuesDirectory(name: String): Boolean {
+        val qualifier = name.removePrefix("values-").takeIf { it != name } ?: return false
+        return LOCALE_QUALIFIER.matches(qualifier)
+    }
+
     private fun defaultStringResourceNames(): Set<String> =
         Files.list(resRoot.resolve("values")).use { paths ->
             paths
@@ -264,5 +276,9 @@ class LocalizationSourceTest {
             val item = strings.item(index)
             item.attributes.getNamedItem("name").nodeValue to item.textContent.trim()
         }
+    }
+
+    private companion object {
+        val LOCALE_QUALIFIER = Regex("""^(b\+[A-Za-z0-9+]+|[a-z]{2,3}(-r[A-Z]{2})?)$""")
     }
 }

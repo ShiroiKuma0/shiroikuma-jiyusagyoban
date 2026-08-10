@@ -3,6 +3,8 @@ package com.opentasker.ui.screens
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.annotation.SuppressLint
+import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -151,10 +153,19 @@ internal data class TaskerImportReviewState(
 
 /** Snackbar payloads stay as resource IDs until the Compose collector resolves them. */
 data class UiMessage(
-    @StringRes val resId: Int,
+    // Deliberately unannotated: this is a string resource when [quantity] is null and a plurals
+    // resource otherwise. The message() and pluralMessage() factories carry the precise type.
+    val resId: Int,
     val args: List<Any> = emptyList(),
+    /** Set when [resId] names a plurals resource rather than a string. */
+    val quantity: Int? = null,
 ) {
-    fun resolve(context: Context): String = context.getString(resId, *args.toTypedArray())
+    @SuppressLint("ResourceType")
+    fun resolve(context: Context): String = if (quantity == null) {
+        context.getString(resId, *args.toTypedArray())
+    } else {
+        context.resources.getQuantityString(resId, quantity, *args.toTypedArray())
+    }
 }
 
 internal data class OpenTaskerBundleReviewState(
@@ -256,6 +267,9 @@ class ActiveAutomationViewModel(
 
     private fun message(@StringRes resId: Int, vararg args: Any): UiMessage =
         UiMessage(resId, args.toList())
+
+    private fun pluralMessage(@PluralsRes resId: Int, quantity: Int, vararg args: Any): UiMessage =
+        UiMessage(resId, args.toList(), quantity)
 
     private fun errorMessage(error: Throwable, fallbackRes: Int): UiMessage =
         message(R.string.ui_error_message, error.message ?: appContext.getString(fallbackRes))
@@ -1946,7 +1960,7 @@ class ActiveAutomationViewModel(
     private suspend fun emitLintWarnings(profile: Profile, report: AutomationLintReport) {
         val warningCount = report.forProfile(profile.id).count { it.severity == AutomationLintSeverity.WARNING }
         if (warningCount > 0) {
-            events.send(message(R.string.ui_profile_lint_warnings, warningCount))
+            events.send(pluralMessage(R.plurals.ui_profile_lint_warnings, warningCount, warningCount))
         }
     }
 
